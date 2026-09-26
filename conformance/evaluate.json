@@ -603,7 +603,7 @@
                   "startedAt": 1767605400000,
                   "finishedAt": 1767605760000,
                   "durationMs": 360000,
-                  "error": "Still running after 5 minutes; marked as timed out",
+                  "error": "Still running after 5m; marked as timed out",
                   "output": null,
                   "metrics": {},
                   "trigger": "run"
@@ -652,7 +652,7 @@
                 "startedAt": 1767605400000,
                 "finishedAt": 1767605760000,
                 "durationMs": 360000,
-                "error": "Still running after 5 minutes; marked as timed out",
+                "error": "Still running after 5m; marked as timed out",
                 "output": null,
                 "metrics": {},
                 "trigger": "run"
@@ -704,7 +704,7 @@
                 "startedAt": 1767605400000,
                 "finishedAt": 1767605760000,
                 "durationMs": 360000,
-                "error": "Still running after 5 minutes; marked as timed out",
+                "error": "Still running after 5m; marked as timed out",
                 "output": null,
                 "metrics": {},
                 "trigger": "run"
@@ -893,7 +893,7 @@
                 "startedAt": 1767605400000,
                 "finishedAt": 1767605520000,
                 "durationMs": 120000,
-                "error": "Still running after 2 minutes; marked as timed out",
+                "error": "Still running after 1m 30s; marked as timed out",
                 "output": null,
                 "metrics": {},
                 "trigger": "run"
@@ -1101,7 +1101,7 @@
                 "startedAt": 1767605400000,
                 "finishedAt": 1767605580000,
                 "durationMs": 180000,
-                "error": "Still running after 2 minutes; marked as timed out",
+                "error": "Still running after 2m; marked as timed out",
                 "output": null,
                 "metrics": {},
                 "trigger": "run"
@@ -1148,7 +1148,7 @@
                   "startedAt": 1767605640000,
                   "finishedAt": 1767605820000,
                   "durationMs": 180000,
-                  "error": "Still running after 2 minutes; marked as timed out",
+                  "error": "Still running after 2m; marked as timed out",
                   "output": null,
                   "metrics": {},
                   "trigger": "run"
@@ -1199,7 +1199,7 @@
                 "startedAt": 1767605640000,
                 "finishedAt": 1767605820000,
                 "durationMs": 180000,
-                "error": "Still running after 2 minutes; marked as timed out",
+                "error": "Still running after 2m; marked as timed out",
                 "output": null,
                 "metrics": {},
                 "trigger": "run"
@@ -6515,7 +6515,7 @@
                 "startedAt": 1767605400000,
                 "finishedAt": 1767606000000,
                 "durationMs": 600000,
-                "error": "Still running after 5 minutes; marked as timed out",
+                "error": "Still running after 5m; marked as timed out",
                 "output": null,
                 "metrics": {},
                 "trigger": "run"
@@ -6563,7 +6563,7 @@
                 "startedAt": 1767605400000,
                 "finishedAt": 1767606000000,
                 "durationMs": 600000,
-                "error": "Still running after 5 minutes; marked as timed out",
+                "error": "Still running after 5m; marked as timed out",
                 "output": null,
                 "metrics": {},
                 "trigger": "run"
@@ -9710,6 +9710,1455 @@
               "lastAlertAt": null,
               "pendingRecovery": [],
               "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an interval job whose run is still going is busy, not missed",
+      "definition": {
+        "name": "long",
+        "schedule": "every 5m",
+        "grace": "2m",
+        "timeout": "30m"
+      },
+      "createdAt": 1767605400000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605401000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "busy",
+          "at": 1767605700000,
+          "expect": {
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767606180000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767606000000,
+            "summary": {
+              "name": "long",
+              "definition": {
+                "name": "long",
+                "schedule": "every 5m",
+                "grace": "2m",
+                "timeout": "30m"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "busy",
+                "job": "long",
+                "status": "running",
+                "startedAt": 1767605700000,
+                "finishedAt": null,
+                "durationMs": null,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767606600000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767606000000,
+            "summary": {
+              "name": "long",
+              "definition": {
+                "name": "long",
+                "schedule": "every 5m",
+                "grace": "2m",
+                "timeout": "30m"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "busy",
+                "job": "long",
+                "status": "running",
+                "startedAt": 1767605700000,
+                "finishedAt": null,
+                "durationMs": null,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "busy",
+          "at": 1767606660000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767606720000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": {
+                  "id": "busy",
+                  "job": "long",
+                  "status": "ok",
+                  "startedAt": 1767605700000,
+                  "finishedAt": 1767606660000,
+                  "durationMs": 960000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "dueAt": 1767606000000,
+                  "deadline": 1767606120000,
+                  "graceMs": 120000,
+                  "lastRunAt": 1767605700000
+                },
+                "job": "long",
+                "definition": {
+                  "name": "long",
+                  "schedule": "every 5m",
+                  "grace": "2m",
+                  "timeout": "30m"
+                },
+                "title": "long missed its scheduled run",
+                "message": "Due 2026-01-05 09:40:00 UTC (12m ago), and no run had started by 2026-01-05 09:42:00 UTC (10m ago) (grace 2m).\nSchedule: every 5m.\nLast run: ok 2026-01-05 09:35:00 UTC (17m ago).",
+                "at": 1767606720000
+              }
+            ],
+            "state": {
+              "job": "long",
+              "open": {
+                "missed": 1767606720000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767606000000,
+            "summary": {
+              "name": "long",
+              "definition": {
+                "name": "long",
+                "schedule": "every 5m",
+                "grace": "2m",
+                "timeout": "30m"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": {
+                "id": "busy",
+                "job": "long",
+                "status": "ok",
+                "startedAt": 1767605700000,
+                "finishedAt": 1767606660000,
+                "durationMs": 960000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 2,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 960000
+              }
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767607140000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "long",
+              "open": {
+                "missed": 1767606720000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767606000000,
+            "summary": {
+              "name": "long",
+              "definition": {
+                "name": "long",
+                "schedule": "every 5m",
+                "grace": "2m",
+                "timeout": "30m"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": {
+                "id": "busy",
+                "job": "long",
+                "status": "ok",
+                "startedAt": 1767605700000,
+                "finishedAt": 1767606660000,
+                "durationMs": 960000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 2,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 960000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an interval job whose running run passes its timeout is stuck, never missed",
+      "definition": {
+        "name": "long",
+        "schedule": "every 5m",
+        "grace": "1m",
+        "timeout": "10m"
+      },
+      "createdAt": 1767605400000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605401000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "hung",
+          "at": 1767605700000,
+          "expect": {
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767606120000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "long",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767606000000,
+            "summary": {
+              "name": "long",
+              "definition": {
+                "name": "long",
+                "schedule": "every 5m",
+                "grace": "1m",
+                "timeout": "10m"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "hung",
+                "job": "long",
+                "status": "running",
+                "startedAt": 1767605700000,
+                "finishedAt": null,
+                "durationMs": null,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767606360000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "stuck",
+                "run": {
+                  "id": "hung",
+                  "job": "long",
+                  "status": "timeout",
+                  "startedAt": 1767605700000,
+                  "finishedAt": 1767606360000,
+                  "durationMs": 660000,
+                  "error": "Still running after 10m; marked as timed out",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 1,
+                  "threshold": 1
+                },
+                "job": "long",
+                "definition": {
+                  "name": "long",
+                  "schedule": "every 5m",
+                  "grace": "1m",
+                  "timeout": "10m"
+                },
+                "title": "long is stuck",
+                "message": "Started 2026-01-05 09:35:00 UTC (11m ago) and never reported finishing. Marked as timed out after 11m.\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+                "at": 1767606360000
+              },
+              {
+                "type": "missed",
+                "run": {
+                  "id": "hung",
+                  "job": "long",
+                  "status": "timeout",
+                  "startedAt": 1767605700000,
+                  "finishedAt": 1767606360000,
+                  "durationMs": 660000,
+                  "error": "Still running after 10m; marked as timed out",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "dueAt": 1767606000000,
+                  "deadline": 1767606060000,
+                  "graceMs": 60000,
+                  "lastRunAt": 1767605700000
+                },
+                "job": "long",
+                "definition": {
+                  "name": "long",
+                  "schedule": "every 5m",
+                  "grace": "1m",
+                  "timeout": "10m"
+                },
+                "title": "long missed its scheduled run",
+                "message": "Due 2026-01-05 09:40:00 UTC (6m ago), and no run had started by 2026-01-05 09:41:00 UTC (5m ago) (grace 1m).\nSchedule: every 5m.\nLast run: timeout 2026-01-05 09:35:00 UTC (11m ago).",
+                "at": 1767606360000
+              }
+            ],
+            "state": {
+              "job": "long",
+              "open": {
+                "stuck": 1767606360000,
+                "missed": 1767606360000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767606000000,
+            "summary": {
+              "name": "long",
+              "definition": {
+                "name": "long",
+                "schedule": "every 5m",
+                "grace": "1m",
+                "timeout": "10m"
+              },
+              "health": "stuck",
+              "open": [
+                "stuck",
+                "missed"
+              ],
+              "lastRun": {
+                "id": "hung",
+                "job": "long",
+                "status": "timeout",
+                "startedAt": 1767605700000,
+                "finishedAt": 1767606360000,
+                "durationMs": 660000,
+                "error": "Still running after 10m; marked as timed out",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 2,
+                "okRate": 0.5,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767606660000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "long",
+              "open": {
+                "stuck": 1767606360000,
+                "missed": 1767606360000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767606000000,
+            "summary": {
+              "name": "long",
+              "definition": {
+                "name": "long",
+                "schedule": "every 5m",
+                "grace": "1m",
+                "timeout": "10m"
+              },
+              "health": "stuck",
+              "open": [
+                "stuck",
+                "missed"
+              ],
+              "lastRun": {
+                "id": "hung",
+                "job": "long",
+                "status": "timeout",
+                "startedAt": 1767605700000,
+                "finishedAt": 1767606360000,
+                "durationMs": 660000,
+                "error": "Still running after 10m; marked as timed out",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 2,
+                "okRate": 0.5,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a cron job with a run still going is still missed when the next fire passes",
+      "definition": {
+        "name": "cron",
+        "schedule": "*/5 * * * *",
+        "grace": "1m",
+        "timeout": "2h"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "slow",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "cron",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605700000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "cron",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767605700000,
+            "summary": {
+              "name": "cron",
+              "definition": {
+                "name": "cron",
+                "schedule": "*/5 * * * *",
+                "grace": "1m",
+                "timeout": "2h"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "slow",
+                "job": "cron",
+                "status": "running",
+                "startedAt": 1767605400000,
+                "finishedAt": null,
+                "durationMs": null,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605820000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": {
+                  "id": "slow",
+                  "job": "cron",
+                  "status": "running",
+                  "startedAt": 1767605400000,
+                  "finishedAt": null,
+                  "durationMs": null,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "dueAt": 1767605700000,
+                  "deadline": 1767605760000,
+                  "graceMs": 60000,
+                  "lastRunAt": 1767605400000
+                },
+                "job": "cron",
+                "definition": {
+                  "name": "cron",
+                  "schedule": "*/5 * * * *",
+                  "grace": "1m",
+                  "timeout": "2h"
+                },
+                "title": "cron missed its scheduled run",
+                "message": "Due 2026-01-05 09:35:00 UTC (2m ago), and no run had started by 2026-01-05 09:36:00 UTC (1m ago) (grace 1m).\nSchedule: */5 * * * *.\nLast run: running 2026-01-05 09:30:00 UTC (7m ago).",
+                "at": 1767605820000
+              }
+            ],
+            "state": {
+              "job": "cron",
+              "open": {
+                "missed": 1767605820000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767605700000,
+            "summary": {
+              "name": "cron",
+              "definition": {
+                "name": "cron",
+                "schedule": "*/5 * * * *",
+                "grace": "1m",
+                "timeout": "2h"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": {
+                "id": "slow",
+                "job": "cron",
+                "status": "running",
+                "startedAt": 1767605400000,
+                "finishedAt": null,
+                "durationMs": null,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "slow",
+          "at": 1767605880000,
+          "status": "ok",
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "slow",
+                  "job": "cron",
+                  "status": "ok",
+                  "startedAt": 1767605400000,
+                  "finishedAt": 1767605880000,
+                  "durationMs": 480000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "missed"
+                  ]
+                },
+                "job": "cron",
+                "definition": {
+                  "name": "cron",
+                  "schedule": "*/5 * * * *",
+                  "grace": "1m",
+                  "timeout": "2h"
+                },
+                "title": "cron recovered",
+                "message": "A run 2026-01-05 09:30:00 UTC (8m ago) succeeded after: missed.\nRan 8m.",
+                "at": 1767605880000
+              }
+            ],
+            "state": {
+              "job": "cron",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a run a check marked stuck, that then fails, counts once",
+      "definition": {
+        "name": "slowpoke",
+        "timeout": "1m",
+        "failuresBeforeAlert": 2
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "a",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "slowpoke",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605520000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "slowpoke",
+              "open": {},
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "slowpoke",
+              "definition": {
+                "name": "slowpoke",
+                "timeout": "1m",
+                "failuresBeforeAlert": 2
+              },
+              "health": "failing",
+              "open": [],
+              "lastRun": {
+                "id": "a",
+                "job": "slowpoke",
+                "status": "timeout",
+                "startedAt": 1767605400000,
+                "finishedAt": 1767605520000,
+                "durationMs": 120000,
+                "error": "Still running after 1m; marked as timed out",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 0,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "a",
+          "at": 1767605580000,
+          "status": "failed",
+          "error": "Error: gave up",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "slowpoke",
+              "open": {},
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605640000,
+          "expect": {
+            "state": {
+              "job": "slowpoke",
+              "open": {},
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605641000,
+          "status": "failed",
+          "error": "Error: boom",
+          "expect": {
+            "alerts": [
+              {
+                "type": "failed",
+                "run": {
+                  "id": "r1",
+                  "job": "slowpoke",
+                  "status": "failed",
+                  "startedAt": 1767605640000,
+                  "finishedAt": 1767605641000,
+                  "durationMs": 1000,
+                  "error": "Error: boom",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 2,
+                  "threshold": 2
+                },
+                "job": "slowpoke",
+                "definition": {
+                  "name": "slowpoke",
+                  "timeout": "1m",
+                  "failuresBeforeAlert": 2
+                },
+                "title": "slowpoke failed",
+                "message": "2 consecutive failures.\nStarted 2026-01-05 09:34:00 UTC (now), ran 1s.\nError: boom",
+                "at": 1767605641000
+              }
+            ],
+            "state": {
+              "job": "slowpoke",
+              "open": {
+                "failed": 1767605641000
+              },
+              "consecutiveFailures": 2,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a late success after a stuck mark closes stuck and recovers",
+      "definition": {
+        "name": "late",
+        "timeout": "30s"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "a",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "late",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605460000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "stuck",
+                "run": {
+                  "id": "a",
+                  "job": "late",
+                  "status": "timeout",
+                  "startedAt": 1767605400000,
+                  "finishedAt": 1767605460000,
+                  "durationMs": 60000,
+                  "error": "Still running after 30s; marked as timed out",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 1,
+                  "threshold": 1
+                },
+                "job": "late",
+                "definition": {
+                  "name": "late",
+                  "timeout": "30s"
+                },
+                "title": "late is stuck",
+                "message": "Started 2026-01-05 09:30:00 UTC (1m ago) and never reported finishing. Marked as timed out after 1m.\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+                "at": 1767605460000
+              }
+            ],
+            "state": {
+              "job": "late",
+              "open": {
+                "stuck": 1767605460000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "late",
+              "definition": {
+                "name": "late",
+                "timeout": "30s"
+              },
+              "health": "stuck",
+              "open": [
+                "stuck"
+              ],
+              "lastRun": {
+                "id": "a",
+                "job": "late",
+                "status": "timeout",
+                "startedAt": 1767605400000,
+                "finishedAt": 1767605460000,
+                "durationMs": 60000,
+                "error": "Still running after 30s; marked as timed out",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 0,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "a",
+          "at": 1767605520000,
+          "status": "ok",
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "a",
+                  "job": "late",
+                  "status": "ok",
+                  "startedAt": 1767605400000,
+                  "finishedAt": 1767605520000,
+                  "durationMs": 120000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "stuck"
+                  ]
+                },
+                "job": "late",
+                "definition": {
+                  "name": "late",
+                  "timeout": "30s"
+                },
+                "title": "late recovered",
+                "message": "A run 2026-01-05 09:30:00 UTC (2m ago) succeeded after: stuck.\nRan 2m.",
+                "at": 1767605520000
+              }
+            ],
+            "state": {
+              "job": "late",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "stuck messages name the timeout as a duration",
+      "definition": {
+        "name": "odd",
+        "timeout": "1h30m"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "a",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "odd",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767612600000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "stuck",
+                "run": {
+                  "id": "a",
+                  "job": "odd",
+                  "status": "timeout",
+                  "startedAt": 1767605400000,
+                  "finishedAt": 1767612600000,
+                  "durationMs": 7200000,
+                  "error": "Still running after 1h 30m; marked as timed out",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 1,
+                  "threshold": 1
+                },
+                "job": "odd",
+                "definition": {
+                  "name": "odd",
+                  "timeout": "1h30m"
+                },
+                "title": "odd is stuck",
+                "message": "Started 2026-01-05 09:30:00 UTC (2h ago) and never reported finishing. Marked as timed out after 2h.\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+                "at": 1767612600000
+              }
+            ],
+            "state": {
+              "job": "odd",
+              "open": {
+                "stuck": 1767612600000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "odd",
+              "definition": {
+                "name": "odd",
+                "timeout": "1h30m"
+              },
+              "health": "stuck",
+              "open": [
+                "stuck"
+              ],
+              "lastRun": {
+                "id": "a",
+                "job": "odd",
+                "status": "timeout",
+                "startedAt": 1767605400000,
+                "finishedAt": 1767612600000,
+                "durationMs": 7200000,
+                "error": "Still running after 1h 30m; marked as timed out",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 0,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "definition": {
+            "name": "odd",
+            "timeout": 90500
+          }
+        },
+        {
+          "op": "start",
+          "id": "b",
+          "at": 1767616200000,
+          "expect": {
+            "state": {
+              "job": "odd",
+              "open": {},
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "stuck"
+              ],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767616320000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "stuck",
+                "run": {
+                  "id": "b",
+                  "job": "odd",
+                  "status": "timeout",
+                  "startedAt": 1767616200000,
+                  "finishedAt": 1767616320000,
+                  "durationMs": 120000,
+                  "error": "Still running after 1m 31s; marked as timed out",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 2,
+                  "threshold": 1
+                },
+                "job": "odd",
+                "definition": {
+                  "name": "odd",
+                  "timeout": 90500
+                },
+                "title": "odd is stuck",
+                "message": "Started 2026-01-05 12:30:00 UTC (2m ago) and never reported finishing. Marked as timed out after 2m.\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+                "at": 1767616320000
+              }
+            ],
+            "state": {
+              "job": "odd",
+              "open": {
+                "stuck": 1767616320000
+              },
+              "consecutiveFailures": 2,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "stuck"
+              ],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "odd",
+              "definition": {
+                "name": "odd",
+                "timeout": 90500
+              },
+              "health": "stuck",
+              "open": [
+                "stuck"
+              ],
+              "lastRun": {
+                "id": "b",
+                "job": "odd",
+                "status": "timeout",
+                "startedAt": 1767616200000,
+                "finishedAt": 1767616320000,
+                "durationMs": 120000,
+                "error": "Still running after 1m 31s; marked as timed out",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 2,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 2,
+                "okRate": 0,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "definition": {
+            "name": "odd"
+          }
+        },
+        {
+          "op": "start",
+          "id": "c",
+          "at": 1767619800000,
+          "expect": {
+            "state": {
+              "job": "odd",
+              "open": {},
+              "consecutiveFailures": 2,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "stuck"
+              ],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767627000000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "stuck",
+                "run": {
+                  "id": "c",
+                  "job": "odd",
+                  "status": "timeout",
+                  "startedAt": 1767619800000,
+                  "finishedAt": 1767627000000,
+                  "durationMs": 7200000,
+                  "error": "Still running after 1h; marked as timed out",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 3,
+                  "threshold": 1
+                },
+                "job": "odd",
+                "definition": {
+                  "name": "odd"
+                },
+                "title": "odd is stuck",
+                "message": "Started 2026-01-05 13:30:00 UTC (2h ago) and never reported finishing. Marked as timed out after 2h.\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+                "at": 1767627000000
+              }
+            ],
+            "state": {
+              "job": "odd",
+              "open": {
+                "stuck": 1767627000000
+              },
+              "consecutiveFailures": 3,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "stuck"
+              ],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "odd",
+              "definition": {
+                "name": "odd"
+              },
+              "health": "stuck",
+              "open": [
+                "stuck"
+              ],
+              "lastRun": {
+                "id": "c",
+                "job": "odd",
+                "status": "timeout",
+                "startedAt": 1767619800000,
+                "finishedAt": 1767627000000,
+                "durationMs": 7200000,
+                "error": "Still running after 1h; marked as timed out",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 3,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 3,
+                "okRate": 0,
+                "p50Ms": null,
+                "p95Ms": null
+              }
             }
           }
         }

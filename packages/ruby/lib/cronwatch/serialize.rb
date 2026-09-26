@@ -30,6 +30,9 @@ module Cronwatch
       when String
         text.include?(expect) ? nil : "Output did not contain #{JS.quote(expect)}"
       when Regexp
+        # match? keeps no position between calls (JavaScript's /g and /y do,
+        # which is why the SDK resets lastIndex) and does not touch $~, so
+        # every run is checked from the start whatever the flags.
         expect.match?(text) ? nil : "Output did not match #{expect.inspect}"
       else
         ok = false

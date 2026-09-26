@@ -80,9 +80,10 @@ module StoreConformance
     assert_equal :failed, store.get_state("a").undelivered[0].type
 
     store.insert_run(run_record("r5", "a", :running, 500))
-    assert_equal 3, store.prune(2500), "r1, r2 and b's r4 pruned; running r5 kept"
+    assert_equal 2, store.prune(2500), "r1 and r2 pruned; running r5 kept, and b's r4 kept as b's newest run"
     assert_equal %w[r3 r5], store.list_runs("a", 10).map(&:id)
-    assert_equal [], store.list_runs("b", 10)
+    assert_equal %w[r4], store.list_runs("b", 10).map(&:id)
+    assert_equal 0, store.prune(1_000_000), "however old, each job keeps its newest run, and running runs stay"
 
     store.delete_job("a")
     assert_nil store.get_job("a")

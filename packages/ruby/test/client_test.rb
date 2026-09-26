@@ -123,7 +123,7 @@ class ClientTest < Minitest::Test
     result = cw.check
     assert_equal [:stuck], result.alerts.map(&:type)
     assert_equal :timeout, cw.runs("long").first.status
-    assert_equal "Still running after 5 minutes; marked as timed out", cw.runs("long").first.error
+    assert_equal "Still running after 5m; marked as timed out", cw.runs("long").first.error
     assert_equal :stuck, result.jobs[0].health
     assert_match(/never reported finishing/, alerts.alerts[0].message)
   ensure
@@ -607,5 +607,138 @@ class ClientTest < Minitest::Test
     assert_equal %w[checkedAt jobs alerts pruned], json.keys
     assert_equal %w[name definition health open lastRun nextExpectedAt consecutiveFailures silencedUntil stats], json["jobs"][0].keys
     assert_equal({ "runs" => 1, "okRate" => 1, "p50Ms" => 0, "p95Ms" => 0 }, json["jobs"][0]["stats"])
+  end
+
+  # The SDK's redaction.test.ts and correctness.test.ts.
+
+  def test_secrets_are_redacted_from_output_and_errors_before_they_are_stored_or_alerted
+    cw, _, alerts = make
+    assert_raises(RuntimeError) do
+      cw.run("leaky") do |job|
+        job.log("DB_PASSWORD=hunter2 tokens: 1200")
+        raise "connect ECONNREFUSED postgres://app:s3cr3t@10.0.0.12:5432/db"
+      end
+    end
+    run = cw.runs("leaky").first
+    assert_equal "DB_PASSWORD=[redacted] tokens: 1200", run.output
+    assert_match(%r{postgres://app:\[redacted\]@10\.0\.0\.12}, run.error)
+    assert_equal 1, alerts.alerts.length
+    refute_match(/hunter2|s3cr3t/, alerts.alerts.map(&:to_json).join)
+
+    raw, = make(redact: false)
+    raw.run("raw") { |job| job.log("password=kept") }
+    assert_equal "password=kept", raw.runs("raw").first.output
+
+    own, = make(redact: ->(text) { text.upcase })
+    own.run("own") { |job| job.log("quiet") }
+    assert_equal "QUIET", own.runs("own").first.output
+    assert_raises(ArgumentError) { Cronwatch.new(redact: true) }
+  end
+
+  def test_expect_still_sees_the_unredacted_output
+    cw, = make
+    cw.run("e", expect: "token=abc") { |job| job.log("token=abc") }
+    run = cw.runs("e").first
+    assert_equal :ok, run.status
+    assert_equal "token=[redacted]", run.output
+  end
+
+  def test_errors_are_capped_like_logged_output
+    cw, = make
+    assert_raises(RuntimeError) { cw.run("big") { raise "x" * 100_000 } }
+    error = cw.runs("big").first.error
+    assert_operator error.length, :<=, Cronwatch::Output::CAP + 30
+    assert error.start_with?("[earlier output trimmed]\n")
+  end
+
+  def test_pruning_keeps_each_jobs_newest_run_so_a_monthly_job_is_not_reported_missed
+    cw, clock, alerts = make(retention: "30d")
+    clock.now = Time.utc(2026, 1, 1).to_i * 1000
+    cw.job("monthly", schedule: "0 0 1 * *", timezone: "UTC").run { nil }
+    clock.now = Time.utc(2026, 1, 31, 12).to_i * 1000
+    assert_equal 0, cw.check.pruned
+    clock.advance(2 * HOUR)
+    cw.check
+    assert_equal [], alerts.types
+    assert_equal :healthy, cw.job_summary("monthly").health
+  end
+
+  def test_an_expect_regexp_gives_the_same_answer_every_run
+    cw, = make
+    [/done/, /DONE/i, /d o n e/x, /done.?/m].each_with_index do |pattern, i|
+      job = cw.job("g#{i}", expect: pattern)
+      4.times { job.run { |j| j.log("done") } }
+      assert_equal %i[ok ok ok ok], cw.runs("g#{i}").map(&:status), pattern.inspect
+    end
+  end
+
+  def test_expect_sees_a_line_logged_early_even_after_the_stored_output_has_dropped_it
+    cw, = make
+    cw.run("report", expect: "Report written") do |j|
+      j.log("Report written: /tmp/r.pdf")
+      3000.times { |i| j.log("row #{i} #{"x" * 40}") }
+    end
+    run = cw.runs("report").first
+    assert_equal :ok, run.status
+    refute_match(/Report written/, run.output, "the stored output is still only the tail")
+  end
+
+  def test_expect_checks_a_returned_string_in_full_not_its_capped_tail
+    cw, = make
+    cw.run("returned", expect: "header") { "header\n#{"y" * 40_000}" }
+    run = cw.runs("returned").first
+    assert_equal :ok, run.status
+    assert run.output.start_with?("[earlier output trimmed]\n")
+  end
+
+  def test_an_interval_job_whose_run_is_still_going_is_busy_not_missed
+    cw, clock, alerts = make
+    job = cw.job("long", schedule: "every 5m", grace: "2m")
+    gate = Queue.new
+    thread = Thread.new { job.run { gate.pop } }
+    wait_for { cw.runs("long").first&.status == :running }
+    clock.advance(8 * MIN)
+    cw.check
+    assert_equal [], alerts.types
+    gate.push(nil)
+    thread.join
+    assert_equal [], alerts.types, "and no recovered for a miss that never was"
+  end
+
+  def test_a_run_a_check_marked_stuck_that_then_fails_counts_once
+    cw, clock, alerts = make
+    job = cw.job("slowpoke", timeout: "1m", failures_before_alert: 2)
+    gate = Queue.new
+    thread = Thread.new do
+      job.run do
+        gate.pop
+        raise "gave up"
+      end
+    rescue RuntimeError
+      nil
+    end
+    wait_for { cw.runs("slowpoke").first&.status == :running }
+    clock.advance(2 * MIN)
+    cw.check
+    assert_equal 1, cw.store.get_state("slowpoke").consecutive_failures
+    gate.push(nil)
+    thread.join
+    assert_equal 1, cw.store.get_state("slowpoke").consecutive_failures
+    assert_equal [], alerts.types, "one run is one failure, under the threshold of two"
+    assert_equal "RuntimeError: gave up", cw.runs("slowpoke").first.error.split("\n").first, "the run keeps its real error"
+  end
+
+  def test_a_late_success_after_a_stuck_mark_closes_stuck_and_recovers
+    cw, clock, alerts = make
+    job = cw.job("late", timeout: "30s")
+    gate = Queue.new
+    thread = Thread.new { job.run { gate.pop } }
+    wait_for { cw.runs("late").first&.status == :running }
+    clock.advance(MIN)
+    from_check = cw.check.alerts
+    assert_match(/\AStill running after 30s;/, from_check[0].run.error)
+    gate.push(nil)
+    thread.join
+    assert_equal %i[stuck recovered], alerts.types
   end
 end

@@ -1,0 +1,1726 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.2.0",
+  "outputCap": 16384,
+  "redact": [
+    {
+      "input": "DB_PASSWORD=hunter2 tokens: 1200",
+      "result": {
+        "text": "DB_PASSWORD=[redacted] tokens: 1200"
+      }
+    },
+    {
+      "input": "max_tokens: 800",
+      "result": {
+        "text": "max_tokens: 800"
+      }
+    },
+    {
+      "input": "max_tokens=800",
+      "result": {
+        "text": "max_tokens=800"
+      }
+    },
+    {
+      "input": "MAX_TOKENS: 800",
+      "result": {
+        "text": "MAX_TOKENS: 800"
+      }
+    },
+    {
+      "input": "maxTokens: 800",
+      "result": {
+        "text": "maxTokens: 800"
+      }
+    },
+    {
+      "input": "tokens: 1200",
+      "result": {
+        "text": "tokens: 1200"
+      }
+    },
+    {
+      "input": "input_tokens=5 output_tokens=7",
+      "result": {
+        "text": "input_tokens=5 output_tokens=7"
+      }
+    },
+    {
+      "input": "Tokens=9",
+      "result": {
+        "text": "Tokens=9"
+      }
+    },
+    {
+      "input": "TOKENS = 9",
+      "result": {
+        "text": "TOKENS = 9"
+      }
+    },
+    {
+      "input": "tokenS: 5",
+      "result": {
+        "text": "tokenS: 5"
+      }
+    },
+    {
+      "input": "secrets: 5",
+      "result": {
+        "text": "secrets: [redacted]"
+      }
+    },
+    {
+      "input": "token_count: 5",
+      "result": {
+        "text": "token_count: [redacted]"
+      }
+    },
+    {
+      "input": "password: hunter2",
+      "result": {
+        "text": "password: [redacted]"
+      }
+    },
+    {
+      "input": "passwd=x",
+      "result": {
+        "text": "passwd=[redacted]"
+      }
+    },
+    {
+      "input": "pwd=abc",
+      "result": {
+        "text": "pwd=[redacted]"
+      }
+    },
+    {
+      "input": "PASSWORD = \"quoted value\"",
+      "result": {
+        "text": "PASSWORD = \"[redacted] value\""
+      }
+    },
+    {
+      "input": "\"client_secret\": \"abc123\"",
+      "result": {
+        "text": "\"client_secret\": \"[redacted]\""
+      }
+    },
+    {
+      "input": "{\"password\":\"hunter2\",\"user\":\"bob\"}",
+      "result": {
+        "text": "{\"password\":\"[redacted]\",\"user\":\"bob\"}"
+      }
+    },
+    {
+      "input": "api_key=abc",
+      "result": {
+        "text": "api_key=[redacted]"
+      }
+    },
+    {
+      "input": "apiKey: abc",
+      "result": {
+        "text": "apiKey: [redacted]"
+      }
+    },
+    {
+      "input": "API-KEY: abc",
+      "result": {
+        "text": "API-KEY: [redacted]"
+      }
+    },
+    {
+      "input": "x-api-key: abc",
+      "result": {
+        "text": "x-api-key: [redacted]"
+      }
+    },
+    {
+      "input": "access_key=abc",
+      "result": {
+        "text": "access_key=[redacted]"
+      }
+    },
+    {
+      "input": "accessKey=abc",
+      "result": {
+        "text": "accessKey=[redacted]"
+      }
+    },
+    {
+      "input": "private_key=-----BEGIN",
+      "result": {
+        "text": "private_key=[redacted]"
+      }
+    },
+    {
+      "input": "privateKey: abc",
+      "result": {
+        "text": "privateKey: [redacted]"
+      }
+    },
+    {
+      "input": "aws_secret_access_key=abc/def+ghi",
+      "result": {
+        "text": "aws_secret_access_key=[redacted]"
+      }
+    },
+    {
+      "input": "credentials: foo",
+      "result": {
+        "text": "credentials: [redacted]"
+      }
+    },
+    {
+      "input": "credential=bar",
+      "result": {
+        "text": "credential=[redacted]"
+      }
+    },
+    {
+      "input": "secret",
+      "result": {
+        "text": "secret"
+      }
+    },
+    {
+      "input": "no secrets here",
+      "result": {
+        "text": "no secrets here"
+      }
+    },
+    {
+      "input": "my secret is safe",
+      "result": {
+        "text": "my secret is safe"
+      }
+    },
+    {
+      "input": "secret = ",
+      "result": {
+        "text": "secret = "
+      }
+    },
+    {
+      "input": "secret=",
+      "result": {
+        "text": "secret="
+      }
+    },
+    {
+      "input": "secret=a,b",
+      "result": {
+        "text": "secret=[redacted],b"
+      }
+    },
+    {
+      "input": "token=abc;next=1",
+      "result": {
+        "text": "token=[redacted];next=1"
+      }
+    },
+    {
+      "input": "token=abc&x=1",
+      "result": {
+        "text": "token=[redacted]&x=1"
+      }
+    },
+    {
+      "input": "https://api.example.com/v1?token=abc&user=me",
+      "result": {
+        "text": "https://api.example.com/v1?token=[redacted]&user=me"
+      }
+    },
+    {
+      "input": "Token:abc",
+      "result": {
+        "text": "Token:[redacted]"
+      }
+    },
+    {
+      "input": "password    =   x",
+      "result": {
+        "text": "password    =   x"
+      }
+    },
+    {
+      "input": "password   =   x",
+      "result": {
+        "text": "password   =   [redacted]"
+      }
+    },
+    {
+      "input": "password= x",
+      "result": {
+        "text": "password= [redacted]"
+      }
+    },
+    {
+      "input": "password=　 x",
+      "result": {
+        "text": "password=　 [redacted]"
+      }
+    },
+    {
+      "input": "password=\nnext",
+      "result": {
+        "text": "password=\n[redacted]"
+      }
+    },
+    {
+      "input": "line1\npassword=x\nline3",
+      "result": {
+        "text": "line1\npassword=[redacted]\nline3"
+      }
+    },
+    {
+      "input": "  secret_key_base: abc123",
+      "result": {
+        "text": "  secret_key_base: [redacted]"
+      }
+    },
+    {
+      "input": "export GITHUB_TOKEN=ghp_a1B2a1B2a1B2a1B2a1B2a1B2a1B2a1B2a1B2",
+      "result": {
+        "text": "export GITHUB_TOKEN=[redacted]"
+      }
+    },
+    {
+      "input": "SLACK_TOKEN='xoxb-123'",
+      "result": {
+        "text": "SLACK_TOKEN='xoxb-123'"
+      }
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_password=x",
+      "result": {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_password=x"
+      }
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_password=x",
+      "result": {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_password=x"
+      }
+    },
+    {
+      "input": "password_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb=x",
+      "result": {
+        "text": "password_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb=x"
+      }
+    },
+    {
+      "input": "password_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb=x",
+      "result": {
+        "text": "password_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb=x"
+      }
+    },
+    {
+      "input": "émail_token=abc",
+      "result": {
+        "text": "émail_token=[redacted]"
+      }
+    },
+    {
+      "input": "pässword=x",
+      "result": {
+        "text": "pässword=x"
+      }
+    },
+    {
+      "input": "paßword=x",
+      "result": {
+        "text": "paßword=x"
+      }
+    },
+    {
+      "input": "ſecret=x",
+      "result": {
+        "text": "ſecret=x"
+      }
+    },
+    {
+      "input": "api_Key=x",
+      "result": {
+        "text": "api_Key=x"
+      }
+    },
+    {
+      "input": "SECRET=été next",
+      "result": {
+        "text": "SECRET=[redacted] next"
+      }
+    },
+    {
+      "input": "token=😀abc x",
+      "result": {
+        "text": "token=[redacted] x"
+      }
+    },
+    {
+      "input": "token:\"a b\"",
+      "result": {
+        "text": "token:\"[redacted] b\""
+      }
+    },
+    {
+      "input": "passWord=1 PassWd=2 PWD=3 ApI_kEy=4",
+      "result": {
+        "text": "passWord=[redacted] PassWd=[redacted] PWD=[redacted] ApI_kEy=[redacted]"
+      }
+    },
+    {
+      "input": "tokenizer=on",
+      "result": {
+        "text": "tokenizer=[redacted]"
+      }
+    },
+    {
+      "input": "secretary: Ann",
+      "result": {
+        "text": "secretary: [redacted]"
+      }
+    },
+    {
+      "input": "tokens_used: 12, token: abc",
+      "result": {
+        "text": "tokens_used: [redacted], token: [redacted]"
+      }
+    },
+    {
+      "input": "postgres://user:pass@host/db",
+      "result": {
+        "text": "postgres://user:[redacted]@host/db"
+      }
+    },
+    {
+      "input": "connect ECONNREFUSED postgres://app:s3cr3t@10.0.0.12:5432/db",
+      "result": {
+        "text": "connect ECONNREFUSED postgres://app:[redacted]@10.0.0.12:5432/db"
+      }
+    },
+    {
+      "input": "https://example.com/path",
+      "result": {
+        "text": "https://example.com/path"
+      }
+    },
+    {
+      "input": "https://user@host/x",
+      "result": {
+        "text": "https://user@host/x"
+      }
+    },
+    {
+      "input": "redis://:pass@host:6379",
+      "result": {
+        "text": "redis://:[redacted]@host:6379"
+      }
+    },
+    {
+      "input": "mongodb+srv://u:p@cluster0.example.net/db",
+      "result": {
+        "text": "mongodb+srv://u:[redacted]@cluster0.example.net/db"
+      }
+    },
+    {
+      "input": "http://host:8080/x",
+      "result": {
+        "text": "http://host:8080/x"
+      }
+    },
+    {
+      "input": "http://a:b@c:d@e",
+      "result": {
+        "text": "http://a:[redacted]@c:d@e"
+      }
+    },
+    {
+      "input": "Visit https://user:secret@x.com and ftp://a:b@c",
+      "result": {
+        "text": "Visit https://user:[redacted]@x.com and ftp://a:[redacted]@c"
+      }
+    },
+    {
+      "input": "HTTPS://U:P@H",
+      "result": {
+        "text": "HTTPS://U:[redacted]@H"
+      }
+    },
+    {
+      "input": "1http://u:p@h",
+      "result": {
+        "text": "1http://u:p@h"
+      }
+    },
+    {
+      "input": "postgres://u:p:q@h",
+      "result": {
+        "text": "postgres://u:[redacted]@h"
+      }
+    },
+    {
+      "input": "s3://key:secret/with/slash@bucket",
+      "result": {
+        "text": "s3://key:secret/with/slash@bucket"
+      }
+    },
+    {
+      "input": "x-y.z+w://u:p@h",
+      "result": {
+        "text": "x-y.z+w://u:[redacted]@h"
+      }
+    },
+    {
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa://u:p@h",
+      "result": {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa://u:p@h"
+      }
+    },
+    {
+      "input": "postgres://uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu:p@h",
+      "result": {
+        "text": "postgres://uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu:p@h"
+      }
+    },
+    {
+      "input": "postgres://u:pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp@h",
+      "result": {
+        "text": "postgres://u:[redacted]@h"
+      }
+    },
+    {
+      "input": "postgres://u:ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp@h",
+      "result": {
+        "text": "postgres://u:ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp@h"
+      }
+    },
+    {
+      "input": "postgres://üser:päss@h",
+      "result": {
+        "text": "postgres://üser:[redacted]@h"
+      }
+    },
+    {
+      "input": "postgres://😀:😁@h",
+      "result": {
+        "text": "postgres://😀:[redacted]@h"
+      }
+    },
+    {
+      "input": "Authorization: Bearer abcdefgh12345",
+      "result": {
+        "text": "Authorization: Bearer [redacted]"
+      }
+    },
+    {
+      "input": "authorization: bearer abcdefgh12345",
+      "result": {
+        "text": "authorization: bearer abcdefgh12345"
+      }
+    },
+    {
+      "input": "Bearer short",
+      "result": {
+        "text": "Bearer short"
+      }
+    },
+    {
+      "input": "Bearer  \t abcdefghij",
+      "result": {
+        "text": "Bearer  \t abcdefghij"
+      }
+    },
+    {
+      "input": "Bearer    abcdefghij",
+      "result": {
+        "text": "Bearer    abcdefghij"
+      }
+    },
+    {
+      "input": "Bearer eyJhbGciOi.eyJzdWIi.sig-_~+/=",
+      "result": {
+        "text": "Bearer [redacted]"
+      }
+    },
+    {
+      "input": "xBearer abcdefghijk",
+      "result": {
+        "text": "xBearer abcdefghijk"
+      }
+    },
+    {
+      "input": "Bearer abcdefghij",
+      "result": {
+        "text": "Bearer [redacted]"
+      }
+    },
+    {
+      "input": "key AKIAIOSFODNN7EXAMPLE and ghp_a1B2a1B2a1B2a1B2a1B2a1B2a1B2a1B2a1B2",
+      "result": {
+        "text": "key [redacted] and [redacted]"
+      }
+    },
+    {
+      "input": "ASIAIOSFODNN7EXAMPLE",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "AKIAIOSFODNN7EXAMPL",
+      "result": {
+        "text": "AKIAIOSFODNN7EXAMPL"
+      }
+    },
+    {
+      "input": "xAKIAIOSFODNN7EXAMPLE",
+      "result": {
+        "text": "xAKIAIOSFODNN7EXAMPLE"
+      }
+    },
+    {
+      "input": "AKIAIOSFODNN7EXAMPLEX",
+      "result": {
+        "text": "AKIAIOSFODNN7EXAMPLEX"
+      }
+    },
+    {
+      "input": "gho_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "result": {
+        "text": "ghu_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    },
+    {
+      "input": "github_pat_a_a_a_a_a_a_a_a_a_a_a_",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "xoxb-1234567890-abc",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "xoxp-12345",
+      "result": {
+        "text": "xoxp-12345"
+      }
+    },
+    {
+      "input": "xoxq-1234567890",
+      "result": {
+        "text": "xoxq-1234567890"
+      }
+    },
+    {
+      "input": "sk_live_abcdefghij12",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "rk_test_abcdefghij",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "pk_live_abcdefghi",
+      "result": {
+        "text": "pk_live_abcdefghi"
+      }
+    },
+    {
+      "input": "sk_live_abcdefghij_",
+      "result": {
+        "text": "sk_live_abcdefghij_"
+      }
+    },
+    {
+      "input": "sk-ant-api03-Ab_-Ab_-Ab_-Ab_-Ab_-Ab_-Ab_-Ab_-Ab_-Ab_-",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "sk-proj-zzzzzzzzzzzzzzzzzzzz",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "task-11111111111111111111",
+      "result": {
+        "text": "task-11111111111111111111"
+      }
+    },
+    {
+      "input": "sk-aaaaaaaaaaaaaaaaaaa",
+      "result": {
+        "text": "sk-aaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "input": "ésk-aaaaaaaaaaaaaaaaaaaa",
+      "result": {
+        "text": "é[redacted]"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "password=",
+            1
+          ],
+          [
+            "x",
+            5000
+          ]
+        ]
+      },
+      "result": {
+        "length": 923,
+        "sha256": "4a97c24092406642cc11f4ad844f82f2e1d43696bfae4161484fdf557257e6db"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "x",
+            10000
+          ],
+          [
+            " token=abc",
+            1
+          ]
+        ]
+      },
+      "result": {
+        "length": 10017,
+        "sha256": "14f1907dc0d65a83088a5c10c403fb24cce92b5b2e96980bdc212d7b8ba27e60"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "secret ",
+            2000
+          ]
+        ]
+      },
+      "result": {
+        "length": 14000,
+        "sha256": "bc625bf98bb5f36123b268e8ba214db04562370f0f418ceb71c162a73b63dd15"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "abc ",
+            3000
+          ]
+        ]
+      },
+      "result": {
+        "length": 12000,
+        "sha256": "d1c05ce937206e89bd472162771b278667d448e3f13d25790886a2b90e6a5e42"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "Bearer ",
+            1
+          ],
+          [
+            "A",
+            5000
+          ]
+        ]
+      },
+      "result": {
+        "length": 921,
+        "sha256": "3e7ef311efe8b4314a1bf9399aba9a9e65b6566ddd484a545abf71093c4f4718"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "token=",
+            1
+          ],
+          [
+            "😀",
+            3000
+          ]
+        ]
+      },
+      "result": {
+        "length": 1920,
+        "sha256": "2f36205ae4244a15dd5c1a3e9d98b32f5bec05c947f545c5fa5b529bd8f75381"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "token=a",
+            1
+          ],
+          [
+            "😀",
+            3000
+          ]
+        ]
+      },
+      "result": {
+        "length": 1921,
+        "sha256": "1defa959e571f0264dbf8306c5cc90e4414b0e849b3c199ec7de1e54328026b0"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "a=b; password=c; ",
+            500
+          ]
+        ]
+      },
+      "result": {
+        "length": 13000,
+        "sha256": "0c5b609f8c2f738166544a2bedf5fb9e9ec6477188c3c7af02738282c00a2a8d"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "sk-",
+            1
+          ],
+          [
+            "a",
+            300
+          ]
+        ]
+      },
+      "result": {
+        "text": "[redacted]aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "xoxb-",
+            1
+          ],
+          [
+            "1",
+            300
+          ]
+        ]
+      },
+      "result": {
+        "text": "[redacted]111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "ghp_",
+            1
+          ],
+          [
+            "a",
+            256
+          ]
+        ]
+      },
+      "result": {
+        "text": "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "ghp_",
+            1
+          ],
+          [
+            "a",
+            255
+          ]
+        ]
+      },
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "AKIAIOSFODNN7EXAMPLE ",
+            400
+          ]
+        ]
+      },
+      "result": {
+        "length": 4400,
+        "sha256": "4ee1569ca8a31d4be0d0c5653cf98ed918325c167c89175c5f37eb180024112f"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "postgres://u:p@h ",
+            400
+          ]
+        ]
+      },
+      "result": {
+        "length": 10400,
+        "sha256": "14b336eeab013be0c30d853f56137722214fb09eea1600d647a87f6ed980d014"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "token",
+            5000
+          ],
+          [
+            "=x",
+            1
+          ]
+        ]
+      },
+      "result": {
+        "length": 25002,
+        "sha256": "2bb4b8d4a079a7c23b8805e69b66505501c34f9cc8f64d1ccadd7d1e339cd065"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "_",
+            5000
+          ],
+          [
+            "password=x",
+            1
+          ]
+        ]
+      },
+      "result": {
+        "length": 5010,
+        "sha256": "aba921116198f7b4abcf792e1f00b621b3d520eb6026a6e5705ce1661085ac18"
+      }
+    }
+  ],
+  "errorMessage": [
+    {
+      "name": "StandardError",
+      "message": "boom",
+      "frames": [
+        "a (app.js:1:1)",
+        "b (app.js:2:2)"
+      ],
+      "result": {
+        "text": "StandardError: boom\n    at a (app.js:1:1)\n    at b (app.js:2:2)"
+      }
+    },
+    {
+      "name": "TypeError",
+      "message": "cannot read x",
+      "frames": [
+        "a (app.js:1:1)",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g"
+      ],
+      "result": {
+        "text": "TypeError: cannot read x\n    at a (app.js:1:1)\n    at b\n    at c\n    at d\n    at e"
+      }
+    },
+    {
+      "name": "RuntimeError",
+      "message": "first line\nsecond line",
+      "frames": [
+        "main.rb:1",
+        "main.rb:2"
+      ],
+      "result": {
+        "text": "RuntimeError: first line\nsecond line\n    at main.rb:1\n    at main.rb:2"
+      }
+    },
+    {
+      "name": "ArgumentError",
+      "message": "no frames",
+      "frames": [],
+      "result": {
+        "text": "ArgumentError: no frames"
+      }
+    },
+    {
+      "name": "RuntimeError",
+      "message": {
+        "parts": [
+          [
+            "x",
+            100000
+          ]
+        ]
+      },
+      "frames": [
+        "a (app.js:1:1)"
+      ],
+      "result": {
+        "length": 16409,
+        "sha256": "9f2487c35f7d3d4a072d39eab15cbe35762ff76df41730f0e03a8d28db41b4c3"
+      }
+    },
+    {
+      "name": "RuntimeError",
+      "message": {
+        "parts": [
+          [
+            "y",
+            16364
+          ]
+        ]
+      },
+      "frames": [
+        "a (app.js:1:1)"
+      ],
+      "result": {
+        "length": 16409,
+        "sha256": "34e0b086234b423ad01280b8b0ee14870fa7dc6e0bc6ec6e1ec141212af7b331"
+      }
+    },
+    {
+      "name": "RuntimeError",
+      "message": {
+        "parts": [
+          [
+            "é",
+            17000
+          ]
+        ]
+      },
+      "frames": [],
+      "result": {
+        "length": 16409,
+        "sha256": "4f39e5bcc3ef38f8392f855ce2f08a978c91f5d6e8ef45ff4f178b7cdd29ee6f"
+      }
+    },
+    {
+      "value": "plain string",
+      "result": {
+        "text": "plain string"
+      }
+    },
+    {
+      "value": {
+        "parts": [
+          [
+            "z",
+            20000
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "b995dc6dc59e90e4827add17ae07a66b44e6fdc59e9a7969a8bc5333a8993f34"
+      }
+    },
+    {
+      "value": {
+        "code": 5,
+        "why": "x"
+      },
+      "result": {
+        "text": "{\"code\":5,\"why\":\"x\"}"
+      }
+    },
+    {
+      "value": [
+        1,
+        "two",
+        null
+      ],
+      "result": {
+        "text": "[1,\"two\",null]"
+      }
+    },
+    {
+      "value": 42,
+      "result": {
+        "text": "42"
+      }
+    },
+    {
+      "value": null,
+      "result": {
+        "text": "null"
+      }
+    }
+  ],
+  "expectText": [
+    {
+      "name": "nothing logged",
+      "lines": [],
+      "expectText": null,
+      "output": null,
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": "Output did not contain \"a\""
+        }
+      ]
+    },
+    {
+      "name": "a few lines",
+      "lines": [
+        "a",
+        "b",
+        ""
+      ],
+      "expectText": {
+        "text": "a\nb\n"
+      },
+      "output": {
+        "text": "a\nb\n"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "exactly twice the cap",
+      "lines": [
+        {
+          "numbered": "",
+          "count": 32,
+          "width": 1023
+        }
+      ],
+      "expectText": {
+        "length": 32767,
+        "sha256": "4a53e342128ce41facbdf6ea5efac7d8da2af591fe30f2801016be99145d6aa5"
+      },
+      "output": {
+        "length": 16409,
+        "sha256": "75d67347a78890161ae36a23878a2ef331cd3d266897f83a543de6fca448926c"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": "Output did not contain \"a\""
+        }
+      ]
+    },
+    {
+      "name": "one over twice the cap",
+      "lines": [
+        {
+          "numbered": "",
+          "count": 31,
+          "width": 1023
+        },
+        {
+          "parts": [
+            [
+              "q",
+              1024
+            ]
+          ]
+        }
+      ],
+      "expectText": {
+        "length": 32768,
+        "sha256": "a87db006de3baab52d821d97989ed757f7d93ba0990dca749bf21fce09b6001c"
+      },
+      "output": {
+        "length": 16409,
+        "sha256": "3cbf266182eabc061fbe63206d1d7b78ac8e086c80f1aadd735d38511d396bbf"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": "Output did not contain \"a\""
+        }
+      ]
+    },
+    {
+      "name": "past the rolling window, with the done line first",
+      "lines": [
+        "Report written: /tmp/r.pdf",
+        {
+          "numbered": "row ",
+          "count": 3000,
+          "width": 40
+        }
+      ],
+      "expectText": {
+        "length": 32769,
+        "sha256": "6b7f654b59c7ad1c8d8dbc4e2f63251df53562072e72856330ae837ad6081a0f"
+      },
+      "output": {
+        "length": 16409,
+        "sha256": "9e4eb02842fbc2c0c03003cc5002b020b203bb0d6d72f9009f27493fb8979286"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": null
+        },
+        {
+          "expect": "row 2999",
+          "result": null
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": "Output did not contain \"a\""
+        }
+      ]
+    },
+    {
+      "name": "one huge line",
+      "lines": [
+        {
+          "parts": [
+            [
+              "h",
+              100000
+            ]
+          ]
+        }
+      ],
+      "expectText": {
+        "length": 32769,
+        "sha256": "0a0920158398dbbbbc069e2899c3fef66c987a8ac47e569204f347ea65696ab4"
+      },
+      "output": {
+        "length": 16409,
+        "sha256": "6385c7239b5655f02156dcb5f118aa54c59a1d9e17bf78c2eb15d283a938363d"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": "Output did not contain \"a\""
+        }
+      ]
+    },
+    {
+      "name": "a huge line after a small one",
+      "lines": [
+        "start",
+        {
+          "parts": [
+            [
+              "h",
+              100000
+            ]
+          ]
+        },
+        "end"
+      ],
+      "expectText": {
+        "length": 16388,
+        "sha256": "7d1670f2b6ac9ed954b1de422c38882deb18073b6dd9903a7e71d134b9eccfe3"
+      },
+      "output": {
+        "text": "end"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": null
+        },
+        {
+          "expect": "end",
+          "result": null
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "the head crosses the cap inside a line",
+      "lines": [
+        {
+          "numbered": "",
+          "count": 15,
+          "width": 1000
+        },
+        {
+          "parts": [
+            [
+              "m",
+              3000
+            ]
+          ]
+        },
+        {
+          "numbered": "tail ",
+          "count": 20,
+          "width": 2000
+        }
+      ],
+      "expectText": {
+        "length": 32769,
+        "sha256": "87cde9ed81087ab2320257431a08ccbb97b045b46c19b3b6b27ac88cf34a7c11"
+      },
+      "output": {
+        "length": 16409,
+        "sha256": "221c09210397518a7f354fc5cabd7be7f4fcb0a435b9f935a81824956b13ef26"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": null
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": null
+        }
+      ]
+    },
+    {
+      "name": "accented lines",
+      "lines": [
+        {
+          "numbered": "été ",
+          "count": 200,
+          "width": 200
+        },
+        "fin"
+      ],
+      "expectText": {
+        "length": 32769,
+        "sha256": "f271d91f4261cf3d6013c1463cd1bc4a51f0dca1e2f17c4b437a23753dd63ca3"
+      },
+      "output": {
+        "length": 16409,
+        "sha256": "061ff1c753a56928040a7941e5e0441e70090eee4182b9c75fc48740a13b2010"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": null
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": "Output did not contain \"a\""
+        }
+      ]
+    },
+    {
+      "name": "just under the window",
+      "lines": [
+        {
+          "numbered": "",
+          "count": 63,
+          "width": 1039
+        }
+      ],
+      "expectText": {
+        "length": 32769,
+        "sha256": "eca1ee70594a305908e7208be01d023ad6919bd5cca01db1f393739102ad0c23"
+      },
+      "output": {
+        "length": 16409,
+        "sha256": "0283a9171b11512989d4cac0d6e03a7c5567d1ab367028e03905523004e568b6"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": "Output did not contain \"a\""
+        }
+      ]
+    },
+    {
+      "name": "just over the window",
+      "lines": [
+        {
+          "numbered": "",
+          "count": 64,
+          "width": 1040
+        }
+      ],
+      "expectText": {
+        "length": 32769,
+        "sha256": "f890f5a2f573240e79b8423c00b8558082f8786255fdd10061ed5822ab660525"
+      },
+      "output": {
+        "length": 16409,
+        "sha256": "db6f3ecfe1c70d19e55d192740da6f344f730c68068e015ba868efd0c125d42c"
+      },
+      "checks": [
+        {
+          "expect": "Report written",
+          "result": "Output did not contain \"Report written\""
+        },
+        {
+          "expect": "row 2999",
+          "result": "Output did not contain \"row 2999\""
+        },
+        {
+          "expect": "row 1500",
+          "result": "Output did not contain \"row 1500\""
+        },
+        {
+          "expect": "start",
+          "result": "Output did not contain \"start\""
+        },
+        {
+          "expect": "end",
+          "result": "Output did not contain \"end\""
+        },
+        {
+          "expect": "fin",
+          "result": "Output did not contain \"fin\""
+        },
+        {
+          "expect": "tail 19",
+          "result": "Output did not contain \"tail 19\""
+        },
+        {
+          "expect": "0000",
+          "result": "Output did not contain \"0000\""
+        },
+        {
+          "expect": "a",
+          "result": "Output did not contain \"a\""
+        }
+      ]
+    }
+  ]
+}
