@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 # The smallest Rails app that exercises the integration: ActiveRecord on
-# SQLite in memory, ActiveJob on the test adapter, cronwatch/rails required as
-# a Gemfile would. Booted once per process.
+# SQLite in memory, ActiveJob on the test adapter, cronwatch/rails and sidekiq
+# required as a Gemfile would. Booted once per process.
 ENV["RAILS_ENV"] = "test"
 require_relative "../test_helper"
 require "logger"
@@ -13,6 +13,8 @@ require "rails"
 require "active_record/railtie"
 require "active_job/railtie"
 require "cronwatch/rails"
+# After cronwatch, as a Gemfile may list it: the Railtie still finds it at boot.
+require "sidekiq"
 require "rails/generators"
 require "generators/cronwatch/install/install_generator"
 

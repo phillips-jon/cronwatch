@@ -18,13 +18,14 @@ module Cronwatch
   #     cron: "*/5 * * * *"
   #     class: "Cronwatch::CheckJob"
   #
-  # Returns the CheckResult.
+  # With Sidekiq but no ActiveJob adapter for it, Cronwatch::Sidekiq::CheckWorker
+  # does the same. Returns the CheckResult.
   class CheckJob < ::ActiveJob::Base
     queue_as :default
 
     def perform
-      Cronwatch::ActiveJob.load_app_jobs
-      Cronwatch::ActiveJob.register_all(strict: false)
+      Cronwatch::Monitored.load_app_jobs
+      Cronwatch::Monitored.register_all(strict: false)
       Cronwatch.client.check
     end
   end

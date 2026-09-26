@@ -2,7 +2,8 @@
 
 # The Rails integration: a Railtie, the Cronwatch::ActiveJob concern,
 # Cronwatch::CheckJob and the `cronwatch:install` generator. Needs railties
-# and activejob; the ActiveRecord store loads on first use.
+# and activejob; the ActiveRecord store loads on first use, and so does
+# Cronwatch::Sidekiq when the app has Sidekiq (the Railtie loads it at boot).
 #
 # `gem "cronwatch"` loads this file on its own when Rails is already loaded,
 # as it is under Bundler.require; require it by hand only otherwise.
@@ -14,10 +15,14 @@ module Cronwatch
   # So the mount line in config/routes.rb needs no require of its own.
   autoload :Web, File.expand_path("web", __dir__) unless const_defined?(:Web, false)
 
+  autoload :Sidekiq, File.expand_path("sidekiq", __dir__) unless const_defined?(:Sidekiq, false)
+
   module Stores
     autoload :ActiveRecord, File.expand_path("stores/active_record", __dir__) unless const_defined?(:ActiveRecord, false)
   end
 end
+
+require_relative "sidekiq" if defined?(::Sidekiq::Job) || defined?(::Sidekiq::Worker)
 
 require_relative "rails/active_job"
 require_relative "rails/check_job"

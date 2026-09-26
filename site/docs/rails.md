@@ -1,12 +1,12 @@
 ---
 title: Ruby on Rails
-description: The cronwatch gem in a Rails app: the install generator, ActiveJob, Solid Queue or sidekiq-cron, the check job and the dashboard.
+description: The cronwatch gem in a Rails app: the install generator, ActiveJob and Sidekiq jobs, schedules read from Solid Queue or sidekiq-cron, the check job and the dashboard.
 order: 3.1
 ---
 
 # Ruby on Rails
 
-The `cronwatch` gem is the Ruby port of `@cronwatch/sdk`: the same conditions, the same alert text and the same stored rows. In Rails it records runs through ActiveRecord, watches your ActiveJob classes, and runs its check as a job of its own. It needs Ruby 3.2 or newer, and is tested on Rails 7.2, 8.0 and 8.1.
+The `cronwatch` gem is the Ruby port of `@cronwatch/sdk`: the same conditions, the same alert text and the same stored rows. In Rails it records runs through ActiveRecord, watches your ActiveJob and Sidekiq classes, reads their schedules from Solid Queue or sidekiq-cron, and runs its check as a job of its own. It needs Ruby 3.2 or newer, and is tested on Rails 7.2, 8.0 and 8.1.
 
 ## Install
 
@@ -21,7 +21,7 @@ bin/rails generate cronwatch:install
 bin/rails db:migrate
 ```
 
-Bundler requires the gem after Rails has loaded, so `gem "cronwatch"` alone brings in the Rails integration: the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task and the generator. The ActiveRecord store loads the first time it is used. The dashboard does not load on its own; see [Mount the dashboard](#mount-the-dashboard).
+Bundler requires the gem after Rails has loaded, so `gem "cronwatch"` alone brings in the Rails integration: the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task and the generator. With Sidekiq in the Gemfile (before or after `cronwatch`), `Cronwatch::Sidekiq` loads too. The ActiveRecord store loads the first time it is used. The dashboard does not load on its own; see [Mount the dashboard](#mount-the-dashboard).
 
 The generator writes two files:
 
@@ -137,36 +137,112 @@ A job that raises still raises. The run is recorded as failed first, then the er
 
 The check can only report a job missing if the client knows the job's schedule, even when it has never run. Once the app has booted (after `config/initializers/cronwatch.rb`), the Railtie declares every class that has called `cronwatch` on `Cronwatch.client`. A class loaded after that declares itself as it loads. If `Cronwatch.configure` runs again, each class declares itself on the new client at its next perform or check. A bad declaration found at boot stops the boot.
 
-In production the app eager loads, so every job class is declared at boot. In development classes load on first use, so `Cronwatch::CheckJob` (and `bin/rails cronwatch:check`) loads `app/jobs` itself before checking. A monitored job kept outside `app/jobs` is known once its class has loaded.
+In production the app eager loads, so every job class is declared at boot. In development classes load on first use, so `Cronwatch::CheckJob` (and `bin/rails cronwatch:check`) loads `app/jobs` itself before checking, and `app/workers` and `app/sidekiq` when they exist. A monitored job kept elsewhere is known once its class has loaded.
+
+## Sidekiq
+
+Sidekiq jobs that include `Sidekiq::Job` (or `Sidekiq::Worker`) directly, without ActiveJob, include `Cronwatch::Sidekiq` beside it:
+
+```ruby
+class NightlyReportJob
+  include Sidekiq::Job
+  include Cronwatch::Sidekiq
+  cronwatch schedule: "0 2 * * *", grace: "15m" # name: "nightly-report"
+
+  def perform
+    cronwatch.log("Report written")
+  end
+end
+```
+
+`cronwatch` takes the same options and follows the same rules as in an ActiveJob class: the same default name (`HardWorker` is `hard-worker`), declared once the app has booted, `cronwatch` inside `perform` for `log` and `metric`. Each `perform` is a run with the trigger `"sidekiq"`.
+
+The runs are recorded by `Cronwatch::Sidekiq::ServerMiddleware`, which the Railtie adds to Sidekiq's server middleware when the process is a Sidekiq server; web processes are left alone. A job that raises is recorded as failed and the error goes on to Sidekiq, so retries, the dead set and your error handlers see it as before; each retry is a run of its own. Outside Rails, add the middleware yourself (see [Sidekiq without Rails](/docs/ruby/#sidekiq-without-rails)).
+
+An ActiveJob class on Sidekiq's adapter keeps `Cronwatch::ActiveJob`. Sidekiq runs it inside ActiveJob's wrapper, which the middleware passes through, so the run is recorded once, by the ActiveJob side. Including `Cronwatch::Sidekiq` in an ActiveJob class raises.
+
+To run the check from Sidekiq, schedule `Cronwatch::CheckJob` if ActiveJob uses Sidekiq's adapter, or `Cronwatch::Sidekiq::CheckWorker` if it does not; both do the same thing (see [Run the check](#run-the-check)). The worker does not retry: the next check comes five minutes later anyway.
 
 ## Schedule the job
 
-CronWatch does not run anything; your scheduler still does. Give CronWatch the same schedule you give the scheduler, as a cron expression, so a job the scheduler never fires is still noticed.
+CronWatch does not run anything; your scheduler still does. CronWatch has to know the schedule the scheduler keeps, so a job the scheduler never fires is still noticed. Rather than write it twice, take it from the scheduler's config:
 
-Solid Queue:
+```ruby
+class NightlyReportJob < ApplicationJob
+  include Cronwatch::ActiveJob
+  cronwatch schedule: :from_scheduler, grace: "15m"
+end
+```
 
 ```yaml
-# config/recurring.yml
+# config/recurring.yml (Solid Queue)
 production:
   nightly_report:
     class: NightlyReportJob
-    schedule: "0 2 * * * UTC"
+    schedule: every day at 2am
 ```
 
-sidekiq-cron:
-
 ```yaml
-# config/schedule.yml
+# config/schedule.yml (sidekiq-cron)
 nightly_report:
-  cron: "0 2 * * * UTC"
+  cron: "every day at 2am"
   class: "NightlyReportJob"
 ```
 
-Solid Queue and sidekiq-cron also accept phrases such as `every day at 2am`. CronWatch reads cron expressions, nicknames such as `@hourly`, and `every 15m`, so use a cron expression in both places and they cannot drift apart.
+`schedule: :from_scheduler` works the same in a `Cronwatch::Sidekiq` class. When the job is declared (at boot, in production), CronWatch finds the one enabled entry whose `class` is the job's class and turns its schedule into a cron expression and a timezone of its own. A class with no entry, or with more than one, stops the boot with an error that names the files it read; give such a class a `schedule:` of its own. `timezone:` cannot be given beside it, since the zone comes from the scheduler too.
+
+Where it looks:
+
+- Solid Queue, when it is loaded: `config/recurring.yml` (or the file `SOLID_QUEUE_RECURRING_SCHEDULE` names), the section for `Rails.env` when the file has one and the whole file when it does not, as Solid Queue reads it. Only tasks with a `schedule` count; tasks created at runtime (`SolidQueue.schedule_recurring_task`) are not in the file and are not seen.
+- sidekiq-cron, when it is loaded and enabled: its `cron_schedule_file` (`config/schedule.yml`, or `.yaml`), as a map of names to jobs or a list of jobs with `name`. A job with `status: disabled` does not count. Jobs created from code (`Sidekiq::Cron::Job.create`, or `load_from_hash` on a file of your own) are not seen.
+
+To read something else, list the sources in the initializer:
+
+```ruby
+Cronwatch::Scheduler.sources = [
+  Cronwatch::Scheduler::SolidQueue.new("config/recurring.yml"),
+  Cronwatch::Scheduler::SidekiqCron.new("config/cron_jobs.yml"),   # or the Hash you pass to load_from_hash
+]
+```
+
+### How schedules are converted
+
+Both schedulers parse schedules with Fugit, which reads cron lines and phrases such as `every day at 3am`, `every 5 minutes` or `every hour at minute 12`. CronWatch reads cron expressions, not phrases, so each schedule is parsed with Fugit exactly as the scheduler parses it and written out as the cron expression Fugit made of it: `every day at 3am` is `0 3 * * *`, `every 5 minutes` is `0,5,10,15,20,25,30,35,40,45,50,55 * * * *`, `every hour at minute 12` is `12 * * * *`. What CronWatch expects is what the scheduler runs, even where the phrase says something else (Fugit reads `every 90 minutes` as every hour).
+
+The timezone is the one the scheduler reads the schedule in: the zone at the end of the schedule (`every day at 3am America/New_York`, `0 2 * * * Europe/London`) when there is one. Without one, Solid Queue 1.5 and later use `config.solid_queue.time_zone`, which is `config.time_zone` unless you set it; sidekiq-cron and older Solid Queue use Fugit's local zone, which is `TZ`, then Rails' `Time.zone`, then the system's. A schedule with several times in one phrase (`every day at 9:15 and 17:30`) is refused by Solid Queue and read as its first time by sidekiq-cron's default `:single` mode, and CronWatch does the same.
+
+Every conversion is checked against Fugit before it is used: after each run the scheduler would make, the next run CronWatch expects must be the next one the scheduler makes. A schedule that fails is refused at boot with an error that says why, never approximated:
+
+- Forms croner has no equivalent for: every other week (`1%2`), days counted back from the end of the month other than the last (`-2`, `5#-2`), random times (`~`).
+- A zone that is not an IANA name, such as `+05:00`.
+- A time that daylight saving skips. On the night clocks go forward, Fugit skips a run whose time does not exist (02:30 in New York in March), while CronWatch, like cron, expects it once the clocks have moved and would report it missed. So `every day at 2:30am` in a zone that changes at 02:00 is refused; a time outside the change, or a zone without daylight saving such as UTC, is fine. `every hour` is fine too: the skipped 02:00 lands on the 03:00 run. On the night clocks go back, Fugit runs a repeated time twice, and CronWatch counts the second run as an early one, so nothing is reported.
+- Any other schedule whose runs CronWatch would not expect exactly when the scheduler makes them. One known case: with both a day of the month and a day of the week (`0 0 1,15 * 1`), croner, and so CronWatch, skips some firsts of the month that Fugit runs.
+
+A cron expression written by hand in both places still works, as before.
+
+## Watch every recurring task
+
+To watch everything the scheduler runs without touching each class, ask for it in the initializer:
+
+```ruby
+# config/initializers/cronwatch.rb, after Cronwatch.configure
+Cronwatch.declare_from_scheduler!(grace: "10m")
+```
+
+Once the app has booted, every enabled entry in the scheduler's config becomes a job, with the schedule and zone converted as above, so the check reports one that never runs:
+
+- A class that calls `cronwatch` declares itself, as usual; its entry is left to it.
+- Any other class is named as `cronwatch` would name it (`DailyDigestJob` is `daily-digest`) and each of its performs is recorded: ActiveJob classes with the trigger `"active_job"`, Sidekiq jobs through the server middleware with `"sidekiq"`.
+- A Solid Queue `command:` task is named after its key (`clear_solid_queue_finished_jobs`), and each run of Solid Queue's job with that command is recorded.
+- `Cronwatch::CheckJob` and `Cronwatch::Sidekiq::CheckWorker` are left out.
+
+It takes the options of a declared job other than `schedule`, `timezone` and `name` (`grace`, `timeout`, `failures_before_alert`, `tags`, and so on), applied to every job it declares; an entry's `description` becomes the job's. `except:` leaves keys out: `Cronwatch.declare_from_scheduler!(except: %w[one_off_import])`. An entry that cannot be watched stops the boot with an error that says so: a class that does not load, two entries that would be the same job (one class scheduled twice), a key that is not a valid job name, or a schedule that cannot be converted. Leave it out with `except:`, or give its class a `cronwatch` of its own.
+
+Every perform of a watched class counts as a run, whoever enqueued it, as with `cronwatch`. Inside `perform`, `cronwatch` (for `log` and `metric`) exists only in a class that includes `Cronwatch::ActiveJob` or `Cronwatch::Sidekiq`.
 
 ## Run the check
 
-Failures are caught as they happen. A run that never started, or never finished, can only be noticed by looking. `Cronwatch::CheckJob` looks: it loads `app/jobs` when the app does not eager load, declares every monitored job, and calls `Cronwatch.client.check`, which finds missed and stuck runs, sends their alerts, retries alerts no channel accepted and prunes old runs. It returns the check's result and is queued on `default`. Schedule it every five minutes beside your other recurring jobs; these are the entries the generator prints.
+Failures are caught as they happen. A run that never started, or never finished, can only be noticed by looking. `Cronwatch::CheckJob` (or `Cronwatch::Sidekiq::CheckWorker`, for Sidekiq without ActiveJob) looks: it loads `app/jobs` when the app does not eager load, declares every monitored job, and calls `Cronwatch.client.check`, which finds missed and stuck runs, sends their alerts, retries alerts no channel accepted and prunes old runs. It returns the check's result and is queued on `default`. Schedule it every five minutes beside your other recurring jobs; these are the entries the generator prints.
 
 Solid Queue:
 
@@ -184,7 +260,7 @@ sidekiq-cron:
 # config/schedule.yml
 cronwatch_check:
   cron: "*/5 * * * *"
-  class: "Cronwatch::CheckJob"
+  class: "Cronwatch::CheckJob"   # or "Cronwatch::Sidekiq::CheckWorker" when ActiveJob does not use Sidekiq
 ```
 
 With neither, `bin/rails cronwatch:check` runs the same job once and prints what it did (`cronwatch: checked 3 jobs, sent 0 alerts`), so a crontab line does it:
