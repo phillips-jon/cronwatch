@@ -1,6 +1,6 @@
 ---
 name: cronwatch
-description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, cronwatch.dev or the cronwatch MCP server.
+description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, the cronwatch gem, cronwatch.dev or the cronwatch MCP server.
 version: 0.2.0
 ---
 
@@ -34,6 +34,10 @@ export const nightlyReport = cw.job("nightly-report", {
   schedule: "0 2 * * *", timezone: "UTC", grace: "15m", timeout: "30m", expect: "Report written",
 });
 ```
+
+## Rails and Ruby apps
+
+For a Ruby app, use the `cronwatch` gem instead of the npm package; it is a port with the same options (snake_case), conditions and alert text. In Rails: add `gem "cronwatch"`, run `bin/rails generate cronwatch:install` and `bin/rails db:migrate`, set the store and channels in `config/initializers/cronwatch.rb`, and in each scheduled ActiveJob `include Cronwatch::ActiveJob` with `cronwatch schedule: "<the same cron the scheduler uses>"`, logging through `cronwatch.log` and `cronwatch.metric` inside `perform`. Schedule `Cronwatch::CheckJob` every five minutes in `config/recurring.yml` (Solid Queue) or the sidekiq-cron schedule, and mount `Cronwatch::Web.new(Cronwatch.client)` at `/cronwatch` in `config/routes.rb`. The MCP server works against it unchanged. Docs: https://cronwatch.dev/docs/rails/
 
 ## Investigating a failure
 
