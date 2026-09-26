@@ -33,7 +33,7 @@ Any client that launches stdio servers:
 }
 ```
 
-`--url` and `--token` work as flags too. The URL is the mount point (`/cronwatch` in the examples, wherever `cw.routes()` or `mount Cronwatch::Web` put it). For a local app leave the token out: both serve `localhost` without one in development.
+`--url` and `--token` work as flags too. The URL is the mount point (`/cronwatch` in the examples, wherever `cw.routes()` or `mount Cronwatch::Web` put it). For a local app without `CRONWATCH_TOKEN`, a development server makes a token of its own and prints a sign-in link to its log on the first request; pass the `?token=` from that link as `CRONWATCH_TOKEN` here, or set one yourself.
 
 ## Tools
 
