@@ -103,4 +103,12 @@ app.all("/cronwatch/*", (c) => routes.handler(c.req.raw));
 app.get("/jobs/hourly", (c) => hourly.handler(async () => { /* ... */ })(c.req.raw));
 ```
 
+A handler requires `Authorization: Bearer <CRON_SECRET>`. With no `CRON_SECRET` set (an empty value counts as unset) it answers 503 and runs nothing, unless `NODE_ENV` is `development` or `test`. For an endpoint that is protected some other way, say so explicitly with `secret: null`:
+
+```ts
+app.post("/internal/reindex", (c) => reindex.handler(async () => { /* ... */ }, { secret: null })(c.req.raw));
+```
+
+Without a secret the response never includes the job's error text, only its status.
+
 The stores use Node drivers (`better-sqlite3`, `pg`), so the process needs Node compatibility; Bun runs both.

@@ -16,7 +16,7 @@ export default defineConfig({
   clean: true,
   splitting: false,
   treeshake: true,
-  target: "node20",
+  target: "node22",
   platform: "node",
   external: ["better-sqlite3", "pg", "@anthropic-ai/sdk"],
 });

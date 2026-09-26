@@ -12,19 +12,22 @@ export function cronwatch(options: CronWatchOptions = {}): CronWatch {
 }
 
 export { CronWatch, consoleChannel, custom } from "./client.js";
-export { json } from "./http.js";
 export type { CronWatchOptions, HandlerFn, HandlerOptions, JobFn, JobHandle } from "./client.js";
 export type { JobContext } from "./job.js";
 export { memory } from "./stores/memory.js";
 export { createRoutes } from "./routes/index.js";
-export type { RoutesOptions, Routes } from "./routes/index.js";
-export { parseDuration, formatDuration, formatRelative } from "./duration.js";
-export { parseSchedule, previousFire, nextFire } from "./schedule.js";
+export type { FetchHandler, Routes, RoutesOptions } from "./routes/index.js";
+export { parseDuration, formatDuration } from "./duration.js";
+export { parseSchedule, nextFire } from "./schedule.js";
+export type { ParsedSchedule } from "./schedule.js";
 export { composeAlert } from "./format.js";
 export type {
   Alert,
   AlertChannel,
+  AlertDetails,
+  AlertDraft,
   AlertType,
+  BudgetBreach,
   CheckResult,
   Condition,
   Duration,

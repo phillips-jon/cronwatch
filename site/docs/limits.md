@@ -16,7 +16,15 @@ Missed and stuck runs are only found by `cw.check()`. In a long-running process 
 
 ## Several instances
 
-Any number of app instances may share one store; runs from all of them are recorded. Checks are not coordinated across instances, so two instances checking at the same moment could both open the same condition and send two alerts. Run the interval on one instance, or let one platform cron call the check endpoint.
+Any number of app instances may share one store; runs from all of them are recorded. Within one process, every change to a job's state (a run starting or finishing, a check, a silence) waits its turn, so overlapping runs of the same job count every failure and alert once. Across processes nothing is locked: two instances finishing runs or checking at the same moment can each read the same state, so one may overwrite the other's count, or both may open the same condition and send two alerts. Run the interval on one instance, or let one platform cron call the check endpoint, and avoid overlapping runs of one job on different instances.
+
+## The store going down
+
+A job always runs, whatever the store is doing. If recording the run fails, the error goes to `onError`, the job's own result or error is returned as usual, and the finished run is written if the store is back by then. A store that fails to initialise is tried again on the next call.
+
+## Alert delivery
+
+Each channel gets 15 seconds per alert (Slack, Discord and webhook requests give up after 10). If no channel accepts an alert, it is kept with the job's state and each check tries it once more until one does. That is a retry of the same alert, not a reminder. An alert is only lost if the process dies while sending it, or if more than twenty pile up for one job.
 
 ## Clocks
 
@@ -28,7 +36,7 @@ A job the store has never seen cannot be missed. Jobs are registered on their fi
 
 ## Alert fatigue
 
-Each condition alerts once when it opens and once when it clears. There is no repeat reminder for a job that stays broken; the dashboard and `list_jobs` show it as failing until it recovers.
+Each condition alerts once when it opens and is answered by one recovered message once the job succeeds again. There is no repeat reminder for a job that stays broken; the dashboard and `list_jobs` show it as failing until it recovers.
 
 ## What it is not
 

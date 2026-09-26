@@ -11,3 +11,4 @@ data/
 .DS_Store
 site/dist/
 .release-ok
+*.tgz

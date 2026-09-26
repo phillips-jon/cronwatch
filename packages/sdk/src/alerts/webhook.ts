@@ -13,6 +13,16 @@ export interface WebhookOptions {
   secret?: string;
 }
 
+const TIMEOUT_MS = 10_000;
+
+function origin(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "(invalid URL)";
+  }
+}
+
 /**
  * POSTs the alert as JSON to any URL. The body is the Alert object:
  * { type, job, title, message, run, details, triage, at, definition }.
@@ -27,8 +37,9 @@ export function webhook(options: WebhookOptions): AlertChannel {
       if (options.secret) {
         headers["x-cronwatch-signature"] = `sha256=${createHmac("sha256", options.secret).update(body).digest("hex")}`;
       }
-      const response = await fetch(options.url, { method: "POST", headers, body });
-      if (!response.ok) throw new Error(`Webhook ${options.url} answered ${response.status}`);
+      const response = await fetch(options.url, { method: "POST", headers, body, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      // Only the origin: a webhook URL's path or query often is the credential.
+      if (!response.ok) throw new Error(`Webhook ${origin(options.url)} answered ${response.status}`);
     },
   };
 }

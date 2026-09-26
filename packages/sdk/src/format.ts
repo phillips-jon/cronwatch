@@ -1,7 +1,6 @@
 import { formatDuration, formatRelative } from "./duration.js";
-import type { AlertDraft, BudgetBreach } from "./evaluate.js";
 import { formatNumber } from "./evaluate.js";
-import type { Alert, StoredJobDefinition } from "./types.js";
+import type { Alert, AlertDraft, StoredJobDefinition } from "./types.js";
 
 function when(at: number | null | undefined, now: number): string {
   if (at === null || at === undefined) return "never";
@@ -19,29 +18,35 @@ function tail(text: string | null, n: number): string {
   return lines.slice(Math.max(0, lines.length - n)).join("\n");
 }
 
+/** "Error: x" for a bare message, but not "Error: TypeError: x" for one that already names itself. */
+function errorLine(error: string): string {
+  const text = firstLines(error, 4);
+  return /^[A-Za-z_$][\w$]*: /.test(text) ? text : `Error: ${text}`;
+}
+
 /** Turns a draft into the title and message every channel shows. */
 export function composeAlert(draft: AlertDraft, def: StoredJobDefinition, now: number): Alert {
   const name = def.name;
   const run = draft.run;
-  const d = draft.details;
   let title: string;
   const lines: string[] = [];
 
   switch (draft.type) {
     case "missed": {
+      const d = draft.details;
       title = `${name} missed its scheduled run`;
-      lines.push(`Due ${when(d.dueAt as number, now)}, and no run had started by ${when(d.deadline as number, now)} (grace ${formatDuration(d.graceMs as number)}).`);
+      lines.push(`Due ${when(d.dueAt, now)}, and no run had started by ${when(d.deadline, now)} (grace ${formatDuration(d.graceMs)}).`);
       lines.push(`Schedule: ${def.schedule}${def.timezone ? ` (${def.timezone})` : ""}.`);
       lines.push(`Last run: ${run ? `${run.status} ${when(run.startedAt, now)}` : "never"}.`);
       break;
     }
     case "failed": {
       title = `${name} failed`;
-      const n = d.consecutiveFailures as number;
+      const n = draft.details.consecutiveFailures;
       if (n > 1) lines.push(`${n} consecutive failures.`);
       if (run) {
         lines.push(`Started ${when(run.startedAt, now)}${run.durationMs !== null ? `, ran ${formatDuration(run.durationMs)}` : ""}.`);
-        if (run.error) lines.push(`Error: ${firstLines(run.error, 4)}`);
+        if (run.error) lines.push(errorLine(run.error));
         const out = tail(run.output, 8);
         if (out) lines.push(`Output (tail):\n${out}`);
       }
@@ -58,14 +63,15 @@ export function composeAlert(draft: AlertDraft, def: StoredJobDefinition, now: n
       break;
     }
     case "slow": {
+      const d = draft.details;
       title = `${name} was slow`;
-      lines.push(`Took ${formatDuration(d.durationMs as number)}; the limit is ${formatDuration(d.thresholdMs as number)} (${d.basis}).`);
+      lines.push(`Took ${formatDuration(d.durationMs)}; the limit is ${formatDuration(d.thresholdMs)} (${d.basis}).`);
       if (run) lines.push(`Started ${when(run.startedAt, now)}.`);
       break;
     }
     case "over_budget": {
       title = `${name} went over budget`;
-      for (const b of d.breaches as BudgetBreach[]) {
+      for (const b of draft.details.breaches) {
         lines.push(`${b.metric}: ${formatNumber(b.value)}, limit ${formatNumber(b.limit)} (${b.basis}).`);
       }
       if (run) lines.push(`Started ${when(run.startedAt, now)}.`);
@@ -73,21 +79,12 @@ export function composeAlert(draft: AlertDraft, def: StoredJobDefinition, now: n
     }
     case "recovered": {
       title = `${name} recovered`;
-      const after = (d.after as string[]).map((c) => c.replace("_", " ")).join(", ");
+      const after = draft.details.after.map((c) => c.replace("_", " ")).join(", ");
       lines.push(`A run ${run ? when(run.startedAt, now) : "just now"} succeeded${after ? ` after: ${after}` : ""}.`);
       if (run?.durationMs !== null && run?.durationMs !== undefined) lines.push(`Ran ${formatDuration(run.durationMs)}.`);
       break;
     }
   }
 
-  return {
-    type: draft.type,
-    job: name,
-    definition: def,
-    run,
-    title,
-    message: lines.join("\n"),
-    details: d,
-    at: now,
-  };
+  return { ...draft, job: name, definition: def, title, message: lines.join("\n"), at: now };
 }

@@ -6,10 +6,13 @@ export function capOutput(text: string): string {
   return "[earlier output trimmed]\n" + text.slice(text.length - OUTPUT_CAP);
 }
 
+/** "Name: message" and the first five stack frames. */
 export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
-    const stack = error.stack ? `\n${error.stack.split("\n").slice(1, 6).join("\n")}` : "";
-    return `${error.name}: ${error.message}${stack}`;
+    // The stack repeats the header (over several lines when the message has
+    // newlines), so take only its frames.
+    const frames = (error.stack ?? "").split("\n").filter((line) => /^\s+at /.test(line)).slice(0, 5);
+    return `${error.name}: ${error.message}${frames.length ? `\n${frames.join("\n")}` : ""}`;
   }
   if (typeof error === "string") return error;
   try {

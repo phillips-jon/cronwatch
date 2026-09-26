@@ -4,7 +4,7 @@
 #
 #   ssh joncpu /var/www/cronwatch.dev/deploy/release-deploy [--force | --prepare]
 #
-# The GitHub Action runs it on every push to main. Each deploy builds a new
+# The GitHub Action runs it after CI passes on a push to main. Each deploy builds a new
 # release beside the live one, so a build never touches what is serving:
 #
 #   /var/www/cronwatch.dev-repo.git          bare clone that fetches from GitHub
@@ -12,7 +12,9 @@
 #   /var/www/cronwatch.dev                   symlink to the live release; nginx serves its site/dist
 #
 # A new release gets npm ci and `npm run build:site`. The output must contain
-# an index.html that mentions CronWatch. Only then is the release marked
+# an index.html that mentions CronWatch and carries the day's strip (the build
+# fails without the demo captures, and this catches it if it ever did not),
+# plus the docs. Only then is the release marked
 # .release-ok and the symlink moved (one rename). nginx follows the symlink,
 # so there is no service to restart. The newest releases that went live are
 # kept for ./rollback.
@@ -105,14 +107,16 @@ CREATED=true
 cd "$DIR"
 
 echo "Installing npm packages (Node $(node -v))..."
-# 9>&-: nothing started here may hold the deploy lock. The site only needs
-# marked, but the workspace install is what package-lock.json describes.
-npm ci --no-audit --no-fund --ignore-scripts 9>&-
+# 9>&-: nothing started here may hold the deploy lock. The site builds from
+# committed captures and needs only marked, so only its workspace is
+# installed; the packages (and native drivers like better-sqlite3) are not.
+npm ci --workspace site --no-audit --no-fund --ignore-scripts 9>&-
 
 echo "Building the site..."
 npm run build:site 9>&-
 [ -f "$WEB_ROOT/index.html" ] || { echo "The build left no $WEB_ROOT/index.html." >&2; false; }
 grep -q "CronWatch" "$WEB_ROOT/index.html" || { echo "$WEB_ROOT/index.html does not look like the site." >&2; false; }
+grep -q 'class="strip"' "$WEB_ROOT/index.html" || { echo "$WEB_ROOT/index.html has no strip of runs; are the demo captures missing?" >&2; false; }
 [ -f "$WEB_ROOT/docs/index.html" ] || { echo "The build left no docs." >&2; false; }
 # The build output is all nginx serves; node_modules is not needed after this.
 rm -rf node_modules
@@ -131,17 +135,28 @@ ln -sfn "$DIR" "$LIVE.next"
 mv -T "$LIVE.next" "$LIVE"
 echo "Live: $(git log -1 --format='%h %s')"
 
-# Confirm nginx serves the new release. It follows the symlink, so nothing
-# needs restarting; a failure here means nginx itself is unwell.
-code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$SITE/" || true)
-if [ "$code" != "200" ]; then
-    echo "https://$SITE/ answered $code after the switch." >&2
+# Confirm nginx serves the new release, not just something: the front page
+# must answer 200 with exactly the index.html this build wrote (its asset
+# names are hashes of their content, so an older release differs). nginx
+# follows the symlink, so nothing needs restarting.
+page=$(mktemp)
+code=$(curl -s -o "$page" -w '%{http_code}' --max-time 10 -H 'Cache-Control: no-cache' "https://$SITE/" || true)
+served=false
+if [ "$code" = "200" ] && cmp -s "$page" "$WEB_ROOT/index.html"; then
+    served=true
+fi
+rm -f "$page"
+if ! $served; then
+    echo "https://$SITE/ answered $code after the switch, not with the page this release built." >&2
+    rm -f "$DIR/.release-ok"
     if [ -n "$CURRENT_DIR" ]; then
         ln -sfn "$CURRENT_DIR" "$LIVE.next"
         mv -T "$LIVE.next" "$LIVE"
         echo "Went back to $(basename "$CURRENT_DIR")." >&2
+    else
+        echo "!!! There is no previous release to go back to, so $(basename "$DIR") is STILL LIVE" >&2
+        echo "!!! but was not seen being served. Check nginx and https://$SITE/ by hand." >&2
     fi
-    rm -f "$DIR/.release-ok"
     exit 1
 fi
 

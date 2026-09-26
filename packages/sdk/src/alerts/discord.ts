@@ -15,6 +15,8 @@ const COLOR: Record<Alert["type"], number> = {
   recovered: 0x1f8a4c,
 };
 
+const TIMEOUT_MS = 10_000;
+
 /** Sends alerts to a Discord channel through a webhook. */
 export function discord(options: DiscordOptions): AlertChannel {
   if (!options.webhookUrl) throw new Error("discord() needs a webhookUrl");
@@ -25,13 +27,16 @@ export function discord(options: DiscordOptions): AlertChannel {
       const response = await fetch(options.webhookUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
         body: JSON.stringify({
           content: alert.title,
+          // Job output can hold anything, "@everyone" included; ping no one.
+          allowed_mentions: { parse: [] },
           embeds: [
             {
               title: alert.title,
               ...(url ? { url } : {}),
-              description: "```\n" + alert.message.slice(0, 3800) + "\n```" + (alert.triage ? `\n**Triage:** ${alert.triage.slice(0, 1000)}` : ""),
+              description: "```\n" + codeBlockSafe(alert.message.slice(0, 3800)) + "\n```" + (alert.triage ? `\n**Triage:** ${escapeMarkdown(alert.triage.slice(0, 1000))}` : ""),
               color: COLOR[alert.type],
               timestamp: new Date(alert.at).toISOString(),
             },
@@ -41,4 +46,14 @@ export function discord(options: DiscordOptions): AlertChannel {
       if (!response.ok) throw new Error(`Discord webhook answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
     },
   };
+}
+
+/** Breaks up ``` so text inside a code block cannot close it. */
+export function codeBlockSafe(text: string): string {
+  return text.replace(/```/g, "`​`​`");
+}
+
+/** Escapes the characters Discord reads as markdown, links included. */
+export function escapeMarkdown(text: string): string {
+  return text.replace(/[\\`*_~|[\]()<>]/g, "\\$&");
 }

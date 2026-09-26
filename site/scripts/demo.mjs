@@ -2,8 +2,9 @@
 // actual thing rather than a mockup. Needs packages/sdk built first.
 //
 //   node scripts/demo.mjs            serve it on http://localhost:4399/cronwatch/
-//   node scripts/demo.mjs --capture  write src/demo/alerts.txt, mcp.json and
-//                                    jobs.json, which the landing page quotes
+//   node scripts/demo.mjs --capture  write src/demo/alerts.txt, mcp.json,
+//                                    jobs.json and runs.json, which the
+//                                    landing page quotes
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";

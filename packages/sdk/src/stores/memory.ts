@@ -13,6 +13,8 @@ export function memory(): Store {
   let seq = 0;
 
   const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+  // Code unit order, as the SQL stores sort by bytes rather than by locale.
+  const byName = (a: StoredJob, b: StoredJob) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
   return {
     async upsertJob(definition: StoredJobDefinition, now: number) {
@@ -29,7 +31,7 @@ export function memory(): Store {
       return j ? clone(j) : null;
     },
     async listJobs() {
-      return [...jobs.values()].map(clone).sort((a, b) => a.name.localeCompare(b.name));
+      return [...jobs.values()].map(clone).sort(byName);
     },
     async deleteJob(name) {
       jobs.delete(name);
@@ -41,7 +43,11 @@ export function memory(): Store {
       order.set(run.id, ++seq);
     },
     async updateRun(run) {
-      runs.set(run.id, clone(run));
+      // Like SQL's UPDATE: a run that is gone (its job was forgotten) stays gone, and only these fields change.
+      const existing = runs.get(run.id);
+      if (!existing) return;
+      const { status, finishedAt, durationMs, error, output, metrics } = clone(run);
+      runs.set(run.id, { ...existing, status, finishedAt, durationMs, error, output, metrics });
     },
     async getRun(id) {
       const r = runs.get(id);
@@ -59,7 +65,10 @@ export function memory(): Store {
       return list[0] ?? null;
     },
     async runningRuns() {
-      return [...runs.values()].filter((r) => r.status === "running").map(clone);
+      return [...runs.values()]
+        .filter((r) => r.status === "running")
+        .sort((a, b) => a.startedAt - b.startedAt || order.get(a.id)! - order.get(b.id)!)
+        .map(clone);
     },
     async getState(job) {
       const s = states.get(job);

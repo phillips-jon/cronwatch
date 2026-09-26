@@ -6,7 +6,7 @@ order: 6
 
 # Alerts
 
-Pass any number of channels. Every alert goes to every channel; a channel that throws is reported through `onError` and never blocks the others.
+Pass any number of channels. Every alert goes to every channel at once; a channel that throws, or takes longer than 15 seconds, is reported through `onError` and never blocks the others. If no channel accepts an alert, each later check tries it again, once, until one does (see [Limits](/docs/limits/)).
 
 ## Slack
 
@@ -30,9 +30,11 @@ import { discord } from "@cronwatch/sdk/discord";
 discord({ webhookUrl: process.env.DISCORD_WEBHOOK_URL! });
 ```
 
+Job output is shown inside a code block it cannot break out of, and messages never ping anyone, even when the output contains `@everyone`. Slack messages are escaped the same way.
+
 ## Webhook
 
-POSTs the alert as JSON to any URL. With a `secret`, each request carries `X-CronWatch-Signature: sha256=<hex>`, the HMAC-SHA256 of the raw body.
+POSTs the alert as JSON to any URL. With a `secret`, each request carries `X-CronWatch-Signature: sha256=<hex>`, the HMAC-SHA256 of the raw body. A failed request is reported with the URL's origin only, since a webhook's path often holds its credential.
 
 ```ts
 import { webhook } from "@cronwatch/sdk/webhook";
@@ -71,15 +73,31 @@ interface Alert {
   run: Run | null;                   // the run that triggered it, with error, output and metrics
   title: string;                     // "nightly-report failed"
   message: string;                   // a few lines of specifics
-  details: Record<string, unknown>;  // per type: dueAt/deadline, durationMs/thresholdMs, breaches...
+  details: AlertDetails[type];       // depends on type, below
   triage?: string;                   // the diagnosis, when triage is configured
   at: number;                        // epoch ms
 }
 ```
 
+`Alert` is a union on `type`, so checking the type gives you typed `details`:
+
+| `type` | `details` |
+|---|---|
+| `missed` | `{ dueAt, deadline, graceMs, lastRunAt }` |
+| `failed`, `stuck` | `{ consecutiveFailures, threshold }` |
+| `slow` | `{ durationMs, thresholdMs, basis }` |
+| `over_budget` | `{ breaches: { metric, value, limit, basis }[] }` |
+| `recovered` | `{ after: Condition[] }` |
+
+```ts
+custom("latency", (alert) => {
+  if (alert.type === "slow") metrics.gauge("job.slow_ms", alert.details.durationMs);
+});
+```
+
 ## Errors outside jobs
 
-`onError(error, where)` is called when a channel fails, triage times out or pruning throws. The default prints to the console. Wire it to your error tracker:
+`onError(error, where)` is called when a channel fails, triage times out, the store throws or pruning fails. The default prints to the console. Wire it to your error tracker:
 
 ```ts
 cronwatch({ onError: (error, where) => Sentry.captureException(error, { tags: { where } }) });

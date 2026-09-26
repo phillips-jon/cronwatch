@@ -10,7 +10,12 @@ The common shape: Vercel's cron hits a route handler on a schedule, and the app 
 
 ## The pieces
 
-**A Postgres store.** Serverless functions have no persistent filesystem, so use `@cronwatch/sdk/postgres` with the database you already have (Neon, Supabase, Vercel Postgres). It creates three tables prefixed `cronwatch_` on first use.
+**A Postgres store.** Serverless functions have no persistent filesystem, so use `@cronwatch/sdk/postgres` with the database you already have (Neon, Supabase, Vercel Postgres). It creates three tables prefixed `cronwatch_` on first use. It needs the `pg` driver, and TypeScript projects that do not set `skipLibCheck` need its types too:
+
+```bash
+npm install @cronwatch/sdk pg
+npm install -D @types/pg
+```
 
 ```ts
 // lib/cronwatch.ts
@@ -38,7 +43,7 @@ export const digest = cw.job("daily-digest", { schedule: "0 6 * * *", grace: "10
 }
 ```
 
-**The job route.** `handler()` checks the bearer secret itself, so the route needs nothing else.
+**The job route.** `handler()` checks the bearer secret itself, so the route needs nothing else. Set `CRON_SECRET` in the project's environment variables: Vercel sends it with every cron request, and without it the handler refuses to run (503) in production. An empty value counts as unset. Under `next dev` (`NODE_ENV` is `development`) it runs without one.
 
 ```ts
 // app/api/cron/daily-digest/route.ts
@@ -86,4 +91,4 @@ SQLite is fine here. Keep the database outside the build output and inside whate
 
 ## Development
 
-`next dev` reloads modules, and each reload creates a fresh client. That is harmless: `cw.job()` declarations are idempotent and the store is shared. Leave `CRONWATCH_TOKEN` unset locally and the routes are open.
+`next dev` reloads modules, and each reload creates a fresh client. That is harmless: `cw.job()` declarations are idempotent and the store is shared. Leave `CRONWATCH_TOKEN` and `CRON_SECRET` unset locally and the routes and job handlers are open.

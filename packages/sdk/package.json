@@ -1,6 +1,6 @@
 {
   "name": "@cronwatch/sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cron and scheduled-job monitoring that lives inside your app. Wrap a job, mount a route, get told when it is missed, failed, slow or over budget. No server to run.",
   "license": "MIT",
   "repository": {
@@ -22,57 +22,108 @@
   "type": "module",
   "sideEffects": false,
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.cts",
+  "typesVersions": {
+    "*": {
+      "sqlite": [
+        "./dist/sqlite.d.cts"
+      ],
+      "postgres": [
+        "./dist/postgres.d.cts"
+      ],
+      "slack": [
+        "./dist/slack.d.cts"
+      ],
+      "discord": [
+        "./dist/discord.d.cts"
+      ],
+      "webhook": [
+        "./dist/webhook.d.cts"
+      ],
+      "anthropic": [
+        "./dist/anthropic.d.cts"
+      ]
+    }
+  },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "default": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./sqlite": {
-      "types": "./dist/sqlite.d.ts",
-      "import": "./dist/sqlite.js",
-      "require": "./dist/sqlite.cjs",
-      "default": "./dist/sqlite.js"
+      "import": {
+        "types": "./dist/sqlite.d.ts",
+        "default": "./dist/sqlite.js"
+      },
+      "require": {
+        "types": "./dist/sqlite.d.cts",
+        "default": "./dist/sqlite.cjs"
+      }
     },
     "./postgres": {
-      "types": "./dist/postgres.d.ts",
-      "import": "./dist/postgres.js",
-      "require": "./dist/postgres.cjs",
-      "default": "./dist/postgres.js"
+      "import": {
+        "types": "./dist/postgres.d.ts",
+        "default": "./dist/postgres.js"
+      },
+      "require": {
+        "types": "./dist/postgres.d.cts",
+        "default": "./dist/postgres.cjs"
+      }
     },
     "./slack": {
-      "types": "./dist/slack.d.ts",
-      "import": "./dist/slack.js",
-      "require": "./dist/slack.cjs",
-      "default": "./dist/slack.js"
+      "import": {
+        "types": "./dist/slack.d.ts",
+        "default": "./dist/slack.js"
+      },
+      "require": {
+        "types": "./dist/slack.d.cts",
+        "default": "./dist/slack.cjs"
+      }
     },
     "./discord": {
-      "types": "./dist/discord.d.ts",
-      "import": "./dist/discord.js",
-      "require": "./dist/discord.cjs",
-      "default": "./dist/discord.js"
+      "import": {
+        "types": "./dist/discord.d.ts",
+        "default": "./dist/discord.js"
+      },
+      "require": {
+        "types": "./dist/discord.d.cts",
+        "default": "./dist/discord.cjs"
+      }
     },
     "./webhook": {
-      "types": "./dist/webhook.d.ts",
-      "import": "./dist/webhook.js",
-      "require": "./dist/webhook.cjs",
-      "default": "./dist/webhook.js"
+      "import": {
+        "types": "./dist/webhook.d.ts",
+        "default": "./dist/webhook.js"
+      },
+      "require": {
+        "types": "./dist/webhook.d.cts",
+        "default": "./dist/webhook.cjs"
+      }
     },
     "./anthropic": {
-      "types": "./dist/anthropic.d.ts",
-      "import": "./dist/anthropic.js",
-      "require": "./dist/anthropic.cjs",
-      "default": "./dist/anthropic.js"
+      "import": {
+        "types": "./dist/anthropic.d.ts",
+        "default": "./dist/anthropic.js"
+      },
+      "require": {
+        "types": "./dist/anthropic.d.cts",
+        "default": "./dist/anthropic.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
@@ -86,10 +137,22 @@
     "croner": "^10.0.1"
   },
   "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.115.0",
+    "@types/better-sqlite3": ">=7.6",
+    "@types/pg": ">=8.11",
     "better-sqlite3": ">=9",
     "pg": ">=8"
   },
   "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "@types/better-sqlite3": {
+      "optional": true
+    },
+    "@types/pg": {
+      "optional": true
+    },
     "better-sqlite3": {
       "optional": true
     },

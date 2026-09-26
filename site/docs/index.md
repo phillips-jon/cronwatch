@@ -22,6 +22,8 @@ npm install better-sqlite3     # Node 22 or newer for better-sqlite3 13
 npm install pg
 ```
 
+In TypeScript, add the driver's types too (`npm install -D @types/better-sqlite3` or `@types/pg`), unless your `tsconfig` sets `skipLibCheck`.
+
 ## Create one client
 
 One client per app, at module level, in a file everything else imports from.
@@ -72,7 +74,9 @@ export const GET = nightlyReport.handler(async (job, request) => {
 });
 ```
 
-The handler checks `Authorization: Bearer <CRON_SECRET>` (from `process.env.CRON_SECRET`) before running, answers 200 with the run id on success and 500 on failure, and records the run either way. Return a `Response` yourself if you need to; a 4xx or 5xx counts as a failure.
+The handler checks `Authorization: Bearer <CRON_SECRET>` (from `process.env.CRON_SECRET`) before running, answers 200 with the run id on success and 500 with the first line of the error on failure, and records the run either way. Return a `Response` yourself if you need to; a 4xx or 5xx counts as a failure.
+
+Set `CRON_SECRET`. Without one (an empty value counts as unset) the handler fails closed: it answers 503 and runs nothing, except when `NODE_ENV` is `development` or `test`. To accept unauthenticated requests on purpose, pass `{ secret: null }` as the handler's second argument, or `cronSecret: null` to `cronwatch()`; those responses leave out the error text.
 
 For anything else, wrap a function:
 
@@ -95,7 +99,7 @@ import { cw } from "@/lib/cronwatch";
 export const { GET, POST, DELETE } = cw.routes();
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without a token the routes are open in development and refuse to serve in production.
+Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without a token the routes are open only when `NODE_ENV` is `development` or `test` (or you pass `token: null`), and answer 503 everywhere else.
 
 ## Run the check
 

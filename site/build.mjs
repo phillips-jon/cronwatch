@@ -2,7 +2,7 @@
  * Builds cronwatch.dev into dist/: the landing page from src/landing.html,
  * one page per markdown file in docs/, and hashed copies of the assets. The
  * landing page quotes real library output captured into src/demo by
- * scripts/demo.mjs --capture.
+ * scripts/demo.mjs --capture; a one-off build fails without those captures.
  *
  *   node build.mjs            build once
  *   node build.mjs --watch    rebuild on change
@@ -22,6 +22,8 @@ const DEMO = path.join(SRC, "demo");
 const DIST = path.join(here, "dist");
 const SITE = "https://cronwatch.dev";
 const GITHUB = "https://github.com/phillips-jon/cronwatch";
+const args = process.argv.slice(2);
+const WATCHING = args.includes("--watch") || args.includes("--serve");
 
 const escape = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const slug = (s) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -35,26 +37,33 @@ const LINKS = [
 ];
 
 function frontmatter(text) {
-  const m = /^---\n([\s\S]*?)\n---\n?/.exec(text);
+  const m = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)?/.exec(text);
   if (!m) return { meta: {}, body: text };
   const meta = {};
-  for (const line of m[1].split("\n")) {
+  for (const line of m[1].split(/\r?\n/)) {
     const i = line.indexOf(":");
     if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim().replace(/^"|"$/g, "");
   }
   return { meta, body: text.slice(m[0].length) };
 }
 
-/** Minimal, safe syntax colouring for TypeScript, shell and JSON blocks. */
+/**
+ * Minimal, safe syntax colouring for TypeScript, shell and JSON blocks.
+ * Strings and comments are found in one left-to-right pass, so a // or # inside
+ * a string (a URL, say) stays part of the string. A comment marker only counts
+ * at the start of a line or after whitespace: // in code, # in shell and YAML.
+ */
+const STRING = /&quot;(?:[^&]|&(?!quot;))*?&quot;|&#39;[^\n]*?&#39;|'[^'\n]*'|`[^`]*`/.source;
+const COMMENT = { code: /(?<=^|\s)\/\/[^\n]*/.source, shell: /(?<=^|\s)#(?![{!])[^\n]*/.source };
 function highlight(code, lang) {
   const esc = escape(code);
   if (!["ts", "tsx", "js", "typescript", "javascript", "json", "bash", "sh", "shell", "yaml", "yml"].includes(lang)) return esc;
   const tokens = [];
   const stash = (html) => `\u0000${tokens.push(html) - 1}\u0000`;
   const shell = lang.startsWith("sh") || lang === "bash" || lang.startsWith("y");
+  const lexer = new RegExp(`(${shell ? COMMENT.shell : COMMENT.code})|${STRING}`, "gm");
   let out = esc
-    .replace(/(\/\/[^\n]*|#(?![{!])[^\n]*)/g, (m, c) => (shell || !c.startsWith("#") ? stash(`<span class="c">${c}</span>`) : c))
-    .replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;|&#39;[^\n]*?&#39;|'[^'\n]*'|`[^`]*`)/g, (m) => stash(`<span class="s">${m}</span>`))
+    .replace(lexer, (m, c) => stash(`<span class="${c ? "c" : "s"}">${m}</span>`))
     .replace(/\b(import|export|from|const|let|var|async|await|return|function|new|if|else|throw|try|catch|finally|type|interface|extends|default|for|of|in|while|null|true|false|undefined)\b/g, '<span class="k">$1</span>');
   out = out.replace(/\u0000(\d+)\u0000/g, (m, i) => tokens[Number(i)]);
   return out;
@@ -70,6 +79,10 @@ const renderer = {
     const language = (lang || "").trim().split(/\s+/)[0] || "text";
     return `<div class="code"><pre><code translate="no">${highlight(text, language)}</code></pre></div>\n`;
   },
+  // A wide table scrolls inside its own box rather than widening the page.
+  table(token) {
+    return `<div class="table">${new marked.Renderer().table.call(this, token)}</div>\n`;
+  },
 };
 marked.use({ renderer, gfm: true });
 
@@ -81,9 +94,13 @@ function curlyApostrophes(html) {
 /* The mark: a clock at three, the hour the invoice run failed, in a rounded box. */
 const MARK = `<svg class="mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><rect x="0.5" y="0.5" width="39" height="39" rx="9.5" fill="var(--box)" stroke="var(--line)"/><circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 12.5V20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-const assets = { css: "", js: "" };
+const assets = { css: "", js: "", theme: "" };
 
-function layout({ title, description, body, path: pagePath, kind = "page" }) {
+/* The browser chrome matches --paper; theme.js and site.js swap it to the
+   dark paper when the sheet is turned over. */
+const THEME_COLOR = "#f4f4f5";
+
+function layout({ title, description, body, path: pagePath, kind = "page", index = true }) {
   const canonical = `${SITE}${pagePath}`;
   const fullTitle = pagePath === "/" ? "CronWatch | Cron fails silently. This doesn’t." : `${title} | CronWatch`;
   const here = (href) => (href === pagePath || (href === "/docs/" && pagePath.startsWith("/docs/")) ? "here" : "");
@@ -98,15 +115,15 @@ function layout({ title, description, body, path: pagePath, kind = "page" }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(fullTitle)}</title>
 <meta name="description" content="${escape(description)}">
-<link rel="canonical" href="${canonical}">
+${index ? `<link rel="canonical" href="${canonical}">` : `<meta name="robots" content="noindex">`}
 <meta property="og:title" content="${escape(fullTitle)}">
 <meta property="og:description" content="${escape(description)}">
-<meta property="og:url" content="${canonical}">
-<meta property="og:type" content="website">
-<meta name="theme-color" content="#efece2">
+${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta property="og:type" content="website">
+<meta name="theme-color" content="${THEME_COLOR}">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/newsreader-normal-200-800.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/plexmono-normal-400.woff2" as="font" type="font/woff2" crossorigin>
+<script src="${assets.theme}"></script>
 <link rel="stylesheet" href="${assets.css}">
 <script src="${assets.js}" defer></script>
 </head>
@@ -173,7 +190,7 @@ function alertTime(alerts, needle, which = 0) {
  * and went with nothing in it. The empty part of each row carries a note
  * saying what happened, which is the whole point of the picture.
  */
-function strip() {
+function strip(alerts) {
   const { capturedAt, dayStart, jobs } = JSON.parse(readFileSync(path.join(DEMO, "runs.json"), "utf8"));
   const DAY = 86_400_000, W = 1400, L = 196, R = 26, TOP = 40, ROW = 52, LEG = 58;
   const H = TOP + jobs.length * ROW + LEG;
@@ -181,17 +198,39 @@ function strip() {
   const f = (n) => n.toFixed(1);
   const nx = x(capturedAt), late = nx > W - 170;
 
+  /** The metrics the captured over-budget alert names, e.g. ["tokens", "cost"]. */
+  function overBudget(j) {
+    const a = alerts.find((x) => x.startsWith(`[cronwatch] ${j.name} went over budget`)) ?? "";
+    const metrics = [...a.matchAll(/^(\w+): [\d.,]+, limit/gm)].map((m) => m[1]);
+    return `went over budget${metrics.length ? ` on ${metrics.join(" and ")}` : ""}`;
+  }
+
   /** What this row is worth saying out loud, anchored to the mark it is about. */
   function note(j) {
     const r = j.runs.length ? j.runs[j.runs.length - 1] : null;
     if (j.missedAt) return { at: j.missedAt, text: `due ${hhmm(j.missedAt)}, and nothing ran` };
     if (r && r.status === "failed") return { at: r.startedAt, text: `threw at ${hhmm(r.startedAt)}, and cron said nothing` };
-    if (j.open.includes("over_budget")) return { at: r ? r.startedAt : null, text: "finished fine, and cost three times its usual" };
+    if (j.open.includes("over_budget")) return { at: r ? r.startedAt : null, text: `${r?.status === "ok" ? "finished fine, and " : ""}${overBudget(j)}` };
     if (r && r.status === "running") return { at: r.startedAt, text: `started ${hhmm(r.startedAt)}, still going` };
     return null;
   }
 
-  let s = `<svg class="strip" viewBox="0 0 ${W} ${H}" role="img" aria-label="One day of scheduled runs for ${jobs.length} jobs: every time each job was due, and every run recorded">`;
+  /** The same row in words, for anyone who cannot see the picture. */
+  function words(j) {
+    const due = (j.expected ?? []).filter((t) => t >= dayStart && t <= capturedAt).length;
+    const ok = j.runs.filter((r) => r.status === "ok").length;
+    const parts = [`due ${due === 1 ? "once" : `${due} times`} so far`];
+    parts.push(`${j.runs.length} ${j.runs.length === 1 ? "run" : "runs"} recorded${!j.runs.length ? "" : ok === j.runs.length ? `, ${ok === 1 ? "ok" : "all ok"}` : ok ? `, ${ok} ok` : ""}`);
+    for (const r of j.runs) {
+      if (r.status === "running") parts.push(`running since ${hhmm(r.startedAt)} UTC`);
+      else if (r.status !== "ok") parts.push(`${r.status} at ${hhmm(r.startedAt)} UTC after ${duration(r.durationMs)}`);
+    }
+    if (j.missedAt) parts.push(`due at ${hhmm(j.missedAt)} UTC and never started`);
+    if (j.open.includes("over_budget")) parts.push(`the last run ${overBudget(j)}`);
+    return `${j.name} (${j.schedule}): ${parts.join("; ")}.`;
+  }
+
+  let s = `<svg class="strip" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false">`;
   for (let h = 0; h <= 24; h += 2) {
     const gx = f(x(dayStart + h * 3_600_000));
     s += `<line class="grid" x1="${gx}" y1="${TOP}" x2="${gx}" y2="${TOP + jobs.length * ROW}"/>`;
@@ -249,7 +288,8 @@ function strip() {
     s += `<rect class="run ${cls}" x="${lx}" y="${ly - 11}" width="15" height="12" rx="2"/><text class="legend" x="${lx + 22}" y="${ly}">${label}</text>`;
     lx += 22 + label.length * 6.9 + 28;
   }
-  return s + "</svg>";
+  const list = `<ul class="vh">${jobs.map((j) => `<li>${escape(words(j))}</li>`).join("")}</ul>`;
+  return `${s}</svg>${list}`;
 }
 
 /** The captured demo output, rendered for the landing page. */
@@ -267,17 +307,18 @@ function demoContent() {
     });
     out.JOBS_BOARD = `<div class="rows"><table><thead><tr><th>Job</th><th class="sm">Schedule</th><th>Health</th><th>Last run</th><th class="sm">Next due</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
 
+    const alerts = readFileSync(path.join(DEMO, "alerts.txt"), "utf8").split(/\n\n+/).map((a) => a.trim()).filter(Boolean);
+
     const day = JSON.parse(readFileSync(path.join(DEMO, "runs.json"), "utf8"));
     const total = day.jobs.reduce((n, j) => n + j.runs.length, 0);
     out.DAY_META = `${new Date(day.dayStart).toISOString().slice(0, 10)} · ${total} runs by ${hhmm(day.capturedAt)} UTC`;
-    out.STRIP = strip();
+    out.STRIP = strip(alerts);
 
     const mcp = JSON.parse(readFileSync(path.join(DEMO, "mcp.json"), "utf8"));
     const reply = (tool) => mcp.find((x) => x.tool === tool)?.reply ?? "";
     out.MCP_GET_JOB = colourReply(reply("get_job"));
     out.MCP_LIST_JOBS = colourReply(reply("list_jobs"));
 
-    const alerts = readFileSync(path.join(DEMO, "alerts.txt"), "utf8").split(/\n\n+/).map((a) => a.trim()).filter(Boolean);
     out.ALERT_MISSED = alertBlock(alerts, "sync-crm missed");
     out.ALERT_BUDGET = alertBlock(alerts, "daily-digest went over budget");
     out.ALERT_RECOVERED = alertBlock(alerts, "invoice-run recovered");
@@ -286,8 +327,14 @@ function demoContent() {
     out.T_MISSED = alertTime(alerts, "sync-crm missed", 1);
     out.T_BUDGET = alertTime(alerts, "daily-digest went over budget");
     out.T_RECOVERED = alertTime(alerts, "invoice-run recovered");
+    const empty = Object.keys(out).filter((k) => !out[k]);
+    if (empty.length) throw new Error(`nothing captured for ${empty.join(", ")}`);
   } catch (e) {
-    console.warn("demo captures missing; run scripts/demo.mjs --capture", e.message);
+    // Without the captures the landing page would ship empty. While watching,
+    // keep serving so the rest of the site can be worked on.
+    const message = `demo captures missing or unreadable (run site/scripts/demo.mjs --capture): ${e.message}`;
+    if (!WATCHING) throw new Error(message);
+    console.warn(message);
   }
   return out;
 }
@@ -303,10 +350,15 @@ function build() {
   const js = readFileSync(path.join(SRC, "site.js"), "utf8");
   assets.js = `/assets/site.${hash(js)}.js`;
   writeFileSync(path.join(DIST, assets.js), js);
+  const theme = readFileSync(path.join(SRC, "theme.js"), "utf8");
+  assets.theme = `/assets/theme.${hash(theme)}.js`;
+  writeFileSync(path.join(DIST, assets.theme), theme);
 
-  let landing = readFileSync(path.join(SRC, "landing.html"), "utf8").replace(/\{\{GITHUB\}\}/g, GITHUB);
-  landing = landing.replace(/\{\{PROMPT\}\}/g, escape(readFileSync(path.join(SRC, "prompt.txt"), "utf8")));
-  for (const [key, value] of Object.entries(demoContent())) landing = landing.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
+  // Replacer functions, so a $& or $1 in captured text is inserted as written.
+  let landing = readFileSync(path.join(SRC, "landing.html"), "utf8").replace(/\{\{GITHUB\}\}/g, () => GITHUB);
+  const promptHtml = escape(readFileSync(path.join(SRC, "prompt.txt"), "utf8"));
+  landing = landing.replace(/\{\{PROMPT\}\}/g, () => promptHtml);
+  for (const [key, value] of Object.entries(demoContent())) landing = landing.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), () => value);
   writeFileSync(path.join(DIST, "index.html"), layout({
     title: "CronWatch",
     description: "Open source cron and scheduled-job monitoring that lives inside your TypeScript app. Every run recorded in your own database; alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. MCP server included. No server to run.",
@@ -334,7 +386,7 @@ function build() {
   }
 
   writeFileSync(path.join(DIST, "404.html"), layout({
-    title: "Not found", description: "That page is not here.", path: "/404", kind: "docs",
+    title: "Not found", description: "That page is not here.", path: "/404", kind: "docs", index: false,
     body: `<article class="doc"><h1>Not found</h1><p>Nothing is scheduled at this address. Try the <a href="/docs/">docs</a> or the <a href="/">front page</a>.</p></article>`,
   }));
 
@@ -351,8 +403,7 @@ function build() {
 
 build();
 
-const args = process.argv.slice(2);
-if (args.includes("--watch") || args.includes("--serve")) {
+if (WATCHING) {
   let timer = null;
   const rebuild = () => {
     clearTimeout(timer);

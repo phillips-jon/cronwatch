@@ -1,6 +1,6 @@
 ---
 title: AI triage
-description: Attach a short diagnosis from Claude to every failure alert, with your own API key.
+description: Attach a short diagnosis from Claude to every alert except recoveries, with your own API key.
 order: 11
 ---
 
@@ -36,7 +36,7 @@ The key comes from `ANTHROPIC_API_KEY`, or pass `apiKey`, or hand in a configure
 
 ## Cost and timing
 
-Triage runs only when an alert is sent, never per run, so it costs roughly one short request per incident. It gets 25 seconds; if the request is slower or fails, the alert goes out without a diagnosis and the error is reported through `onError`. Recovery messages are never triaged.
+Triage runs only when an alert is sent, never per run, so it costs roughly one short request per incident: every missed, failed, stuck, slow and over-budget alert, but never a recovery. It gets 25 seconds; if the request is slower or fails, the alert goes out without a diagnosis and the error is reported through `onError`. The request is made once, without retries, and is cancelled when the 25 seconds are up, so it never runs on after the alert has gone.
 
 ## What is sent
 
@@ -44,7 +44,7 @@ The alert title and message, the job's stored definition, the triggering run (st
 
 ## Your own triage
 
-`triage` is any function from a context to a string. Plug in a different model, a runbook lookup, or a rule engine:
+`triage` is any function from a context to a string. Plug in a different model, a runbook lookup, or a rule engine. The context carries `signal`, an `AbortSignal` that fires when the client stops waiting; pass it to any request you make.
 
 ```ts
 cronwatch({

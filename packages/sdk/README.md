@@ -6,10 +6,12 @@ Docs: [cronwatch.dev/docs](https://cronwatch.dev/docs/)
 
 ```bash
 npm install @cronwatch/sdk
-npm install better-sqlite3    # or pg
+npm install better-sqlite3                # or pg
+npm install -D @types/better-sqlite3      # or @types/pg; TypeScript without skipLibCheck
 ```
 
 ```ts
+// lib/cronwatch.ts
 import { cronwatch } from "@cronwatch/sdk";
 import { sqlite } from "@cronwatch/sdk/sqlite";
 import { slack } from "@cronwatch/sdk/slack";
@@ -27,19 +29,32 @@ export const nightlyReport = cw.job("nightly-report", {
   expect: "Report written",  // output must contain this, or the run failed
   budget: { cost: 2 },       // cost above 2 is over budget
 });
+```
 
-// A fetch-style handler (Next.js route, Hono, Bun): checks Authorization: Bearer CRON_SECRET
+```ts
+// app/api/cron/nightly-report/route.ts
+// A fetch-style handler (Next.js route, Hono, Bun). Checks Authorization: Bearer CRON_SECRET,
+// and answers 503 without running when CRON_SECRET is unset outside development.
+import { nightlyReport } from "@/lib/cronwatch";
+
 export const GET = nightlyReport.handler(async (job) => {
   const report = await buildReport();
   job.log("Report written:", report.path);
   job.metric("cost", report.usdCost);
 });
+```
 
-// Or a plain function
-await nightlyReport.run(async (job) => { /* ... */ });
-
+```ts
+// app/cronwatch/[[...path]]/route.ts
 // Dashboard and JSON API, behind CRONWATCH_TOKEN
+import { cw } from "@/lib/cronwatch";
+
 export const { GET, POST, DELETE } = cw.routes();
+```
+
+```ts
+// Or wrap a plain function
+await nightlyReport.run(async (job) => { /* ... */ });
 
 // Missed and stuck runs are found by the check: on an interval, or a cron hitting /cronwatch/api/check
 cw.start();
@@ -54,16 +69,16 @@ cw.start();
 - **over_budget**: a metric went above its `budget` ceiling, or three times its usual median
 - **recovered**: a run succeeded after any of the above
 
-Each condition alerts once when it opens and once when it clears.
+Each condition alerts once when it opens, and is answered by one recovered message once a run succeeds again.
 
 ## Entry points
 
 | Import | |
 |---|---|
 | `@cronwatch/sdk` | `cronwatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, types |
-| `@cronwatch/sdk/sqlite` | `sqlite({ path })`, needs `better-sqlite3` |
-| `@cronwatch/sdk/postgres` | `postgres({ connectionString })`, needs `pg` |
+| `@cronwatch/sdk/sqlite` | `sqlite({ path })`, needs `better-sqlite3` (and `@types/better-sqlite3` in TypeScript) |
+| `@cronwatch/sdk/postgres` | `postgres({ connectionString })`, needs `pg` (and `@types/pg` in TypeScript) |
 | `@cronwatch/sdk/slack`, `/discord`, `/webhook` | alert channels |
-| `@cronwatch/sdk/anthropic` | `anthropic()` triage: a short diagnosis on every failure alert, needs `@anthropic-ai/sdk` |
+| `@cronwatch/sdk/anthropic` | `anthropic()` triage: a short diagnosis on every alert except recoveries, needs `@anthropic-ai/sdk` |
 
-Node 20 or newer; `better-sqlite3` 13 needs Node 22. MIT.
+Node 22 or newer. MIT.

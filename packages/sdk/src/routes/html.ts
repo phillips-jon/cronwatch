@@ -40,6 +40,8 @@ button:hover{border-color:var(--muted)}
 .stat{padding:12px 14px}.stat .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.stat .v{font-size:20px;font-weight:600;margin-top:2px}
 pre{margin:0;padding:10px 12px;background:var(--pill);border-radius:8px;font:12.5px/1.45 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto}
 details summary{cursor:pointer;color:var(--muted);font-size:13px}details{margin-top:6px}
+details.confirm{margin:0}details.confirm summary{list-style:none;display:inline-block;font-size:13px;padding:5px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--fg)}
+details.confirm summary::-webkit-details-marker{display:none}details.confirm[open] summary{border-color:var(--muted)}details.confirm form{margin-left:8px;font-size:13px}
 .empty{padding:40px 16px;text-align:center;color:var(--muted)}
 dl{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0;padding:14px 16px;font-size:14px}dt{color:var(--muted)}dd{margin:0}
 footer{margin-top:28px;color:var(--muted);font-size:12px}
@@ -154,13 +156,13 @@ export function jobPage(job: JobSummary, runs: Run[], now: number, base: string)
     ${silenced
       ? `<form class="inline" method="post" action="${h(base)}/jobs/${encodeURIComponent(job.name)}/unsilence"><button type="submit">Unsilence (until ${h(formatRelative(job.silencedUntil!, now))})</button></form>`
       : `<form class="inline" method="post" action="${h(base)}/jobs/${encodeURIComponent(job.name)}/silence"><select name="for"><option value="1h">1 hour</option><option value="4h">4 hours</option><option value="1d">1 day</option><option value="7d">1 week</option></select> <button type="submit">Silence</button></form>`}
-    <form class="inline" method="post" action="${h(base)}/jobs/${encodeURIComponent(job.name)}/forget" onsubmit="return confirm('Remove this job and its runs from the store?')"><button type="submit">Forget</button></form>
+    <details class="confirm"><summary>Forget</summary><form class="inline" method="post" action="${h(base)}/jobs/${encodeURIComponent(job.name)}/forget"><span class="muted">Remove this job and its runs from the store?</span> <button type="submit">Forget</button></form></details>
   </div>
 </header>
 <div class="grid">
   <div class="card stat"><div class="k">Last run</div><div class="v">${job.lastRun ? h(formatRelative(job.lastRun.startedAt, now)) : "never"}</div></div>
   <div class="card stat"><div class="k">Next due</div><div class="v">${job.nextExpectedAt ? h(formatRelative(job.nextExpectedAt, now)) : "no schedule"}</div></div>
-  <div class="card stat"><div class="k">Success, last ${job.stats.runs}</div><div class="v">${okRate}</div></div>
+  <div class="card stat"><div class="k">Success, last ${h(job.stats.runs)}</div><div class="v">${h(okRate)}</div></div>
   <div class="card stat"><div class="k">p50 / p95</div><div class="v">${job.stats.p50Ms !== null ? h(formatDuration(job.stats.p50Ms)) : "?"} <span class="muted">/</span> ${job.stats.p95Ms !== null ? h(formatDuration(job.stats.p95Ms)) : "?"}</div></div>
 </div>
 <div class="card" style="margin-bottom:20px">
@@ -171,11 +173,11 @@ export function jobPage(job: JobSummary, runs: Run[], now: number, base: string)
   ${d.maxDuration ? `<dt>Max duration</dt><dd class="mono">${h(d.maxDuration)}</dd>` : ""}
   ${d.budget ? `<dt>Budget</dt><dd class="mono">${h(Object.entries(d.budget).map(([k, v]) => `${k} ≤ ${v}`).join(", "))}</dd>` : ""}
   ${d.expect ? `<dt>Expect</dt><dd class="mono">${h(d.expect)}</dd>` : ""}
-  ${d.failuresBeforeAlert && d.failuresBeforeAlert > 1 ? `<dt>Alert after</dt><dd>${d.failuresBeforeAlert} consecutive failures</dd>` : ""}
+  ${d.failuresBeforeAlert && d.failuresBeforeAlert > 1 ? `<dt>Alert after</dt><dd>${h(d.failuresBeforeAlert)} consecutive failures</dd>` : ""}
   ${d.description ? `<dt>Description</dt><dd>${h(d.description)}</dd>` : ""}
   ${d.tags?.length ? `<dt>Tags</dt><dd>${d.tags.map((t) => `<span class="pill mutedpill">${h(t)}</span>`).join(" ")}</dd>` : ""}
   ${job.open.length ? `<dt>Open</dt><dd>${job.open.map((c) => `<span class="pill warn">${h(c.replace("_", " "))}</span>`).join(" ")}</dd>` : ""}
-  ${job.consecutiveFailures > 0 ? `<dt>Consecutive failures</dt><dd>${job.consecutiveFailures}</dd>` : ""}
+  ${job.consecutiveFailures > 0 ? `<dt>Consecutive failures</dt><dd>${h(job.consecutiveFailures)}</dd>` : ""}
 </dl>
 </div>
 <div class="card">

@@ -34,4 +34,8 @@ Any stdio MCP client:
 | `forget_job` | remove a job that no longer exists in the code |
 | `get_setup_guide` | the code to add CronWatch to a job |
 
+Give the token through `CRONWATCH_TOKEN`, as above. The `--url` and `--token` flags still work, but a flag is visible to anyone who can list processes (`ps`), so keep the token in the environment. Node 22 or newer.
+
+`list_jobs`, `get_job` and `get_setup_guide` are marked read-only; `silence_job` and `forget_job` are marked destructive, so clients that ask before destructive tools will ask. A run's error and output are written by the job, so tool results label them as untrusted data for the model to read, not follow.
+
 The token grants everything the dashboard can do. Docs: [cronwatch.dev/docs/mcp](https://cronwatch.dev/docs/mcp/). MIT.

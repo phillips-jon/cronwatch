@@ -4,9 +4,11 @@ told when one is missed, fails, gets stuck, runs slow or goes over budget.
 CronWatch is an open source TypeScript library. It runs inside my app and writes
 to my own database. There is no hosted service, no account and no API key.
 
-1. Install it.
+1. Install it with the driver for the store you will use in step 2 (it needs
+   Node 22 or newer). The drivers are optional peers, so install one yourself.
 
-   npm install @cronwatch/sdk
+   npm install @cronwatch/sdk better-sqlite3     # for sqlite
+   npm install @cronwatch/sdk pg                 # for postgres
 
 2. Create one client for the whole app, in its own module, and export it.
    Pick the store that matches this project: sqlite for a long running server,
@@ -33,7 +35,8 @@ to my own database. There is no hosted service, no account and no API key.
    });
 
 4. Wrap the work. In a route handler use .handler(); anywhere else use .run().
-   .handler() checks the Authorization bearer against CRON_SECRET for you.
+   .handler() checks the Authorization bearer against CRON_SECRET for you, and
+   answers 503 without running when CRON_SECRET is unset outside development.
 
    export const GET = nightlyReport.handler(async (job) => {
      const report = await buildReport();
@@ -46,7 +49,9 @@ to my own database. There is no hosted service, no account and no API key.
    once at boot. On serverless, mount the routes and point a cron at the check
    endpoint every few minutes.
 
-   export const { GET, POST } = cw.routes({ token: process.env.CRONWATCH_TOKEN });
+   // app/cronwatch/[[...path]]/route.ts in Next.js; elsewhere mount it at
+   // /cronwatch or pass basePath to cw.routes()
+   export const { GET, POST, DELETE } = cw.routes({ token: process.env.CRONWATCH_TOKEN });
    // then: GET /cronwatch/api/check every 5 minutes, with the bearer token
 
 6. Set the environment variables you referenced: CRON_SECRET, CRONWATCH_TOKEN,

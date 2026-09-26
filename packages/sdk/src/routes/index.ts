@@ -1,15 +1,17 @@
 import type { CronWatch } from "../client.js";
-import { json } from "../http.js";
+import { constantTimeEqual, json } from "../http.js";
 import { parseDuration } from "../duration.js";
-import type { Run } from "../types.js";
+import type { Duration, Run } from "../types.js";
 import { dashboardPage, jobPage, messagePage } from "./html.js";
 
 export interface RoutesOptions {
   /**
    * Required to reach anything. Send it as `Authorization: Bearer <token>`,
    * or open the dashboard once with `?token=<token>` and a cookie is set.
-   * Defaults to process.env.CRONWATCH_TOKEN. With no token at all, the routes
-   * are open in development and refuse to serve in production.
+   * Defaults to process.env.CRONWATCH_TOKEN; an empty string counts as unset.
+   * With no token, the routes are open only when NODE_ENV is "development" or
+   * "test" and answer 503 otherwise. Pass `null` to opt out and serve them
+   * open everywhere, for example behind your own auth.
    *
    * The check endpoint (/api/check) also accepts the client's cronSecret, so
    * a platform cron that sends `Authorization: Bearer <CRON_SECRET>` can
@@ -30,12 +32,21 @@ export interface Routes {
 }
 
 const COOKIE = "cronwatch_token";
+const DEFAULT_RUNS = 20;
+const MAX_RUNS = 500;
 
-function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+const CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+// same-origin rather than no-referrer: under no-referrer browsers send
+// `Origin: null` on form posts, which the CSRF check would refuse, and the
+// forms redirect back to the page named by the same-origin Referer.
+const SECURITY_HEADERS = { "x-content-type-options": "nosniff", "referrer-policy": "same-origin", "x-robots-tag": "noindex" };
+
+function safeDecode(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
 }
 
 function readCookie(request: Request, name: string): string | null {
@@ -43,7 +54,8 @@ function readCookie(request: Request, name: string): string | null {
   if (!header) return null;
   for (const part of header.split(";")) {
     const [k, ...rest] = part.trim().split("=");
-    if (k === name) return decodeURIComponent(rest.join("="));
+    // A malformed escape counts as no cookie.
+    if (k === name) return safeDecode(rest.join("="));
   }
   return null;
 }
@@ -75,31 +87,61 @@ async function readBody(request: Request): Promise<Record<string, string>> {
 }
 
 /**
+ * A browser attaches Origin or Sec-Fetch-Site to a cross-site form post, and
+ * a page cannot forge either. Non-browser clients send neither.
+ */
+function crossSite(request: Request, url: URL): boolean {
+  const origin = request.headers.get("origin");
+  if (origin !== null && origin !== url.origin) return true;
+  const site = request.headers.get("sec-fetch-site");
+  return site !== null && site !== "same-origin" && site !== "none";
+}
+
+/** Absent means one hour; a number or numeric string is milliseconds. Throws on anything else. */
+function silenceDuration(value: string | null | undefined): Duration {
+  if (value === undefined || value === null) return "1h";
+  const text = value.trim();
+  const duration: Duration = /^\d+(\.\d+)?$/.test(text) ? Number(text) : text;
+  parseDuration(duration, "silence duration");
+  return duration;
+}
+
+function runsLimit(value: string | null): number {
+  const n = value === null || value.trim() === "" ? NaN : Math.trunc(Number(value));
+  return Number.isFinite(n) ? Math.min(MAX_RUNS, Math.max(1, n)) : DEFAULT_RUNS;
+}
+
+/**
  * A fetch-style handler serving the dashboard and a small JSON API. Mount it
  * in a Next.js app at app/cronwatch/[[...path]]/route.ts:
  *
  *   export const { GET, POST, DELETE } = cw.routes();
  */
 export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes {
-  const token = options.token === undefined ? (process.env.CRONWATCH_TOKEN ?? null) : options.token;
+  const optedOut = options.token === null;
+  const token = optedOut ? null : (options.token || process.env.CRONWATCH_TOKEN || null);
   const base = (options.basePath ?? "/cronwatch").replace(/\/+$/, "");
-  const production = process.env.NODE_ENV === "production";
+  const openWithoutToken = optedOut || process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
 
-  const handler: FetchHandler = async (request) => {
-    const url = new URL(request.url);
-    const path = stripBase(url.pathname, base);
-    const wantsHtml = !path.startsWith("/api");
+  const serve = async (request: Request, url: URL, path: string, wantsHtml: boolean): Promise<Response> => {
     const method = request.method.toUpperCase();
 
-    if (!token && production) {
+    if (!token && !openWithoutToken) {
       return wantsHtml
-        ? html(messagePage("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token to cw.routes()) to use them in production.", base), 503)
-        : json({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503);
+        ? html(messagePage("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token to cw.routes()) to use them outside development.", base), 503)
+        : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503);
     }
 
+    if (method !== "GET" && method !== "HEAD" && crossSite(request, url)) {
+      return wantsHtml
+        ? html(messagePage("Cross-site request refused", "Changes can only be made from the dashboard itself.", base), 403)
+        : api({ ok: false, error: "Cross-site request refused" }, 403);
+    }
+
+    const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? null;
     if (token) {
-      const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? null;
-      const query = url.searchParams.get("token");
+      // ?token= is only the sign-in that moves the token into a cookie.
+      const query = wantsHtml && method === "GET" ? url.searchParams.get("token") : null;
       const cookie = readCookie(request, COOKIE);
       const presented = bearer ?? query ?? cookie;
       const isCheck = path === "/api/check";
@@ -107,40 +149,37 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
       if (!cronSecretOk && (presented === null || !constantTimeEqual(presented, token))) {
         return wantsHtml
           ? html(messagePage("Sign in", `Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.`, base), 401)
-          : json({ ok: false, error: "Unauthorized" }, 401);
+          : api({ ok: false, error: "Unauthorized" }, 401);
       }
-      if (query !== null && wantsHtml && method === "GET") {
+      if (query !== null) {
         // Move the token from the URL into a cookie so it is not in history or logs.
         url.searchParams.delete("token");
         const secure = url.protocol === "https:" ? "; Secure" : "";
-        return new Response(null, {
-          status: 303,
-          headers: {
-            location: url.pathname + (url.search || ""),
-            "set-cookie": `${COOKIE}=${encodeURIComponent(token)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`,
-          },
+        return redirect(url.pathname + (url.search || ""), {
+          "set-cookie": `${COOKIE}=${encodeURIComponent(token)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`,
         });
       }
     }
 
     const redirectBack = () => {
       const referer = request.headers.get("referer") ?? "";
-      const location = referer.startsWith(url.origin + "/") ? referer : `${base}/`;
-      return new Response(null, { status: 303, headers: { location } });
+      return redirect(referer.startsWith(url.origin + "/") ? referer : `${base}/`);
     };
-    const jobName = (segment: string | undefined) => (segment ? decodeURIComponent(segment) : "");
-    const parts = path.split("/").filter(Boolean);
+    const decoded = path.split("/").filter(Boolean).map(safeDecode);
+    if (decoded.some((part) => part === null)) {
+      return wantsHtml ? html(messagePage("Bad request", "The path is not valid.", base), 400) : api({ ok: false, error: "Bad path" }, 400);
+    }
+    const parts = decoded as string[];
 
     // HTML
     if (method === "GET" && path === "/") {
-      const jobs = await cw.jobs();
-      const runsByJob = new Map<string, Run[]>();
-      for (const job of jobs) runsByJob.set(job.name, await cw.runs(job.name, 20));
-      return html(dashboardPage(jobs, runsByJob, cw.now(), base, null));
+      const entries = await cw.jobsWithRuns(20);
+      const runsByJob = new Map<string, Run[]>(entries.map((entry) => [entry.job.name, entry.runs]));
+      return html(dashboardPage(entries.map((entry) => entry.job), runsByJob, cw.now(), base, null));
     }
     if (method === "GET" && parts[0] === "jobs" && parts.length === 2) {
-      const job = await cw.jobSummary(jobName(parts[1]));
-      if (!job) return html(messagePage("No such job", `${jobName(parts[1])} is not in the store.`, base), 404);
+      const job = await cw.jobSummary(parts[1]!);
+      if (!job) return html(messagePage("No such job", `${parts[1]} is not in the store.`, base), 404);
       return html(jobPage(job, await cw.runs(job.name, 50), cw.now(), base));
     }
     if (method === "POST" && path === "/check") {
@@ -148,14 +187,22 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
       return redirectBack();
     }
     if (method === "POST" && parts[0] === "jobs" && parts.length === 3) {
-      const name = jobName(parts[1]);
-      const body = await readBody(request);
-      if (parts[2] === "silence") await cw.silence(name, safeDuration(body.for, "1h"));
-      else if (parts[2] === "unsilence") await cw.unsilence(name);
-      else if (parts[2] === "forget") {
+      const name = parts[1]!;
+      if (parts[2] === "forget") {
         await cw.forget(name);
-        return new Response(null, { status: 303, headers: { location: `${base}/` } });
-      } else return html(messagePage("Not found", path, base), 404);
+        return redirect(`${base}/`);
+      }
+      if (parts[2] !== "silence" && parts[2] !== "unsilence") return html(messagePage("Not found", path, base), 404);
+      if (!(await cw.jobSummary(name))) return html(messagePage("No such job", `${name} is not in the store.`, base), 404);
+      if (parts[2] === "silence") {
+        let duration: Duration;
+        try {
+          duration = silenceDuration((await readBody(request)).for);
+        } catch (e) {
+          return html(messagePage("Not silenced", (e as Error).message, base), 400);
+        }
+        await cw.silence(name, duration);
+      } else await cw.unsilence(name);
       return redirectBack();
     }
 
@@ -163,58 +210,95 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
     if (parts[0] === "api") {
       const rest = parts.slice(1);
       if (method === "GET" && rest[0] === "jobs" && rest.length === 1) {
-        return json({ ok: true, jobs: await cw.jobs() });
+        return api({ ok: true, jobs: await cw.jobs() });
       }
       if (rest[0] === "jobs" && rest.length === 2) {
-        const name = jobName(rest[1]);
+        const name = rest[1]!;
         if (method === "GET") {
           const job = await cw.jobSummary(name);
-          if (!job) return json({ ok: false, error: "No such job" }, 404);
-          const limit = Number(url.searchParams.get("runs") ?? 20);
-          return json({ ok: true, job, runs: await cw.runs(name, Number.isFinite(limit) ? limit : 20) });
+          if (!job) return api({ ok: false, error: "No such job" }, 404);
+          return api({ ok: true, job, runs: await cw.runs(name, runsLimit(url.searchParams.get("runs"))) });
         }
         if (method === "DELETE") {
           await cw.forget(name);
-          return json({ ok: true });
+          return api({ ok: true });
         }
       }
       if (method === "POST" && rest[0] === "jobs" && rest.length === 3) {
-        const name = jobName(rest[1]);
-        if (!(await cw.jobSummary(name))) return json({ ok: false, error: "No such job" }, 404);
-        const body = await readBody(request);
-        if (rest[2] === "silence") return json({ ok: true, state: await cw.silence(name, safeDuration(body.for ?? url.searchParams.get("for"), "1h")) });
-        if (rest[2] === "unsilence") return json({ ok: true, state: await cw.unsilence(name) });
+        const name = rest[1]!;
+        if (!(await cw.jobSummary(name))) return api({ ok: false, error: "No such job" }, 404);
+        if (rest[2] === "silence") {
+          const body = await readBody(request);
+          let duration: Duration;
+          try {
+            duration = silenceDuration(body.for ?? url.searchParams.get("for"));
+          } catch (e) {
+            return api({ ok: false, error: (e as Error).message }, 400);
+          }
+          return api({ ok: true, state: await cw.silence(name, duration) });
+        }
+        if (rest[2] === "unsilence") return api({ ok: true, state: await cw.unsilence(name) });
       }
-      if ((method === "GET" || method === "POST") && rest[0] === "check" && rest.length === 1) {
-        const result = await cw.check();
-        return json({ ok: true, ...result });
+      if (rest[0] === "check" && rest.length === 1) {
+        // A page cannot send an Authorization header cross-site, so a GET
+        // may only run the check when it carries a bearer (token or cron secret).
+        if (method === "GET" && bearer === null) {
+          return api({ ok: false, error: "Use POST, or GET with an Authorization bearer" }, 405, { allow: "POST" });
+        }
+        if (method === "GET" || method === "POST") {
+          const result = await cw.check();
+          return api({ ok: true, ...result });
+        }
       }
       if (method === "GET" && rest[0] === "runs" && rest.length === 2) {
         const run = await cw.getRun(rest[1]!);
-        return run ? json({ ok: true, run }) : json({ ok: false, error: "No such run" }, 404);
+        return run ? api({ ok: true, run }) : api({ ok: false, error: "No such run" }, 404);
       }
-      return json({ ok: false, error: "Not found" }, 404);
+      return api({ ok: false, error: "Not found" }, 404);
     }
 
     return html(messagePage("Not found", path, base), 404);
   };
 
+  const handler: FetchHandler = async (request) => {
+    let wantsHtml = true;
+    try {
+      const url = new URL(request.url);
+      const path = stripBase(url.pathname, base);
+      wantsHtml = !path.startsWith("/api");
+      return await serve(request, url, path, wantsHtml);
+    } catch (e) {
+      try {
+        cw.onError(e, "routes");
+      } catch {
+        // An onError that throws must not turn a 500 into an unhandled rejection.
+      }
+      return wantsHtml
+        ? html(messagePage("Something went wrong", "The request failed and the error was reported.", base), 500)
+        : api({ ok: false, error: "Internal error" }, 500);
+    }
+  };
+
   return { handler, GET: handler, POST: handler, DELETE: handler };
 }
 
-function safeDuration(value: string | null | undefined, fallback: string): string {
-  if (!value) return fallback;
-  try {
-    parseDuration(value);
-    return value;
-  } catch {
-    return fallback;
-  }
+function api(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
+  return json(body, status, { ...SECURITY_HEADERS, ...headers });
+}
+
+function redirect(location: string, headers: Record<string, string> = {}): Response {
+  return new Response(null, { status: 303, headers: { location, "cache-control": "no-store", ...SECURITY_HEADERS, ...headers } });
 }
 
 function html(body: string, status = 200): Response {
   return new Response(body, {
     status,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "content-security-policy": CSP,
+      "x-frame-options": "DENY",
+      ...SECURITY_HEADERS,
+    },
   });
 }

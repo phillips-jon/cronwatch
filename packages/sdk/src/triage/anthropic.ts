@@ -23,7 +23,10 @@ export interface AnthropicTriageOptions {
   context?: string;
 }
 
-const SYSTEM = `You help an engineer understand why a scheduled job misbehaved. You are given the alert, the job's definition, the run that triggered it and a few earlier runs.
+/** Under the client's 25 second wait, so the request ends on its own first. */
+const REQUEST_TIMEOUT_MS = 24_000;
+
+const SYSTEM =`You help an engineer understand why a scheduled job misbehaved. You are given the alert, the job's definition, the run that triggered it and a few earlier runs.
 
 Reply with two to four sentences of plain prose: the most likely cause, and the first concrete thing to check or change. Be specific to the evidence given; if the evidence is thin, say what is missing rather than guessing. No headings, no lists, no preamble, no restating the error verbatim.`;
 
@@ -76,6 +79,12 @@ export function anthropic(options: AnthropicTriageOptions = {}): TriageFn {
       output_config: { effort: options.effort ?? "medium" },
       messages: [{ role: "user", content: user }],
       ...(useFallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {}),
+    }, {
+      // One attempt that ends when the client stops waiting, rather than
+      // retries that run on after the alert has gone out without a diagnosis.
+      signal: ctx.signal,
+      timeout: REQUEST_TIMEOUT_MS,
+      maxRetries: 0,
     });
     if (response.stop_reason === "refusal") return null;
     const text = response.content

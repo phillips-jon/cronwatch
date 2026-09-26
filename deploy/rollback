@@ -6,7 +6,7 @@
 #   ssh joncpu /var/www/cronwatch.dev/deploy/rollback <name>   # one listed in /var/www/cronwatch.dev-releases
 #
 # Only releases that passed their build check (marked .release-ok) qualify.
-# The next push to main deploys as usual, so push a fix (or a revert) next.
+# The next push to main deploys as usual once CI passes, so push a fix (or a revert) next.
 
 set -euo pipefail
 

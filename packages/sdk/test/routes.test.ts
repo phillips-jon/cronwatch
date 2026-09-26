@@ -108,16 +108,52 @@ test("dashboard forms post and redirect back", async () => {
   assert.equal(elsewhere.headers.get("location"), "/cronwatch/", "a foreign referer is not followed");
 });
 
-test("without a token: open in development, locked in production", async () => {
-  const { get } = app(null);
-  assert.equal((await get("/cronwatch/api/jobs")).status, 200);
-  const before = process.env.NODE_ENV;
-  process.env.NODE_ENV = "production";
-  try {
-    const { get: prodGet } = app(null);
-    assert.equal((await prodGet("/cronwatch/api/jobs")).status, 503);
-    assert.equal((await prodGet("/cronwatch")).status, 503);
-  } finally {
-    if (before === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = before;
+async function withEnv<T>(env: Record<string, string | undefined>, fn: () => Promise<T>): Promise<T> {
+  const before: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(env)) {
+    before[k] = process.env[k];
+    if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
+  try {
+    return await fn();
+  } finally {
+    for (const [k, v] of Object.entries(before)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
+
+function unconfigured(token?: string | null) {
+  const cw = cronwatch({ alerts: [capture()], cronSecret: null });
+  const routes = cw.routes(token === undefined ? {} : { token });
+  return (path: string) => routes.GET(new Request(`http://app.test${path}`));
+}
+
+test("without a token: open only in development and test, locked otherwise", async () => {
+  for (const env of [undefined, "production", "staging", ""]) {
+    await withEnv({ NODE_ENV: env, CRONWATCH_TOKEN: undefined }, async () => {
+      const get = unconfigured();
+      assert.equal((await get("/cronwatch/api/jobs")).status, 503, `NODE_ENV=${env}`);
+      assert.equal((await get("/cronwatch")).status, 503, `NODE_ENV=${env}`);
+    });
+  }
+  for (const env of ["development", "test"]) {
+    await withEnv({ NODE_ENV: env, CRONWATCH_TOKEN: undefined }, async () => {
+      assert.equal((await unconfigured()("/cronwatch/api/jobs")).status, 200, `NODE_ENV=${env}`);
+    });
+  }
+});
+
+test("an empty token counts as unset; null opts out explicitly", async () => {
+  await withEnv({ NODE_ENV: "production", CRONWATCH_TOKEN: "" }, async () => {
+    assert.equal((await unconfigured()("/cronwatch/api/jobs")).status, 503);
+    assert.equal((await unconfigured("")("/cronwatch/api/jobs")).status, 503);
+    assert.equal((await unconfigured(null)("/cronwatch/api/jobs")).status, 200, "token: null serves open");
+  });
+  await withEnv({ NODE_ENV: "production", CRONWATCH_TOKEN: "envtok" }, async () => {
+    const cw = cronwatch({ alerts: [capture()], cronSecret: null });
+    const routes = cw.routes({ token: "" });
+    assert.equal((await routes.GET(new Request("http://app.test/cronwatch/api/jobs"))).status, 401);
+    assert.equal((await routes.GET(new Request("http://app.test/cronwatch/api/jobs", { headers: { authorization: "Bearer envtok" } }))).status, 200);
+  });
 });

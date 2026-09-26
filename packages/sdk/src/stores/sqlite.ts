@@ -1,26 +1,16 @@
 import Database from "better-sqlite3";
-import { chmodSync, mkdirSync } from "node:fs";
+import { chmodSync, closeSync, mkdirSync, openSync } from "node:fs";
 import path from "node:path";
-import type { JobState, Run, Store, StoredJob, StoredJobDefinition } from "../types.js";
+import type { Store, StoredJob, StoredJobDefinition } from "../types.js";
+import { params, rowToJob, rowToRun, rowToState, schema, statements, tablePrefix, type JobRow, type RunRow, type StateRow } from "./sql.js";
 
 export interface SqliteOptions {
   /** File path. The directory is created if missing. ":memory:" works too. */
   path?: string;
   /** Bring your own open better-sqlite3 database instead. */
   database?: Database.Database;
-}
-
-interface JobRow { name: string; definition: string; created_at: number; updated_at: number }
-interface RunRow {
-  id: string; job: string; status: Run["status"]; started_at: number; finished_at: number | null;
-  duration_ms: number | null; error: string | null; output: string | null; metrics: string; trigger: string;
-}
-
-function rowToRun(r: RunRow): Run {
-  return {
-    id: r.id, job: r.job, status: r.status, startedAt: r.started_at, finishedAt: r.finished_at,
-    durationMs: r.duration_ms, error: r.error, output: r.output, metrics: JSON.parse(r.metrics), trigger: r.trigger,
-  };
+  /** Table name prefix: lowercase letters, digits and underscores. Default "cronwatch_". */
+  prefix?: string;
 }
 
 /**
@@ -29,118 +19,98 @@ function rowToRun(r: RunRow): Run {
  * run being written.
  */
 export function sqlite(options: SqliteOptions = {}): Store {
+  const p = tablePrefix(options.prefix);
+  const sql = statements("sqlite", p);
   let db: Database.Database | null = options.database ?? null;
   const file = options.path ?? "./data/cronwatch.db";
+  const cache = new Map<string, Database.Statement>();
 
   const open = (): Database.Database => {
     if (db) return db;
-    if (file !== ":memory:") {
+    const onDisk = file !== ":memory:" && file !== "";
+    if (onDisk) {
       mkdirSync(path.dirname(file), { recursive: true });
+      // Create the file private before SQLite opens it. SQLite gives the -wal and -shm files the
+      // main file's mode, so the whole set stays 0600; the chmods cover files left by an earlier open.
+      try {
+        closeSync(openSync(file, "a", 0o600));
+        for (const f of [file, `${file}-wal`, `${file}-shm`]) {
+          try { chmodSync(f, 0o600); } catch { /* the sidecar may not exist yet */ }
+        }
+      } catch { /* best effort: not every filesystem cares */ }
     }
     db = new Database(file);
-    if (file !== ":memory:") {
-      try { chmodSync(file, 0o600); } catch { /* best effort: not every filesystem cares */ }
-    }
     db.pragma("journal_mode = WAL");
     db.pragma("busy_timeout = 5000");
     db.pragma("synchronous = NORMAL");
     return db;
   };
 
+  // Each statement is prepared once per open database.
+  const stmt = (text: string): Database.Statement => {
+    let s = cache.get(text);
+    if (!s) {
+      s = open().prepare(text);
+      cache.set(text, s);
+    }
+    return s;
+  };
+
+  const forget = (name: string) => {
+    stmt(sql.deleteRuns).run(name);
+    stmt(sql.deleteState).run(name);
+    stmt(sql.deleteJob).run(name);
+  };
+
   return {
     async init() {
-      const d = open();
-      d.exec(`
-        CREATE TABLE IF NOT EXISTS cronwatch_jobs (
-          name TEXT PRIMARY KEY,
-          definition TEXT NOT NULL,
-          created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS cronwatch_runs (
-          id TEXT PRIMARY KEY,
-          job TEXT NOT NULL,
-          status TEXT NOT NULL,
-          started_at INTEGER NOT NULL,
-          finished_at INTEGER,
-          duration_ms INTEGER,
-          error TEXT,
-          output TEXT,
-          metrics TEXT NOT NULL DEFAULT '{}',
-          trigger TEXT NOT NULL DEFAULT 'run'
-        );
-        CREATE INDEX IF NOT EXISTS cronwatch_runs_job_started ON cronwatch_runs (job, started_at DESC);
-        CREATE INDEX IF NOT EXISTS cronwatch_runs_running ON cronwatch_runs (status) WHERE status = 'running';
-        CREATE TABLE IF NOT EXISTS cronwatch_state (
-          job TEXT PRIMARY KEY,
-          state TEXT NOT NULL
-        );
-      `);
+      open().exec(schema("sqlite", p));
     },
     async upsertJob(definition: StoredJobDefinition, now: number) {
-      open().prepare(`
-        INSERT INTO cronwatch_jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
-        ON CONFLICT(name) DO UPDATE SET definition = excluded.definition, updated_at = excluded.updated_at
-      `).run(definition.name, JSON.stringify(definition), now, now);
+      stmt(sql.upsertJob).run(...params.upsertJob(definition, now));
     },
     async getJob(name) {
-      const r = open().prepare("SELECT * FROM cronwatch_jobs WHERE name = ?").get(name) as JobRow | undefined;
-      return r ? { name: r.name, definition: JSON.parse(r.definition), createdAt: r.created_at, updatedAt: r.updated_at } : null;
+      const r = stmt(sql.getJob).get(name) as JobRow | undefined;
+      return r ? rowToJob(r) : null;
     },
     async listJobs(): Promise<StoredJob[]> {
-      const rows = open().prepare("SELECT * FROM cronwatch_jobs ORDER BY name").all() as JobRow[];
-      return rows.map((r) => ({ name: r.name, definition: JSON.parse(r.definition), createdAt: r.created_at, updatedAt: r.updated_at }));
+      return (stmt(sql.listJobs).all() as JobRow[]).map(rowToJob);
     },
     async deleteJob(name) {
-      const d = open();
-      d.transaction(() => {
-        d.prepare("DELETE FROM cronwatch_runs WHERE job = ?").run(name);
-        d.prepare("DELETE FROM cronwatch_state WHERE job = ?").run(name);
-        d.prepare("DELETE FROM cronwatch_jobs WHERE name = ?").run(name);
-      })();
+      open().transaction(forget)(name);
     },
     async insertRun(run) {
-      open().prepare(`
-        INSERT INTO cronwatch_runs (id, job, status, started_at, finished_at, duration_ms, error, output, metrics, trigger)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(run.id, run.job, run.status, run.startedAt, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.trigger);
+      stmt(sql.insertRun).run(...params.insertRun(run));
     },
     async updateRun(run) {
-      open().prepare(`
-        UPDATE cronwatch_runs SET status = ?, finished_at = ?, duration_ms = ?, error = ?, output = ?, metrics = ? WHERE id = ?
-      `).run(run.status, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.id);
+      stmt(sql.updateRun).run(...params.updateRun(run));
     },
     async getRun(id) {
-      const r = open().prepare("SELECT * FROM cronwatch_runs WHERE id = ?").get(id) as RunRow | undefined;
+      const r = stmt(sql.getRun).get(id) as RunRow | undefined;
       return r ? rowToRun(r) : null;
     },
     async listRuns(job, limit) {
-      const rows = open().prepare("SELECT * FROM cronwatch_runs WHERE job = ? ORDER BY started_at DESC, rowid DESC LIMIT ?").all(job, limit) as RunRow[];
-      return rows.map(rowToRun);
+      return (stmt(sql.listRuns).all(job, limit) as RunRow[]).map(rowToRun);
     },
     async lastRun(job) {
-      const r = open().prepare("SELECT * FROM cronwatch_runs WHERE job = ? ORDER BY started_at DESC, rowid DESC LIMIT 1").get(job) as RunRow | undefined;
+      const r = stmt(sql.listRuns).get(job, 1) as RunRow | undefined;
       return r ? rowToRun(r) : null;
     },
     async runningRuns() {
-      const rows = open().prepare("SELECT * FROM cronwatch_runs WHERE status = 'running' ORDER BY started_at").all() as RunRow[];
-      return rows.map(rowToRun);
+      return (stmt(sql.runningRuns).all() as RunRow[]).map(rowToRun);
     },
     async getState(job) {
-      const r = open().prepare("SELECT state FROM cronwatch_state WHERE job = ?").get(job) as { state: string } | undefined;
-      return r ? (JSON.parse(r.state) as JobState) : null;
+      const r = stmt(sql.getState).get(job) as StateRow | undefined;
+      return r ? rowToState(r) : null;
     },
     async setState(state) {
-      open().prepare(`
-        INSERT INTO cronwatch_state (job, state) VALUES (?, ?)
-        ON CONFLICT(job) DO UPDATE SET state = excluded.state
-      `).run(state.job, JSON.stringify(state));
+      stmt(sql.setState).run(...params.setState(state));
     },
     async prune(before) {
-      const info = open().prepare("DELETE FROM cronwatch_runs WHERE status != 'running' AND started_at < ?").run(before);
-      return info.changes;
+      return stmt(sql.prune).run(before).changes;
     },
     async close() {
+      cache.clear();
       if (db && !options.database) {
         db.close();
         db = null;

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
 
@@ -13,7 +14,9 @@ if (args.includes("--help") || args.includes("-h")) {
   CRONWATCH_URL    where cw.routes() is mounted, e.g. https://app.example.com/cronwatch
   CRONWATCH_TOKEN  the token those routes expect
 
-Or pass --url and --token. Add it to Claude Code with:
+Set them in the environment. --url and --token work too, but a flag shows up
+in the process list (ps) for anyone on the machine, so prefer the variable for
+the token. Add it to Claude Code with:
 
   claude mcp add cronwatch -e CRONWATCH_URL=https://app.example.com/cronwatch -e CRONWATCH_TOKEN=... -- npx -y @cronwatch/mcp
 `);

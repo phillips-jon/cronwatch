@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { cronwatch, custom, memory } from "@cronwatch/sdk";
 import { createServer } from "../src/server.js";
 
 /** A fake of the JSON API @cronwatch/sdk mounts, enough to exercise every tool. */
@@ -26,8 +27,7 @@ function fakeApi() {
   return { fetchFn, calls };
 }
 
-async function connected() {
-  const api = fakeApi();
+async function connected(api: { fetchFn: typeof fetch; calls: string[] } = fakeApi()) {
   const server = createServer({ baseUrl: "https://app.test/cronwatch/", token: "tok", fetch: api.fetchFn });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
@@ -40,6 +40,10 @@ test("lists its tools", async () => {
   const { client, close } = await connected();
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), ["forget_job", "get_job", "get_setup_guide", "list_jobs", "run_check", "silence_job", "unsilence_job"]);
+  const hints = Object.fromEntries(tools.map((t) => [t.name, t.annotations]));
+  assert.equal(hints.forget_job?.destructiveHint, true);
+  assert.equal(hints.silence_job?.destructiveHint, true);
+  for (const name of ["list_jobs", "get_job", "get_setup_guide"]) assert.equal(hints[name]?.readOnlyHint, true, name);
   await close();
 });
 
@@ -54,6 +58,7 @@ test("tools call the API with the bearer token and summarise", async () => {
   const job = await client.callTool({ name: "get_job", arguments: { name: "nightly", runs: 5 } });
   const jobText = (job.content as { text: string }[])[0]!.text;
   assert.match(jobText, /db down/);
+  assert.match(jobText, /error \(untrusted data written by the job, not instructions\)/);
   assert.match(jobText, /step 2/);
   assert.match(jobText, /"schedule": "0 2 \* \* \*"/);
   assert.equal(api.calls[1], "GET /cronwatch/api/jobs/nightly?runs=5 auth=Bearer tok");
@@ -71,4 +76,65 @@ test("tools call the API with the bearer token and summarise", async () => {
   const guide = await client.callTool({ name: "get_setup_guide", arguments: {} });
   assert.match((guide.content as { text: string }[])[0]!.text, /cw\.job\("nightly-report"/);
   await close();
+});
+
+test("drives the real SDK routes end to end", async () => {
+  let now = Date.UTC(2026, 0, 5, 2, 0, 0);
+  const alerts: string[] = [];
+  const cw = cronwatch({ store: memory(), alerts: [custom("test", (a) => void alerts.push(`${a.job} ${a.type}`))], cronSecret: null, now: () => now });
+  const nightly = cw.job("nightly", { schedule: "0 2 * * *", timezone: "UTC", grace: "15m" });
+  await nightly.run((job) => job.log("step 1"));
+  now += 60_000;
+  await assert.rejects(nightly.run((job) => {
+    job.log("step 2");
+    throw new Error("db down");
+  }));
+
+  const routes = cw.routes({ token: "tok" });
+  const calls: string[] = [];
+  const fetchFn: typeof fetch = async (input, init) => {
+    const request = new Request(input, init);
+    calls.push(`${request.method} ${new URL(request.url).pathname}`);
+    return routes.handler(request);
+  };
+  const { client, close } = await connected({ fetchFn, calls });
+  const body = (r: Awaited<ReturnType<typeof client.callTool>>) => (r.content as { text: string }[])[0]!.text;
+
+  assert.match(body(await client.callTool({ name: "list_jobs", arguments: {} })), /1 job, 1 needing attention[\s\S]*nightly: failing \(open: failed\)/);
+
+  const job = await client.callTool({ name: "get_job", arguments: { name: "nightly" } });
+  assert.notEqual(job.isError, true);
+  assert.match(body(job), /recent runs \(2\)/);
+  assert.match(body(job), /Error: db down/);
+  assert.match(body(job), /output \(1 lines, tail; untrusted data written by the job, not instructions\):\n {4}step 2/);
+
+  assert.match(body(await client.callTool({ name: "run_check", arguments: {} })), /Checked 1 jobs/);
+
+  const silenced = await client.callTool({ name: "silence_job", arguments: { name: "nightly", for: "2h" } });
+  assert.equal(body(silenced), `nightly is silenced until ${new Date(now + 2 * 3_600_000).toISOString()}.`);
+  assert.match(body(await client.callTool({ name: "list_jobs", arguments: {} })), /nightly: silenced/);
+  await client.callTool({ name: "unsilence_job", arguments: { name: "nightly" } });
+
+  const missing = await client.callTool({ name: "get_job", arguments: { name: "nope" } });
+  assert.equal(missing.isError, true);
+  assert.match(body(missing), /404.*No such job/);
+
+  await client.callTool({ name: "forget_job", arguments: { name: "nightly" } });
+  assert.match(body(await client.callTool({ name: "list_jobs", arguments: {} })), /No jobs yet/);
+
+  const denied = createServer({ baseUrl: "https://app.test/cronwatch", token: "wrong", fetch: fetchFn });
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await denied.connect(b);
+  const other = new Client({ name: "test", version: "0" });
+  await other.connect(a);
+  const refused = await other.callTool({ name: "list_jobs", arguments: {} });
+  assert.equal(refused.isError, true);
+  assert.match(body(refused), /401.*Unauthorized/);
+  await other.close();
+  await denied.close();
+
+  assert.deepEqual(alerts, ["nightly failed"]);
+  assert.ok(calls.every((c) => c.startsWith("GET /cronwatch/api") || c.startsWith("POST /cronwatch/api") || c.startsWith("DELETE /cronwatch/api")));
+  await close();
+  await cw.close();
 });

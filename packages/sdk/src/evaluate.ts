@@ -5,15 +5,22 @@
  */
 import { formatDuration } from "./duration.js";
 import { parseDuration } from "./duration.js";
-import { expectation, parseSchedule, runCovers } from "./schedule.js";
+import { expectation, nextFire, parseSchedule } from "./schedule.js";
 import { median, percentile } from "./stats.js";
-import type { Condition, JobDefinition, JobState, Run, StoredJob, StoredJobDefinition } from "./types.js";
+import type {
+  AlertDraft,
+  BudgetBreach,
+  Condition,
+  JobDefinition,
+  JobHealth,
+  JobState,
+  JobSummary,
+  Run,
+  StoredJob,
+  StoredJobDefinition,
+} from "./types.js";
 
-export interface AlertDraft {
-  type: Condition | "recovered";
-  run: Run | null;
-  details: Record<string, unknown>;
-}
+export type { AlertDraft, BudgetBreach };
 
 export interface Evaluation {
   state: JobState;
@@ -26,14 +33,27 @@ export const DEFAULT_TIMEOUT_MS = 60 * 60_000;
 export const SLOW_FLOOR_MS = 10_000;
 /** How many earlier runs a baseline needs before it is trusted. */
 export const BASELINE_MIN_RUNS = 5;
+/** How many successful runs a baseline looks at, and how many runs a summary covers. */
 export const BASELINE_WINDOW = 20;
 
 export function emptyState(job: string): JobState {
-  return { job, open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null };
+  return { job, open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, pendingRecovery: [], undelivered: [] };
+}
+
+/** A stored state with every field present, or a fresh one. State written by an older version lacks the newer fields. */
+export function normalizeState(state: JobState | null, job: string): JobState {
+  if (!state) return emptyState(job);
+  return {
+    ...emptyState(job),
+    ...state,
+    open: { ...state.open },
+    pendingRecovery: [...(state.pendingRecovery ?? [])],
+    undelivered: [...(state.undelivered ?? [])],
+  };
 }
 
 function cloneState(state: JobState): JobState {
-  return { ...state, open: { ...state.open } };
+  return normalizeState(state, state.job);
 }
 
 function openCondition(state: JobState, condition: Condition, now: number): boolean {
@@ -42,9 +62,15 @@ function openCondition(state: JobState, condition: Condition, now: number): bool
   return true;
 }
 
+/**
+ * Every open condition has alerted, so closing one owes a recovered message.
+ * It is remembered until a successful run leaves nothing open and sends it.
+ */
 function closeCondition(state: JobState, condition: Condition): boolean {
   if (state.open[condition] === undefined) return false;
   delete state.open[condition];
+  const pending = (state.pendingRecovery ??= []);
+  if (!pending.includes(condition)) pending.push(condition);
   return true;
 }
 
@@ -74,13 +100,6 @@ export function slowThreshold(def: Pick<JobDefinition, "maxDuration">, history: 
   return { thresholdMs: Math.max(2 * p95, SLOW_FLOOR_MS), basis: `twice the p95 of the last ${durations.length} runs (${formatDuration(p95)})` };
 }
 
-export interface BudgetBreach {
-  metric: string;
-  value: number;
-  limit: number;
-  basis: string;
-}
-
 export function budgetBreaches(def: Pick<JobDefinition, "budget">, run: Run, history: Run[]): BudgetBreach[] {
   const breaches: BudgetBreach[] = [];
   for (const [metric, value] of Object.entries(run.metrics)) {
@@ -102,6 +121,11 @@ export function budgetBreaches(def: Pick<JobDefinition, "budget">, run: Run, his
   return breaches;
 }
 
+/** Whether `history` (newest first) holds a full baseline window of successful runs. */
+export function hasFullBaseline(history: Run[]): boolean {
+  return history.filter((r) => r.status === "ok").length >= BASELINE_WINDOW;
+}
+
 export function formatNumber(n: number): string {
   if (Number.isInteger(n)) return n.toLocaleString("en-US");
   return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
@@ -109,15 +133,14 @@ export function formatNumber(n: number): string {
 
 /**
  * Called when a run starts. Missed and stuck are about the absence of a run,
- * so a run starting closes them without an alert. Returns which conditions
- * were open beforehand, for the recovered message at the end.
+ * so a run starting closes them without an alert; the recovered message
+ * waits for a successful finish.
  */
-export function onRunStart(state: JobState): { state: JobState; openBefore: Condition[] } {
+export function onRunStart(state: JobState): JobState {
   const next = cloneState(state);
-  const openBefore = openConditions(next);
   closeCondition(next, "missed");
   closeCondition(next, "stuck");
-  return { state: next, openBefore };
+  return next;
 }
 
 /**
@@ -129,7 +152,6 @@ export function onRunFinish(
   run: Run,
   state: JobState,
   history: Run[],
-  openBefore: Condition[],
   now: number,
 ): Evaluation {
   const next = cloneState(state);
@@ -137,9 +159,9 @@ export function onRunFinish(
 
   if (run.status === "ok") {
     next.consecutiveFailures = 0;
-    closeCondition(next, "failed");
     closeCondition(next, "missed");
     closeCondition(next, "stuck");
+    closeCondition(next, "failed");
 
     const slow = slowThreshold(def, history);
     if (slow && run.durationMs !== null && run.durationMs > slow.thresholdMs) {
@@ -159,9 +181,10 @@ export function onRunFinish(
       closeCondition(next, "over_budget");
     }
 
-    const wasOpen = new Set([...openBefore, ...openConditions(state)]);
-    if (wasOpen.size > 0 && openConditions(next).length === 0) {
-      alerts.push({ type: "recovered", run, details: { after: [...wasOpen] } });
+    const pending = next.pendingRecovery ?? [];
+    if (pending.length > 0 && openConditions(next).length === 0) {
+      alerts.push({ type: "recovered", run, details: { after: [...pending] } });
+      next.pendingRecovery = [];
     }
     return { state: next, alerts };
   }
@@ -170,7 +193,7 @@ export function onRunFinish(
   next.consecutiveFailures += 1;
   closeCondition(next, "missed");
   const threshold = Math.max(1, def.failuresBeforeAlert ?? 1);
-  const condition: Condition = run.status === "timeout" ? "stuck" : "failed";
+  const condition = run.status === "timeout" ? "stuck" : "failed";
   if (next.consecutiveFailures >= threshold) {
     if (openCondition(next, condition, now)) {
       alerts.push({ type: condition, run, details: { consecutiveFailures: next.consecutiveFailures, threshold } });
@@ -180,8 +203,9 @@ export function onRunFinish(
 }
 
 /**
- * Called by check(). Decides whether the schedule has been missed. `lastRun`
- * is the most recent run of any status.
+ * Called by check(). Decides whether the schedule has been missed: the run
+ * the schedule wants next (see expectation()) has not started and its grace
+ * has run out. `lastRun` is the most recent run of any status.
  */
 export function onCheck(
   def: StoredJobDefinition,
@@ -196,31 +220,18 @@ export function onCheck(
 
   const parsed = parseSchedule(def.schedule, def.timezone);
   const grace = graceMs(def);
-  const exp = expectation(parsed, now, lastRun?.startedAt ?? null, stored.createdAt, grace);
-
-  let nextExpectedAt: number | null = null;
-  if (parsed.kind === "interval") {
-    nextExpectedAt = (lastRun?.startedAt ?? stored.createdAt) + parsed.everyMs!;
-  } else {
-    const upcoming = parsed.cron!.nextRun(new Date(now));
-    nextExpectedAt = upcoming ? upcoming.getTime() : null;
-  }
-
+  const lastRunAt = lastRun?.startedAt ?? null;
+  const exp = expectation(parsed, lastRunAt, stored.createdAt, grace);
+  const nextExpectedAt = parsed.kind === "interval" ? nextFire(parsed, stored.createdAt, lastRunAt) : nextFire(parsed, now, null);
   if (!exp) return { state: next, alerts, nextExpectedAt, dueAt: null };
 
-  // For a cron, a run at or after the fire covers it. For an interval the due
-  // time is computed from the last run itself, so only the deadline matters.
-  const covered = parsed.kind === "cron" && lastRun !== null && runCovers(lastRun.startedAt, exp.dueAt);
-  if (covered) {
-    closeCondition(next, "missed");
-  } else if (now > exp.deadline) {
+  if (now > exp.deadline) {
     if (openCondition(next, "missed", now)) {
-      alerts.push({
-        type: "missed",
-        run: lastRun,
-        details: { dueAt: exp.dueAt, deadline: exp.deadline, graceMs: grace, lastRunAt: lastRun?.startedAt ?? null },
-      });
+      alerts.push({ type: "missed", run: lastRun, details: { dueAt: exp.dueAt, deadline: exp.deadline, graceMs: grace, lastRunAt } });
     }
+  } else {
+    // A run has started since it opened, or the grace was widened.
+    closeCondition(next, "missed");
   }
   return { state: next, alerts, nextExpectedAt, dueAt: exp.dueAt };
 }
@@ -245,4 +256,43 @@ export function muteOpens(previous: JobState, next: JobState): JobState {
 
 export function isSilenced(state: JobState, now: number): boolean {
   return state.silencedUntil !== null && state.silencedUntil > now;
+}
+
+/** How a job looks at a glance. Silence wins, then stuck, failing and late. */
+export function jobHealth(def: Pick<JobDefinition, "timeout">, lastRun: Run | null, state: JobState, now: number): JobHealth {
+  const open = openConditions(state);
+  if (isSilenced(state, now)) return "silenced";
+  if (open.includes("stuck") || (lastRun && isStuck(def, lastRun, now))) return "stuck";
+  if (open.includes("failed") || lastRun?.status === "failed" || lastRun?.status === "timeout") return "failing";
+  if (open.includes("missed")) return "late";
+  if (!lastRun) return "never_ran";
+  return "healthy";
+}
+
+/**
+ * A job's summary from its most recent runs (newest first; the first
+ * BASELINE_WINDOW are used) and its state. Stats cover runs of any status;
+ * the percentiles are over the successful ones among them.
+ */
+export function summarize(stored: StoredJob, recent: Run[], state: JobState, nextExpectedAt: number | null, now: number): JobSummary {
+  const window = recent.slice(0, BASELINE_WINDOW);
+  const lastRun = window[0] ?? null;
+  const finished = window.filter((r) => r.status !== "running");
+  const okDurations = window.filter((r) => r.status === "ok" && r.durationMs !== null).map((r) => r.durationMs!);
+  return {
+    name: stored.name,
+    definition: stored.definition,
+    health: jobHealth(stored.definition, lastRun, state, now),
+    open: openConditions(state),
+    lastRun,
+    nextExpectedAt,
+    consecutiveFailures: state.consecutiveFailures,
+    silencedUntil: state.silencedUntil,
+    stats: {
+      runs: finished.length,
+      okRate: finished.length === 0 ? 1 : finished.filter((r) => r.status === "ok").length / finished.length,
+      p50Ms: percentile(okDurations, 50),
+      p95Ms: percentile(okDurations, 95),
+    },
+  };
 }

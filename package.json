@@ -9,7 +9,7 @@
     "site"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "check:dashes": "node scripts/check-dashes.mjs",
@@ -17,6 +17,10 @@
     "test": "npm run check:dashes && npm test --workspaces --if-present",
     "build": "npm run check:dashes && npm run build --workspaces --if-present",
     "build:site": "npm run build --workspace site",
-    "check": "npm run check:dashes && npm run typecheck && npm test"
+    "check": "npm run check:dashes && npm run typecheck && npm test",
+    "check:packages": "node scripts/check-packages.mjs"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5"
   }
 }

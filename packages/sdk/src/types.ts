@@ -96,13 +96,43 @@ export interface JobState {
   open: Partial<Record<Condition, number>>;
   consecutiveFailures: number;
   silencedUntil: number | null;
+  /** When an alert last reached at least one channel. */
   lastAlertAt: number | null;
+  /**
+   * Conditions that alerted and have since closed, waiting for the recovered
+   * message that the next successful run sends. Absent in state written
+   * before this field existed.
+   */
+  pendingRecovery?: Condition[];
+  /** Alerts that no channel accepted. Each check retries them once. */
+  undelivered?: Alert[];
 }
 
 export type AlertType = Condition | "recovered";
 
-export interface Alert {
-  type: AlertType;
+export interface BudgetBreach {
+  metric: string;
+  value: number;
+  limit: number;
+  basis: string;
+}
+
+/** What each alert type carries in `details`. */
+export interface AlertDetails {
+  missed: { dueAt: number; deadline: number; graceMs: number; lastRunAt: number | null };
+  failed: { consecutiveFailures: number; threshold: number };
+  stuck: { consecutiveFailures: number; threshold: number };
+  slow: { durationMs: number; thresholdMs: number; basis: string };
+  over_budget: { breaches: BudgetBreach[] };
+  recovered: { after: Condition[] };
+}
+
+/** An alert before it has a title and message. See composeAlert(). */
+export type AlertDraft = {
+  [K in AlertType]: { type: K; run: Run | null; details: AlertDetails[K] };
+}[AlertType];
+
+interface AlertBase {
   job: string;
   definition: StoredJobDefinition;
   run: Run | null;
@@ -110,11 +140,15 @@ export interface Alert {
   title: string;
   /** A few lines of plain text with the specifics. */
   message: string;
-  details: Record<string, unknown>;
   /** A short diagnosis from the triage function, when one is configured. */
   triage?: string;
   at: number;
 }
+
+/** Narrow on `type` to read `details`: `if (alert.type === "slow") alert.details.durationMs`. */
+export type Alert = {
+  [K in AlertType]: AlertBase & { type: K; details: AlertDetails[K] };
+}[AlertType];
 
 export interface AlertChannel {
   name: string;
@@ -154,7 +188,7 @@ export interface JobSummary {
   nextExpectedAt: number | null;
   consecutiveFailures: number;
   silencedUntil: number | null;
-  /** From the last twenty successful runs. */
+  /** From the last twenty runs of any status; p50Ms and p95Ms are over the successful ones among them. */
   stats: { runs: number; okRate: number; p50Ms: number | null; p95Ms: number | null };
 }
 
@@ -168,6 +202,8 @@ export interface CheckResult {
 export interface TriageContext {
   alert: Alert;
   recentRuns: Run[];
+  /** Aborts when the client stops waiting for a diagnosis. Pass it to any request you make. */
+  signal: AbortSignal;
 }
 
 export type TriageFn = (context: TriageContext) => Promise<string | null>;

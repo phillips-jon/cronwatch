@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { emptyState, muteOpens, onCheck, onRunFinish, onRunStart } from "../src/evaluate.js";
-import type { JobDefinition, Run, StoredJob } from "../src/types.js";
+import { emptyState, jobHealth, muteOpens, normalizeState, onCheck, onRunFinish, onRunStart, summarize } from "../src/evaluate.js";
+import type { AlertDetails, AlertDraft, JobDefinition, Run, StoredJob } from "../src/types.js";
 import { MIN, HOUR, T0 } from "./helpers.js";
 
 let counter = 0;
@@ -12,25 +12,32 @@ function run(job: string, status: Run["status"], startedAt: number, durationMs: 
   };
 }
 
+function details<K extends AlertDraft["type"]>(draft: AlertDraft | undefined, type: K): AlertDetails[K] {
+  assert.equal(draft?.type, type);
+  return draft!.details as AlertDetails[K];
+}
+
 const def: JobDefinition = { name: "j", schedule: "every 1h", grace: "10m" };
 
 test("a failure opens `failed` once, and success recovers", () => {
   const s0 = emptyState("j");
   const r1 = run("j", "failed", T0);
-  const e1 = onRunFinish(def, r1, s0, [], [], T0 + 1000);
+  const e1 = onRunFinish(def, r1, s0, [], T0 + 1000);
   assert.deepEqual(e1.alerts.map((a) => a.type), ["failed"]);
   assert.equal(e1.state.consecutiveFailures, 1);
 
   const r2 = run("j", "failed", T0 + HOUR);
-  const e2 = onRunFinish(def, r2, e1.state, [r1], [], T0 + HOUR + 1000);
+  const e2 = onRunFinish(def, r2, e1.state, [r1], T0 + HOUR + 1000);
   assert.deepEqual(e2.alerts, [], "already open: no second alert");
   assert.equal(e2.state.consecutiveFailures, 2);
 
   const r3 = run("j", "ok", T0 + 2 * HOUR);
   const started = onRunStart(e2.state);
-  const e3 = onRunFinish(def, r3, started.state, [r2, r1], started.openBefore, T0 + 2 * HOUR + 1000);
+  const e3 = onRunFinish(def, r3, started, [r2, r1], T0 + 2 * HOUR + 1000);
   assert.deepEqual(e3.alerts.map((a) => a.type), ["recovered"]);
+  assert.deepEqual(details(e3.alerts[0], "recovered").after, ["failed"]);
   assert.deepEqual(e3.state.open, {});
+  assert.deepEqual(e3.state.pendingRecovery, []);
   assert.equal(e3.state.consecutiveFailures, 0);
 });
 
@@ -40,7 +47,7 @@ test("failuresBeforeAlert waits for the Nth consecutive failure", () => {
   const history: Run[] = [];
   for (let i = 1; i <= 3; i++) {
     const r = run("j", "failed", T0 + i * MIN);
-    const e = onRunFinish(d, r, state, [...history], [], T0 + i * MIN + 100);
+    const e = onRunFinish(d, r, state, [...history], T0 + i * MIN + 100);
     history.unshift(r);
     state = e.state;
     assert.deepEqual(e.alerts.map((a) => a.type), i === 3 ? ["failed"] : [], `failure ${i}`);
@@ -49,35 +56,48 @@ test("failuresBeforeAlert waits for the Nth consecutive failure", () => {
 
 test("slow uses maxDuration, or twice the p95 once there are five runs", () => {
   const fixed: JobDefinition = { name: "j", maxDuration: "5s" };
-  const e = onRunFinish(fixed, run("j", "ok", T0, 6000), emptyState("j"), [], [], T0 + 6000);
+  const e = onRunFinish(fixed, run("j", "ok", T0, 6000), emptyState("j"), [], T0 + 6000);
   assert.deepEqual(e.alerts.map((a) => a.type), ["slow"]);
 
   const baseline: JobDefinition = { name: "j" };
   const history = [1, 2, 3, 4].map((i) => run("j", "ok", T0 - i * HOUR, 1000));
   // Only four earlier runs: no baseline yet, a 30s run passes quietly.
-  assert.deepEqual(onRunFinish(baseline, run("j", "ok", T0, 30_000), emptyState("j"), history, [], T0 + 30_000).alerts, []);
+  assert.deepEqual(onRunFinish(baseline, run("j", "ok", T0, 30_000), emptyState("j"), history, T0 + 30_000).alerts, []);
   history.push(run("j", "ok", T0 - 5 * HOUR, 1000));
   // Five earlier runs at 1s: threshold is max(2s, 10s floor) = 10s.
-  assert.deepEqual(onRunFinish(baseline, run("j", "ok", T0, 9_000), emptyState("j"), history, [], T0 + 9_000).alerts, []);
-  const slow = onRunFinish(baseline, run("j", "ok", T0, 11_000), emptyState("j"), history, [], T0 + 11_000);
-  assert.deepEqual(slow.alerts.map((a) => a.type), ["slow"]);
-  assert.equal(slow.alerts[0]!.details.thresholdMs, 10_000);
+  assert.deepEqual(onRunFinish(baseline, run("j", "ok", T0, 9_000), emptyState("j"), history, T0 + 9_000).alerts, []);
+  const slow = onRunFinish(baseline, run("j", "ok", T0, 11_000), emptyState("j"), history, T0 + 11_000);
+  assert.equal(details(slow.alerts[0], "slow").thresholdMs, 10_000);
   // A normal run afterwards recovers.
-  const back = onRunFinish(baseline, run("j", "ok", T0 + HOUR, 1_000), slow.state, [run("j", "ok", T0, 11_000), ...history], [], T0 + HOUR + 1000);
+  const back = onRunFinish(baseline, run("j", "ok", T0 + HOUR, 1_000), slow.state, [run("j", "ok", T0, 11_000), ...history], T0 + HOUR + 1000);
   assert.deepEqual(back.alerts.map((a) => a.type), ["recovered"]);
+});
+
+test("the slow baseline looks past failures to twenty successful runs", () => {
+  const baseline: JobDefinition = { name: "j" };
+  // Newest first: ten failures, then twenty ok runs at 20s, then older ok runs at 1s.
+  const history = [
+    ...Array.from({ length: 10 }, (_, i) => run("j", "failed", T0 - (i + 1) * MIN)),
+    ...Array.from({ length: 20 }, (_, i) => run("j", "ok", T0 - HOUR - i * MIN, 20_000)),
+    ...Array.from({ length: 20 }, (_, i) => run("j", "ok", T0 - 2 * HOUR - i * MIN, 1_000)),
+  ];
+  // Twice the p95 of the twenty 20s runs is 40s; the older 1s runs are outside the window.
+  assert.deepEqual(onRunFinish(baseline, run("j", "ok", T0, 39_000), emptyState("j"), history, T0).alerts, []);
+  const slow = onRunFinish(baseline, run("j", "ok", T0, 41_000), emptyState("j"), history, T0);
+  assert.match(details(slow.alerts[0], "slow").basis, /last 20 runs/);
 });
 
 test("budgets: a ceiling, or three times the median once there are five runs", () => {
   const ceiling: JobDefinition = { name: "j", budget: { cost: 2 } };
-  const over = onRunFinish(ceiling, run("j", "ok", T0, 1000, { metrics: { cost: 2.5 } }), emptyState("j"), [], [], T0 + 1000);
+  const over = onRunFinish(ceiling, run("j", "ok", T0, 1000, { metrics: { cost: 2.5 } }), emptyState("j"), [], T0 + 1000);
   assert.deepEqual(over.alerts.map((a) => a.type), ["over_budget"]);
-  const under = onRunFinish(ceiling, run("j", "ok", T0 + HOUR, 1000, { metrics: { cost: 1 } }), over.state, [], [], T0 + HOUR + 1000);
+  const under = onRunFinish(ceiling, run("j", "ok", T0 + HOUR, 1000, { metrics: { cost: 1 } }), over.state, [], T0 + HOUR + 1000);
   assert.deepEqual(under.alerts.map((a) => a.type), ["recovered"]);
 
   const baseline: JobDefinition = { name: "j" };
   const history = [1, 2, 3, 4, 5].map((i) => run("j", "ok", T0 - i * HOUR, 1000, { metrics: { tokens: 100 } }));
-  assert.deepEqual(onRunFinish(baseline, run("j", "ok", T0, 1000, { metrics: { tokens: 299 } }), emptyState("j"), history, [], T0).alerts, []);
-  const spike = onRunFinish(baseline, run("j", "ok", T0, 1000, { metrics: { tokens: 301 } }), emptyState("j"), history, [], T0);
+  assert.deepEqual(onRunFinish(baseline, run("j", "ok", T0, 1000, { metrics: { tokens: 299 } }), emptyState("j"), history, T0).alerts, []);
+  const spike = onRunFinish(baseline, run("j", "ok", T0, 1000, { metrics: { tokens: 301 } }), emptyState("j"), history, T0);
   assert.deepEqual(spike.alerts.map((a) => a.type), ["over_budget"]);
 });
 
@@ -86,8 +106,7 @@ test("onCheck reports a missed cron run once, and clears when a run covers it", 
   const stored: StoredJob = { name: "j", definition: d, createdAt: T0 - 3 * HOUR, updatedAt: T0 };
   // 09:30, last run 08:00. The 09:00 fire is 30 minutes late: missed.
   const e1 = onCheck(d, stored, run("j", "ok", T0 - 90 * MIN), emptyState("j"), T0);
-  assert.deepEqual(e1.alerts.map((a) => a.type), ["missed"]);
-  assert.equal(e1.alerts[0]!.details.dueAt, T0 - 30 * MIN);
+  assert.equal(details(e1.alerts[0], "missed").dueAt, T0 - 30 * MIN);
   assert.equal(e1.nextExpectedAt, T0 + 30 * MIN);
   const e2 = onCheck(d, stored, run("j", "ok", T0 - 90 * MIN), e1.state, T0 + MIN);
   assert.deepEqual(e2.alerts, [], "still missed, no repeat");
@@ -97,6 +116,30 @@ test("onCheck reports a missed cron run once, and clears when a run covers it", 
   // Inside the grace window nothing is missed.
   const e4 = onCheck(d, stored, run("j", "ok", T0 - 90 * MIN), emptyState("j"), T0 - 25 * MIN);
   assert.deepEqual(e4.alerts, []);
+});
+
+test("onCheck catches a cron whose period is shorter than its grace", () => {
+  // Every five minutes with the default ten minutes of grace.
+  const d = { name: "j", schedule: "*/5 * * * *" };
+  const stored: StoredJob = { name: "j", definition: d, createdAt: T0 - 3 * HOUR, updatedAt: T0 };
+  const last = run("j", "ok", T0 - 30 * MIN); // 09:00; 09:05 was due, and nothing since
+  const late = onCheck(d, stored, last, emptyState("j"), T0);
+  assert.equal(details(late.alerts[0], "missed").dueAt, T0 - 25 * MIN);
+  // Still inside the grace of the 09:05 fire: quiet.
+  assert.deepEqual(onCheck(d, stored, last, emptyState("j"), T0 - 25 * MIN + 10 * MIN).alerts, []);
+  // A check landing just after a fire no longer hides a job that stopped hours ago.
+  const hourly = { name: "h", schedule: "0 * * * *" };
+  const hStored: StoredJob = { name: "h", definition: hourly, createdAt: T0 - 5 * HOUR, updatedAt: T0 };
+  const e = onCheck(hourly, hStored, run("h", "ok", T0 - 150 * MIN), emptyState("h"), T0 - 30 * MIN + MIN);
+  assert.deepEqual(e.alerts.map((a) => a.type), ["missed"], "09:01, last run 07:00: 08:00 was missed");
+});
+
+test("onCheck never ran: the first fire at or after registration is due", () => {
+  const d = { name: "j", schedule: "0 9 * * *" };
+  const stored: StoredJob = { name: "j", definition: d, createdAt: T0 - 45 * MIN, updatedAt: T0 }; // registered 08:45
+  assert.equal(details(onCheck(d, stored, null, emptyState("j"), T0).alerts[0], "missed").dueAt, T0 - 30 * MIN);
+  const later: StoredJob = { ...stored, createdAt: T0 - 20 * MIN }; // registered 09:10, after the fire
+  assert.deepEqual(onCheck(d, later, null, emptyState("j"), T0).alerts, []);
 });
 
 test("onCheck for intervals counts from the last run, or from registration", () => {
@@ -116,9 +159,79 @@ test("a job without a schedule is never missed", () => {
   assert.equal(e.nextExpectedAt, null);
 });
 
+test("missed closed by a run start still recovers, even when that run fails quietly", () => {
+  const d = { name: "j", schedule: "every 1h", failuresBeforeAlert: 3 };
+  const stored: StoredJob = { name: "j", definition: d, createdAt: T0 - 3 * HOUR, updatedAt: T0 };
+  const missed = onCheck(d, stored, null, emptyState("j"), T0);
+  assert.deepEqual(missed.alerts.map((a) => a.type), ["missed"]);
+  // A run starts (closing missed without a message) and fails, below the alert threshold.
+  const started = onRunStart(missed.state);
+  assert.deepEqual(started.open, {});
+  const failed = onRunFinish(d, run("j", "failed", T0), started, [], T0 + 1000);
+  assert.deepEqual(failed.alerts, []);
+  // The next success owes the recovery.
+  const ok = onRunFinish(d, run("j", "ok", T0 + HOUR), onRunStart(failed.state), [], T0 + HOUR + 1000);
+  assert.deepEqual(ok.alerts.map((a) => a.type), ["recovered"]);
+  assert.deepEqual(details(ok.alerts[0], "recovered").after, ["missed"]);
+});
+
+test("stuck closed by the next run start is recovered by a later success", () => {
+  const d: JobDefinition = { name: "j" };
+  const stuck = onRunFinish(d, run("j", "timeout", T0 - HOUR), emptyState("j"), [], T0);
+  assert.deepEqual(stuck.alerts.map((a) => a.type), ["stuck"]);
+  // The next run starts in another process, so its finish sees stuck already closed.
+  const closed = onRunStart(stuck.state);
+  const ok = onRunFinish(d, run("j", "ok", T0 + MIN), closed, [], T0 + 2 * MIN);
+  assert.deepEqual(details(ok.alerts[0], "recovered").after, ["stuck"]);
+});
+
+test("a recovery waits while another condition is still open", () => {
+  const d: JobDefinition = { name: "j", maxDuration: "5s" };
+  const failed = onRunFinish(d, run("j", "failed", T0), emptyState("j"), [], T0);
+  const slowOk = onRunFinish(d, run("j", "ok", T0 + HOUR, 6000), failed.state, [], T0 + HOUR);
+  assert.deepEqual(slowOk.alerts.map((a) => a.type), ["slow"], "failed closed, slow opened: not recovered yet");
+  const fine = onRunFinish(d, run("j", "ok", T0 + 2 * HOUR, 1000), slowOk.state, [], T0 + 2 * HOUR);
+  assert.deepEqual(details(fine.alerts[0], "recovered").after, ["failed", "slow"]);
+});
+
+test("normalizeState fills fields that older stored state lacks", () => {
+  const old = { job: "j", open: { failed: 1 }, consecutiveFailures: 2, silencedUntil: null, lastAlertAt: 5 };
+  assert.deepEqual(normalizeState(old, "j"), { ...old, pendingRecovery: [], undelivered: [] });
+  assert.deepEqual(normalizeState(null, "j"), emptyState("j"));
+});
+
 test("muteOpens keeps closes and drops new opens", () => {
   const previous = { ...emptyState("j"), open: { failed: T0 } };
   const next = { ...emptyState("j"), open: { slow: T0 + 1 } };
   const muted = muteOpens(previous, next);
   assert.deepEqual(muted.open, {});
+});
+
+test("jobHealth ranks silence, stuck, failing, late, never ran and healthy", () => {
+  const d = { timeout: "5m" };
+  const ok = run("j", "ok", T0 - HOUR);
+  assert.equal(jobHealth(d, ok, { ...emptyState("j"), silencedUntil: T0 + 1, open: { failed: 1 } }, T0), "silenced");
+  assert.equal(jobHealth(d, run("j", "running", T0 - 6 * MIN, null), emptyState("j"), T0), "stuck");
+  assert.equal(jobHealth(d, ok, { ...emptyState("j"), open: { stuck: 1 } }, T0), "stuck");
+  assert.equal(jobHealth(d, run("j", "failed", T0 - HOUR), emptyState("j"), T0), "failing");
+  assert.equal(jobHealth(d, ok, { ...emptyState("j"), open: { missed: 1 } }, T0), "late");
+  assert.equal(jobHealth(d, null, emptyState("j"), T0), "never_ran");
+  assert.equal(jobHealth(d, ok, emptyState("j"), T0), "healthy");
+});
+
+test("summarize takes the last run and stats from the newest twenty runs", () => {
+  const stored: StoredJob = { name: "j", definition: { name: "j" }, createdAt: T0 - 30 * HOUR, updatedAt: T0 };
+  const recent = [
+    run("j", "running", T0 - MIN, null),
+    run("j", "failed", T0 - HOUR),
+    ...Array.from({ length: 25 }, (_, i) => run("j", "ok", T0 - (i + 2) * HOUR, 1000 * (i + 1))),
+  ];
+  const s = summarize(stored, recent, emptyState("j"), null, T0);
+  assert.equal(s.lastRun, recent[0]);
+  assert.equal(s.health, "healthy", "a run in progress, inside its timeout");
+  // Twenty runs in the window: one running, one failed, eighteen ok (1s to 18s).
+  assert.equal(s.stats.runs, 19);
+  assert.equal(s.stats.okRate, 18 / 19);
+  assert.equal(s.stats.p50Ms, 9000);
+  assert.equal(s.stats.p95Ms, 18000);
 });

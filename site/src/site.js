@@ -1,10 +1,8 @@
 // Light unless the reader chose otherwise (Shift+Cmd+D or the footer toggle),
-// and the copy buttons.
+// and the copy buttons. theme.js has already applied a stored choice.
 (function () {
   var root = document.documentElement;
-  var stored = null;
-  try { stored = localStorage.getItem("cronwatch-theme"); } catch (e) {}
-  if (stored === "dark") root.setAttribute("data-theme", "dark");
+  var themeColor = document.querySelector('meta[name="theme-color"]');
   function toggle() {
     var dark = root.getAttribute("data-theme") !== "dark";
     if (dark) root.setAttribute("data-theme", "dark"); else root.removeAttribute("data-theme");
@@ -14,6 +12,7 @@
   function render() {
     var dark = root.getAttribute("data-theme") === "dark";
     document.querySelectorAll(".theme").forEach(function (b) { b.textContent = dark ? "Light paper" : "Dark paper"; });
+    if (themeColor) themeColor.setAttribute("content", dark ? "#09090b" : "#f4f4f5");
   }
   document.addEventListener("keydown", function (e) {
     if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") { e.preventDefault(); toggle(); }
