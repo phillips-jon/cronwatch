@@ -93,6 +93,56 @@ module StoreConformance
     store.close if store.respond_to?(:close)
   end
 
+  # The SDK's store test for compareAndSetState: writes only over the version
+  # it was told to expect.
+  def test_compare_and_set_state
+    store = make_store
+    store.init if store.respond_to?(:init)
+    v = ->(version, extra = {}) { Cronwatch::JobState.from_h({ "job" => "v", "open" => {}, "consecutiveFailures" => 0, "silencedUntil" => nil, "lastAlertAt" => nil, "version" => version }.merge(extra)) }
+    cas = ->(state, expected) { store.compare_and_set_state(state, expected) }
+    assert_equal false, cas.call(v.call(2), 1), "no row matches only version 0"
+    assert_nil store.get_state("v")
+    assert_equal true, cas.call(v.call(1), 0), "no row counts as version 0"
+    assert_equal false, cas.call(v.call(1, "consecutiveFailures" => 9), 0), "a write from a stale read is refused"
+    assert_equal true, cas.call(v.call(2, "consecutiveFailures" => 1), 1)
+    assert_equal false, cas.call(v.call(3), 1)
+    assert_equal v.call(2, "consecutiveFailures" => 1).to_json, store.get_state("v").to_json
+    store.set_state(Cronwatch::JobState.from_h("job" => "w", "open" => {}, "consecutiveFailures" => 3, "silencedUntil" => nil, "lastAlertAt" => nil))
+    assert_equal false, cas.call(v.call(1).tap { |s| s.job = "w" }, 1), "state written before versions counts as 0"
+    assert_equal true, cas.call(v.call(1).tap { |s| s.job = "w" }, 0)
+    assert_equal 1, store.get_state("w").version
+    store.delete_job("v")
+    assert_equal false, cas.call(v.call(3), 2), "a forgotten job's state is not written back"
+    assert_nil store.get_state("v")
+    store.delete_job("w")
+  end
+
+  CAS_SCRIPT = JSON.parse(File.read(File.expand_path("../../../conformance/store.json", __dir__)))["compareAndSetState"]
+
+  # conformance/store.json's compareAndSetState script, recorded from the
+  # SDK's memory store: which writes go through, and the states stored after
+  # each step.
+  def test_compare_and_set_state_replays_the_sdk_script
+    store = make_store
+    store.init if store.respond_to?(:init)
+    failures = []
+    CAS_SCRIPT.each_with_index do |step, i|
+      written = nil
+      if step["cas"]
+        written = store.compare_and_set_state(Cronwatch::JobState.from_h(step["cas"]), step["expected"])
+      elsif step["set"]
+        store.set_state(Cronwatch::JobState.from_h(step["set"]))
+      else
+        store.delete_job(step["forget"])
+      end
+      expected = Cronwatch::JS.json([step["written"], step["states"]])
+      states = { "a" => store.get_state("a")&.to_h, "b" => store.get_state("b")&.to_h }
+      actual = Cronwatch::JS.json([written, states])
+      failures << "step #{i} #{JSON.generate(step)}\n    expected #{expected}\n    got      #{actual}" unless expected == actual
+    end
+    assert failures.empty?, failures.join("\n")
+  end
+
   def test_the_store_hands_out_copies
     store = make_store
     store.init if store.respond_to?(:init)

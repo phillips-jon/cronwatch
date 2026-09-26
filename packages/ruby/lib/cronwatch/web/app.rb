@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
+require "base64"
 require "digest"
+require "securerandom"
 
 module Cronwatch
   # The dashboard and the small JSON API, as a Rack app: the SDK's routes
@@ -16,10 +18,11 @@ module Cronwatch
   # token:     required to reach anything. Send it as `Authorization: Bearer <token>`,
   #            or open the dashboard once with `?token=<token>` and a cookie is set.
   #            Defaults to ENV["CRONWATCH_TOKEN"]; an empty string counts as unset.
-  #            With no token, the app answers only requests to localhost while
-  #            Cronwatch::Environment is development or test, and 503 otherwise.
-  #            Pass `token: nil` to opt out and serve it open everywhere, for
-  #            example behind your own auth. /api/check also accepts the
+  #            With no token while Cronwatch::Environment is development or
+  #            test, the app makes a random one and prints a sign-in link to
+  #            stdout on its first request; with no token otherwise it answers
+  #            503. Pass `token: nil` to opt out and serve it open everywhere,
+  #            for example behind your own auth. /api/check also accepts the
   #            client's cron_secret as a bearer, for a platform cron.
   # base_path: where the app is mounted, so links resolve. Defaults to the
   #            mount point (SCRIPT_NAME), which is right under Rails' `mount`.
@@ -27,7 +30,6 @@ module Cronwatch
     # Tells "token not given" (read CRONWATCH_TOKEN) from "token: nil" (open on purpose).
     UNSET = Object.new.freeze
     COOKIE = "cronwatch_token"
-    LOOPBACK = /\A(?:localhost|::1|(?:::ffff:)?127(?:\.\d{1,3}){3})\z/
     DEFAULT_RUNS = 20
     MAX_RUNS = 500
     COOKIE_MAX_AGE = 60 * 60 * 24 * 30
@@ -50,7 +52,29 @@ module Cronwatch
       given = token.equal?(UNSET) ? nil : token
       @token = @opted_out ? nil : [given, ENV.fetch("CRONWATCH_TOKEN", nil)].map(&:to_s).find { |t| !t.empty? }
       @base_path = base_path&.to_s&.sub(%r{/+\z}, "")
-      @developing = Client.development?
+      # A Rack app cannot reliably tell a local caller from a remote one
+      # (proxies, tunnels and a server bound to every interface all look
+      # alike), so development gets a token too: made here, and shown only in
+      # the server log.
+      @generated = @token.nil? && !@opted_out && Client.development?
+      @token = Web.development_token if @generated
+      @announced = false
+      @announce_lock = Mutex.new
+    end
+
+    # A token for one app in development, when none is configured: 32 random
+    # bytes, base64url (43 characters).
+    def self.development_token
+      Base64.urlsafe_encode64(SecureRandom.random_bytes(32), padding: false)
+    end
+
+    # The line a development token is announced with, printed once to stdout
+    # on the app's first request. `origin` is that request's origin (scheme,
+    # host and any port), `base` the base path without a trailing slash (""
+    # when mounted at the root).
+    def self.development_sign_in_line(origin, base, token)
+      "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. " \
+        "Sign in: #{origin}#{base}/?token=#{token}"
     end
 
     # The client given, or Cronwatch.client when none was.
@@ -82,53 +106,15 @@ module Cronwatch
 
     private
 
-    # The routes' localRequest: the Host header as sent and the peer's address
-    # are loopback, and no proxy header names anything else. Never Rack's
-    # #hostname, which follows X-Forwarded-Host (any client can set it); a
-    # proxy header naming another machine means the caller is not known to be local.
-    def local_request?(request)
-      env = request.env
-      return false unless loopback?(env["HTTP_HOST"] || env["SERVER_NAME"] || "")
-
-      peer = env["REMOTE_ADDR"]
-      return false unless peer.nil? || loopback?(peer)
-
-      forwarded_values(env).all? { |value| loopback?(value) }
-    end
-
-    # Every host or address a proxy header names. Forwarded contributes its for= and host= values.
-    def forwarded_values(env)
-      values = %w[HTTP_X_FORWARDED_HOST HTTP_X_FORWARDED_FOR HTTP_X_REAL_IP].flat_map { |key| env[key].to_s.split(",") }
-      env["HTTP_FORWARDED"].to_s.split(/[,;]/).each do |pair|
-        key, *rest = pair.split("=")
-        values << rest.join("=") if %w[for host].include?(key.to_s.strip.downcase)
-      end
-      values.reject { |value| value.strip.empty? }
-    end
-
-    def loopback?(value)
-      LOOPBACK.match?(bare_host(value))
-    end
-
-    # A host or address, with any quotes, brackets and port removed.
-    def bare_host(value)
-      text = value.strip.downcase.sub(/\A"(.*)"\z/, "\\1")
-      if text.start_with?("[")
-        close = text.index("]")
-        return close.nil? ? text : text[1...close]
-      end
-      # One colon is host:port; more is a bare IPv6 address.
-      text.count(":") == 1 ? text[0...text.index(":")] : text
-    end
-
     def serve(request, path, wants_html, base)
       cw = client
       method = request.verb
 
-      # No token: fail closed, except for a developer on their own machine. The
-      # Host check also stops a DNS-rebinding page from reaching a dev server.
-      if !@token && !@opted_out && !(@developing && local_request?(request))
-        return wants_html ? html(HTML.message_page("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token: to Cronwatch::Web.new). Without one the routes only answer localhost in development.", base), 503) : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503)
+      announce(request, base) if @generated && !@announced
+
+      # No token outside development: fail closed.
+      if !@token && !@opted_out
+        return wants_html ? html(HTML.message_page("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token: to Cronwatch::Web.new), or pass token: nil to serve them open behind your own auth.", base), 503) : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503)
       end
 
       if method != "GET" && method != "HEAD" && cross_site?(request)
@@ -149,6 +135,9 @@ module Cronwatch
           else !cookie.nil? && HTTP.constant_time_equal?(cookie, cookie_value(@token))
           end
         unless cron_secret_ok || token_ok
+          if @generated
+            return wants_html ? html(HTML.message_page("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base), 401) : api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401)
+          end
           return wants_html ? html(HTML.message_page("Sign in", "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.", base), 401) : api({ ok: false, error: "Unauthorized" }, 401)
         end
         unless query.nil?
@@ -255,6 +244,19 @@ module Cronwatch
         return run ? api({ ok: true, run: run }) : api({ ok: false, error: "No such run" }, 404)
       end
       api({ ok: false, error: "Not found" }, 404)
+    end
+
+    # Prints the development sign-in link, once per app.
+    def announce(request, base)
+      first = @announce_lock.synchronize do
+        next false if @announced
+
+        @announced = true
+      end
+      return unless first
+
+      $stdout.puts(Web.development_sign_in_line(request.origin, base, @token))
+      $stdout.flush
     end
 
     # The cookie holds a digest of the token, so a leaked cookie does not reveal the bearer token itself.

@@ -28,20 +28,42 @@ module Cronwatch
         ci("credential"),
       ].join("|").freeze
 
+      # "=", ":" or a hash rocket, between a name and its value.
+      ASSIGN = "(?:=>|[=:])"
+
+      # They apply in this order, each to the text the ones before it left.
       PATTERNS = [
-        # password=..., API_KEY: ..., "client_secret": "...", TOKEN='...', token=... (but not max_tokens: 800).
-        # A quoted value is blanked to its closing quote, spaces and all, and keeps its quotes.
-        [Regexp.new("(?a)\\b([A-Za-z0-9_-]{0,40}(?:#{NAMES})[A-Za-z0-9_-]{0,40}(?<![Tt][Oo][Kk][Ee][Nn][Ss])\"?[#{WS}]{0,3}[=:][#{WS}]{0,3})(?:(\")[^\"\\n]{1,4096}\"|(')[^'\\n]{1,4096}'|[\"']?[^#{WS}\"',;&]{1,4096})"), :quoted],
-        # Credentials inside a URL: postgres://user:password@host
-        [Regexp.new("(?a)(\\b[A-Za-z][A-Za-z0-9+.-]{0,30}://[^#{WS}/:@]{0,256}:)[^#{WS}/@]{1,256}@"), :url],
+        # A PEM private key, header to footer. Without a footer (the output was
+        # trimmed) it runs to the end of the base64 body. A "-" that starts five
+        # dashes ends the body, so the footer is never swallowed into it.
+        [Regexp.new("-----BEGIN (?:[A-Z0-9]{1,20} ){0,3}PRIVATE KEY-----(?:[A-Za-z0-9+/=#{WS},:]|-(?!----)){0,16384}" \
+                    "(?:-----END (?:[A-Z0-9]{1,20} ){0,3}PRIVATE KEY-----)?"), false],
+        # password=..., API_KEY: ..., "client_secret": "...", TOKEN='...', token=...,
+        # :password=>"..." (but not max_tokens: 800). A quoted value is blanked to
+        # its closing quote, spaces and all, and keeps its quotes.
+        [Regexp.new("(?a)\\b([A-Za-z0-9_-]{0,40}(?:#{NAMES})[A-Za-z0-9_-]{0,40}(?<![Tt][Oo][Kk][Ee][Nn][Ss])\"?[#{WS}]{0,3}#{ASSIGN}[#{WS}]{0,3})(?:(\")[^\"\\n]{1,4096}\"|(')[^'\\n]{1,4096}'|[\"']?[^#{WS}\"',;&]{1,4096})"), :quoted],
+        # Authorization: Basic <base64> and Authorization: Token <token>, also as a JSON or hash entry.
+        [Regexp.new("(?a)\\b((?:#{ci("proxy-")})?#{ci("authorization")}[\"']?[#{WS}]{0,3}#{ASSIGN}[#{WS}]{0,3}[\"']?[#{WS}]{0,3}" \
+                    "(?:#{ci("basic")}|#{ci("token")})[#{WS}]{1,3})[A-Za-z0-9._~+/=:-]{1,4096}"), true],
+        # Credentials inside a URL: postgres://user:password@host. The password
+        # runs to the last "@" before a "/" or a space, so one that contains "@"
+        # is blanked whole.
+        [Regexp.new("(?a)(\\b[A-Za-z][A-Za-z0-9+.-]{0,30}://[^#{WS}/:@]{0,256}:)[^#{WS}/]{1,256}@"), :url],
         # Authorization: Bearer <token>
         [Regexp.new("(?a)\\b(Bearer[#{WS}]{1,3})[A-Za-z0-9._~+/=-]{8,4096}"), true],
-        # Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic and OpenAI style keys.
+        # A bare JWT: three base64url segments, the first starting eyJ.
+        [/(?a)\beyJ[A-Za-z0-9_-]{4,4096}\.[A-Za-z0-9_-]{4,4096}\.[A-Za-z0-9_-]{0,4096}/, false],
+        # Incoming webhook URLs carry their secret in the path.
+        [Regexp.new("(?a)(\\b#{ci("hooks.slack.com")}/(?:#{ci("services")}|#{ci("workflows")}|#{ci("triggers")})/)[A-Za-z0-9/_-]{1,255}"), true],
+        [Regexp.new("(?a)(\\b#{ci("discord")}(?:#{ci("app")})?#{ci(".com/api/")}(?:[Vv][0-9]{1,2}/)?#{ci("webhooks/")})[A-Za-z0-9/_-]{1,255}"), true],
+        # Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google style keys.
         [/(?a)\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/, false],
         [/(?a)\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b/, false],
         [/(?a)\bxox[abposr]-[A-Za-z0-9-]{10,255}/, false],
         [/(?a)\b[rsp]k_(?:live|test)_[A-Za-z0-9]{10,255}\b/, false],
+        [%r{(?a)\bwhsec_[A-Za-z0-9+/=]{16,255}}, false],
         [/(?a)\bsk-[A-Za-z0-9_-]{20,255}/, false],
+        [/(?a)\bAIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])/, false],
       ].freeze
 
       # Characters outside the Basic Multilingual Plane.
@@ -100,11 +122,19 @@ module Cronwatch
       end
     end
 
+    # NUL characters are removed first, since Postgres refuses them in TEXT
+    # and JSONB and the whole run row would be lost. The cap then applies to
+    # what is left.
     def cap(text)
-      text = utf8(text)
+      text = strip_nul(utf8(text))
       return text if JS.length16(text) <= CAP
 
       "[earlier output trimmed]\n#{JS.tail16(text, CAP)}"
+    end
+
+    # Removes every U+0000.
+    def strip_nul(text)
+      text.include?("\0") ? text.delete("\0") : text
     end
 
     # "Name: message" and the first five backtrace lines, each written as
@@ -145,9 +175,9 @@ module Cronwatch
     end
 
     # The default `redact`: blanks values that look like secrets (key=value
-    # pairs with secret-ish names, URL credentials, bearer tokens and
-    # well-known token formats) before output or an error is stored, shown or
-    # sent anywhere. Matches exactly what the SDK's redactSecrets matches.
+    # pairs with secret-ish names, Authorization headers, URL credentials,
+    # bearer tokens, JWTs, PEM private keys, webhook URLs and well-known token
+    # formats) before output or an error is stored, shown or sent anywhere. Matches exactly what the SDK's redactSecrets matches.
     def redact_secrets(text)
       astral = !text.ascii_only? && Secrets::ASTRAL.match?(text)
       out = astral ? Secrets.to_units(text) : text

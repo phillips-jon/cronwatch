@@ -245,6 +245,19 @@ module Cronwatch
         nil
       end
 
+      # Writes `state` only when the stored state's version (absent, or no
+      # row at all, counts as 0) is `expected_version`, in one statement.
+      # Returns whether it wrote. This is what keeps two processes sharing the
+      # database (Ruby or Node) from overwriting each other's updates.
+      def compare_and_set_state(state, expected_version)
+        text = JS.json(state.to_h)
+        changed =
+          if expected_version.zero? then write(:cas_insert, [state.job, text])
+          else write(:cas_update, [text, state.job, expected_version])
+          end
+        changed.to_i.positive?
+      end
+
       # Deletes finished runs that started before this time, except each job's
       # newest run. Returns how many.
       def prune(before)
@@ -308,6 +321,8 @@ module Cronwatch
         seq = pg ? "seq" : "rowid"
         # Byte order on both, so names sort the same whatever the database's collation.
         by_name = pg ? 'name COLLATE "C"' : "name"
+        # The version inside a state's JSON, 0 when it has none.
+        version = ->(column) { pg ? "COALESCE((#{column}->>'version')::bigint, 0)" : "COALESCE(json_extract(#{column}, '$.version'), 0)" }
         sql = {
           upsert_job: "INSERT INTO #{p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)\n      " \
                       "ON CONFLICT (name) DO UPDATE SET definition = excluded.definition, updated_at = excluded.updated_at",
@@ -324,6 +339,11 @@ module Cronwatch
           running_runs: "SELECT * FROM #{p}runs WHERE status = 'running' ORDER BY started_at, #{seq}",
           get_state: "SELECT state FROM #{p}state WHERE job = ?",
           set_state: "INSERT INTO #{p}state (job, state) VALUES (?, ?) ON CONFLICT (job) DO UPDATE SET state = excluded.state",
+          # compare_and_set_state. Expecting version 0 also matches a missing
+          # row, so that case inserts; any other version must find its row.
+          cas_insert: "INSERT INTO #{p}state (job, state) VALUES (?, ?)\n      " \
+                      "ON CONFLICT (job) DO UPDATE SET state = excluded.state WHERE #{version.call("#{p}state.state")} = 0",
+          cas_update: "UPDATE #{p}state SET state = ? WHERE job = ? AND #{version.call("state")} = ?",
           # Each job's newest run is kept whatever its age: without it, a job that
           # runs less often than the retention looks like it never ran.
           prune: "DELETE FROM #{p}runs WHERE status <> 'running' AND started_at < ?\n      " \

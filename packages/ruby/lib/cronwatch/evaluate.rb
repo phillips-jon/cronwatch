@@ -38,6 +38,7 @@ module Cronwatch
         last_alert_at: state.last_alert_at,
         pending_recovery: (state.pending_recovery || []).dup,
         undelivered: (state.undelivered || []).dup,
+        version: state.version,
       )
     end
 
@@ -272,6 +273,25 @@ module Cronwatch
       !state.silenced_until.nil? && state.silenced_until > now
     end
 
+    # An evaluation as it is saved and sent: while the job was silenced when it
+    # began, nothing opens and nothing is sent.
+    def apply_silence(previous, evaluation, now)
+      return evaluation unless silenced?(previous, now)
+
+      Evaluation.new(state: mute_opens(previous, evaluation.state), alerts: [])
+    end
+
+    # Whether an alert waiting to be retried no longer describes the job, so it
+    # is dropped rather than sent late. An alert for a condition is stale once
+    # that condition has closed, or has closed and opened again (it opened at a
+    # time other than the alert's). A recovery is stale when any condition it
+    # names is open again; while they all stay closed it is kept.
+    def stale_alert?(alert, state)
+      return Array(alert.details[:after]).any? { |condition| state.open.key?(condition.to_sym) } if alert.type == :recovered
+
+      state.open[alert.type] != alert.at
+    end
+
     # How a job looks at a glance. Silence wins, then stuck, failing and late.
     def job_health(definition, last_run, state, now)
       open = open_conditions(state)
@@ -288,6 +308,18 @@ module Cronwatch
     # BASELINE_WINDOW are used) and its state. Stats cover runs of any status;
     # the percentiles are over the successful ones among them.
     def summarize(stored, recent, state, next_expected_at, now)
+      summary(stored, recent, state, next_expected_at) { |last_run| job_health(stored.definition, last_run, state, now) }
+    end
+
+    # The summary of a job that could not be evaluated, say because its stored
+    # schedule no longer parses. It reads nothing from the definition. The job
+    # shows as failing (or silenced, while it is), since it needs a look, and
+    # nothing is known about when it is next due.
+    def unevaluable_summary(stored, recent, state, now)
+      summary(stored, recent, state, nil) { silenced?(state, now) ? :silenced : :failing }
+    end
+
+    def summary(stored, recent, state, next_expected_at)
       window = recent.first(BASELINE_WINDOW)
       last_run = window.first
       finished = window.reject { |r| r.status == :running }
@@ -295,7 +327,7 @@ module Cronwatch
       JobSummary.new(
         name: stored.name,
         definition: stored.definition,
-        health: job_health(stored.definition, last_run, state, now),
+        health: yield(last_run),
         open: open_conditions(state),
         last_run: last_run,
         next_expected_at: next_expected_at,

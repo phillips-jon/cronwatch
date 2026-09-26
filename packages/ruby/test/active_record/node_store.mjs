@@ -2,16 +2,18 @@
 // test (node_compat_test.rb), from the built packages/sdk/dist.
 //
 //   node node_store.mjs write|read sqlite|postgres <path or url> <prefix> <fixture.json>
+//   node node_store.mjs cas sqlite|postgres <path or url> <prefix> <state.json> <expected version>
 //
 // write replays the fixture's store calls; read prints what the store hands
-// back for the fixture's jobs and runs, as JSON on stdout.
+// back for the fixture's jobs and runs, as JSON on stdout; cas makes one
+// compareAndSetState and prints whether it wrote, and the state after.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const [action, dialect, target, prefix, fixturePath] = process.argv.slice(2);
+const [action, dialect, target, prefix, fixturePath, expected] = process.argv.slice(2);
 const dist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../sdk/dist");
-const fixture = JSON.parse(readFileSync(fixturePath, "utf8"));
+const fixture = action === "cas" ? null : JSON.parse(readFileSync(fixturePath, "utf8"));
 
 let store;
 if (dialect === "sqlite") {
@@ -39,6 +41,10 @@ try {
       }
     }
     out.pruned = pruned;
+  } else if (action === "cas") {
+    const state = JSON.parse(fixturePath);
+    out.written = await store.compareAndSetState(state, Number(expected));
+    out.state = await store.getState(state.job);
   } else if (action === "read") {
     out.jobs = await store.listJobs();
     out.job = {};

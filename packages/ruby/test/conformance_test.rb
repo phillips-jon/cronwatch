@@ -356,6 +356,31 @@ class ConformanceTest < Minitest::Test
     end
   end
 
+  def test_unevaluable_summary
+    each_case(HEALTH["unevaluableSummary"]) do |c|
+      stored = Cronwatch::StoredJob.from_h(c["stored"])
+      recent = c["recent"].map { |r| Cronwatch::Run.from_h(r) }
+      differs(c["summary"], Cronwatch::Evaluate.unevaluable_summary(stored, recent, state_from(c["state"]), c["now"]))
+    end
+  end
+
+  def test_apply_silence
+    each_case(HEALTH["applySilence"]) do |c|
+      evaluation = Cronwatch::Evaluate::Evaluation.new(
+        state: state_from(c["evaluation"]["state"]),
+        alerts: c["evaluation"]["alerts"].map { |a| draft_from(a) },
+      )
+      result = Cronwatch::Evaluate.apply_silence(state_from(c["previous"]), evaluation, c["now"])
+      differs(c["result"], { "state" => result.state, "alerts" => result.alerts })
+    end
+  end
+
+  def test_stale_alert
+    each_case(HEALTH["staleAlert"]) do |c|
+      differs(c["stale"], Cronwatch::Evaluate.stale_alert?(Cronwatch::Alert.from_h(c["alert"]), state_from(c["state"])))
+    end
+  end
+
   # ---------------------------------------------------------------- output
 
   OUTPUT = fixture("output.json")
@@ -391,10 +416,17 @@ class ConformanceTest < Minitest::Test
         if c.key?("value")
           expand(c["value"])
         else
-          Object.const_get(c["name"]).new(expand(c["message"])).tap { |e| e.set_backtrace(c["frames"]) }
+          error_class(c["name"]).new(expand(c["message"])).tap { |e| e.set_backtrace(c["frames"]) }
         end
       differs(c["result"], digest(Cronwatch::Output.error_message(error)))
     end
+  end
+
+  # The Ruby class of that name, or for JavaScript's plain Error, a class that calls itself that.
+  def error_class(name)
+    return Object.const_get(name) if Object.const_defined?(name)
+
+    Class.new(StandardError) { define_singleton_method(:name) { name } }
   end
 
   def self.expand_lines(lines)

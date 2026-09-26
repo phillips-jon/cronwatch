@@ -200,8 +200,25 @@ module Cronwatch
 
   # Members in the order the SDK's alert object has its keys, which is the
   # order its JSON (a webhook body, an undelivered alert in state) has them.
+  #
+  # `triage` is the triage callable's diagnosis, or nil. A nil triage is one
+  # of two things, as in the SDK: never tried (no "triage" key in the JSON),
+  # or tried and nothing came of it (it raised, timed out or answered empty;
+  # `"triage": null`, and `triage_tried?` is true). A tried alert is not
+  # triaged again.
   Alert = Struct.new(:type, :run, :details, :job, :definition, :title, :message, :at, :triage, keyword_init: true) do
     include Serializable
+
+    # Whether triage was tried for this alert, whatever it gave.
+    def triage_tried?
+      !triage.nil? || @triage_tried == true
+    end
+
+    # Records a triage attempt: the diagnosis, or nil when there was none.
+    def triage_result=(diagnosis)
+      self.triage = diagnosis
+      @triage_tried = true
+    end
 
     def self.from_h(hash)
       return hash if hash.is_a?(Alert)
@@ -209,7 +226,7 @@ module Cronwatch
       run = Naming.fetch(hash, "run")
       details = Naming.from_json_value(Naming.fetch(hash, "details") || {})
       details[:after] = details[:after].map(&:to_sym) if details[:after].is_a?(Array)
-      new(
+      alert = new(
         type: Naming.fetch(hash, "type")&.to_sym,
         run: run && Run.from_h(run),
         details: details,
@@ -218,8 +235,9 @@ module Cronwatch
         title: Naming.fetch(hash, "title"),
         message: Naming.fetch(hash, "message"),
         at: Naming.fetch(hash, "at"),
-        triage: Naming.fetch(hash, "triage"),
       )
+      alert.triage_result = Naming.fetch(hash, "triage") if Naming.present?(hash, "triage")
+      alert
     end
 
     def to_h
@@ -228,13 +246,16 @@ module Cronwatch
         "definition" => definition.respond_to?(:to_h) ? definition.to_h : definition,
         "title" => title, "message" => message, "at" => at,
       }
-      out["triage"] = triage unless triage.nil?
+      out["triage"] = triage if triage_tried?
       out
     end
   end
 
+  # `version` goes up by one on every write, so a store can refuse a write
+  # made from a stale read (see Stores::Memory#compare_and_set_state). Absent
+  # (nil) counts as 0.
   JobState = Struct.new(:job, :open, :consecutive_failures, :silenced_until, :last_alert_at, :pending_recovery,
-                        :undelivered, keyword_init: true) do
+                        :undelivered, :version, keyword_init: true) do
     include Serializable
 
     def self.from_h(hash)
@@ -250,11 +271,13 @@ module Cronwatch
         last_alert_at: Naming.fetch(hash, "lastAlertAt"),
         pending_recovery: pending&.map(&:to_sym),
         undelivered: undelivered&.map { |a| Alert.from_h(a) },
+        version: Naming.fetch(hash, "version"),
       )
     end
 
-    # pendingRecovery and undelivered are left out when unset, as in state
-    # written before they existed.
+    # pendingRecovery, undelivered and version are left out when unset, as in
+    # state written before they existed. The version comes last, where the
+    # SDK's spread of a normalized state puts it.
     def to_h
       out = {
         "job" => job, "open" => (open || {}).transform_keys(&:to_s), "consecutiveFailures" => consecutive_failures,
@@ -262,6 +285,7 @@ module Cronwatch
       }
       out["pendingRecovery"] = pending_recovery.map(&:to_s) unless pending_recovery.nil?
       out["undelivered"] = undelivered.map(&:to_h) unless undelivered.nil?
+      out["version"] = version unless version.nil?
       out
     end
   end

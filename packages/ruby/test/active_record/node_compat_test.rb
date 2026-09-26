@@ -144,6 +144,37 @@ module NodeCompatTests
     assert_equal comparable(Cronwatch::JS.json(node_view)), comparable(ruby_read(store))
   end
 
+  # One compareAndSetState from Node: whether it wrote, and the state it then reads.
+  def node_cas(prefix, state, expected)
+    out, err, status = Open3.capture3("node", SCRIPT, "cas", postgres? ? "postgres" : "sqlite", target, prefix,
+                                      Cronwatch::JS.json(state.to_h), expected.to_s)
+    assert status.success?, "node cas failed: #{err}"
+    Cronwatch::JS.parse(out)
+  end
+
+  # Versions written by either side count for the other: a Node process and a
+  # Ruby process sharing a job's state refuse each other's stale writes.
+  def test_node_and_ruby_take_turns_on_one_jobs_state_version
+    store = make_store
+    v = ->(version, failures) { Cronwatch::JobState.from_h("job" => "v", "open" => {}, "consecutiveFailures" => failures, "silencedUntil" => nil, "lastAlertAt" => nil, "version" => version) }
+    assert store.compare_and_set_state(v.call(1, 1), 0), "Ruby writes the first version"
+    stale = node_cas(store.prefix, v.call(1, 9), 0)
+    assert_equal false, stale["written"], "Node's write from before it is refused"
+    fresh = node_cas(store.prefix, v.call(2, 2), 1)
+    assert_equal true, fresh["written"]
+    assert_equal 2, fresh["state"]["version"]
+    refute store.compare_and_set_state(v.call(2, 7), 1), "Ruby's stale write is refused"
+    assert store.compare_and_set_state(v.call(3, 3), 2)
+    late = node_cas(store.prefix, v.call(3, 0), 2)
+    assert_equal [false, 3, 3], [late["written"], late["state"]["version"], late["state"]["consecutiveFailures"]], "Node reads Ruby's version"
+    assert_equal comparable(Cronwatch::JS.json(v.call(3, 3).to_h)), comparable(Cronwatch::JS.json(store.get_state("v").to_h))
+
+    # State Node wrote before versions existed counts as 0 for Ruby too.
+    store.set_state(Cronwatch::JobState.from_h("job" => "old", "open" => {}, "consecutiveFailures" => 4, "silencedUntil" => nil, "lastAlertAt" => nil))
+    assert_equal true, node_cas(store.prefix, v.call(1, 5).tap { |s| s.job = "old" }, 0)["written"]
+    assert_equal 1, store.get_state("old").version
+  end
+
   def test_the_tables_are_the_same_whoever_creates_them
     node_prefix = ARSupport.prefix
     node_write(node_prefix)

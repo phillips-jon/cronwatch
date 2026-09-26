@@ -8,7 +8,8 @@ module Cronwatch
     #
     # Every store answers the same methods: init (optional), upsert_job,
     # get_job, list_jobs, delete_job, insert_run, update_run, get_run,
-    # list_runs, last_run, running_runs, get_state, set_state, prune and close
+    # list_runs, last_run, running_runs, get_state, set_state, compare_and_set_state
+    # (optional: without it the client falls back to set_state), prune and close
     # (optional). They take and return the types in types.rb.
     class Memory
       def initialize
@@ -116,6 +117,18 @@ module Cronwatch
       def set_state(state)
         sync { @states[state.job] = clone(state, JobState) }
         nil
+      end
+
+      # Writes `state` only when the stored state's version (absent, or no
+      # state at all, counts as 0) is `expected_version`. Returns whether it
+      # wrote. See JobState#version.
+      def compare_and_set_state(state, expected_version)
+        sync do
+          next false unless (@states[state.job]&.version || 0) == expected_version
+
+          @states[state.job] = clone(state, JobState)
+          true
+        end
       end
 
       # Delete finished runs that started before this time. Returns how many.

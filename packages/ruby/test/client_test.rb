@@ -189,6 +189,7 @@ class ClientTest < Minitest::Test
     assert_raises(RuntimeError) { cw2.run("t") { raise "x" } }
     assert_equal [:failed], alerts2.types
     assert_nil alerts2.alerts[0].triage
+    assert alerts2.alerts[0].triage_tried?, "tried, and gave nothing: JSON null"
     assert_equal ["triage for t"], errors
   end
 

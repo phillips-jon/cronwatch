@@ -322,6 +322,80 @@ module ActiveRecordStoreTests
     assert_equal [], store.running_runs
   end
 
+  # A second store on the same tables, as another process would open.
+  def same_tables(store)
+    Cronwatch::Stores::ActiveRecord.new(prefix: store.prefix, connection_class: connection_class)
+  end
+
+  def test_two_stores_racing_on_one_jobs_state
+    one = make_store
+    two = same_tables(one)
+    state = ->(version, n) { Cronwatch::JobState.from_h("job" => "r", "open" => {}, "consecutiveFailures" => n, "silencedUntil" => nil, "lastAlertAt" => nil, "version" => version) }
+    race = lambda do |expected, version|
+      [[one, 1], [two, 2]].map { |store, n| Thread.new { store.compare_and_set_state(state.call(version, n), expected) } }.map(&:value)
+    end
+    assert_equal [false, true], race.call(0, 1).sort_by { |w| w ? 1 : 0 }, "exactly one insert wins"
+    assert_equal [false, true], race.call(1, 2).sort_by { |w| w ? 1 : 0 }, "exactly one update wins"
+    assert_equal 2, one.get_state("r").version
+  end
+
+  # A store whose state reads take a while, as over a network, so two
+  # clients reading at about the same time both get the old state.
+  class SlowStateReads
+    def initialize(store)
+      @store = store
+    end
+
+    def respond_to_missing?(name, include_private = false) = @store.respond_to?(name, include_private)
+
+    def method_missing(name, *args, &block)
+      return super unless @store.respond_to?(name)
+
+      result = @store.public_send(name, *args, &block)
+      sleep 0.025 if name == :get_state
+      result
+    end
+  end
+
+  def test_two_clients_failing_a_job_at_once_lose_no_failure_and_alert_once
+    store = make_store
+    clock = TestHelpers::Clock.new
+    a = TestHelpers::Capture.new
+    b = TestHelpers::Capture.new
+    one = Cronwatch.new(store: SlowStateReads.new(store), now: clock.to_proc, alerts: [a], cron_secret: nil)
+    two = Cronwatch.new(store: SlowStateReads.new(same_tables(store)), now: clock.to_proc, alerts: [b], cron_secret: nil)
+    one.run("shared", failures_before_alert: 2) { nil }
+    [[one, "one"], [two, "two"]].map do |client, message|
+      Thread.new do
+        client.run("shared", failures_before_alert: 2) { raise message }
+      rescue RuntimeError
+        nil
+      end
+    end.each(&:join)
+    state = store.get_state("shared")
+    assert_equal 2, state.consecutive_failures, "neither failure was lost"
+    assert_equal [:failed], state.open.keys
+    assert_equal [:failed], a.types + b.types, "one alert, from whichever client counted the second failure"
+    assert_operator state.version, :>=, 3
+  end
+
+  def test_output_and_errors_with_nul_characters_are_still_recorded
+    store = make_store
+    cw = Cronwatch.new(store: store, alerts: [], cron_secret: nil, on_error: ->(e, _where) { raise e })
+    error = assert_raises(RuntimeError) do
+      cw.run("nul") do |job|
+        job.log("before\0after")
+        raise "bad\0byte"
+      end
+    end
+    assert_match(/bad/, error.message)
+    run = cw.runs("nul").first
+    assert_equal :failed, run.status
+    assert_equal "beforeafter", run.output
+    assert_match(/\ARuntimeError: badbyte/, run.error)
+    assert_equal 1, store.get_state("nul").consecutive_failures, "the state, with its alert, was written too"
+  end
+
   def test_a_client_on_the_store_records_runs_and_alerts
     store = make_store
     client, clock, capture = make(store: store)

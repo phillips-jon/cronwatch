@@ -165,7 +165,9 @@ module Cronwatch
 
                mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
 
-             Outside development it needs CRONWATCH_TOKEN set to sign in.
+             Outside development it needs CRONWATCH_TOKEN set to sign in. In
+             development, without one, the server prints a sign-in link on
+             the dashboard's first request.
 
         TEXT
       end

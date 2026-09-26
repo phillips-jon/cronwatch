@@ -110,21 +110,7 @@ class WebRoutesTest < Minitest::Test
     assert_equal "/cronwatch/", elsewhere.headers["location"], "a foreign referer is not followed"
   end
 
-  def test_without_a_token_a_forwarded_host_or_a_remote_peer_is_not_local
-    with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
-      cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
-      web = Cronwatch::Web.new(cw, base_path: "/cronwatch")
-      local = Rack::MockRequest.env_for("http://localhost:3000/cronwatch/api/jobs", "REMOTE_ADDR" => "127.0.0.1")
-      assert_equal 200, web.call(local)[0]
-      forwarded = Rack::MockRequest.env_for("http://evil.example/cronwatch/api/jobs",
-                                            "REMOTE_ADDR" => "127.0.0.1", "HTTP_X_FORWARDED_HOST" => "localhost")
-      assert_equal 503, web.call(forwarded)[0], "X-Forwarded-Host is set by the client"
-      remote = Rack::MockRequest.env_for("http://localhost/cronwatch/api/jobs", "REMOTE_ADDR" => "203.0.113.9")
-      assert_equal 503, web.call(remote)[0], "a Host of localhost from another machine"
-    end
-  end
-
-  def unconfigured(token: Cronwatch::Web::UNSET, host: "localhost")
+  def unconfigured(token: Cronwatch::Web::UNSET, host: "app.test")
     cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
     web = if token.equal?(Cronwatch::Web::UNSET)
             Cronwatch::Web.new(cw, base_path: "/cronwatch")
@@ -134,23 +120,98 @@ class WebRoutesTest < Minitest::Test
     ->(path) { send_request(web, "GET", "http://#{host}#{path}") }
   end
 
-  def test_without_a_token_open_only_to_localhost_in_development_and_test_locked_otherwise
+  # The lines the block printed to stdout, and its result.
+  def printed
+    before = $stdout
+    $stdout = StringIO.new
+    result = yield
+    [$stdout.string.lines.map(&:chomp), result]
+  ensure
+    $stdout = before
+  end
+
+  def test_without_a_token_outside_development_the_routes_are_locked
     [nil, "production", "staging", ""].each do |env|
       with_env("RAILS_ENV" => nil, "RACK_ENV" => env, "CRONWATCH_TOKEN" => nil) do
-        get = unconfigured
-        assert_equal 503, get.call("/cronwatch/api/jobs").status, "RACK_ENV=#{env}"
-        assert_equal 503, get.call("/cronwatch").status, "RACK_ENV=#{env}"
+        get = unconfigured(host: "localhost:3000")
+        lines, = printed do
+          assert_equal 503, get.call("/cronwatch/api/jobs").status, "RACK_ENV=#{env}"
+          page = get.call("/cronwatch")
+          assert_equal 503, page.status, "RACK_ENV=#{env}"
+          assert_includes page.body, "Set CRONWATCH_TOKEN (or pass token: to Cronwatch::Web.new), or pass token: nil to serve them open behind your own auth."
+        end
+        assert_empty lines, "no token is made outside development"
       end
     end
+  end
+
+  SIGN_IN = %r{\A\[cronwatch\] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard\. Sign in: http://localhost:3000/cronwatch/\?token=([A-Za-z0-9_-]{43})\z}
+
+  def test_without_a_token_in_development_a_made_up_token_is_printed_once_and_required_from_everyone
     %w[development test].each do |env|
       %w[RAILS_ENV RACK_ENV].each do |var|
         with_env("RAILS_ENV" => nil, "RACK_ENV" => nil, var => env, "CRONWATCH_TOKEN" => nil) do
-          assert_equal 200, unconfigured.call("/cronwatch/api/jobs").status, "#{var}=#{env}"
-          assert_equal 200, unconfigured(host: "127.0.0.1:3000").call("/cronwatch/api/jobs").status, "#{var}=#{env}"
-          assert_equal 200, unconfigured(host: "[::1]:3000").call("/cronwatch/api/jobs").status, "#{var}=#{env}"
-          assert_equal 503, unconfigured(host: "192.168.1.20:3000").call("/cronwatch/api/jobs").status, "a LAN address, #{var}=#{env}"
-          assert_equal 503, unconfigured(host: "evil.example").call("/cronwatch/api/jobs").status, "a rebinding host, #{var}=#{env}"
+          cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
+          web = Cronwatch::Web.new(cw, base_path: "/cronwatch/")
+          lines, = printed do
+            # Every request is refused without the token, whatever it claims about where it came from.
+            [
+              ["http://localhost:3000/cronwatch/api/jobs", {}],
+              ["http://localhost:3000/cronwatch/api/jobs", { "x-forwarded-for" => "127.0.0.1", "x-real-ip" => "127.0.0.1" }],
+              ["http://127.0.0.1:3000/cronwatch/", {}],
+              ["http://192.168.1.20:3000/cronwatch/api/jobs", {}],
+            ].each do |url, headers|
+              assert_equal 401, send_request(web, "GET", url, headers).status, "#{url} #{var}=#{env}"
+            end
+          end
+          assert_equal 1, lines.length, "announced once, on the first request"
+          match = SIGN_IN.match(lines[0])
+          assert match, lines[0]
+          token = match[1]
+
+          page = send_request(web, "GET", "http://localhost:3000/cronwatch/")
+          assert_equal 401, page.status
+          assert_includes page.body, "The sign-in link is in the server log: open it once and this browser stays signed in."
+          api = send_request(web, "GET", "http://localhost:3000/cronwatch/api/jobs")
+          assert_equal({ "ok" => false, "error" => "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, api.json)
+
+          sign_in = send_request(web, "GET", "http://localhost:3000/cronwatch/?token=#{token}")
+          assert_equal 303, sign_in.status
+          assert_equal "/cronwatch/", sign_in.headers["location"]
+          cookie = sign_in.headers["set-cookie"].split(";").first
+          assert_equal 200, send_request(web, "GET", "http://localhost:3000/cronwatch/", { "cookie" => cookie }).status
+          assert_equal 200, send_request(web, "GET", "http://localhost:3000/cronwatch/api/jobs", { "authorization" => "Bearer #{token}" }).status
+
+          other = Cronwatch::Web.new(Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil), base_path: "/")
+          second, = printed { send_request(other, "GET", "https://dev.example:8443/api/jobs") }
+          assert_match %r{Sign in: https://dev\.example:8443/\?token=[A-Za-z0-9_-]{43}\z}, second[0], "the origin as requested, and a root mount"
+          refute_equal token, second[0][-43..], "each app makes its own"
+
+          mounted = Cronwatch::Web.new(Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil))
+          third, = printed { send_request(mounted, "GET", "http://localhost:3000/admin/cronwatch/api/jobs", script_name: "/admin/cronwatch") }
+          assert_match %r{Sign in: http://localhost:3000/admin/cronwatch/\?token=[A-Za-z0-9_-]{43}\z}, third[0], "the mount point, from SCRIPT_NAME"
         end
+      end
+    end
+    with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
+      lines, response = printed { unconfigured(token: nil).call("/cronwatch/api/jobs") }
+      assert_equal 200, response.status, "token: nil serves open in development too"
+      assert_empty lines, "and makes no token"
+    end
+    with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => "envtok") do
+      lines, response = printed { unconfigured.call("/cronwatch/api/jobs") }
+      assert_equal 401, response.status, "a configured token is used in development"
+      assert_empty lines
+    end
+  end
+
+  def test_the_development_token_lets_a_cron_secret_run_the_check
+    with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
+      cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: "cronsecret")
+      web = Cronwatch::Web.new(cw, base_path: "/cronwatch")
+      printed do
+        assert_equal 200, send_request(web, "GET", "/cronwatch/api/check", { "authorization" => "Bearer cronsecret" }).status
+        assert_equal 401, send_request(web, "GET", "/cronwatch/api/jobs", { "authorization" => "Bearer cronsecret" }).status
       end
     end
   end

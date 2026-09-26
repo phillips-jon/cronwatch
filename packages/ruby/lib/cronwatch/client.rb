@@ -26,6 +26,11 @@ module Cronwatch
     PRUNE_INTERVAL_MS = 60 * 60_000
     # Undelivered alerts kept per job for retry; the oldest go first.
     MAX_UNDELIVERED = 20
+    # Wall-clock time one check spends retrying undelivered alerts, across
+    # every job. Once it is spent the rest wait for the next check.
+    RETRY_BUDGET_MS = 20_000
+    # Reads and writes of one job's state before an update gives up on a store that keeps changing under it.
+    STATE_ATTEMPTS = 10
     # Runs read for a baseline, and the most read when failures crowd out the successes.
     HISTORY_PAGE = Evaluate::BASELINE_WINDOW + 5
     HISTORY_MAX = 200
@@ -58,8 +63,10 @@ module Cronwatch
     # defaults:    grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
     # redact:      applied to every run's output and error before it is stored, shown or sent to an alert
     #              channel or triage. The default (Output.redact_secrets) blanks values that look like secrets
-    #              (password=..., URL credentials, bearer tokens, AWS, GitHub, Slack, Stripe and API key
-    #              formats). Pass your own callable, or false to keep output exactly as logged.
+    #              (password=..., Authorization headers, URL credentials, bearer tokens, JWTs, PEM private
+    #              keys, webhook URLs, AWS, GitHub, Slack, Stripe, Google and API key formats). Pass your own
+    #              callable, or false to keep output exactly as logged. A callable that raises or returns
+    #              something other than a String is reported to on_error ("redact") and the default is used.
     # now:         the clock, a callable returning epoch milliseconds. Tests use this.
     # on_error:    called with (error, where) for anything that goes wrong outside a job: the store failing,
     #              an alert channel failing, a triage timeout.
@@ -80,7 +87,11 @@ module Cronwatch
         raise ArgumentError, "redact must be a callable, or false to keep output as logged"
       end
 
-      @redact = redact == false ? ->(text) { text } : (redact || Output.method(:redact_secrets))
+      @redact =
+        if redact == false then ->(text) { text }
+        elsif redact.nil? then Output.method(:redact_secrets)
+        else guarded_redact(redact)
+        end
       unless [:now, :check, "now", "check", nil].include?(deliver)
         raise ArgumentError, "deliver must be \"now\" or \"check\", not #{deliver.inspect}"
       end
@@ -99,6 +110,8 @@ module Cronwatch
       @first_tick_s = 1.0
       @channel_timeout_ms = CHANNEL_TIMEOUT_MS
       @triage_timeout_ms = TRIAGE_TIMEOUT_MS
+      @retry_budget_ms = RETRY_BUDGET_MS
+      @warned_deferred_start = false
       reset_process_state
     end
 
@@ -173,11 +186,7 @@ module Cronwatch
       # just before the block runs. The result is the same.
       if recorded
         begin
-          serial(name) do
-            before = read_state(name)
-            after = Evaluate.on_run_start(before)
-            @store.set_state(after) unless same_state?(before, after)
-          end
+          update_state(name) { |before| [Evaluate.on_run_start(before), nil] }
         rescue StandardError => e
           report(e, "starting #{name}")
         end
@@ -219,9 +228,10 @@ module Cronwatch
           run.status = :ok
         end
       end
-      # Redacted after the expect check, so a rule can still match what was logged.
-      run.output = @redact.call(run.output) unless run.output.nil?
-      run.error = @redact.call(run.error) unless run.error.nil?
+      # Redacted after the expect check, so a rule can still match what was
+      # logged. NULs go last, so not even a custom redact can store one.
+      run.output = Output.strip_nul(@redact.call(run.output)) unless run.output.nil?
+      run.error = Output.strip_nul(@redact.call(run.error)) unless run.error.nil?
 
       stored = Serialize.to_stored(definition)
       if recorded && marked_timed_out?(run)
@@ -362,6 +372,11 @@ module Cronwatch
         end
 
         @ticker_ms = ms
+        if @defer_delivery && !@warned_deferred_start
+          @warned_deferred_start = true
+          warn '[cronwatch] start() was called with deliver: "check", so these checks send no alerts. ' \
+               'Another process must run checks with deliver: "now" (the default) to send them.'
+        end
         @ticker = Ticker.new(ms / 1000.0, @first_tick_s) do
           check
         rescue StandardError => e
@@ -524,8 +539,8 @@ module Cronwatch
 
     # Runs the block while holding the job's lock, so two runs (or a run and a
     # check) in this process never read and write the job's state over each
-    # other. Other processes are not coordinated. Only store reads and writes
-    # happen inside; alerts are sent outside it.
+    # other. Other processes are coordinated by update_state instead. Only
+    # store reads and writes happen inside; alerts are sent outside it.
     def serial(job, &block)
       after_fork_check
       lock = @registry.synchronize { @locks[job] ||= Monitor.new }
@@ -538,6 +553,60 @@ module Cronwatch
 
     def same_state?(a, b)
       JS.json(a.to_h) == JS.json(b.to_h)
+    end
+
+    # Every read-modify-write of a job's state goes through here. In turn with
+    # this process's other updates to the job (serial), it reads the state,
+    # yields it for the next one and a result (`[state, result]`), and writes
+    # that with the version one higher, only if the stored version is still
+    # the one read. When another process wrote in between, the write is
+    # refused and it starts again from a fresh read, up to STATE_ATTEMPTS
+    # times. So the block may run more than once and must only compute:
+    # whatever it returns from the attempt that was written is the result.
+    # Nothing is written when the state is unchanged. Returns
+    # `[state as stored, result]`.
+    def update_state(job)
+      serial(job) do
+        attempt = 0
+        loop do
+          attempt += 1
+          current = read_state(job)
+          state, result = yield(current)
+          break [current, result] if same_state?(state, current)
+
+          version = current.version || 0
+          following = state.dup
+          following.version = version + 1
+          break [following, result] if write_state(following, version)
+          if attempt >= STATE_ATTEMPTS
+            raise "the state of #{job} changed under #{STATE_ATTEMPTS} attempts in a row to update it; gave up"
+          end
+        end
+      end
+    end
+
+    # A conditional write, or for a store without compare_and_set_state, a
+    # plain one that always succeeds.
+    def write_state(state, expected_version)
+      return @store.compare_and_set_state(state, expected_version) if @store.respond_to?(:compare_and_set_state)
+
+      @store.set_state(state)
+      true
+    end
+
+    # A custom redact, made safe: one that raises or returns something other
+    # than a String is reported and the default is used instead, so a broken
+    # redact neither stops the run finishing nor leaks what it was given.
+    def guarded_redact(redact)
+      lambda do |text|
+        out = redact.call(text)
+        raise TypeError, "redact must return a string, not #{out.nil? ? "null" : out.class}" unless out.is_a?(String)
+
+        Output.utf8(out)
+      rescue StandardError => e
+        report(e, "redact")
+        Output.redact_secrets(text)
+      end
     end
 
     # Identifies an alert across retries.
@@ -560,10 +629,11 @@ module Cronwatch
       drafts = nil
       begin
         @store.update_run(run) if write
-        drafts = serial(run.job) do
-          history = history(run)
-          previous = read_state(run.job)
-          settle(previous, Evaluate.on_run_finish(definition, run, previous, history, at), at).alerts
+        past = nil
+        _, drafts = update_state(run.job) do |previous|
+          past ||= history(run)
+          settled = Evaluate.apply_silence(previous, Evaluate.on_run_finish(definition, run, previous, past, at), at)
+          [settled.state, settled.alerts]
         end
       rescue StandardError => e
         report(e, "evaluating #{run.job}")
@@ -589,36 +659,44 @@ module Cronwatch
       at = now
       alerts = []
 
-      # Runs that never reported back.
+      # Runs that never reported back. One that cannot be judged (its job's
+      # stored timeout no longer parses, say) is reported and skipped.
       @store.running_runs.each do |run|
         declared = @registry.synchronize { @definitions[run.job] }
         definition = declared ? Serialize.to_stored(declared) : @store.get_job(run.job)&.definition
-        next if definition.nil? || !isolated(run.job) { Evaluate.stuck?(definition, run, at) }
+        next if definition.nil? || !Evaluate.stuck?(definition, run, at)
 
+        timeout = Evaluate.timeout_ms(definition)
         run.status = :timeout
         run.finished_at = at
         run.duration_ms = at - run.started_at
-        run.error = "Still running after #{Duration.format(Evaluate.timeout_ms(definition))}; marked as timed out"
+        run.error = "Still running after #{Duration.format(timeout)}; marked as timed out"
         alerts.concat(finish_run(definition, run, at, true))
+      rescue StandardError => e
+        report(e, "checking #{run.job}")
       end
 
+      # Each job on its own: one that cannot be evaluated (a stored schedule
+      # this process cannot read, one a Node process wrote, say) is reported,
+      # shown as failing (see Evaluate.unevaluable_summary) and does not stop
+      # the others.
       jobs = []
+      retries = RetryBudget.new(0)
       @store.list_jobs.each do |stored|
         recent = @store.list_runs(stored.name, Evaluate::BASELINE_WINDOW)
-        # A job whose stored schedule this process cannot read (one a Node
-        # process wrote, say) is reported and skipped; the others go on.
-        previous, evaluation, settled = isolated(stored.name) do
-          serial(stored.name) do
-            before = read_state(stored.name)
-            result = Evaluate.on_check(stored.definition, stored, recent.first, before, at)
-            [before, result, settle(before, result, at)]
-          end
+        next_expected_at = nil
+        state, drafts = update_state(stored.name) do |previous|
+          evaluation = Evaluate.on_check(stored.definition, stored, recent.first, previous, at)
+          next_expected_at = evaluation.next_expected_at
+          settled = Evaluate.apply_silence(previous, evaluation, at)
+          [settled.state, settled.alerts]
         end
-        next if evaluation.nil?
-
-        alerts.concat(retry_undelivered(stored.name, previous, at))
-        alerts.concat(dispatch(settled.alerts, stored.definition, at))
-        jobs << Evaluate.summarize(stored, recent, settled.state, evaluation.next_expected_at, at)
+        alerts.concat(retry_undelivered(stored.name, state, at, retries))
+        alerts.concat(dispatch(drafts, stored.definition, at))
+        jobs << Evaluate.summarize(stored, recent, state, next_expected_at, at)
+      rescue StandardError => e
+        report(e, "checking #{stored.name}")
+        jobs << unevaluable(stored, at)
       end
 
       pruned = 0
@@ -634,52 +712,51 @@ module Cronwatch
       CheckResult.new(checked_at: at, jobs: jobs, alerts: alerts, pruned: pruned)
     end
 
-    # The block's answer, or nil when it raised ArgumentError: a stored
-    # schedule or option this process cannot read. That goes to on_error.
-    def isolated(name)
-      yield
-    rescue ArgumentError => e
-      report(e, "checking #{name}")
-      nil
+    # A job's summary and its newest runs, without alerting. A job that cannot
+    # be evaluated (a stored schedule this process cannot read, say) is
+    # reported and shown as failing.
+    def snapshot(stored, at, count)
+      recent = []
+      begin
+        recent = @store.list_runs(stored.name, [count, Evaluate::BASELINE_WINDOW].max)
+        state = read_state(stored.name)
+        next_expected_at = Evaluate.on_check(stored.definition, stored, recent.first, state, at).next_expected_at
+        JobWithRuns.new(job: Evaluate.summarize(stored, recent, state, next_expected_at, at), runs: recent.first(count))
+      rescue StandardError => e
+        report(e, "reading #{stored.name}")
+        JobWithRuns.new(job: unevaluable(stored, at), runs: recent.first(count))
+      end
     end
 
-    # A job's summary and its newest runs, without alerting. A job whose
-    # schedule cannot be read is shown with no next expected time.
-    def snapshot(stored, at, count)
-      recent = @store.list_runs(stored.name, [count, Evaluate::BASELINE_WINDOW].max)
-      state = read_state(stored.name)
-      next_expected_at = isolated(stored.name) do
-        Evaluate.on_check(stored.definition, stored, recent.first, state, at).next_expected_at
+    # The summary of a job whose evaluation failed, from whatever can still be read.
+    def unevaluable(stored, at)
+      recent = begin
+        @store.list_runs(stored.name, Evaluate::BASELINE_WINDOW)
+      rescue StandardError
+        []
       end
-      JobWithRuns.new(job: Evaluate.summarize(stored, recent, state, next_expected_at, at), runs: recent.first(count))
+      state = begin
+        read_state(stored.name)
+      rescue StandardError
+        Evaluate.empty_state(stored.name)
+      end
+      Evaluate.unevaluable_summary(stored, recent, state, at)
     end
 
     # Read, change and write one job's state, in turn with every other update to it.
     def patch_state(name)
       ensure_ready
-      serial(name) do
-        state = read_state(name)
-        yield state
-        @store.set_state(state)
-        state
+      state, = update_state(name) do |current|
+        following = Evaluate.normalize_state(current, name)
+        yield following
+        [following, nil]
       end
-    end
-
-    # Save an evaluation's state, honouring silence, and return what should be sent. Call inside serial.
-    def settle(previous, evaluation, at)
-      state = evaluation.state
-      alerts = evaluation.alerts
-      if Evaluate.silenced?(previous, at)
-        state = Evaluate.mute_opens(previous, state)
-        alerts = []
-      end
-      @store.set_state(state) unless same_state?(state, previous)
-      Evaluate::Evaluation.new(state: state, alerts: alerts)
+      state
     end
 
     # Compose, triage and send each draft. The state was saved before this
-    # (settle), so a slow channel holds up nothing else; afterwards only the
-    # delivery fields are written back, onto a fresh read of the state.
+    # (update_state), so a slow channel holds up nothing else; afterwards only
+    # the delivery fields are written back, onto a fresh read of the state.
     def dispatch(drafts, definition, at)
       return [] if drafts.empty?
 
@@ -691,43 +768,65 @@ module Cronwatch
         if @defer_delivery
           failed << alert
         else
-          add_triage(alert) if @triage && alert.type != :recovered
+          add_triage(alert, @triage_timeout_ms) if @triage && alert.type != :recovered
           (deliver(alert) ? delivered : failed) << alert
         end
         composed << alert
       end
-      record_delivery(definition.name, delivered, failed, at)
+      record_delivery(definition.name, delivered, failed, [], at)
       composed
     end
 
-    # Send the alerts that no channel accepted last time, once each.
-    def retry_undelivered(name, state, at)
+    # The wall-clock milliseconds one check has spent retrying, across its jobs.
+    RetryBudget = Struct.new(:spent_ms)
+
+    # Send the alerts that no channel accepted last time, once each, oldest
+    # first. `state` is the job's state as this check left it: an alert that
+    # no longer describes it (Evaluate.stale_alert?) is dropped instead.
+    # Retries across a check share RETRY_BUDGET_MS of wall-clock time; once it
+    # is spent the rest stay queued for the next check.
+    def retry_undelivered(name, state, at, budget)
       pending = state.undelivered || []
       return [] if pending.empty? || Evaluate.silenced?(state, at) || @defer_delivery
 
       delivered = []
       failed = []
+      dropped = pending.select { |alert| Evaluate.stale_alert?(alert, state) }
       pending.each do |alert|
-        # An alert queued by a process that delivers at check time was never triaged.
-        add_triage(alert) if @triage && alert.type != :recovered && alert.triage.nil?
+        next if dropped.any? { |d| d.equal?(alert) }
+
+        left = @retry_budget_ms - budget.spent_ms
+        break if left <= 0
+
+        started = AbortSignal.monotonic
+        # An alert queued by a process that delivers at check time was never
+        # triaged. One that was tried (triage: null) is not tried again.
+        add_triage(alert, [@triage_timeout_ms, left].min) if @triage && alert.type != :recovered && !alert.triage_tried?
         (deliver(alert) ? delivered : failed) << alert
+        budget.spent_ms += [0, ((AbortSignal.monotonic - started) * 1000).round].max
       end
-      record_delivery(name, delivered, failed, at)
+      record_delivery(name, delivered, failed, dropped, at)
       delivered
     end
 
-    # Mark delivered alerts done and keep failed ones for the next check. last_alert_at moves only on a delivery.
-    def record_delivery(name, delivered, failed, at)
-      serial(name) do
-        previous = read_state(name)
+    # Mark delivered alerts done, drop stale ones, and keep failed ones for the
+    # next check. A failed alert replaces its stored copy, so a triage made on
+    # this attempt is kept. last_alert_at moves only on a delivery.
+    def record_delivery(name, delivered, failed, dropped, at)
+      _, trimmed = update_state(name) do |previous|
         state = Evaluate.normalize_state(previous, name)
-        done = delivered.map { |a| alert_key(a) }.to_set
-        kept = state.undelivered.reject { |a| done.include?(alert_key(a)) }
+        done = (delivered + dropped).map { |a| alert_key(a) }.to_set
+        retried = failed.to_h { |a| [alert_key(a), a] }
+        kept = state.undelivered.reject { |a| done.include?(alert_key(a)) }.map { |a| retried.fetch(alert_key(a), a) }
         known = kept.map { |a| alert_key(a) }.to_set
         kept.concat(failed.reject { |a| known.include?(alert_key(a)) })
         state.undelivered = kept.last(MAX_UNDELIVERED)
         state.last_alert_at = at if delivered.any?
-        @store.set_state(state) unless same_state?(state, previous)
+        [state, [0, kept.length - MAX_UNDELIVERED].max]
+      end
+      if trimmed.positive?
+        report(RuntimeError.new("#{trimmed} undelivered alert#{trimmed == 1 ? "" : "s"} for #{name} dropped: " \
+                                "only the newest #{MAX_UNDELIVERED} are kept for retry"), "alert queue for #{name}")
       end
     rescue StandardError => e
       report(e, "recording alert delivery for #{name}")
@@ -775,10 +874,11 @@ module Cronwatch
       channel.respond_to?(:name) && channel.name ? channel.name : channel.class.name
     end
 
-    # Adds the triage callable's diagnosis to the alert. While a triage that
-    # timed out is still going, alerts go out without one rather than start
-    # another beside it.
-    def add_triage(alert)
+    # Sets the alert's triage to the diagnosis, or to nil (JSON null) when
+    # there is none (it raised, timed out or answered nil or ""), so it is
+    # tried once per alert. While a triage that timed out is still going,
+    # alerts go out without one rather than start another beside it.
+    def add_triage(alert, timeout_ms)
       signal = AbortSignal.new
       if @sending_lock.synchronize { @abandoned[:triage]&.alive? }
         raise TimeoutError, "skipped: an earlier triage timed out and is still running"
@@ -793,16 +893,17 @@ module Cronwatch
       rescue StandardError, ScriptError => e
         outcome = [:error, e]
       end
-      unless thread.join(@triage_timeout_ms / 1000.0)
+      unless thread.join(timeout_ms / 1000.0)
         @sending_lock.synchronize { @abandoned[:triage] = thread }
-        raise TimeoutError, "timed out after #{@triage_timeout_ms}ms"
+        raise TimeoutError, "timed out after #{timeout_ms}ms"
       end
       raise outcome[1] if outcome[0] == :error
 
       diagnosis = outcome[1]
-      alert.triage = Output.utf8(diagnosis) if diagnosis.is_a?(String) && !diagnosis.empty?
+      alert.triage_result = diagnosis.is_a?(String) && !diagnosis.empty? ? Output.utf8(diagnosis) : nil
     rescue StandardError => e
       signal&.abort!
+      alert.triage_result = nil
       report(e, "triage for #{alert.job}")
     end
 

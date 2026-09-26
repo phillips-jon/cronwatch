@@ -133,10 +133,16 @@ Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSO
 `Cronwatch::Web.new(client = nil, token:, base_path:)`:
 
 - `client`: the client to serve. Leave it out and each request uses `Cronwatch.client`.
-- `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Without a token the app answers only `localhost` while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, and 503 everywhere else. `nil` opts out and serves it open, for a mount behind your own auth.
+- `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Without a token, while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, the app makes a token of its own and prints a sign-in link to standard output on its first request (see below); anywhere else it answers 503. `nil` opts out and serves it open, for a mount behind your own auth.
 - `base_path`: where it is mounted. It defaults to `SCRIPT_NAME`, which `map` and Rails' `mount` set, so it is only needed when something strips the prefix without setting it.
 
-The `localhost` check reads the `Host` header as sent and the peer's address, never the host Rack reports, and refuses a request whose `X-Forwarded-Host`, `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header names anything but loopback. The request's origin, used to refuse cross-site writes, comes from the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto`; behind a proxy, make sure those carry the public host and scheme. `/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
+The development token is 32 random bytes, base64url, made once per `Cronwatch::Web` instance (so a restart, or a reload that builds a new one, signs you out). The first request prints one line:
+
+```text
+[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
+```
+
+The link is built from that request's origin and the mount path. Open it once and the browser keeps a cookie, as with any token; scripts and the MCP server can send it as a bearer. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a Rack app cannot tell a caller on this machine from one elsewhere (proxies, tunnels and a server bound to every interface all look alike), so the log, which only you can read, is the proof. The request's origin, used to refuse cross-site writes, comes from the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto`; behind a proxy, make sure those carry the public host and scheme. `/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
 
 ## Stores
 
@@ -161,7 +167,9 @@ Each store call checks a connection out for just that call, so runs and checks i
 
 On Postgres the store never writes inside a transaction your code has open. It connects through a pool of its own (an abstract class under `Cronwatch::Stores::ActiveRecord`, with the writing database config of `connection_class`), so a job run inside `transaction do ... end` is recorded when it happens and stays recorded if the transaction rolls back, and a check running at the same time cannot deadlock with it. That pool is the size of the config's `pool` (5 by default), so each process may open up to that many more connections, one at a time as they are needed; count them against the database's connection limit, or give the store a `connection_class` whose config sets a smaller `pool`. SQLite allows one writer at a time, so there the store uses your pool: inside an open transaction each call runs in a savepoint, so a store error cannot abort the transaction, and the rows commit or roll back with it.
 
-A store of your own is any object with the methods the memory store has: `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune`, and optionally `init` and `close`. They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says, with epoch milliseconds for every time.
+A store of your own is any object with the methods the memory store has: `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `compare_and_set_state`, `prune`, and optionally `init` and `close`. They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says, with epoch milliseconds for every time.
+
+`compare_and_set_state(state, expected_version)` writes the state only when the stored one's `version` is `expected_version` (a missing row, or a state with no version, counts as 0) and returns whether it wrote. Every change to a job's state (a run starting or finishing, a check, a delivery, a silence) is read, worked out, and written with the version one higher through it; a refused write is worked out again from a fresh read, up to ten times, before it is reported to `on_error`. So two processes sharing a store, Ruby or Node, never lose each other's updates. It is optional: without it the client falls back to `set_state`, which is safe only while one process at a time updates a job's state. The memory and ActiveRecord stores have it; see [two processes, one store](/docs/stores/#two-processes-one-store).
 
 ## Alerts
 
@@ -195,11 +203,15 @@ A job can run somewhere that cannot reach Slack or a mail relay: a sandboxed bac
 RECORDER = Cronwatch.new(store: Cronwatch::Stores::ActiveRecord.new, deliver: :check)
 ```
 
-It still records every run and evaluates it, but instead of sending an alert it queues it with the job's state. The next check in a process that sends normally (a `start` thread, `Cronwatch::CheckJob`, or whatever calls the check endpoint) delivers it, adds triage if that process has it, and marks it sent. Both processes must use the same store. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send).
+It still records every run and evaluates it, but instead of sending an alert it queues it with the job's state. The next check in a process that sends normally (a `start` thread, `Cronwatch::CheckJob`, or whatever calls the check endpoint) delivers it, adds triage if that process has it, and marks it sent. Both processes must use the same store. Calling `start` in the recording process is allowed but sends nothing, so it warns once on standard error. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send).
+
+An alert no channel accepted waits in the same queue, and each check tries it once more. A queued alert that no longer describes the job is dropped instead of sent late: one whose condition has closed since, or closed and opened again, and a recovery once any condition it names is open again. One check spends at most 20 seconds of retries across all jobs, and whatever is left waits for the next check. More than twenty queued alerts for one job drops the oldest and says so through `on_error` (`"alert queue for <job>"`).
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent to a channel or triage, `redact` rewrites them. The default, `Cronwatch::Output.redact_secrets`, blanks values that look like secrets: `password=...` and other secret-named pairs (quoted or not), credentials in URLs, bearer tokens, and AWS, GitHub, Slack, Stripe and API key formats. It matches exactly what the SDK's default matches. An `expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent to a channel or triage, `redact` rewrites them. The default, `Cronwatch::Output.redact_secrets`, blanks values that look like secrets: `password=...`, `api_key: ...`, `:secret => "..."` and other secret-named pairs (quoted values in full), credentials in URLs, `Bearer`, `Basic` and `Token` authorization values, PEM private keys, JWTs, Slack and Discord webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats. It matches exactly what the SDK's default matches. An `expect` rule is checked before redaction, so it still sees what was logged. NUL characters are removed from output and errors, before the 16 KB cap and again after `redact`, because Postgres refuses them.
+
+A `redact` that raises, or returns something other than a String, is reported to `on_error` (as `"redact"`) and the default patterns are used for that text, so the run is still recorded and nothing leaks.
 
 ```ruby
 Cronwatch.new(redact: false)                                                     # keep output as logged
@@ -235,7 +247,7 @@ CW = Cronwatch.new(
 | `api_key` | what the `anthropic` gem resolves, normally `ANTHROPIC_API_KEY` | |
 | `client` | | a configured `Anthropic::Client` to use instead |
 
-It runs only when an alert is sent, never per run, and never for a recovery. The client waits 25 seconds for it, then sends the alert without a diagnosis and reports the timeout to `on_error`. The `anthropic` gem cannot cancel a request under way, so the request is made once, without retries, with a 24 second timeout, and ends on its own before the client stops waiting. A refusal gives no diagnosis. What is sent is in [AI triage](/docs/triage/).
+It runs only when an alert is sent, never per run, and never for a recovery, and once per alert whatever happens to it. The client waits 25 seconds for it (on a retry, no longer than what is left of the check's 20 second retry budget), then sends the alert without a diagnosis and reports the timeout to `on_error`. When triage gives nothing (it raised, timed out or answered nil or an empty string) the alert's `triage` is nil, `null` in its JSON, and it is not asked again when the alert is retried; an alert that no channel accepted is queued with its diagnosis, so a retry sends the same one. The `anthropic` gem cannot cancel a request under way, so the request is made once, without retries, with a 24 second timeout, and ends on its own before the client stops waiting. A refusal gives no diagnosis. What is sent is in [AI triage](/docs/triage/).
 
 A triage of your own is any callable that takes the context (`alert`, `recent_runs`, `signal`) and returns a string or nil. `signal.aborted?` turns true, and `signal.check!` raises, once the client has stopped waiting; nothing is interrupted, so honour it if the work can stop early.
 
@@ -251,7 +263,7 @@ A triage of your own is any callable that takes the context (`alert`, `recent_ru
 | `cron_secret` | `ENV["CRON_SECRET"]` | the bearer `/api/check` on `Cronwatch::Web` accepts beside the token. Empty counts as unset; `nil` means none on purpose |
 | `retention` | `"30d"` | how long finished runs are kept. Each job's newest run is always kept |
 | `defaults` | | `grace`, `timeout`, `timezone`, `failures_before_alert` applied to every job that does not set its own |
-| `redact` | secret patterns | a callable applied to output and errors before they are stored or sent; `false` keeps them as logged. See [Redaction](#redaction) |
+| `redact` | secret patterns | a callable applied to output and errors before they are stored or sent; `false` keeps them as logged. One that raises or returns something other than a String is reported to `on_error` and the default is used. See [Redaction](#redaction) |
 | `deliver` | `:now` | `:check` sends nothing from this process: alerts are queued in the store and the next check in a process that delivers now sends them, with triage. See [processes that cannot send](#processes-that-cannot-send) |
 | `on_error` | `Rails.logger`, or a warning on standard error | `->(error, where) { ... }` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a callable returning epoch milliseconds; for tests |
@@ -266,11 +278,11 @@ The client:
 |---|---|
 | `job(name, **options)` | declare a job and get its handle |
 | `run(name, **options) { \|job\| ... }` | run without keeping a handle. Without a block, `run(id)` is `get_run(id)` |
-| `check` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune. Returns a result with `checked_at`, `jobs`, `alerts` and `pruned`. Calls at the same time share one check |
-| `start(every = "1m")`, `stop` | check in a background thread; the first check comes after a second, and the interval is at least 5 seconds. A second `start` does nothing, and one with another interval is reported to `on_error` |
+| `check` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune. Returns a result with `checked_at`, `jobs`, `alerts` and `pruned`. Calls at the same time share one check. A job that cannot be evaluated is reported to `on_error` (as `"checking <job>"`) and listed as `failing`; the rest are checked as usual |
+| `start(every = "1m")`, `stop` | check in a background thread; the first check comes after a second, and the interval is at least 5 seconds. A second `start` does nothing, and one with another interval is reported to `on_error`. With `deliver: :check`, `start` warns once that these checks send nothing |
 | `jobs`, `jobs_with_runs(limit = 20)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit = 50)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
-| `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath |
+| `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath. Each returns the job's stored state, `version` included |
 | `forget(name)` | remove a job and its runs |
 | `defined_jobs` | the definitions declared in this process |
 | `close` | stop the thread and close the store |
@@ -289,7 +301,9 @@ The gem reads every schedule the SDK writes but a few cron forms croner takes an
 - `L` after a day of the month other than on its own (`0 0 3L * *`)
 - a date no month has (`0 0 30 2 *`)
 
-A job the Node side declares with one of these is shown on the Ruby dashboard without a next expected time, and a Ruby check skips it and reports the schedule to `on_error`; the other jobs are checked as usual. Let the Node side check those jobs.
+A job the Node side declares with one of these is shown on the Ruby dashboard as `failing` (or `silenced`, while it is) without a next expected time, and a Ruby check skips it and reports the schedule to `on_error`; the other jobs are checked as usual. Let the Node side check those jobs.
+
+Both sides write a job's state through `compare_and_set_state` and the same `version` inside its JSON, so a Ruby process and a Node process updating one job at the same moment refuse each other's stale writes rather than lose them.
 
 ## Kept in step
 

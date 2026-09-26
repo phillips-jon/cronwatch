@@ -134,13 +134,14 @@ class ClientEdgesTest < Minitest::Test
     assert_operator Thread.list.length - before, :<=, 2, "one channel thread and one triage thread"
     assert(errors.any? { |_, message| message.include?("skipped: an earlier alert timed out") })
     assert(errors.any? { |_, message| message.include?("skipped: an earlier triage timed out") })
-    assert_equal 2, cw.store.get_state("job-0").undelivered.length, "kept for a later check"
+    queued = cw.store.get_state("job-0").undelivered
+    assert_equal [:recovered], queued.map(&:type), "the recovery kept for a later check; the failure, closed since, dropped as stale"
   ensure
     20.times { gate&.push(nil) }
   end
 
   # A schedule written by a Node process sharing the store that this port
-  # does not read: that job is reported and skipped, the others are checked.
+  # does not read: that job is reported and shown as failing, the others are checked.
   def test_a_stored_schedule_this_port_cannot_read_does_not_stop_the_check
     errors = []
     cw, clock, capture = make(on_error: ->(e, where) { errors << [where, e.message] })
@@ -150,14 +151,17 @@ class ClientEdgesTest < Minitest::Test
     clock.advance(2 * HOUR)
     result = cw.check
     assert_equal [:missed], capture.types, "the other job is checked"
-    assert_equal ["hourly"], result.jobs.map(&:name)
+    assert_equal({ "from-node" => :failing, "hourly" => :late }, result.jobs.to_h { |job| [job.name, job.health] })
+    assert_nil result.jobs.first.next_expected_at
     assert_equal "checking from-node", errors.first[0]
     assert_match(/W is not supported by the Ruby port/, errors.first[1])
 
     listed = cw.jobs.to_h { |job| [job.name, job] }
     assert_equal %w[from-node hourly], listed.keys.sort, "still listed"
     assert_nil listed["from-node"].next_expected_at
+    assert_equal :failing, listed["from-node"].health
     assert_nil cw.job_summary("from-node").next_expected_at
+    assert_equal "reading from-node", errors.last[0]
   end
 
   def test_bytes_that_are_not_utf8_are_kept_as_replacement_characters

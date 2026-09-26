@@ -199,34 +199,34 @@ class WebSecurityTest < Minitest::Test
     end
   end
 
-  def test_without_a_token_localhost_means_the_host_header_the_peer_and_every_proxy_header
+  def test_without_a_token_in_development_nothing_a_request_says_about_itself_lets_it_in
     with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
       cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
       web = Cronwatch::Web.new(cw, base_path: "/cronwatch")
-      status = lambda do |headers, peer: "127.0.0.1"|
-        env = Rack::MockRequest.env_for("http://localhost:3000/cronwatch/api/jobs", "REMOTE_ADDR" => peer)
-        headers.each { |name, value| env["HTTP_#{name.tr('-', '_').upcase}"] = value }
-        web.call(env)[0]
+      before = $stdout
+      $stdout = StringIO.new
+      begin
+        # What the old loopback check let through: all of it can be forged,
+        # since a proxy keeps a client's X-Forwarded-For and a tunnel rewrites Host.
+        looks_local = [
+          {},
+          { "host" => "localhost:3000", "x-forwarded-host" => "localhost:3000", "x-forwarded-for" => "::ffff:127.0.0.1" },
+          { "host" => "127.0.0.1:3000", "x-forwarded-for" => "::1" },
+          { "host" => "[::1]:3000", "forwarded" => 'for="[::1]:51234";host=localhost;proto=http' },
+          { "host" => "localhost", "x-real-ip" => "127.0.0.1" },
+        ]
+        looks_local.each do |headers|
+          env = Rack::MockRequest.env_for("http://localhost:3000/cronwatch/api/jobs", "REMOTE_ADDR" => "127.0.0.1")
+          headers.each { |name, value| env["HTTP_#{name.tr("-", "_").upcase}"] = value }
+          status, _, body = web.call(env)
+          assert_equal 401, status, headers.inspect
+          assert_equal false, JSON.parse(body.join)["ok"]
+        end
+        write = Rack::MockRequest.env_for("http://localhost:3000/cronwatch/api/check", method: "POST", "REMOTE_ADDR" => "127.0.0.1")
+        assert_equal 401, web.call(write)[0]
+      ensure
+        $stdout = before
       end
-
-      assert_equal 200, status.call({})
-      assert_equal 200, status.call({ "host" => "127.0.0.1:3000", "x-forwarded-for" => "::1" }, peer: "::1")
-      assert_equal 200, status.call({ "host" => "[::1]:3000", "forwarded" => 'for="[::1]:51234";host=localhost;proto=http' }, peer: "::ffff:127.0.0.1")
-
-      refused = {
-        "a rebinding page (Host names the attacker's domain)" => { "host" => "evil.example" },
-        "a LAN address" => { "host" => "192.168.1.20:3000" },
-        "a spoofed X-Forwarded-Host from another machine" => { "host" => "192.168.1.20:3000", "x-forwarded-host" => "localhost" },
-        "X-Forwarded-For through a proxy" => { "x-forwarded-for" => "203.0.113.9, 127.0.0.1" },
-        "X-Forwarded-Host naming a public host" => { "x-forwarded-host" => "app.example" },
-        "X-Real-IP" => { "x-real-ip" => "203.0.113.9" },
-        "Forwarded for=" => { "forwarded" => "for=203.0.113.9;proto=https" },
-        "Forwarded host=" => { "forwarded" => 'for="[::1]";host=app.example' },
-        "an obfuscated Forwarded for=" => { "forwarded" => "for=_hidden" },
-        "localhost as a subdomain" => { "host" => "localhost.evil.example" },
-      }
-      refused.each { |why, headers| assert_equal 503, status.call(headers), why }
-      assert_equal 503, status.call({}, peer: "192.168.1.20"), "a forged Host of localhost from another machine"
     end
   end
 end

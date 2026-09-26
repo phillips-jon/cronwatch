@@ -155,7 +155,7 @@ Rails.application.routes.draw do
 end
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie. Without a token it answers only `localhost` while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, and 503 everywhere else. To rely on the app's own sign in, mount it behind that (Devise's `authenticate` block, or a routing constraint) and pass `token: nil`. The URLs, JSON shapes, headers and CSRF rules are the SDK's, so the MCP server reads it unchanged. `GET /cronwatch/api/check` with a bearer (the token or `CRON_SECRET`) runs the check, for an outside cron.
+Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie. Without a token, while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, it makes a token of its own and prints a sign-in link to standard output on its first request (open it once); anywhere else it answers 503. To rely on the app's own sign in, mount it behind that (Devise's `authenticate` block, or a routing constraint) and pass `token: nil`. The URLs, JSON shapes, headers and CSRF rules are the SDK's, so the MCP server reads it unchanged. `GET /cronwatch/api/check` with a bearer (the token or `CRON_SECRET`) runs the check, for an outside cron.
 
 There is no `handler()` as in the TypeScript SDK: for a job triggered over HTTP, wrap the controller action's body in `CW.job(...).run` (declared once, at boot) and check the bearer in the controller.
 

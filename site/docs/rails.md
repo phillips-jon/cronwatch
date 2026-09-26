@@ -298,7 +298,13 @@ end
 - `token`: leave it out to read `CRONWATCH_TOKEN`. An empty string, passed or in the variable, counts as unset. `nil` opts out of the token entirely and serves the app to anyone who reaches it, for a mount that sits behind your own sign in.
 - `base_path`: where it is mounted, so links resolve. It defaults to the mount point Rack reports (`SCRIPT_NAME`), which is right under Rails' `mount` and Rack's `map`.
 
-Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token it answers only `localhost` while `Rails.env` is `development` or `test`, and 503 everywhere else. Local means the `Host` header as sent and the peer's address are both loopback, and no `X-Forwarded-Host`, `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header names anything else.
+Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token, while `Rails.env` is `development` or `test`, it makes a token of its own (32 random bytes, new each time the app boots) and prints a sign-in link to the server's standard output on its first request:
+
+```text
+[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
+```
+
+Open that link once and the browser stays signed in; until then every request answers 401 and the page says the link is in the server log. Nothing about a request itself lets it in, since proxies, tunnels and `bin/rails server -b 0.0.0.0` all make a remote caller look local. In any other environment it answers 503 until a token is set.
 
 To put it behind the app's own sign in instead, mount it inside that check and pass `token: nil`, so it serves whoever gets through. With Devise:
 
@@ -310,7 +316,7 @@ end
 
 Without Devise, a routing constraint does the same job: `constraints ->(request) { AdminSession.valid?(request) } do ... end` around the mount.
 
-A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto` (the `localhost` check does not; see above). Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign. For the same reason, set a token on a development server other machines can reach.
+A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto`. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign.
 
 `/cronwatch/api/check` runs the check. It accepts the token or, on this path only, the client's `cron_secret` (`CRON_SECRET` by default) as a bearer, so a platform cron or an outside scheduler can call it instead of `CheckJob` without holding the dashboard token. A `GET` must carry a bearer, so a page cannot set it off with the dashboard's cookie. [Dashboard and API](/docs/dashboard/) has every endpoint and JSON shape.
 
@@ -354,11 +360,13 @@ Cronwatch.configure do |c|
 end
 ```
 
-It records and evaluates every run, but queues each alert in the store instead of sending it. The next check in a process that sends normally (the worker that runs `Cronwatch::CheckJob`, or whatever calls `/cronwatch/api/check`) delivers it, adds triage if that process has it, and marks it sent. Both must use the same database. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send).
+It records and evaluates every run, but queues each alert in the store instead of sending it. The next check in a process that sends normally (the worker that runs `Cronwatch::CheckJob`, or whatever calls `/cronwatch/api/check`) delivers it, adds triage if that process has it, and marks it sent. Both must use the same database. A queued alert whose condition has closed since is dropped rather than sent late, and one check spends at most 20 seconds retrying across all jobs. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send) and [Ruby](/docs/ruby/#processes-that-cannot-send).
+
+Every process writes a job's state with a `version` that goes up on each write, and a write based on a stale read is refused and worked out again, so a web server, a Sidekiq process and a Node service sharing the database never lose each other's failures, alerts or silences.
 
 ## Development and tests
 
-In development, reloading a job class runs its `cronwatch` declaration again. That is harmless: declarations are idempotent and the store is shared. Leave `CRONWATCH_TOKEN` unset locally and the dashboard is open at `localhost` (not at a LAN address or tunnel URL; set a token for those).
+In development, reloading a job class runs its `cronwatch` declaration again. That is harmless: declarations are idempotent and the store is shared. Leave `CRONWATCH_TOKEN` unset locally and the dashboard makes a token of its own when the app boots and prints a sign-in link to the terminal running `bin/rails server` on its first request; open that link once. A restart makes a new token, and prints a new link.
 
 In tests, keep runs in memory and alerts quiet:
 
@@ -385,4 +393,4 @@ Cronwatch.configure do |c|
 end
 ```
 
-The Ruby options and defaults are in [Ruby](/docs/ruby/#triage); what is sent is in [AI triage](/docs/triage/).
+Triage runs once per alert: when it gives nothing (it raised, timed out or answered empty) the alert's `triage` is `null` and it is not asked again on a retry. The Ruby options and defaults are in [Ruby](/docs/ruby/#triage); what is sent is in [AI triage](/docs/triage/).

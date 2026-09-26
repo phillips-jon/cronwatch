@@ -116,7 +116,9 @@ The job name defaults to the class name without `Job`, dasherized (`NightlyRepor
 
 ## Delivery
 
-`deliver: :now` (the default) sends each alert from the process that produced it. `deliver: :check` sends nothing: the alert is queued in the job's state (`undelivered`, at most `Client::MAX_UNDELIVERED`, the oldest dropped first) for the next check in a process that delivers now, which adds triage and sends it, as the SDK's `deliver: "check"` does. An alert no channel accepted is queued the same way and retried once per check.
+`deliver: :now` (the default) sends each alert from the process that produced it. `deliver: :check` sends nothing: the alert is queued in the job's state (`undelivered`, at most `Client::MAX_UNDELIVERED`, the oldest dropped first) for the next check in a process that delivers now, which adds triage and sends it, as the SDK's `deliver: "check"` does. An alert no channel accepted is queued the same way and retried once per check, oldest first. A queued alert that no longer describes the job (`Evaluate.stale_alert?`) is dropped rather than sent; one check spends at most `Client::RETRY_BUDGET_MS` (20 seconds) retrying across all jobs; past `MAX_UNDELIVERED` the oldest are dropped and `on_error` hears of it. Triage is tried once per alert: `Alert#triage` nil with `triage_tried?` true is JSON `null`, never tried again.
+
+Every read-modify-write of a job's state goes through `Client#update_state`: in turn with the process's other updates to the job, it reads the state, works out the next one, and writes it only when it changed, with `version` one higher, through the store's `compare_and_set_state` against the version read. A refused write is worked out again from a fresh read, up to `Client::STATE_ATTEMPTS` times. A store without `compare_and_set_state` gets `set_state`, as the SDK does.
 
 Each channel sends in a thread of its own with a 15 second timeout, and triage gets 25 seconds. A channel (or triage) that times out is left to finish; until it has, nothing more is sent to it (the alert counts as not delivered there, and is retried) and no second triage starts, so a hung channel holds one thread rather than one per alert.
 
@@ -124,7 +126,7 @@ Each channel sends in a thread of its own with a 15 second timeout, and triage g
 
 `conformance/` at the repo root holds JSON cases generated from the TypeScript build by `scripts/conformance.mjs`: duration parsing and formatting, schedule parsing and due/deadline/covers (including daylight saving), sequences of run and check events with the alerts and state they must produce, alert titles and messages, stats and health. The SDK's tests fail when the files are stale, and the gem's tests replay every case. A behaviour change lands in TypeScript first, the fixtures are regenerated, and the gem is fixed until they pass.
 
-A stored schedule this port cannot read (croner forms such as `W`, `LW`, a range with `#`, a seventh field, or a date no month has, written by a Node process sharing the store) is reported to `on_error` and that job is skipped by the check; the others are checked, and the dashboard lists it without a next expected time.
+A stored schedule this port cannot read (croner forms such as `W`, `LW`, a range with `#`, a seventh field, or a date no month has, written by a Node process sharing the store) is reported to `on_error` and that job is skipped by the check; the others are checked, and it is listed as failing (`Evaluate.unevaluable_summary`) without a next expected time.
 
 ## Storage
 
@@ -134,4 +136,4 @@ On Postgres the store writes through a pool of its own: an abstract class under 
 
 ## Web
 
-`Cronwatch::Web` is a Rack app with the SDK routes' URLs, JSON shapes, auth and headers: bearer or cookie token (`CRONWATCH_TOKEN`), `?token=` only on the HTML sign in, fail closed outside development and test (`Cronwatch::Environment` instead of `NODE_ENV`), the same CSRF and CSP rules, and `GET /api/check` with a bearer (the token or `CRON_SECRET`). Request bodies are read as the SDK's `request.json()` and `request.formData()` read them: forms through `Rack::Request#POST` (so a body `Rack::MethodOverride` already read still counts), JSON without a byte order mark and with bytes that are not UTF-8 as U+FFFD, every value as JavaScript's `String(value)`.
+`Cronwatch::Web` is a Rack app with the SDK routes' URLs, JSON shapes, auth and headers: bearer or cookie token (`CRONWATCH_TOKEN`), `?token=` only on the HTML sign in, a token made per app and printed to stdout on the first request in development and test (`Cronwatch::Environment` instead of `NODE_ENV`), fail closed otherwise, the same CSRF and CSP rules, and `GET /api/check` with a bearer (the token or `CRON_SECRET`). Request bodies are read as the SDK's `request.json()` and `request.formData()` read them: forms through `Rack::Request#POST` (so a body `Rack::MethodOverride` already read still counts), JSON without a byte order mark and with bytes that are not UTF-8 as U+FFFD, every value as JavaScript's `String(value)`.
