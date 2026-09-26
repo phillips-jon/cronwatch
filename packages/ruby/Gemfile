@@ -7,6 +7,12 @@ gemspec
 gem "minitest", ">= 5.16"
 gem "rake", ">= 13"
 
+# Cronwatch::Web (require "cronwatch/web") is a Rack app; rack stays optional for apps.
+gem "rack", ">= 2.2"
+
+# Triage (require "cronwatch/triage/anthropic") is tested against the real client when it is here.
+gem "anthropic", ">= 1.73", require: false
+
 # The ActiveRecord store and the Rails integration are tested against one
 # Rails at a time: 8.0 by default, or the one CRONWATCH_RAILS names ("7.2").
 # test/rails/gemfiles has a Gemfile per version with its own lockfile, so
