@@ -24,7 +24,7 @@ A job always runs, whatever the store is doing. If recording the run fails, the 
 
 ## Alert delivery
 
-Each channel gets 15 seconds per alert (Slack, Discord and webhook requests give up after 10). If no channel accepts an alert, it is kept with the job's state and each check tries it once more until one does. That is a retry of the same alert, not a reminder. An alert is only lost if the process dies while sending it, or if more than twenty pile up for one job.
+Each channel gets 15 seconds per alert (Slack, Discord and webhook requests give up after 10). If no channel accepts an alert, it is kept with the job's state and each check tries it once more until one does. A process created with `deliver: "check"` uses the same queue on purpose, so another process sends its alerts. That is a retry of the same alert, not a reminder. An alert is only lost if the process dies while sending it, or if more than twenty pile up for one job.
 
 ## Clocks
 
@@ -33,6 +33,8 @@ Missed detection compares the schedule with the store's timestamps, which come f
 ## Never-ran jobs
 
 A job the store has never seen cannot be missed. Jobs are registered on their first run, or on the first check in a process that declared them. For crontab scripts, declare every job in the module the check script imports.
+
+If each job is declared only in the worker that runs it, the checking process learns about a job when it first runs, so a job that stops is caught but a timer or crontab line that was never installed is not. To catch that too, declare the jobs in the process that runs the check as well. When installs differ (some run a job, some do not), declare each job there only where it is expected, using the configuration that already decides what that install runs; a job declared where it never runs is reported missed until it is forgotten.
 
 ## Alert fatigue
 

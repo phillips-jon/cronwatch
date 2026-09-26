@@ -63,6 +63,16 @@ custom("pagerduty", async (alert) => {
 });
 ```
 
+## Processes that cannot send
+
+A job can run somewhere that cannot reach Slack or a mail relay: a sandboxed backup unit, a worker with no network, a script without the app's secrets. Give that process `deliver: "check"`:
+
+```ts
+const recorder = cronwatch({ store: sqlite({ path: "/var/lib/app/cronwatch.db" }), deliver: "check" });
+```
+
+It still records every run and evaluates it, but instead of sending an alert it queues it with the job's state. The next check in a process that sends normally (the web server's `cw.start()`, or whatever calls the check endpoint) delivers it, adds triage if that process has it, and marks it sent. A failed backup reaches you a minute later rather than never. Both processes must use the same store.
+
 ## The alert payload
 
 ```ts

@@ -26,6 +26,14 @@ test("secrets are redacted from output and errors before they are stored or aler
   assert.equal(redactSecrets("max_tokens: 800"), "max_tokens: 800");
 });
 
+test("a quoted secret is blanked to its closing quote, in single or double quotes", () => {
+  assert.equal(redactSecrets("SLACK_TOKEN='xoxb-123'"), "SLACK_TOKEN='[redacted]'");
+  assert.equal(redactSecrets('PASSWORD = "two words here"'), 'PASSWORD = "[redacted]"');
+  assert.equal(redactSecrets('{"client_secret": "abc def", "other": "x"}'), '{"client_secret": "[redacted]", "other": "x"}');
+  assert.equal(redactSecrets('password="a" user="b"'), 'password="[redacted]" user="b"');
+  assert.equal(redactSecrets('password="unterminated'), "password=[redacted]");
+});
+
 test("expect still sees the unredacted output", async () => {
   const cw = cronwatch({ alerts: [capture()], cronSecret: null });
   await cw.run("e", { expect: "token=abc" }, async (job) => { job.log("token=abc"); });

@@ -133,6 +133,48 @@ test("an alert no channel took is retried once per check until one does", async 
   assert.equal(attempts, 3, "not sent again");
 });
 
+test("deliver: check queues alerts for another process's check, which sends them with triage", async () => {
+  const c = clock();
+  const store = memory();
+  const unused = capture();
+  let triaged = 0;
+  // The recording process: no network, so it sends nothing itself.
+  const recorder = cronwatch({ store, now: c.now, alerts: [unused], deliver: "check", triage: async () => "never asked", cronSecret: null });
+  const job = recorder.job("backup", { schedule: "40 3 * * *", timezone: "UTC" });
+  await assert.rejects(job.run(async () => { throw new Error("disk full"); }));
+  assert.deepEqual(unused.types(), [], "nothing sent from the recording process");
+  let state = (await store.getState("backup"))!;
+  assert.deepEqual(state.undelivered!.map((a) => a.type), ["failed"]);
+  assert.equal(state.lastAlertAt, null);
+  assert.deepEqual((await recorder.check()).alerts, [], "its own check does not send either");
+
+  // The web server: can send, and has not declared the job.
+  const sent = capture();
+  const server = cronwatch({ store, now: c.now, alerts: [sent], triage: async () => { triaged++; return "The disk is full."; }, cronSecret: null });
+  c.advance(MIN);
+  const result = await server.check();
+  assert.deepEqual(result.alerts.map((a) => a.type), ["failed"]);
+  assert.deepEqual(sent.types(), ["failed"]);
+  assert.equal(sent.alerts[0]!.triage, "The disk is full.");
+  assert.equal(sent.alerts[0]!.at, T0, "the alert from the run, not a new one");
+  assert.equal(triaged, 1);
+  state = (await store.getState("backup"))!;
+  assert.deepEqual(state.undelivered, []);
+  assert.equal(state.lastAlertAt, T0 + MIN);
+  await server.check();
+  assert.deepEqual(sent.types(), ["failed"], "sent once");
+
+  // The recovery takes the same route.
+  await job.run(async () => {});
+  await server.check();
+  assert.deepEqual(sent.types(), ["failed", "recovered"]);
+  assert.equal(triaged, 1, "recoveries are not triaged");
+});
+
+test("deliver takes only now or check", () => {
+  assert.throws(() => cronwatch({ deliver: "later" as never }), /deliver must be "now" or "check"/);
+});
+
 test("overlapping runs of one job share its state without losing updates", async () => {
   const { cw, alerts } = make();
   const job = cw.job("par", { failuresBeforeAlert: 2 });

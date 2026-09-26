@@ -29,9 +29,16 @@ function describeError(error: unknown): string {
 const REDACTED = "[redacted]";
 
 // Bounded quantifiers throughout, so a long line cannot make these backtrack.
-const SECRET_PATTERNS: [RegExp, string][] = [
-  // password=..., API_KEY: ..., "client_secret": "...", token=... (but not max_tokens: 800)
-  [/\b([A-Za-z0-9_-]{0,40}(?:secret|token|passw(?:or)?d|pwd|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_-]{0,40}(?<![Tt][Oo][Kk][Ee][Nn][Ss])"?\s{0,3}[=:]\s{0,3}"?)[^\s"',;&]{1,4096}/gi, `$1${REDACTED}`],
+const SECRET_PATTERNS: [RegExp, string | ((match: string, ...groups: string[]) => string)][] = [
+  // password=..., API_KEY: ..., "client_secret": "...", TOKEN='...', token=... (but not max_tokens: 800).
+  // A quoted value is blanked to its closing quote, spaces and all, and keeps its quotes.
+  [
+    /\b([A-Za-z0-9_-]{0,40}(?:secret|token|passw(?:or)?d|pwd|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_-]{0,40}(?<![Tt][Oo][Kk][Ee][Nn][Ss])"?\s{0,3}[=:]\s{0,3})(?:(")[^"\n]{1,4096}"|(')[^'\n]{1,4096}'|["']?[^\s"',;&]{1,4096})/gi,
+    (_match, name: string, double?: string, single?: string) => {
+      const quote = double ?? single ?? "";
+      return `${name}${quote}${REDACTED}${quote}`;
+    },
+  ],
   // Credentials inside a URL: postgres://user:password@host
   [/(\b[a-z][a-z0-9+.-]{0,30}:\/\/[^\s/:@]{0,256}:)[^\s/@]{1,256}@/gi, `$1${REDACTED}@`],
   // Authorization: Bearer <token>
@@ -51,6 +58,6 @@ const SECRET_PATTERNS: [RegExp, string][] = [
  */
 export function redactSecrets(text: string): string {
   let out = text;
-  for (const [pattern, replacement] of SECRET_PATTERNS) out = out.replace(pattern, replacement);
+  for (const [pattern, replacement] of SECRET_PATTERNS) out = out.replace(pattern, replacement as string);
   return out;
 }

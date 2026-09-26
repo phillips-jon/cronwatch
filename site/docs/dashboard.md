@@ -20,7 +20,25 @@ Every request needs the token, as `Authorization: Bearer <token>` or as the cook
 
 To sign in to the dashboard, open any page once with `?token=<token>`. The response moves it into an HttpOnly cookie that lasts thirty days (holding a digest of the token, not the token) and redirects to the same URL without it. `?token=` is read only there, on a `GET` of a page; the JSON API and every `POST` or `DELETE` ignore it, so use the bearer header or the cookie.
 
-With no token configured, the routes answer only requests to `localhost` while `NODE_ENV` is `development` or `test`, which also keeps a DNS-rebinding page off a dev server. Anywhere else, including a LAN address or tunnel URL, including when `NODE_ENV` is unset, they answer 503. Pass `token: null` to serve them open everywhere, for example when the mount already sits behind your own auth.
+With no token configured, the routes answer only requests to `localhost` while `NODE_ENV` is `development` or `test`, which also keeps a DNS-rebinding page off a dev server. Anywhere else, including a LAN address or tunnel URL, including when `NODE_ENV` is unset, they answer 503. Pass `token: null` to serve them open everywhere, for example when the mount already sits behind your own auth:
+
+```ts
+// app/admin/cronwatch/[[...path]]/route.ts: your guard is the lock
+import { requireAdmin } from "@/lib/auth";
+import { cw } from "@/lib/cronwatch";
+
+const routes = cw.routes({ token: null, basePath: "/admin/cronwatch" });
+const guarded = (handler: (request: Request) => Promise<Response>) => async (request: Request) => {
+  await requireAdmin(); // throws or redirects when the viewer is not allowed
+  return handler(request);
+};
+
+export const GET = guarded(routes.GET);
+export const POST = guarded(routes.POST);
+export const DELETE = guarded(routes.DELETE);
+```
+
+The cross-site checks below still apply to requests that pass your guard.
 
 The check endpoint additionally accepts the client's `cronSecret` as a bearer, so a platform cron can call it.
 
