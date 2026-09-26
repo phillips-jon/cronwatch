@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.2.0",
+  "sdkVersion": "0.3.0",
   "alerts": [
     {
       "name": "a failure with markup in its output",

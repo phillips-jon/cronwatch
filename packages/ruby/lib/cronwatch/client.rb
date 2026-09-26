@@ -51,7 +51,7 @@ module Cronwatch
     # on_error:    called with (error, where) for anything that goes wrong outside a job: the store failing,
     #              an alert channel failing, a triage timeout.
     def initialize(store: nil, alerts: nil, triage: nil, cron_secret: UNSET, retention: "30d", defaults: {}, redact: nil,
-                   now: nil, on_error: nil)
+                   deliver: :now, now: nil, on_error: nil)
       @using_default_store = store.nil?
       @store = store || Stores::Memory.new
       @alerts = alerts.nil? ? [Alerts::Console.new] : Array(alerts)
@@ -69,6 +69,12 @@ module Cronwatch
       end
 
       @redact = redact == false ? ->(text) { text } : (redact || Output.method(:redact_secrets))
+      unless [:now, :check, "now", "check", nil].include?(deliver)
+        raise ArgumentError, "deliver must be \"now\" or \"check\", not #{deliver.inspect}"
+      end
+
+      # :check queues alerts in the store for another process's check to send. See DESIGN.md and deliver in the SDK.
+      @defer_delivery = deliver.to_s == "check"
       @clock = now || -> { Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond) }
       @on_error = on_error || method(:default_on_error)
       @definitions = {}
@@ -598,8 +604,12 @@ module Cronwatch
       failed = []
       drafts.each do |draft|
         alert = Format.compose_alert(draft, definition, at)
-        add_triage(alert) if @triage && alert.type != :recovered
-        (deliver(alert) ? delivered : failed) << alert
+        if @defer_delivery
+          failed << alert
+        else
+          add_triage(alert) if @triage && alert.type != :recovered
+          (deliver(alert) ? delivered : failed) << alert
+        end
         composed << alert
       end
       record_delivery(definition.name, delivered, failed, at)
@@ -609,11 +619,15 @@ module Cronwatch
     # Send the alerts that no channel accepted last time, once each.
     def retry_undelivered(name, state, at)
       pending = state.undelivered || []
-      return [] if pending.empty? || Evaluate.silenced?(state, at)
+      return [] if pending.empty? || Evaluate.silenced?(state, at) || @defer_delivery
 
       delivered = []
       failed = []
-      pending.each { |alert| (deliver(alert) ? delivered : failed) << alert }
+      pending.each do |alert|
+        # An alert queued by a process that delivers at check time was never triaged.
+        add_triage(alert) if @triage && alert.type != :recovered && alert.triage.nil?
+        (deliver(alert) ? delivered : failed) << alert
+      end
       record_delivery(name, delivered, failed, at)
       delivered
     end

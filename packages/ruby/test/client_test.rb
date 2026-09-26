@@ -323,6 +323,54 @@ class ClientTest < Minitest::Test
     gate&.push(nil)
   end
 
+  def test_deliver_check_queues_alerts_for_another_processes_check_which_sends_them_with_triage
+    clock = Clock.new
+    store = Cronwatch::Stores::Memory.new
+    unused = Capture.new
+    triaged = 0
+    # The recording process: no network, so it sends nothing itself.
+    recorder = Cronwatch.new(store: store, now: clock.to_proc, alerts: [unused], deliver: :check,
+                             triage: ->(_) { "never asked" }, cron_secret: nil)
+    job = recorder.job("backup", schedule: "40 3 * * *", timezone: "UTC")
+    assert_raises(RuntimeError) { job.run { raise "disk full" } }
+    assert_equal [], unused.types, "nothing sent from the recording process"
+    state = store.get_state("backup")
+    assert_equal [:failed], state.undelivered.map(&:type)
+    assert_nil state.last_alert_at
+    assert_equal [], recorder.check.alerts, "its own check does not send either"
+
+    # The web server: can send, and has not declared the job.
+    sent = Capture.new
+    server = Cronwatch.new(store: store, now: clock.to_proc, alerts: [sent], cron_secret: nil,
+                           triage: lambda { |_|
+                             triaged += 1
+                             "The disk is full."
+                           })
+    clock.advance(MIN)
+    assert_equal [:failed], server.check.alerts.map(&:type)
+    assert_equal [:failed], sent.types
+    assert_equal "The disk is full.", sent.alerts[0].triage
+    assert_equal T0, sent.alerts[0].at, "the alert from the run, not a new one"
+    assert_equal 1, triaged
+    state = store.get_state("backup")
+    assert_equal [], state.undelivered
+    assert_equal T0 + MIN, state.last_alert_at
+    server.check
+    assert_equal [:failed], sent.types, "sent once"
+
+    # The recovery takes the same route.
+    job.run { nil }
+    server.check
+    assert_equal %i[failed recovered], sent.types
+    assert_equal 1, triaged, "recoveries are not triaged"
+  end
+
+  def test_deliver_takes_only_now_or_check
+    error = assert_raises(ArgumentError) { Cronwatch.new(deliver: :later) }
+    assert_match(/deliver must be "now" or "check"/, error.message)
+    assert Cronwatch.new(deliver: "check", cron_secret: nil)
+  end
+
   def test_an_alert_no_channel_took_is_retried_once_per_check_until_one_does
     down = true
     attempts = 0

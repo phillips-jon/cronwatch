@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.2.0",
+  "sdkVersion": "0.3.0",
   "outputCap": 16384,
   "redact": [
     {
@@ -96,7 +96,7 @@
     {
       "input": "PASSWORD = \"quoted value\"",
       "result": {
-        "text": "PASSWORD = \"[redacted] value\""
+        "text": "PASSWORD = \"[redacted]\""
       }
     },
     {
@@ -288,7 +288,7 @@
     {
       "input": "SLACK_TOKEN='xoxb-123'",
       "result": {
-        "text": "SLACK_TOKEN='xoxb-123'"
+        "text": "SLACK_TOKEN='[redacted]'"
       }
     },
     {
@@ -360,7 +360,7 @@
     {
       "input": "token:\"a b\"",
       "result": {
-        "text": "token:\"[redacted] b\""
+        "text": "token:\"[redacted]\""
       }
     },
     {

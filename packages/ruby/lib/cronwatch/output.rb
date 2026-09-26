@@ -29,8 +29,9 @@ module Cronwatch
       ].join("|")
 
       PATTERNS = [
-        # password=..., API_KEY: ..., "client_secret": "...", token=... (but not max_tokens: 800)
-        [Regexp.new("(?a)\\b([A-Za-z0-9_-]{0,40}(?:#{NAMES})[A-Za-z0-9_-]{0,40}(?<![Tt][Oo][Kk][Ee][Nn][Ss])\"?[#{WS}]{0,3}[=:][#{WS}]{0,3}\"?)[^#{WS}\"',;&]{1,4096}"), true],
+        # password=..., API_KEY: ..., "client_secret": "...", TOKEN='...', token=... (but not max_tokens: 800).
+        # A quoted value is blanked to its closing quote, spaces and all, and keeps its quotes.
+        [Regexp.new("(?a)\\b([A-Za-z0-9_-]{0,40}(?:#{NAMES})[A-Za-z0-9_-]{0,40}(?<![Tt][Oo][Kk][Ee][Nn][Ss])\"?[#{WS}]{0,3}[=:][#{WS}]{0,3})(?:(\")[^\"\\n]{1,4096}\"|(')[^'\\n]{1,4096}'|[\"']?[^#{WS}\"',;&]{1,4096})"), :quoted],
         # Credentials inside a URL: postgres://user:password@host
         [Regexp.new("(?a)(\\b[A-Za-z][A-Za-z0-9+.-]{0,30}://[^#{WS}/:@]{0,256}:)[^#{WS}/@]{1,256}@"), :url],
         # Authorization: Bearer <token>
@@ -122,6 +123,9 @@ module Cronwatch
         out = out.gsub(pattern) do
           case keep
           when :url then "#{Regexp.last_match(1)}#{REDACTED}@"
+          when :quoted
+            quote = Regexp.last_match(2) || Regexp.last_match(3) || ""
+            "#{Regexp.last_match(1)}#{quote}#{REDACTED}#{quote}"
           when true then "#{Regexp.last_match(1)}#{REDACTED}"
           else REDACTED
           end

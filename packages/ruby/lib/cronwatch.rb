@@ -32,7 +32,7 @@ require_relative "cronwatch/client"
 module Cronwatch
   # The options Cronwatch.configure sets. Anything left unset takes the client's default.
   class Configuration
-    OPTIONS = %i[store alerts triage cron_secret retention defaults redact now on_error].freeze
+    OPTIONS = %i[store alerts triage cron_secret retention defaults redact deliver now on_error].freeze
 
     attr_accessor(*OPTIONS)
 
@@ -90,3 +90,7 @@ module Cronwatch
     end
   end
 end
+
+# In a Rails app Bundler requires gems after Rails itself, so `gem "cronwatch"`
+# alone brings in the Railtie, the ActiveJob concern and the generator.
+require_relative "cronwatch/rails" if defined?(::Rails::Railtie)

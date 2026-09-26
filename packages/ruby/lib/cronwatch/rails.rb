@@ -6,7 +6,7 @@
 #
 #   # Gemfile
 #   gem "cronwatch", require: "cronwatch/rails"
-require "cronwatch"
+require "cronwatch" unless defined?(Cronwatch::Client) # loaded from cronwatch.rb when Rails is already up
 require "rails"
 require "active_job"
 
