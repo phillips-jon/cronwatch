@@ -70,10 +70,38 @@ module Cronwatch
     end
 
     # The first fire strictly after `from`, or nil when the cron never fires again.
+    # The first fire strictly after `from`, or nil when the cron never fires
+    # again. Like croner, the walker can answer with times in the past when
+    # asked from inside the hour that repeats when clocks go back, so its
+    # answers are filtered, and a stretch of nothing but past times is stepped
+    # over an hour at a time. Ported from fireAfter in schedule.ts.
     def fire_after(parsed, from)
       raise ArgumentError, "schedule \"#{parsed.source}\" was not made by Schedule.parse" unless parsed.pattern
 
-      parsed.pattern.next_after(from, parsed.timezone)
+      probe = from
+      4.times do
+        runs = next_runs(parsed, 8, probe)
+        return nil if runs.empty?
+
+        found = runs.find { |t| t > from }
+        return found if found
+
+        probe += 3_600_000
+      end
+      nil
+    end
+
+    # Up to `count` fires, each found from the one before, as croner's nextRuns.
+    def next_runs(parsed, count, from)
+      runs = []
+      at = from
+      count.times do
+        at = parsed.pattern.next_after(at, parsed.timezone)
+        break if at.nil?
+
+        runs << at
+      end
+      runs
     end
 
     # The next time the schedule fires strictly after `from`. For an interval, counted from the last run when there is one.
