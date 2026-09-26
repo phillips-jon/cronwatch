@@ -109,7 +109,7 @@ Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSO
 - `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Without a token the app answers only `localhost` while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, and 503 everywhere else. `nil` opts out and serves it open, for a mount behind your own auth.
 - `base_path`: where it is mounted. It defaults to `SCRIPT_NAME`, which `map` and Rails' `mount` set, so it is only needed when something strips the prefix without setting it.
 
-The request's origin, used to refuse cross-site writes, and the `localhost` check come from the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto`; behind a proxy, make sure those carry the public host and scheme. `/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
+The `localhost` check reads the `Host` header as sent and the peer's address, never the host Rack reports, and refuses a request whose `X-Forwarded-Host`, `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header names anything but loopback. The request's origin, used to refuse cross-site writes, comes from the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto`; behind a proxy, make sure those carry the public host and scheme. `/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
 
 ## Stores
 

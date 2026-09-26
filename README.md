@@ -106,6 +106,17 @@ bundle exec rake test
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 
+## Releasing
+
+The SDK, the MCP server, the gem and the skill share one version. From a clean `main`:
+
+```bash
+npm run release -- 0.4.0 --dry-run   # show every change and command, write nothing
+npm run release -- 0.4.0             # bump, regenerate, check, commit "Release 0.4.0", tag v0.4.0
+```
+
+It bumps every file listed at the top of `scripts/release.mjs`, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, runs `npm run check`, the build, `npm run check:packages` and (with Ruby 3.2 or newer; `--skip-ruby` skips them) the gem's tests. It does not push or publish: it prints the `git push`, `npm publish` and `gem push` commands to run next, and `npm deprecate` lines for any `--deprecate <old>`. A new package under `packages/` needs a row in that table, or the script refuses to run.
+
 ## Deploying the site
 
 Once CI passes on a push to `main`, `.github/workflows/deploy.yml` runs the deploy script on the server, which builds a release on the server beside the live one and switches a symlink only when the build checks out. `deploy/README.md` has the server layout, the one-time setup and the rollback command.
