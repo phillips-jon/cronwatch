@@ -546,15 +546,24 @@ class ClientTest < Minitest::Test
   def test_check_is_shared_by_concurrent_callers
     store = Cronwatch::Stores::Memory.new
     calls = 0
+    entered = Queue.new
+    gate = Queue.new
     store.define_singleton_method(:list_jobs) do
       calls += 1
-      sleep 0.1
+      entered.push(true)
+      gate.pop
       super()
     end
     cw, = make(store: store)
-    results = Array.new(3) { Thread.new { cw.check } }.map(&:value)
+    first = Thread.new { cw.check }
+    entered.pop # the first check is inside the store now
+    others = Array.new(2) { Thread.new { cw.check } }
+    wait_for { others.all? { |t| t.status == "sleep" } } # both waiting on the shared check
+    gate.push(nil)
+    results = [first, *others].map(&:value)
     assert_equal 1, calls
     assert(results.all? { |r| r.equal?(results[0]) })
+    gate.push(nil)
     cw.check
     assert_equal 2, calls
   end

@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
+require "date"
 require "erb"
 require "yaml"
 require "fugit"
 require "cronwatch" unless defined?(Cronwatch::Client)
+require_relative "monitored"
 
 module Cronwatch
   # Reads schedules from the scheduler's own config, so a job's cron
@@ -38,12 +40,15 @@ module Cronwatch
       end
     end
 
-    # How far ahead the daylight saving check looks.
+    # How far ahead the daylight saving check looks, and how far either side
+    # of each clock change it compares the scheduler's runs with CronWatch's.
     HORIZON_YEARS = 5
-    # Where, and for how many runs (or until when), a conversion is compared with Fugit.
-    SAMPLE_FROM = Time.utc(2026, 1, 1)
-    SAMPLE_RUNS = 32
-    SAMPLE_UNTIL = Time.utc(2027, 2, 1).to_i * 1000
+    CHANGE_WINDOW_MS = 2 * 86_400_000
+    # Away from clock changes, SAMPLE_RUNS runs from the start of each month
+    # of a fixed year are compared too.
+    SAMPLE_YEAR = 2026
+    SAMPLE_MONTHS = 12
+    SAMPLE_RUNS = 8
 
     # Where a schedule's file is read from, and how its entries are parsed.
     class Source
@@ -73,15 +78,19 @@ module Cronwatch
 
       private
 
-      # The config: the Hash or Array given, or the file after ERB, as both schedulers read it.
+      # The config: the Hash or Array given, or the file after ERB, as both
+      # schedulers read it. Dates and times are allowed, as in a job's args.
       def read
         return @config if @config.is_a?(Hash) || @config.is_a?(Array)
         return nil unless File.exist?(path)
 
-        text = ERB.new(File.read(path)).result
-        YAML.safe_load(text, aliases: true, permitted_classes: [Symbol])
-      rescue Psych::Exception, SystemCallError => e
+        parse_file
+      rescue SystemCallError, RuntimeError => e # Psych's errors, and ConfigurationFile's syntax error
         raise Error, "cronwatch: could not read #{label}: #{e.message}"
+      end
+
+      def parse_file
+        YAML.safe_load(ERB.new(File.read(path)).result, aliases: true, permitted_classes: [Symbol, Date, Time])
       end
 
       # Fugit::Cron, and the IANA name of the zone the scheduler reads it in.
@@ -94,18 +103,27 @@ module Cronwatch
     # Solid Queue's recurring tasks: config/recurring.yml (or the file
     # SOLID_QUEUE_RECURRING_SCHEDULE names), the section for the current
     # environment when the file has one, each task a `class:` or a
-    # `command:` with a `schedule:`. Read as Solid Queue 1.x reads it.
+    # `command:` with a `schedule:`. Read as Solid Queue 1.x reads it. The
+    # file bin/jobs is given with --recurring_schedule_file is not seen:
+    # pass it as config, or set SOLID_QUEUE_RECURRING_SCHEDULE instead.
     class SolidQueue < Source
+      # What ActiveModel::Type::Boolean casts to false.
+      FALSE_VALUES = %w[0 f F false FALSE off OFF].freeze
+
       # config: a path (default: SOLID_QUEUE_RECURRING_SCHEDULE or
       # config/recurring.yml under the app's root) or the parsed Hash.
       # env: the section to read (default: Rails.env). time_zone: the zone a
-      # schedule without one is read in; by default Solid Queue's own
+      # schedule without one is read in, an IANA name or a Rails one ("Eastern
+      # Time (US & Canada)"); by default Solid Queue's own
       # (config.solid_queue.time_zone, which is config.time_zone unless set),
-      # and Fugit's local zone when that is nil or Solid Queue is older than 1.5.
-      def initialize(config = nil, env: nil, time_zone: :auto, label: nil)
+      # and Fugit's local zone when that is nil or Solid Queue is older than
+      # 1.5. skip_recurring: true reads no tasks, as Solid Queue runs none; by
+      # default SOLID_QUEUE_SKIP_RECURRING, as Solid Queue reads it.
+      def initialize(config = nil, env: nil, time_zone: :auto, skip_recurring: :auto, label: nil)
         super(config || ENV["SOLID_QUEUE_RECURRING_SCHEDULE"] || "config/recurring.yml", label)
         @env = env
         @time_zone = time_zone
+        @skip_recurring = skip_recurring
       end
 
       def name = "Solid Queue"
@@ -114,7 +132,20 @@ module Cronwatch
         (@env || Scheduler.env).to_s
       end
 
+      def skip_recurring?
+        return @skip_recurring unless @skip_recurring == :auto
+
+        value = ENV.fetch("SOLID_QUEUE_SKIP_RECURRING", nil)
+        !(value.nil? || value.empty? || FALSE_VALUES.include?(value))
+      end
+
+      def label
+        skip_recurring? ? "#{super} (not read: SOLID_QUEUE_SKIP_RECURRING is set)" : super
+      end
+
       def entries
+        return [] if skip_recurring?
+
         config = read
         return [] if config.nil?
         raise Error, "cronwatch: #{label} is not a map of recurring tasks" unless config.is_a?(Hash)
@@ -147,22 +178,56 @@ module Cronwatch
 
       private
 
-      def default_zone
-        return @time_zone unless @time_zone == :auto
-        return nil unless defined?(::SolidQueue) && ::SolidQueue.respond_to?(:time_zone)
-
-        ::SolidQueue.time_zone
+      # As SolidQueue::Configuration reads the file: ActiveSupport's
+      # ConfigurationFile (ERB, then YAML with any class) when it is there.
+      def parse_file
+        begin
+          require "active_support/configuration_file"
+        rescue LoadError
+          return super
+        end
+        ::ActiveSupport::ConfigurationFile.parse(path)
       end
 
-      # As SolidQueue::RecurringTask#apply_default_time_zone_to.
+      def default_zone
+        zone = @time_zone
+        if zone == :auto
+          return nil unless defined?(::SolidQueue) && ::SolidQueue.respond_to?(:time_zone)
+
+          zone = ::SolidQueue.time_zone
+        end
+        return nil if zone.nil? || zone.to_s.empty?
+
+        iana_zone(zone)
+      end
+
+      # The IANA name for a zone given as SolidQueue.time_zone= takes it: an
+      # IANA name, a Rails name or an ActiveSupport::TimeZone.
+      def iana_zone(zone)
+        return zone.tzinfo.name if zone.respond_to?(:tzinfo)
+        return zone.to_s if Zone.valid?(zone.to_s)
+
+        found = (::ActiveSupport::TimeZone[zone.to_s] if defined?(::ActiveSupport::TimeZone))
+        return found.tzinfo.name if found
+
+        raise Error, "cronwatch: #{label}: the time zone #{zone.to_s.inspect} is neither an IANA timezone (such as " \
+                     "America/New_York) nor a Rails time zone name (such as \"Eastern Time (US & Canada)\")"
+      end
+
+      # As SolidQueue::RecurringTask#apply_default_time_zone_to. A zone that
+      # cannot be applied raises, rather than leave the schedule in another.
       def with_default_zone(cron)
         zone = default_zone
-        return cron unless cron.zone.nil? && zone && zone.to_s != ""
+        return cron unless cron.zone.nil? && zone
 
-        with = Fugit.parse("#{cron.to_cron_s} #{zone}", multi: :fail)
-        with.is_a?(Fugit::Cron) ? with : cron
-      rescue ArgumentError
-        cron
+        with = begin
+          Fugit.parse("#{cron.to_cron_s} #{zone}", multi: :fail)
+        rescue ArgumentError
+          nil
+        end
+        return with if with.is_a?(Fugit::Cron)
+
+        raise Error, "cronwatch: #{label}: #{cron.original.inspect} cannot be read in the time zone #{zone.inspect}"
       end
 
       def symbolize(value)
@@ -285,12 +350,10 @@ module Cronwatch
         found
       end
 
-      # The environment whose section of a Solid Queue file is read: Rails.env, or RAILS_ENV.
+      # The environment whose section of a Solid Queue file is read: Rails.env,
+      # RAILS_ENV or RACK_ENV (Cronwatch::Environment), else development.
       def env
-        return @env if @env
-        return ::Rails.env.to_s if defined?(::Rails) && ::Rails.respond_to?(:env)
-
-        ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "development"
+        @env || Environment.name || "development"
       end
 
       # Relative paths are read from here: Rails.root, or the working directory.
@@ -543,79 +606,131 @@ module Cronwatch
         end.join(",")
       end
 
-      # Checks that CronWatch expects each run exactly when the scheduler
-      # makes it: for a run of the scheduler, the next one CronWatch wants
-      # is the scheduler's next. Where daylight saving changes the clock the
-      # two may differ in one way only: the scheduler (Fugit) runs a time
-      # that repeats when clocks go back twice, which CronWatch takes as an
-      # early run. A time that clocks skip when they go forward is refused:
-      # Fugit skips the run, and CronWatch would expect it and report it
-      # missed.
+      # Checks that CronWatch expects runs when the scheduler makes them, by
+      # walking Fugit's runs and CronWatch's fires side by side: from two days
+      # before to two days after every clock change in the next HORIZON_YEARS
+      # years (one change of each kind for a cron that names no day or month,
+      # which meets every such change alike), and from the start of each month
+      # of a sample year, so the answer does not depend on when the app boots.
+      #
+      # Between two runs of the scheduler, CronWatch must not want one of its
+      # own, or it would report it missed: a fire CronWatch has and the
+      # scheduler does not (a time Fugit skips when clocks go forward, or a
+      # run its hour steps drop on that day) is refused unless the run before
+      # it covers it (a minute of early slack, as in a burst such as
+      # "* 5 * * *", or a fire moved past a spring-forward jump). Away from
+      # clock changes every run the scheduler makes must also be one CronWatch
+      # expects; near one, Fugit may run a repeated time twice, which
+      # CronWatch takes as an early run.
       def check_fires(cron, parsed, where, scheduler)
         zone = parsed.timezone
         tz = Zone.get(zone)
         cron = in_zone(cron, zone)
 
-        # Away from clock changes, every due time is the scheduler's next run.
-        # Sampled from a fixed day, so the answer does not depend on when the app boots.
-        runs = [fugit_ms(cron.next_time(SAMPLE_FROM))]
-        until runs.length > SAMPLE_RUNS || (runs.length > 1 && runs.last > SAMPLE_UNTIL)
-          runs << fugit_ms(cron.next_time(Time.at(runs.last / 1000).utc))
-        end
-        changes = tz.transitions_up_to(Time.at(runs.last / 1000 + 86_400).utc, Time.at(runs.first / 1000 - 86_400).utc)
-                    .map { |change| change.at.to_i * 1000 }
-        runs.each_cons(2) do |at, following|
-          due = Schedule.due_after_run(parsed, at)
-          next if due == following || changes.any? { |t| t > at - 86_400_000 && t < following + 86_400_000 }
-
-          raise Error, "#{where} is #{parsed.source.inspect} in #{zone}, but after a run at #{stamp(at, zone)} #{scheduler} " \
-                       "runs it next at #{stamp(following, zone)} and CronWatch would expect #{due ? stamp(due, zone) : "nothing"}, so it " \
-                       "cannot be converted exactly; give cronwatch a schedule: of its own"
-        end
-
-        # Where clocks go forward. A cron that names no day or month meets
-        # each change alike, so one change per clock time is enough.
         daily = cron.monthdays.nil? && cron.months.nil? && cron.weekdays.nil?
         seen = {}
         now = Time.now.utc
         tz.transitions_up_to(Time.utc(now.year + HORIZON_YEARS + 1, 1, 1), Time.utc(now.year, 1, 1)).each do |change|
           before = change.previous_offset.utc_total_offset
-          gap = (change.offset.utc_total_offset - before) * 1000
-          next unless gap.positive?
-          next if daily && seen[[(change.at.to_i + before) % 86_400, gap]]
+          kind = [(change.at.to_i + before) % 86_400, change.offset.utc_total_offset - before]
+          next if daily && seen[kind]
 
-          seen[[(change.at.to_i + before) % 86_400, gap]] = true
-          check_gap(cron, parsed, change.at.to_i * 1000, gap, before, where, scheduler)
+          seen[kind] = true
+          from = (change.at.to_i * 1000) - CHANGE_WINDOW_MS
+          to = from + (2 * CHANGE_WINDOW_MS)
+          # Near a change only CronWatch's own fires can be refused, so a
+          # stretch where it has none needs no walk (Fugit's is slow for L and #).
+          first = Schedule.next_runs(parsed, 1, from - 1).first
+          next if first.nil? || first > to
+
+          compare_runs(fugit_runs(cron, from, to), parsed, false, where, scheduler)
         end
+
+        compared_until = nil
+        SAMPLE_MONTHS.times do |month|
+          from = Time.utc(SAMPLE_YEAR, month + 1, 1).to_i * 1000
+          next if compared_until && from < compared_until # a sparse cron's earlier sample reached past this month
+
+          runs = fugit_runs(cron, from, nil)
+          compared_until = runs.last
+          near = tz.transitions_up_to(Time.at((runs.last / 1000) + 86_400).utc, Time.at((runs.first / 1000) - 86_400).utc).any?
+          compare_runs(runs, parsed, !near, where, scheduler)
+        end
+      rescue TZInfo::AmbiguousTime, TZInfo::PeriodNotFound => e
+        raise Error, "#{where} cannot be checked in #{zone}: Fugit fails on a time around a clock change there " \
+                     "(#{e.class}: #{e.message}); give cronwatch a schedule: of its own"
       rescue RuntimeError => e
         raise Error, "#{where} never fires: #{e.message}"
       end
 
-      # Checks one spring-forward change. CronWatch moves a fire whose wall
-      # time the change skips to the same distance past the change, as cron
-      # does; Fugit runs only at wall times that exist. So each fire
-      # CronWatch has between the change and one gap after it must be one
-      # Fugit makes, or be covered by the run Fugit makes before it.
-      def check_gap(cron, parsed, jump, gap, before, where, scheduler)
-        zone = parsed.timezone
-        fire = jump - 1
+      # Fugit's runs: the one before `from` and every one after it up to the
+      # first past `to`, or SAMPLE_RUNS of them from `from` when `to` is nil.
+      def fugit_runs(cron, from, to)
+        runs = [fugit_ms(cron.previous_time(Time.at(from / 1000).utc))]
         loop do
-          fire = Schedule.next_runs(parsed, 1, fire).first
-          break if fire.nil? || fire >= jump + gap
-          next if cron.match?(Time.at(fire / 1000).utc)
-
-          at = fugit_ms(cron.previous_time(Time.at(fire / 1000).utc))
-          following = fugit_ms(cron.next_time(Time.at(at / 1000).utc))
-          due = Schedule.due_after_run(parsed, at)
-          next unless due && due < following
-
-          old = Time.at(jump / 1000 + before).utc
-          raise Error, "#{where} is due at a time that does not exist in #{zone} on #{old.strftime("%Y-%m-%d")}, when clocks " \
-                       "go forward from #{old.strftime("%H:%M")} to #{Time.at((jump + gap) / 1000 + before).utc.strftime("%H:%M")}. " \
-                       "#{scheduler} skips that run and CronWatch would expect it at #{stamp(due, zone)}, so it would be " \
-                       "reported missed. Move the time outside the change, give the schedule a zone without daylight " \
-                       "saving (such as UTC), or give cronwatch a schedule: of its own"
+          runs << fugit_ms(cron.next_time(Time.at(runs.last / 1000).utc))
+          break if to ? runs.last > to : runs.length > SAMPLE_RUNS
         end
+        runs
+      end
+
+      # CronWatch's fires after `from`, up to and including `to`.
+      def cronwatch_fires(parsed, from, to)
+        fires = []
+        at = from
+        loop do
+          fire = Schedule.next_runs(parsed, 1, at).first
+          # Asked from inside a repeated hour the walker can answer with a past time.
+          fire = Schedule.fire_after(parsed, at) if fire && fire <= at
+          break if fire.nil? || fire > to
+
+          fires << fire
+          at = fire
+        end
+        fires
+      end
+
+      # Refuses the conversion where, after one of the scheduler's runs,
+      # CronWatch would want a run before the scheduler's next (or, when
+      # `strict`, where the scheduler's next is not a time CronWatch fires).
+      def compare_runs(runs, parsed, strict, where, scheduler)
+        fires = cronwatch_fires(parsed, runs.first, runs.last)
+        expected = strict ? fires.to_h { |fire| [fire, true] } : nil
+        i = 0
+        runs.each_cons(2) do |at, following|
+          i += 1 while i < fires.length && fires[i] <= at
+          own = i >= fires.length || fires[i] < following
+          unexpected = strict && !expected[following]
+          next unless own || unexpected
+
+          due = Schedule.due_after_run(parsed, at)
+          next if !unexpected && due && due >= following
+
+          mismatch(parsed, at, following, due, where, scheduler)
+        end
+      end
+
+      def mismatch(parsed, at, following, due, where, scheduler)
+        zone = parsed.timezone
+        tz = Zone.get(zone)
+        skipped = due && tz.transitions_up_to(Time.at((due / 1000) + 1).utc, Time.at((due / 1000) - 86_400).utc).find do |change|
+          gap = change.offset.utc_total_offset - change.previous_offset.utc_total_offset
+          gap.positive? && due < (change.at.to_i + gap) * 1000
+        end
+        unless skipped
+          raise Error, "#{where} is #{parsed.source.inspect} in #{zone}, but after a run at #{stamp(at, zone)} #{scheduler} " \
+                       "runs it next at #{stamp(following, zone)} and CronWatch would expect #{due ? stamp(due, zone) : "nothing"}, " \
+                       "so it cannot be converted exactly; give cronwatch a schedule: of its own"
+        end
+
+        before = skipped.previous_offset.utc_total_offset
+        old = Time.at(skipped.at.to_i + before).utc
+        new = Time.at(skipped.at.to_i + skipped.offset.utc_total_offset).utc
+        raise Error, "#{where} is due at a time that does not exist in #{zone} on #{old.strftime("%Y-%m-%d")}, when clocks " \
+                     "go forward from #{old.strftime("%H:%M")} to #{new.strftime("%H:%M")}. " \
+                     "#{scheduler} skips that run and CronWatch would expect it at #{stamp(due, zone)}, so it would be " \
+                     "reported missed. Move the time outside the change, give the schedule a zone without daylight " \
+                     "saving (such as UTC), or give cronwatch a schedule: of its own"
       end
 
       # The cron with its zone named, so it is read in `zone` whatever this
@@ -646,5 +761,3 @@ module Cronwatch
     end
   end
 end
-
-require_relative "monitored" unless defined?(Cronwatch::Monitored)

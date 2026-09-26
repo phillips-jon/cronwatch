@@ -108,7 +108,7 @@ class RailsIntegrationTest < Minitest::Test
     assert_equal "flaky", FlakyJob.cronwatch_name
     assert_equal "reports:weekly", Reports::WeeklyJob.cronwatch_name
     assert_nil PlainJob.cronwatch_name
-    assert_equal %w[NightlyReportJob FlakyJob Reports::WeeklyJob], Cronwatch::ActiveJob.monitored.first(3)
+    assert_equal %w[NightlyReportJob FlakyJob Reports::WeeklyJob], Cronwatch::Monitored.monitored.first(3)
   end
 
   def test_a_perform_is_recorded_as_an_ok_run_with_its_output_and_metrics
@@ -178,9 +178,9 @@ class RailsIntegrationTest < Minitest::Test
   end
 
   def test_cronwatch_outside_a_monitored_perform_drops_what_it_is_given
-    assert_same Cronwatch::ActiveJob::NULL_CONTEXT, NightlyReportJob.new(1).cronwatch
+    assert_same Cronwatch::Monitored::NULL_CONTEXT, NightlyReportJob.new(1).cronwatch
     assert_nil NightlyReportJob.new(1).cronwatch.log("x")
-    assert_same Cronwatch::ActiveJob::NULL_CONTEXT, PlainJob.perform_now
+    assert_same Cronwatch::Monitored::NULL_CONTEXT, PlainJob.perform_now
     assert_nil Cronwatch.client.store.get_job("plain")
   end
 
@@ -297,8 +297,13 @@ class RailsGeneratorTest < Minitest::Test
   end
 
   def test_a_prefix_reaches_the_migration_and_the_initializer
-    generate("--prefix", "ops_")
-    assert_includes File.read(migrations.first), 'create_tables!(connection, prefix: "ops_")'
+    generate
+    generate("--prefix", "ops_", "--force") # the initializer changes too
+    assert_equal 1, migrations.length
+    prefixed = Dir[File.join(@dir, "db/migrate/*_create_cronwatch_ops_tables.rb")]
+    assert_equal 1, prefixed.length, "a second prefix gets a migration of its own"
+    assert_includes File.read(prefixed.first), "class CreateCronwatchOpsTables < ActiveRecord::Migration"
+    assert_includes File.read(prefixed.first), 'create_tables!(connection, prefix: "ops_")'
     assert_includes File.read(File.join(@dir, "config/initializers/cronwatch.rb")),
                     'c.store = Cronwatch::Stores::ActiveRecord.new(prefix: "ops_")'
   end

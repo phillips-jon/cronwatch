@@ -29,6 +29,9 @@ group :test do
   # Rails 8 takes sqlite3 2.x; 7.2 still takes 1.4 and up.
   gem "sqlite3", Gem::Version.new(rails) >= Gem::Version.new("8.0") ? ">= 2.1" : ">= 1.4"
 
+  # The MCP server's tests start test/web/server.rb with rackup, which needs a server.
+  gem "webrick", ">= 1.8"
+
   # Cronwatch::Sidekiq (require "cronwatch/sidekiq") runs under Sidekiq's own
   # testing harness, and schedules are read beside sidekiq-cron's own parse.
   # Sidekiq stays optional for apps. CRONWATCH_SIDEKIQ picks a series ("7"),

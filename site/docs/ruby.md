@@ -19,13 +19,13 @@ Ruby 3.2 or newer; the Rails integration is tested on Rails 7.2, 8.0 and 8.1. Th
 |---|---|---|
 | `cronwatch` | the client, the memory store, and the Slack, Discord, webhook and console channels | |
 | `cronwatch/active_record` | the ActiveRecord store | `activerecord` |
-| `cronwatch/rails` | the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task, the install generator | `railties`, `activejob` |
+| `cronwatch/rails` | the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, `Cronwatch::Web`, the `cronwatch:check` task, the install generator | `railties`, `activejob` |
 | `cronwatch/sidekiq` | `Cronwatch::Sidekiq` for jobs that include `Sidekiq::Job`, its server middleware, `Cronwatch::Sidekiq::CheckWorker` | `sidekiq` 7 or newer |
 | `cronwatch/scheduler` | schedules read from Solid Queue's `config/recurring.yml` or sidekiq-cron's schedule, and `Cronwatch.declare_from_scheduler!` | |
 | `cronwatch/web` | the dashboard and JSON API as a Rack app | `rack` |
 | `cronwatch/triage/anthropic` | Claude triage | `anthropic` |
 
-In a Rails app, `require "cronwatch"` (which Bundler does for `gem "cronwatch"`) also loads `cronwatch/rails`, `cronwatch/scheduler`, and `cronwatch/sidekiq` when Sidekiq is in the bundle; the ActiveRecord store loads on first use. `cronwatch/web` and `cronwatch/triage/anthropic` are always required by hand. [Ruby on Rails](/docs/rails/) has the rest.
+In a Rails app, `require "cronwatch"` (which Bundler does for `gem "cronwatch"`) also loads `cronwatch/rails`, `cronwatch/web`, `cronwatch/scheduler`, and `cronwatch/sidekiq` when Sidekiq is in the bundle; the ActiveRecord store loads on first use. `cronwatch/triage/anthropic` is always required by hand, and so is `cronwatch/web` outside Rails. A missing gem raises a `LoadError` that names it. [Ruby on Rails](/docs/rails/) has the rest.
 
 ## Create one client
 
@@ -62,7 +62,9 @@ NIGHTLY.run do |job|
 end
 ```
 
-`run` returns what the block returns. What the block raises is recorded as the failure and raised again, so your own error handling still works. Without keeping a handle, `CW.run("nightly-report") { |job| ... }` declares the job on first use.
+`run` returns what the block returns. What the block raises is recorded as the failure and raised again, so your own error handling still works. That includes exceptions outside `StandardError`: an `Interrupt`, `SystemExit`, `Sidekiq::Shutdown` or `Timeout` that stops the block is recorded as a failed run (`Interrupted: Sidekiq::Shutdown`) and raised again, so the run is never left running to be reported stuck later. Without keeping a handle, `CW.run("nightly-report") { |job| ... }` declares the job on first use; `CW.run(id)` without a block reads a run, and takes no options.
+
+Logged output, a returned string and an error's message are stored as UTF-8: bytes that are not valid UTF-8 (binary output, a C extension's message) become the replacement character `�`, as they would in a JavaScript string.
 
 Option names are snake_case (`max_duration`, `failures_before_alert`); conditions and alert types are symbols (`:missed`, `:over_budget`, `:recovered`). Durations are strings such as `"15m"` or `"1h30m"`, or milliseconds as an Integer. Anything that leaves the process (store rows, the JSON API, webhook bodies) uses the SDK's camelCase field names and string values.
 
@@ -74,6 +76,10 @@ A long-running process checks in a background thread:
 CW.start            # every minute; CW.start("5m") to change it
 at_exit { CW.stop }
 ```
+
+Calling `start` again while it runs does nothing; a different interval is reported to `on_error` and ignored, so call `stop` first to change it. The thread does not survive a fork: in a forking server (Puma with `preload_app!`, Unicorn), call `start` in each worker (`on_worker_boot`). A forked child gets fresh locks and no check in flight, so `start` and `check` work there.
+
+Run one checker per store: one process with `start`, or one scheduled check, not one per process. Two checkers on one database can each send the same alert.
 
 A script run from crontab exits when it is done, so nothing inside it notices the run that never happened. Add a second crontab line that checks:
 
@@ -122,7 +128,7 @@ map "/cronwatch" do
 end
 ```
 
-Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules, reading `RAILS_ENV` or `RACK_ENV` where the SDK reads `NODE_ENV`.
+Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules, reading `Rails.env` (when Rails is loaded), `RAILS_ENV` or `RACK_ENV` where the SDK reads `NODE_ENV`. It reads forms through Rack, so it works behind `Rack::MethodOverride` and with a request body that can be read only once.
 
 `Cronwatch::Web.new(client = nil, token:, base_path:)`:
 
@@ -134,9 +140,9 @@ The `localhost` check reads the `Host` header as sent and the peer's address, ne
 
 ## Stores
 
-`Cronwatch::Stores::Memory.new` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each process has its own. The client warns when it is used with `RAILS_ENV` or `RACK_ENV` set to `production`.
+`Cronwatch::Stores::Memory.new` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each process has its own. The client warns when it is used in production (`Rails.env`, or `RAILS_ENV` or `RACK_ENV`, is `production`).
 
-`Cronwatch::Stores::ActiveRecord.new(prefix: "cronwatch_", connection_class: nil)` writes through ActiveRecord, to Postgres or SQLite, in three tables named `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. `prefix` is lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. `connection_class` is the ActiveRecord class whose pool it uses (or its name, looked up on first use), `ActiveRecord::Base` by default; pass one that `connects_to` another database to keep the tables there. MySQL is untested and will not work as written: the statements use `ON CONFLICT` and `TEXT` primary keys.
+`Cronwatch::Stores::ActiveRecord.new(prefix: "cronwatch_", connection_class: nil)` writes through ActiveRecord, to Postgres or SQLite, in three tables named `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. `prefix` is lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. `connection_class` is the ActiveRecord class whose database it uses (or its name, looked up on first use), `ActiveRecord::Base` by default; pass one that `connects_to` another database to keep the tables there. MySQL is not supported yet: the SDK's statements use `ON CONFLICT` and `TEXT` primary keys, and any adapter other than Postgres and SQLite is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter`.
 
 The store never creates its tables. In Rails, `bin/rails generate cronwatch:install` writes the migration that does. Elsewhere, create them once:
 
@@ -151,7 +157,9 @@ CW = Cronwatch.new(store: Cronwatch::Stores::ActiveRecord.new)
 
 `create_tables!(connection = ActiveRecord::Base.connection, prefix: "cronwatch_")` runs the SDK's own `CREATE TABLE IF NOT EXISTS` statements (on Postgres under the same advisory lock the Node store takes), and `drop_tables!` takes the same arguments. If the tables are missing, the client's first use of the store raises `Cronwatch::Stores::ActiveRecord::MissingTables`, naming them and the command that creates them. A run still goes ahead and hands the error to `on_error`; `check` raises it. The client looks again on its next call.
 
-Each store call checks a connection out of the pool for just that call, so runs and checks in other threads are fine. Inside an open transaction the call runs in a savepoint, so a store error cannot abort your transaction; its rows still commit or roll back with it.
+Each store call checks a connection out for just that call, so runs and checks in other threads are fine, and it always uses the writing database, even inside `connected_to(role: :reading, prevent_writes: true)` (what Rails' automatic role switching wraps a `GET` in).
+
+On Postgres the store never writes inside a transaction your code has open. It connects through a pool of its own (an abstract class under `Cronwatch::Stores::ActiveRecord`, with the writing database config of `connection_class`), so a job run inside `transaction do ... end` is recorded when it happens and stays recorded if the transaction rolls back, and a check running at the same time cannot deadlock with it. That pool is the size of the config's `pool` (5 by default), so each process may open up to that many more connections, one at a time as they are needed; count them against the database's connection limit, or give the store a `connection_class` whose config sets a smaller `pool`. SQLite allows one writer at a time, so there the store uses your pool: inside an open transaction each call runs in a savepoint, so a store error cannot abort the transaction, and the rows commit or roll back with it.
 
 A store of your own is any object with the methods the memory store has: `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune`, and optionally `init` and `close`. They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says, with epoch milliseconds for every time.
 
@@ -259,10 +267,10 @@ The client:
 | `job(name, **options)` | declare a job and get its handle |
 | `run(name, **options) { \|job\| ... }` | run without keeping a handle. Without a block, `run(id)` is `get_run(id)` |
 | `check` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune. Returns a result with `checked_at`, `jobs`, `alerts` and `pruned`. Calls at the same time share one check |
-| `start(every = "1m")`, `stop` | check in a background thread; the first check comes after a second, and the interval is at least 5 seconds |
+| `start(every = "1m")`, `stop` | check in a background thread; the first check comes after a second, and the interval is at least 5 seconds. A second `start` does nothing, and one with another interval is reported to `on_error` |
 | `jobs`, `jobs_with_runs(limit = 20)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit = 50)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
-| `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too. State keeps updating underneath |
+| `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath |
 | `forget(name)` | remove a job and its runs |
 | `defined_jobs` | the definitions declared in this process |
 | `close` | stop the thread and close the store |
@@ -271,7 +279,17 @@ The client:
 
 A Rails app and a Node service can watch their jobs in one database. The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The gem's tests run the SDK's own stores in Node beside it, on SQLite and Postgres, and check that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes in every column. Create the tables from either side; the other side's `CREATE TABLE IF NOT EXISTS` finds them and leaves them alone. Use the same prefix on both sides.
 
-Each process alerts on the jobs it runs, and either side's check sees every job in the store. One dashboard, Rails or Node, shows them all, and one MCP server reads it. Give each job a name only one side uses.
+Each process alerts on the jobs it runs, and either side's check sees every job in the store. One dashboard, Rails or Node, shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store, on one side.
+
+The gem reads every schedule the SDK writes but a few cron forms croner takes and the gem does not:
+
+- `W` in the day of the month (`0 0 15W * *`, the weekday nearest the 15th) and `LW`
+- `#` on a range of weekdays (`0 0 * * 1-5#2`)
+- a seventh (year) field
+- `L` after a day of the month other than on its own (`0 0 3L * *`)
+- a date no month has (`0 0 30 2 *`)
+
+A job the Node side declares with one of these is shown on the Ruby dashboard without a next expected time, and a Ruby check skips it and reports the schedule to `on_error`; the other jobs are checked as usual. Let the Node side check those jobs.
 
 ## Kept in step
 

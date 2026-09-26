@@ -17,7 +17,7 @@ module Cronwatch
   #            or open the dashboard once with `?token=<token>` and a cookie is set.
   #            Defaults to ENV["CRONWATCH_TOKEN"]; an empty string counts as unset.
   #            With no token, the app answers only requests to localhost while
-  #            RAILS_ENV or RACK_ENV is development or test, and 503 otherwise.
+  #            Cronwatch::Environment is development or test, and 503 otherwise.
   #            Pass `token: nil` to opt out and serve it open everywhere, for
   #            example behind your own auth. /api/check also accepts the
   #            client's cron_secret as a bearer, for a platform cron.
@@ -299,22 +299,43 @@ module Cronwatch
       !site.nil? && site != "same-origin" && site != "none"
     end
 
-    # The form fields or JSON object of a request, each value as a string.
+    # The form fields or JSON object of a request, each value as String(value)
+    # gives it in JavaScript. The body is read as the SDK's request.json()
+    # reads it: bytes that are not UTF-8 become U+FFFD, and a leading byte
+    # order mark is dropped.
     def read_body(request)
       type = request.header("content-type") || ""
       if type.include?("application/json")
-        data = JSON.parse(request.body)
-        return data.to_h { |k, v| [k.to_s, HTML.text(v)] } if data.is_a?(Hash)
-        return data.each_with_index.to_h { |v, i| [i.to_s, HTML.text(v)] } if data.is_a?(Array)
-      elsif type.include?("application/x-www-form-urlencoded")
-        return Request.parse_query(request.body).each_with_object({}) { |(k, v), out| out[k] = v }
-      elsif type.include?("multipart/form-data")
-        params = request.multipart
-        return params.to_h { |k, v| [k.to_s, v.is_a?(Hash) ? "[object File]" : HTML.text(v)] }
+        data = JSON.parse(Output.utf8(request.body).delete_prefix("﻿"))
+        return data.to_h { |k, v| [k.to_s, js_string(v)] } if data.is_a?(Hash)
+        return data.each_with_index.to_h { |v, i| [i.to_s, js_string(v)] } if data.is_a?(Array)
+      elsif type.include?("application/x-www-form-urlencoded") || type.include?("multipart/form-data")
+        return request.form.transform_values { |v| form_value(v) }
       end
       {}
     rescue StandardError
       {}
+    end
+
+    # String(value) for a parsed JSON value.
+    def js_string(value)
+      case value
+      when nil then "null"
+      when Array then value.map { |v| v.nil? ? "" : js_string(v) }.join(",")
+      when Hash then "[object Object]"
+      when Numeric then JS.number(value)
+      else value.to_s
+      end
+    end
+
+    # String(value) for a form field Rack parsed: a file is "[object File]".
+    def form_value(value)
+      case value
+      when String then Output.utf8(value)
+      when Hash then value.key?(:tempfile) ? "[object File]" : "[object Object]"
+      when Array then value.map { |v| form_value(v) }.join(",")
+      else js_string(value)
+      end
     end
 
     # Absent means one hour; a number or numeric string is milliseconds. Raises on anything else.
@@ -408,10 +429,6 @@ module Cronwatch
         @rack.base_url
       end
 
-      def hostname
-        @rack.host.to_s.downcase
-      end
-
       def https?
         @rack.scheme == "https"
       end
@@ -439,9 +456,12 @@ module Cronwatch
         text.force_encoding(Encoding::UTF_8)
       end
 
-      def multipart
-        @env["rack.input"]&.rewind
-        Rack::Multipart.parse_multipart(@env) || {}
+      # The form's fields, as Rack parses them. Rack keeps what it parsed, so
+      # a body Rack::MethodOverride (or anything else) already read, which
+      # cannot be read twice, still gives its fields.
+      def form
+        fields = @rack.POST
+        fields.each_with_object({}) { |(k, v), out| out[Output.utf8(k)] = v }
       end
 
       # application/x-www-form-urlencoded parsing as URLSearchParams does it:

@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
-require "active_record"
+begin
+  require "active_record"
+rescue LoadError => e
+  raise LoadError, "cronwatch/active_record needs the activerecord gem: add `gem \"activerecord\"` to your Gemfile " \
+                   "(Rails apps already have it) (#{e.message})"
+end
 
 module Cronwatch
   module Stores
@@ -8,29 +13,42 @@ module Cronwatch
     # The same three tables, columns, indexes and JSON as the SDK's SQLite and
     # Postgres stores (packages/sdk/src/stores/sql.ts), so a Node process and a
     # Ruby process can share one database. Postgres and SQLite are supported
-    # and tested; MySQL is untested (the statements use ON CONFLICT and TEXT
-    # primary keys, which it does not take as written).
+    # and tested; any other adapter (MySQL among them) is refused.
     #
     #   Cronwatch.configure do |c|
     #     c.store = Cronwatch::Stores::ActiveRecord.new
     #   end
     #
     # It never creates tables on its own: in Rails the install generator's
-    # migration does, and elsewhere call ActiveRecord.create_tables!. Every call
-    # checks a connection out of the pool for just that call, so checks and
-    # runs in other threads are fine. Inside an open transaction each call runs
-    # in a savepoint, so a store error cannot abort the app's transaction; the
-    # rows still commit or roll back with it. Pass a connection_class that
-    # connects_to another database to keep them apart.
+    # migration does, and elsewhere call ActiveRecord.create_tables!. Every
+    # call checks a connection out for just that call, so checks and runs in
+    # other threads are fine, and always on the writing role, so it works
+    # inside connected_to(role: :reading).
+    #
+    # On Postgres the store connects through a pool of its own (an abstract
+    # class under this one, with the connection_class's writing database
+    # config), so its writes never join a transaction the app has open: a run
+    # recorded inside one is kept when it rolls back, and a check waiting on a
+    # job's row cannot deadlock with it. That pool opens up to the config's
+    # `pool` connections per process, beside the app's. SQLite allows one
+    # writer at a time, so there the store uses the app's pool, and inside an
+    # open transaction each call runs in a savepoint of it.
     class ActiveRecord
       DEFAULT_PREFIX = "cronwatch_"
       # Postgres truncates identifiers past 63 bytes; the longest name built is the prefix plus "runs_job_started".
       MAX_PREFIX = 63 - "runs_job_started".length
       NAME = "Cronwatch"
-      JS_SAFE_INTEGER = (2**53) - 1
 
       # Raised by init when the tables are not there.
       class MissingTables < StandardError; end
+
+      # Raised for a database the store does not write: anything but Postgres and SQLite.
+      class UnsupportedAdapter < ArgumentError; end
+
+      # The abstract classes whose pools give the store its own Postgres
+      # connections, one per database config.
+      @pools = {}
+      @pools_lock = Mutex.new
 
       attr_reader :prefix
 
@@ -56,9 +74,33 @@ module Cronwatch
         prefix
       end
 
-      # :postgres or :sqlite, from a connection's adapter.
+      # :postgres or :sqlite, from a connection or an adapter's name. Raises
+      # UnsupportedAdapter for anything else.
       def self.dialect(connection)
-        /postg/i.match?(connection.adapter_name) ? :postgres : :sqlite
+        adapter = connection.respond_to?(:adapter_name) ? connection.adapter_name : connection.to_s
+        return :postgres if /postg/i.match?(adapter)
+        return :sqlite if /sqlite/i.match?(adapter)
+
+        raise UnsupportedAdapter,
+              "cronwatch: the ActiveRecord store supports PostgreSQL and SQLite, not #{adapter}. MySQL is not " \
+              "supported yet: the SDK's statements (ON CONFLICT, TEXT primary keys) do not run on it."
+      end
+
+      # The abstract class, named under this one, whose pool is the store's
+      # own for `db_config`: created once per config, on first use.
+      def self.own_connection_class(db_config)
+        @pools_lock.synchronize do
+          @pools[[db_config.env_name, db_config.name, db_config.configuration_hash]] ||= begin
+            klass = Class.new(::ActiveRecord::Base) { self.abstract_class = true }
+            # Named before it connects: ActiveRecord keys the pool by the class's name.
+            const_set("Connection#{@pools.length + 1}", klass)
+            config = ::ActiveRecord::DatabaseConfigurations::HashConfig.new(
+              db_config.env_name, "#{db_config.name}_cronwatch", db_config.configuration_hash,
+            )
+            ::ActiveRecord::Base.connected_to(role: ::ActiveRecord.writing_role) { klass.establish_connection(config) }
+            klass
+          end
+        end
       end
 
       # The SDK's schema, character for character (sql.ts `schema`).
@@ -221,10 +263,26 @@ module Cronwatch
         klass.is_a?(String) ? Object.const_get(klass) : klass
       end
 
+      # The pool a call checks a connection out of: on Postgres the store's
+      # own, on SQLite the connection_class's writing pool.
+      def pool
+        source = connection_class
+        found = source.connection_handler.retrieve_connection_pool(
+          source.connection_specification_name, role: ::ActiveRecord.writing_role, shard: source.default_shard,
+        ) || source.connection_pool
+        return found if self.class.dialect(found.db_config.adapter) == :sqlite
+
+        self.class.own_connection_class(found.db_config).connection_pool
+      end
+
+      # Every call runs on the writing role, even inside the app's
+      # connected_to(role: :reading, prevent_writes: true).
       def with_connection(&block)
-        connection_class.connection_pool.with_connection do |conn|
-          # A failed statement aborts a Postgres transaction; a savepoint keeps that from reaching the app's.
-          conn.transaction_open? ? conn.transaction(requires_new: true) { block.call(conn) } : block.call(conn)
+        ::ActiveRecord::Base.connected_to(role: ::ActiveRecord.writing_role, prevent_writes: false) do
+          pool.with_connection do |conn|
+            # A failed statement aborts a Postgres transaction; a savepoint keeps that from reaching an open one.
+            conn.transaction_open? ? conn.transaction(requires_new: true) { block.call(conn) } : block.call(conn)
+          end
         end
       end
 
@@ -292,7 +350,7 @@ module Cronwatch
       # same number and write it back the same.
       def js_numbers(value)
         case value
-        when Integer then value.abs > JS_SAFE_INTEGER ? value.to_f : value
+        when Integer then value.abs > JS::MAX_SAFE_INTEGER ? value.to_f : value
         when Hash then value.transform_values! { |v| js_numbers(v) }
         when Array then value.map! { |v| js_numbers(v) }
         else value

@@ -216,6 +216,59 @@ class WebRoutesTest < Minitest::Test
     assert_equal clock.now + (4 * HOUR), cw.job_summary("mp").silenced_until
   end
 
+  # A Rack 3 input may be read once. Rack::MethodOverride reads a form
+  # before the app does; the fields must still arrive.
+  class OneShotInput
+    def initialize(text) = @io = StringIO.new(text)
+    def read(*args) = @io.read(*args)
+    def gets = @io.gets
+    def each(&block) = @io.each(&block)
+    def close = nil
+  end
+
+  def test_a_form_body_that_cannot_be_read_twice_is_still_read
+    require "rack/method_override"
+    cw, clock, web = app
+    cw.run("once") { nil }
+    forms = {
+      "application/x-www-form-urlencoded" => "for=5m",
+      "multipart/form-data; boundary=XX" => "--XX\r\nContent-Disposition: form-data; name=\"for\"\r\n\r\n5m\r\n--XX--\r\n",
+    }
+    [web, Rack::MethodOverride.new(web)].each do |handler|
+      forms.each do |type, body|
+        cw.unsilence("once")
+        env = Rack::MockRequest.env_for("http://app.test/cronwatch/api/jobs/once/silence",
+                                        method: "POST", "CONTENT_TYPE" => type, "HTTP_AUTHORIZATION" => "Bearer tok",
+                                        "CONTENT_LENGTH" => body.bytesize.to_s)
+        env["rack.input"] = OneShotInput.new(body)
+        status, _, response = handler.call(env)
+        assert_equal 200, status
+        assert_equal clock.now + (5 * MIN), JSON.parse(response.join)["state"]["silencedUntil"], "#{handler.class} #{type}"
+      end
+    end
+  end
+
+  # What the SDK answers for the same bytes (audit-bugs/web/bytes.mjs): a
+  # byte order mark is dropped, bytes that are not UTF-8 become U+FFFD, and a
+  # value is String(value), so null is "null".
+  def test_a_json_body_is_decoded_as_request_json_decodes_it
+    cw, clock, web = app
+    cw.run("bytes") { nil }
+    post = ->(body) { send_request(web, "POST", "/cronwatch/api/jobs/bytes/silence", BEARER.merge("content-type" => "application/json"), body.b) }
+    res = post.call("\xEF\xBB\xBF{\"for\":\"5m\"}")
+    assert_equal 200, res.status
+    assert_equal clock.now + (5 * MIN), res.json["state"]["silencedUntil"]
+    res = post.call("{\"for\":\"5m\xFF\"}")
+    assert_equal 400, res.status
+    assert_equal "silence duration \"5m\u{FFFD}\" is not a duration like \"15m\", \"1h30m\" or \"90s\"", res.json["error"]
+    res = post.call('{"for":null}')
+    assert_equal 400, res.status
+    assert_equal 'silence duration "null" is not a duration like "15m", "1h30m" or "90s"', res.json["error"]
+    res = post.call('{"for":[null,"2h"]}')
+    assert_equal 400, res.status
+    assert_match(/silence duration ",2h"/, res.json["error"])
+  end
+
   # Ruby only: the app passes Rack::Lint.
   def test_responses_pass_rack_lint
     cw, = make

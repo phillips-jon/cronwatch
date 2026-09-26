@@ -7,5 +7,5 @@
 #
 # `require "cronwatch/rails"` loads it on first use, so a Rails app does not
 # need this line.
-require "cronwatch"
+require "cronwatch" unless defined?(Cronwatch::Client)
 require_relative "stores/active_record"

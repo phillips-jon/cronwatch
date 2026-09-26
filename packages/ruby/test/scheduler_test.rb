@@ -2,6 +2,7 @@
 
 require_relative "test_helper"
 require "cronwatch/scheduler"
+require "tmpdir"
 
 # Reading schedules from Solid Queue's and sidekiq-cron's config, and turning
 # what Fugit reads into the cron expression CronWatch reads.
@@ -12,7 +13,6 @@ class SchedulerTest < Minitest::Test
   SC = Cronwatch::Scheduler::SidekiqCron
   Error = Cronwatch::Scheduler::Error
   DIR = File.expand_path("support/schedules", __dir__)
-  DAY = 86_400_000
 
   def teardown
     Cronwatch::Scheduler.sources = nil
@@ -169,63 +169,75 @@ class SchedulerTest < Minitest::Test
     assert_equal "Asia/Kolkata", sq("every day at 2:30am Asia/Kolkata").convert[:timezone]
   end
 
-  # Every accepted conversion, in zones with and without daylight saving:
-  # after each run Fugit makes, CronWatch wants the next run Fugit makes.
-  # Where clocks go back Fugit runs a repeated time twice, which CronWatch
-  # takes as an early run; nowhere does CronWatch want a run Fugit skips.
-  def test_conversions_match_fugits_own_next_time_across_the_year
-    schedules = ["every hour at minute 12", "every day at 10am", "every day at 3am", "0 2 * * *", "every 5 minutes",
-                 "every monday at 9am", "every weekday at 8:30", "0 0 L * *", "0 12 * * 5#-1", "every 30 seconds"]
-    zones = %w[UTC America/New_York Europe/London Australia/Sydney Asia/Kolkata]
-    checked = 0
-    zones.each do |zone|
-      schedules.each do |schedule|
-        converted = begin
-          sq("#{schedule} #{zone}").convert
-        rescue Error
-          next if zone != "UTC" # a clock change the scheduler skips: refused, as above
-
-          raise
-        end
-        cron = Fugit.parse("#{schedule} #{zone}")
-        parsed = Cronwatch::Schedule.parse(converted[:schedule], converted[:timezone])
-        changes = Cronwatch::Zone.get(zone).transitions_up_to(Time.utc(2028, 1, 1), Time.utc(2026, 1, 1)).map { |c| c.at.to_i * 1000 }
-        windows(schedule, changes).each do |from, to|
-          at = cron.next_time(Time.at(from / 1000).utc).to_i * 1000
-          while at < to
-            following = cron.next_time(Time.at(at / 1000).utc).to_i * 1000
-            due = Cronwatch::Schedule.due_after_run(parsed, at)
-            near = changes.any? { |t| t > at - DAY && t < following + DAY }
-            label = "#{schedule} in #{zone}, after #{Time.at(at / 1000).utc}"
-            if near
-              assert_operator due, :>=, following, label
-            else
-              assert_equal following, due, label
-            end
-            checked += 1
-            at = following
-          end
-        end
-      end
+  # Fugit's own next_time drops runs on the day clocks change in these (its
+  # hour steps, a midnight that repeats, a half hour change), where CronWatch
+  # would expect them and report them missed.
+  def test_a_run_fugit_drops_on_a_clock_change_is_refused
+    {
+      "every 5 hours America/New_York" => /after a run at 2026-03-08 00:00:00 Solid Queue runs it next at 2026-03-08 10:00:00 and CronWatch would expect 2026-03-08 05:00:00/,
+      "0 */5 * * * America/New_York" => /Solid Queue runs it next at 2026-03-08 10:00:00/,
+      "0 0,4 * * * America/New_York" => /after a run at 2026-11-01 00:00:00/,
+      "0 0 */2 * * Australia/Lord_Howe" => /in Australia\/Lord_Howe, but after a run at/,
+      "45 2 * * * Pacific/Chatham" => /does not exist in Pacific\/Chatham on \d{4}-09-\d\d, when clocks go forward from 02:45 to 03:45/,
+    }.each do |schedule, message|
+      error = assert_raises(Error, schedule) { sq(schedule).convert }
+      assert_match message, error.message, schedule
     end
-    assert_operator checked, :>, 5000
+    # A midnight clock change: Havana springs from 00:00 to 01:00 and falls back from 01:00 to 00:00.
+    assert_raises(Error) { sq("0 0 * * * America/Havana").convert }
+    assert_equal "America/Havana", sq("every minute America/Havana").convert[:timezone]
   end
 
-  # Stretches to walk: around every clock change of 2026 and 2027, and the
-  # start of each month of 2026, shorter the more often the schedule fires (all of
-  # 2026 for one that fires weekly or less).
-  def windows(schedule, changes)
-    return [[Time.utc(2026, 1, 1).to_i * 1000, Time.utc(2027, 1, 1).to_i * 1000]] if schedule.match?(/ L | 5#-1|monday/)
+  # A burst of minutes: after the last but one, CronWatch counts the last as
+  # covered by it (a minute of early slack), so it wants the next burst.
+  def test_a_difference_the_early_slack_explains_is_accepted
+    assert_equal({ schedule: "* 5 * * *", timezone: "Asia/Kolkata" }, sq("* 5 * * * Asia/Kolkata").convert)
+    assert_equal "22,23,24,25,26,27,28,29,30,31,32,33 1 * * *", sq("22-33 1 * * * UTC").convert[:schedule]
+    assert_equal "19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48 11 * * 3",
+                 sq("19-48 11 * * 3 UTC").convert[:schedule]
+  end
 
-    around, month =
-      case schedule
-      when /seconds/ then [20 * 60_000, 5 * 60_000]
-      when /minutes/ then [2 * 3_600_000, 3_600_000]
-      when /hour/ then [DAY / 2, DAY / 2]
-      else [3 * DAY, 7 * DAY]
-      end
-    months = (1..12).map { |i| Time.utc(2026, i, 1).to_i * 1000 }
-    changes.map { |t| [t - around, t + around] } + months.map { |t| [t, t + month] }
+  def test_a_rails_time_zone_name_is_read_as_solid_queue_reads_it
+    require "active_support"
+    require "active_support/values/time_zone"
+    assert_equal({ schedule: "0 3 * * *", timezone: "America/New_York" },
+                 sq("every day at 3am", time_zone: "Eastern Time (US & Canada)").convert)
+    assert_equal "Europe/London", sq("every day at 3am", time_zone: ActiveSupport::TimeZone["London"]).convert[:timezone]
+    error = assert_raises(Error) { sq("every day at 3am", time_zone: "Middle Earth").convert }
+    assert_match(/the time zone "Middle Earth" is neither an IANA timezone .* nor a Rails time zone name/, error.message)
+  end
+
+  def test_dates_and_times_in_a_tasks_args_are_read_as_solid_queue_reads_them
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "recurring.yml")
+      File.write(path, <<~YAML)
+        production:
+          backfill:
+            class: BackfillJob
+            args: [2026-01-01, 2026-01-01 12:00:00]
+            schedule: every day at 4am
+      YAML
+      entries = SQ.new(path, env: "production", time_zone: "UTC").entries
+      assert_equal %w[backfill], entries.map(&:key)
+      assert_equal({ schedule: "0 4 * * *", timezone: "UTC" }, entries.first.convert)
+    end
+  end
+
+  def test_solid_queue_skip_recurring_reads_no_tasks
+    with = ->(value, &block) do
+      before = ENV.fetch("SOLID_QUEUE_SKIP_RECURRING", nil)
+      value.nil? ? ENV.delete("SOLID_QUEUE_SKIP_RECURRING") : ENV["SOLID_QUEUE_SKIP_RECURRING"] = value
+      block.call
+    ensure
+      before.nil? ? ENV.delete("SOLID_QUEUE_SKIP_RECURRING") : ENV["SOLID_QUEUE_SKIP_RECURRING"] = before
+    end
+    with.call("true") do
+      assert_empty recurring.entries
+      assert_match(/not read: SOLID_QUEUE_SKIP_RECURRING is set/, recurring.label)
+      refute_empty SQ.new(File.join(DIR, "recurring.yml"), env: "production", skip_recurring: false).entries
+    end
+    with.call("false") { refute_empty recurring.entries }
+    with.call("") { refute_empty recurring.entries }
   end
 
   # sidekiq-cron's own parse, where the gem is here: the same Fugit::Cron.

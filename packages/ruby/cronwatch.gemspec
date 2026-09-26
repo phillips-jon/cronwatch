@@ -15,10 +15,14 @@ Gem::Specification.new do |spec|
   spec.metadata = {
     "homepage_uri" => spec.homepage,
     "source_code_uri" => "https://github.com/phillips-jon/cronwatch/tree/main/packages/ruby",
+    "changelog_uri" => "https://github.com/phillips-jon/cronwatch/releases",
+    "bug_tracker_uri" => "https://github.com/phillips-jon/cronwatch/issues",
+    "documentation_uri" => "https://cronwatch.dev/docs/ruby/",
     "rubygems_mfa_required" => "true",
   }
 
-  spec.files = Dir["lib/**/*.rb"] + %w[README.md LICENSE]
+  # Globbed from this file's directory, so the list is the same whatever the working directory.
+  spec.files = Dir.glob("lib/**/*.rb", base: __dir__) + %w[README.md LICENSE]
   spec.require_paths = ["lib"]
 
   spec.add_dependency "fugit", "~> 1.11"

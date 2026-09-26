@@ -15,9 +15,14 @@
 #     config.server_middleware { |chain| chain.add Cronwatch::Sidekiq::ServerMiddleware }
 #     config.on(:startup) { Cronwatch::Sidekiq.ready! } # after Cronwatch.configure, with the jobs loaded
 #   end
+begin
+  require "sidekiq"
+rescue LoadError => e
+  raise LoadError, "cronwatch/sidekiq needs the sidekiq gem (7 or newer): add `gem \"sidekiq\"` to your Gemfile (#{e.message})"
+end
+
 require "cronwatch" unless defined?(Cronwatch::Client)
-require "sidekiq"
-require_relative "monitored"
+require_relative "scheduler"
 
 module Cronwatch
   # Monitors a Sidekiq job class. Each perform run by a Sidekiq server with

@@ -170,7 +170,7 @@ map("/cronwatch") { run Cronwatch::Web.new(CW) }
 ## Stores
 
 - `Cronwatch::Stores::Memory.new`: the default. Nothing survives a restart.
-- `Cronwatch::Stores::ActiveRecord.new(prefix: "cronwatch_", connection_class: nil)`: Postgres or SQLite through ActiveRecord, in `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. `connection_class` picks the pool (a class, or its name). In Rails the generator's migration creates the tables; elsewhere call `Cronwatch::Stores::ActiveRecord.create_tables!` (and `drop_tables!`). The store never creates them itself, and raises `MissingTables` when they are not there. Inside an open transaction each call runs in a savepoint. MySQL is untested.
+- `Cronwatch::Stores::ActiveRecord.new(prefix: "cronwatch_", connection_class: nil)`: Postgres or SQLite through ActiveRecord, in `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. `connection_class` picks the pool (a class, or its name). In Rails the generator's migration creates the tables; elsewhere call `Cronwatch::Stores::ActiveRecord.create_tables!` (and `drop_tables!`). The store never creates them itself, and raises `MissingTables` when they are not there. On Postgres it writes through a connection pool of its own (up to the database config's `pool` more connections per process), so a run is recorded outside any transaction the app has open and stays recorded when that transaction rolls back; on SQLite it uses the app's pool, and inside an open transaction each call runs in a savepoint. It always writes on the writing role, even inside `connected_to(role: :reading)`. Other adapters, MySQL among them, are refused with `UnsupportedAdapter`.
 
 Finished runs older than `retention` (default `"30d"`) are pruned by the check; each job's newest run is kept.
 
@@ -209,15 +209,15 @@ Adds two to four sentences from Claude (likely cause, first thing to check) to e
 
 ## Sharing a database with a Node app
 
-The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: same names, columns and indexes, epoch milliseconds in the time columns, the SDK's camelCase JSON in the JSON columns. `test/active_record/node_compat_test.rb` runs the SDK's stores in Node beside this one, on SQLite and Postgres, and checks that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes. Use the same prefix on both sides and give each job a name only one side uses. Then one dashboard, Rails or Node, shows every job, and one MCP server reads them all.
+The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: same names, columns and indexes, epoch milliseconds in the time columns, the SDK's camelCase JSON in the JSON columns. [`test/active_record/node_compat_test.rb`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/active_record/node_compat_test.rb) runs the SDK's stores in Node beside this one, on SQLite and Postgres, and checks that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes. Use the same prefix on both sides and give each job a name only one side uses. Then one dashboard, Rails or Node, shows every job, and one MCP server reads them all.
 
 ## Kept in step with the TypeScript SDK
 
 The TypeScript SDK is the source of truth. `npm run conformance` at the repository root runs it and writes JSON cases to `conformance/`: duration parsing and formatting, schedules including daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, stats and health. This gem's tests replay every case, and the SDK's own check fails when the files are stale. A change of behaviour lands in TypeScript first, the cases are regenerated, and the gem is fixed until its tests pass. When the two disagree, the Ruby side is wrong.
 
-The dashboard is held to the SDK the same way: `test/web/golden.json` records what the SDK's routes answer to a fixed set of requests, and `test/web_golden_test.rb` makes `Cronwatch::Web` answer them byte for byte.
+The dashboard is held to the SDK the same way: [`test/web/golden.json`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/web/golden.json) records what the SDK's routes answer to a fixed set of requests, and [`test/web_golden_test.rb`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/web_golden_test.rb) makes `Cronwatch::Web` answer them byte for byte.
 
-The design of the port is in [DESIGN.md](DESIGN.md).
+The design of the port is in [DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/DESIGN.md).
 
 ## Testing
 
@@ -226,7 +226,7 @@ bundle install
 bundle exec rake test
 ```
 
-`rake test` runs three suites, each in its own process: `rake test:core` (the client, channels, conformance, the Rack app, Sidekiq without Rails, schedule conversion checked against Fugit), `rake test:active_record` (the store, on SQLite, and on Postgres when `CRONWATCH_TEST_PG` is set) and `rake test:rails` (a small Rails app: ActiveJob, Sidekiq, schedules from `recurring.yml` and `schedule.yml`, `CheckJob`, the rake task, the generator).
+`rake test` runs four suites, each in its own process: `rake test:core` (the client, channels, conformance, the Rack app, Sidekiq without Rails, schedule conversion checked against Fugit), `rake test:slow` (every schedule conversion walked against Fugit across a year, some ten seconds), `rake test:active_record` (the store, on SQLite, and on Postgres when `CRONWATCH_TEST_PG` is set) and `rake test:rails` (a small Rails app: ActiveJob, Sidekiq, schedules from `recurring.yml` and `schedule.yml`, `CheckJob`, the rake task, the generator).
 
 ```sh
 CRONWATCH_TEST_PG=postgres://postgres:pw@127.0.0.1:5432/cw bundle exec rake test
@@ -238,7 +238,7 @@ The node compatibility tests run the built SDK and its drivers, and skip themsel
 npm ci && npm run build
 ```
 
-The default Gemfile tests Rails 8.1. Each supported Rails series has its own Gemfile, with its own lockfile, in `test/rails/gemfiles`:
+The default Gemfile tests Rails 8.1. Each supported Rails series has its own Gemfile, with its own lockfile, in [`test/rails/gemfiles`](https://github.com/phillips-jon/cronwatch/tree/main/packages/ruby/test/rails/gemfiles):
 
 ```sh
 BUNDLE_GEMFILE=test/rails/gemfiles/rails_7_2.gemfile bundle install
@@ -255,7 +255,7 @@ npm run build --workspace packages/sdk && TZ=UTC node packages/ruby/test/web/gol
 
 `npm run check` fails while `test/web/golden.json` or `conformance/` is stale.
 
-The MCP server's tests can also drive this gem's `Cronwatch::Web` over HTTP (`test/web/server.rb`). They need `fugit`, `rack` and a server rackup can start (puma or webrick) in the Ruby they run, and only run when asked, from `packages/mcp`:
+The MCP server's tests can also drive this gem's `Cronwatch::Web` over HTTP ([`test/web/server.rb`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/web/server.rb)). They need `fugit`, `rack` and a server rackup can start (puma, or webrick, which the Gemfile's test group has) in the Ruby they run, and only run when asked, from `packages/mcp`:
 
 ```sh
 CRONWATCH_TEST_RUBY=1 CRONWATCH_RUBY="rbenv exec ruby" npm test

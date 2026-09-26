@@ -124,6 +124,19 @@ if defined?(::Sidekiq::Job)
       assert_equal [:failed], @capture.types
     end
 
+    # What Sidekiq raises into a busy job when a deploy outlasts its
+    # timeout: the job goes back on the queue, and its run is not left running.
+    def test_a_job_stopped_by_sidekiq_shutdown_is_recorded_and_the_shutdown_raised
+      job = SidekiqJobs::HardWorker.new
+      assert_raises(::Sidekiq::Shutdown) do
+        chain.invoke(job, payload(SidekiqJobs::HardWorker, "ok"), "default") { raise ::Sidekiq::Shutdown }
+      end
+      run = runs("hard").first
+      assert_equal :failed, run.status
+      assert_equal "Interrupted: Sidekiq::Shutdown", run.error.split("\n").first
+      refute_nil run.finished_at
+    end
+
     def test_sidekiq_testing_inline_runs_the_middleware
       ::Sidekiq::Testing.server_middleware { |c| c.add(M) }
       ::Sidekiq::Testing.inline! do

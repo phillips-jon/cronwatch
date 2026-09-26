@@ -1,47 +1,8 @@
 # frozen_string_literal: true
 
+require_relative "abort_signal"
+
 module Cronwatch
-  # Raised by Signal#check! once a signal has aborted.
-  class AbortError < StandardError; end
-
-  # A cancellation flag, like an AbortSignal. A job's signal aborts once the
-  # job's timeout has passed; triage gets one that aborts when the client
-  # stops waiting. Nothing is interrupted: code that can stop early checks it.
-  class Signal
-    def initialize(timeout_ms = nil)
-      @deadline = timeout_ms && (Signal.monotonic + (timeout_ms / 1000.0))
-      @aborted = false
-      @settled = false
-      @lock = Mutex.new
-    end
-
-    def self.monotonic
-      Process.clock_gettime(Process::CLOCK_MONOTONIC)
-    end
-
-    def aborted?
-      @lock.synchronize do
-        @aborted = true if !@aborted && !@settled && @deadline && Signal.monotonic >= @deadline
-        @aborted
-      end
-    end
-
-    def abort!
-      @lock.synchronize { @aborted = true unless @settled }
-    end
-
-    # Raises AbortError when aborted, for a loop that should stop there.
-    def check!
-      raise AbortError, "This operation was aborted" if aborted?
-    end
-
-    # Called when the work is over: a timeout that passes later no longer aborts it.
-    def settle!
-      aborted?
-      @lock.synchronize { @settled = true }
-    end
-  end
-
   # What a job's block receives.
   class JobContext
     attr_reader :name, :run_id, :started_at, :signal
@@ -66,7 +27,7 @@ module Cronwatch
         raise ArgumentError, "metric \"#{name}\" must be a finite number"
       end
 
-      @recorder.metric(name.to_s, value)
+      @recorder.metric(Output.utf8(name), value)
       nil
     end
 
@@ -80,14 +41,17 @@ module Cronwatch
       @signal.aborted?
     end
 
+    # A logged value as text, the way the SDK writes it, always valid UTF-8.
     def self.stringify(part)
-      case part
-      when String then part
-      when Symbol then part.to_s
-      when Exception then "#{part.class.name || part.class}: #{part.message}"
-      when Hash, Array, Numeric, true, false, nil, Struct then JS.json(part)
-      else part.to_s
-      end
+      text =
+        case part
+        when String then part
+        when Symbol then part.to_s
+        when Exception then "#{part.class.name || part.class}: #{Output.utf8(part.message)}"
+        when Hash, Array, Numeric, true, false, nil, Struct then JS.json(part)
+        else part.to_s
+        end
+      Output.utf8(text)
     end
   end
 
@@ -131,7 +95,7 @@ module Cronwatch
       @dropped = false
       @metrics = {}
       @lock = Mutex.new
-      @signal = Signal.new(timeout_ms)
+      @signal = AbortSignal.new(timeout_ms)
       @context = JobContext.new(run, @signal, self)
     end
 
