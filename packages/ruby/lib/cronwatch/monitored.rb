@@ -4,7 +4,8 @@ module Cronwatch
   # What Cronwatch::ActiveJob and Cronwatch::Sidekiq share: the `cronwatch`
   # class macro, the list of classes that called it, and when their jobs are
   # declared on Cronwatch.client. Needs nothing beyond the core, so Sidekiq
-  # without Rails can use it.
+  # without Rails can use it. Loaded by cronwatch/scheduler, which schedule:
+  # :from_scheduler and declare_from_scheduler! need.
   module Monitored
     # What `cronwatch` is outside a monitored run: it takes log and metric
     # calls and drops them, so the job's code runs the same either way.
@@ -42,11 +43,6 @@ module Cronwatch
         @resolved = nil
         @registration = nil
         @lock = Mutex.new
-      end
-
-      # The options the job is declared with, once resolved.
-      def resolved_options
-        @lock.synchronize { resolve_locked }
       end
 
       # [client, handle] on Cronwatch.client. With strict: false a bad
@@ -105,7 +101,7 @@ module Cronwatch
       def boot!
         ready!
         register_all(strict: true)
-        Cronwatch::Scheduler.declare_pending!
+        Cronwatch::Scheduler.declare_pending! if defined?(Cronwatch::Scheduler)
         nil
       end
 
@@ -261,5 +257,3 @@ module Cronwatch
     end
   end
 end
-
-require_relative "scheduler" unless defined?(Cronwatch::Scheduler)

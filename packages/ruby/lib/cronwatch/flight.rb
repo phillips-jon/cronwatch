@@ -1,0 +1,42 @@
+# frozen_string_literal: true
+
+module Cronwatch
+  class Client
+    # One shared check: the first caller runs it, the others wait for its result.
+    class Flight
+      def initialize
+        @lock = Mutex.new
+        @done = ConditionVariable.new
+        @finished = false
+      end
+
+      def resolve(value)
+        settle(value, nil)
+      end
+
+      def reject(error)
+        settle(nil, error)
+      end
+
+      def value
+        @lock.synchronize do
+          @done.wait(@lock) until @finished
+          raise @error if @error
+
+          @value
+        end
+      end
+
+      private
+
+      def settle(value, error)
+        @lock.synchronize do
+          @value = value
+          @error = error
+          @finished = true
+          @done.broadcast
+        end
+      end
+    end
+  end
+end

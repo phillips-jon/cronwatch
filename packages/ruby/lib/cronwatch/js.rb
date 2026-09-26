@@ -18,6 +18,8 @@ module Cronwatch
     ESCAPES = { '"' => '\\"', "\\" => "\\\\", "\b" => "\\b", "\f" => "\\f", "\n" => "\\n", "\r" => "\\r", "\t" => "\\t" }.freeze
     # An array index is a canonical integer below 2**32 - 1; JavaScript lists those keys first.
     INDEX_KEY = /\A(?:0|[1-9]\d{0,9})\z/
+    # Number.MAX_SAFE_INTEGER. Past it JavaScript holds an integer as the nearest double.
+    MAX_SAFE_INTEGER = (2**53) - 1
 
     module_function
 
@@ -49,7 +51,7 @@ module Cronwatch
 
     # String(number), the text a template literal or JSON.stringify gives a number.
     def number(value)
-      return value.to_s if value.is_a?(Integer)
+      return value.to_s if value.is_a?(Integer) && value.abs <= MAX_SAFE_INTEGER
 
       value = value.to_f
       return "NaN" if value.nan?
@@ -142,7 +144,7 @@ module Cronwatch
       when false then "false"
       when String then quote(value)
       when Symbol then quote(value.to_s)
-      when Integer then value.to_s
+      when Integer then number(value)
       when Float then value.finite? ? number(value) : "null"
       when Hash then "{#{object_keys(value).map { |k| "#{quote(k.to_s)}:#{json(value[k])}" }.join(",")}}"
       when Array then "[#{value.map { |v| json(v) }.join(",")}]"

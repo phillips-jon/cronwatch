@@ -5,10 +5,19 @@ require "rake/testtask"
 # The ActiveRecord store and the Rails integration load ActiveRecord and boot
 # a Rails app, so each runs in a process of its own, away from the core tests.
 INTEGRATIONS = %w[active_record rails].freeze
+# Walks every schedule conversion against Fugit across a year: slow, so out of
+# test:core, but part of `rake test` and so of CI.
+SLOW = %w[slow].freeze
 
 Rake::TestTask.new("test:core") do |t|
   t.libs << "lib" << "test"
-  t.test_files = FileList["test/**/*_test.rb"].exclude(*INTEGRATIONS.map { |dir| "test/#{dir}/**/*" })
+  t.test_files = FileList["test/**/*_test.rb"].exclude(*(INTEGRATIONS + SLOW).map { |dir| "test/#{dir}/**/*" })
+  t.warning = true
+end
+
+Rake::TestTask.new("test:slow") do |t|
+  t.libs << "lib" << "test"
+  t.test_files = FileList["test/slow/**/*_test.rb"]
   t.warning = true
 end
 
@@ -20,7 +29,7 @@ INTEGRATIONS.each do |dir|
   end
 end
 
-desc "Run every test: core, then the ActiveRecord store (Postgres when CRONWATCH_TEST_PG is set), then Rails"
-task test: ["test:core", *INTEGRATIONS.map { |dir| "test:#{dir}" }]
+desc "Run every test: core, the slow schedule walk, then the ActiveRecord store (Postgres when CRONWATCH_TEST_PG is set), then Rails"
+task test: ["test:core", "test:slow", *INTEGRATIONS.map { |dir| "test:#{dir}" }]
 
 task default: :test

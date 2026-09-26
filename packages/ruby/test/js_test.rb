@@ -10,7 +10,7 @@ class JSTest < Minitest::Test
       0 => "0", -0.0 => "0", 1.0 => "1", 1.5 => "1.5", 0.1 + 0.2 => "0.30000000000000004", 1e21 => "1e+21",
       1.5e-7 => "1.5e-7", 0.000001 => "0.000001", 123_456_789_012_345_680_000.0 => "123456789012345680000",
       100.0 => "100", 2.5e-5 => "0.000025", 1.7976931348623157e308 => "1.7976931348623157e+308", -42.25 => "-42.25",
-      Float::NAN => "NaN", Float::INFINITY => "Infinity", 10**25 => "10000000000000000000000000",
+      Float::NAN => "NaN", Float::INFINITY => "Infinity", 10**25 => "1e+25", (2**53) + 1 => "9007199254740992",
     }.each do |value, text|
       assert_equal text, Cronwatch::JS.number(value), value.inspect
     end
@@ -19,6 +19,13 @@ class JSTest < Minitest::Test
   def test_json_matches_json_stringify
     value = { "b" => 1.0, "a" => [nil, true, "q\"\\\n\u0001\u007f\u2028/"], "10" => 1, "2" => 2, x: :y, "n" => Float::NAN }
     assert_equal '{"2":2,"10":1,"b":1,"a":[null,true,"q\"\\\\\\n\\u0001' + "\u007f\u2028" + '/"],"x":"y","n":null}', Cronwatch::JS.json(value)
+  end
+
+  def test_integers_past_2_to_the_53_are_written_as_node_holds_them
+    value = { "big" => (2**53) + 1, "huge" => 10**21, "neg" => -(2**60), "safe" => (2**53) - 1 }
+    # node -e 'console.log(JSON.stringify({big: 2**53 + 1, huge: 1e21, neg: -(2**60), safe: 2**53 - 1}))'
+    assert_equal '{"big":9007199254740992,"huge":1e+21,"neg":-1152921504606847000,"safe":9007199254740991}',
+                 Cronwatch::JS.json(value)
   end
 
   def test_round_is_math_round

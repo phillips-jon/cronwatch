@@ -3,7 +3,7 @@
 require "active_support/concern"
 require "active_support/inflector"
 require "active_job"
-require_relative "../monitored"
+require_relative "../scheduler"
 
 module Cronwatch
   # Monitors an ActiveJob class. Each perform is a recorded run with the
@@ -35,21 +35,6 @@ module Cronwatch
     include Cronwatch::Monitored
 
     TRIGGER = "active_job"
-
-    NullContext = Cronwatch::Monitored::NullContext
-    NULL_CONTEXT = Cronwatch::Monitored::NULL_CONTEXT
-
-    class << self
-      # The names of the classes that declared `cronwatch` (ActiveJob and
-      # Sidekiq alike), in the order they did.
-      def monitored = Cronwatch::Monitored.monitored
-      def track(klass) = Cronwatch::Monitored.track(klass)
-      def ready! = Cronwatch::Monitored.ready!
-      def ready? = Cronwatch::Monitored.ready?
-      def register_all(strict: true) = Cronwatch::Monitored.register_all(strict: strict)
-      def load_app_jobs = Cronwatch::Monitored.load_app_jobs
-      def default_name(klass) = Cronwatch::Monitored.default_name(klass)
-    end
 
     included do
       around_perform :cronwatch_perform

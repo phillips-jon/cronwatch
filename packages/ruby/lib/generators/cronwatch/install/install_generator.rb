@@ -23,8 +23,6 @@ module Cronwatch
       class_option :database, type: :string, aliases: %i[--db],
                               desc: "The database for the migration, in an app with several"
 
-      MIGRATION = "create_cronwatch_tables"
-
       def check_prefix
         Cronwatch::Stores::ActiveRecord.table_prefix(options[:prefix])
       rescue ArgumentError => e
@@ -34,13 +32,13 @@ module Cronwatch
       def create_migration_file
         dir = db_migrate_path
         absolute = File.join(destination_root, dir)
-        if (existing = self.class.migration_exists?(absolute, MIGRATION))
+        if (existing = self.class.migration_exists?(absolute, migration_name))
           say_status :exist, existing.delete_prefix("#{destination_root}/"), :blue
           return
         end
 
         number = self.class.next_migration_number(absolute)
-        create_file File.join(dir, "#{number}_#{MIGRATION}.rb"), migration
+        create_file File.join(dir, "#{number}_#{migration_name}.rb"), migration
       end
 
       def create_initializer
@@ -52,6 +50,15 @@ module Cronwatch
       end
 
       private
+
+      # create_cronwatch_tables, or with a prefix create_cronwatch_ops_tables,
+      # so each prefix gets a migration of its own.
+      def migration_name
+        prefix = options[:prefix]
+        return "create_cronwatch_tables" if prefix == Cronwatch::Stores::ActiveRecord::DEFAULT_PREFIX
+
+        "create_cronwatch_#{prefix.squeeze("_").delete_prefix("_").delete_suffix("_")}_tables"
+      end
 
       def store_args
         prefix = options[:prefix]
@@ -67,7 +74,7 @@ module Cronwatch
           # The tables CronWatch keeps jobs, runs and alert state in. They are
           # created with the SDK's own statements, so a Node process using
           # @cronwatch/sdk can share them.
-          class CreateCronwatchTables < ActiveRecord::Migration[#{::ActiveRecord::Migration.current_version}]
+          class #{migration_name.camelize} < ActiveRecord::Migration[#{::ActiveRecord::Migration.current_version}]
             def up
               Cronwatch::Stores::ActiveRecord.create_tables!(connection, prefix: #{options[:prefix].inspect})
             end
@@ -136,7 +143,8 @@ module Cronwatch
                  cronwatch schedule: "0 2 * * *", grace: "15m" # name: "nightly-report"
                end
 
-          3. Run Cronwatch::CheckJob every 5 minutes. It notices the runs that never happen.
+          3. Run Cronwatch::CheckJob every 5 minutes, from one scheduler only. It notices
+             the runs that never happen; two checkers would send each alert twice.
 
              Solid Queue, in config/recurring.yml:
 

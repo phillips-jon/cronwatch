@@ -26,7 +26,7 @@ module Cronwatch
         ci("secret"), ci("token"), "#{ci("passw")}(?:#{ci("or")})?#{ci("d")}", ci("pwd"),
         "#{ci("api")}[_-]?#{ci("key")}", "#{ci("access")}[_-]?#{ci("key")}", "#{ci("private")}[_-]?#{ci("key")}",
         ci("credential"),
-      ].join("|")
+      ].join("|").freeze
 
       PATTERNS = [
         # password=..., API_KEY: ..., "client_secret": "...", TOKEN='...', token=... (but not max_tokens: 800).
@@ -85,7 +85,23 @@ module Cronwatch
 
     module_function
 
+    # Text as valid UTF-8, whatever it was read as: bytes that are not UTF-8
+    # (binary output, a C extension's message) become U+FFFD, and text in
+    # another encoding is converted. JavaScript strings cannot hold anything
+    # else, and the store, the alerts and the redaction all expect UTF-8.
+    def utf8(text)
+      text = text.to_s
+      return text if text.encoding == Encoding::UTF_8 && text.valid_encoding?
+
+      if [Encoding::UTF_8, Encoding::BINARY, Encoding::US_ASCII].include?(text.encoding)
+        text.dup.force_encoding(Encoding::UTF_8).scrub
+      else
+        text.encode(Encoding::UTF_8, invalid: :replace, undef: :replace)
+      end
+    end
+
     def cap(text)
+      text = utf8(text)
       return text if JS.length16(text) <= CAP
 
       "[earlier output trimmed]\n#{JS.tail16(text, CAP)}"
@@ -93,23 +109,39 @@ module Cronwatch
 
     # "Name: message" and the first five backtrace lines, each written as
     # "    at <line>" like the frames of a JavaScript stack, capped like output.
+    # An exception that stops the thread rather than reporting a problem
+    # (Interrupt, SystemExit, Sidekiq::Shutdown, a Timeout) is written
+    # "Interrupted: <class>", with its message when it says more.
     def error_message(error)
       cap(describe_error(error))
     end
 
     def describe_error(error)
       if error.is_a?(Exception)
-        frames = (error.backtrace || []).first(5).map { |line| "    at #{line}" }
-        header = "#{error.class.name || error.class}: #{error.message}"
+        frames = (error.backtrace || []).first(5).map { |line| "    at #{utf8(line)}" }
+        name = error.class.name || error.class.to_s
+        message = utf8(error.message)
+        header =
+          if interruption?(error)
+            message.empty? || message == name ? "Interrupted: #{name}" : "Interrupted: #{name}: #{message}"
+          else
+            "#{name}: #{message}"
+          end
         return frames.empty? ? header : "#{header}\n#{frames.join("\n")}"
       end
-      return error if error.is_a?(String)
+      return utf8(error) if error.is_a?(String)
 
       begin
         JS.json(error)
       rescue StandardError
-        error.to_s
+        utf8(error)
       end
+    end
+
+    # Outside StandardError, and not a ScriptError (NotImplementedError,
+    # LoadError), which is a problem in the code rather than a stop.
+    def interruption?(error)
+      !error.is_a?(StandardError) && !error.is_a?(ScriptError)
     end
 
     # The default `redact`: blanks values that look like secrets (key=value

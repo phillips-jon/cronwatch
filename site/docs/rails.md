@@ -21,7 +21,7 @@ bin/rails generate cronwatch:install
 bin/rails db:migrate
 ```
 
-Bundler requires the gem after Rails has loaded, so `gem "cronwatch"` alone brings in the Rails integration: the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task and the generator. With Sidekiq in the Gemfile (before or after `cronwatch`), `Cronwatch::Sidekiq` loads too. The ActiveRecord store loads the first time it is used. The dashboard does not load on its own; see [Mount the dashboard](#mount-the-dashboard).
+Bundler requires the gem after Rails has loaded, so `gem "cronwatch"` alone brings in the Rails integration: the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task and the generator. With Sidekiq in the Gemfile (before or after `cronwatch`), `Cronwatch::Sidekiq` loads too. So does the dashboard, `Cronwatch::Web` (see [Mount the dashboard](#mount-the-dashboard)). The ActiveRecord store loads the first time it is used.
 
 The generator writes two files:
 
@@ -48,7 +48,8 @@ CronWatch is installed. Next:
        cronwatch schedule: "0 2 * * *", grace: "15m" # name: "nightly-report"
      end
 
-3. Run Cronwatch::CheckJob every 5 minutes. It notices the runs that never happen.
+3. Run Cronwatch::CheckJob every 5 minutes, from one scheduler only. It notices
+   the runs that never happen; two checkers would send each alert twice.
 
    Solid Queue, in config/recurring.yml:
 
@@ -104,7 +105,11 @@ The store takes `prefix:` and `connection_class:`. To keep the tables in another
 c.store = Cronwatch::Stores::ActiveRecord.new(connection_class: "OpsRecord")
 ```
 
-A class name is looked up on first use, so the initializer does not have to load the model. Each store call checks a connection out of that class's pool for just that call. Inside an open transaction it runs in a savepoint, so a store error cannot abort your transaction; its rows still commit or roll back with it. Postgres and SQLite are supported and tested. MySQL is untested and will not work as written: the statements use `ON CONFLICT` and `TEXT` primary keys.
+A class name is looked up on first use, so the initializer does not have to load the model. Each store call checks a connection out for just that call, always on the writing database, even inside a request Rails' automatic role switching runs on the reading one.
+
+On Postgres the store never joins a transaction your code has open. A job that runs inside `ActiveRecord::Base.transaction` has its run recorded as it happens, and the run stays recorded if the transaction rolls back, so its alert is not sent again on the next failure. To do that the store connects through a pool of its own, with the writing database config of `connection_class` (`ActiveRecord::Base` by default): each process may open up to that config's `pool` (5 unless set) more connections, only as it needs them. Count them against your database's connection limit, or point `connection_class` at a class whose config sets a smaller `pool`. SQLite allows one writer at a time, so there the store uses your pool and, inside an open transaction, runs in a savepoint of it: a store error cannot abort your transaction, and the rows commit or roll back with it.
+
+Postgres and SQLite are supported and tested. MySQL is not supported yet: the SDK's statements use `ON CONFLICT` and `TEXT` primary keys, and any other adapter is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter` when the store is first used.
 
 ## Watch a job
 
@@ -193,7 +198,7 @@ nightly_report:
 
 Where it looks:
 
-- Solid Queue, when it is loaded: `config/recurring.yml` (or the file `SOLID_QUEUE_RECURRING_SCHEDULE` names), the section for `Rails.env` when the file has one and the whole file when it does not, as Solid Queue reads it. Only tasks with a `schedule` count; tasks created at runtime (`SolidQueue.schedule_recurring_task`) are not in the file and are not seen.
+- Solid Queue, when it is loaded: `config/recurring.yml` (or the file `SOLID_QUEUE_RECURRING_SCHEDULE` names), the section for `Rails.env` when the file has one and the whole file when it does not, read as Solid Queue reads it (ERB, then YAML with dates and times allowed in `args`). Only tasks with a `schedule` count; tasks created at runtime (`SolidQueue.schedule_recurring_task`) are not in the file and are not seen. A file given to `bin/jobs` with `--recurring_schedule_file` is not seen either, since only the process that runs `bin/jobs` knows it: set `SOLID_QUEUE_RECURRING_SCHEDULE` instead, or list the file in `Cronwatch::Scheduler.sources`. With `SOLID_QUEUE_SKIP_RECURRING` set, Solid Queue runs no recurring tasks, and CronWatch reads none; where only this process skips them and another schedules them, pass `skip_recurring: false` to the source (below).
 - sidekiq-cron, when it is loaded and enabled: its `cron_schedule_file` (`config/schedule.yml`, or `.yaml`), as a map of names to jobs or a list of jobs with `name`. A job with `status: disabled` does not count. Jobs created from code (`Sidekiq::Cron::Job.create`, or `load_from_hash` on a file of your own) are not seen.
 
 To read something else, list the sources in the initializer:
@@ -205,17 +210,20 @@ Cronwatch::Scheduler.sources = [
 ]
 ```
 
+`SolidQueue.new` also takes `env:` (the section to read), `time_zone:` (the zone for a schedule without one, an IANA name or a Rails name such as `"Eastern Time (US & Canada)"`; one that is neither stops the boot) and `skip_recurring:`.
+
 ### How schedules are converted
 
 Both schedulers parse schedules with Fugit, which reads cron lines and phrases such as `every day at 3am`, `every 5 minutes` or `every hour at minute 12`. CronWatch reads cron expressions, not phrases, so each schedule is parsed with Fugit exactly as the scheduler parses it and written out as the cron expression Fugit made of it: `every day at 3am` is `0 3 * * *`, `every 5 minutes` is `0,5,10,15,20,25,30,35,40,45,50,55 * * * *`, `every hour at minute 12` is `12 * * * *`. What CronWatch expects is what the scheduler runs, even where the phrase says something else (Fugit reads `every 90 minutes` as every hour).
 
 The timezone is the one the scheduler reads the schedule in: the zone at the end of the schedule (`every day at 3am America/New_York`, `0 2 * * * Europe/London`) when there is one. Without one, Solid Queue 1.5 and later use `config.solid_queue.time_zone`, which is `config.time_zone` unless you set it; sidekiq-cron and older Solid Queue use Fugit's local zone, which is `TZ`, then Rails' `Time.zone`, then the system's. A schedule with several times in one phrase (`every day at 9:15 and 17:30`) is refused by Solid Queue and read as its first time by sidekiq-cron's default `:single` mode, and CronWatch does the same.
 
-Every conversion is checked against Fugit before it is used: after each run the scheduler would make, the next run CronWatch expects must be the next one the scheduler makes. A schedule that fails is refused at boot with an error that says why, never approximated:
+Every conversion is checked against Fugit before it is used, by walking Fugit's runs and CronWatch's side by side from two days before to two days after every clock change in the next five years, and through a sample year: between two runs the scheduler makes, CronWatch must never expect one of its own. A difference CronWatch's minute of early slack explains is fine (in a burst such as `22-33 1 * * *`, the run at 01:32 already covers 01:33). The check takes a few tens of milliseconds for most schedules and up to about a second for one that fires every minute or more often, once, at boot. A schedule that fails is refused at boot with an error that says why, never approximated:
 
 - Forms croner has no equivalent for: every other week (`1%2`), days counted back from the end of the month other than the last (`-2`, `5#-2`), random times (`~`).
 - A zone that is not an IANA name, such as `+05:00`.
 - A time that daylight saving skips. On the night clocks go forward, Fugit skips a run whose time does not exist (02:30 in New York in March), while CronWatch, like cron, expects it once the clocks have moved and would report it missed. So `every day at 2:30am` in a zone that changes at 02:00 is refused; a time outside the change, or a zone without daylight saving such as UTC, is fine. `every hour` is fine too: the skipped 02:00 lands on the 03:00 run. On the night clocks go back, Fugit runs a repeated time twice, and CronWatch counts the second run as an early one, so nothing is reported.
+- A run Fugit drops on the day clocks change. Fugit's hour steps skip runs that exist: in New York `every 5 hours` (`0 */5 * * *`) runs at midnight and then not until 10:00 on the day clocks go forward, and `0 0,4 * * *` misses a run on the day they go back. Zones that change at midnight or by half an hour (`America/Havana`, `Australia/Lord_Howe`, `Pacific/Chatham`) have more such days.
 - Any other schedule whose runs CronWatch would not expect exactly when the scheduler makes them. One known case: with both a day of the month and a day of the week (`0 0 1,15 * 1`), croner, and so CronWatch, skips some firsts of the month that Fugit runs.
 
 A cron expression written by hand in both places still works, as before.
@@ -241,6 +249,8 @@ It takes the options of a declared job other than `schedule`, `timezone` and `na
 Every perform of a watched class counts as a run, whoever enqueued it, as with `cronwatch`. Inside `perform`, `cronwatch` (for `log` and `metric`) exists only in a class that includes `Cronwatch::ActiveJob` or `Cronwatch::Sidekiq`.
 
 ## Run the check
+
+**Run exactly one checker.** Schedule `Cronwatch::CheckJob` once, as one recurring entry, not per process or per machine, and do not also call `Cronwatch.client.start` or hit `/cronwatch/api/check` from elsewhere. Two checks against one database at the same moment can each open the same condition and send the same alert twice.
 
 Failures are caught as they happen. A run that never started, or never finished, can only be noticed by looking. `Cronwatch::CheckJob` (or `Cronwatch::Sidekiq::CheckWorker`, for Sidekiq without ActiveJob) looks: it loads `app/jobs` when the app does not eager load, declares every monitored job, and calls `Cronwatch.client.check`, which finds missed and stuck runs, sends their alerts, retries alerts no channel accepted and prunes old runs. It returns the check's result and is queued on `default`. Schedule it every five minutes beside your other recurring jobs; these are the entries the generator prints.
 
@@ -282,13 +292,13 @@ Rails.application.routes.draw do
 end
 ```
 
-`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. It is not loaded by `gem "cronwatch"`, hence the `require`. `Cronwatch::Web.new(client = nil, token:, base_path:)` takes:
+`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch::Web.new(client = nil, token:, base_path:)` takes:
 
 - `client`: the client to serve. Leave it out and each request uses `Cronwatch.client` at that moment.
 - `token`: leave it out to read `CRONWATCH_TOKEN`. An empty string, passed or in the variable, counts as unset. `nil` opts out of the token entirely and serves the app to anyone who reaches it, for a mount that sits behind your own sign in.
 - `base_path`: where it is mounted, so links resolve. It defaults to the mount point Rack reports (`SCRIPT_NAME`), which is right under Rails' `mount` and Rack's `map`.
 
-Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token it answers only `localhost` while `RAILS_ENV` (or `RACK_ENV`) is `development` or `test`, and 503 everywhere else, including when neither is set. Local means the `Host` header as sent and the peer's address are both loopback, and no `X-Forwarded-Host`, `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header names anything else.
+Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token it answers only `localhost` while `Rails.env` is `development` or `test`, and 503 everywhere else. Local means the `Host` header as sent and the peer's address are both loopback, and no `X-Forwarded-Host`, `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header names anything else.
 
 To put it behind the app's own sign in instead, mount it inside that check and pass `token: nil`, so it serves whoever gets through. With Devise:
 

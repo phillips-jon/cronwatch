@@ -51,7 +51,7 @@ class TriageAnthropicTest < Minitest::Test
     )
   end
 
-  def context_for(name, signal: Cronwatch::Signal.new)
+  def context_for(name, signal: Cronwatch::AbortSignal.new)
     c = CONTEXTS.fetch(name)
     Cronwatch::Client::TriageContext.new(alert: Cronwatch::Alert.from_h(c["alert"]), recent_runs: c["recentRuns"].map { |r| Cronwatch::Run.from_h(r) }, signal: signal)
   end
@@ -108,7 +108,7 @@ class TriageAnthropicTest < Minitest::Test
 
   def test_an_aborted_signal_sends_nothing
     client = StubClient.new
-    signal = Cronwatch::Signal.new
+    signal = Cronwatch::AbortSignal.new
     signal.abort!
     assert_raises(Cronwatch::AbortError) { triage_for({}, client).call(context_for("a stuck run", signal: signal)) }
     assert_equal [], client.requests

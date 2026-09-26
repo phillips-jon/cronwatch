@@ -3,10 +3,20 @@
 require "monitor"
 require "securerandom"
 require "set"
+require_relative "abort_signal"
+require_relative "environment"
+require_relative "flight"
+require_relative "ticker"
 
 module Cronwatch
-  # Raised (and handed to on_error) when a channel or triage takes too long.
+  # Raised (and handed to on_error) when a channel or triage takes too long,
+  # or is skipped because its previous call has not finished.
   class TimeoutError < StandardError; end
+
+  # What callers waiting on a shared check see when the check was stopped by
+  # an exception outside StandardError (Interrupt, Timeout, SystemExit). The
+  # caller that ran the check sees the original exception.
+  class InterruptedError < StandardError; end
 
   class Client
     NAME_RE = /\A[A-Za-z0-9][A-Za-z0-9._:-]{0,119}\z/
@@ -22,6 +32,9 @@ module Cronwatch
     DEFAULT_OPTIONS = %i[grace timeout timezone failures_before_alert].freeze
     # Tells "cron_secret not given" (read CRON_SECRET) from "cron_secret: nil" (no secret on purpose).
     UNSET = Object.new.freeze
+    # Guards the reset a forked child makes of the parent's locks and threads.
+    FORK_LOCK = Mutex.new
+    SILENCE_OPTIONS = %i[for].freeze
 
     # What execute returns: the recorded run, and the block's own outcome.
     ExecuteResult = Struct.new(:run, :result, :error, :threw, keyword_init: true)
@@ -72,25 +85,21 @@ module Cronwatch
         raise ArgumentError, "deliver must be \"now\" or \"check\", not #{deliver.inspect}"
       end
 
-      # :check queues alerts in the store for another process's check to send. See DESIGN.md and deliver in the SDK.
+      # :check queues alerts in the store for another process's check to send
+      # (see "Delivery" in DESIGN.md, and deliver in the SDK).
       @defer_delivery = deliver.to_s == "check"
       @clock = now || -> { Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond) }
       @on_error = on_error || method(:default_on_error)
       @definitions = {}
       @synced = Set.new
       @registry = Mutex.new
-      @locks = {}
       @ready = false
-      @ready_lock = Mutex.new
-      @check_lock = Mutex.new
-      @checking = nil
       @last_prune_at = 0
-      @ticker = nil
       # Seconds before start()'s first check, and how long a channel or triage may take. Tests shorten them.
       @first_tick_s = 1.0
       @channel_timeout_ms = CHANNEL_TIMEOUT_MS
       @triage_timeout_ms = TRIAGE_TIMEOUT_MS
-      @warned_no_secret = false
+      reset_process_state
     end
 
     # Epoch milliseconds, from the clock the client was given.
@@ -118,7 +127,11 @@ module Cronwatch
     # on first use (or again, when options are given). Without a block: the
     # run with this id, as get_run.
     def run(name_or_id, **options, &block)
-      return get_run(name_or_id) unless block
+      unless block
+        raise ArgumentError, "run(#{name_or_id.inspect}, ...) needs a block; without one, run(id) reads a run" if options.any?
+
+        return get_run(name_or_id)
+      end
 
       declared = @registry.synchronize { @definitions[name_or_id.to_s] }
       handle = options.any? || declared.nil? ? job(name_or_id, **options) : JobHandle.new(self, declared)
@@ -132,13 +145,18 @@ module Cronwatch
 
     # Runs a block as a recorded run. The block always runs, whatever the store
     # is doing: store errors go to on_error, and the result is the block's own
-    # outcome. Never raises for the block's own error; see `threw`.
+    # outcome. A StandardError from the block is not raised; see `threw`. An
+    # exception outside StandardError (Interrupt, SystemExit, Sidekiq::Shutdown,
+    # a Timeout, NotImplementedError) is recorded as a failed run and then
+    # raised again, so the run is never left running.
     #
-    # Meant for integrations (the Rack handler, ActiveJob) rather than apps.
     # `failure` is an optional callable that turns the block's result into an
     # error message, or nil when the result is fine: an HTTP handler uses it to
     # count a 500 response as a failed run.
+    #
+    # @api private For integrations (JobHandle#run, ActiveJob, Sidekiq), not apps.
     def execute(definition, trigger, failure: nil)
+      after_fork_check
       name = definition.name
       started_at = now
       run = Run.new(id: SecureRandom.uuid, job: name, status: :running, started_at: started_at, finished_at: nil,
@@ -171,7 +189,7 @@ module Cronwatch
       threw = false
       begin
         result = yield(recorder.context)
-      rescue StandardError => e
+      rescue Exception => e # rubocop:disable Lint/RescueException -- recorded, then raised again below
         error = e
         threw = true
       ensure
@@ -182,16 +200,17 @@ module Cronwatch
       run.finished_at = finished_at
       run.duration_ms = [0, finished_at - started_at].max
       run.metrics = recorder.metrics
-      run.output = recorder.output || (result.is_a?(String) ? Output.cap(result) : nil)
+      returned = result.is_a?(String) ? Output.utf8(result) : nil
+      run.output = recorder.output || (returned && Output.cap(returned))
 
       if threw
         run.status = :failed
         run.error = Output.error_message(error)
       elsif (problem = failure&.call(result))
         run.status = :failed
-        run.error = problem
+        run.error = Output.utf8(problem.to_s)
       else
-        expect_text = recorder.expect_text || (result.is_a?(String) ? result : nil)
+        expect_text = recorder.expect_text || returned
         unmet = Serialize.check_expectation(definition.expect, expect_text)
         if unmet
           run.status = :failed
@@ -228,6 +247,8 @@ module Cronwatch
         finish_run(stored, run, finished_at, false) if recorded
       end
 
+      raise error if threw && interrupted?(error)
+
       ExecuteResult.new(run: run, result: result, error: error, threw: threw)
     end
 
@@ -236,6 +257,7 @@ module Cronwatch
     # scheduled job (Cronwatch::CheckJob), or by hand. Concurrent calls share
     # one check.
     def check
+      after_fork_check
       flight = nil
       mine = false
       @check_lock.synchronize do
@@ -247,10 +269,13 @@ module Cronwatch
       if mine
         begin
           flight.resolve(run_check)
-        rescue StandardError => e
-          flight.reject(e)
+        rescue Exception => e # rubocop:disable Lint/RescueException -- the waiters must not hang
+          # An Interrupt or a Timeout is meant for this thread only, so the
+          # waiters get an error of their own and this thread the original.
+          flight.reject(interrupted?(e) ? InterruptedError.new("the check was interrupted by #{e.class}") : e)
+          raise if interrupted?(e)
         ensure
-          @check_lock.synchronize { @checking = nil }
+          @check_lock.synchronize { @checking = nil if @checking.equal?(flight) }
         end
       end
       flight.value
@@ -263,6 +288,7 @@ module Cronwatch
 
     # Every job's summary with its newest `limit` runs, read together. What the dashboard shows.
     def jobs_with_runs(limit = 20)
+      after_fork_check
       ensure_ready
       defined_jobs.each { |definition| sync(definition) }
       at = now
@@ -292,9 +318,13 @@ module Cronwatch
     end
 
     # Stop alerts for a job for a while. State keeps updating underneath.
-    #   silence("nightly-report", for: "2h")
+    #   silence("nightly-report", for: "2h")   # or silence("nightly-report", "2h")
     def silence(name, duration = nil, **options)
-      duration = options.fetch(:for) if duration.nil? && options.key?(:for)
+      unknown = options.keys - SILENCE_OPTIONS
+      raise ArgumentError, "silence takes for:, not #{unknown.map(&:inspect).join(", ")}" if unknown.any?
+      raise ArgumentError, "silence takes a duration or for:, not both" if !duration.nil? && options.key?(:for)
+
+      duration = options[:for] if duration.nil?
       ms = Duration.parse(duration, "silence duration")
       patch_state(name) { |state| state.silenced_until = now + ms }
     end
@@ -316,21 +346,39 @@ module Cronwatch
 
     # Check on an interval, in a background thread, for long-running
     # processes. Default every minute; the first check comes after a second.
+    # Calling it again while it runs does nothing, and a different interval
+    # is reported to on_error and ignored: stop first to change it. A forked
+    # child (Puma, Unicorn, Sidekiq) has no thread, so call start there.
     def start(every = "1m")
-      return if @ticker
+      after_fork_check
+      ms = [5_000, Duration.parse(every, "check interval")].max
+      @ticker_lock.synchronize do
+        if @ticker
+          unless @ticker_ms == ms
+            report(ArgumentError.new("start(#{every.inspect}) ignored: already checking every #{Duration.format(@ticker_ms)}; " \
+                                     "call stop first to change it"), "start")
+          end
+          return nil
+        end
 
-      seconds = [5_000, Duration.parse(every, "check interval")].max / 1000.0
-      @ticker = Ticker.new(seconds, @first_tick_s) do
-        check
-      rescue StandardError => e
-        report(e, "check")
+        @ticker_ms = ms
+        @ticker = Ticker.new(ms / 1000.0, @first_tick_s) do
+          check
+        rescue StandardError => e
+          report(e, "check")
+        end
       end
       nil
     end
 
     def stop
-      @ticker&.stop
-      @ticker = nil
+      after_fork_check
+      ticker = @ticker_lock.synchronize do
+        current = @ticker
+        @ticker = nil
+        current
+      end
+      ticker&.stop
       nil
     end
 
@@ -340,15 +388,15 @@ module Cronwatch
       nil
     end
 
-    # True in development or test: Rails.env when Rails is loaded, otherwise
-    # RAILS_ENV or RACK_ENV. Cronwatch::Web without a token only serves then.
+    # True in development or test. See Cronwatch::Environment.
     def self.development?
-      env = defined?(::Rails) && ::Rails.respond_to?(:env) ? ::Rails.env.to_s : (ENV["RAILS_ENV"] || ENV.fetch("RACK_ENV", nil))
-      %w[development test].include?(env)
+      Environment.development?
     end
 
     # Hands an error to on_error. An on_error that raises is not allowed to
     # take the job down with it.
+    #
+    # @api private For integrations (Cronwatch::Web, ActiveJob, Sidekiq), not apps.
     def report(error, where)
       @on_error.call(error, where)
     rescue StandardError => e
@@ -356,6 +404,36 @@ module Cronwatch
     end
 
     private
+
+    # Locks, the check in flight, the interval thread and the channel and
+    # triage threads belong to one process. A forked child (Puma, Unicorn,
+    # Sidekiq) starts with fresh ones, so start and check work there.
+    def reset_process_state
+      @pid = Process.pid
+      @locks = {}
+      @check_lock = Mutex.new
+      @checking = nil
+      @ticker_lock = Mutex.new
+      @ticker = nil
+      @ticker_ms = nil
+      @ready_lock = Mutex.new
+      @sending_lock = Mutex.new
+      # Channel (by index) and triage threads that timed out and are still going.
+      @abandoned = {}
+    end
+
+    def after_fork_check
+      return if @pid == Process.pid
+
+      FORK_LOCK.synchronize { reset_process_state unless @pid == Process.pid }
+    end
+
+    # An exception outside StandardError: the thread is being stopped
+    # (Interrupt, SystemExit, Sidekiq::Shutdown, a Timeout) or the code is
+    # broken (NotImplementedError, LoadError).
+    def interrupted?(error)
+      !error.is_a?(StandardError)
+    end
 
     def build_definition(name, options)
       unknown = options.keys.map(&:to_sym) - JobDefinition::OPTIONS
@@ -427,7 +505,7 @@ module Cronwatch
         next if @ready
 
         @store.init if @store.respond_to?(:init)
-        if @using_default_store && (ENV["RAILS_ENV"] || ENV.fetch("RACK_ENV", nil)) == "production"
+        if @using_default_store && Environment.production?
           warn "[cronwatch] using the in-memory store: runs and state are lost on restart. " \
                "Pass a store such as Cronwatch::Stores::ActiveRecord."
         end
@@ -449,6 +527,7 @@ module Cronwatch
     # other. Other processes are not coordinated. Only store reads and writes
     # happen inside; alerts are sent outside it.
     def serial(job, &block)
+      after_fork_check
       lock = @registry.synchronize { @locks[job] ||= Monitor.new }
       lock.synchronize(&block)
     end
@@ -514,7 +593,7 @@ module Cronwatch
       @store.running_runs.each do |run|
         declared = @registry.synchronize { @definitions[run.job] }
         definition = declared ? Serialize.to_stored(declared) : @store.get_job(run.job)&.definition
-        next if definition.nil? || !Evaluate.stuck?(definition, run, at)
+        next if definition.nil? || !isolated(run.job) { Evaluate.stuck?(definition, run, at) }
 
         run.status = :timeout
         run.finished_at = at
@@ -526,11 +605,17 @@ module Cronwatch
       jobs = []
       @store.list_jobs.each do |stored|
         recent = @store.list_runs(stored.name, Evaluate::BASELINE_WINDOW)
-        previous, evaluation, settled = serial(stored.name) do
-          before = read_state(stored.name)
-          result = Evaluate.on_check(stored.definition, stored, recent.first, before, at)
-          [before, result, settle(before, result, at)]
+        # A job whose stored schedule this process cannot read (one a Node
+        # process wrote, say) is reported and skipped; the others go on.
+        previous, evaluation, settled = isolated(stored.name) do
+          serial(stored.name) do
+            before = read_state(stored.name)
+            result = Evaluate.on_check(stored.definition, stored, recent.first, before, at)
+            [before, result, settle(before, result, at)]
+          end
         end
+        next if evaluation.nil?
+
         alerts.concat(retry_undelivered(stored.name, previous, at))
         alerts.concat(dispatch(settled.alerts, stored.definition, at))
         jobs << Evaluate.summarize(stored, recent, settled.state, evaluation.next_expected_at, at)
@@ -549,11 +634,23 @@ module Cronwatch
       CheckResult.new(checked_at: at, jobs: jobs, alerts: alerts, pruned: pruned)
     end
 
-    # A job's summary and its newest runs, without alerting.
+    # The block's answer, or nil when it raised ArgumentError: a stored
+    # schedule or option this process cannot read. That goes to on_error.
+    def isolated(name)
+      yield
+    rescue ArgumentError => e
+      report(e, "checking #{name}")
+      nil
+    end
+
+    # A job's summary and its newest runs, without alerting. A job whose
+    # schedule cannot be read is shown with no next expected time.
     def snapshot(stored, at, count)
       recent = @store.list_runs(stored.name, [count, Evaluate::BASELINE_WINDOW].max)
       state = read_state(stored.name)
-      next_expected_at = Evaluate.on_check(stored.definition, stored, recent.first, state, at).next_expected_at
+      next_expected_at = isolated(stored.name) do
+        Evaluate.on_check(stored.definition, stored, recent.first, state, at).next_expected_at
+      end
       JobWithRuns.new(job: Evaluate.summarize(stored, recent, state, next_expected_at, at), runs: recent.first(count))
     end
 
@@ -638,12 +735,20 @@ module Cronwatch
 
     # Send to every channel at once, each in its own thread with its own
     # timeout. True when at least one accepted it, or there are none. A
-    # channel that times out is left to finish on its own.
+    # channel that times out is left to finish on its own, and nothing more
+    # is sent to it until it has: meanwhile its alerts count as not
+    # delivered there, to be retried by a later check. So a hung channel
+    # holds one thread, not one per alert.
     def deliver(alert)
       return true if @alerts.empty?
 
       outcomes = Array.new(@alerts.length)
       threads = @alerts.each_with_index.map do |channel, i|
+        if @sending_lock.synchronize { @abandoned[i]&.alive? }
+          outcomes[i] = TimeoutError.new("skipped: an earlier alert timed out and is still being sent")
+          next nil
+        end
+
         Thread.new do
           Thread.current.report_on_exception = false
           channel.call(alert)
@@ -652,10 +757,13 @@ module Cronwatch
           outcomes[i] = e
         end
       end
-      deadline = Signal.monotonic + (@channel_timeout_ms / 1000.0)
+      deadline = AbortSignal.monotonic + (@channel_timeout_ms / 1000.0)
       results = threads.each_with_index.map do |thread, i|
-        finished = thread.join([deadline - Signal.monotonic, 0].max)
-        finished ? outcomes[i] : TimeoutError.new("timed out after #{@channel_timeout_ms}ms")
+        next outcomes[i] if thread.nil?
+        next outcomes[i] if thread.join([deadline - AbortSignal.monotonic, 0].max)
+
+        @sending_lock.synchronize { @abandoned[i] = thread }
+        TimeoutError.new("timed out after #{@channel_timeout_ms}ms")
       end
       results.each_with_index do |result, i|
         report(result, "alert channel #{channel_name(@alerts[i])}") unless result == true
@@ -667,8 +775,15 @@ module Cronwatch
       channel.respond_to?(:name) && channel.name ? channel.name : channel.class.name
     end
 
+    # Adds the triage callable's diagnosis to the alert. While a triage that
+    # timed out is still going, alerts go out without one rather than start
+    # another beside it.
     def add_triage(alert)
-      signal = Signal.new
+      signal = AbortSignal.new
+      if @sending_lock.synchronize { @abandoned[:triage]&.alive? }
+        raise TimeoutError, "skipped: an earlier triage timed out and is still running"
+      end
+
       recent = @store.list_runs(alert.job, 5)
       context = TriageContext.new(alert: alert, recent_runs: recent, signal: signal)
       outcome = nil
@@ -678,11 +793,14 @@ module Cronwatch
       rescue StandardError, ScriptError => e
         outcome = [:error, e]
       end
-      raise TimeoutError, "timed out after #{@triage_timeout_ms}ms" unless thread.join(@triage_timeout_ms / 1000.0)
+      unless thread.join(@triage_timeout_ms / 1000.0)
+        @sending_lock.synchronize { @abandoned[:triage] = thread }
+        raise TimeoutError, "timed out after #{@triage_timeout_ms}ms"
+      end
       raise outcome[1] if outcome[0] == :error
 
       diagnosis = outcome[1]
-      alert.triage = diagnosis if diagnosis.is_a?(String) && !diagnosis.empty?
+      alert.triage = Output.utf8(diagnosis) if diagnosis.is_a?(String) && !diagnosis.empty?
     rescue StandardError => e
       signal&.abort!
       report(e, "triage for #{alert.job}")
@@ -700,95 +818,6 @@ module Cronwatch
         ::Rails.logger.error(message)
       else
         warn message
-      end
-    end
-
-    # One shared check: the first caller runs it, the others wait for its result.
-    class Flight
-      def initialize
-        @lock = Mutex.new
-        @done = ConditionVariable.new
-        @finished = false
-      end
-
-      def resolve(value)
-        settle(value, nil)
-      end
-
-      def reject(error)
-        settle(nil, error)
-      end
-
-      def value
-        @lock.synchronize do
-          @done.wait(@lock) until @finished
-          raise @error if @error
-
-          @value
-        end
-      end
-
-      private
-
-      def settle(value, error)
-        @lock.synchronize do
-          @value = value
-          @error = error
-          @finished = true
-          @done.broadcast
-        end
-      end
-    end
-
-    # Calls the block after `first` seconds, then every `interval` seconds
-    # counted from the start, in a background thread, until stopped.
-    class Ticker
-      def initialize(interval, first, &tick)
-        @lock = Mutex.new
-        @wake = ConditionVariable.new
-        @stopped = false
-        started = Signal.monotonic
-        @thread = Thread.new do
-          Thread.current.name = "cronwatch-check" if Thread.current.respond_to?(:name=)
-          Thread.current.report_on_exception = false
-          first_at = started + first
-          next_at = started + interval
-          loop do
-            due = first_at ? [first_at, next_at].min : next_at
-            break unless wait_until(due)
-
-            clock = Signal.monotonic
-            if first_at && clock >= first_at
-              first_at = nil
-            else
-              next_at += interval while next_at <= clock
-            end
-            tick.call
-          end
-        end
-      end
-
-      def stop
-        @lock.synchronize do
-          @stopped = true
-          @wake.broadcast
-        end
-      end
-
-      private
-
-      # False once stopped.
-      def wait_until(due)
-        @lock.synchronize do
-          loop do
-            return false if @stopped
-
-            left = due - Signal.monotonic
-            return true if left <= 0
-
-            @wake.wait(@lock, left)
-          end
-        end
       end
     end
   end
