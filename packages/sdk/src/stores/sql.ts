@@ -66,6 +66,8 @@ export function statements(dialect: Dialect, p: string) {
   const seq = pg ? "seq" : "rowid";
   // Byte order on both, so names sort the same whatever the database's collation.
   const byName = pg ? `name COLLATE "C"` : "name";
+  // The version inside a state's JSON, 0 when it has none.
+  const version = (column: string) => (pg ? `COALESCE((${column}->>'version')::bigint, 0)` : `COALESCE(json_extract(${column}, '$.version'), 0)`);
   const sql = {
     upsertJob: `INSERT INTO ${p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
       ON CONFLICT (name) DO UPDATE SET definition = excluded.definition, updated_at = excluded.updated_at`,
@@ -82,6 +84,11 @@ export function statements(dialect: Dialect, p: string) {
     runningRuns: `SELECT * FROM ${p}runs WHERE status = 'running' ORDER BY started_at, ${seq}`,
     getState: `SELECT state FROM ${p}state WHERE job = ?`,
     setState: `INSERT INTO ${p}state (job, state) VALUES (?, ?) ON CONFLICT (job) DO UPDATE SET state = excluded.state`,
+    // compareAndSetState. Expecting version 0 also matches a missing row, so
+    // that case inserts; any other version must find its row.
+    casInsert: `INSERT INTO ${p}state (job, state) VALUES (?, ?)
+      ON CONFLICT (job) DO UPDATE SET state = excluded.state WHERE ${version(`${p}state.state`)} = 0`,
+    casUpdate: `UPDATE ${p}state SET state = ? WHERE job = ? AND ${version("state")} = ?`,
     // Each job's newest run is kept whatever its age: without it, a job that
     // runs less often than the retention looks like it never ran.
     prune: `DELETE FROM ${p}runs WHERE status <> 'running' AND started_at < ?
@@ -104,6 +111,8 @@ export const params = {
   ],
   updateRun: (run: Run) => [run.status, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.id],
   setState: (state: JobState) => [state.job, JSON.stringify(state)],
+  casInsert: (state: JobState) => [state.job, JSON.stringify(state)],
+  casUpdate: (state: JobState, expectedVersion: number) => [JSON.stringify(state), state.job, expectedVersion],
 };
 
 // SQLite hands back JSON as TEXT and Postgres as parsed JSONB; Postgres returns BIGINT as a string.

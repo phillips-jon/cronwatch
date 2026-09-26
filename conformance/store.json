@@ -289,5 +289,267 @@
         }
       ]
     }
+  ],
+  "compareAndSetState": [
+    {
+      "cas": {
+        "job": "a",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 2
+      },
+      "expected": 1,
+      "written": false,
+      "states": {
+        "a": null,
+        "b": null
+      }
+    },
+    {
+      "cas": {
+        "job": "a",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 1
+      },
+      "expected": 0,
+      "written": true,
+      "states": {
+        "a": {
+          "job": "a",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 1
+        },
+        "b": null
+      }
+    },
+    {
+      "cas": {
+        "job": "a",
+        "open": {},
+        "consecutiveFailures": 9,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 1
+      },
+      "expected": 0,
+      "written": false,
+      "states": {
+        "a": {
+          "job": "a",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 1
+        },
+        "b": null
+      }
+    },
+    {
+      "cas": {
+        "job": "a",
+        "open": {},
+        "consecutiveFailures": 1,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 2
+      },
+      "expected": 1,
+      "written": true,
+      "states": {
+        "a": {
+          "job": "a",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 2
+        },
+        "b": null
+      }
+    },
+    {
+      "cas": {
+        "job": "a",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 3
+      },
+      "expected": 1,
+      "written": false,
+      "states": {
+        "a": {
+          "job": "a",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 2
+        },
+        "b": null
+      }
+    },
+    {
+      "set": {
+        "job": "b",
+        "open": {},
+        "consecutiveFailures": 3,
+        "silencedUntil": null,
+        "lastAlertAt": null
+      },
+      "states": {
+        "a": {
+          "job": "a",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 2
+        },
+        "b": {
+          "job": "b",
+          "open": {},
+          "consecutiveFailures": 3,
+          "silencedUntil": null,
+          "lastAlertAt": null
+        }
+      }
+    },
+    {
+      "cas": {
+        "job": "b",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 1
+      },
+      "expected": 1,
+      "written": false,
+      "states": {
+        "a": {
+          "job": "a",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 2
+        },
+        "b": {
+          "job": "b",
+          "open": {},
+          "consecutiveFailures": 3,
+          "silencedUntil": null,
+          "lastAlertAt": null
+        }
+      }
+    },
+    {
+      "cas": {
+        "job": "b",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 1
+      },
+      "expected": 0,
+      "written": true,
+      "states": {
+        "a": {
+          "job": "a",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 2
+        },
+        "b": {
+          "job": "b",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 1
+        }
+      }
+    },
+    {
+      "forget": "a",
+      "states": {
+        "a": null,
+        "b": {
+          "job": "b",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 1
+        }
+      }
+    },
+    {
+      "cas": {
+        "job": "a",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 3
+      },
+      "expected": 2,
+      "written": false,
+      "states": {
+        "a": null,
+        "b": {
+          "job": "b",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 1
+        }
+      }
+    },
+    {
+      "cas": {
+        "job": "a",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "version": 1
+      },
+      "expected": 0,
+      "written": true,
+      "states": {
+        "a": {
+          "job": "a",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 1
+        },
+        "b": {
+          "job": "b",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "version": 1
+        }
+      }
+    }
   ]
 }

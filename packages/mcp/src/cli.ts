@@ -42,7 +42,7 @@ if (!baseUrl) {
   process.exit(2);
 }
 if (!token) {
-  console.error("cronwatch-mcp: no CRONWATCH_TOKEN given; this only works against an app on localhost with NODE_ENV=development and no token set.");
+  console.error("cronwatch-mcp: no CRONWATCH_TOKEN given; this only works against routes mounted with token: null. For an app in development without a token, use the one in the sign-in link it printed to its log.");
 }
 
 const server = createServer({ baseUrl, token });

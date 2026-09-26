@@ -1189,6 +1189,41 @@
       "times": 6000,
       "length": 16409,
       "sha256": "2625e6c949a4f4d74be521d0e0a5be3d67ee340ebb8a1a2425da3b4adf32f4a5"
+    },
+    {
+      "prefix": "a\u0000b",
+      "piece": "",
+      "times": 0,
+      "length": 2,
+      "sha256": "fb8e20fc2e4c3f248c60c39bd652f3c1347298bb977b8b4d5903b85055620603"
+    },
+    {
+      "prefix": "\u0000",
+      "piece": "\u0000",
+      "times": 3,
+      "length": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "prefix": "",
+      "piece": "x\u0000",
+      "times": 16384,
+      "length": 16384,
+      "sha256": "1536c422c31cc98834759d7085cda394a3510a03d78188248986a6b1a7207d03"
+    },
+    {
+      "prefix": "",
+      "piece": "x\u0000",
+      "times": 16385,
+      "length": 16409,
+      "sha256": "7e271d64d9aeaf95719ea8830cf580e5b114f9bbe54480276890e10de3dddd06"
+    },
+    {
+      "prefix": "n",
+      "piece": "\u0000y",
+      "times": 9000,
+      "length": 9001,
+      "sha256": "1fe6b5fd12b5846ad4c811232d6912ac857d848eec5c6a55160f8bf4d6faba44"
     }
   ],
   "toStored": [

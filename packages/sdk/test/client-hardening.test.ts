@@ -300,3 +300,158 @@ test("execute is not part of the public API", () => {
   // @ts-expect-error execute is private; use run() or a handle.
   void cw.execute;
 });
+
+/** A job's failure queued by a deliver: "check" process, so a check elsewhere must triage and send it. */
+async function queued(store: Store, c: ReturnType<typeof clock>, name = "backup") {
+  const recorder = cronwatch({ store, now: c.now, deliver: "check", cronSecret: null });
+  await assert.rejects(recorder.run(name, async () => { throw new Error("disk full"); }));
+  return recorder;
+}
+
+test("a diagnosis made on a retry is kept with the queued alert, and triage runs once per alert", async () => {
+  const c = clock();
+  const store = memory();
+  await queued(store, c);
+  let asked = 0;
+  let down = true;
+  const sent: Alert[] = [];
+  const channel: AlertChannel = { name: "flaky", send: async (a) => { if (down) throw new Error("down"); sent.push(a); } };
+  const server = cronwatch({ store, now: c.now, alerts: [channel], triage: async () => { asked++; return "The disk is full."; }, cronSecret: null, onError: () => {} });
+  await server.check();
+  assert.equal(asked, 1);
+  assert.equal((await store.getState("backup"))!.undelivered![0]!.triage, "The disk is full.", "the stored copy has it");
+  await server.check();
+  await server.check();
+  assert.equal(asked, 1, "not asked again on later retries");
+  down = false;
+  await server.check();
+  assert.deepEqual(sent.map((a) => [a.type, a.triage]), [["failed", "The disk is full."]]);
+});
+
+test("a triage that throws or answers nothing is tried once, recorded as null", async () => {
+  for (const triage of [async () => { throw new Error("api down"); }, async () => "", async () => null]) {
+    const c = clock();
+    const store = memory();
+    await queued(store, c);
+    let asked = 0;
+    const server = cronwatch({
+      store, now: c.now, cronSecret: null, onError: () => {},
+      alerts: [{ name: "down", send: async () => { throw new Error("down"); } }],
+      triage: async (ctx) => { asked++; return triage(); },
+    });
+    for (let i = 0; i < 3; i++) await server.check();
+    assert.equal(asked, 1);
+    assert.equal((await store.getState("backup"))!.undelivered![0]!.triage, null);
+  }
+});
+
+test("retries stop once a check has spent its budget, and the rest wait", async (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: T0 });
+  const c = clock();
+  const store = memory();
+  for (const name of ["a", "b", "c"]) await queued(store, c, name);
+  const tried: string[] = [];
+  // Each attempt takes twelve seconds of wall clock and fails.
+  const slow: AlertChannel = { name: "slow", send: async (a) => { tried.push(a.job); t.mock.timers.tick(12_000); throw new Error("timed out"); } };
+  const server = cronwatch({ store, now: c.now, alerts: [slow], cronSecret: null, onError: () => {} });
+  await server.check();
+  assert.deepEqual(tried, ["a", "b"], "twenty seconds cover two attempts");
+  assert.equal((await store.getState("c"))!.undelivered!.length, 1, "c is still queued");
+  tried.length = 0;
+  await server.check();
+  assert.deepEqual(tried, ["a", "b"], "each check has a fresh budget");
+});
+
+test("an alert whose condition closed is dropped from the retry queue; a recovery whose conditions stay closed is sent", async () => {
+  let down = true;
+  const sent: string[] = [];
+  const channel: AlertChannel = { name: "flaky", send: async (a) => { if (down) throw new Error("down"); sent.push(`${a.type}@${a.at}`); } };
+  const { cw, c } = make({ alerts: [channel], onError: () => {} });
+  await assert.rejects(cw.run("s", async () => { throw new Error("x"); }));
+  c.advance(MIN);
+  await cw.run("s", async () => {});
+  assert.deepEqual((await cw.store.getState("s"))!.undelivered!.map((a) => a.type), ["failed", "recovered"]);
+  down = false;
+  c.advance(MIN);
+  await cw.check();
+  assert.deepEqual(sent, [`recovered@${T0 + MIN}`], "the failure is over, so only its recovery goes");
+  assert.deepEqual((await cw.store.getState("s"))!.undelivered, []);
+});
+
+test("an alert whose condition opened again at another time is dropped, and so is a recovery it undoes", async () => {
+  let down = true;
+  const sent: string[] = [];
+  const channel: AlertChannel = { name: "flaky", send: async (a) => { if (down) throw new Error("down"); sent.push(`${a.type}@${a.at}`); } };
+  const { cw, c } = make({ alerts: [channel], onError: () => {} });
+  await assert.rejects(cw.run("s", async () => { throw new Error("x"); }));
+  c.advance(MIN);
+  await cw.run("s", async () => {});
+  c.advance(MIN);
+  await assert.rejects(cw.run("s", async () => { throw new Error("again"); }));
+  assert.deepEqual((await cw.store.getState("s"))!.undelivered!.map((a) => a.type), ["failed", "recovered", "failed"]);
+  down = false;
+  c.advance(MIN);
+  await cw.check();
+  assert.deepEqual(sent, [`failed@${T0 + 2 * MIN}`]);
+});
+
+test("a job that cannot be evaluated is reported and shown as failing, and the others are checked", async () => {
+  const errors: [unknown, string][] = [];
+  const { cw, c, alerts } = make({ onError: (e, where) => errors.push([e, where]) });
+  const good = cw.job("good", { schedule: "every 1h" });
+  await good.run(async () => {});
+  await cw.store.upsertJob({ name: "bad", schedule: "not a schedule" }, T0);
+  await cw.store.upsertJob({ name: "odd", timeout: "soon" }, T0);
+  await cw.store.insertRun({ id: "hung", job: "odd", status: "running", startedAt: T0, finishedAt: null, durationMs: null, error: null, output: null, metrics: {}, trigger: "run" });
+  c.advance(2 * HOUR);
+  const result = await cw.check();
+  assert.deepEqual(result.alerts.map((a) => `${a.job}:${a.type}`), ["good:missed"]);
+  const health = Object.fromEntries(result.jobs.map((j) => [j.name, j.health]));
+  assert.deepEqual(health, { bad: "failing", good: "late", odd: "failing" });
+  assert.deepEqual(errors.map(([, where]) => where), ["checking odd", "checking bad", "checking odd"]);
+  assert.deepEqual(alerts.types(), ["missed"]);
+
+  errors.length = 0;
+  const jobs = await cw.jobs();
+  assert.deepEqual(jobs.map((j) => [j.name, j.health, j.nextExpectedAt === null]), [["bad", "failing", true], ["good", "late", false], ["odd", "failing", true]]);
+  assert.deepEqual(errors.map(([, where]) => where), ["reading bad", "reading odd"]);
+  assert.equal((await cw.jobSummary("bad"))!.health, "failing");
+  await cw.silence("bad", "1h");
+  assert.equal((await cw.jobSummary("bad"))!.health, "silenced");
+});
+
+test("trimming the undelivered queue past twenty is reported", async () => {
+  const c = clock();
+  const errors: string[] = [];
+  const cw = cronwatch({ now: c.now, deliver: "check", cronSecret: null, onError: (_e, where) => errors.push(where) });
+  for (let i = 0; i < 10; i++) {
+    await assert.rejects(cw.run("q", async () => { throw new Error("x"); }));
+    await cw.run("q", async () => {});
+  }
+  assert.equal((await cw.store.getState("q"))!.undelivered!.length, 20);
+  assert.deepEqual(errors, []);
+  await assert.rejects(cw.run("q", async () => { throw new Error("x"); }));
+  assert.equal((await cw.store.getState("q"))!.undelivered!.length, 20);
+  assert.deepEqual(errors, ["alert queue for q"]);
+});
+
+test('start() with deliver: "check" says once that another process must send', (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const warnings: string[] = [];
+  const warn = console.warn;
+  console.warn = (...parts: unknown[]) => { warnings.push(parts.map(String).join(" ")); };
+  try {
+    const cw = cronwatch({ deliver: "check", cronSecret: null });
+    cw.check = async () => ({ checkedAt: 0, jobs: [], alerts: [], pruned: 0 });
+    cw.start();
+    cw.stop();
+    cw.start();
+    cw.stop();
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0]!, /deliver: "check".*send no alerts.*Another process/);
+    cronwatch({ cronSecret: null }).start();
+    assert.equal(warnings.length, 1, "a delivering client says nothing");
+  } finally {
+    console.warn = warn;
+  }
+});

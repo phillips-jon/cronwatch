@@ -432,7 +432,7 @@
     {
       "input": "http://a:b@c:d@e",
       "result": {
-        "text": "http://a:[redacted]@c:d@e"
+        "text": "http://a:[redacted]@e"
       }
     },
     {
@@ -938,6 +938,547 @@
         "length": 5010,
         "sha256": "aba921116198f7b4abcf792e1f00b621b3d520eb6026a6e5705ce1661085ac18"
       }
+    },
+    {
+      "input": ":password=>\"hunter2\"",
+      "result": {
+        "text": ":password=>\"[redacted]\""
+      }
+    },
+    {
+      "input": "{:api_key => 'abc', user: 1}",
+      "result": {
+        "text": "{:api_key => '[redacted]', user: 1}"
+      }
+    },
+    {
+      "input": "\"password\" => \"x y\"",
+      "result": {
+        "text": "\"password\" => \"[redacted]\""
+      }
+    },
+    {
+      "input": "password=>x",
+      "result": {
+        "text": "password=>[redacted]"
+      }
+    },
+    {
+      "input": "token =>  'a b'",
+      "result": {
+        "text": "token =>  '[redacted]'"
+      }
+    },
+    {
+      "input": ":secret=>nil, :name=>\"n\"",
+      "result": {
+        "text": ":secret=>[redacted], :name=>\"n\""
+      }
+    },
+    {
+      "input": "max_tokens=>800",
+      "result": {
+        "text": "max_tokens=>800"
+      }
+    },
+    {
+      "input": "password = > x",
+      "result": {
+        "text": "password = [redacted] x"
+      }
+    },
+    {
+      "input": "{ \"token\"=>\"abc\" }",
+      "result": {
+        "text": "{ \"token\"=>\"[redacted]\" }"
+      }
+    },
+    {
+      "input": "Authorization: Basic dXNlcjpwYXNz",
+      "result": {
+        "text": "Authorization: Basic [redacted]"
+      }
+    },
+    {
+      "input": "authorization: basic dXNlcjpwYXNz==",
+      "result": {
+        "text": "authorization: basic [redacted]"
+      }
+    },
+    {
+      "input": "{\"Authorization\": \"Token abc123\", \"x\": 1}",
+      "result": {
+        "text": "{\"Authorization\": \"Token [redacted]\", \"x\": 1}"
+      }
+    },
+    {
+      "input": "authorization='token abc'",
+      "result": {
+        "text": "authorization='token [redacted]'"
+      }
+    },
+    {
+      "input": "Proxy-Authorization: Basic YWI6Y2Q=",
+      "result": {
+        "text": "Proxy-Authorization: Basic [redacted]"
+      }
+    },
+    {
+      "input": "Authorization: Token token=\"abc\", other=1",
+      "result": {
+        "text": "Authorization: Token [redacted]\"[redacted]\", other=1"
+      }
+    },
+    {
+      "input": ":authorization => \"Basic abc\"",
+      "result": {
+        "text": ":authorization => \"Basic [redacted]\""
+      }
+    },
+    {
+      "input": "Authorization: Digest username=x",
+      "result": {
+        "text": "Authorization: Digest username=x"
+      }
+    },
+    {
+      "input": "Authorization: Basic",
+      "result": {
+        "text": "Authorization: Basic"
+      }
+    },
+    {
+      "input": "Authorization:Basic abc",
+      "result": {
+        "text": "Authorization:Basic [redacted]"
+      }
+    },
+    {
+      "input": "Authorization: Basic  \t abc",
+      "result": {
+        "text": "Authorization: Basic  \t abc"
+      }
+    },
+    {
+      "input": "Token abc123",
+      "result": {
+        "text": "Token abc123"
+      }
+    },
+    {
+      "input": "my_authorization: basic x",
+      "result": {
+        "text": "my_authorization: basic x"
+      }
+    },
+    {
+      "input": "Authorization: Negotiate abc",
+      "result": {
+        "text": "Authorization: Negotiate abc"
+      }
+    },
+    {
+      "input": "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nIBAAK==\n-----END RSA PRIVATE KEY-----\nafter",
+      "result": {
+        "text": "[redacted]\nafter"
+      }
+    },
+    {
+      "input": "key:\n-----BEGIN PRIVATE KEY-----\nMIIE\nabc",
+      "result": {
+        "text": "key:\n[redacted]"
+      }
+    },
+    {
+      "input": "-----BEGIN PUBLIC KEY-----\nMIIB\n-----END PUBLIC KEY-----",
+      "result": {
+        "text": "-----BEGIN PUBLIC KEY-----\nMIIB\n-----END PUBLIC KEY-----"
+      }
+    },
+    {
+      "input": "-----BEGIN ENCRYPTED PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,AB12\n\nMIIE\n-----END ENCRYPTED PRIVATE KEY-----",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbn\n-----END OPENSSH PRIVATE KEY-----",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "-----BEGIN EC PRIVATE KEY-----\nMHc\n-----END RSA PRIVATE KEY----- x",
+      "result": {
+        "text": "[redacted] x"
+      }
+    },
+    {
+      "input": "a -----BEGIN PRIVATE KEY-----\nk1\n-----END PRIVATE KEY----- b -----BEGIN PRIVATE KEY-----\nk2\n-----END PRIVATE KEY----- c",
+      "result": {
+        "text": "a [redacted] b [redacted] c"
+      }
+    },
+    {
+      "input": "private_key: -----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
+      "result": {
+        "text": "private_key: [redacted]"
+      }
+    },
+    {
+      "input": "-----BEGIN A B C D PRIVATE KEY-----\nx",
+      "result": {
+        "text": "-----BEGIN A B C D PRIVATE KEY-----\nx"
+      }
+    },
+    {
+      "input": "-----BEGIN PRIVATE KEY-----\nabc then prose, and more",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "-----BEGIN PRIVATE KEY-----\nabc-def\n-----END PRIVATE KEY-----",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "-----BEGIN PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "QUJD",
+            5000
+          ]
+        ]
+      },
+      "result": {
+        "length": 3627,
+        "sha256": "3913e4e2037d538dcf6bb63d1eb646d55ab587f1369ed4af095d073739a5cff2"
+      }
+    },
+    {
+      "input": "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc_def-123 done",
+      "result": {
+        "text": "jwt [redacted] done"
+      }
+    },
+    {
+      "input": "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "eyJabcd.efgh",
+      "result": {
+        "text": "eyJabcd.efgh"
+      }
+    },
+    {
+      "input": "xeyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig",
+      "result": {
+        "text": "xeyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig"
+      }
+    },
+    {
+      "input": "eyJabc.defg.hij",
+      "result": {
+        "text": "eyJabc.defg.hij"
+      }
+    },
+    {
+      "input": "(eyJaaaa.bbbb.cccc)",
+      "result": {
+        "text": "([redacted])"
+      }
+    },
+    {
+      "input": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig",
+      "result": {
+        "text": "Bearer [redacted]"
+      }
+    },
+    {
+      "input": "token=eyJhbGci.eyJzdWIi.sig",
+      "result": {
+        "text": "token=[redacted]"
+      }
+    },
+    {
+      "input": "https://hooks.slack.com/services/T0/B0/xyz ok",
+      "result": {
+        "text": "https://hooks.slack.com/services/[redacted] ok"
+      }
+    },
+    {
+      "input": "hooks.slack.com/workflows/T1/A2/3/abc",
+      "result": {
+        "text": "hooks.slack.com/workflows/[redacted]"
+      }
+    },
+    {
+      "input": "https://hooks.slack.com/services/",
+      "result": {
+        "text": "https://hooks.slack.com/services/"
+      }
+    },
+    {
+      "input": "https://hooks.slack.example/services/x",
+      "result": {
+        "text": "https://hooks.slack.example/services/x"
+      }
+    },
+    {
+      "input": "HTTPS://HOOKS.SLACK.COM/SERVICES/T/B/Z",
+      "result": {
+        "text": "HTTPS://HOOKS.SLACK.COM/SERVICES/[redacted]"
+      }
+    },
+    {
+      "input": "https://hooks.slack.com/triggers/T/1/x?y=1",
+      "result": {
+        "text": "https://hooks.slack.com/triggers/[redacted]?y=1"
+      }
+    },
+    {
+      "input": "https://discord.com/api/webhooks/123/abc-def",
+      "result": {
+        "text": "https://discord.com/api/webhooks/[redacted]"
+      }
+    },
+    {
+      "input": "https://discordapp.com/api/v10/webhooks/1/x",
+      "result": {
+        "text": "https://discordapp.com/api/v10/webhooks/[redacted]"
+      }
+    },
+    {
+      "input": "https://canary.discord.com/api/webhooks/1/y",
+      "result": {
+        "text": "https://canary.discord.com/api/webhooks/[redacted]"
+      }
+    },
+    {
+      "input": "https://discord.com/api/channels/1",
+      "result": {
+        "text": "https://discord.com/api/channels/1"
+      }
+    },
+    {
+      "input": "https://notdiscord.com/api/webhooks/1/z",
+      "result": {
+        "text": "https://notdiscord.com/api/webhooks/1/z"
+      }
+    },
+    {
+      "input": "key AIzaSySySySySySySySySySySySySySySySySyA",
+      "result": {
+        "text": "key [redacted]"
+      }
+    },
+    {
+      "input": "AIzabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "result": {
+        "text": "AIzabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    {
+      "input": "AIzabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "result": {
+        "text": "AIzabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    {
+      "input": "xAIzabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "result": {
+        "text": "xAIzabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    },
+    {
+      "input": "AIza-----------------------------------.",
+      "result": {
+        "text": "[redacted]."
+      }
+    },
+    {
+      "input": "whsec_abcd1234abcd1234abcd1234abcd1234",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "whsec_short",
+      "result": {
+        "text": "whsec_short"
+      }
+    },
+    {
+      "input": "whsec_a+b/c=a+b/c=a+b/c=a+b/c=",
+      "result": {
+        "text": "[redacted]"
+      }
+    },
+    {
+      "input": "postgres://user:p@ss@host/db",
+      "result": {
+        "text": "postgres://user:[redacted]@host/db"
+      }
+    },
+    {
+      "input": "redis://:p@ss@w0rd@h:6379",
+      "result": {
+        "text": "redis://:[redacted]@h:6379"
+      }
+    },
+    {
+      "input": "https://u:p@host?x=a@b",
+      "result": {
+        "text": "https://u:[redacted]@b"
+      }
+    },
+    {
+      "input": "mysql://u:p@ss word@h",
+      "result": {
+        "text": "mysql://u:[redacted]@ss word@h"
+      }
+    },
+    {
+      "input": "amqp://u:a@b@c@d/vhost next@x",
+      "result": {
+        "text": "amqp://u:[redacted]@d/vhost next@x"
+      }
+    },
+    {
+      "input": "postgres://u:@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@h",
+      "result": {
+        "text": "postgres://u:[redacted]@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@h"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "-----BEGIN PRIVATE KEY-----",
+            600
+          ]
+        ]
+      },
+      "result": {
+        "length": 6000,
+        "sha256": "8de1b76df15eee00c2e41ebfa10c68640f0e7e98052c9d89884410fe124e5f19"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "eyJa.",
+            3000
+          ]
+        ]
+      },
+      "result": {
+        "length": 15000,
+        "sha256": "24207c2675e3db65c998187e76edface3e9ea69857ec164380c9fc0c89faaab0"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "x=>",
+            5000
+          ]
+        ]
+      },
+      "result": {
+        "length": 15000,
+        "sha256": "76d7ef15c5eb6cd397808277e629dd254f5c7691907115ea8da6ae08ce54d7cf"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "postgres://u:",
+            1
+          ],
+          [
+            "@",
+            300
+          ]
+        ]
+      },
+      "result": {
+        "text": "postgres://u:[redacted]@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "a://b:",
+            1
+          ],
+          [
+            "c@",
+            200
+          ]
+        ]
+      },
+      "result": {
+        "text": "a://b:[redacted]@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@c@"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "Authorization: Basic ",
+            700
+          ]
+        ]
+      },
+      "result": {
+        "length": 13300,
+        "sha256": "aaf54dd306d21773ff3e5777763fe4ce7ffd183e3fac1c0b088101c46a9f9366"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "hooks.slack.com/services/",
+            1
+          ],
+          [
+            "a",
+            300
+          ]
+        ]
+      },
+      "result": {
+        "text": "hooks.slack.com/services/[redacted]aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "AIza",
+            4000
+          ]
+        ]
+      },
+      "result": {
+        "length": 16000,
+        "sha256": "a777565e2bb51bf5e26ffad09e9302faccffa49c365e8e86982c90e6682fc3e9"
+      }
     }
   ],
   "errorMessage": [
@@ -1088,6 +1629,36 @@
       "value": null,
       "result": {
         "text": "null"
+      }
+    },
+    {
+      "name": "Error",
+      "message": "bad\u0000byte",
+      "frames": [
+        "a (app.js:1:1)"
+      ],
+      "result": {
+        "text": "Error: badbyte\n    at a (app.js:1:1)"
+      }
+    },
+    {
+      "value": "a\u0000b\u0000",
+      "result": {
+        "text": "ab"
+      }
+    },
+    {
+      "value": {
+        "parts": [
+          [
+            "z\u0000",
+            20000
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "b995dc6dc59e90e4827add17ae07a66b44e6fdc59e9a7969a8bc5333a8993f34"
       }
     }
   ],

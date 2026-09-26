@@ -92,6 +92,12 @@ export function postgres(options: PostgresOptions = {}): Store {
     async setState(state) {
       await pool.query(sql.setState, params.setState(state));
     },
+    async compareAndSetState(state, expectedVersion) {
+      const result = expectedVersion === 0
+        ? await pool.query(sql.casInsert, params.casInsert(state))
+        : await pool.query(sql.casUpdate, params.casUpdate(state, expectedVersion));
+      return (result.rowCount ?? 0) > 0;
+    },
     async prune(before) {
       const result = await pool.query(sql.prune, [before]);
       return result.rowCount ?? 0;

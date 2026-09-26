@@ -77,6 +77,11 @@ export function memory(): Store {
     async setState(state) {
       states.set(state.job, clone(state));
     },
+    async compareAndSetState(state, expectedVersion) {
+      if ((states.get(state.job)?.version ?? 0) !== expectedVersion) return false;
+      states.set(state.job, clone(state));
+      return true;
+    },
     async prune(before) {
       // Each job's newest run is kept whatever its age: without it, a job
       // that runs less often than the retention looks like it never ran.

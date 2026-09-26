@@ -1,23 +1,25 @@
 import { formatDuration, parseDuration } from "./duration.js";
 import {
+  applySilence,
   BASELINE_WINDOW,
+  emptyState,
   hasFullBaseline,
   isSilenced,
   isStuck,
-  muteOpens,
   normalizeState,
   onCheck,
   onRunFinish,
   onRunStart,
+  staleAlert,
   summarize,
   timeoutMs,
+  unevaluableSummary,
 } from "./evaluate.js";
-import type { Evaluation } from "./evaluate.js";
 import { composeAlert } from "./format.js";
 import { constantTimeEqual, json } from "./http.js";
 import { createRecorder } from "./job.js";
 import type { JobContext } from "./job.js";
-import { capOutput, errorMessage, redactSecrets } from "./output.js";
+import { capOutput, errorMessage, redactSecrets, stripNul } from "./output.js";
 import { parseSchedule } from "./schedule.js";
 import { checkExpectation, toStored } from "./serialize.js";
 import { createRoutes } from "./routes/index.js";
@@ -84,9 +86,11 @@ export interface CronWatchOptions {
   /**
    * Applied to every run's output and error before it is stored, shown or
    * sent to an alert channel or triage. The default blanks values that look
-   * like secrets (password=..., URL credentials, bearer tokens, AWS, GitHub,
-   * Slack, Stripe and API key formats). Pass your own function, or false to
-   * keep output exactly as logged.
+   * like secrets (password=..., Authorization headers, URL credentials, bearer
+   * tokens, JWTs, PEM private keys, webhook URLs, AWS, GitHub, Slack, Stripe,
+   * Google and API key formats). Pass your own function, or false to keep
+   * output exactly as logged. A function that throws or returns something
+   * other than a string is reported to onError and the default is used.
    */
   redact?: ((text: string) => string) | false;
   /**
@@ -117,6 +121,13 @@ const CHANNEL_TIMEOUT_MS = 15_000;
 const PRUNE_INTERVAL_MS = 60 * 60_000;
 /** Undelivered alerts kept per job for retry; the oldest go first. */
 const MAX_UNDELIVERED = 20;
+/**
+ * Wall-clock time one check spends retrying undelivered alerts, across every
+ * job. Once it is spent the rest wait for the next check.
+ */
+const RETRY_BUDGET_MS = 20_000;
+/** Reads and writes of one job's state before an update gives up on a store that keeps changing under it. */
+const STATE_ATTEMPTS = 10;
 /** Runs read for a baseline, and the most read when failures crowd out the successes. */
 const HISTORY_PAGE = BASELINE_WINDOW + 5;
 const HISTORY_MAX = 200;
@@ -191,6 +202,7 @@ export class CronWatch {
   private firstTick: ReturnType<typeof setTimeout> | null = null;
   private usingDefaultStore = false;
   private warnedNoSecret = false;
+  private warnedDeferredStart = false;
 
   constructor(options: CronWatchOptions = {}) {
     this.store = options.store ?? (this.usingDefaultStore = true, memory());
@@ -202,7 +214,20 @@ export class CronWatch {
     this.retentionMs = parseDuration(options.retention ?? "30d", "retention");
     this.defaults = options.defaults ?? {};
     this.now = options.now ?? (() => Date.now());
-    this.redact = options.redact === false ? (text) => text : (options.redact ?? redactSecrets);
+    const redact = options.redact;
+    this.redact = redact === false ? (text) => text
+      : typeof redact === "function" ? (text) => {
+          try {
+            const out: unknown = redact(text);
+            if (typeof out !== "string") throw new TypeError(`redact must return a string, not ${out === null ? "null" : typeof out}`);
+            return out;
+          } catch (e) {
+            // A broken redact must not stop the run finishing, nor leak what it was given.
+            this.report(e, "redact");
+            return redactSecrets(text);
+          }
+        }
+      : redactSecrets;
     if (options.deliver !== undefined && options.deliver !== "now" && options.deliver !== "check") {
       throw new Error(`deliver must be "now" or "check", not ${JSON.stringify(options.deliver)}`);
     }
@@ -285,6 +310,15 @@ export class CronWatch {
     this.onError(new Error("handler() refused a request because no CRON_SECRET is set; pass secret: null to allow unauthenticated requests"), "handler");
   }
 
+  /** onError, for places that must carry on even when onError itself throws. */
+  private report(error: unknown, where: string): void {
+    try {
+      this.onError(error, where);
+    } catch {
+      // Nothing more can be done with it.
+    }
+  }
+
   private async ensureReady(): Promise<void> {
     if (!this.ready) {
       this.ready = (async () => {
@@ -311,7 +345,8 @@ export class CronWatch {
   /**
    * Runs `fn` after every earlier state update for the same job has settled,
    * so two runs (or a run and a check) in this process never read and write
-   * the job's state over each other. Other processes are not coordinated.
+   * the job's state over each other. Other processes are coordinated by
+   * updateState() instead.
    */
   private serial<T>(job: string, fn: () => Promise<T>): Promise<T> {
     const result = (this.queues.get(job) ?? Promise.resolve()).then(fn);
@@ -325,6 +360,43 @@ export class CronWatch {
 
   private async readState(job: string): Promise<JobState> {
     return normalizeState(await this.store.getState(job), job);
+  }
+
+  /**
+   * Every read-modify-write of a job's state goes through here. In turn with
+   * this process's other updates to the job (serial()), it reads the state,
+   * asks `change` for the next one, and writes it with the version one
+   * higher, only if the stored version is still the one read. When another
+   * process wrote in between, the write is refused and it starts again from
+   * a fresh read, up to STATE_ATTEMPTS times. So `change` may run more than
+   * once and must only compute: whatever it returns from the attempt that
+   * was written is the result. Nothing is written when the state is
+   * unchanged. Returns the state as stored.
+   */
+  private updateState<T>(
+    job: string,
+    change: (current: JobState) => { state: JobState; result: T } | Promise<{ state: JobState; result: T }>,
+  ): Promise<{ state: JobState; result: T }> {
+    return this.serial(job, async () => {
+      for (let attempt = 1; ; attempt++) {
+        const current = await this.readState(job);
+        const { state, result } = await change(current);
+        if (sameState(state, current)) return { state: current, result };
+        const version = current.version ?? 0;
+        const next: JobState = { ...state, version: version + 1 };
+        if (await this.writeState(next, version)) return { state: next, result };
+        if (attempt >= STATE_ATTEMPTS) {
+          throw new Error(`the state of ${job} changed under ${STATE_ATTEMPTS} attempts in a row to update it; gave up`);
+        }
+      }
+    });
+  }
+
+  /** A conditional write, or for a store without compareAndSetState, a plain one that always succeeds. */
+  private async writeState(state: JobState, expectedVersion: number): Promise<boolean> {
+    if (typeof this.store.compareAndSetState === "function") return this.store.compareAndSetState(state, expectedVersion);
+    await this.store.setState(state);
+    return true;
   }
 
   /**
@@ -357,11 +429,8 @@ export class CronWatch {
     }
     // Closing missed and stuck happens beside the job, which never waits on it.
     const started = recorded
-      ? this.serial(name, async () => {
-          const before = await this.readState(name);
-          const after = onRunStart(before);
-          if (!sameState(before, after)) await this.store.setState(after);
-        }).catch((e) => this.onError(e, `starting ${name}`))
+      ? this.updateState(name, (before) => ({ state: onRunStart(before), result: undefined }))
+          .then(() => {}, (e) => this.onError(e, `starting ${name}`))
       : Promise.resolve();
 
     const recorder = createRecorder(run);
@@ -402,9 +471,10 @@ export class CronWatch {
         run.status = "ok";
       }
     }
-    // Redacted after the expect check, so a rule can still match what was logged.
-    if (run.output !== null) run.output = this.redact(run.output);
-    if (run.error !== null) run.error = this.redact(run.error);
+    // Redacted after the expect check, so a rule can still match what was
+    // logged. NULs go last, so not even a custom redact can store one.
+    if (run.output !== null) run.output = stripNul(this.redact(run.output));
+    if (run.error !== null) run.error = stripNul(this.redact(run.error));
 
     await started;
     if (!recorded) {
@@ -451,11 +521,12 @@ export class CronWatch {
     let drafts: AlertDraft[];
     try {
       if (write) await this.store.updateRun(run);
-      drafts = await this.serial(run.job, async () => {
-        const history = await this.history(run);
-        const previous = await this.readState(run.job);
-        return (await this.settle(previous, onRunFinish(definition, run, previous, history, now), now)).alerts;
-      });
+      let history: Run[] | null = null;
+      ({ result: drafts } = await this.updateState(run.job, async (previous) => {
+        history ??= await this.history(run);
+        const settled = applySilence(previous, onRunFinish(definition, run, previous, history, now), now);
+        return { state: settled.state, result: settled.alerts };
+      }));
     } catch (e) {
       this.onError(e, `evaluating ${run.job}`);
       return [];
@@ -497,29 +568,45 @@ export class CronWatch {
     const now = this.now();
     const alerts: Alert[] = [];
 
-    // Runs that never reported back.
+    // Runs that never reported back. One that cannot be judged (its job's
+    // stored timeout no longer parses, say) is reported and skipped.
     for (const run of await this.store.runningRuns()) {
-      const declared = this.definitions.get(run.job);
-      const definition = declared ? toStored(declared) : (await this.store.getJob(run.job))?.definition;
-      if (!definition || !isStuck(definition, run, now)) continue;
-      run.status = "timeout";
-      run.finishedAt = now;
-      run.durationMs = now - run.startedAt;
-      run.error = `Still running after ${formatDuration(timeoutMs(definition))}; marked as timed out`;
-      alerts.push(...(await this.finishRun(definition, run, now, true)));
+      try {
+        const declared = this.definitions.get(run.job);
+        const definition = declared ? toStored(declared) : (await this.store.getJob(run.job))?.definition;
+        if (!definition || !isStuck(definition, run, now)) continue;
+        const timeout = timeoutMs(definition);
+        run.status = "timeout";
+        run.finishedAt = now;
+        run.durationMs = now - run.startedAt;
+        run.error = `Still running after ${formatDuration(timeout)}; marked as timed out`;
+        alerts.push(...(await this.finishRun(definition, run, now, true)));
+      } catch (e) {
+        this.onError(e, `checking ${run.job}`);
+      }
     }
 
+    // Each job on its own: one that cannot be evaluated is reported, shown
+    // as failing (see unevaluableSummary) and does not stop the others.
     const jobs: JobSummary[] = [];
+    const retries = { spentMs: 0 };
     for (const stored of await this.store.listJobs()) {
-      const recent = await this.store.listRuns(stored.name, BASELINE_WINDOW);
-      const { previous, evaluation, settled } = await this.serial(stored.name, async () => {
-        const previous = await this.readState(stored.name);
-        const evaluation = onCheck(stored.definition, stored, recent[0] ?? null, previous, now);
-        return { previous, evaluation, settled: await this.settle(previous, evaluation, now) };
-      });
-      alerts.push(...(await this.retryUndelivered(stored.name, previous, now)));
-      alerts.push(...(await this.dispatch(settled.alerts, stored.definition, now)));
-      jobs.push(summarize(stored, recent, settled.state, evaluation.nextExpectedAt, now));
+      try {
+        const recent = await this.store.listRuns(stored.name, BASELINE_WINDOW);
+        let nextExpectedAt: number | null = null;
+        const { state, result: drafts } = await this.updateState(stored.name, (previous) => {
+          const evaluation = onCheck(stored.definition, stored, recent[0] ?? null, previous, now);
+          nextExpectedAt = evaluation.nextExpectedAt;
+          const settled = applySilence(previous, evaluation, now);
+          return { state: settled.state, result: settled.alerts };
+        });
+        alerts.push(...(await this.retryUndelivered(stored.name, state, now, retries)));
+        alerts.push(...(await this.dispatch(drafts, stored.definition, now)));
+        jobs.push(summarize(stored, recent, state, nextExpectedAt, now));
+      } catch (e) {
+        this.onError(e, `checking ${stored.name}`);
+        jobs.push(await this.unevaluable(stored, now));
+      }
     }
 
     let pruned = 0;
@@ -535,12 +622,25 @@ export class CronWatch {
     return { checkedAt: now, jobs, alerts, pruned };
   }
 
-  /** A job's summary and its newest runs, without alerting. */
+  /** A job's summary and its newest runs, without alerting. A job that cannot be evaluated is reported and shown as failing. */
   private async snapshot(stored: StoredJob, now: number, runs: number): Promise<{ job: JobSummary; runs: Run[] }> {
-    const recent = await this.store.listRuns(stored.name, Math.max(runs, BASELINE_WINDOW));
-    const state = await this.readState(stored.name);
-    const { nextExpectedAt } = onCheck(stored.definition, stored, recent[0] ?? null, state, now);
-    return { job: summarize(stored, recent, state, nextExpectedAt, now), runs: recent.slice(0, runs) };
+    let recent: Run[] = [];
+    try {
+      recent = await this.store.listRuns(stored.name, Math.max(runs, BASELINE_WINDOW));
+      const state = await this.readState(stored.name);
+      const { nextExpectedAt } = onCheck(stored.definition, stored, recent[0] ?? null, state, now);
+      return { job: summarize(stored, recent, state, nextExpectedAt, now), runs: recent.slice(0, runs) };
+    } catch (e) {
+      this.onError(e, `reading ${stored.name}`);
+      return { job: await this.unevaluable(stored, now), runs: recent.slice(0, runs) };
+    }
+  }
+
+  /** The summary of a job whose evaluation failed, from whatever can still be read. */
+  private async unevaluable(stored: StoredJob, now: number): Promise<JobSummary> {
+    const recent = await this.store.listRuns(stored.name, BASELINE_WINDOW).catch((): Run[] => []);
+    const state = await this.readState(stored.name).catch(() => emptyState(stored.name));
+    return unevaluableSummary(stored, recent, state, now);
   }
 
   /** Every job the store knows about, with its health. Does not send alerts. */
@@ -591,12 +691,12 @@ export class CronWatch {
   /** Read, change and write one job's state, in turn with every other update to it. */
   private async patchState(name: string, change: (state: JobState) => void): Promise<JobState> {
     await this.ensureReady();
-    return this.serial(name, async () => {
-      const state = await this.readState(name);
-      change(state);
-      await this.store.setState(state);
-      return state;
+    const { state } = await this.updateState(name, (current) => {
+      const next = normalizeState(current, name);
+      change(next);
+      return { state: next, result: undefined };
     });
+    return state;
   }
 
   /** Remove a job and its runs from the store. A job still declared in code comes back on its next run. */
@@ -616,6 +716,10 @@ export class CronWatch {
   start(every: Duration = "1m"): void {
     if (this.timer) return;
     const ms = Math.max(5_000, parseDuration(every, "check interval"));
+    if (this.deferDelivery && !this.warnedDeferredStart) {
+      this.warnedDeferredStart = true;
+      console.warn('[cronwatch] start() was called with deliver: "check", so these checks send no alerts. Another process must run checks with deliver: "now" (the default) to send them.');
+    }
     const tick = () => this.check().catch((e) => this.onError(e, "check"));
     this.timer = setInterval(tick, ms);
     if (typeof this.timer === "object" && "unref" in this.timer) this.timer.unref();
@@ -638,21 +742,10 @@ export class CronWatch {
     if (this.store.close) await this.store.close();
   }
 
-  /** Save an evaluation's state, honouring silence, and return what should be sent. Call inside serial(). */
-  private async settle(previous: JobState, evaluation: Evaluation, now: number): Promise<Evaluation> {
-    let { state, alerts } = evaluation;
-    if (isSilenced(previous, now)) {
-      state = muteOpens(previous, state);
-      alerts = [];
-    }
-    if (!sameState(state, previous)) await this.store.setState(state);
-    return { state, alerts };
-  }
-
   /**
    * Compose, triage and send each draft. The state was saved before this
-   * (settle), so a slow channel holds up nothing else; afterwards only the
-   * delivery fields are written back, onto a fresh read of the state.
+   * (updateState), so a slow channel holds up nothing else; afterwards only
+   * the delivery fields are written back, onto a fresh read of the state.
    */
   private async dispatch(drafts: AlertDraft[], definition: StoredJobDefinition, now: number): Promise<Alert[]> {
     if (drafts.length === 0) return [];
@@ -664,44 +757,67 @@ export class CronWatch {
       if (this.deferDelivery) {
         failed.push(alert);
       } else {
-        if (this.triage && alert.type !== "recovered") await this.addTriage(alert);
+        if (this.triage && alert.type !== "recovered") await this.addTriage(alert, TRIAGE_TIMEOUT_MS);
         (await this.deliver(alert) ? delivered : failed).push(alert);
       }
       composed.push(alert);
     }
-    await this.recordDelivery(definition.name, delivered, failed, now);
+    await this.recordDelivery(definition.name, delivered, failed, [], now);
     return composed;
   }
 
-  /** Send the alerts that no channel accepted last time, once each. */
-  private async retryUndelivered(name: string, state: JobState, now: number): Promise<Alert[]> {
+  /**
+   * Send the alerts that no channel accepted last time, once each, oldest
+   * first. `state` is the job's state as this check left it: an alert that
+   * no longer describes it (staleAlert) is dropped instead. Retries across a
+   * check share RETRY_BUDGET_MS of wall-clock time; once it is spent the rest
+   * stay queued for the next check.
+   */
+  private async retryUndelivered(name: string, state: JobState, now: number, budget: { spentMs: number }): Promise<Alert[]> {
     const pending = state.undelivered ?? [];
     if (pending.length === 0 || isSilenced(state, now) || this.deferDelivery) return [];
     const delivered: Alert[] = [];
     const failed: Alert[] = [];
+    const dropped = pending.filter((alert) => staleAlert(alert, state));
     for (const alert of pending) {
-      // An alert queued by a process that delivers at check time was never triaged.
-      if (this.triage && alert.type !== "recovered" && alert.triage === undefined) await this.addTriage(alert);
+      if (dropped.includes(alert)) continue;
+      const left = RETRY_BUDGET_MS - budget.spentMs;
+      if (left <= 0) break;
+      const started = Date.now();
+      // An alert queued by a process that delivers at check time was never
+      // triaged. One that was tried (triage: null) is not tried again.
+      if (this.triage && alert.type !== "recovered" && alert.triage === undefined) await this.addTriage(alert, Math.min(TRIAGE_TIMEOUT_MS, left));
       (await this.deliver(alert) ? delivered : failed).push(alert);
+      budget.spentMs += Math.max(0, Date.now() - started);
     }
-    await this.recordDelivery(name, delivered, failed, now);
+    await this.recordDelivery(name, delivered, failed, dropped, now);
     return delivered;
   }
 
-  /** Mark delivered alerts done and keep failed ones for the next check. lastAlertAt moves only on a delivery. */
-  private async recordDelivery(name: string, delivered: Alert[], failed: Alert[], now: number): Promise<void> {
+  /**
+   * Mark delivered alerts done, drop stale ones, and keep failed ones for the
+   * next check. A failed alert replaces its stored copy, so a triage made on
+   * this attempt is kept. lastAlertAt moves only on a delivery.
+   */
+  private async recordDelivery(name: string, delivered: Alert[], failed: Alert[], dropped: Alert[], now: number): Promise<void> {
     try {
-      await this.serial(name, async () => {
-        const previous = await this.readState(name);
+      const { result: trimmed } = await this.updateState(name, (previous) => {
         const state = normalizeState(previous, name);
-        const done = new Set(delivered.map(alertKey));
-        const kept = state.undelivered!.filter((a) => !done.has(alertKey(a)));
+        const done = new Set([...delivered, ...dropped].map(alertKey));
+        const retried = new Map(failed.map((a) => [alertKey(a), a]));
+        const kept = state.undelivered!.filter((a) => !done.has(alertKey(a))).map((a) => retried.get(alertKey(a)) ?? a);
         const known = new Set(kept.map(alertKey));
         kept.push(...failed.filter((a) => !known.has(alertKey(a))));
         state.undelivered = kept.slice(-MAX_UNDELIVERED);
         if (delivered.length > 0) state.lastAlertAt = now;
-        if (!sameState(state, previous)) await this.store.setState(state);
+        return { state, result: Math.max(0, kept.length - MAX_UNDELIVERED) };
       });
+      if (trimmed > 0) {
+        this.onError(
+          new Error(`${trimmed} undelivered alert${trimmed === 1 ? "" : "s"} for ${name} dropped: only the newest ${MAX_UNDELIVERED} are kept for retry`),
+          `alert queue for ${name}`,
+        );
+      }
     } catch (e) {
       this.onError(e, `recording alert delivery for ${name}`);
     }
@@ -724,14 +840,16 @@ export class CronWatch {
     return results.includes(true);
   }
 
-  private async addTriage(alert: Alert): Promise<void> {
+  /** Sets alert.triage to the diagnosis, or to null when there is none, so it is tried once per alert. */
+  private async addTriage(alert: Alert, timeout: number): Promise<void> {
     const controller = new AbortController();
     try {
       const recentRuns = await this.store.listRuns(alert.job, 5);
-      const diagnosis = await withTimeout(this.triage!({ alert, recentRuns, signal: controller.signal }), TRIAGE_TIMEOUT_MS);
-      if (diagnosis) alert.triage = diagnosis;
+      const diagnosis = await withTimeout(this.triage!({ alert, recentRuns, signal: controller.signal }), timeout);
+      alert.triage = typeof diagnosis === "string" && diagnosis !== "" ? diagnosis : null;
     } catch (e) {
       controller.abort();
+      alert.triage = null;
       this.onError(e, `triage for ${alert.job}`);
     }
   }

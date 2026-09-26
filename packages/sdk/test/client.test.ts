@@ -174,7 +174,7 @@ test("triage output is attached to failure alerts and never blocks them", async 
   const { cw: cw2, alerts: alerts2 } = make({ triage: async () => { throw new Error("api down"); }, onError: (e, where) => errors.push(where) });
   await assert.rejects(cw2.run("t", async () => { throw new Error("x"); }));
   assert.deepEqual(alerts2.types(), ["failed"]);
-  assert.equal(alerts2.alerts[0]!.triage, undefined);
+  assert.equal(alerts2.alerts[0]!.triage, null, "tried, and gave nothing");
   assert.deepEqual(errors, ["triage for t"]);
 });
 

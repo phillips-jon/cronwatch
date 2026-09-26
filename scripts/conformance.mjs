@@ -24,6 +24,7 @@ import { anthropic } from "../packages/sdk/dist/anthropic.js";
 import { formatDuration, formatRelative } from "../packages/sdk/src/duration.ts";
 import { expectation, nextFire, parseSchedule, runCovers } from "../packages/sdk/src/schedule.ts";
 import {
+  applySilence,
   emptyState,
   formatNumber,
   isStuck,
@@ -34,8 +35,10 @@ import {
   onRunFinish,
   onRunStart,
   isSilenced,
+  staleAlert,
   summarize,
   timeoutMs,
+  unevaluableSummary,
 } from "../packages/sdk/src/evaluate.ts";
 import { median, percentile } from "../packages/sdk/src/stats.ts";
 import { capOutput, errorMessage, OUTPUT_CAP, redactSecrets } from "../packages/sdk/src/output.ts";
@@ -716,6 +719,8 @@ function formatCases() {
   const capInputs = [
     ["short", "", 0], ["", "", 0], ["", "x", 16 * 1024], ["", "x", 16 * 1024 + 1], ["", "ab\n", 10_000],
     ["", "\u00e9", 17_000], ["", "\u{1F600}", 9_000], ["a", "\u{1F600}", 8_192], ["line\n", "\u00e9\u{1F600}x", 6_000],
+    // NULs are removed before the cap counts.
+    ["a\u0000b", "", 0], ["\u0000", "\u0000", 3], ["", "x\u0000", 16 * 1024], ["", "x\u0000", 16 * 1024 + 1], ["n", "\u0000y", 9_000],
   ];
   const storedInputs = [
     [{ name: "a", schedule: "0 2 * * *", expect: "wrote" }],
@@ -813,7 +818,46 @@ function healthCases() {
     [{ timeout: 1000 }, r("a", "running", T0 - 1001, null)],
   ].map(([definition, runValue]) => ({ definition, run: runValue, now: T0, stuck: isStuck(definition, runValue, T0) }));
 
-  return { jobHealth: jobHealthCases, summarize: summaries, percentile: stats, median: medians, normalizeState: normalized, muteOpens: mutes, isStuck: stuck };
+  // A job that could not be evaluated: its summary reads nothing from the definition.
+  const broken = { name: "j", definition: { name: "j", schedule: "not a schedule", timeout: "soon" }, createdAt: T0 - DAY, updatedAt: T0 };
+  const unevaluable = [
+    [[], state()],
+    [recents[2], state({ open: { failed: T0 - HOUR }, consecutiveFailures: 3 })],
+    [recents[3], state({ silencedUntil: T0 + HOUR })],
+    [recents[5], state({ silencedUntil: T0 })],
+  ].map(([recent, s]) => ({ stored: broken, recent, state: s, now: T0, summary: clone(unevaluableSummary(broken, recent, s, T0)) }));
+
+  // Silence as a saved evaluation sees it: nothing opens and nothing is sent while the job was silenced.
+  const draft = { type: "failed", run: null, details: { consecutiveFailures: 1, threshold: 1 } };
+  const silences = [
+    [state(), { state: state({ open: { failed: T0 }, consecutiveFailures: 1 }), alerts: [draft] }],
+    [state({ silencedUntil: T0 + 1 }), { state: state({ silencedUntil: T0 + 1, open: { failed: T0 }, consecutiveFailures: 1 }), alerts: [draft] }],
+    [state({ silencedUntil: T0 }), { state: state({ silencedUntil: T0, open: { failed: T0 }, consecutiveFailures: 1 }), alerts: [draft] }],
+    [state({ silencedUntil: T0 + HOUR, open: { slow: 1 } }), { state: state({ silencedUntil: T0 + HOUR, open: { failed: T0 }, pendingRecovery: ["slow"] }), alerts: [] }],
+  ].map(([previous, evaluation]) => ({ previous, evaluation, now: T0, result: clone(applySilence(previous, evaluation, T0)) }));
+
+  // Which queued alerts a retry drops.
+  const queuedAlert = (type, atMs, details = {}) => ({ type, at: atMs, run: null, details });
+  const staleInputs = [
+    [queuedAlert("failed", T0), state({ open: { failed: T0 } })],
+    [queuedAlert("failed", T0), state()],
+    [queuedAlert("failed", T0), state({ open: { failed: T0 + MIN } })],
+    [queuedAlert("failed", T0), state({ open: { stuck: T0 } })],
+    [queuedAlert("missed", T0), state({ open: { missed: T0 } })],
+    [queuedAlert("stuck", T0), state({ open: { stuck: T0 - 1 } })],
+    [queuedAlert("slow", T0), state({ open: { slow: T0 }, silencedUntil: T0 + HOUR })],
+    [queuedAlert("over_budget", T0), state({ open: {} })],
+    [queuedAlert("recovered", T0, { after: ["failed"] }), state()],
+    [queuedAlert("recovered", T0, { after: ["failed", "slow"] }), state({ open: { missed: T0 } })],
+    [queuedAlert("recovered", T0, { after: ["failed", "slow"] }), state({ open: { slow: T0 + MIN } })],
+    [queuedAlert("recovered", T0, { after: [] }), state({ open: { failed: T0 } })],
+  ];
+  const staleCases = staleInputs.map(([alert, s]) => ({ alert, state: s, stale: staleAlert(alert, s) }));
+
+  return {
+    jobHealth: jobHealthCases, summarize: summaries, percentile: stats, median: medians, normalizeState: normalized, muteOpens: mutes, isStuck: stuck,
+    unevaluableSummary: unevaluable, applySilence: silences, staleAlert: staleCases,
+  };
 }
 
 // ---------------------------------------------------------------- output
@@ -874,6 +918,42 @@ function outputCases() {
     long(["xoxb-", 1], ["1", 300]), long(["ghp_", 1], ["a", 256]), long(["ghp_", 1], ["a", 255]),
     long(["AKIAIOSFODNN7EXAMPLE ", 400]), long(["postgres://u:p@h ", 400]), long(["token", 5000], ["=x", 1]),
     long(["_", 5000], ["password=x", 1]),
+    // hash rockets
+    ":password=>\"hunter2\"", "{:api_key => 'abc', user: 1}", "\"password\" => \"x y\"", "password=>x", "token =>  'a b'",
+    ":secret=>nil, :name=>\"n\"", "max_tokens=>800", "password = > x", "{ \"token\"=>\"abc\" }",
+    // Authorization schemes other than Bearer
+    "Authorization: Basic dXNlcjpwYXNz", "authorization: basic dXNlcjpwYXNz==", "{\"Authorization\": \"Token abc123\", \"x\": 1}",
+    "authorization='token abc'", "Proxy-Authorization: Basic YWI6Y2Q=", "Authorization: Token token=\"abc\", other=1",
+    ":authorization => \"Basic abc\"", "Authorization: Digest username=x", "Authorization: Basic", "Authorization:Basic abc",
+    "Authorization: Basic  \t abc", "Token abc123", "my_authorization: basic x", "Authorization: Negotiate abc",
+    // PEM private keys
+    "-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nIBAAK==\n-----END RSA PRIVATE KEY-----\nafter",
+    "key:\n-----BEGIN PRIVATE KEY-----\nMIIE\nabc", "-----BEGIN PUBLIC KEY-----\nMIIB\n-----END PUBLIC KEY-----",
+    "-----BEGIN ENCRYPTED PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-128-CBC,AB12\n\nMIIE\n-----END ENCRYPTED PRIVATE KEY-----",
+    "-----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbn\n-----END OPENSSH PRIVATE KEY-----", "-----BEGIN EC PRIVATE KEY-----\nMHc\n-----END RSA PRIVATE KEY----- x",
+    "a -----BEGIN PRIVATE KEY-----\nk1\n-----END PRIVATE KEY----- b -----BEGIN PRIVATE KEY-----\nk2\n-----END PRIVATE KEY----- c",
+    "private_key: -----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----", "-----BEGIN A B C D PRIVATE KEY-----\nx",
+    "-----BEGIN PRIVATE KEY-----\nabc then prose, and more", "-----BEGIN PRIVATE KEY-----\nabc-def\n-----END PRIVATE KEY-----",
+    long(["-----BEGIN PRIVATE KEY-----\n", 1], ["QUJD", 5000]),
+    // bare JWTs
+    "jwt " + "eyJ" + "hbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc_def-123 done", "eyJ" + "hbGciOiJub25lIn0.eyJzdWIiOiIxIn0.",
+    "eyJ" + "abcd.efgh", "x" + "eyJ" + "hbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig", "eyJ" + "abc.defg.hij", "(" + "eyJ" + "aaaa.bbbb.cccc)",
+    "Bearer " + "eyJ" + "hbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig", "token=" + "eyJ" + "hbGci.eyJzdWIi.sig",
+    // webhook URLs
+    "https://hooks.slack.com/services/T0/B0/xyz ok", "hooks.slack.com/workflows/T1/A2/3/abc", "https://hooks.slack.com/services/",
+    "https://hooks.slack.example/services/x", "HTTPS://HOOKS.SLACK.COM/SERVICES/T/B/Z", "https://hooks.slack.com/triggers/T/1/x?y=1",
+    "https://discord.com/api/webhooks/123/abc-def", "https://discordapp.com/api/v10/webhooks/1/x", "https://canary.discord.com/api/webhooks/1/y",
+    "https://discord.com/api/channels/1", "https://notdiscord.com/api/webhooks/1/z",
+    // Google and Stripe webhook secrets
+    "key AI" + "za" + "Sy".repeat(17) + "A", "AI" + "za" + "b".repeat(34), "AI" + "za" + "b".repeat(36), "xAI" + "za" + "b".repeat(35),
+    "AI" + "za" + "-".repeat(35) + ".", "wh" + "sec_" + "abcd1234".repeat(4), "wh" + "sec_" + "short", "wh" + "sec_" + "a+b/c=".repeat(4),
+    // URL passwords containing "@"
+    "postgres://user:p@ss@host/db", "redis://:p@ss@w0rd@h:6379", "https://u:p@host?x=a@b", "mysql://u:p@ss word@h",
+    "amqp://u:a@b@c@d/vhost next@x", "postgres://u:" + "@".repeat(300) + "h",
+    // long lines against the new shapes
+    long(["-----BEGIN PRIVATE KEY-----", 600]), long(["eyJ" + "a.", 3000]), long(["x=>", 5000]), long(["postgres://u:", 1], ["@", 300]),
+    long(["a://b:", 1], ["c@", 200]), long(["Authorization: Basic ", 700]), long(["hooks.slack.com/services/", 1], ["a", 300]),
+    long(["AI" + "za", 4000]),
   ];
 
   const errors = [
@@ -890,6 +970,9 @@ function outputCases() {
     { value: [1, "two", null] },
     { value: 42 },
     { value: null },
+    { name: "Error", message: "bad\u0000byte", frames: ["a (app.js:1:1)"] },
+    { value: "a\u0000b\u0000" },
+    { value: long(["z\u0000", 20_000]) },
   ].map((c) => {
     let text;
     if ("value" in c) {
@@ -1013,7 +1096,33 @@ async function storeCases() {
     }
     out.push({ name, events });
   }
-  return { prune: out };
+
+  // compareAndSetState: a write goes through only over the version it expects
+  // (no row, or a state without a version, counts as 0).
+  const s = (job, version, extra = {}) => ({ job, open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, ...(version === undefined ? {} : { version }), ...extra });
+  const casSteps = [
+    { cas: s("a", 2), expected: 1 },
+    { cas: s("a", 1), expected: 0 },
+    { cas: s("a", 1, { consecutiveFailures: 9 }), expected: 0 },
+    { cas: s("a", 2, { consecutiveFailures: 1 }), expected: 1 },
+    { cas: s("a", 3), expected: 1 },
+    { set: s("b", undefined, { consecutiveFailures: 3 }) },
+    { cas: s("b", 1), expected: 1 },
+    { cas: s("b", 1), expected: 0 },
+    { forget: "a" },
+    { cas: s("a", 3), expected: 2 },
+    { cas: s("a", 1), expected: 0 },
+  ];
+  const store = sdk.memory();
+  const cas = [];
+  for (const step of casSteps) {
+    let written;
+    if (step.cas) written = await store.compareAndSetState(step.cas, step.expected);
+    else if (step.set) await store.setState(step.set);
+    else await store.deleteJob(step.forget);
+    cas.push({ ...step, ...(written === undefined ? {} : { written }), states: { a: await store.getState("a"), b: await store.getState("b") } });
+  }
+  return { prune: out, compareAndSetState: cas };
 }
 
 // ---------------------------------------------------------------- channels

@@ -71,7 +71,7 @@ A job can run somewhere that cannot reach Slack or a mail relay: a sandboxed bac
 const recorder = cronwatch({ store: sqlite({ path: "/var/lib/app/cronwatch.db" }), deliver: "check" });
 ```
 
-It still records every run and evaluates it, but instead of sending an alert it queues it with the job's state. The next check in a process that sends normally (the web server's `cw.start()`, or whatever calls the check endpoint) delivers it, adds triage if that process has it, and marks it sent. A failed backup reaches you a minute later rather than never. Both processes must use the same store.
+It still records every run and evaluates it, but instead of sending an alert it queues it with the job's state. The next check in a process that sends normally (the web server's `cw.start()`, or whatever calls the check endpoint) delivers it, adds triage if that process has it, and marks it sent. A failed backup reaches you a minute later rather than never. Both processes must use the same store. Calling `cw.start()` in the recording process is allowed but sends nothing, so it warns once on the console.
 
 ## The alert payload
 
@@ -84,7 +84,7 @@ interface Alert {
   title: string;                     // "nightly-report failed"
   message: string;                   // a few lines of specifics
   details: AlertDetails[type];       // depends on type, below
-  triage?: string;                   // the diagnosis, when triage is configured
+  triage?: string | null;            // the diagnosis, when triage is configured; null when it gave none
   at: number;                        // epoch ms
 }
 ```
@@ -107,7 +107,7 @@ custom("latency", (alert) => {
 
 ## Errors outside jobs
 
-`onError(error, where)` is called when a channel fails, triage times out, the store throws or pruning fails. The default prints to the console. Wire it to your error tracker:
+`onError(error, where)` is called when a channel fails, triage times out, the store throws, pruning fails, a custom `redact` throws, a job cannot be evaluated, or queued alerts are dropped past twenty. The default prints to the console. Wire it to your error tracker:
 
 ```ts
 cronwatch({ onError: (error, where) => Sentry.captureException(error, { tags: { where } }) });

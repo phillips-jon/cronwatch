@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { chmodSync, closeSync, mkdirSync, openSync } from "node:fs";
 import path from "node:path";
 import type { Store, StoredJob, StoredJobDefinition } from "../types.js";
+import { retryBusy } from "./busy.js";
 import { params, rowToJob, rowToRun, rowToState, schema, statements, tablePrefix, type JobRow, type RunRow, type StateRow } from "./sql.js";
 
 export interface SqliteOptions {
@@ -39,10 +40,20 @@ export function sqlite(options: SqliteOptions = {}): Store {
         }
       } catch { /* best effort: not every filesystem cares */ }
     }
-    db = new Database(file);
-    db.pragma("journal_mode = WAL");
-    db.pragma("busy_timeout = 5000");
-    db.pragma("synchronous = NORMAL");
+    // No busy handler until WAL is on: switching journal mode can answer
+    // SQLITE_BUSY at once while another process is doing the same on a new
+    // file, so that is retried here. The database is kept only once every
+    // pragma has gone through; a failed open is tried afresh next time.
+    const opened = new Database(file, { timeout: 0 });
+    try {
+      retryBusy(() => opened.pragma("journal_mode = WAL"));
+      opened.pragma("busy_timeout = 5000");
+      opened.pragma("synchronous = NORMAL");
+    } catch (e) {
+      opened.close();
+      throw e;
+    }
+    db = opened;
     return db;
   };
 
@@ -105,6 +116,12 @@ export function sqlite(options: SqliteOptions = {}): Store {
     },
     async setState(state) {
       stmt(sql.setState).run(...params.setState(state));
+    },
+    async compareAndSetState(state, expectedVersion) {
+      const result = expectedVersion === 0
+        ? stmt(sql.casInsert).run(...params.casInsert(state))
+        : stmt(sql.casUpdate).run(...params.casUpdate(state, expectedVersion));
+      return result.changes > 0;
     },
     async prune(before) {
       return stmt(sql.prune).run(before).changes;

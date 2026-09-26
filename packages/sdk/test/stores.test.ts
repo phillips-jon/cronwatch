@@ -5,6 +5,8 @@ import path from "node:path";
 import { test } from "node:test";
 import Database from "better-sqlite3";
 import pg from "pg";
+import { cronwatch } from "../src/index.js";
+import { retryBusy } from "../src/stores/busy.js";
 import { memory } from "../src/stores/memory.js";
 import { postgres } from "../src/stores/postgres.js";
 import { sqlite } from "../src/stores/sqlite.js";
@@ -74,6 +76,25 @@ async function conformance(name: string, make: () => Store, skip: string | false
     assert.deepEqual(await store.getState("a"), full, "pendingRecovery and undelivered round-trip");
     await store.setState({ job: "a", open: {}, consecutiveFailures: 0, silencedUntil: 99, lastAlertAt: 6 });
 
+    // compareAndSetState: writes only over the version it was told to expect.
+    const cas = store.compareAndSetState!.bind(store);
+    const v = (version: number, extra: Partial<JobState> = {}): JobState => ({ job: "v", open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, version, ...extra });
+    assert.equal(await cas(v(2), 1), false, "no row matches only version 0");
+    assert.equal(await store.getState("v"), null);
+    assert.equal(await cas(v(1), 0), true, "no row counts as version 0");
+    assert.equal(await cas(v(1, { consecutiveFailures: 9 }), 0), false, "a write from a stale read is refused");
+    assert.equal(await cas(v(2, { consecutiveFailures: 1 }), 1), true);
+    assert.equal(await cas(v(3), 1), false);
+    assert.deepEqual(await store.getState("v"), v(2, { consecutiveFailures: 1 }));
+    await store.setState({ job: "w", open: {}, consecutiveFailures: 3, silencedUntil: null, lastAlertAt: null });
+    assert.equal(await cas({ ...v(1), job: "w" }, 1), false, "state written before versions counts as 0");
+    assert.equal(await cas({ ...v(1), job: "w" }, 0), true);
+    assert.equal((await store.getState("w"))!.version, 1);
+    await store.deleteJob("v");
+    assert.equal(await cas(v(3), 2), false, "a forgotten job's state is not written back");
+    assert.equal(await store.getState("v"), null);
+    await store.deleteJob("w");
+
     await store.insertRun(run("r5", "a", "running", 500));
     assert.equal(await store.prune(2500), 2, "r1 and r2 pruned; running r5 kept, and b's r4 kept as b's newest run");
     assert.deepEqual((await store.listRuns("a", 10)).map((r) => r.id), ["r3", "r5"]);
@@ -117,6 +138,41 @@ await test("sqlite: the database file and its -wal and -shm files are private", 
   await store.close!();
 });
 
+await test("sqlite: opening retries a busy database, and keeps nothing from a failed open", async () => {
+  const file = path.join(dir, "busy.db");
+  const holder = new Database(file);
+  holder.exec("CREATE TABLE t (x)");
+  holder.exec("BEGIN EXCLUSIVE");
+  const store = sqlite({ path: file });
+  const started = Date.now();
+  await assert.rejects(store.init!(), (e: { code?: string }) => e.code === "SQLITE_BUSY");
+  assert.ok(Date.now() - started >= 1_500, "it kept trying for a while first");
+  holder.exec("COMMIT");
+  holder.close();
+  // The next use opens afresh, and gets WAL and the busy timeout this time.
+  await store.init!();
+  await store.upsertJob({ name: "after" }, 1);
+  const check = new Database(file);
+  assert.equal(check.pragma("journal_mode", { simple: true }), "wal");
+  check.close();
+  await store.close!();
+});
+
+await test("retryBusy retries only SQLITE_BUSY and SQLITE_LOCKED, within its budget", () => {
+  const pauses: number[] = [];
+  const sleep = (ms: number) => { pauses.push(ms); };
+  let calls = 0;
+  const busy = Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+  assert.equal(retryBusy(() => { if (++calls < 4) throw busy; return "ok"; }, 2_000, sleep), "ok");
+  assert.deepEqual(pauses, [10, 20, 40]);
+  pauses.length = 0;
+  assert.throws(() => retryBusy(() => { throw Object.assign(new Error("x"), { code: "SQLITE_LOCKED_SHAREDCACHE" }); }, 100, sleep), /x/);
+  assert.equal(pauses.reduce((a, b) => a + b, 0), 100, "gave up once the budget was spent");
+  pauses.length = 0;
+  assert.throws(() => retryBusy(() => { throw Object.assign(new Error("corrupt"), { code: "SQLITE_CORRUPT" }); }, 2_000, sleep), /corrupt/);
+  assert.deepEqual(pauses, [], "anything else is thrown at once");
+});
+
 await test("sqlite: a prefix keeps two stores apart in one database", async () => {
   const db = new Database(":memory:");
   const one = sqlite({ database: db });
@@ -150,6 +206,45 @@ async function drop(prefix: string) {
 const conformancePrefix = pgPrefix();
 await conformance("postgres", () => postgres({ connectionString: PG, prefix: conformancePrefix }), NO_PG);
 if (PG) await drop(conformancePrefix);
+
+await test("postgres: output and errors with NUL characters are still recorded", { skip: NO_PG }, async () => {
+  const prefix = pgPrefix();
+  const cw = cronwatch({ store: postgres({ connectionString: PG, prefix }), alerts: [], cronSecret: null, onError: (e) => { throw e; } });
+  try {
+    await assert.rejects(cw.run("nul", async (job) => {
+      job.log("before\u0000after");
+      throw new Error("bad\u0000byte");
+    }), /bad/);
+    const [run] = await cw.runs("nul");
+    assert.equal(run!.status, "failed");
+    assert.equal(run!.output, "beforeafter");
+    assert.match(run!.error!, /^Error: badbyte/);
+    assert.equal((await cw.store.getState("nul"))!.consecutiveFailures, 1, "the state, with its alert, was written too");
+  } finally {
+    await cw.close();
+    await drop(prefix);
+  }
+});
+
+await test("postgres: two stores racing on one job's state", { skip: NO_PG }, async () => {
+  const prefix = pgPrefix();
+  const one = postgres({ connectionString: PG, prefix });
+  const two = postgres({ connectionString: PG, prefix });
+  try {
+    await one.init!();
+    await two.init!();
+    const state = (version: number, n: number): JobState => ({ job: "r", open: {}, consecutiveFailures: n, silencedUntil: null, lastAlertAt: null, version });
+    const results = await Promise.all([one.compareAndSetState!(state(1, 1), 0), two.compareAndSetState!(state(1, 2), 0)]);
+    assert.deepEqual(results.sort(), [false, true], "exactly one insert wins");
+    const results2 = await Promise.all([one.compareAndSetState!(state(2, 3), 1), two.compareAndSetState!(state(2, 4), 1)]);
+    assert.deepEqual(results2.sort(), [false, true], "exactly one update wins");
+    assert.equal((await one.getState("r"))!.version, 2);
+  } finally {
+    await one.close!();
+    await two.close!();
+    await drop(prefix);
+  }
+});
 
 await test("postgres: many instances can init at once", { skip: NO_PG }, async () => {
   const prefix = pgPrefix();

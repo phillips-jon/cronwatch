@@ -60,11 +60,6 @@ await nightlyReport.run(async (job) => { /* ... */ });
 cw.start();
 ```
 
-```ts
-// app/cronwatch/[[...path]]/route.ts: dashboard and JSON API, behind CRONWATCH_TOKEN
-export const { GET, POST, DELETE } = cw.routes();
-```
-
 ## What it catches
 
 - **missed**: the schedule said a run was due and none started within the grace period

@@ -191,7 +191,7 @@ test("markup in definitions, output and metrics stays escaped on every page", as
   }
 });
 
-/** No token in development: the routes as a dev server on this machine would serve them. */
+/** No token in development: the routes as a dev server would serve them, with the sign-in line swallowed. */
 function devRoutes() {
   const before = { NODE_ENV: process.env.NODE_ENV, CRONWATCH_TOKEN: process.env.CRONWATCH_TOKEN };
   process.env.NODE_ENV = "development";
@@ -206,39 +206,31 @@ function devRoutes() {
   }
 }
 
-test("without a token, localhost means the URL, the Host header and every proxy header", async () => {
+test("without a token in development, nothing a request says about itself lets it in", async () => {
   const routes = devRoutes();
-  const status = async (url: string, headers: Record<string, string> = {}) => (await routes.GET(new Request(url, { headers }))).status;
-  const local = "http://localhost:3000/cronwatch/api/jobs";
-
-  // What Next.js hands a route handler for a browser on this machine: its own
-  // listen address as the URL, the Host sent, and the x-forwarded-* it fills in.
-  const next = { host: "localhost:3000", "x-forwarded-host": "localhost:3000", "x-forwarded-for": "::ffff:127.0.0.1", "x-forwarded-port": "3000", "x-forwarded-proto": "http" };
-  assert.equal(await status(local, next), 200);
-  assert.equal(await status(local, { host: "127.0.0.1:3000", "x-forwarded-for": "::1" }), 200);
-  assert.equal(await status(local, { host: "[::1]:3000", forwarded: 'for="[::1]:51234";host=localhost;proto=http' }), 200);
-  assert.equal(await status(local), 200, "no Host header, as over HTTP/2: the URL's host is the authority");
-
-  // Next.js builds request.url from its listen address, so each of these
-  // arrives with a localhost URL.
-  const refused: [string, Record<string, string>][] = [
-    ["a rebinding page (Host names the attacker's domain)", { ...next, host: "evil.example", "x-forwarded-host": "evil.example" }],
-    ["a LAN address", { ...next, host: "192.168.1.20:3000", "x-forwarded-host": "192.168.1.20:3000", "x-forwarded-for": "::ffff:192.168.1.20" }],
-    ["a spoofed X-Forwarded-Host from another machine", { host: "192.168.1.20:3000", "x-forwarded-host": "localhost" }],
-    ["a forged Host, but Next.js recorded the peer", { ...next, "x-forwarded-for": "::ffff:192.168.1.20" }],
-    ["X-Forwarded-For through a proxy", { host: "localhost", "x-forwarded-for": "203.0.113.9, 127.0.0.1" }],
-    ["X-Forwarded-Host naming a public host", { host: "localhost", "x-forwarded-host": "app.example" }],
-    ["X-Real-IP", { host: "localhost", "x-real-ip": "203.0.113.9" }],
-    ["Forwarded for=", { host: "localhost", forwarded: "for=203.0.113.9;proto=https" }],
-    ["Forwarded host=", { host: "localhost", forwarded: 'for="[::1]";host=app.example' }],
-    ["an obfuscated Forwarded for=", { host: "localhost", forwarded: "for=_hidden" }],
-    ["localhost as a subdomain", { host: "localhost.evil.example" }],
-  ];
-  for (const [why, headers] of refused) assert.equal(await status(local, headers), 503, why);
-
-  // Hono on Node takes the URL from an absolute-form request target, whatever Host says.
-  assert.equal(await status(local, { host: "evil.example" }), 503, "an absolute-form target naming localhost");
-  // Otherwise from Host, so a spoofed X-Forwarded-Host never reaches the URL.
-  assert.equal(await status("http://evil.example/cronwatch/api/jobs", { host: "evil.example", "x-forwarded-host": "localhost" }), 503);
-  assert.equal(await status("http://192.168.1.20:3000/cronwatch/api/jobs", { host: "localhost" }), 503, "an adapter trusting X-Forwarded-Host for the URL");
+  const info = console.info;
+  console.info = () => {};
+  try {
+    const local = "http://localhost:3000/cronwatch/api/jobs";
+    // What Next.js hands a route handler for a browser on this machine, and
+    // what the old loopback check let through: all of it can be forged, since
+    // Next.js keeps a client's X-Forwarded-For and a tunnel rewrites Host.
+    const looksLocal: Record<string, string>[] = [
+      {},
+      { host: "localhost:3000", "x-forwarded-host": "localhost:3000", "x-forwarded-for": "::ffff:127.0.0.1", "x-forwarded-port": "3000", "x-forwarded-proto": "http" },
+      { host: "127.0.0.1:3000", "x-forwarded-for": "::1" },
+      { host: "[::1]:3000", forwarded: 'for="[::1]:51234";host=localhost;proto=http' },
+      { host: "localhost", "x-real-ip": "127.0.0.1" },
+    ];
+    for (const headers of looksLocal) {
+      const res = await routes.GET(new Request(local, { headers }));
+      assert.equal(res.status, 401, JSON.stringify(headers));
+      assert.equal((await res.json()).ok, false);
+    }
+    const write = await routes.POST(new Request("http://localhost:3000/cronwatch/api/check", { method: "POST", headers: { host: "localhost:3000" } }));
+    assert.equal(write.status, 401);
+  } finally {
+    console.info = info;
+  }
 });
+

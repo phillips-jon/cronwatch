@@ -42,6 +42,75 @@ test("expect still sees the unredacted output", async () => {
   assert.equal(run!.output, "token=[redacted]");
 });
 
+test("the added secret shapes are blanked", () => {
+  const cases: [string, string][] = [
+    [':password=>"hunter2"', ':password=>"[redacted]"'],
+    ["{:api_key => 'abc', user: 1}", "{:api_key => '[redacted]', user: 1}"],
+    ["Authorization: Basic dXNlcjpwYXNz", "Authorization: Basic [redacted]"],
+    ['{"Authorization": "Token abc123", "x": 1}', '{"Authorization": "Token [redacted]", "x": 1}'],
+    ["-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nIBAAK==\n-----END RSA PRIVATE KEY-----\nafter", "[redacted]\nafter"],
+    ["-----BEGIN PRIVATE KEY-----\nMIIE\nabc", "[redacted]"],
+    ["jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc_def-123 done", "jwt [redacted] done"],
+    ["https://hooks.slack.com/services/T0/B0/xyz ok", "https://hooks.slack.com/services/[redacted] ok"],
+    ["https://discord.com/api/webhooks/123/abc-def", "https://discord.com/api/webhooks/[redacted]"],
+    ["key AI" + "za" + "Sy".repeat(17) + "A", "key [redacted]"],
+    ["wh" + "sec_" + "abcd1234".repeat(3), "[redacted]"],
+    ["postgres://user:p@ss@host/db", "postgres://user:[redacted]@host/db"],
+  ];
+  for (const [input, expected] of cases) assert.equal(redactSecrets(input), expected, input);
+});
+
+test("adversarial 16 KB lines redact in linear time", () => {
+  const shapes = [
+    "password", "token-", "secret_", "a-", "password_x-", "-token", "tokens-", 'token"  ', "token  =", 'password="', "x=>", "=>",
+    "authorization: ", "authorization: basic ", "Authorization-", "a://", "a://x:", "postgres://u:", "a://" + "b".repeat(250) + ":",
+    "a://b:" + "c".repeat(250), "https://u:@@@", "@", ":", "Bearer ", "eyJ", "eyJa.", "eyJaaaa.aaaa", "eyJ" + "a".repeat(4090) + ".",
+    "-----BEGIN PRIVATE KEY-----", "-----BEGIN PRIVATE KEY-----" + "a".repeat(100), "-----BEGIN A B C ", "-----BEGIN PRIVATE KEY----------",
+    "hooks.slack.com/services/", "x.discord.com/api/webhooks/", "AI" + "za", "wh" + "sec_", "-", " ",
+  ];
+  let worst = 0;
+  let slowest = "";
+  for (const shape of shapes) {
+    const line = shape.repeat(Math.ceil(16_384 / shape.length)).slice(0, 16_384);
+    const started = performance.now();
+    redactSecrets(line);
+    redactSecrets(line + "!");
+    const took = performance.now() - started;
+    if (took > worst) [worst, slowest] = [took, shape.slice(0, 30)];
+  }
+  assert.ok(worst < 250, `${JSON.stringify(slowest)} took ${worst.toFixed(1)}ms`);
+});
+
+test("NUL characters never reach the store", async () => {
+  const cw = cronwatch({ alerts: [capture()], cronSecret: null });
+  await assert.rejects(cw.run("nul", async (job) => { job.log("a\u0000b"); throw new Error("bad\u0000byte"); }));
+  const [run] = await cw.runs("nul");
+  assert.equal(run!.output, "ab");
+  assert.match(run!.error!, /^Error: badbyte/);
+  await cw.run("nul", async () => "x\u0000y");
+  assert.equal((await cw.runs("nul"))[0]!.output, "xy");
+  const custom = cronwatch({ alerts: [capture()], cronSecret: null, redact: (text) => `${text}\u0000` });
+  await custom.run("nul", async (job) => { job.log("z"); });
+  assert.equal((await custom.runs("nul"))[0]!.output, "z", "even a custom redact cannot put one back");
+});
+
+test("a redact that throws falls back to the default and is reported", async () => {
+  const errors: [unknown, string][] = [];
+  const cw = cronwatch({ alerts: [capture()], cronSecret: null, redact: () => { throw new Error("redactor broke"); }, onError: (e, where) => errors.push([e, where]) });
+  await cw.run("r", async (job) => { job.log("password=hunter2"); });
+  const [run] = await cw.runs("r");
+  assert.equal(run!.status, "ok");
+  assert.equal(run!.output, "password=[redacted]");
+  assert.deepEqual(errors.map(([, where]) => where), ["redact"]);
+  assert.match((errors[0]![0] as Error).message, /redactor broke/);
+
+  const odd = cronwatch({ alerts: [capture()], cronSecret: null, redact: () => 42 as unknown as string, onError: () => { throw new Error("and onError too"); } });
+  await assert.rejects(odd.run("r", async () => { throw new Error("token=abc"); }), /token=abc/);
+  const [failed] = await odd.runs("r");
+  assert.equal(failed!.status, "failed");
+  assert.match(failed!.error!, /token=\[redacted\]/);
+});
+
 test("errors are capped like logged output", async () => {
   const cw = cronwatch({ alerts: [capture()], cronSecret: null });
   await assert.rejects(cw.run("big", async () => { throw new Error("x".repeat(100_000)); }));

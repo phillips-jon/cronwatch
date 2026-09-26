@@ -16,7 +16,7 @@ Missed and stuck runs are only found by `cw.check()`. In a long-running process 
 
 ## Several instances
 
-Any number of app instances may share one store; runs from all of them are recorded. Within one process, every change to a job's state (a run starting or finishing, a check, a silence) waits its turn, so overlapping runs of the same job count every failure and alert once. Across processes nothing is locked: two instances finishing runs or checking at the same moment can each read the same state, so one may overwrite the other's count, or both may open the same condition and send two alerts. Run the interval on one instance, or let one platform cron call the check endpoint, and avoid overlapping runs of one job on different instances.
+Any number of app instances may share one store; runs from all of them are recorded. Within one process, every change to a job's state (a run starting or finishing, a check, a silence) waits its turn. Across processes each write names the state version it was based on, and one based on a stale read is refused and worked out again from a fresh read (see [two processes, one store](/docs/stores/#two-processes-one-store)). So overlapping runs of the same job on different instances count every failure, and a condition opens, and alerts, once. Two checks retrying the same queued alert at the same moment can each send it, so run the interval on one instance, or let one platform cron call the check endpoint. A custom store without `compareAndSetState` gets none of this across processes.
 
 ## The store going down
 
@@ -24,7 +24,17 @@ A job always runs, whatever the store is doing. If recording the run fails, the 
 
 ## Alert delivery
 
-Each channel gets 15 seconds per alert (Slack, Discord and webhook requests give up after 10). If no channel accepts an alert, it is kept with the job's state and each check tries it once more until one does. A process created with `deliver: "check"` uses the same queue on purpose, so another process sends its alerts. That is a retry of the same alert, not a reminder. An alert is only lost if the process dies while sending it, or if more than twenty pile up for one job.
+Each channel gets 15 seconds per alert (Slack, Discord and webhook requests give up after 10). If no channel accepts an alert, it is kept with the job's state and each check tries it once more until one does. A process created with `deliver: "check"` uses the same queue on purpose, so another process sends its alerts. That is a retry of the same alert, not a reminder.
+
+A queued alert that no longer describes the job is dropped instead of sent late: one whose condition has closed since, or closed and opened again (the newer alert is queued too), and a recovery once any condition it names is open again. A recovery whose conditions all stay closed is still sent. One check spends at most 20 seconds of retries across all jobs; whatever is left waits for the next check. More than twenty queued alerts for one job drops the oldest, and says so through `onError`. Otherwise an alert is only lost if the process dies while sending it.
+
+## Output and errors
+
+Output and errors are capped at 16 KB, keeping the tail. NUL characters are removed from both before anything else, because Postgres refuses them. A custom `redact` that throws is reported through `onError` and the default patterns are used instead, so the run is still recorded.
+
+## A job that cannot be evaluated
+
+If one job's stored definition cannot be used (a schedule or timeout written by a newer or older version that this one cannot parse, say), that job is reported through `onError` and shown as failing, with no next due time, and every other job is checked and listed as usual.
 
 ## Clocks
 

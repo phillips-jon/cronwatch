@@ -267,7 +267,7 @@
         "x-content-type-options": "nosniff",
         "x-robots-tag": "noindex"
       },
-      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":1767612600000,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[]}}"
+      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":1767612600000,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[],\"version\":3}}"
     },
     {
       "method": "POST",
@@ -302,7 +302,7 @@
         "x-content-type-options": "nosniff",
         "x-robots-tag": "noindex"
       },
-      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":1767610800000,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[]}}"
+      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":1767610800000,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[],\"version\":4}}"
     },
     {
       "method": "POST",
@@ -373,7 +373,7 @@
         "x-content-type-options": "nosniff",
         "x-robots-tag": "noindex"
       },
-      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":null,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[]}}"
+      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":null,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[],\"version\":5}}"
     },
     {
       "method": "GET",

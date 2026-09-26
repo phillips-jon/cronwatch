@@ -1,9 +1,20 @@
 /** Output is capped so a chatty job cannot fill the store. The tail is kept. */
 export const OUTPUT_CAP = 16 * 1024;
 
+/**
+ * NUL characters are removed first, since Postgres refuses them in TEXT and
+ * JSONB and the whole run row would be lost. The cap then applies to what is
+ * left.
+ */
 export function capOutput(text: string): string {
-  if (text.length <= OUTPUT_CAP) return text;
-  return "[earlier output trimmed]\n" + text.slice(text.length - OUTPUT_CAP);
+  const clean = stripNul(text);
+  if (clean.length <= OUTPUT_CAP) return clean;
+  return "[earlier output trimmed]\n" + clean.slice(clean.length - OUTPUT_CAP);
+}
+
+/** Removes every U+0000. */
+export function stripNul(text: string): string {
+  return text.includes("\u0000") ? text.replace(/\u0000/g, "") : text;
 }
 
 /** "Name: message" and the first five stack frames, capped like output. */
@@ -29,32 +40,53 @@ function describeError(error: unknown): string {
 const REDACTED = "[redacted]";
 
 // Bounded quantifiers throughout, so a long line cannot make these backtrack.
+// They apply in this order, each to the text the ones before it left.
 const SECRET_PATTERNS: [RegExp, string | ((match: string, ...groups: string[]) => string)][] = [
-  // password=..., API_KEY: ..., "client_secret": "...", TOKEN='...', token=... (but not max_tokens: 800).
-  // A quoted value is blanked to its closing quote, spaces and all, and keeps its quotes.
+  // A PEM private key, header to footer. Without a footer (the output was
+  // trimmed) it runs to the end of the base64 body. A "-" that starts five
+  // dashes ends the body, so the footer is never swallowed into it.
   [
-    /\b([A-Za-z0-9_-]{0,40}(?:secret|token|passw(?:or)?d|pwd|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_-]{0,40}(?<![Tt][Oo][Kk][Ee][Nn][Ss])"?\s{0,3}[=:]\s{0,3})(?:(")[^"\n]{1,4096}"|(')[^'\n]{1,4096}'|["']?[^\s"',;&]{1,4096})/gi,
+    /-----BEGIN (?:[A-Z0-9]{1,20} ){0,3}PRIVATE KEY-----(?:[A-Za-z0-9+/=\s,:]|-(?!----)){0,16384}(?:-----END (?:[A-Z0-9]{1,20} ){0,3}PRIVATE KEY-----)?/g,
+    REDACTED,
+  ],
+  // password=..., API_KEY: ..., "client_secret": "...", TOKEN='...', token=...,
+  // :password=>"..." (but not max_tokens: 800). A quoted value is blanked to
+  // its closing quote, spaces and all, and keeps its quotes.
+  [
+    /\b([A-Za-z0-9_-]{0,40}(?:secret|token|passw(?:or)?d|pwd|api[_-]?key|access[_-]?key|private[_-]?key|credential)[A-Za-z0-9_-]{0,40}(?<![Tt][Oo][Kk][Ee][Nn][Ss])"?\s{0,3}(?:=>|[=:])\s{0,3})(?:(")[^"\n]{1,4096}"|(')[^'\n]{1,4096}'|["']?[^\s"',;&]{1,4096})/gi,
     (_match, name: string, double?: string, single?: string) => {
       const quote = double ?? single ?? "";
       return `${name}${quote}${REDACTED}${quote}`;
     },
   ],
-  // Credentials inside a URL: postgres://user:password@host
-  [/(\b[a-z][a-z0-9+.-]{0,30}:\/\/[^\s/:@]{0,256}:)[^\s/@]{1,256}@/gi, `$1${REDACTED}@`],
+  // Authorization: Basic <base64> and Authorization: Token <token>, also as a JSON or hash entry.
+  [/\b((?:proxy-)?authorization["']?\s{0,3}(?:=>|[=:])\s{0,3}["']?\s{0,3}(?:basic|token)\s{1,3})[A-Za-z0-9._~+/=:-]{1,4096}/gi, `$1${REDACTED}`],
+  // Credentials inside a URL: postgres://user:password@host. The password
+  // runs to the last "@" before a "/" or a space, so one that contains "@"
+  // is blanked whole.
+  [/(\b[a-z][a-z0-9+.-]{0,30}:\/\/[^\s/:@]{0,256}:)[^\s/]{1,256}@/gi, `$1${REDACTED}@`],
   // Authorization: Bearer <token>
   [/\b(Bearer\s{1,3})[A-Za-z0-9._~+/=-]{8,4096}/g, `$1${REDACTED}`],
-  // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic and OpenAI style keys.
+  // A bare JWT: three base64url segments, the first starting eyJ.
+  [/\beyJ[A-Za-z0-9_-]{4,4096}\.[A-Za-z0-9_-]{4,4096}\.[A-Za-z0-9_-]{0,4096}/g, REDACTED],
+  // Incoming webhook URLs carry their secret in the path.
+  [/(\bhooks\.slack\.com\/(?:services|workflows|triggers)\/)[A-Za-z0-9/_-]{1,255}/gi, `$1${REDACTED}`],
+  [/(\bdiscord(?:app)?\.com\/api\/(?:v\d{1,2}\/)?webhooks\/)[A-Za-z0-9/_-]{1,255}/gi, `$1${REDACTED}`],
+  // Well-known token shapes: AWS, GitHub, Slack, Stripe, Anthropic, OpenAI and Google style keys.
   [/\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g, REDACTED],
   [/\b(?:gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9_]{20,255})\b/g, REDACTED],
   [/\bxox[abposr]-[A-Za-z0-9-]{10,255}/g, REDACTED],
   [/\b[rsp]k_(?:live|test)_[A-Za-z0-9]{10,255}\b/g, REDACTED],
+  [/\bwhsec_[A-Za-z0-9+/=]{16,255}/g, REDACTED],
   [/\bsk-[A-Za-z0-9_-]{20,255}/g, REDACTED],
+  [/\bAIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])/g, REDACTED],
 ];
 
 /**
  * The default `redact`: blanks values that look like secrets (key=value pairs
- * with secret-ish names, URL credentials, bearer tokens and well-known token
- * formats) before output or an error is stored, shown or sent anywhere.
+ * with secret-ish names, Authorization headers, URL credentials, bearer
+ * tokens, JWTs, PEM private keys, webhook URLs and well-known token formats)
+ * before output or an error is stored, shown or sent anywhere.
  */
 export function redactSecrets(text: string): string {
   let out = text;
