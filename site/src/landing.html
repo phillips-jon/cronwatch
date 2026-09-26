@@ -1,7 +1,10 @@
 <section class="opening">
   <h1 class="say"><b>CronWatch</b> records every run of your scheduled jobs in your own database, and speaks up when one is missed, fails, gets stuck, runs slow or costs too much.</h1>
-  <p class="then">It is a TypeScript library, not a service. No server to run, no account to make, and run history that never leaves your database. Output tails go only to the alert channels you pick, and to Anthropic only if you turn on triage. <a href="{{GITHUB}}">MIT licensed</a> and small enough to read in an afternoon.</p>
-  <div class="install"><code translate="no">npm install @cronwatch/sdk</code><button class="copy" type="button" aria-label="Copy the install command">Copy</button></div>
+  <p class="then">It is a library, not a service. No server to run, no account to make, and run history that never leaves your database. Output tails go only to the alert channels you pick, and to Anthropic only if you turn on triage. <a href="{{GITHUB}}">MIT licensed</a> and small enough to read in an afternoon.</p>
+  <div class="installs">
+    <div class="install"><code translate="no">npm install @cronwatch/sdk</code><button class="copy" type="button" aria-label="Copy the npm install command">Copy</button></div>
+    <div class="install"><code translate="no">bundle add cronwatch</code><button class="copy" type="button" aria-label="Copy the Bundler install command">Copy</button></div>
+  </div>
   <div class="actions">
     <button class="prompt-btn" type="button" data-prompt aria-label="Copy the setup instructions for a coding agent">Copy setup prompt for your AI</button>
     <p class="prompt-note">Paste it into any coding agent to wire up every job. Also at <a href="/prompt.txt">/prompt.txt</a>.</p>
@@ -74,7 +77,7 @@
   job.log(<span class="s">"Report written:"</span>, report.path);
 });</code></pre>
     </div>
-    <p class="small">Vercel cron, Next.js, node-cron, BullMQ, GitHub Actions, Hono, Bun with the Postgres store, or a script from crontab. Anywhere a fetch handler or an async function runs.</p>
+    <p class="small">Vercel cron, Next.js, node-cron, BullMQ, GitHub Actions, Hono, Bun with the Postgres store, or a script from crontab. Anywhere a fetch handler or an async function runs. In Rails: ActiveJob on Solid Queue or any adapter, Sidekiq and sidekiq-cron, with the schedule read from the scheduler’s own config (<a href="/docs/rails/">Rails docs</a>).</p>
   </div>
 </section>
 
@@ -86,7 +89,7 @@
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_MISSED}}</span></p><pre translate="no">{{ALERT_MISSED}}</pre></div>
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_BUDGET}}</span></p><pre translate="no">{{ALERT_BUDGET}}</pre></div>
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_RECOVERED}}</span></p><pre translate="no">{{ALERT_RECOVERED}}</pre></div>
-    <p class="small">Every condition sends one message when it opens. When a successful run leaves nothing open, one recovered message names everything that was. A job that fails all night pages you once, and the fix announces itself. The check runs from <code>cw.start()</code> in a long-running server, or from a cron hitting <code>/cronwatch/api/check</code> on Vercel.</p>
+    <p class="small">Every condition sends one message when it opens. When a successful run leaves nothing open, one recovered message names everything that was. A job that fails all night pages you once, and the fix announces itself. The check runs from <code>cw.start()</code> in a long-running server, from a cron hitting <code>/cronwatch/api/check</code> on Vercel, or in Rails as <code>Cronwatch::CheckJob</code>, scheduled every five minutes beside your other recurring jobs.</p>
   </div>
 </section>
 
@@ -111,7 +114,7 @@
     <h2>Your agent reads the same records.</h2>
     <p>CronWatch ships an MCP server. Claude Code, Cursor or any MCP client can list what is failing, read the error and the output, and silence a job while it fixes it. A <a href="/docs/agent-skill/">Claude Code skill</a> in the repo teaches the agent to add monitoring to a job as it writes it.</p>
     <div class="install"><code translate="no">claude mcp add cronwatch -e CRONWATCH_URL=… -e CRONWATCH_TOKEN=… -- npx -y @cronwatch/mcp</code><button class="copy" type="button" aria-label="Copy the MCP command">Copy</button></div>
-    <p class="small">To get it installed in the first place, hand your agent the setup prompt. It names the store to pick, the shape of a job, the check endpoint and the environment variables, and it tells the agent to declare every job already scheduled in the project rather than one example.</p>
+    <p class="small">To get it installed in the first place, hand your agent the setup prompt. It works out whether the project is TypeScript or Rails, names the store to pick, the shape of a job, the check endpoint and the environment variables, and it tells the agent to declare every job already scheduled in the project rather than one example.</p>
     <div class="actions">
       <button class="prompt-btn" type="button" data-prompt aria-label="Copy the setup instructions for a coding agent">Copy setup prompt for your AI</button>
       <p class="prompt-note">Or point it at <a href="/prompt.txt">/prompt.txt</a> and <a href="/llms.txt">/llms.txt</a>.</p>
@@ -130,7 +133,7 @@
   <p class="label">Dashboard</p>
   <div class="body">
     <h2>And a dashboard, mounted inside your app.</h2>
-    <p>At <code>/cronwatch</code>, behind a token you set in <code>CRONWATCH_TOKEN</code>, not your app’s own auth. The same records the agent reads, with the run history, output and metrics of every job.</p>
+    <p>At <code>/cronwatch</code>, from <code>cw.routes()</code> or, in Rails, <code>mount Cronwatch::Web</code>, behind a token you set in <code>CRONWATCH_TOKEN</code> or behind your app’s own sign in. The same records the agent reads, with the run history, output and metrics of every job.</p>
     <div class="out">
       <p class="from"><span translate="no">/cronwatch</span><span>{{BOARD_META}}</span></p>
       {{JOBS_BOARD}}
@@ -143,7 +146,7 @@
   <div class="body">
     <h2>Why a library, and not a service.</h2>
     <p>The hosted monitors are good, and you pay for them with a monthly bill, an account, and a copy of your job output on someone else’s servers. A library needs none of that. It lives in the app that runs the jobs, writes to the database you already have, and sends the alert straight from your app to your channel.</p>
-    <p>The one thing it cannot see is an app that is entirely down, because nothing inside a dead process can alert. Pair it with any uptime monitor for that. Everything else, from a job that never fires to one that costs three times what it should, it catches from the inside. Stores: SQLite or Postgres. Alerts: Slack, Discord, a signed webhook, the console, or your own function.</p>
+    <p>The one thing it cannot see is an app that is entirely down, because nothing inside a dead process can alert. Pair it with any uptime monitor for that. Everything else, from a job that never fires to one that costs three times what it should, it catches from the inside. Stores: SQLite or Postgres, or ActiveRecord in Rails; a Rails app and a Node service can share one database and one dashboard. Alerts: Slack, Discord, a signed webhook, the console, or your own function.</p>
   </div>
 </section>
 

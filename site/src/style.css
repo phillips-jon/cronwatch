@@ -99,6 +99,8 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .opening .then { margin-top: 24px; color: var(--body); max-width: 52ch; text-wrap: pretty; }
 .install { display: inline-flex; align-items: center; gap: 14px; margin-top: 26px; background: var(--sunk); border: 1px solid var(--rule); border-radius: 3px; padding: 10px 10px 10px 14px; font: 400 14px/1.4 var(--mono); }
 .install code::before { content: "$ "; color: var(--muted); }
+.installs { display: inline-grid; gap: 8px; margin-top: 26px; }
+.installs .install { margin-top: 0; justify-content: space-between; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 22px; }
 .prompt-btn { display: inline-flex; align-items: center; gap: 9px; font: 500 14px/1 var(--mono); color: var(--sheet); background: var(--ink); border: 1px solid var(--ink); border-radius: 3px; padding: 11px 14px; }
 .prompt-btn:hover { opacity: .85; }
@@ -282,6 +284,7 @@ footer button:hover { color: var(--ink); }
   .top { padding-top: 20px; }
   .opening { padding: 36px 0 32px; }
   .install { display: flex; width: 100%; }
+  .installs { display: grid; }
   .catches li { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .board .sm { display: none; }
   .board td, .board th { padding-left: 10px; padding-right: 10px; }
