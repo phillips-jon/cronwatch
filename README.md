@@ -43,12 +43,14 @@ export const { GET, POST, DELETE } = cw.routes();
 | Package | What |
 |---|---|
 | [`@cronwatch/sdk`](packages/sdk) | the library: jobs, runs, checks, stores (memory, SQLite, Postgres), alerts (Slack, Discord, webhook), dashboard and API, optional Claude triage |
-| [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob integration, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
+| [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob and Sidekiq integration, schedules read from Solid Queue or sidekiq-cron, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
 | [`site`](site) | cronwatch.dev, a static landing page and docs |
 
 ## Installing
+
+TypeScript and Node: `npm install @cronwatch/sdk`. Ruby and Rails: `bundle add cronwatch` (see [Ruby and Rails](#ruby-and-rails)).
 
 The SDK needs Node 22 or newer and depends only on `croner`. Each driver is an optional peer, installed only when you use its entry point:
 
@@ -75,7 +77,13 @@ class NightlyReportJob < ApplicationJob
 end
 ```
 
-`gem "cronwatch"` in a Rails app loads the Rails integration. `bin/rails generate cronwatch:install` adds the migration and the initializer (which sets the ActiveRecord store) and prints the rest: schedule `Cronwatch::CheckJob` every five minutes (or `bin/rails cronwatch:check` from a crontab), and `require "cronwatch/web"` and mount `Cronwatch::Web` for the dashboard. Ruby 3.2 or newer; tested on Rails 7.2, 8.0 and 8.1. See [packages/ruby](packages/ruby) and [cronwatch.dev/docs/rails](https://cronwatch.dev/docs/rails/). The TypeScript SDK is the source of truth: `npm run conformance` generates cases in `conformance/` that the gem's tests replay.
+```bash
+bundle add cronwatch
+bin/rails generate cronwatch:install
+bin/rails db:migrate
+```
+
+`gem "cronwatch"` in a Rails app loads the Rails integration, and `Cronwatch::Sidekiq` when Sidekiq is in the bundle. `bin/rails generate cronwatch:install` adds the migration and the initializer (which sets the ActiveRecord store) and prints the rest: schedule `Cronwatch::CheckJob` every five minutes (or `bin/rails cronwatch:check` from a crontab), and mount `Cronwatch::Web.new(Cronwatch.client)` in `config/routes.rb` for the dashboard (Rails autoloads it; outside Rails, `require "cronwatch/web"`). `schedule: :from_scheduler` reads a job's schedule from Solid Queue's or sidekiq-cron's config. Ruby 3.2 or newer; tested on Rails 7.2, 8.0 and 8.1. See [packages/ruby](packages/ruby), [cronwatch.dev/docs/rails](https://cronwatch.dev/docs/rails/) and [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/); the gem is on [RubyGems](https://rubygems.org/gems/cronwatch). The TypeScript SDK is the source of truth: `npm run conformance` generates cases in `conformance/` that the gem's tests replay.
 
 ## Why a library and not a service
 
@@ -115,7 +123,7 @@ npm run release -- 0.4.0 --dry-run   # show every change and command, write noth
 npm run release -- 0.4.0             # bump, regenerate, check, commit "Release 0.4.0", tag v0.4.0
 ```
 
-It bumps every file listed at the top of `scripts/release.mjs`, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, runs `npm run check`, the build, `npm run check:packages` and (with Ruby 3.2 or newer; `--skip-ruby` skips them) the gem's tests. It does not push or publish: it prints the `git push`, `npm publish` and `gem push` commands to run next, and `npm deprecate` lines for any `--deprecate <old>`. A new package under `packages/` needs a row in that table, or the script refuses to run.
+It bumps every file listed at the top of `scripts/release.mjs`, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, runs `npm run check`, the build, `npm run check:packages` and (with Ruby 3.2 or newer; `--skip-ruby` skips them) the gem's tests, then builds the gem and checks what it carries. It does not push or publish: it prints the `git push`, `npm publish` and `gem push` commands to run next (RubyGems spells a prerelease `0.4.0-beta.1` as `0.4.0.pre.beta.1` and refuses `+build` metadata, so the script does too), and `npm deprecate` lines for any `--deprecate <old>`. A new package under `packages/` needs a row in both of its tables (the file holding its version, and how it ships), or the script refuses to run.
 
 ## Deploying the site
 

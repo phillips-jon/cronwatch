@@ -115,3 +115,32 @@ jobs:
         working-directory: packages/ruby
         env:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+      # Build the gem, install it into an empty GEM_HOME and use it from a
+      # fresh process outside the bundle, as an app would (check:packages
+      # does the same for the npm packages).
+      - name: Build, install and require the gem
+        working-directory: packages/ruby
+        run: |
+          dir="$(mktemp -d)"
+          gem build cronwatch.gemspec --output "$dir/cronwatch.gem"
+          unset BUNDLE_GEMFILE RUBYOPT
+          export GEM_HOME="$dir/gems" GEM_PATH="$dir/gems"
+          gem install --no-document "$dir/cronwatch.gem"
+          cd "$dir"
+          ruby -e '
+            require "cronwatch"
+            cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [], cron_secret: nil)
+            job = cw.job("smoke", schedule: "*/5 * * * *", timezone: "UTC")
+            abort "run returned the wrong value" unless job.run { |j| j.log("ok"); 42 } == 42
+            run = cw.runs("smoke").first
+            abort "no run recorded" unless run&.ok?
+            puts "cronwatch #{Cronwatch::VERSION} from #{Gem.loaded_specs.fetch("cronwatch").full_gem_path}"
+          '
+      # @cronwatch/mcp's tools against the gem's Cronwatch::Web, served by
+      # packages/ruby/test/web/server.rb under the bundle (webrick is in its
+      # test group).
+      - name: MCP server against Cronwatch::Web
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_RUBY: "1"
+          CRONWATCH_RUBY: bundle exec ruby

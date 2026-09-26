@@ -14,6 +14,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { cronwatch, custom, memory } from "../../../sdk/dist/index.js";
 
+if (process.env.TZ !== "UTC") {
+  console.error("golden: run with TZ=UTC (npm run check:conformance does); the fixture depends on the time zone");
+  process.exit(2);
+}
+
 const T0 = Date.UTC(2026, 0, 5, 9, 30, 0);
 const MIN = 60_000;
 const HOUR = 3_600_000;

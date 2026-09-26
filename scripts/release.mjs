@@ -14,10 +14,11 @@
  *
  * A new language package under packages/ needs a row in VERSIONED (the file
  * holding its version), and a row in PUBLISH (how it ships). The script
- * refuses to run while a package directory has no VERSIONED row.
+ * refuses to run while a package directory is missing either row.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 /** Every place the release version lives. Each pattern captures (before)(version)(after). */
@@ -29,12 +30,16 @@ const VERSIONED = [
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
-/** How each package ships, printed after the release commit, in order. */
+/** How each package ships, printed after the release commit, in order. Given the semver and the RubyGems version. */
 const PUBLISH = [
   { dir: "packages/sdk", commands: () => ["npm publish --workspace packages/sdk --access public"] },
   { dir: "packages/mcp", commands: () => ["npm publish --workspace packages/mcp --access public"] },
-  { dir: "packages/ruby", commands: (v) => [`(cd packages/ruby && gem build cronwatch.gemspec && gem push cronwatch-${v}.gem)`] },
+  { dir: "packages/ruby", commands: (v, gem) => [`(cd packages/ruby && gem build cronwatch.gemspec && gem push cronwatch-${gem}.gem)`] },
 ];
+
+/** Files the built gem must carry, and prefixes it must not. */
+const GEM_REQUIRED = ["lib/cronwatch.rb", "lib/cronwatch/client.rb"];
+const GEM_FORBIDDEN = ["test/", "conformance/"];
 
 /** npm packages `--deprecate` covers. RubyGems has no deprecation; yank only a broken gem. */
 const NPM_PACKAGES = ["@cronwatch/sdk", "@cronwatch/mcp"];
@@ -108,11 +113,42 @@ function read(file) {
   return readFileSync(path.join(ROOT, file), "utf8");
 }
 
-/** Every packages/* directory must have a VERSIONED row, so a new package is not released at a stale version. */
+/**
+ * Every packages/* directory must have a VERSIONED row, so a new package is
+ * not released at a stale version, and a PUBLISH row, so it is not left unshipped.
+ */
 function checkTable() {
   const dirs = readdirSync(path.join(ROOT, "packages")).filter((d) => statSync(path.join(ROOT, "packages", d)).isDirectory());
-  const missing = dirs.filter((d) => !VERSIONED.some((row) => row.file.startsWith(`packages/${d}/`)));
-  if (missing.length > 0) fail(`no VERSIONED row for ${missing.map((d) => `packages/${d}`).join(", ")}; add the file that holds its version to the table in scripts/release.mjs`);
+  const unversioned = dirs.filter((d) => !VERSIONED.some((row) => row.file.startsWith(`packages/${d}/`)));
+  if (unversioned.length > 0) fail(`no VERSIONED row for ${unversioned.map((d) => `packages/${d}`).join(", ")}; add the file that holds its version to the table in scripts/release.mjs`);
+  const unpublished = dirs.filter((d) => !PUBLISH.some((row) => row.dir === `packages/${d}`));
+  if (unpublished.length > 0) fail(`no PUBLISH row for ${unpublished.map((d) => `packages/${d}`).join(", ")}; add how it ships to the table in scripts/release.mjs`);
+}
+
+/**
+ * The version RubyGems gives a semver: Gem::Version turns each "-" into
+ * ".pre.", so 0.4.0-beta.1 is 0.4.0.pre.beta.1. Asked of Ruby when there is
+ * one, so the printed filename is the one `gem build` writes.
+ */
+function gemVersion(version, ruby) {
+  if (!ruby) return version.replaceAll("-", ".pre.");
+  const result = spawnSync("ruby", ["-e", "print Gem::Version.new(ARGV[0]).to_s", version], { cwd: ROOT, encoding: "utf8", env: { ...process.env, ...ruby.env } });
+  if (result.status !== 0) fail(`RubyGems rejects ${version}:\n${result.stderr}`);
+  return result.stdout;
+}
+
+/** Lists the built gem's files and fails unless it carries the library and none of the tests. */
+function checkGem(file, ruby) {
+  const list = 'require "rubygems/package"; puts Gem::Package.new(ARGV[0]).contents';
+  const result = spawnSync("ruby", ["-e", list, file], { cwd: ROOT, encoding: "utf8", env: { ...process.env, ...ruby.env } });
+  if (result.status !== 0) fail(`could not list ${file}:\n${result.stderr}`);
+  const contents = result.stdout.split("\n").filter(Boolean);
+  for (const f of contents) console.log(`  ${f}`);
+  const missing = GEM_REQUIRED.filter((f) => !contents.includes(f));
+  const extra = contents.filter((f) => GEM_FORBIDDEN.some((prefix) => f.startsWith(prefix)));
+  if (missing.length > 0) fail(`the gem is missing ${missing.join(", ")}; check spec.files in packages/ruby/cronwatch.gemspec`);
+  if (extra.length > 0) fail(`the gem carries ${extra.join(", ")}; check spec.files in packages/ruby/cronwatch.gemspec`);
+  console.log(`${contents.length} files, with ${GEM_REQUIRED.join(" and ")}, and nothing under ${GEM_FORBIDDEN.join(" or ")}.`);
 }
 
 /** The edits to make, one per file, after checking every row holds the current version. */
@@ -180,6 +216,7 @@ function run(label, cmd, args, { cwd = ROOT, env = {} } = {}) {
 const options = parseArgs(process.argv.slice(2));
 const next = options.version;
 if (!SEMVER.test(next)) fail(`${next} is not a valid semver version`);
+if (next.includes("+")) fail(`${next} has build metadata, which RubyGems rejects; release without the +...`);
 const current = JSON.parse(read("packages/sdk/package.json")).version;
 if (compareVersions(next, current) <= 0) fail(`${next} is not greater than the current ${current}`);
 
@@ -193,6 +230,9 @@ if (git("tag", "--list", tag) !== "") fail(`tag ${tag} already exists`);
 
 const edits = planEdits(current, next);
 const ruby = options.skipRuby ? null : findRuby();
+const gem = gemVersion(next, ruby);
+const gemDir = options.dryRun ? path.join(os.tmpdir(), "cronwatch-gem-XXXXXX") : mkdtempSync(path.join(os.tmpdir(), "cronwatch-gem-"));
+const gemFile = path.join(gemDir, `cronwatch-${gem}.gem`);
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const steps = [
   ["Refresh package-lock.json", npm, ["install", "--no-audit", "--no-fund"]],
@@ -205,6 +245,7 @@ const steps = [
   ...(ruby ? [
     ["Install the gem's bundle", "bundle", ["install", "--quiet"], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env }],
     ["Test the gem", "bundle", ["exec", "rake", "test"], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env }],
+    ["Build the gem", "gem", ["build", "cronwatch.gemspec", "--output", gemFile], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env, after: () => checkGem(gemFile, ruby) }],
   ] : []),
 ];
 const leftovers = strays(current);
@@ -219,9 +260,10 @@ if (leftovers.length > 0) {
   console.log(`\nStill mentioning ${current} (not in VERSIONED; check whether they should move):`);
   for (const line of leftovers) console.log(`  ${line}`);
 }
-if (options.skipRuby) console.log("\nSkipping the gem's tests (--skip-ruby).");
-else if (!ruby) console.log("\nNo Ruby 3.2 or newer with bundler found; skipping the gem's tests. CI runs them.");
-else console.log(`\nRuby ${ruby.version}${ruby.env.RBENV_VERSION ? " (rbenv)" : ""} found; the gem's tests run.`);
+if (options.skipRuby) console.log("\nSkipping the gem's tests and build (--skip-ruby).");
+else if (!ruby) console.log("\nNo Ruby 3.2 or newer with bundler found; skipping the gem's tests and build. CI runs the tests.");
+else console.log(`\nRuby ${ruby.version}${ruby.env.RBENV_VERSION ? " (rbenv)" : ""} found; the gem's tests run and the gem is built.`);
+if (gem !== next) console.log(`RubyGems spells ${next} as ${gem}.`);
 
 if (options.dryRun) {
   console.log("\nWould run:");
@@ -229,12 +271,17 @@ if (options.dryRun) {
     const env = Object.entries(opts.env ?? {}).map(([k, v]) => `${k}=${v} `).join("");
     const cwd = opts.cwd ? `(cd ${path.relative(ROOT, opts.cwd)}) ` : "";
     console.log(`  ${label}: ${cwd}${env}${[cmd, ...args].join(" ")}`);
+    if (opts.after) console.log(`    then check it carries ${GEM_REQUIRED.join(" and ")} and nothing under ${GEM_FORBIDDEN.join(" or ")}`);
   }
   console.log(`  Commit: git add -u && git commit -m "Release ${next}"`);
   console.log(`  Tag: git tag -a ${tag} -m "Release ${next}"`);
 } else {
   for (const [file, { after }] of edits) writeFileSync(path.join(ROOT, file), after);
-  for (const [label, cmd, args, opts] of steps) run(label, cmd, args, opts);
+  for (const [label, cmd, args, opts = {}] of steps) {
+    run(label, cmd, args, opts);
+    opts.after?.();
+  }
+  rmSync(gemDir, { recursive: true, force: true });
   const untracked = git("status", "--porcelain").split("\n").filter((line) => line.startsWith("??"));
   if (untracked.length > 0) console.log(`\nLeft out of the commit (untracked):\n${untracked.join("\n")}`);
   git("add", "-u");
@@ -244,7 +291,7 @@ if (options.dryRun) {
 }
 
 console.log(`\nNext, by hand:\n  git push origin ${branch} ${tag}`);
-for (const { commands } of PUBLISH) for (const command of commands(next)) console.log(`  ${command}`);
+for (const { commands } of PUBLISH) for (const command of commands(next, gem)) console.log(`  ${command}`);
 for (const old of options.deprecate) {
   for (const name of NPM_PACKAGES) console.log(`  npm deprecate "${name}@${old}" "Upgrade to ${next}"`);
 }
