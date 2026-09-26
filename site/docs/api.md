@@ -17,6 +17,7 @@ order: 12
 | `retention` | `"30d"` | how long finished runs are kept |
 | `defaults` | | `grace`, `timeout`, `timezone`, `failuresBeforeAlert` applied to every job |
 | `redact` | secret patterns | `(text) => string` applied to output and errors before they are stored or sent; `false` keeps them as logged |
+| `deliver` | `"now"` | `"check"` sends nothing from this process: alerts are queued in the store and the next check in a process that delivers now sends them, with triage. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send) |
 | `onError` | console | `(error, where) => void` for failures outside jobs: the store, a channel, triage |
 | `now` | `Date.now` | the clock; for tests |
 

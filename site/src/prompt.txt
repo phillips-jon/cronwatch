@@ -66,7 +66,13 @@ Rules for you:
 - Do not add a retry loop or an uptime ping. CronWatch records what happened; it
   does not re-run work.
 - If this project already has a dashboard route or auth, mount cw.routes()
-  behind that auth rather than exposing it.
+  behind that auth with cw.routes({ token: null }) rather than exposing it.
+- Make sure the process that runs the check knows every job it should expect,
+  or a job that never starts at all goes unnoticed. If installs differ, declare
+  a job there only where that install runs it.
+- A job that runs where the network or the app's secrets are unavailable gets
+  its own client with deliver: "check" and the same store; the next check sends
+  its alerts.
 
 Docs: https://cronwatch.dev/docs/
 MCP server for agents: npx -y @cronwatch/mcp

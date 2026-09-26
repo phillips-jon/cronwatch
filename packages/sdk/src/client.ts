@@ -89,6 +89,14 @@ export interface CronWatchOptions {
    * keep output exactly as logged.
    */
   redact?: ((text: string) => string) | false;
+  /**
+   * "now" (the default) sends alerts from this process. "check" sends nothing
+   * from here: each alert is queued in the store and the next check, in a
+   * process that delivers now, sends it (with triage). For a process that
+   * records runs but cannot reach the network, such as a sandboxed backup job.
+   * Its `alerts` and `triage` are not used.
+   */
+  deliver?: "now" | "check";
   /** Called with anything that goes wrong outside a job: the store failing, an alert channel failing, a triage timeout. */
   onError?: (error: unknown, where: string) => void;
   /** The clock. Tests use this. */
@@ -169,6 +177,8 @@ export class CronWatch {
   /** cronSecret was passed as null: handlers may run without a secret. */
   private readonly secretOptOut: boolean;
   private readonly redact: (text: string) => string;
+  /** "check": queue alerts for another process's check instead of sending them. See CronWatchOptions.deliver. */
+  private readonly deferDelivery: boolean;
   private readonly defaults: NonNullable<CronWatchOptions["defaults"]>;
   private readonly definitions = new Map<string, JobDefinition>();
   private readonly synced = new Set<string>();
@@ -193,6 +203,10 @@ export class CronWatch {
     this.defaults = options.defaults ?? {};
     this.now = options.now ?? (() => Date.now());
     this.redact = options.redact === false ? (text) => text : (options.redact ?? redactSecrets);
+    if (options.deliver !== undefined && options.deliver !== "now" && options.deliver !== "check") {
+      throw new Error(`deliver must be "now" or "check", not ${JSON.stringify(options.deliver)}`);
+    }
+    this.deferDelivery = options.deliver === "check";
     this.onError = options.onError ?? ((error, where) => console.error(`[cronwatch] ${where}:`, error));
   }
 
@@ -647,8 +661,12 @@ export class CronWatch {
     const failed: Alert[] = [];
     for (const draft of drafts) {
       const alert = composeAlert(draft, definition, now);
-      if (this.triage && alert.type !== "recovered") await this.addTriage(alert);
-      (await this.deliver(alert) ? delivered : failed).push(alert);
+      if (this.deferDelivery) {
+        failed.push(alert);
+      } else {
+        if (this.triage && alert.type !== "recovered") await this.addTriage(alert);
+        (await this.deliver(alert) ? delivered : failed).push(alert);
+      }
       composed.push(alert);
     }
     await this.recordDelivery(definition.name, delivered, failed, now);
@@ -658,10 +676,14 @@ export class CronWatch {
   /** Send the alerts that no channel accepted last time, once each. */
   private async retryUndelivered(name: string, state: JobState, now: number): Promise<Alert[]> {
     const pending = state.undelivered ?? [];
-    if (pending.length === 0 || isSilenced(state, now)) return [];
+    if (pending.length === 0 || isSilenced(state, now) || this.deferDelivery) return [];
     const delivered: Alert[] = [];
     const failed: Alert[] = [];
-    for (const alert of pending) (await this.deliver(alert) ? delivered : failed).push(alert);
+    for (const alert of pending) {
+      // An alert queued by a process that delivers at check time was never triaged.
+      if (this.triage && alert.type !== "recovered" && alert.triage === undefined) await this.addTriage(alert);
+      (await this.deliver(alert) ? delivered : failed).push(alert);
+    }
     await this.recordDelivery(name, delivered, failed, now);
     return delivered;
   }
