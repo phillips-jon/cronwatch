@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { cronwatch } from "../src/index.js";
 import { capture, clock, HOUR } from "./helpers.js";
@@ -9,7 +10,7 @@ function app(onError?: (error: unknown, where: string) => void) {
   const routes = cw.routes({ token: "tok", basePath: "/cronwatch" });
   const send = (method: string, path: string, headers: Record<string, string> = {}, body?: string) =>
     routes.handler(new Request(`http://app.test${path}`, { method, headers, body }));
-  const cookie = { cookie: "cronwatch_token=tok" };
+  const cookie = { cookie: `cronwatch_token=${createHash("sha256").update("cronwatch-cookie:tok").digest("hex")}` };
   const bearer = { authorization: "Bearer tok" };
   return { cw, c, routes, send, cookie, bearer };
 }

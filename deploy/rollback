@@ -30,7 +30,7 @@ if [ -z "$target" ] || [ ! -f "$target/.release-ok" ] || [ "$(readlink -f "$targ
 fi
 
 # Never at the same time as a deploy.
-exec 9>"/tmp/${SITE//./-}-deploy.lock"
+exec 9>"$RELEASES/.deploy.lock"   # not /tmp, where any local user could pre-create or symlink it
 flock -n 9 || { echo "A deploy is running; try again when it finishes." >&2; exit 1; }
 
 ln -sfn "$target" "$LIVE.next"

@@ -1,17 +1,17 @@
 <section class="opening">
   <h1 class="say"><b>CronWatch</b> records every run of your scheduled jobs in your own database, and speaks up when one is missed, fails, gets stuck, runs slow or costs too much.</h1>
-  <p class="then">It is a TypeScript library, not a service. No server to run, no account to make, and no copy of your job output on anybody else’s machine. <a href="{{GITHUB}}">MIT licensed</a> and small enough to read in an afternoon.</p>
+  <p class="then">It is a TypeScript library, not a service. No server to run, no account to make, and run history that never leaves your database. Output tails go only to the alert channels you pick, and to Anthropic only if you turn on triage. <a href="{{GITHUB}}">MIT licensed</a> and small enough to read in an afternoon.</p>
   <div class="install"><code translate="no">npm install @cronwatch/sdk</code><button class="copy" type="button" aria-label="Copy the install command">Copy</button></div>
   <div class="actions">
     <button class="prompt-btn" type="button" data-prompt aria-label="Copy the setup instructions for a coding agent">Copy setup prompt for your AI</button>
-    <p class="prompt-note">Paste it into Claude Code, Cursor or any coding agent and it will wire up every job in your project. Also at <a href="/prompt.txt">/prompt.txt</a>.</p>
+    <p class="prompt-note">Paste it into any coding agent to wire up every job. Also at <a href="/prompt.txt">/prompt.txt</a>.</p>
   </div>
 </section>
 
 <section class="row day">
   <p class="label">Runs</p>
   <div class="body">
-    <h2>Every run six jobs made today, against every run they owed.</h2>
+    <h2>Six jobs, one day: what was due, and what ran.</h2>
     <div class="scroll">{{STRIP}}</div>
     <p class="small">Each faint tick is a moment a job was <b>due</b>, worked out from its schedule by the same parser the library uses, so you can read a job’s cadence straight off its row: one a day, one every half hour, one every quarter of an hour. Each solid mark is a run it actually recorded, as wide as the run took. The gap between those two things is the entire product. {{DAY_META}}, and every mark is real output, not a mockup.</p>
   </div>
@@ -30,9 +30,10 @@
         </div>
       </figure>
       <div class="arrow" aria-hidden="true">
-        <svg viewBox="0 0 78 46" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" focusable="false">
-          <path d="M7 32.4c7.6-6.2 15.1-8.9 22.6-8 4.8.6 8.2 2.4 12.7 2.8 6.1.5 11.7-2 17.6-6.3"/>
-          <path d="M52.4 12.2c3 3.1 5.6 5.5 8.3 7.7-3 1.8-5.8 3.9-8.5 6.8"/>
+        <svg viewBox="0 4 80 36" fill="currentColor" focusable="false">
+          <path d="M4.5 34.4L5.5 33.3L6.6 32.2L7.7 31.1L8.8 30L10 29L11.1 27.9L12.3 26.9L13.5 25.9L14.7 24.9L16 23.9L17.2 22.9L18.5 22L19.7 21.2L21 20.4L22.3 19.6L23.6 18.9L25 18.3L26.3 17.7L27.7 17.1L29 16.7L30.4 16.3L31.8 15.9L33.3 15.7L34.7 15.4L36.2 15.2L37.6 15.1L39.1 15L40.6 15L42.2 15L43.7 15L45.3 15.1L46.8 15.2L48.4 15.4L50 15.6L51.6 15.9L53.2 16.1L54.9 16.5L56.5 16.9L58.2 17.3L59.9 17.8L61.5 18.4L63.2 19L64.9 19.6L66.7 20.3L68.4 21L70.1 21.9L71.9 22.7L73.7 23.6L74.3 22.4L72.6 21.3L70.9 20.4L69.2 19.4L67.4 18.6L65.7 17.8L64 17L62.3 16.3L60.6 15.7L58.8 15.1L57.1 14.6L55.4 14.1L53.8 13.7L52.1 13.3L50.4 13L48.8 12.8L47.1 12.6L45.5 12.4L43.8 12.3L42.2 12.2L40.6 12.2L39 12.2L37.4 12.3L35.9 12.5L34.3 12.7L32.8 12.9L31.2 13.2L29.7 13.6L28.2 14.1L26.7 14.6L25.3 15.2L23.8 15.8L22.4 16.6L21 17.4L19.7 18.2L18.3 19.1L17 20.1L15.8 21.1L14.5 22.1L13.3 23.2L12.1 24.2L10.9 25.4L9.8 26.5L8.7 27.6L7.6 28.8L6.5 30L5.5 31.2L4.5 32.4L3.5 33.6Z"/>
+          <path d="M74.2 21.7L73.4 21.6L72.6 21.6L71.8 21.6L71 21.6L70.1 21.6L69.3 21.6L68.5 21.6L67.7 21.7L66.9 21.7L66 21.8L65.2 21.8L64.4 21.9L63.5 22L62.7 22.1L61.8 22.2L61 22.4L61 22.8L61.9 22.8L62.7 22.9L63.5 23L64.4 23L65.2 23.1L66 23.2L66.8 23.2L67.6 23.3L68.4 23.4L69.2 23.5L70 23.6L70.8 23.8L71.5 23.9L72.3 24L73.1 24.2L73.8 24.3Z"/>
+          <path d="M75 22.1L74.5 21.6L74 21.2L73.5 20.7L73 20.2L72.6 19.7L72.1 19.1L71.6 18.6L71.2 18.1L70.7 17.5L70.3 17L69.8 16.4L69.4 15.8L68.9 15.3L68.5 14.7L68 14.1L67.5 13.5L67.2 13.7L67.5 14.4L67.8 15.1L68.1 15.8L68.4 16.4L68.7 17.1L69.1 17.7L69.4 18.4L69.8 19L70.2 19.7L70.6 20.3L70.9 20.9L71.3 21.5L71.7 22.1L72.2 22.7L72.6 23.3L73 23.9Z"/>
         </svg>
       </div>
       <figure class="side">
@@ -43,7 +44,7 @@
         </div>
       </figure>
     </div>
-    <p class="small">A handler that answers 4xx or 5xx counts as failed too, and so does a run whose output does not contain what you told it to <code>expect</code>: the job that exits cleanly and did nothing. With a Claude key, a two-sentence diagnosis rides along.</p>
+    <p class="small">A handler that answers 4xx or 5xx counts as failed too, and so does a run whose output does not contain what you told it to <code>expect</code>: the job that exits cleanly and did nothing. Configure <code>triage: anthropic()</code> with a Claude key and a diagnosis of two to four sentences rides along.</p>
   </div>
 </section>
 
@@ -55,7 +56,7 @@
     <div class="out code">
       <p class="from"><span translate="no">app/api/cron/nightly/route.ts</span><span>TypeScript</span></p>
 <pre><code translate="no"><span class="k">import</span> { cronwatch } <span class="k">from</span> <span class="s">"@cronwatch/sdk"</span>;
-<span class="k">import</span> { sqlite } <span class="k">from</span> <span class="s">"@cronwatch/sdk/sqlite"</span>;
+<span class="k">import</span> { sqlite } <span class="k">from</span> <span class="s">"@cronwatch/sdk/sqlite"</span>;  <span class="c">// npm install better-sqlite3</span>
 <span class="k">import</span> { slack } <span class="k">from</span> <span class="s">"@cronwatch/sdk/slack"</span>;
 
 <span class="k">const</span> cw = cronwatch({
@@ -73,7 +74,7 @@
   job.log(<span class="s">"Report written:"</span>, report.path);
 });</code></pre>
     </div>
-    <p class="small">Vercel cron, Next.js, node-cron, BullMQ, GitHub Actions, Hono, Bun, or a script from crontab. Anywhere a fetch handler or an async function runs.</p>
+    <p class="small">Vercel cron, Next.js, node-cron, BullMQ, GitHub Actions, Hono, Bun with the Postgres store, or a script from crontab. Anywhere a fetch handler or an async function runs.</p>
   </div>
 </section>
 
@@ -85,21 +86,21 @@
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_MISSED}}</span></p><pre translate="no">{{ALERT_MISSED}}</pre></div>
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_BUDGET}}</span></p><pre translate="no">{{ALERT_BUDGET}}</pre></div>
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_RECOVERED}}</span></p><pre translate="no">{{ALERT_RECOVERED}}</pre></div>
-    <p class="small">Every condition sends one message when it opens and one when the next run succeeds. A job that fails all night pages you once, and the fix announces itself. The check runs from <code>cw.start()</code> in a long-running server, or from a cron hitting <code>/cronwatch/api/check</code> on Vercel.</p>
+    <p class="small">Every condition sends one message when it opens. When a successful run leaves nothing open, one recovered message names everything that was. A job that fails all night pages you once, and the fix announces itself. The check runs from <code>cw.start()</code> in a long-running server, or from a cron hitting <code>/cronwatch/api/check</code> on Vercel.</p>
   </div>
 </section>
 
 <section class="row">
   <p class="label">Conditions</p>
   <div class="body">
-    <h2>Six conditions. That is the whole product.</h2>
+    <h2>Five conditions and a recovery. That is the whole product.</h2>
     <ul class="catches">
       <li><code class="warn">missed</code><span>A run was due and none started within the grace period. Cron expressions, <code>@hourly</code>, or <code>every 15m</code>, in any timezone.</span></li>
       <li><code class="bad">failed</code><span>The function threw, the handler answered 4xx or 5xx, or the output did not satisfy <code>expect</code>.</span></li>
       <li><code class="bad">stuck</code><span>A run started and never reported finishing. A killed process, a serverless timeout, a deploy mid-run.</span></li>
       <li><code class="warn">slow</code><span>A successful run took longer than <code>maxDuration</code>, or more than twice the job’s own recent p95.</span></li>
-      <li><code class="warn">over_budget</code><span>A number you reported with <code>job.metric()</code> went above its ceiling, or three times its usual median.</span></li>
-      <li><code class="ok">recovered</code><span>A run succeeded after any of the above. One message, naming what it recovered from.</span></li>
+      <li><code class="warn">over_budget</code><span>On a successful run, a number you reported with <code>job.metric()</code> went above its ceiling, or three times its usual median.</span></li>
+      <li><code class="ok">recovered</code><span>A successful run left nothing open. One message, naming everything that was.</span></li>
     </ul>
   </div>
 </section>
@@ -129,7 +130,7 @@
   <p class="label">Dashboard</p>
   <div class="body">
     <h2>And a dashboard, mounted inside your app.</h2>
-    <p>At <code>/cronwatch</code>, behind whatever auth you already have. The same records the agent reads, with the run history, output and metrics of every job.</p>
+    <p>At <code>/cronwatch</code>, behind a token you set in <code>CRONWATCH_TOKEN</code>, not your app’s own auth. The same records the agent reads, with the run history, output and metrics of every job.</p>
     <div class="out">
       <p class="from"><span translate="no">/cronwatch</span><span>{{BOARD_META}}</span></p>
       {{JOBS_BOARD}}

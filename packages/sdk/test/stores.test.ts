@@ -75,9 +75,10 @@ async function conformance(name: string, make: () => Store, skip: string | false
     await store.setState({ job: "a", open: {}, consecutiveFailures: 0, silencedUntil: 99, lastAlertAt: 6 });
 
     await store.insertRun(run("r5", "a", "running", 500));
-    assert.equal(await store.prune(2500), 3, "r1, r2 and b's r4 pruned; running r5 kept");
+    assert.equal(await store.prune(2500), 2, "r1 and r2 pruned; running r5 kept, and b's r4 kept as b's newest run");
     assert.deepEqual((await store.listRuns("a", 10)).map((r) => r.id), ["r3", "r5"]);
-    assert.deepEqual(await store.listRuns("b", 10), []);
+    assert.deepEqual((await store.listRuns("b", 10)).map((r) => r.id), ["r4"]);
+    assert.equal(await store.prune(1_000_000), 0, "however old, each job keeps its newest run, and running runs stay");
 
     await store.deleteJob("a");
     assert.equal(await store.getJob("a"), null);

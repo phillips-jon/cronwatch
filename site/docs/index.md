@@ -99,7 +99,7 @@ import { cw } from "@/lib/cronwatch";
 export const { GET, POST, DELETE } = cw.routes();
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without a token the routes are open only when `NODE_ENV` is `development` or `test` (or you pass `token: null`), and answer 503 everywhere else.
+Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without a token the routes answer only `localhost` while `NODE_ENV` is `development` or `test` (or you pass `token: null`), and answer 503 everywhere else.
 
 ## Run the check
 

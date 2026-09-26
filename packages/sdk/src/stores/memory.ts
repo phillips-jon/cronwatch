@@ -78,9 +78,13 @@ export function memory(): Store {
       states.set(state.job, clone(state));
     },
     async prune(before) {
+      // Each job's newest run is kept whatever its age: without it, a job
+      // that runs less often than the retention looks like it never ran.
+      const newest = new Map<string, number>();
+      for (const run of runs.values()) newest.set(run.job, Math.max(newest.get(run.job) ?? -Infinity, run.startedAt));
       let n = 0;
       for (const [id, run] of runs) {
-        if (run.status !== "running" && run.startedAt < before) {
+        if (run.status !== "running" && run.startedAt < before && run.startedAt < newest.get(run.job)!) {
           runs.delete(id);
           order.delete(id);
           n++;

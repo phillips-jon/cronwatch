@@ -136,7 +136,7 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .out .prompt { color: var(--ink); font-weight: 600; }
 .out .prompt::before { content: "> "; color: var(--muted); font-weight: 400; }
 .out.tall pre { max-height: 440px; overflow-y: auto; }
-.pair { display: grid; grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1.28fr); align-items: stretch; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1.28fr); align-items: stretch; margin-top: 34px; }
 .pair .side { display: flex; flex-direction: column; margin: 0; min-width: 0; }
 .pair .side figcaption { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
 .pair .side figcaption b { color: var(--ink); font-weight: 500; }
@@ -145,7 +145,7 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .pair .silence { flex: 1; display: grid; place-items: center; min-height: 140px; padding: 24px 16px; }
 .pair .silence span { font: 400 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
 .pair .arrow { display: grid; place-items: center; color: var(--muted); margin-top: 26px; }
-.pair .arrow svg { width: 86px; height: auto; overflow: visible; }
+.pair .arrow svg { width: 74px; height: auto; overflow: visible; }
 
 /* The day, drawn from the library's own records. */
 .day .scroll { overflow-x: auto; margin-left: -190px; }
@@ -243,7 +243,7 @@ footer button:hover { color: var(--ink); }
   .row { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .day .scroll { margin-left: 0; }
   .row > .label { padding-top: 0; }
-  .pair { grid-template-columns: minmax(0, 1fr); }
+  .pair { grid-template-columns: minmax(0, 1fr); margin-top: 24px; }
   .pair .side + .side figcaption { margin-top: 0; }
   .pair .silence { min-height: 92px; }
   .pair .arrow { margin: 10px 0 14px; justify-items: start; }

@@ -28,7 +28,7 @@ Each `cw.check()` counts forward from the job's last run:
 
 1. Finds the **due time**: the first time the schedule fires after the last run started. A run covers a fire it started up to one minute before (schedulers sometimes fire a touch early), so a run at 01:59:30 counts for 02:00 and the next day's 02:00 is due. For a cron that fires more often than every two minutes, that slack shrinks to half the gap between fires, so one run never covers two. For an interval, the due time is the last run's start plus the interval.
 2. Adds `grace` (default `10m`) to get the **deadline**.
-3. If now is past the deadline, the job is **missed**.
+3. If now is past the deadline, the job is **missed**. An interval job whose last run is still going is busy, not missed; **stuck** covers a run that never ends.
 
 Because the due time comes from the last run rather than from the latest fire, a job that runs more often than its grace (every five minutes with the default ten minutes of grace) is still caught, and so is a cron that fires once a year.
 
@@ -42,7 +42,7 @@ A cron read in a timezone with daylight saving follows that zone's clock. When c
 
 ## Timeouts and stuck runs
 
-Every run is recorded as `running` when it starts. Normally it is updated to `ok` or `failed` within the same call. If the process dies first, the row stays `running`. Each check marks any run older than the job's `timeout` (default `1h`) as `timeout`, counts it as a failure, and opens a **stuck** condition. The next run's start closes it, and the next successful run sends the recovery.
+Every run is recorded as `running` when it starts. Normally it is updated to `ok` or `failed` within the same call. If the process dies first, the row stays `running`. Each check marks any run older than the job's `timeout` (default `1h`) as `timeout`, counts it as a failure, and opens a **stuck** condition. The next run's start closes it, and the next successful run sends the recovery. If the timed-out run does finish later, a success closes stuck and recovers, and a failure is not counted a second time.
 
 Inside the process, `job.signal` is an `AbortSignal` that fires when the timeout elapses, so work that can stop early may honour it; nothing is killed for you.
 

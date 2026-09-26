@@ -26,8 +26,7 @@ export function slack(options: SlackOptions): AlertChannel {
     async send(alert) {
       const url = options.link?.(alert);
       const title = `${EMOJI[alert.type]} *${escape(alert.title)}*${url ? ` (<${url}|open>)` : ""}`;
-      const body = codeBlockSafe(escape(alert.message).slice(0, 2800));
-      const triage = alert.triage ? `\n_Triage:_ ${escape(alert.triage)}` : "";
+      const body = codeBlockSafe(escape(alert.message)).slice(0, 2900);
       const response = await fetch(options.webhookUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -37,7 +36,9 @@ export function slack(options: SlackOptions): AlertChannel {
           text: escape(`${alert.title}\n${alert.message}`),
           blocks: [
             { type: "section", text: { type: "mrkdwn", text: title } },
-            { type: "section", text: { type: "mrkdwn", text: "```" + body + "```" + triage } },
+            { type: "section", text: { type: "mrkdwn", text: "```" + body + "```" } },
+            // Its own block, so a long diagnosis cannot push a block past Slack's 3000 character limit.
+            ...(alert.triage ? [{ type: "section", text: { type: "mrkdwn", text: `_Triage:_ ${escape(alert.triage)}`.slice(0, 3000) } }] : []),
           ],
         }),
       });

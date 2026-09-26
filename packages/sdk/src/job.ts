@@ -1,4 +1,4 @@
-import { capOutput } from "./output.js";
+import { capOutput, OUTPUT_CAP } from "./output.js";
 import type { Run } from "./types.js";
 
 /** What a job function receives. */
@@ -18,6 +18,12 @@ export interface JobContext {
 export interface RunRecorder {
   context: JobContext;
   output(): string | null;
+  /**
+   * What an expect rule is checked against: everything logged, or when that
+   * ran long, the first 16 KB and the last 16 KB. The stored output keeps only
+   * the tail, so a "done" line printed early would otherwise be lost.
+   */
+  expectText(): string | null;
   metrics(): Record<string, number>;
   abort(): void;
 }
@@ -35,6 +41,9 @@ function stringify(part: unknown): string {
 export function createRecorder(run: Run): RunRecorder {
   const lines: string[] = [];
   let size = 0;
+  const head: string[] = [];
+  let headSize = 0;
+  let dropped = false;
   const metrics: Record<string, number> = {};
   const controller = new AbortController();
 
@@ -45,11 +54,16 @@ export function createRecorder(run: Run): RunRecorder {
     signal: controller.signal,
     log(...parts) {
       const line = parts.map(stringify).join(" ");
+      if (headSize < OUTPUT_CAP) {
+        head.push(line);
+        headSize += line.length + 1;
+      }
       lines.push(line);
       size += line.length + 1;
       // Drop from the front once well past the cap; capOutput trims exactly at the end.
       while (size > 64 * 1024 && lines.length > 1) {
         size -= lines.shift()!.length + 1;
+        dropped = true;
       }
     },
     metric(name, value) {
@@ -66,6 +80,12 @@ export function createRecorder(run: Run): RunRecorder {
   return {
     context,
     output: () => (lines.length === 0 ? null : capOutput(lines.join("\n"))),
+    expectText: () => {
+      if (lines.length === 0) return null;
+      const all = lines.join("\n");
+      if (!dropped && all.length <= 2 * OUTPUT_CAP) return all;
+      return head.join("\n").slice(0, OUTPUT_CAP) + "\n" + all.slice(-OUTPUT_CAP);
+    },
     metrics: () => ({ ...metrics }),
     abort: () => controller.abort(),
   };

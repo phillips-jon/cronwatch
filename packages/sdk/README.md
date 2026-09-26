@@ -60,16 +60,21 @@ await nightlyReport.run(async (job) => { /* ... */ });
 cw.start();
 ```
 
+```ts
+// app/cronwatch/[[...path]]/route.ts: dashboard and JSON API, behind CRONWATCH_TOKEN
+export const { GET, POST, DELETE } = cw.routes();
+```
+
 ## What it catches
 
 - **missed**: the schedule said a run was due and none started within the grace period
 - **failed**: the function threw, the handler returned 4xx or 5xx, or the output did not satisfy `expect`
 - **stuck**: a run started and never reported finishing within `timeout`
 - **slow**: a successful run took longer than `maxDuration`, or twice the job's recent p95
-- **over_budget**: a metric went above its `budget` ceiling, or three times its usual median
-- **recovered**: a run succeeded after any of the above
+- **over_budget**: on a successful run, a metric went above its `budget` ceiling, or three times its usual median
+- **recovered**: a successful run left nothing open; one message names everything that was
 
-Each condition alerts once when it opens, and is answered by one recovered message once a run succeeds again.
+Each condition alerts once when it opens. When a successful run leaves nothing open, one recovered message names everything that closed.
 
 ## Entry points
 

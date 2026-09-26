@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { CronWatch } from "../client.js";
 import { constantTimeEqual, json } from "../http.js";
 import { parseDuration } from "../duration.js";
@@ -9,8 +10,8 @@ export interface RoutesOptions {
    * Required to reach anything. Send it as `Authorization: Bearer <token>`,
    * or open the dashboard once with `?token=<token>` and a cookie is set.
    * Defaults to process.env.CRONWATCH_TOKEN; an empty string counts as unset.
-   * With no token, the routes are open only when NODE_ENV is "development" or
-   * "test" and answer 503 otherwise. Pass `null` to opt out and serve them
+   * With no token, the routes answer only requests to localhost while NODE_ENV
+   * is "development" or "test", and 503 otherwise. Pass `null` to opt out and serve them
    * open everywhere, for example behind your own auth.
    *
    * The check endpoint (/api/check) also accepts the client's cronSecret, so
@@ -32,6 +33,13 @@ export interface Routes {
 }
 
 const COOKIE = "cronwatch_token";
+
+/** The cookie holds a digest of the token, so a leaked cookie does not reveal the bearer token itself. */
+function cookieValue(token: string): string {
+  return createHash("sha256").update(`cronwatch-cookie:${token}`).digest("hex");
+}
+
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const DEFAULT_RUNS = 20;
 const MAX_RUNS = 500;
 
@@ -121,14 +129,16 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
   const optedOut = options.token === null;
   const token = optedOut ? null : (options.token || process.env.CRONWATCH_TOKEN || null);
   const base = (options.basePath ?? "/cronwatch").replace(/\/+$/, "");
-  const openWithoutToken = optedOut || process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  const developing = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
 
   const serve = async (request: Request, url: URL, path: string, wantsHtml: boolean): Promise<Response> => {
     const method = request.method.toUpperCase();
 
-    if (!token && !openWithoutToken) {
+    // No token: fail closed, except for a developer on their own machine. The
+    // Host check also stops a DNS-rebinding page from reaching a dev server.
+    if (!token && !optedOut && !(developing && LOOPBACK.has(url.hostname))) {
       return wantsHtml
-        ? html(messagePage("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token to cw.routes()) to use them outside development.", base), 503)
+        ? html(messagePage("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token to cw.routes()). Without one the routes only answer localhost in development.", base), 503)
         : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503);
     }
 
@@ -143,10 +153,13 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
       // ?token= is only the sign-in that moves the token into a cookie.
       const query = wantsHtml && method === "GET" ? url.searchParams.get("token") : null;
       const cookie = readCookie(request, COOKIE);
-      const presented = bearer ?? query ?? cookie;
       const isCheck = path === "/api/check";
       const cronSecretOk = isCheck && bearer !== null && cw.cronSecret !== null && constantTimeEqual(bearer, cw.cronSecret);
-      if (!cronSecretOk && (presented === null || !constantTimeEqual(presented, token))) {
+      const tokenOk =
+        bearer !== null ? constantTimeEqual(bearer, token)
+        : query !== null ? constantTimeEqual(query, token)
+        : cookie !== null && constantTimeEqual(cookie, cookieValue(token));
+      if (!cronSecretOk && !tokenOk) {
         return wantsHtml
           ? html(messagePage("Sign in", `Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.`, base), 401)
           : api({ ok: false, error: "Unauthorized" }, 401);
@@ -156,7 +169,7 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
         url.searchParams.delete("token");
         const secure = url.protocol === "https:" ? "; Secure" : "";
         return redirect(url.pathname + (url.search || ""), {
-          "set-cookie": `${COOKIE}=${encodeURIComponent(token)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`,
+          "set-cookie": `${COOKIE}=${cookieValue(token)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`,
         });
       }
     }
@@ -220,6 +233,7 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
           return api({ ok: true, job, runs: await cw.runs(name, runsLimit(url.searchParams.get("runs"))) });
         }
         if (method === "DELETE") {
+          if (!(await cw.jobSummary(name))) return api({ ok: false, error: "No such job" }, 404);
           await cw.forget(name);
           return api({ ok: true });
         }
