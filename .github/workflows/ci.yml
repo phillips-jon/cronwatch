@@ -1,7 +1,8 @@
 # Every push and pull request: the dash check (files and commit messages),
 # typecheck, tests, a build, and the packed packages used from a scratch
 # project, on the two Node majors better-sqlite3 13 supports. The Ruby gem's
-# tests run on the oldest and newest Ruby it supports.
+# tests run on the oldest and newest Ruby it supports, against each
+# supported Rails series.
 # A green run on main is what lets deploy.yml ship the site.
 name: CI
 
@@ -70,12 +71,22 @@ jobs:
       - run: npm run check:packages
 
   # The gem's tests replay conformance/ and compare against the built SDK, so
-  # the SDK is built first. Postgres store tests run against the service.
+  # the SDK is built (and the fixtures checked) first. Postgres store tests run against the service.
+  # Each supported Rails series runs from its own Gemfile in
+  # test/rails/gemfiles; setup-ruby's bundler-cache reads BUNDLE_GEMFILE
+  # from the job's environment.
   ruby:
+    name: ruby (Ruby ${{ matrix.ruby }}, Rails ${{ matrix.rails }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        ruby: ["3.2", "3.4"]
+        include:
+          - { ruby: "3.2", rails: "7.2", gemfile: rails_7_2 }
+          - { ruby: "3.4", rails: "8.0", gemfile: rails_8_0 }
+          - { ruby: "3.4", rails: "8.1", gemfile: rails_8_1 }
+          - { ruby: "4.0", rails: "8.1", gemfile: rails_8_1 }
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/packages/ruby/test/rails/gemfiles/${{ matrix.gemfile }}.gemfile
     services:
       postgres:
         image: postgres:16-alpine
@@ -92,7 +103,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm run build --workspace packages/sdk
+      # Builds the SDK, then fails if conformance/ or the dashboard fixture
+      # (packages/ruby/test/web/golden.json) is stale.
+      - run: npm run check:conformance
       - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
         with:
           ruby-version: ${{ matrix.ruby }}

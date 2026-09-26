@@ -75,7 +75,7 @@ class NightlyReportJob < ApplicationJob
 end
 ```
 
-`bin/rails generate cronwatch:install` adds the migration and initializer; schedule `Cronwatch::CheckJob` every five minutes and mount `Cronwatch::Web` for the dashboard. See [packages/ruby](packages/ruby) and [cronwatch.dev/docs/rails](https://cronwatch.dev/docs/rails/). The TypeScript SDK is the source of truth: `npm run conformance` generates cases in `conformance/` that the gem's tests replay.
+`gem "cronwatch"` in a Rails app loads the Rails integration. `bin/rails generate cronwatch:install` adds the migration and the initializer (which sets the ActiveRecord store) and prints the rest: schedule `Cronwatch::CheckJob` every five minutes (or `bin/rails cronwatch:check` from a crontab), and `require "cronwatch/web"` and mount `Cronwatch::Web` for the dashboard. Ruby 3.2 or newer; tested on Rails 7.2, 8.0 and 8.1. See [packages/ruby](packages/ruby) and [cronwatch.dev/docs/rails](https://cronwatch.dev/docs/rails/). The TypeScript SDK is the source of truth: `npm run conformance` generates cases in `conformance/` that the gem's tests replay.
 
 ## Why a library and not a service
 
@@ -94,13 +94,15 @@ npm run check:packages # pack both packages and use them from a scratch project 
 npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem
 ```
 
-The gem (Ruby 3.2 or newer):
+The gem (Ruby 3.2 or newer), after `npm run build` so its Node compatibility tests can run:
 
 ```bash
 cd packages/ruby
 bundle install
 bundle exec rake test
 ```
+
+[Its README](packages/ruby/README.md#testing) has the rest: Postgres, each Rails series, the dashboard fixture and the MCP cross test.
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 

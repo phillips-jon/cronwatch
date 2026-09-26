@@ -24,7 +24,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "cronwatch-mcp": "./dist/cli.js"
+    "cronwatch-mcp": "dist/cli.js"
   },
   "files": ["dist", "README.md", "LICENSE"],
   "scripts": {

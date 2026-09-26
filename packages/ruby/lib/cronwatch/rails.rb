@@ -4,8 +4,8 @@
 # Cronwatch::CheckJob and the `cronwatch:install` generator. Needs railties
 # and activejob; the ActiveRecord store loads on first use.
 #
-#   # Gemfile
-#   gem "cronwatch", require: "cronwatch/rails"
+# `gem "cronwatch"` loads this file on its own when Rails is already loaded,
+# as it is under Bundler.require; require it by hand only otherwise.
 require "cronwatch" unless defined?(Cronwatch::Client) # loaded from cronwatch.rb when Rails is already up
 require "rails"
 require "active_job"

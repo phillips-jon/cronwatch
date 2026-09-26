@@ -19,7 +19,7 @@
     "build:site": "npm run build --workspace site",
     "check": "npm run check:dashes && npm run typecheck && npm test && npm run check:conformance",
     "conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs",
-    "check:conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs --check",
+    "check:conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs --check && TZ=UTC node packages/ruby/test/web/golden.mjs --check",
     "check:packages": "node scripts/check-packages.mjs"
   },
   "devDependencies": {
