@@ -1,10 +1,10 @@
 // The real CronWatch dashboard with seeded runs, so the site can show the
 // actual thing rather than a mockup. Needs packages/sdk built first.
 //
-//   node scripts/demo.mjs            serve it on http://localhost:4399/cronwatch/
-//   node scripts/demo.mjs --capture  write src/demo/alerts.txt, mcp.json,
-//                                    jobs.json and runs.json, which the
-//                                    landing page quotes
+//   node site/scripts/demo.mjs            serve it on http://localhost:4399/cronwatch/
+//   node site/scripts/demo.mjs --capture  write src/demo/alerts.txt, mcp.json,
+//                                         jobs.json and runs.json, which the
+//                                         landing page quotes (run with TZ=UTC)
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -37,7 +37,11 @@ async function at(when, name, ms, fn) {
   } catch {}
 }
 
-const now = Date.now();
+// The demo day always ends at 22:42:19 UTC, the latest one already past, so
+// the night's jobs have all run (or failed to) whenever the capture is taken.
+const endOfDay = new Date(); endOfDay.setUTCHours(22, 42, 19, 0);
+if (endOfDay.getTime() > Date.now()) endOfDay.setUTCDate(endOfDay.getUTCDate() - 1);
+const now = endOfDay.getTime();
 const today = new Date(now); today.setUTCHours(0, 0, 0, 0);
 const T = (h, m = 0, dayOffset = 0) => today.getTime() + dayOffset * 86_400_000 + h * HOUR + m * MIN;
 
@@ -60,8 +64,11 @@ await at(T(4, 0), "daily-digest", 44_000, (j) => { j.metrics({ tokens: 131_000, 
 for (let i = 12; i >= 1; i--) {
   await at(now - (i - 1) * 15 * MIN - 5 * MIN, "embeddings-refresh", 240_000 + i * 1000, (j) => { j.metric("documents", 1_800 + i); });
 }
-for (let i = 6; i >= 2; i--) {
-  await at(now - i * 30 * MIN - 10_000, "sync-crm", 8_000, (j) => { j.metric("contacts", 120 + i); });
+// sync-crm stops: its last run was 35m30s ago, so with a 5m grace its
+// deadline passed 30s before the check below, which is when a server calling
+// cw.start() would have said so.
+for (let i = 5; i >= 1; i--) {
+  await at(now - (i - 1) * 30 * MIN - 35 * MIN - 30_000, "sync-crm", 8_000, (j) => { j.metric("contacts", 120 + i); });
 }
 // A backup that is running right now.
 clock = now - 2 * MIN;
@@ -141,8 +148,8 @@ if (process.argv.includes("--capture")) {
   server.close();
   writeFileSync(path.join(out, "mcp.json"), JSON.stringify(exchange, null, 2) + "\n");
 
-  // Later that morning the fix ships and invoice-run recovers.
-  await at(T(9, 41), "invoice-run", 19_600, (j) => { j.log("Loading 1,204 open invoices"); j.log("Sent 37 invoices"); j.metric("invoices", 37); });
+  // After the capture: the fix ships, and the next night's invoice run succeeds.
+  await at(T(3, 0, 1), "invoice-run", 19_600, (j) => { j.log("Loading 1,204 open invoices"); j.log("Sent 37 invoices"); j.metric("invoices", 37); });
   writeFileSync(path.join(out, "alerts.txt"), printed.join("\n\n") + "\n");
   console.log(`wrote ${out}/alerts.txt, mcp.json, jobs.json and runs.json`);
   await cw.close();

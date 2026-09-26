@@ -16,12 +16,13 @@ order: 12
 | `cronSecret` | `process.env.CRON_SECRET` | what `handler()` requires as a bearer. Empty counts as unset, and with none set handlers answer 503 outside development. `null` lets handlers run without one |
 | `retention` | `"30d"` | how long finished runs are kept |
 | `defaults` | | `grace`, `timeout`, `timezone`, `failuresBeforeAlert` applied to every job |
+| `redact` | secret patterns | `(text) => string` applied to output and errors before they are stored or sent; `false` keeps them as logged |
 | `onError` | console | `(error, where) => void` for failures outside jobs: the store, a channel, triage |
 | `now` | `Date.now` | the clock; for tests |
 
 ## cw.job(name, options)
 
-Names are 1 to 120 characters of letters, digits, `.`, `_`, `:` and `-`. Declaring the same name twice replaces the options. Options are checked when the job is declared: an unknown timezone, a zero `timeout` or `maxDuration`, a `failuresBeforeAlert` that is not a whole number of 1 or more, or a budget that is not a finite number of 0 or more all throw, rather than quietly turning a check off.
+Names are 1 to 120 characters, starting with a letter or digit, of letters, digits, `.`, `_`, `:` and `-`. Declaring the same name twice replaces the options. Options are checked when the job is declared: an unknown timezone, a zero `timeout` or `maxDuration`, a `failuresBeforeAlert` that is not a whole number of 1 or more, or a budget that is not a finite number of 0 or more all throw, rather than quietly turning a check off.
 
 | Option | Default | |
 |---|---|---|
@@ -61,7 +62,7 @@ Passed to your function.
 | `run(name, options?, fn)` | run without keeping a handle; declares the job on first use |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune. Returns `{ checkedAt, jobs, alerts, pruned }`. Concurrent calls share one check. |
 | `start(every = "1m")`, `stop()` | check on an interval |
-| `routes({ token?, basePath? })` | the [dashboard and API](/docs/dashboard/) handlers. `token` defaults to `CRONWATCH_TOKEN` (empty counts as unset); with none, the routes serve only when `NODE_ENV` is `development` or `test`, and `token: null` opts out to serve them open. Cross-site writes are refused, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400 |
+| `routes({ token?, basePath? })` | the [dashboard and API](/docs/dashboard/) handlers. `token` defaults to `CRONWATCH_TOKEN` (empty counts as unset); with none, the routes answer only `localhost` while `NODE_ENV` is `development` or `test`, and `token: null` opts out to serve them open. Cross-site writes are refused, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400 |
 | `jobs()` | every job's summary, without alerting |
 | `jobsWithRuns(limit = 20)` | every job's summary with its newest `limit` runs, read together: `{ job, runs }[]` |
 | `jobSummary(name)`, `getRun(id)` | |
@@ -75,4 +76,4 @@ Passed to your function.
 
 `@cronwatch/sdk`: `cronwatch`, `CronWatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails` and `ParsedSchedule`.
 
-`@cronwatch/sdk/sqlite`, `/postgres`, `/slack`, `/discord`, `/webhook`, `/anthropic`: one adapter each, with the driver as an optional peer dependency.
+`@cronwatch/sdk/sqlite`, `/postgres`, `/slack`, `/discord`, `/webhook`, `/anthropic`: one adapter each. `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies. `/anthropic` needs `@anthropic-ai/sdk`, which you install yourself. `/slack`, `/discord` and `/webhook` need nothing.

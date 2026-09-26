@@ -1,4 +1,4 @@
-import { parseDuration } from "./duration.js";
+import { formatDuration, parseDuration } from "./duration.js";
 import {
   BASELINE_WINDOW,
   hasFullBaseline,
@@ -17,7 +17,7 @@ import { composeAlert } from "./format.js";
 import { constantTimeEqual, json } from "./http.js";
 import { createRecorder } from "./job.js";
 import type { JobContext } from "./job.js";
-import { capOutput, errorMessage } from "./output.js";
+import { capOutput, errorMessage, redactSecrets } from "./output.js";
 import { parseSchedule } from "./schedule.js";
 import { checkExpectation, toStored } from "./serialize.js";
 import { createRoutes } from "./routes/index.js";
@@ -81,6 +81,14 @@ export interface CronWatchOptions {
   retention?: Duration;
   /** Applied to every job unless the job sets its own. */
   defaults?: Pick<JobOptions, "grace" | "timeout" | "timezone" | "failuresBeforeAlert">;
+  /**
+   * Applied to every run's output and error before it is stored, shown or
+   * sent to an alert channel or triage. The default blanks values that look
+   * like secrets (password=..., URL credentials, bearer tokens, AWS, GitHub,
+   * Slack, Stripe and API key formats). Pass your own function, or false to
+   * keep output exactly as logged.
+   */
+  redact?: ((text: string) => string) | false;
   /** Called with anything that goes wrong outside a job: the store failing, an alert channel failing, a triage timeout. */
   onError?: (error: unknown, where: string) => void;
   /** The clock. Tests use this. */
@@ -160,6 +168,7 @@ export class CronWatch {
   readonly onError: (error: unknown, where: string) => void;
   /** cronSecret was passed as null: handlers may run without a secret. */
   private readonly secretOptOut: boolean;
+  private readonly redact: (text: string) => string;
   private readonly defaults: NonNullable<CronWatchOptions["defaults"]>;
   private readonly definitions = new Map<string, JobDefinition>();
   private readonly synced = new Set<string>();
@@ -183,6 +192,7 @@ export class CronWatch {
     this.retentionMs = parseDuration(options.retention ?? "30d", "retention");
     this.defaults = options.defaults ?? {};
     this.now = options.now ?? (() => Date.now());
+    this.redact = options.redact === false ? (text) => text : (options.redact ?? redactSecrets);
     this.onError = options.onError ?? ((error, where) => console.error(`[cronwatch] ${where}:`, error));
   }
 
@@ -369,7 +379,8 @@ export class CronWatch {
       run.status = "failed";
       run.error = `HTTP ${result.status}${result.statusText ? ` ${result.statusText}` : ""}`;
     } else {
-      const unmet = checkExpectation(definition.expect, run.output);
+      const expectText = recorder.expectText() ?? (typeof result === "string" ? result : null);
+      const unmet = checkExpectation(definition.expect, expectText);
       if (unmet) {
         run.status = "failed";
         run.error = unmet;
@@ -377,6 +388,9 @@ export class CronWatch {
         run.status = "ok";
       }
     }
+    // Redacted after the expect check, so a rule can still match what was logged.
+    if (run.output !== null) run.output = this.redact(run.output);
+    if (run.error !== null) run.error = this.redact(run.error);
 
     await started;
     if (!recorded) {
@@ -389,11 +403,30 @@ export class CronWatch {
         this.onError(e, `recording ${name}`);
       }
       if (recorded) await this.finishRun(toStored(definition), run, finishedAt, false);
+    } else if (await this.markedTimedOut(run)) {
+      // A check gave up on this run while it was going and already counted it
+      // as a stuck failure. A late failure must not count twice; a late
+      // success still closes stuck and recovers.
+      try {
+        await this.store.updateRun(run);
+      } catch (e) {
+        this.onError(e, `recording ${name}`);
+      }
     } else {
       await this.finishRun(toStored(definition), run, finishedAt, true);
     }
 
     return { run, result, error, threw };
+  }
+
+  /** Whether a check already marked this run as timed out, for a failure that finished late. */
+  private async markedTimedOut(run: Run): Promise<boolean> {
+    if (run.status === "ok") return false;
+    try {
+      return (await this.store.getRun(run.id))?.status === "timeout";
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -458,7 +491,7 @@ export class CronWatch {
       run.status = "timeout";
       run.finishedAt = now;
       run.durationMs = now - run.startedAt;
-      run.error = `Still running after ${Math.round(timeoutMs(definition) / 60_000)} minutes; marked as timed out`;
+      run.error = `Still running after ${formatDuration(timeoutMs(definition))}; marked as timed out`;
       alerts.push(...(await this.finishRun(definition, run, now, true)));
     }
 

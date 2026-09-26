@@ -51,12 +51,24 @@ export function parseSchedule(schedule: string, timezone?: string): ParsedSchedu
   return parsed;
 }
 
-/** The first fire strictly after `from`, or null when the cron never fires again. */
+/**
+ * The first fire strictly after `from`, or null when the cron never fires
+ * again. croner answers with times in the past when asked from inside the
+ * hour that repeats when clocks go back, so its answers are filtered, and a
+ * stretch of nothing but past times is stepped over an hour at a time.
+ */
 function fireAfter(parsed: ParsedSchedule, from: number): number | null {
   const cron = crons.get(parsed);
   if (!cron) throw new Error(`schedule "${parsed.source}" was not made by parseSchedule`);
-  const next = cron.nextRun(new Date(from));
-  return next ? next.getTime() : null;
+  let probe = from;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const runs = cron.nextRuns(8, new Date(probe));
+    if (runs.length === 0) return null;
+    const found = runs.find((d) => d.getTime() > from);
+    if (found) return found.getTime();
+    probe += 3_600_000;
+  }
+  return null;
 }
 
 /** The next time the schedule fires strictly after `from`. For an interval, counted from the last run when there is one. */

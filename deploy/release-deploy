@@ -57,7 +57,7 @@ fi
 export PATH="$NODE_PREFIX/bin:$PATH"
 
 # One deploy at a time; rollback takes the same lock.
-exec 9>"/tmp/${SITE//./-}-deploy.lock"
+exec 9>"$RELEASES/.deploy.lock"   # not /tmp, where any local user could pre-create or symlink it
 flock -n 9 || { echo "Another deploy is already running." >&2; exit 1; }
 
 echo "Fetching..."

@@ -324,7 +324,8 @@ function demoContent() {
     out.ALERT_RECOVERED = alertBlock(alerts, "invoice-run recovered");
     out.ALERT_FAILED = alertBlock(alerts, "invoice-run failed");
     out.T_FAILED = alertTime(alerts, "invoice-run failed");
-    out.T_MISSED = alertTime(alerts, "sync-crm missed", 1);
+    // The missed alert went out at the check the capture ran, just past its deadline.
+    out.T_MISSED = `${hhmm(JSON.parse(readFileSync(path.join(DEMO, "jobs.json"), "utf8")).capturedAt)} UTC`;
     out.T_BUDGET = alertTime(alerts, "daily-digest went over budget");
     out.T_RECOVERED = alertTime(alerts, "invoice-run recovered");
     const empty = Object.keys(out).filter((k) => !out[k]);

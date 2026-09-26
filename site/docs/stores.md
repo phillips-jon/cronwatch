@@ -51,7 +51,7 @@ The tables are created inside a transaction that holds an advisory lock for the 
 
 ## Retention
 
-Finished runs older than `retention` (default `30d`) are deleted by `check()`, at most once an hour. Pruning happens only there: recording runs never deletes anything, so an app that never checks (no `cw.start()`, no cron hitting the check endpoint, no `cw.check()` of its own) keeps every run until something does. Running rows are never pruned.
+Finished runs older than `retention` (default `30d`) are deleted by `check()`, at most once an hour. Pruning happens only there: recording runs never deletes anything, so an app that never checks (no `cw.start()`, no cron hitting the check endpoint, no `cw.check()` of its own) keeps every run until something does. Running rows are never pruned, and neither is each job's newest run, so a job that runs less often than the retention is not mistaken for one that never ran.
 
 ```ts
 cronwatch({ retention: "90d" });
@@ -76,7 +76,7 @@ interface Store {
   runningRuns(): Promise<Run[]>;                                            // oldest first
   getState(job: string): Promise<JobState | null>;
   setState(state: JobState): Promise<void>;
-  prune(before: number): Promise<number>;                                   // finished runs started before this
+  prune(before: number): Promise<number>;                                   // finished runs started before this, except each job's newest
   close?(): Promise<void>;
 }
 ```

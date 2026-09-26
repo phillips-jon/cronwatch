@@ -97,6 +97,9 @@ Keep every `cw.job()` declaration in one module the check script imports. A job 
 
 ```ts
 import { Hono } from "hono";
+import { cw } from "./cronwatch.js";
+
+const hourly = cw.job("hourly-sync", { schedule: "@hourly" });
 const app = new Hono();
 const routes = cw.routes({ basePath: "/cronwatch" });
 app.all("/cronwatch/*", (c) => routes.handler(c.req.raw));
@@ -111,4 +114,4 @@ app.post("/internal/reindex", (c) => reindex.handler(async () => { /* ... */ }, 
 
 Without a secret the response never includes the job's error text, only its status.
 
-The stores use Node drivers (`better-sqlite3`, `pg`), so the process needs Node compatibility; Bun runs both.
+The stores use Node drivers (`better-sqlite3`, `pg`), so the process needs Node compatibility. `better-sqlite3` crashes in Bun; on Bun, use the Postgres store.

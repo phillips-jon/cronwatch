@@ -82,7 +82,10 @@ export function statements(dialect: Dialect, p: string) {
     runningRuns: `SELECT * FROM ${p}runs WHERE status = 'running' ORDER BY started_at, ${seq}`,
     getState: `SELECT state FROM ${p}state WHERE job = ?`,
     setState: `INSERT INTO ${p}state (job, state) VALUES (?, ?) ON CONFLICT (job) DO UPDATE SET state = excluded.state`,
-    prune: `DELETE FROM ${p}runs WHERE status <> 'running' AND started_at < ?`,
+    // Each job's newest run is kept whatever its age: without it, a job that
+    // runs less often than the retention looks like it never ran.
+    prune: `DELETE FROM ${p}runs WHERE status <> 'running' AND started_at < ?
+      AND started_at < (SELECT MAX(r.started_at) FROM ${p}runs r WHERE r.job = ${p}runs.job)`,
   };
   if (pg) {
     for (const key of Object.keys(sql) as (keyof typeof sql)[]) {

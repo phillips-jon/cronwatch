@@ -20,6 +20,7 @@ export function checkExpectation(expect: JobDefinition["expect"], output: string
     return text.includes(expect) ? null : `Output did not contain ${JSON.stringify(expect)}`;
   }
   if (expect instanceof RegExp) {
+    expect.lastIndex = 0; // a /g or /y pattern would otherwise resume where the last run stopped
     return expect.test(text) ? null : `Output did not match ${expect.toString()}`;
   }
   let ok = false;

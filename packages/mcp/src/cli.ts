@@ -26,12 +26,23 @@ the token. Add it to Claude Code with:
 const baseUrl = flag("--url") ?? process.env.CRONWATCH_URL;
 const token = flag("--token") ?? process.env.CRONWATCH_TOKEN ?? null;
 
+if (baseUrl) {
+  try {
+    const { protocol, hostname } = new URL(baseUrl);
+    if (protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(hostname)) {
+      console.error(`cronwatch-mcp: ${baseUrl} is plain http, so the token travels unencrypted; use https.`);
+    }
+  } catch {
+    console.error(`cronwatch-mcp: CRONWATCH_URL "${baseUrl}" is not a URL.`);
+    process.exit(2);
+  }
+}
 if (!baseUrl) {
   console.error("cronwatch-mcp: set CRONWATCH_URL (or pass --url) to where cw.routes() is mounted, e.g. https://app.example.com/cronwatch");
   process.exit(2);
 }
 if (!token) {
-  console.error("cronwatch-mcp: no CRONWATCH_TOKEN given; this only works if the app's routes are unprotected (development).");
+  console.error("cronwatch-mcp: no CRONWATCH_TOKEN given; this only works against an app on localhost with NODE_ENV=development and no token set.");
 }
 
 const server = createServer({ baseUrl, token });

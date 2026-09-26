@@ -50,7 +50,7 @@ A run succeeded and no condition remains open. The message names everything that
 
 ## expect rules
 
-`expect` turns a quiet success into a failure when the job produced no evidence of doing its work. The output is whatever the job logged with `job.log()`, or the string the function returned if it logged nothing.
+`expect` turns a quiet success into a failure when the job produced no evidence of doing its work. The output is whatever the job logged with `job.log()`, or the string the function returned if it logged nothing. The rule sees all of it, or for very long output its first and last 16 KB, so a line logged early still counts even though only the tail is stored.
 
 ```ts
 cw.job("export", { expect: "wrote" });                       // output must contain the string
@@ -68,4 +68,4 @@ Baselines use the last twenty successful runs, reading past any failures in betw
 
 ## Output and metrics
 
-Output, whether logged or returned, is capped at 16 KB per run, keeping the tail. Metrics are numbers keyed by name; report as many as you like. Both are stored with the run, shown on the dashboard and in alerts, and handed to the MCP server and to triage.
+Output, whether logged or returned, and errors are capped at 16 KB per run, keeping the tail. Before either is stored, values that look like secrets are replaced with `[redacted]`: `password=`, `api_key:` and similar pairs, credentials in URLs, bearer tokens, and AWS, GitHub, Slack, Stripe and API key formats. `expect` rules see the output before redaction. Pass `redact` to `cronwatch()` to use your own function, or `false` to turn it off. Metrics are numbers keyed by name; report as many as you like. Both are stored with the run, shown on the dashboard and in alerts, and handed to the MCP server and to triage.

@@ -91,4 +91,4 @@ SQLite is fine here. Keep the database outside the build output and inside whate
 
 ## Development
 
-`next dev` reloads modules, and each reload creates a fresh client. That is harmless: `cw.job()` declarations are idempotent and the store is shared. Leave `CRONWATCH_TOKEN` and `CRON_SECRET` unset locally and the routes and job handlers are open.
+`next dev` reloads modules, and each reload creates a fresh client. That is harmless: `cw.job()` declarations are idempotent and the store is shared. Leave `CRONWATCH_TOKEN` and `CRON_SECRET` unset locally: job handlers run without a secret, and the routes are open at `localhost` (not at a LAN address or tunnel URL; set a token for those).

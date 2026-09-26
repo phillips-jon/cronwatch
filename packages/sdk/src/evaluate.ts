@@ -225,6 +225,12 @@ export function onCheck(
   const nextExpectedAt = parsed.kind === "interval" ? nextFire(parsed, stored.createdAt, lastRunAt) : nextFire(parsed, now, null);
   if (!exp) return { state: next, alerts, nextExpectedAt, dueAt: null };
 
+  // An interval's next run is due a period after the last one started. If that
+  // run is still going, the job is busy, not late; stuck covers one that never ends.
+  if (parsed.kind === "interval" && lastRun?.status === "running") {
+    return { state: next, alerts, nextExpectedAt, dueAt: exp.dueAt };
+  }
+
   if (now > exp.deadline) {
     if (openCondition(next, "missed", now)) {
       alerts.push({ type: "missed", run: lastRun, details: { dueAt: exp.dueAt, deadline: exp.deadline, graceMs: grace, lastRunAt } });
