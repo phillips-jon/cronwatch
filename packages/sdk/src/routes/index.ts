@@ -39,7 +39,6 @@ function cookieValue(token: string): string {
   return createHash("sha256").update(`cronwatch-cookie:${token}`).digest("hex");
 }
 
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const DEFAULT_RUNS = 20;
 const MAX_RUNS = 500;
 
@@ -48,6 +47,55 @@ const CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:
 // `Origin: null` on form posts, which the CSRF check would refuse, and the
 // forms redirect back to the page named by the same-origin Referer.
 const SECURITY_HEADERS = { "x-content-type-options": "nosniff", "referrer-policy": "same-origin", "x-robots-tag": "noindex" };
+
+/** A host or address, with any quotes, brackets and port removed. */
+function bareHost(value: string): string {
+  const text = value.trim().toLowerCase().replace(/^"(.*)"$/, "$1");
+  if (text.startsWith("[")) {
+    const end = text.indexOf("]");
+    return end === -1 ? text : text.slice(1, end);
+  }
+  // One colon is host:port; more is a bare IPv6 address.
+  const colon = text.indexOf(":");
+  return colon !== -1 && colon === text.lastIndexOf(":") ? text.slice(0, colon) : text;
+}
+
+function loopback(value: string): boolean {
+  const host = bareHost(value);
+  return host === "localhost" || host === "::1" || /^(::ffff:)?127(\.\d{1,3}){3}$/.test(host);
+}
+
+/** Every host or address a proxy header names. Forwarded contributes its for= and host= values. */
+function forwardedValues(request: Request): string[] {
+  const values: string[] = [];
+  for (const name of ["x-forwarded-host", "x-forwarded-for", "x-real-ip"]) {
+    const header = request.headers.get(name);
+    if (header !== null) values.push(...header.split(","));
+  }
+  const forwarded = request.headers.get("forwarded");
+  if (forwarded !== null) {
+    for (const pair of forwarded.split(/[,;]/)) {
+      const [key, ...rest] = pair.split("=");
+      const name = key!.trim().toLowerCase();
+      if (name === "for" || name === "host") values.push(rest.join("="));
+    }
+  }
+  return values.filter((v) => v.trim() !== "");
+}
+
+/**
+ * A developer on their own machine: the URL and the Host header as sent both
+ * name a loopback host, and no proxy header names anything else. Frameworks
+ * build request.url differently (Next.js from its own listen address, not the
+ * Host header), so the raw Host is checked too, which also stops a
+ * DNS-rebinding page. (HTTP/2 sends no Host header; the URL's host is the
+ * :authority then.) A fetch handler cannot see the peer address, so a proxy
+ * header naming another machine means the caller is not known to be local.
+ */
+function localRequest(request: Request, url: URL): boolean {
+  const host = request.headers.get("host");
+  return loopback(url.hostname) && (host === null || loopback(host)) && forwardedValues(request).every(loopback);
+}
 
 function safeDecode(value: string): string | null {
   try {
@@ -134,9 +182,8 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
   const serve = async (request: Request, url: URL, path: string, wantsHtml: boolean): Promise<Response> => {
     const method = request.method.toUpperCase();
 
-    // No token: fail closed, except for a developer on their own machine. The
-    // Host check also stops a DNS-rebinding page from reaching a dev server.
-    if (!token && !optedOut && !(developing && LOOPBACK.has(url.hostname))) {
+    // No token: fail closed, except for a developer on their own machine.
+    if (!token && !optedOut && !(developing && localRequest(request, url))) {
       return wantsHtml
         ? html(messagePage("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token to cw.routes()). Without one the routes only answer localhost in development.", base), 503)
         : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503);

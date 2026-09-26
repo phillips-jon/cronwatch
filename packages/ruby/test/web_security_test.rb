@@ -198,4 +198,35 @@ class WebSecurityTest < Minitest::Test
       refute_match(/<img|<t>|<e>|<o>|<k>|<x>/, html, path)
     end
   end
+
+  def test_without_a_token_localhost_means_the_host_header_the_peer_and_every_proxy_header
+    with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
+      cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
+      web = Cronwatch::Web.new(cw, base_path: "/cronwatch")
+      status = lambda do |headers, peer: "127.0.0.1"|
+        env = Rack::MockRequest.env_for("http://localhost:3000/cronwatch/api/jobs", "REMOTE_ADDR" => peer)
+        headers.each { |name, value| env["HTTP_#{name.tr('-', '_').upcase}"] = value }
+        web.call(env)[0]
+      end
+
+      assert_equal 200, status.call({})
+      assert_equal 200, status.call({ "host" => "127.0.0.1:3000", "x-forwarded-for" => "::1" }, peer: "::1")
+      assert_equal 200, status.call({ "host" => "[::1]:3000", "forwarded" => 'for="[::1]:51234";host=localhost;proto=http' }, peer: "::ffff:127.0.0.1")
+
+      refused = {
+        "a rebinding page (Host names the attacker's domain)" => { "host" => "evil.example" },
+        "a LAN address" => { "host" => "192.168.1.20:3000" },
+        "a spoofed X-Forwarded-Host from another machine" => { "host" => "192.168.1.20:3000", "x-forwarded-host" => "localhost" },
+        "X-Forwarded-For through a proxy" => { "x-forwarded-for" => "203.0.113.9, 127.0.0.1" },
+        "X-Forwarded-Host naming a public host" => { "x-forwarded-host" => "app.example" },
+        "X-Real-IP" => { "x-real-ip" => "203.0.113.9" },
+        "Forwarded for=" => { "forwarded" => "for=203.0.113.9;proto=https" },
+        "Forwarded host=" => { "forwarded" => 'for="[::1]";host=app.example' },
+        "an obfuscated Forwarded for=" => { "forwarded" => "for=_hidden" },
+        "localhost as a subdomain" => { "host" => "localhost.evil.example" },
+      }
+      refused.each { |why, headers| assert_equal 503, status.call(headers), why }
+      assert_equal 503, status.call({}, peer: "192.168.1.20"), "a forged Host of localhost from another machine"
+    end
+  end
 end

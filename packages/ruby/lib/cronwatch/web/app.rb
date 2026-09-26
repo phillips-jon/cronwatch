@@ -27,7 +27,7 @@ module Cronwatch
     # Tells "token not given" (read CRONWATCH_TOKEN) from "token: nil" (open on purpose).
     UNSET = Object.new.freeze
     COOKIE = "cronwatch_token"
-    LOOPBACK = %w[localhost 127.0.0.1 [::1]].freeze
+    LOOPBACK = /\A(?:localhost|::1|(?:::ffff:)?127(?:\.\d{1,3}){3})\z/
     DEFAULT_RUNS = 20
     MAX_RUNS = 500
     COOKIE_MAX_AGE = 60 * 60 * 24 * 30
@@ -82,14 +82,43 @@ module Cronwatch
 
     private
 
-    # The Host header as sent and the peer's address, never X-Forwarded-Host
-    # (which Rack's #hostname follows and any client can set).
+    # The routes' localRequest: the Host header as sent and the peer's address
+    # are loopback, and no proxy header names anything else. Never Rack's
+    # #hostname, which follows X-Forwarded-Host (any client can set it); a
+    # proxy header naming another machine means the caller is not known to be local.
     def local_request?(request)
-      host = (request.env["HTTP_HOST"] || request.env["SERVER_NAME"] || "").sub(/:\d+\z/, "")
-      return false unless LOOPBACK.include?(host)
+      env = request.env
+      return false unless loopback?(env["HTTP_HOST"] || env["SERVER_NAME"] || "")
 
-      peer = request.env["REMOTE_ADDR"]
-      peer.nil? || peer.start_with?("127.") || ["::1", "::ffff:127.0.0.1"].include?(peer)
+      peer = env["REMOTE_ADDR"]
+      return false unless peer.nil? || loopback?(peer)
+
+      forwarded_values(env).all? { |value| loopback?(value) }
+    end
+
+    # Every host or address a proxy header names. Forwarded contributes its for= and host= values.
+    def forwarded_values(env)
+      values = %w[HTTP_X_FORWARDED_HOST HTTP_X_FORWARDED_FOR HTTP_X_REAL_IP].flat_map { |key| env[key].to_s.split(",") }
+      env["HTTP_FORWARDED"].to_s.split(/[,;]/).each do |pair|
+        key, *rest = pair.split("=")
+        values << rest.join("=") if %w[for host].include?(key.to_s.strip.downcase)
+      end
+      values.reject { |value| value.strip.empty? }
+    end
+
+    def loopback?(value)
+      LOOPBACK.match?(bare_host(value))
+    end
+
+    # A host or address, with any quotes, brackets and port removed.
+    def bare_host(value)
+      text = value.strip.downcase.sub(/\A"(.*)"\z/, "\\1")
+      if text.start_with?("[")
+        close = text.index("]")
+        return close.nil? ? text : text[1...close]
+      end
+      # One colon is host:port; more is a bare IPv6 address.
+      text.count(":") == 1 ? text[0...text.index(":")] : text
     end
 
     def serve(request, path, wants_html, base)
