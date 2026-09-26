@@ -1,0 +1,317 @@
+# frozen_string_literal: true
+
+module Cronwatch
+  CONDITIONS = %i[missed failed stuck slow over_budget].freeze
+  RUN_STATUSES = %i[running ok failed timeout].freeze
+
+  # Ruby names are snake_case symbols; everything that leaves the process
+  # (store rows, JSON, webhook bodies) uses the SDK's camelCase names and
+  # string values. Each type's to_h is that JSON shape, and from_h reads it.
+  module Naming
+    module_function
+
+    def camel(name)
+      name.to_s.gsub(/_([a-z0-9])/) { Regexp.last_match(1).upcase }
+    end
+
+    def snake(name)
+      name.to_s.gsub(/([A-Z])/) { "_#{Regexp.last_match(1).downcase}" }.to_sym
+    end
+
+    # Reads a camelCase field from a hash with string or symbol keys.
+    def fetch(hash, key, default = nil)
+      return hash[key] if hash.key?(key)
+      return hash[key.to_sym] if hash.key?(key.to_sym)
+
+      default
+    end
+
+    def present?(hash, key)
+      hash.key?(key) || hash.key?(key.to_sym)
+    end
+
+    # Ruby hash with symbol keys and symbol values -> JSON-ready camelCase.
+    def to_json_value(value)
+      case value
+      when Hash then value.each_with_object({}) { |(k, v), out| out[k.is_a?(Symbol) ? camel(k) : k.to_s] = to_json_value(v) }
+      when Array then value.map { |v| to_json_value(v) }
+      when Symbol then value.to_s
+      when Struct then value.to_h
+      else value
+      end
+    end
+
+    def from_json_value(value)
+      case value
+      when Hash then value.each_with_object({}) { |(k, v), out| out[snake(k)] = from_json_value(v) }
+      when Array then value.map { |v| from_json_value(v) }
+      else value
+      end
+    end
+  end
+
+  # Shared by the structs below.
+  module Serializable
+    def as_json(*)
+      to_h
+    end
+
+    def to_json(*)
+      JS.json(to_h)
+    end
+  end
+
+  # A job's options. Kept as an ordered set of fields rather than a Struct so
+  # its JSON has the same keys in the same order as the SDK writes: defaults,
+  # then options as given, then name, and a stored `expect` last. Fields this
+  # version does not know (written by a newer one) are kept as they came.
+  class JobDefinition
+    include Serializable
+
+    FIELDS = {
+      name: "name", schedule: "schedule", timezone: "timezone", grace: "grace", timeout: "timeout",
+      max_duration: "maxDuration", budget: "budget", expect: "expect",
+      failures_before_alert: "failuresBeforeAlert", description: "description", tags: "tags",
+    }.freeze
+    OPTIONS = (FIELDS.keys - [:name]).freeze
+    BY_JSON = FIELDS.invert.freeze
+
+    FIELDS.each_key { |field| define_method(field) { @fields[field] } }
+
+    def initialize(fields = {})
+      @fields = {}
+      fields.each { |k, v| @fields[k.is_a?(Symbol) ? k : k.to_s] = v }
+      @fields.freeze
+      freeze
+    end
+
+    def self.from_h(hash)
+      return hash if hash.is_a?(JobDefinition)
+
+      new(hash.each_with_object({}) { |(k, v), out| out[BY_JSON[k.to_s] || k.to_s] = v })
+    end
+
+    def [](field)
+      @fields[field]
+    end
+
+    def key?(field)
+      @fields.key?(field)
+    end
+
+    # The fields as given, symbols for known ones.
+    def fields
+      @fields.dup
+    end
+
+    # A copy with some fields changed or added (at the end, as in JavaScript).
+    def merge(changes)
+      JobDefinition.new(@fields.merge(changes))
+    end
+
+    def to_h
+      @fields.each_with_object({}) do |(k, v), out|
+        next if v.nil?
+
+        out[k.is_a?(Symbol) ? FIELDS.fetch(k) { Naming.camel(k) } : k] =
+          case v
+          when Hash then v.transform_keys(&:to_s)
+          when Symbol then v.to_s
+          else v
+          end
+      end
+    end
+
+    def ==(other)
+      other.is_a?(JobDefinition) && JS.json(to_h) == JS.json(other.to_h)
+    end
+    alias eql? ==
+
+    def hash
+      JS.json(to_h).hash
+    end
+
+    def inspect
+      "#<Cronwatch::JobDefinition #{JS.json(to_h)}>"
+    end
+  end
+
+  Run = Struct.new(:id, :job, :status, :started_at, :finished_at, :duration_ms, :error, :output, :metrics, :trigger,
+                   keyword_init: true) do
+    include Serializable
+
+    def self.from_h(hash)
+      return hash if hash.is_a?(Run)
+
+      new(
+        id: Naming.fetch(hash, "id"),
+        job: Naming.fetch(hash, "job"),
+        status: Naming.fetch(hash, "status")&.to_sym,
+        started_at: Naming.fetch(hash, "startedAt"),
+        finished_at: Naming.fetch(hash, "finishedAt"),
+        duration_ms: Naming.fetch(hash, "durationMs"),
+        error: Naming.fetch(hash, "error"),
+        output: Naming.fetch(hash, "output"),
+        metrics: (Naming.fetch(hash, "metrics") || {}).transform_keys(&:to_s),
+        trigger: Naming.fetch(hash, "trigger", "run"),
+      )
+    end
+
+    def to_h
+      {
+        "id" => id, "job" => job, "status" => status.to_s, "startedAt" => started_at, "finishedAt" => finished_at,
+        "durationMs" => duration_ms, "error" => error, "output" => output,
+        "metrics" => (metrics || {}).transform_keys(&:to_s), "trigger" => trigger,
+      }
+    end
+
+    def running? = status == :running
+    def ok? = status == :ok
+  end
+
+  StoredJob = Struct.new(:name, :definition, :created_at, :updated_at, keyword_init: true) do
+    include Serializable
+
+    def self.from_h(hash)
+      return hash if hash.is_a?(StoredJob)
+
+      new(
+        name: Naming.fetch(hash, "name"),
+        definition: JobDefinition.from_h(Naming.fetch(hash, "definition") || {}),
+        created_at: Naming.fetch(hash, "createdAt"),
+        updated_at: Naming.fetch(hash, "updatedAt"),
+      )
+    end
+
+    def to_h
+      { "name" => name, "definition" => definition.to_h, "createdAt" => created_at, "updatedAt" => updated_at }
+    end
+  end
+
+  # An alert before it has a title and message. See Format.compose_alert.
+  # `details` is a hash with snake_case symbol keys; its JSON is camelCase.
+  AlertDraft = Struct.new(:type, :run, :details, keyword_init: true) do
+    include Serializable
+
+    def to_h
+      { "type" => type.to_s, "run" => run&.to_h, "details" => Naming.to_json_value(details) }
+    end
+  end
+
+  # Members in the order the SDK's alert object has its keys, which is the
+  # order its JSON (a webhook body, an undelivered alert in state) has them.
+  Alert = Struct.new(:type, :run, :details, :job, :definition, :title, :message, :at, :triage, keyword_init: true) do
+    include Serializable
+
+    def self.from_h(hash)
+      return hash if hash.is_a?(Alert)
+
+      run = Naming.fetch(hash, "run")
+      details = Naming.from_json_value(Naming.fetch(hash, "details") || {})
+      details[:after] = details[:after].map(&:to_sym) if details[:after].is_a?(Array)
+      new(
+        type: Naming.fetch(hash, "type")&.to_sym,
+        run: run && Run.from_h(run),
+        details: details,
+        job: Naming.fetch(hash, "job"),
+        definition: JobDefinition.from_h(Naming.fetch(hash, "definition") || {}),
+        title: Naming.fetch(hash, "title"),
+        message: Naming.fetch(hash, "message"),
+        at: Naming.fetch(hash, "at"),
+        triage: Naming.fetch(hash, "triage"),
+      )
+    end
+
+    def to_h
+      out = {
+        "type" => type.to_s, "run" => run&.to_h, "details" => Naming.to_json_value(details), "job" => job,
+        "definition" => definition.respond_to?(:to_h) ? definition.to_h : definition,
+        "title" => title, "message" => message, "at" => at,
+      }
+      out["triage"] = triage unless triage.nil?
+      out
+    end
+  end
+
+  JobState = Struct.new(:job, :open, :consecutive_failures, :silenced_until, :last_alert_at, :pending_recovery,
+                        :undelivered, keyword_init: true) do
+    include Serializable
+
+    def self.from_h(hash)
+      return hash if hash.is_a?(JobState)
+
+      pending = Naming.fetch(hash, "pendingRecovery")
+      undelivered = Naming.fetch(hash, "undelivered")
+      new(
+        job: Naming.fetch(hash, "job"),
+        open: (Naming.fetch(hash, "open") || {}).each_with_object({}) { |(k, v), out| out[k.to_sym] = v },
+        consecutive_failures: Naming.fetch(hash, "consecutiveFailures", 0),
+        silenced_until: Naming.fetch(hash, "silencedUntil"),
+        last_alert_at: Naming.fetch(hash, "lastAlertAt"),
+        pending_recovery: pending&.map(&:to_sym),
+        undelivered: undelivered&.map { |a| Alert.from_h(a) },
+      )
+    end
+
+    # pendingRecovery and undelivered are left out when unset, as in state
+    # written before they existed.
+    def to_h
+      out = {
+        "job" => job, "open" => (open || {}).transform_keys(&:to_s), "consecutiveFailures" => consecutive_failures,
+        "silencedUntil" => silenced_until, "lastAlertAt" => last_alert_at,
+      }
+      out["pendingRecovery"] = pending_recovery.map(&:to_s) unless pending_recovery.nil?
+      out["undelivered"] = undelivered.map(&:to_h) unless undelivered.nil?
+      out
+    end
+  end
+
+  JobStats = Struct.new(:runs, :ok_rate, :p50_ms, :p95_ms, keyword_init: true) do
+    include Serializable
+
+    def self.from_h(hash)
+      new(runs: Naming.fetch(hash, "runs"), ok_rate: Naming.fetch(hash, "okRate"),
+          p50_ms: Naming.fetch(hash, "p50Ms"), p95_ms: Naming.fetch(hash, "p95Ms"))
+    end
+
+    def to_h
+      { "runs" => runs, "okRate" => ok_rate, "p50Ms" => p50_ms, "p95Ms" => p95_ms }
+    end
+  end
+
+  JobSummary = Struct.new(:name, :definition, :health, :open, :last_run, :next_expected_at, :consecutive_failures,
+                          :silenced_until, :stats, keyword_init: true) do
+    include Serializable
+
+    def self.from_h(hash)
+      last = Naming.fetch(hash, "lastRun")
+      new(
+        name: Naming.fetch(hash, "name"),
+        definition: JobDefinition.from_h(Naming.fetch(hash, "definition") || {}),
+        health: Naming.fetch(hash, "health")&.to_sym,
+        open: (Naming.fetch(hash, "open") || []).map(&:to_sym),
+        last_run: last && Run.from_h(last),
+        next_expected_at: Naming.fetch(hash, "nextExpectedAt"),
+        consecutive_failures: Naming.fetch(hash, "consecutiveFailures"),
+        silenced_until: Naming.fetch(hash, "silencedUntil"),
+        stats: JobStats.from_h(Naming.fetch(hash, "stats") || {}),
+      )
+    end
+
+    def to_h
+      {
+        "name" => name, "definition" => definition.to_h, "health" => health.to_s, "open" => open.map(&:to_s),
+        "lastRun" => last_run&.to_h, "nextExpectedAt" => next_expected_at,
+        "consecutiveFailures" => consecutive_failures, "silencedUntil" => silenced_until, "stats" => stats.to_h,
+      }
+    end
+  end
+
+  CheckResult = Struct.new(:checked_at, :jobs, :alerts, :pruned, keyword_init: true) do
+    include Serializable
+
+    def to_h
+      { "checkedAt" => checked_at, "jobs" => jobs.map(&:to_h), "alerts" => alerts.map(&:to_h), "pruned" => pruned }
+    end
+  end
+end

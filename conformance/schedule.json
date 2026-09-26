@@ -1,0 +1,6544 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.2.0",
+  "parse": [
+    {
+      "schedule": "0 2 * * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 2 * * *"
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 2 * * *",
+        "timezone": "UTC"
+      }
+    },
+    {
+      "schedule": "  0 2 * * *  ",
+      "timezone": "America/New_York",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 2 * * *",
+        "timezone": "America/New_York"
+      }
+    },
+    {
+      "schedule": "@hourly",
+      "parsed": {
+        "kind": "cron",
+        "source": "@hourly"
+      }
+    },
+    {
+      "schedule": "@daily",
+      "parsed": {
+        "kind": "cron",
+        "source": "@daily"
+      }
+    },
+    {
+      "schedule": "@weekly",
+      "parsed": {
+        "kind": "cron",
+        "source": "@weekly"
+      }
+    },
+    {
+      "schedule": "@monthly",
+      "parsed": {
+        "kind": "cron",
+        "source": "@monthly"
+      }
+    },
+    {
+      "schedule": "@yearly",
+      "parsed": {
+        "kind": "cron",
+        "source": "@yearly"
+      }
+    },
+    {
+      "schedule": "@annually",
+      "parsed": {
+        "kind": "cron",
+        "source": "@annually"
+      }
+    },
+    {
+      "schedule": "@midnight",
+      "parsed": {
+        "kind": "cron",
+        "source": "@midnight"
+      }
+    },
+    {
+      "schedule": "@HOURLY",
+      "parsed": {
+        "kind": "cron",
+        "source": "@HOURLY"
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "*/5 * * * *"
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 */30 * * * *"
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "parsed": {
+        "kind": "interval",
+        "source": "every 5m",
+        "everyMs": 300000
+      }
+    },
+    {
+      "schedule": "every 1h30m",
+      "timezone": "America/New_York",
+      "parsed": {
+        "kind": "interval",
+        "source": "every 1h30m",
+        "everyMs": 5400000
+      }
+    },
+    {
+      "schedule": "Every 90s",
+      "parsed": {
+        "kind": "interval",
+        "source": "Every 90s",
+        "everyMs": 90000
+      }
+    },
+    {
+      "schedule": "every   2d",
+      "parsed": {
+        "kind": "interval",
+        "source": "every   2d",
+        "everyMs": 172800000
+      }
+    },
+    {
+      "schedule": "every 1s",
+      "parsed": {
+        "kind": "interval",
+        "source": "every 1s",
+        "everyMs": 1000
+      }
+    },
+    {
+      "schedule": "0 0 * * mon-fri",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 * * mon-fri"
+      }
+    },
+    {
+      "schedule": "0 0 * JAN,jul *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 * JAN,jul *"
+      }
+    },
+    {
+      "schedule": "0 0 L * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 L * *"
+      }
+    },
+    {
+      "schedule": "0 0 * * 5L",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 * * 5L"
+      }
+    },
+    {
+      "schedule": "0 0 * * 5#2",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 * * 5#2"
+      }
+    },
+    {
+      "schedule": "0 0 ? * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 ? * *"
+      }
+    },
+    {
+      "schedule": "0 0 * * +1",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 * * +1"
+      }
+    },
+    {
+      "schedule": "5-10/2 * * * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "5-10/2 * * * *"
+      }
+    },
+    {
+      "schedule": "0 0 1,15 * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 1,15 * *"
+      }
+    },
+    {
+      "schedule": "0 0 * * 0,7",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 * * 0,7"
+      }
+    },
+    {
+      "schedule": "0 0 * * sun",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 * * sun"
+      }
+    },
+    {
+      "schedule": "0 12 * * 1-5",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 12 * * 1-5"
+      }
+    },
+    {
+      "schedule": "every 500ms",
+      "error": "schedule \"every 500ms\" is shorter than one second"
+    },
+    {
+      "schedule": "every 0s",
+      "error": "schedule \"every 0s\" is shorter than one second"
+    },
+    {
+      "schedule": "every banana",
+      "error": "schedule interval \"banana\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "schedule": "every ",
+      "error": "schedule \"every \" is not a cron expression or \"every <duration>\": CronPattern: invalid configuration format ('every'), exactly five, six, or seven space separated parts are required."
+    },
+    {
+      "schedule": "banana",
+      "error": "schedule \"banana\" is not a cron expression or \"every <duration>\": CronPattern: invalid configuration format ('banana'), exactly five, six, or seven space separated parts are required."
+    },
+    {
+      "schedule": "* * * *",
+      "error": "schedule \"* * * *\" is not a cron expression or \"every <duration>\": CronPattern: invalid configuration format ('* * * *'), exactly five, six, or seven space separated parts are required."
+    },
+    {
+      "schedule": "60 * * * *",
+      "error": "schedule \"60 * * * *\" is not a cron expression or \"every <duration>\": CronPattern: Invalid value for minute: 60"
+    },
+    {
+      "schedule": "0 24 * * *",
+      "error": "schedule \"0 24 * * *\" is not a cron expression or \"every <duration>\": CronPattern: Invalid value for hour: 24"
+    },
+    {
+      "schedule": "0 0 32 * *",
+      "error": "schedule \"0 0 32 * *\" is not a cron expression or \"every <duration>\": CronPattern: Invalid value for day: 31"
+    },
+    {
+      "schedule": "0 0 0 * *",
+      "error": "schedule \"0 0 0 * *\" is not a cron expression or \"every <duration>\": CronPattern: Invalid value for day: -1"
+    },
+    {
+      "schedule": "0 0 * 13 *",
+      "error": "schedule \"0 0 * 13 *\" is not a cron expression or \"every <duration>\": CronPattern: Invalid value for month: 12"
+    },
+    {
+      "schedule": "0 0 * * 8",
+      "error": "schedule \"0 0 * * 8\" is not a cron expression or \"every <duration>\": CronPattern: Invalid value for dayOfWeek: 8"
+    },
+    {
+      "schedule": "*/0 * * * *",
+      "error": "schedule \"*/0 * * * *\" is not a cron expression or \"every <duration>\": CronPattern: Syntax error, illegal stepping: 0"
+    },
+    {
+      "schedule": "*/61 * * * *",
+      "error": "schedule \"*/61 * * * *\" is not a cron expression or \"every <duration>\": CronPattern: Syntax error, steps cannot be greater than maximum value of part (60)"
+    },
+    {
+      "schedule": "5/15 * * * *",
+      "error": "schedule \"5/15 * * * *\" is not a cron expression or \"every <duration>\": CronPattern: Syntax error, stepping with numeric prefix ('5/15') is not allowed. Use wildcard (*/step) or range (min-max/step) instead."
+    },
+    {
+      "schedule": "/5 * * * *",
+      "error": "schedule \"/5 * * * *\" is not a cron expression or \"every <duration>\": CronPattern: Syntax error, stepping with missing prefix ('/5') is not allowed. Use wildcard (*/step) or range (min-max/step) instead."
+    },
+    {
+      "schedule": "5-1 * * * *",
+      "error": "schedule \"5-1 * * * *\" is not a cron expression or \"every <duration>\": CronPattern: From value is larger than to value: '5-1'"
+    },
+    {
+      "schedule": "0 0 * * fri-mon",
+      "error": "schedule \"0 0 * * fri-mon\" is not a cron expression or \"every <duration>\": CronPattern: From value is larger than to value: '5-1'"
+    },
+    {
+      "schedule": "0 0 * * 1#6",
+      "error": "schedule \"0 0 * * 1#6\" is not a cron expression or \"every <duration>\": CronPattern: nth weekday out of range, should be 1-5 or L. Value: 6, Type: string"
+    },
+    {
+      "schedule": "0 0 * * 1#0",
+      "error": "schedule \"0 0 * * 1#0\" is not a cron expression or \"every <duration>\": CronPattern: nth weekday out of range, should be 1-5 or L. Value: 0, Type: string"
+    },
+    {
+      "schedule": "@reboot",
+      "error": "schedule \"@reboot\" is not a cron expression or \"every <duration>\": CronPattern: @reboot is not supported in this environment. This is an event-based trigger that requires system startup detection."
+    },
+    {
+      "schedule": "@every 5m",
+      "error": "schedule \"@every 5m\" is not a cron expression or \"every <duration>\": CronPattern: invalid configuration format ('@every 5m'), exactly five, six, or seven space separated parts are required."
+    },
+    {
+      "schedule": "0 0 * * * * * *",
+      "error": "schedule \"0 0 * * * * * *\" is not a cron expression or \"every <duration>\": CronPattern: invalid configuration format ('0 0 * * * * * *'), exactly five, six, or seven space separated parts are required."
+    },
+    {
+      "schedule": "0 0 L * 1L",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 L * 1L"
+      }
+    },
+    {
+      "schedule": "0 0 15W * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 15W * *"
+      }
+    },
+    {
+      "schedule": "0 0 * * +",
+      "error": "schedule \"0 0 * * +\" is not a cron expression or \"every <duration>\": CronPattern: Day-of-week field cannot be empty after '+' modifier."
+    },
+    {
+      "schedule": "0 2 * * * UTC",
+      "error": "schedule \"0 2 * * * UTC\" is not a cron expression or \"every <duration>\": CronPattern: configuration entry 5 (UTC) contains illegal characters."
+    },
+    {
+      "schedule": "0 0 5L * *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 5L * *"
+      }
+    },
+    {
+      "schedule": "x * * * *",
+      "error": "schedule \"x * * * *\" is not a cron expression or \"every <duration>\": CronPattern: configuration entry 1 (x) contains illegal characters."
+    },
+    {
+      "schedule": "0 0 1-5/0 * *",
+      "error": "schedule \"0 0 1-5/0 * *\" is not a cron expression or \"every <duration>\": CronPattern: Syntax error, illegal stepping: 0"
+    },
+    {
+      "schedule": "0 0 * * 1-",
+      "error": "schedule \"0 0 * * 1-\" is not a cron expression or \"every <duration>\": CronPattern: Syntax error, illegal upper range (NaN)"
+    },
+    {
+      "schedule": "0 0 -1 * *",
+      "error": "schedule \"0 0 -1 * *\" is not a cron expression or \"every <duration>\": CronPattern: Syntax error, illegal lower range (NaN)"
+    }
+  ],
+  "fires": [
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "from": 1772884800000,
+      "fires": [
+        1772955000000,
+        1773037800000,
+        1773124200000,
+        1773210600000
+      ]
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "from": 1772884800000,
+      "fires": [
+        1772953200000,
+        1773036000000,
+        1773122400000
+      ]
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "from": 1793448000000,
+      "fires": [
+        1793511000000,
+        1793601000000,
+        1793687400000,
+        1793773800000
+      ]
+    },
+    {
+      "schedule": "0 1 * * *",
+      "timezone": "America/New_York",
+      "from": 1793448000000,
+      "fires": [
+        1793509200000,
+        1793599200000,
+        1793685600000
+      ]
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "from": 1793505600000,
+      "fires": [
+        1793507400000,
+        1793509200000,
+        1793511000000,
+        1793516400000,
+        1793518200000,
+        1793520000000,
+        1793521800000,
+        1793523600000
+      ]
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "from": 1793513400000,
+      "fires": [
+        1793511000000,
+        1793516400000,
+        1793518200000,
+        1793520000000
+      ]
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "from": 1772949600000,
+      "fires": [
+        1772951400000,
+        1772953200000,
+        1772955000000,
+        1772956800000,
+        1772958600000,
+        1772960400000
+      ]
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "from": 1772952300000,
+      "fires": [
+        1772952600000,
+        1772953200000,
+        1772953800000,
+        1772954400000
+      ]
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "from": 1772947800000,
+      "fires": [
+        1772949600000,
+        1772953200000,
+        1772956800000,
+        1772960400000
+      ]
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "from": 1793507400000,
+      "fires": [
+        1793509200000,
+        1793516400000,
+        1793520000000,
+        1793523600000
+      ]
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "Europe/London",
+      "from": 1774699200000,
+      "fires": [
+        1774746900000,
+        1774833300000,
+        1774919700000
+      ]
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "from": 1792843200000,
+      "fires": [
+        1792888200000,
+        1792978200000,
+        1793064600000
+      ]
+    },
+    {
+      "schedule": "0 0 * * *",
+      "timezone": "America/Santiago",
+      "from": 1788609600000,
+      "fires": [
+        1788667200000,
+        1788750000000,
+        1788836400000
+      ]
+    },
+    {
+      "schedule": "30 0 * * *",
+      "timezone": "Australia/Lord_Howe",
+      "from": 1790985600000,
+      "fires": [
+        1791036000000,
+        1791120600000,
+        1791207000000
+      ]
+    },
+    {
+      "schedule": "0 30 2 * * *",
+      "timezone": "America/New_York",
+      "from": 1772884800000,
+      "fires": [
+        1772955000000,
+        1773037800000
+      ]
+    },
+    {
+      "schedule": "0 0 31 * *",
+      "timezone": "UTC",
+      "from": 1767571200000,
+      "fires": [
+        1769817600000,
+        1774915200000,
+        1780185600000,
+        1785456000000
+      ]
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "from": 1767571200000,
+      "fires": [
+        1835395200000,
+        1961625600000
+      ]
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767571200000,
+        1767657600000,
+        1767744000000,
+        1767830400000,
+        1767916800000,
+        1768176000000
+      ]
+    },
+    {
+      "schedule": "0 0 1 * 1",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767571200000,
+        1768176000000,
+        1768780800000,
+        1769385600000,
+        1769904000000,
+        1769990400000,
+        1770595200000
+      ]
+    },
+    {
+      "schedule": "0 0 1 * 1",
+      "timezone": "UTC",
+      "from": 1772193600000,
+      "fires": [
+        1772409600000,
+        1773014400000,
+        1773619200000
+      ]
+    },
+    {
+      "schedule": "0 0 */1 * 1",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767398400000,
+        1767484800000,
+        1767571200000
+      ]
+    },
+    {
+      "schedule": "0 0 ? * 1",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767398400000,
+        1767484800000,
+        1767571200000
+      ]
+    },
+    {
+      "schedule": "0 0 1 * +1",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1780272000000,
+        1801440000000,
+        1803859200000
+      ]
+    },
+    {
+      "schedule": "0 0 L * 1",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767571200000,
+        1768176000000,
+        1768780800000,
+        1769385600000
+      ]
+    },
+    {
+      "schedule": "0 0 * * 5L",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1769731200000,
+        1772150400000,
+        1774569600000
+      ]
+    },
+    {
+      "schedule": "0 0 * * 5#2",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767916800000,
+        1770940800000,
+        1773360000000
+      ]
+    },
+    {
+      "schedule": "0 0 * * 1#1,5#5",
+      "timezone": "UTC",
+      "from": 1767225600000,
+      "fires": [
+        1767571200000,
+        1769731200000,
+        1769990400000,
+        1772409600000,
+        1775433600000
+      ]
+    },
+    {
+      "schedule": "@weekly",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767484800000,
+        1768089600000
+      ]
+    },
+    {
+      "schedule": "@monthly",
+      "timezone": "America/New_York",
+      "from": 1767312000000,
+      "fires": [
+        1769922000000,
+        1772341200000,
+        1775016000000
+      ]
+    },
+    {
+      "schedule": "0 0 L * *",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1769817600000,
+        1772236800000,
+        1774915200000
+      ]
+    },
+    {
+      "schedule": "0 0 L 2 *",
+      "timezone": "UTC",
+      "from": 1798848000000,
+      "fires": [
+        1803772800000,
+        1835395200000
+      ]
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "from": 1767312000500,
+      "fires": [
+        1767312060000,
+        1767312120000
+      ]
+    },
+    {
+      "schedule": "* * * * * *",
+      "timezone": "UTC",
+      "from": 1767312000500,
+      "fires": [
+        1767312001000,
+        1767312002000
+      ]
+    },
+    {
+      "schedule": "*/15 * * * * *",
+      "timezone": "UTC",
+      "from": 1767312059999,
+      "fires": [
+        1767312060000,
+        1767312075000,
+        1767312090000
+      ]
+    },
+    {
+      "schedule": "0 9-17/4 * * mon-fri",
+      "timezone": "UTC",
+      "from": 1767960000000,
+      "fires": [
+        1767963600000,
+        1767978000000,
+        1768208400000,
+        1768222800000
+      ]
+    },
+    {
+      "schedule": "0 0 1 jan,jul *",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1782864000000,
+        1798761600000,
+        1814400000000
+      ]
+    },
+    {
+      "schedule": "45 23 31 12 *",
+      "timezone": "UTC",
+      "from": 1798760699000,
+      "fires": [
+        1798760700000,
+        1830296700000
+      ]
+    },
+    {
+      "schedule": "0 2 * * *",
+      "from": 1767605400000,
+      "fires": [
+        1767664800000,
+        1767751200000
+      ]
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "Asia/Kolkata",
+      "from": 1767605400000,
+      "fires": [
+        1767645000000,
+        1767731400000
+      ]
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "Pacific/Chatham",
+      "from": 1775260800000,
+      "fires": [
+        1775304900000,
+        1775394900000,
+        1775481300000
+      ]
+    },
+    {
+      "schedule": "0 0 L * 1L",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1769385600000,
+        1769817600000,
+        1771804800000,
+        1772236800000,
+        1774828800000,
+        1774915200000
+      ]
+    },
+    {
+      "schedule": "0 0 1-7 * 1",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767398400000,
+        1767484800000,
+        1767571200000,
+        1767657600000,
+        1767744000000,
+        1768176000000
+      ]
+    },
+    {
+      "schedule": "0 0 1-7 * +1",
+      "timezone": "UTC",
+      "from": 1767312000000,
+      "fires": [
+        1767571200000,
+        1769990400000,
+        1772409600000
+      ]
+    },
+    {
+      "schedule": "*/7 * * * *",
+      "timezone": "UTC",
+      "from": 1767315000000,
+      "fires": [
+        1767315360000,
+        1767315600000,
+        1767316020000
+      ]
+    },
+    {
+      "schedule": "0 0 */5 * *",
+      "timezone": "UTC",
+      "from": 1769299200000,
+      "fires": [
+        1769385600000,
+        1769817600000,
+        1769904000000
+      ]
+    },
+    {
+      "schedule": "0 0 1 */3 *",
+      "timezone": "UTC",
+      "from": 1769299200000,
+      "fires": [
+        1775001600000,
+        1782864000000,
+        1790812800000
+      ]
+    },
+    {
+      "schedule": "0 0 * * 0#5",
+      "timezone": "UTC",
+      "from": 1767225600000,
+      "fires": [
+        1774742400000,
+        1780185600000,
+        1788048000000
+      ]
+    },
+    {
+      "schedule": "0 0 30 * 5#1",
+      "timezone": "UTC",
+      "from": 1769904000000,
+      "fires": [
+        1770336000000,
+        1772755200000,
+        1774828800000,
+        1775174400000
+      ]
+    }
+  ],
+  "nextFire": [
+    {
+      "schedule": "every 1h",
+      "from": 1000,
+      "lastRunAt": 500,
+      "expected": 3600500
+    },
+    {
+      "schedule": "every 1h",
+      "from": 1000,
+      "lastRunAt": null,
+      "expected": 3601000
+    },
+    {
+      "schedule": "every 5m",
+      "from": 1767605400000,
+      "lastRunAt": 1767604980000,
+      "expected": 1767605280000
+    },
+    {
+      "schedule": "every 90s",
+      "from": 1767605400000,
+      "lastRunAt": null,
+      "expected": 1767605490000
+    }
+  ],
+  "expectation": [
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664620000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767665400000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664739000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767665400000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664740000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664741000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664769000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664770000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664799000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664800000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664801000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767664830000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767665100000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": 1767667800000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": null,
+      "registeredAt": 1767664799999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767664800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": null,
+      "registeredAt": 1767664800000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767664800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": null,
+      "registeredAt": 1767664800001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751200000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767664800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664620000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767665400000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664739000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767665400000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664740000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664741000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664769000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664770000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664799000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664800000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664801000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767664830000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767665100000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767667800000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767664799999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767664800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767664800000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767664800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767664800001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767751200000,
+        "deadline": 1767751200000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767664800000,
+        "deadline": 1767664800000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605520000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605700000,
+        "deadline": 1767606300000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605639000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605700000,
+        "deadline": 1767606300000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605640000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605641000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605669000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605670000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605699000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605700000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605701000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767605730000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767606000000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606300000,
+        "deadline": 1767606900000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": 1767608700000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": null,
+      "registeredAt": 1767605699999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605700000,
+        "deadline": 1767605700000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": null,
+      "registeredAt": 1767605700000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605700000,
+        "deadline": 1767605700000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": null,
+      "registeredAt": 1767605700001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606000000
+      }
+    },
+    {
+      "schedule": "*/5 * * * *",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767594600000,
+        "deadline": 1767594600000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605280000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605340000,
+        "deadline": 1767605940000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605399000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605460000,
+        "deadline": 1767606060000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605400000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605460000,
+        "deadline": 1767606060000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605401000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605460000,
+        "deadline": 1767606060000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605429000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605460000,
+        "deadline": 1767606060000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605430000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767606120000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605459000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767606120000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605460000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767606120000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605461000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767606120000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605490000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605580000,
+        "deadline": 1767606180000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605760000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605820000,
+        "deadline": 1767606420000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767608460000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608520000,
+        "deadline": 1767609120000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605459999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605460000,
+        "deadline": 1767605460000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605460000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605460000,
+        "deadline": 1767605460000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605460001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767605520000
+      }
+    },
+    {
+      "schedule": "* * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767594600000,
+        "deadline": 1767594600000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607020000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767607200000,
+        "deadline": 1767607800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607139000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767607200000,
+        "deadline": 1767607800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607140000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607141000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607169000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607170000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607199000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607200000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607201000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607230000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607500000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767610200000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767607199999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767607200000,
+        "deadline": 1767607200000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767607200000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767607200000,
+        "deadline": 1767607200000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767607200001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767610800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767596400000,
+        "deadline": 1767596400000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761420000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1798761600000,
+        "deadline": 1798762200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761539000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1798761600000,
+        "deadline": 1798762200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761540000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761541000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761569000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761570000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761599000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761600000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761601000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761630000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798761900000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1798764600000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830298200000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1798761599999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1798761600000,
+        "deadline": 1798761600000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1798761600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1798761600000,
+        "deadline": 1798761600000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1798761600001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1830297600000,
+        "deadline": 1830297600000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1798761600000,
+        "deadline": 1798761600000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395020000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1835395200000,
+        "deadline": 1835395800000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395139000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1835395200000,
+        "deadline": 1835395800000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395140000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395141000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395169000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395170000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395199000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395200000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395201000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395230000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835395500000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1835398200000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961626200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1835395199999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1835395200000,
+        "deadline": 1835395200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1835395200000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1835395200000,
+        "deadline": 1835395200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1835395200001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1961625600000,
+        "deadline": 1961625600000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1835395200000,
+        "deadline": 1835395200000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657420000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767657600000,
+        "deadline": 1767658200000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657539000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767657600000,
+        "deadline": 1767658200000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657540000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657541000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657569000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657570000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657599000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657600000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657601000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657630000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767657900000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": 1767660600000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767657599999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767657600000,
+        "deadline": 1767657600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767657600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767657600000,
+        "deadline": 1767657600000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767657600001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767744000000,
+        "deadline": 1767744000000
+      }
+    },
+    {
+      "schedule": "0 0 * * 1-5",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767657600000,
+        "deadline": 1767657600000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605340000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767606120000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605459000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767606120000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605460000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605461000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605489000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605490000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605519000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605520000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605521000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605550000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605820000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767608520000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608640000,
+        "deadline": 1767609240000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605519999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767605520000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605520000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767605520000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605520001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767605640000
+      }
+    },
+    {
+      "schedule": "*/2 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767594600000,
+        "deadline": 1767594600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607020000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767607200000,
+        "deadline": 1767607800000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607139000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767607200000,
+        "deadline": 1767607800000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607140000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607141000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607169000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607170000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607199000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607200000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607201000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607230000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767607500000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767610200000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767610800000,
+        "deadline": 1767611400000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767607199999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767607200000,
+        "deadline": 1767607200000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767607200000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767607200000,
+        "deadline": 1767607200000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767607200001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609000000
+      }
+    },
+    {
+      "schedule": "0 */30 * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767594600000,
+        "deadline": 1767594600000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605240000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605260000,
+        "deadline": 1767605860000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605359000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605380000,
+        "deadline": 1767605980000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605360000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605380000,
+        "deadline": 1767605980000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605361000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605380000,
+        "deadline": 1767605980000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605389000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605400000,
+        "deadline": 1767606000000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605390000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605420000,
+        "deadline": 1767606020000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605419000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605440000,
+        "deadline": 1767606040000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605420000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605440000,
+        "deadline": 1767606040000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605421000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605440000,
+        "deadline": 1767606040000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605450000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605480000,
+        "deadline": 1767606080000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767605720000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605740000,
+        "deadline": 1767606340000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": 1767608420000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608440000,
+        "deadline": 1767609040000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605419999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605420000,
+        "deadline": 1767605420000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605420000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605420000,
+        "deadline": 1767605420000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767605420001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605440000,
+        "deadline": 1767605440000
+      }
+    },
+    {
+      "schedule": "*/20 * * * * *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767594600000,
+        "deadline": 1767594600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621420000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767621600000,
+        "deadline": 1767622200000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621539000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767621600000,
+        "deadline": 1767622200000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621540000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621541000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621569000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621570000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621599000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621600000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621601000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621630000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767621900000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767624600000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": null,
+      "registeredAt": 1767621599999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767621600000,
+        "deadline": 1767621600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": null,
+      "registeredAt": 1767621600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767621600000,
+        "deadline": 1767621600000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": null,
+      "registeredAt": 1767621600001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767708000000,
+        "deadline": 1767708000000
+      }
+    },
+    {
+      "schedule": "0 9 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767621600000,
+        "deadline": 1767621600000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605220000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608820000,
+        "deadline": 1767609420000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605339000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608939000,
+        "deadline": 1767609539000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605340000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608940000,
+        "deadline": 1767609540000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605341000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608941000,
+        "deadline": 1767609541000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605369000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608969000,
+        "deadline": 1767609569000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605370000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608970000,
+        "deadline": 1767609570000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605399000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608999000,
+        "deadline": 1767609599000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605400000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609600000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605401000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609001000,
+        "deadline": 1767609601000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605430000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609030000,
+        "deadline": 1767609630000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767605700000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767609300000,
+        "deadline": 1767609900000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": 1767608400000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767612000000,
+        "deadline": 1767612600000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": null,
+      "registeredAt": 1767605399999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767608999999,
+        "deadline": 1767608999999
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": null,
+      "registeredAt": 1767605400000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767609000000,
+        "deadline": 1767609000000
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": null,
+      "registeredAt": 1767605400001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767609000001,
+        "deadline": 1767609000001
+      }
+    },
+    {
+      "schedule": "every 1h",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767598200000,
+        "deadline": 1767598200000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605220000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767606120000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605339000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605639000,
+        "deadline": 1767606239000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605340000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605640000,
+        "deadline": 1767606240000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605341000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605641000,
+        "deadline": 1767606241000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605369000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605669000,
+        "deadline": 1767606269000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605370000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605670000,
+        "deadline": 1767606270000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605399000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605699000,
+        "deadline": 1767606299000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605400000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605700000,
+        "deadline": 1767606300000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605401000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605701000,
+        "deadline": 1767606301000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605430000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605730000,
+        "deadline": 1767606330000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767605700000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767606000000,
+        "deadline": 1767606600000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": 1767608400000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608700000,
+        "deadline": 1767609300000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": null,
+      "registeredAt": 1767605399999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605699999,
+        "deadline": 1767605699999
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": null,
+      "registeredAt": 1767605400000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605700000,
+        "deadline": 1767605700000
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": null,
+      "registeredAt": 1767605400001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605700001,
+        "deadline": 1767605700001
+      }
+    },
+    {
+      "schedule": "every 5m",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767594900000,
+        "deadline": 1767594900000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605220000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605310000,
+        "deadline": 1767605910000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605339000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605429000,
+        "deadline": 1767606029000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605340000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605430000,
+        "deadline": 1767606030000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605341000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605431000,
+        "deadline": 1767606031000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605369000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605459000,
+        "deadline": 1767606059000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605370000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605460000,
+        "deadline": 1767606060000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605399000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605489000,
+        "deadline": 1767606089000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605400000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605490000,
+        "deadline": 1767606090000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605401000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605491000,
+        "deadline": 1767606091000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605430000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605520000,
+        "deadline": 1767606120000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767605700000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767605790000,
+        "deadline": 1767606390000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767608400000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1767608490000,
+        "deadline": 1767609090000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": null,
+      "registeredAt": 1767605399999,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605489999,
+        "deadline": 1767605489999
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": null,
+      "registeredAt": 1767605400000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605490000,
+        "deadline": 1767605490000
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": null,
+      "registeredAt": 1767605400001,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767605490001,
+        "deadline": 1767605490001
+      }
+    },
+    {
+      "schedule": "every 90s",
+      "timezone": "America/New_York",
+      "lastRunAt": null,
+      "registeredAt": 1767594600000,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1767594690000,
+        "deadline": 1767594690000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772946000000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772946433000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772946866000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772947299000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772947732000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772948165000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772948598000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949031000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949464000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949897000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772950330000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772950763000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951196000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951629000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952062000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952495000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952928000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953361000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953794000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954227000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954660000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955093000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955526000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955959000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772956392000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772956825000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772957258000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772957691000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958124000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958557000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958990000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772959423000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772959856000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772960289000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773038400000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772946000000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772946433000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772946866000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772947299000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772947732000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772948165000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772948598000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949031000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949464000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949897000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772950330000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772950763000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951196000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951629000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952062000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952495000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952928000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953361000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953794000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954227000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954660000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955093000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955526000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955959000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772956392000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772956825000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772957258000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772957691000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958124000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958557000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958990000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772959423000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772959856000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "0 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772960289000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036000000,
+        "deadline": 1773036600000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951400000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772952000000,
+        "deadline": 1772952600000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951581000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772952000000,
+        "deadline": 1772952600000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951762000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772952000000,
+        "deadline": 1772952600000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951943000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772952600000,
+        "deadline": 1772953200000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952124000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772952600000,
+        "deadline": 1772953200000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952305000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772952600000,
+        "deadline": 1772953200000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952486000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772952600000,
+        "deadline": 1772953200000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952667000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952848000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953029000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953210000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953800000,
+        "deadline": 1772954400000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953391000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953800000,
+        "deadline": 1772954400000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953572000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953800000,
+        "deadline": 1772954400000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953753000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954400000,
+        "deadline": 1772955000000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953934000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954400000,
+        "deadline": 1772955000000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954115000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954400000,
+        "deadline": 1772955000000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954296000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954400000,
+        "deadline": 1772955000000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954477000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954658000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954839000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955600000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955020000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955600000,
+        "deadline": 1772956200000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955201000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955600000,
+        "deadline": 1772956200000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955382000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772955600000,
+        "deadline": 1772956200000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955563000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772956200000,
+        "deadline": 1772956800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772947800000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772949600000,
+        "deadline": 1772950200000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772948460000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772949600000,
+        "deadline": 1772950200000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949120000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772949600000,
+        "deadline": 1772950200000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949780000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772950440000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951100000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951760000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952420000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953080000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772953200000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953740000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772956800000,
+        "deadline": 1772957400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954400000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772956800000,
+        "deadline": 1772957400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955060000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772956800000,
+        "deadline": 1772957400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955720000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772956800000,
+        "deadline": 1772957400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772956380000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772956800000,
+        "deadline": 1772957400000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772957040000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772960400000,
+        "deadline": 1772961000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772957700000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772960400000,
+        "deadline": 1772961000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958360000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772960400000,
+        "deadline": 1772961000000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793505600000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793506033000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793506466000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793506899000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793507332000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793507765000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793508198000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793508631000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793509064000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793509497000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793509930000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793510363000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793510796000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793511229000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793511662000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793512095000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793512528000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793512961000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793513394000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793513827000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793514260000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793514693000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793515126000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793515559000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793515992000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793516425000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793516858000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793517291000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793517724000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793518157000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793518590000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793519023000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793519456000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793519889000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793601000000,
+        "deadline": 1793601600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793505600000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793507400000,
+        "deadline": 1793508000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793506033000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793507400000,
+        "deadline": 1793508000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793506466000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793507400000,
+        "deadline": 1793508000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793506899000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793507400000,
+        "deadline": 1793508000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793507332000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793507400000,
+        "deadline": 1793508000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793507765000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793509200000,
+        "deadline": 1793509800000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793508198000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793509200000,
+        "deadline": 1793509800000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793508631000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793509200000,
+        "deadline": 1793509800000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793509064000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793509200000,
+        "deadline": 1793509800000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793509497000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793509930000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793510363000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793510796000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793511000000,
+        "deadline": 1793511600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793511229000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793511662000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793512095000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793512528000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793512961000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793513394000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793513827000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793514260000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793514693000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793515126000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793515559000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793515992000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793516425000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793518200000,
+        "deadline": 1793518800000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793516858000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793518200000,
+        "deadline": 1793518800000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793517291000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793518200000,
+        "deadline": 1793518800000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793517724000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793518200000,
+        "deadline": 1793518800000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793518157000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793520000000,
+        "deadline": 1793520600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793518590000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793520000000,
+        "deadline": 1793520600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793519023000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793520000000,
+        "deadline": 1793520600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793519456000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793520000000,
+        "deadline": 1793520600000
+      }
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793519889000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793520000000,
+        "deadline": 1793520600000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793507400000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793509200000,
+        "deadline": 1793509800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793508060000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793509200000,
+        "deadline": 1793509800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793508720000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793509200000,
+        "deadline": 1793509800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793509380000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793510040000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793510700000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793511360000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793512020000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793512680000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793513340000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793514000000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793514660000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793515320000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793515980000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793516400000,
+        "deadline": 1793517000000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793516640000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793520000000,
+        "deadline": 1793520600000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793517300000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793520000000,
+        "deadline": 1793520600000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1793517960000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1793520000000,
+        "deadline": 1793520600000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772946000000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772946540000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772947080000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772947620000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772948160000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772948700000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949240000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772949780000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772950320000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772950860000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951400000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772951940000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772952480000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953020000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1772954100000,
+        "deadline": 1772954700000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953560000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954100000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772954640000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955180000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955720000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772956260000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772956800000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772957340000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772957880000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958420000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772958960000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772959500000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "15 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772960040000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1773036900000,
+        "deadline": 1773037500000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774742400000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774742820000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774743240000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774743660000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774744080000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774744500000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774744920000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774745340000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774745760000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774747800000,
+        "deadline": 1774748400000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774746180000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774746600000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774747020000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774747440000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774747860000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774748280000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774748700000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774749120000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774749540000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774749960000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774750380000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774750800000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1774751220000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1774830600000,
+        "deadline": 1774831200000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792886400000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792888200000,
+        "deadline": 1792888800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792886820000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792888200000,
+        "deadline": 1792888800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792887240000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792888200000,
+        "deadline": 1792888800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792887660000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792888200000,
+        "deadline": 1792888800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792888080000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792888200000,
+        "deadline": 1792888800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792888500000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792888920000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792889340000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792889760000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792890180000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792890600000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792891020000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792891440000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792891860000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792892280000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792892700000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792893120000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792893540000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792893960000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792894380000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792894800000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 1 * * *",
+      "timezone": "Europe/London",
+      "lastRunAt": 1792895220000,
+      "registeredAt": 0,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1792978200000,
+        "deadline": 1792978800000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772868600000,
+      "registeredAt": 0,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1772955000000,
+        "deadline": 1772955000000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953202000,
+      "registeredAt": 0,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773037800000
+      }
+    },
+    {
+      "schedule": "30 2 * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772955001000,
+      "registeredAt": 0,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1773037800000,
+        "deadline": 1773037800000
+      }
+    },
+    {
+      "schedule": "*/10 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953202000,
+      "registeredAt": 0,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1772953800000,
+        "deadline": 1772953800000
+      }
+    },
+    {
+      "schedule": "0 * * * *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1772953202000,
+      "registeredAt": 0,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1772956800000,
+        "deadline": 1772956800000
+      }
+    },
+    {
+      "schedule": "0 0 1 1 *",
+      "timezone": "UTC",
+      "lastRunAt": 1767225603000,
+      "registeredAt": 1767139200000,
+      "graceMs": 600000,
+      "expected": {
+        "dueAt": 1798761600000,
+        "deadline": 1798762200000
+      }
+    },
+    {
+      "schedule": "0 0 29 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1709164801000,
+      "registeredAt": 0,
+      "graceMs": 0,
+      "expected": {
+        "dueAt": 1835395200000,
+        "deadline": 1835395200000
+      }
+    }
+  ],
+  "runCovers": [
+    {
+      "startedAt": 1767605400000,
+      "dueAt": 1767605400000,
+      "followingAt": null,
+      "expected": true
+    },
+    {
+      "startedAt": 1767605341000,
+      "dueAt": 1767605400000,
+      "followingAt": null,
+      "expected": true
+    },
+    {
+      "startedAt": 1767605700000,
+      "dueAt": 1767605400000,
+      "followingAt": null,
+      "expected": true
+    },
+    {
+      "startedAt": 1767605339000,
+      "dueAt": 1767605400000,
+      "followingAt": null,
+      "expected": false
+    },
+    {
+      "startedAt": 1767605340000,
+      "dueAt": 1767605400000,
+      "followingAt": null,
+      "expected": true
+    },
+    {
+      "startedAt": 1767605370000,
+      "dueAt": 1767605400000,
+      "followingAt": 1767605460000,
+      "expected": true
+    },
+    {
+      "startedAt": 1767605369000,
+      "dueAt": 1767605400000,
+      "followingAt": 1767605460000,
+      "expected": false
+    },
+    {
+      "startedAt": 1767605385000,
+      "dueAt": 1767605400000,
+      "followingAt": 1767605430000,
+      "expected": true
+    },
+    {
+      "startedAt": 1767605384999,
+      "dueAt": 1767605400000,
+      "followingAt": 1767605430000,
+      "expected": false
+    },
+    {
+      "startedAt": 1767605340000,
+      "dueAt": 1767605400000,
+      "followingAt": 1767606000000,
+      "expected": true
+    },
+    {
+      "startedAt": 1767605339999,
+      "dueAt": 1767605400000,
+      "followingAt": 1767606000000,
+      "expected": false
+    },
+    {
+      "startedAt": 1767605370000,
+      "dueAt": 1767605400000,
+      "followingAt": 1767605461001,
+      "expected": true
+    },
+    {
+      "startedAt": 1767605369500,
+      "dueAt": 1767605400000,
+      "followingAt": 1767605461001,
+      "expected": true
+    }
+  ]
+}

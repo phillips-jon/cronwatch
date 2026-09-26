@@ -1,0 +1,1403 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.2.0",
+  "alerts": [
+    {
+      "draft": {
+        "type": "missed",
+        "run": null,
+        "details": {
+          "dueAt": 1767603600000,
+          "deadline": 1767604500000,
+          "graceMs": 900000,
+          "lastRunAt": null
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "missed",
+        "run": null,
+        "details": {
+          "dueAt": 1767603600000,
+          "deadline": 1767604500000,
+          "graceMs": 900000,
+          "lastRunAt": null
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly missed its scheduled run",
+        "message": "Due 2026-01-05 09:00:00 UTC (30m ago), and no run had started by 2026-01-05 09:15:00 UTC (15m ago) (grace 15m).\nSchedule: 0 2 * * *.\nLast run: never.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "missed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767519000000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "dueAt": 1767604800000,
+          "deadline": 1767605398000,
+          "graceMs": 480000,
+          "lastRunAt": 1767519000000
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "timezone": "America/New_York"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "missed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767519000000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "dueAt": 1767604800000,
+          "deadline": 1767605398000,
+          "graceMs": 480000,
+          "lastRunAt": 1767519000000
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "timezone": "America/New_York"
+        },
+        "title": "nightly missed its scheduled run",
+        "message": "Due 2026-01-05 09:20:00 UTC (10m ago), and no run had started by 2026-01-05 09:29:58 UTC (now) (grace 8m).\nSchedule: 0 2 * * * (America/New_York).\nLast run: ok 2026-01-04 09:30:00 UTC (1d ago).",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "missed",
+        "run": null,
+        "details": {
+          "dueAt": 1767612600000,
+          "deadline": 1767616200000,
+          "graceMs": 3600000,
+          "lastRunAt": null
+        }
+      },
+      "definition": {
+        "name": "odd"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "missed",
+        "run": null,
+        "details": {
+          "dueAt": 1767612600000,
+          "deadline": 1767616200000,
+          "graceMs": 3600000,
+          "lastRunAt": null
+        },
+        "job": "odd",
+        "definition": {
+          "name": "odd"
+        },
+        "title": "odd missed its scheduled run",
+        "message": "Due 2026-01-05 11:30:00 UTC (in 2h), and no run had started by 2026-01-05 12:30:00 UTC (in 3h) (grace 1h).\nSchedule: undefined.\nLast run: never.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605402000,
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: boom",
+        "at": 1767605402000
+      }
+    },
+    {
+      "draft": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "boom\nsecond line\nthird\nfourth\nfifth",
+          "output": "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n\n",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 4,
+          "threshold": 3
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767609000000,
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "boom\nsecond line\nthird\nfourth\nfifth",
+          "output": "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n\n",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 4,
+          "threshold": 3
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "4 consecutive failures.\nStarted 2026-01-05 09:30:00 UTC (1h ago), ran 2s.\nError: boom\nsecond line\nthird\nfourth\nOutput (tail):\nc\nd\ne\nf\ng\nh\ni\nj",
+        "at": 1767609000000
+      }
+    },
+    {
+      "draft": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": "HTTP 503 Service Unavailable",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 2,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767864600000,
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": "HTTP 503 Service Unavailable",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 2,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "2 consecutive failures.\nStarted 2026-01-05 09:30:00 UTC (3d ago).\nError: HTTP 503 Service Unavailable",
+        "at": 1767864600000
+      }
+    },
+    {
+      "draft": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "$weird: yes",
+          "output": "   ",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "$weird: yes",
+          "output": "   ",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\n$weird: yes",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Some::Error: namespaced",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Some::Error: namespaced",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: Some::Error: namespaced",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "failed",
+        "run": null,
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "failed",
+        "run": null,
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 3600001,
+          "error": null,
+          "output": "started\nhalfway",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767609000000,
+      "alert": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 3600001,
+          "error": null,
+          "output": "started\nhalfway",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly is stuck",
+        "message": "Started 2026-01-05 09:30:00 UTC (1h ago) and never reported finishing. Marked as timed out after 1h.\nOutput so far (tail):\nstarted\nhalfway\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+        "at": 1767609000000
+      }
+    },
+    {
+      "draft": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": 1767605400000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 2,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767623400000,
+      "alert": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": 1767605400000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 2,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly is stuck",
+        "message": "Started 2026-01-05 09:30:00 UTC (5h ago) and never reported finishing. Marked as timed out after 5h.\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+        "at": 1767623400000
+      }
+    },
+    {
+      "draft": {
+        "type": "stuck",
+        "run": null,
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "stuck",
+        "run": null,
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly is stuck",
+        "message": "If the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "slow",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 15000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "durationMs": 15000,
+          "thresholdMs": 10000,
+          "basis": "twice the p95 of the last 5 runs (1s)"
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605460000,
+      "alert": {
+        "type": "slow",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 15000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "durationMs": 15000,
+          "thresholdMs": 10000,
+          "basis": "twice the p95 of the last 5 runs (1s)"
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly was slow",
+        "message": "Took 15s; the limit is 10s (twice the p95 of the last 5 runs (1s)).\nStarted 2026-01-05 09:30:00 UTC (1m ago).",
+        "at": 1767605460000
+      }
+    },
+    {
+      "draft": {
+        "type": "slow",
+        "run": null,
+        "details": {
+          "durationMs": 999,
+          "thresholdMs": 500,
+          "basis": "maxDuration"
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "slow",
+        "run": null,
+        "details": {
+          "durationMs": 999,
+          "thresholdMs": 500,
+          "basis": "maxDuration"
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly was slow",
+        "message": "Took 999ms; the limit is 500ms (maxDuration).",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "over_budget",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "breaches": [
+            {
+              "metric": "cost",
+              "value": 1.2,
+              "limit": 1,
+              "basis": "budget"
+            },
+            {
+              "metric": "tokens",
+              "value": 5000,
+              "limit": 3000,
+              "basis": "three times the usual 1,000"
+            }
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "over_budget",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "breaches": [
+            {
+              "metric": "cost",
+              "value": 1.2,
+              "limit": 1,
+              "basis": "budget"
+            },
+            {
+              "metric": "tokens",
+              "value": 5000,
+              "limit": 3000,
+              "basis": "three times the usual 1,000"
+            }
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly went over budget",
+        "message": "cost: 1.2, limit 1 (budget).\ntokens: 5,000, limit 3,000 (three times the usual 1,000).\nStarted 2026-01-05 09:30:00 UTC (now).",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "over_budget",
+        "run": null,
+        "details": {
+          "breaches": [
+            {
+              "metric": "rows",
+              "value": 1234567.891,
+              "limit": 1e+21,
+              "basis": "budget"
+            },
+            {
+              "metric": "tiny",
+              "value": 0.00005,
+              "limit": 0.00001,
+              "basis": "budget"
+            },
+            {
+              "metric": "neg",
+              "value": -1234.5,
+              "limit": -2000,
+              "basis": "budget"
+            }
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "over_budget",
+        "run": null,
+        "details": {
+          "breaches": [
+            {
+              "metric": "rows",
+              "value": 1234567.891,
+              "limit": 1e+21,
+              "basis": "budget"
+            },
+            {
+              "metric": "tiny",
+              "value": 0.00005,
+              "limit": 0.00001,
+              "basis": "budget"
+            },
+            {
+              "metric": "neg",
+              "value": -1234.5,
+              "limit": -2000,
+              "basis": "budget"
+            }
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly went over budget",
+        "message": "rows: 1,234,567.891, limit 1,000,000,000,000,000,000,000 (budget).\ntiny: 0.0001, limit 0 (budget).\nneg: -1,234.5, limit -2,000 (budget).",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "missed",
+            "over_budget",
+            "failed"
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605520000,
+      "alert": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "missed",
+            "over_budget",
+            "failed"
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly recovered",
+        "message": "A run 2026-01-05 09:30:00 UTC (2m ago) succeeded after: missed, over budget, failed.\nRan 2s.",
+        "at": 1767605520000
+      }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": []
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": []
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly recovered",
+        "message": "A run 2026-01-05 09:30:00 UTC (now) succeeded.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": null,
+        "details": {
+          "after": [
+            "stuck"
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "recovered",
+        "run": null,
+        "details": {
+          "after": [
+            "stuck"
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly recovered",
+        "message": "A run just now succeeded after: stuck.",
+        "at": 1767605400000
+      }
+    }
+  ],
+  "numbers": [
+    {
+      "n": 0,
+      "text": "0"
+    },
+    {
+      "n": 1,
+      "text": "1"
+    },
+    {
+      "n": -1,
+      "text": "-1"
+    },
+    {
+      "n": 12,
+      "text": "12"
+    },
+    {
+      "n": 999,
+      "text": "999"
+    },
+    {
+      "n": 1000,
+      "text": "1,000"
+    },
+    {
+      "n": 1234,
+      "text": "1,234"
+    },
+    {
+      "n": 12345.6789,
+      "text": "12,345.6789"
+    },
+    {
+      "n": 1234567.891,
+      "text": "1,234,567.891"
+    },
+    {
+      "n": 0.5,
+      "text": "0.5"
+    },
+    {
+      "n": 0.30000000000000004,
+      "text": "0.3"
+    },
+    {
+      "n": 1.00005,
+      "text": "1.0001"
+    },
+    {
+      "n": 0.00005,
+      "text": "0.0001"
+    },
+    {
+      "n": 0.00004,
+      "text": "0"
+    },
+    {
+      "n": 1234.56785,
+      "text": "1,234.5679"
+    },
+    {
+      "n": 999999.99995,
+      "text": "1,000,000"
+    },
+    {
+      "n": 2.5,
+      "text": "2.5"
+    },
+    {
+      "n": 1e+21,
+      "text": "1,000,000,000,000,000,000,000"
+    },
+    {
+      "n": 1.5e+21,
+      "text": "1,500,000,000,000,000,000,000"
+    },
+    {
+      "n": 123456789012,
+      "text": "123,456,789,012"
+    },
+    {
+      "n": -0.5,
+      "text": "-0.5"
+    },
+    {
+      "n": -1234.5,
+      "text": "-1,234.5"
+    },
+    {
+      "n": 0.30000000000000004,
+      "text": "0.3"
+    },
+    {
+      "n": 0.3333333333333333,
+      "text": "0.3333"
+    },
+    {
+      "n": 0.6666666666666666,
+      "text": "0.6667"
+    },
+    {
+      "n": 100.12345,
+      "text": "100.1235"
+    },
+    {
+      "n": -0.00001,
+      "text": "-0"
+    },
+    {
+      "n": -0.00005,
+      "text": "-0.0001"
+    },
+    {
+      "n": 0.99995,
+      "text": "1"
+    },
+    {
+      "n": 9.99995,
+      "text": "10"
+    },
+    {
+      "n": -9.99995,
+      "text": "-10"
+    },
+    {
+      "n": 0.00015,
+      "text": "0.0002"
+    },
+    {
+      "n": 1e-7,
+      "text": "0"
+    },
+    {
+      "n": 1.23456e-10,
+      "text": "0"
+    },
+    {
+      "n": 123456.00004,
+      "text": "123,456"
+    },
+    {
+      "n": 99999.99999,
+      "text": "100,000"
+    },
+    {
+      "n": 4000001.5,
+      "text": "4,000,001.5"
+    },
+    {
+      "n": 0.00001,
+      "text": "0"
+    }
+  ],
+  "capOutput": [
+    {
+      "prefix": "short",
+      "piece": "",
+      "times": 0,
+      "length": 5,
+      "sha256": "f9b0078b5df596d2ea19010c001bbd009e651de2c57e8fb7e355f31eb9d3f739"
+    },
+    {
+      "prefix": "",
+      "piece": "",
+      "times": 0,
+      "length": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "prefix": "",
+      "piece": "x",
+      "times": 16384,
+      "length": 16384,
+      "sha256": "1536c422c31cc98834759d7085cda394a3510a03d78188248986a6b1a7207d03"
+    },
+    {
+      "prefix": "",
+      "piece": "x",
+      "times": 16385,
+      "length": 16409,
+      "sha256": "7e271d64d9aeaf95719ea8830cf580e5b114f9bbe54480276890e10de3dddd06"
+    },
+    {
+      "prefix": "",
+      "piece": "ab\n",
+      "times": 10000,
+      "length": 16409,
+      "sha256": "898717094878463e9dff4dfded948b91d9bff52874e20f750c791db96dc9f6bc"
+    },
+    {
+      "prefix": "",
+      "piece": "é",
+      "times": 17000,
+      "length": 16409,
+      "sha256": "4f39e5bcc3ef38f8392f855ce2f08a978c91f5d6e8ef45ff4f178b7cdd29ee6f"
+    },
+    {
+      "prefix": "",
+      "piece": "😀",
+      "times": 9000,
+      "length": 16409,
+      "sha256": "34ec952d4eebd2cacdfb3ab6e59e531b371705e962028c1de13cdd71bb436b01"
+    },
+    {
+      "prefix": "a",
+      "piece": "😀",
+      "times": 8192,
+      "length": 16409,
+      "sha256": "34ec952d4eebd2cacdfb3ab6e59e531b371705e962028c1de13cdd71bb436b01"
+    },
+    {
+      "prefix": "line\n",
+      "piece": "é😀x",
+      "times": 6000,
+      "length": 16409,
+      "sha256": "2625e6c949a4f4d74be521d0e0a5be3d67ee340ebb8a1a2425da3b4adf32f4a5"
+    }
+  ],
+  "toStored": [
+    {
+      "definition": {
+        "name": "a",
+        "schedule": "0 2 * * *",
+        "expect": "wrote"
+      },
+      "stored": {
+        "name": "a",
+        "schedule": "0 2 * * *",
+        "expect": "contains \"wrote\""
+      }
+    },
+    {
+      "definition": {
+        "expect": "say \"hi\"\n\ttab\u0001",
+        "name": "b",
+        "grace": "5m"
+      },
+      "stored": {
+        "name": "b",
+        "grace": "5m",
+        "expect": "contains \"say \\\"hi\\\"\\n\\ttab\\u0001\""
+      }
+    },
+    {
+      "definition": {
+        "name": "c",
+        "expect": {
+          "regex": {
+            "source": "wrote \\d+ files",
+            "flags": ""
+          }
+        }
+      },
+      "stored": {
+        "name": "c",
+        "expect": "matches /wrote \\d+ files/"
+      }
+    },
+    {
+      "definition": {
+        "name": "d",
+        "expect": {
+          "regex": {
+            "source": "ok",
+            "flags": "i"
+          }
+        },
+        "timeout": 1000
+      },
+      "stored": {
+        "name": "d",
+        "timeout": 1000,
+        "expect": "matches /ok/i"
+      }
+    },
+    {
+      "definition": {
+        "name": "e",
+        "expect": {
+          "callable": true
+        },
+        "budget": {
+          "cost": 2
+        },
+        "tags": [
+          "x",
+          "y"
+        ]
+      },
+      "stored": {
+        "name": "e",
+        "budget": {
+          "cost": 2
+        },
+        "tags": [
+          "x",
+          "y"
+        ],
+        "expect": "custom function"
+      }
+    },
+    {
+      "definition": {
+        "name": "f",
+        "schedule": "@hourly",
+        "timezone": "UTC",
+        "grace": "15m",
+        "timeout": "1h",
+        "maxDuration": "5m",
+        "budget": {
+          "cost": 1.5
+        },
+        "failuresBeforeAlert": 2,
+        "description": "Nightly",
+        "tags": [
+          "billing"
+        ]
+      },
+      "stored": {
+        "name": "f",
+        "schedule": "@hourly",
+        "timezone": "UTC",
+        "grace": "15m",
+        "timeout": "1h",
+        "maxDuration": "5m",
+        "budget": {
+          "cost": 1.5
+        },
+        "failuresBeforeAlert": 2,
+        "description": "Nightly",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    {
+      "definition": {
+        "timezone": "UTC",
+        "grace": 60000,
+        "schedule": "every 5m",
+        "name": "g"
+      },
+      "stored": {
+        "timezone": "UTC",
+        "grace": 60000,
+        "schedule": "every 5m",
+        "name": "g"
+      }
+    }
+  ],
+  "checkExpectation": [
+    {
+      "expect": "wrote",
+      "output": "wrote 12 files",
+      "result": null
+    },
+    {
+      "expect": "wrote",
+      "output": "nothing to do",
+      "result": "Output did not contain \"wrote\""
+    },
+    {
+      "expect": "wrote",
+      "output": null,
+      "result": "Output did not contain \"wrote\""
+    },
+    {
+      "expect": "",
+      "output": "",
+      "result": null
+    },
+    {
+      "expect": "say \"hi\"",
+      "output": "hello",
+      "result": "Output did not contain \"say \\\"hi\\\"\""
+    },
+    {
+      "expect": {
+        "regex": {
+          "source": "wrote \\d+ files",
+          "flags": ""
+        }
+      },
+      "output": "wrote 12 files",
+      "result": null
+    },
+    {
+      "expect": {
+        "regex": {
+          "source": "wrote \\d+ files",
+          "flags": ""
+        }
+      },
+      "output": "wrote files",
+      "result": "Output did not match /wrote \\d+ files/"
+    },
+    {
+      "expect": {
+        "regex": {
+          "source": "ok",
+          "flags": "i"
+        }
+      },
+      "output": "OK",
+      "result": null
+    },
+    {
+      "expect": {
+        "regex": {
+          "source": "^done$",
+          "flags": ""
+        }
+      },
+      "output": "done",
+      "result": null
+    },
+    {
+      "expect": {
+        "regex": {
+          "source": "^done$",
+          "flags": ""
+        }
+      },
+      "output": "not done",
+      "result": "Output did not match /^done$/"
+    }
+  ]
+}
