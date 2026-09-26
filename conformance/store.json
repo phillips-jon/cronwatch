@@ -1,0 +1,293 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.2.0",
+  "prune": [
+    {
+      "name": "prune keeps each job's newest run, and running runs",
+      "events": [
+        {
+          "insert": [
+            {
+              "id": "r1",
+              "job": "a",
+              "status": "ok",
+              "startedAt": 1000,
+              "finishedAt": 1010,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "r2",
+              "job": "a",
+              "status": "failed",
+              "startedAt": 2000,
+              "finishedAt": 2010,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "r3",
+              "job": "a",
+              "status": "ok",
+              "startedAt": 3000,
+              "finishedAt": 3010,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "r4",
+              "job": "b",
+              "status": "ok",
+              "startedAt": 1500,
+              "finishedAt": 1510,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "r5",
+              "job": "c",
+              "status": "running",
+              "startedAt": 500,
+              "finishedAt": null,
+              "durationMs": null,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "r6",
+              "job": "c",
+              "status": "ok",
+              "startedAt": 400,
+              "finishedAt": 410,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            }
+          ]
+        },
+        {
+          "prune": 2500,
+          "pruned": 3,
+          "remaining": {
+            "a": [
+              "r3"
+            ],
+            "b": [
+              "r4"
+            ],
+            "c": [
+              "r5"
+            ]
+          }
+        },
+        {
+          "prune": 1000000,
+          "pruned": 0,
+          "remaining": {
+            "a": [
+              "r3"
+            ],
+            "b": [
+              "r4"
+            ],
+            "c": [
+              "r5"
+            ]
+          }
+        },
+        {
+          "insert": [
+            {
+              "id": "r7",
+              "job": "a",
+              "status": "timeout",
+              "startedAt": 4000,
+              "finishedAt": 4010,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "r8",
+              "job": "b",
+              "status": "ok",
+              "startedAt": 5000,
+              "finishedAt": 5010,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            }
+          ]
+        },
+        {
+          "prune": 4500,
+          "pruned": 2,
+          "remaining": {
+            "a": [
+              "r7"
+            ],
+            "b": [
+              "r8"
+            ],
+            "c": [
+              "r5"
+            ]
+          }
+        },
+        {
+          "prune": 1000000,
+          "pruned": 0,
+          "remaining": {
+            "a": [
+              "r7"
+            ],
+            "b": [
+              "r8"
+            ],
+            "c": [
+              "r5"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "two newest runs that started together are both kept",
+      "events": [
+        {
+          "insert": [
+            {
+              "id": "x1",
+              "job": "d",
+              "status": "ok",
+              "startedAt": 1000,
+              "finishedAt": 1010,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "x2",
+              "job": "d",
+              "status": "failed",
+              "startedAt": 1000,
+              "finishedAt": 1010,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "x3",
+              "job": "d",
+              "status": "ok",
+              "startedAt": 999,
+              "finishedAt": 1009,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            }
+          ]
+        },
+        {
+          "prune": 5000,
+          "pruned": 1,
+          "remaining": {
+            "d": [
+              "x2",
+              "x1"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a job whose newest run is still going keeps only that one",
+      "events": [
+        {
+          "insert": [
+            {
+              "id": "y1",
+              "job": "e",
+              "status": "ok",
+              "startedAt": 100,
+              "finishedAt": 110,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "y2",
+              "job": "e",
+              "status": "ok",
+              "startedAt": 200,
+              "finishedAt": 210,
+              "durationMs": 10,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            {
+              "id": "y3",
+              "job": "e",
+              "status": "running",
+              "startedAt": 300,
+              "finishedAt": null,
+              "durationMs": null,
+              "error": null,
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            }
+          ]
+        },
+        {
+          "prune": 250,
+          "pruned": 2,
+          "remaining": {
+            "e": [
+              "y3"
+            ]
+          }
+        },
+        {
+          "prune": 10000,
+          "pruned": 0,
+          "remaining": {
+            "e": [
+              "y3"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

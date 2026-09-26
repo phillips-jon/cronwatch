@@ -119,9 +119,13 @@ module Cronwatch
       end
 
       # Delete finished runs that started before this time. Returns how many.
+      # Each job's newest run is kept whatever its age: without it, a job that
+      # runs less often than the retention looks like it never ran.
       def prune(before)
         sync do
-          gone = @runs.select { |_, r| r.status != :running && r.started_at < before }.keys
+          newest = {}
+          @runs.each_value { |r| newest[r.job] = [newest.fetch(r.job, r.started_at), r.started_at].max }
+          gone = @runs.select { |_, r| r.status != :running && r.started_at < before && r.started_at < newest[r.job] }.keys
           gone.each do |id|
             @runs.delete(id)
             @order.delete(id)

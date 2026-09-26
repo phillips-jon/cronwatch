@@ -236,6 +236,12 @@ module Cronwatch
         end
       return CheckEvaluation.new(state: next_state, alerts: alerts, next_expected_at: next_expected_at, due_at: nil) unless exp
 
+      # An interval's next run is due a period after the last one started. If that
+      # run is still going, the job is busy, not late; stuck covers one that never ends.
+      if parsed.interval? && last_run&.status == :running
+        return CheckEvaluation.new(state: next_state, alerts: alerts, next_expected_at: next_expected_at, due_at: exp.due_at)
+      end
+
       if now > exp.deadline
         if open_condition(next_state, :missed, now)
           alerts << AlertDraft.new(type: :missed, run: last_run,

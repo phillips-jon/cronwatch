@@ -117,6 +117,14 @@ class ConformanceTest < Minitest::Test
     end
   end
 
+  def test_schedule_next_fire_across_the_autumn_clock_change
+    each_case(SCHEDULE["autumn"]) do |c|
+      parsed = Cronwatch::Schedule.parse(c["schedule"], c["timezone"])
+      actual = c["next"].each_index.map { |i| Cronwatch::Schedule.next_fire(parsed, c["from"] + (i * c["stepMs"]), nil) }
+      differs(c["next"].map { |f| f && Cronwatch::JS.iso(f) }, actual.map { |f| f && Cronwatch::JS.iso(f) })
+    end
+  end
+
   def test_schedule_next_fire_for_intervals
     each_case(SCHEDULE["nextFire"]) do |c|
       differs(c["expected"], Cronwatch::Schedule.next_fire(Cronwatch::Schedule.parse(c["schedule"]), c["from"], c["lastRunAt"]))
@@ -170,12 +178,17 @@ class ConformanceTest < Minitest::Test
 
     def finish(id, now, fields)
       run = @runs.find { |r| r.id == id }
+      marked_timed_out = run.status == :timeout
       run.finished_at = now
       run.duration_ms = [0, now - run.started_at].max
       run.status = fields.fetch("status").to_sym
       run.metrics = fields.fetch("metrics", {})
       run.output = fields.fetch("output", nil)
       run.error = fields.fetch("error", nil)
+      # As the client does: a check already counted this run as stuck, so a
+      # late failure only updates the run; a late success is evaluated.
+      return { "alerts" => [], "state" => @state } if marked_timed_out && run.status != :ok
+
       alerts = finish_run(run, now)
       { "alerts" => alerts, "state" => @state }
     end
@@ -189,7 +202,7 @@ class ConformanceTest < Minitest::Test
         run.status = :timeout
         run.finished_at = now
         run.duration_ms = now - run.started_at
-        run.error = "Still running after #{Cronwatch::JS.round(Cronwatch::Evaluate.timeout_ms(@def) / 60_000.0)} minutes; marked as timed out"
+        run.error = "Still running after #{Cronwatch::Duration.format(Cronwatch::Evaluate.timeout_ms(@def))}; marked as timed out"
         alerts.concat(finish_run(run, now))
       end
       recent = sorted.first(20).map { |r| copy(r) }
@@ -340,6 +353,148 @@ class ConformanceTest < Minitest::Test
   def test_is_stuck
     each_case(HEALTH["isStuck"]) do |c|
       differs(c["stuck"], Cronwatch::Evaluate.stuck?(Cronwatch::JobDefinition.from_h(c["definition"]), Cronwatch::Run.from_h(c["run"]), c["now"]))
+    end
+  end
+
+  # ---------------------------------------------------------------- output
+
+  OUTPUT = fixture("output.json")
+
+  # Long text travels as { "parts" => [[piece, times], ...] }.
+  def self.expand(spec)
+    spec.is_a?(Hash) && spec.key?("parts") ? spec["parts"].map { |piece, times| piece * times }.join : spec
+  end
+
+  def expand(spec) = self.class.expand(spec)
+
+  # A result as the fixtures hold it: the text, or when long its length in UTF-16 code units and SHA-256.
+  def self.digest(text)
+    return nil if text.nil?
+
+    length = Cronwatch::JS.length16(text)
+    length <= 400 ? { "text" => text } : { "length" => length, "sha256" => Digest::SHA256.hexdigest(text) }
+  end
+
+  def digest(text) = self.class.digest(text)
+
+  def test_output_cap_is_the_sdks
+    assert_equal OUTPUT["outputCap"], Cronwatch::Output::CAP
+  end
+
+  def test_redact_secrets
+    each_case(OUTPUT["redact"]) { |c| differs(c["result"], digest(Cronwatch::Output.redact_secrets(expand(c["input"])))) }
+  end
+
+  def test_error_message
+    each_case(OUTPUT["errorMessage"]) do |c|
+      error =
+        if c.key?("value")
+          expand(c["value"])
+        else
+          Object.const_get(c["name"]).new(expand(c["message"])).tap { |e| e.set_backtrace(c["frames"]) }
+        end
+      differs(c["result"], digest(Cronwatch::Output.error_message(error)))
+    end
+  end
+
+  def self.expand_lines(lines)
+    lines.flat_map do |line|
+      if line.is_a?(Hash) && line.key?("numbered")
+        Array.new(line["count"]) do |i|
+          head = "#{line["numbered"]}#{i} "
+          head + ("x" * [0, line["width"] - Cronwatch::JS.length16(head)].max)
+        end
+      else
+        [expand(line)]
+      end
+    end
+  end
+
+  def test_expect_text
+    each_case(OUTPUT["expectText"]) do |c|
+      run = Cronwatch::Run.new(id: "r", job: "j", status: :running, started_at: T0, finished_at: nil, duration_ms: nil,
+                               error: nil, output: nil, metrics: {}, trigger: "run")
+      recorder = Cronwatch::RunRecorder.new(run, 60_000)
+      self.class.expand_lines(c["lines"]).each { |line| recorder.context.log(line) }
+      text = recorder.expect_text
+      checks = c["checks"].map { |check| { "expect" => check["expect"], "result" => Cronwatch::Serialize.check_expectation(check["expect"], text) } }
+      differs([c["expectText"], c["output"], c["checks"]], [digest(text), digest(recorder.output), checks])
+    end
+  end
+
+  # ---------------------------------------------------------------- store
+
+  STORE = fixture("store.json")
+
+  def test_memory_prune
+    each_case(STORE["prune"]) do |c|
+      store = Cronwatch::Stores::Memory.new
+      mismatch = nil
+      c["events"].each do |event|
+        if event.key?("insert")
+          event["insert"].each { |run| store.insert_run(Cronwatch::Run.from_h(run)) }
+        else
+          pruned = store.prune(event["prune"])
+          remaining = event["remaining"].keys.to_h { |job| [job, store.list_runs(job, 100).map(&:id)] }
+          mismatch ||= differs([event["pruned"], event["remaining"]], [pruned, remaining])
+        end
+      end
+      mismatch
+    end
+  end
+
+  # ---------------------------------------------------------------- channels
+
+  CHANNELS = fixture("channels.json")
+  CHANNEL_ALERTS = CHANNELS["alerts"].to_h { |a| [a["name"], a["alert"]] }
+
+  # Stands in for Net::HTTP, keeping the last request.
+  class FakeHTTP
+    attr_accessor :status, :body
+    attr_reader :last
+
+    def initialize
+      @status = 200
+      @body = ""
+    end
+
+    def post(url, body, headers)
+      @last = { "url" => url, "headers" => headers, "body" => body }
+      Cronwatch::HTTP::Response.new(status: @status, body: @body)
+    end
+  end
+
+  def channel_for(c, http)
+    options = c["options"]
+    link = options["link"] ? ->(alert) { "https://app.example/cronwatch/jobs/#{alert.job}" } : nil
+    case c["channel"]
+    when "slack" then Cronwatch::Alerts::Slack.new(webhook_url: options["webhookUrl"], link: link, http: http)
+    when "discord" then Cronwatch::Alerts::Discord.new(webhook_url: options["webhookUrl"], link: link, http: http)
+    when "webhook" then Cronwatch::Alerts::Webhook.new(url: options["url"], headers: options["headers"] || {}, secret: options["secret"], http: http)
+    end
+  end
+
+  def test_channel_payloads
+    each_case(CHANNELS["sends"]) do |c|
+      http = FakeHTTP.new
+      channel_for(c, http).call(Cronwatch::Alert.from_h(CHANNEL_ALERTS.fetch(c["alert"])))
+      request = http.last
+      differs([c["url"], c["headers"], c["body"]], [request["url"], request["headers"], digest(request["body"])])
+    end
+  end
+
+  def test_channel_failures
+    first = Cronwatch::Alert.from_h(CHANNELS["alerts"][0]["alert"])
+    each_case(CHANNELS["failures"]) do |c|
+      http = FakeHTTP.new
+      http.status = c["status"]
+      http.body = c["body"]
+      begin
+        channel_for(c, http).call(first)
+        next "expected an error: #{c["error"]}"
+      rescue RuntimeError => e
+        differs(c["error"], e.message)
+      end
     end
   end
 end

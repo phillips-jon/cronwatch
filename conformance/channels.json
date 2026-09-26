@@ -1,0 +1,1757 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.2.0",
+  "alerts": [
+    {
+      "name": "a failure with markup in its output",
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom & <b>bust</b>",
+          "output": "before\n```\n@everyone <!channel> [click](https://evil.example) *bold* _it_ ~s~ |pipe| \\back",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: boom & <b>bust</b>\nOutput (tail):\nbefore\n```\n@everyone <!channel> [click](https://evil.example) *bold* _it_ ~s~ |pipe| \\back",
+        "at": 1767605402000
+      }
+    },
+    {
+      "name": "a long triage, in its own block",
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom & <b>bust</b>",
+          "output": "before\n```\n@everyone <!channel> [click](https://evil.example) *bold* _it_ ~s~ |pipe| \\back",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: boom & <b>bust</b>\nOutput (tail):\nbefore\n```\n@everyone <!channel> [click](https://evil.example) *bold* _it_ ~s~ |pipe| \\back",
+        "at": 1767605402000,
+        "triage": "<b>Likely</b> cause & fix: tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+      }
+    },
+    {
+      "name": "a long message with a fence",
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: long",
+          "output": "````\nzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: long\nOutput (tail):\n````\nzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "at": 1767605402000,
+        "triage": "short"
+      }
+    },
+    {
+      "name": "fences all the way past the cut",
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: fences",
+          "output": "```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: fences\nOutput (tail):\n```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>```&<>",
+        "at": 1767605402000
+      }
+    },
+    {
+      "name": "escapes that grow past the cut",
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: amp",
+          "output": "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: amp\nOutput (tail):\n&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>",
+        "at": 1767605402000
+      }
+    },
+    {
+      "name": "accents and emoji",
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: café 😀",
+          "output": "résumé 🚀 done",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: café 😀\nOutput (tail):\nrésumé 🚀 done",
+        "at": 1767605402000,
+        "triage": "été 😀 `code` [link](x)"
+      }
+    },
+    {
+      "name": "an empty triage",
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom & <b>bust</b>",
+          "output": "before\n```\n@everyone <!channel> [click](https://evil.example) *bold* _it_ ~s~ |pipe| \\back",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 2026-01-05 09:30:00 UTC (now), ran 2s.\nError: boom & <b>bust</b>\nOutput (tail):\nbefore\n```\n@everyone <!channel> [click](https://evil.example) *bold* _it_ ~s~ |pipe| \\back",
+        "at": 1767605402000,
+        "triage": ""
+      }
+    },
+    {
+      "name": "a missed run",
+      "alert": {
+        "type": "missed",
+        "run": null,
+        "details": {
+          "dueAt": 1767603600000,
+          "deadline": 1767604500000,
+          "graceMs": 900000,
+          "lastRunAt": null
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly missed its scheduled run",
+        "message": "Due 2026-01-05 09:00:00 UTC (30m ago), and no run had started by 2026-01-05 09:15:00 UTC (15m ago) (grace 15m).\nSchedule: 0 2 * * *.\nLast run: never.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "name": "a stuck run",
+      "alert": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 3600001,
+          "error": null,
+          "output": "started",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly is stuck",
+        "message": "Started 2026-01-05 09:30:00 UTC (1h ago) and never reported finishing. Marked as timed out after 1h.\nOutput so far (tail):\nstarted\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+        "at": 1767609000000
+      }
+    },
+    {
+      "name": "over budget, with a triage full of markdown",
+      "alert": {
+        "type": "over_budget",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {
+            "cost": 1.2
+          },
+          "trigger": "run"
+        },
+        "details": {
+          "breaches": [
+            {
+              "metric": "cost",
+              "value": 1.2,
+              "limit": 1,
+              "basis": "budget"
+            }
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly went over budget",
+        "message": "cost: 1.2, limit 1 (budget).\nStarted 2026-01-05 09:30:00 UTC (now).",
+        "at": 1767605400000,
+        "triage": "Check *this* _now_ ~maybe~ `x` | y (z) [a] <b> \\ dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    },
+    {
+      "name": "slow",
+      "alert": {
+        "type": "slow",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 15000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "durationMs": 15000,
+          "thresholdMs": 10000,
+          "basis": "maxDuration"
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly was slow",
+        "message": "Took 15s; the limit is 10s (maxDuration).\nStarted 2026-01-05 09:30:00 UTC (now).",
+        "at": 1767605400000
+      }
+    },
+    {
+      "name": "recovered",
+      "alert": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "missed",
+            "over_budget"
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly recovered",
+        "message": "A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\nRan 2s.",
+        "at": 1767605460000
+      }
+    }
+  ],
+  "sends": [
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "a failure with markup in its output",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 586,
+        "sha256": "1b7a5dcf357e6998b41d81ab4a44032fb2735f7f7890c114a44e65b9f5f403fb"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "a long triage, in its own block",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 3640,
+        "sha256": "a034d768a2623c79485b73b7f706b8e8b1c9bcbe25db78e8836bb9aedb5649e8"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "a long message with a fence",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 8228,
+        "sha256": "ed63ac30199d1d3727d1a11b8877aefef6c252936095e74f3a36ed319edfcbad"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "fences all the way past the cut",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 27154,
+        "sha256": "868c151c2d665d1d3aa684b7e7fd00005c8763be2e252c1f4a75b5f91fb784ba"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "escapes that grow past the cut",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 12951,
+        "sha256": "2f3fd6ee3d1221b94f7db28feabfb4b7a237fcc19f93bb8f51064e85bd524527"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "accents and emoji",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 447,
+        "sha256": "d22fb77dee7b0a176d2cc9c9b80e3737b1c4a96e2054436d05b0173453354fd3"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "an empty triage",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 586,
+        "sha256": "1b7a5dcf357e6998b41d81ab4a44032fb2735f7f7890c114a44e65b9f5f403fb"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "a missed run",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 531,
+        "sha256": "890792888f3b0587922512edd2f6ac576b471811637270be8a44ee73e103d59d"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "a stuck run",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 645,
+        "sha256": "e297696255df9c132df445a61f3db695c4b98d2d09db408812a3d109aff088da"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 1655,
+        "sha256": "41b8a0bf3617c8b8891af0e19a2e02fa134ecda1ff23f18b5666fd5154fec187"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "slow",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"text\":\"nightly was slow\\nTook 15s; the limit is 10s (maxDuration).\\nStarted 2026-01-05 09:30:00 UTC (now).\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\":turtle: *nightly was slow*\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"```Took 15s; the limit is 10s (maxDuration).\\nStarted 2026-01-05 09:30:00 UTC (now).```\"}}]}"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "recovered",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"text\":\"nightly recovered\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\":white_check_mark: *nightly recovered*\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"```A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.```\"}}]}"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "a failure with markup in its output",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 638,
+        "sha256": "895171c6de96463de906ffda622d304a79e903dac2c0e27b82e14ee9d4e83e34"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "a long triage, in its own block",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 3692,
+        "sha256": "e1ee667c3d6ef0f67bcabc7cc1128207b1f9540021ac25c8d230fc042f859dcc"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "a long message with a fence",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 8280,
+        "sha256": "2d13838686514a6e48b04ac337768bfc1c9dd7c78640711af1366cf32703e281"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "fences all the way past the cut",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 27206,
+        "sha256": "f429d79a265fedc59b92fa31f4673a73e9f8c02411988fc880e33e038cbeb3da"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "escapes that grow past the cut",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 13003,
+        "sha256": "fa4117e28c9ddce4eb8a552d920443dd28292acc876bdd0333c55a15c119f9f9"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "accents and emoji",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 499,
+        "sha256": "53ed7bc076ee51f41a9860d11f852159f0bbfd0d2ecf5d93c7eb05f13f5d5f09"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "an empty triage",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 638,
+        "sha256": "895171c6de96463de906ffda622d304a79e903dac2c0e27b82e14ee9d4e83e34"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "a missed run",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 583,
+        "sha256": "efb78d2cf221544f84e7500ac3b99f2cd33c89b4caf243dfb1b4b218c28e2c2d"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "a stuck run",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 697,
+        "sha256": "c57d242337a83b28f1fb009e153b81dd65a315ccfd9312a233c549d32d862c06"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 1707,
+        "sha256": "ae972a84ed1853135799c9222ee7ace2d1a4c51ca7973e4fb78f1b958da1bcf4"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "slow",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"text\":\"nightly was slow\\nTook 15s; the limit is 10s (maxDuration).\\nStarted 2026-01-05 09:30:00 UTC (now).\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\":turtle: *nightly was slow* (<https://app.example/cronwatch/jobs/nightly|open>)\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"```Took 15s; the limit is 10s (maxDuration).\\nStarted 2026-01-05 09:30:00 UTC (now).```\"}}]}"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "recovered",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 415,
+        "sha256": "cd20d1c948dd356e853d2e0b34bcc9c5793a56b3a0791a2417fd7ed319a64b05"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "a failure with markup in its output",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly failed\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly failed\",\"description\":\"```\\nStarted 2026-01-05 09:30:00 UTC (now), ran 2s.\\nError: boom & <b>bust</b>\\nOutput (tail):\\nbefore\\n`​`​`\\n@everyone <!channel> [click](https://evil.example) *bold* _it_ ~s~ |pipe| \\\\back\\n```\",\"color\":12986408,\"timestamp\":\"2026-01-05T09:30:02.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "a long triage, in its own block",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 1389,
+        "sha256": "13453464f56562ba8f32a508ae8e5c526ded486ee2719b7d5a042baeb10e2bdd"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "a long message with a fence",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 4006,
+        "sha256": "e7cdeb1d036e1fd5550c8d56842872e7cd10e60e94415a7f571b06ce8ae1f6c4"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "fences all the way past the cut",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 5226,
+        "sha256": "de5b6e40974df6ccd1aa2a179fe4c022df37ee1fe99a0c3c2aaf89bea38dec1f"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "escapes that grow past the cut",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 2457,
+        "sha256": "0e0f529b222847798b162d084c780815f0f12b7d5f9696b2fd9ae0a7d9079bd7"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "accents and emoji",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly failed\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly failed\",\"description\":\"```\\nStarted 2026-01-05 09:30:00 UTC (now), ran 2s.\\nError: café 😀\\nOutput (tail):\\nrésumé 🚀 done\\n```\\n**Triage:** été 😀 \\\\`code\\\\` \\\\[link\\\\]\\\\(x\\\\)\",\"color\":12986408,\"timestamp\":\"2026-01-05T09:30:02.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "an empty triage",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly failed\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly failed\",\"description\":\"```\\nStarted 2026-01-05 09:30:00 UTC (now), ran 2s.\\nError: boom & <b>bust</b>\\nOutput (tail):\\nbefore\\n`​`​`\\n@everyone <!channel> [click](https://evil.example) *bold* _it_ ~s~ |pipe| \\\\back\\n```\",\"color\":12986408,\"timestamp\":\"2026-01-05T09:30:02.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "a missed run",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly missed its scheduled run\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly missed its scheduled run\",\"description\":\"```\\nDue 2026-01-05 09:00:00 UTC (30m ago), and no run had started by 2026-01-05 09:15:00 UTC (15m ago) (grace 15m).\\nSchedule: 0 2 * * *.\\nLast run: never.\\n```\",\"color\":12024095,\"timestamp\":\"2026-01-05T09:30:00.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "a stuck run",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 416,
+        "sha256": "8e04f7470095ac49914246fda254e0a5c97c9d1a1c56855d8476907900bb3a0d"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 1316,
+        "sha256": "bc2471f98e14eb8c8558139f459b910897e61525230eecc59f07851c816dd848"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "slow",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly was slow\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly was slow\",\"description\":\"```\\nTook 15s; the limit is 10s (maxDuration).\\nStarted 2026-01-05 09:30:00 UTC (now).\\n```\",\"color\":12024095,\"timestamp\":\"2026-01-05T09:30:00.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "recovered",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly recovered\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly recovered\",\"description\":\"```\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "a failure with markup in its output",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 418,
+        "sha256": "8f363d216c4c338aaf726ef98d982fca8555b6599b85ec58a09771520290fb40"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "a long triage, in its own block",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 1440,
+        "sha256": "11fa4e16eecaa4560971490e08003c8cb58e2395f0ba52cab2d03553b9d5442b"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "a long message with a fence",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 4057,
+        "sha256": "354b4c3b469b127866c096d52c9bc3938df351ba264eb8139ae2b38cbdc549f5"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "fences all the way past the cut",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 5277,
+        "sha256": "0f0b53dafa70ba227c7fd585d99136f025206448ff7b59d9e4de05ce8e22b914"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "escapes that grow past the cut",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 2508,
+        "sha256": "e228ecf6e4c238180a845edaa3d32d3146efae09110037dbf712aa11b42af171"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "accents and emoji",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly failed\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly failed\",\"url\":\"https://app.example/cronwatch/jobs/nightly\",\"description\":\"```\\nStarted 2026-01-05 09:30:00 UTC (now), ran 2s.\\nError: café 😀\\nOutput (tail):\\nrésumé 🚀 done\\n```\\n**Triage:** été 😀 \\\\`code\\\\` \\\\[link\\\\]\\\\(x\\\\)\",\"color\":12986408,\"timestamp\":\"2026-01-05T09:30:02.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "an empty triage",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 418,
+        "sha256": "8f363d216c4c338aaf726ef98d982fca8555b6599b85ec58a09771520290fb40"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "a missed run",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 419,
+        "sha256": "a5026751a3f083808f7f197acafbcfb640d3a3186d1b23b8b123d1d3648e44c9"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "a stuck run",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 467,
+        "sha256": "36f4cca3718d40494887e168a77e7e9219681796afd268f3c0a7348da5ce0e20"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 1367,
+        "sha256": "7668fffa5878de41b14a8a9eba8a30e4bb0f5692ff0d074a558b3917970bc31c"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "slow",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly was slow\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly was slow\",\"url\":\"https://app.example/cronwatch/jobs/nightly\",\"description\":\"```\\nTook 15s; the limit is 10s (maxDuration).\\nStarted 2026-01-05 09:30:00 UTC (now).\\n```\",\"color\":12024095,\"timestamp\":\"2026-01-05T09:30:00.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "recovered",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly recovered\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly recovered\",\"url\":\"https://app.example/cronwatch/jobs/nightly\",\"description\":\"```\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "a failure with markup in its output",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 686,
+        "sha256": "7acde03aba5b2e3e3ecda899c975ed93899d6c2f4082428580a4dd0537ccaaa2"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "a long triage, in its own block",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 4725,
+        "sha256": "b3618c0095481ef711c90dc6d9dc5fc9d61151cb4dbcfe74e3db8225571ca805"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "a long message with a fence",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 10501,
+        "sha256": "48244e1e33b486f23686ec682e5554fce87e2455f079d29d61ceb0c78be83a2e"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "fences all the way past the cut",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 18476,
+        "sha256": "e86c0eb8a602cc2ff35c9c2b822d42a32e5c0ab05bdb08f562a715bdb5d50c21"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "escapes that grow past the cut",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 4870,
+        "sha256": "765a5f2117a653b8787dbcf01ca6f43e34621e74fc31e635fa0b38e5980bc007"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "accents and emoji",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 541,
+        "sha256": "95b62fb7964303a5693a14cefa87a7b5ff2eaf7483ecc97306c80817e37492a7"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "an empty triage",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 698,
+        "sha256": "5b23f7c87d2b35ff03699648d889d3af9132bf328c4b3e6c40db35fb701916d4"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "a missed run",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 432,
+        "sha256": "82b5b9a49d4c518388669f1dfe5d0360e1ed6fb69243c6ef094801ec5e6708b5"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "a stuck run",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 629,
+        "sha256": "c1e9c1223605b2fb6e5d576c85901a821adc55d2862d92242ef2748c949c206b"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 1771,
+        "sha256": "2aa29946e839c3ac407354553b2de673fe99d0330bcd9b436afde70e62c36f59"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "slow",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 489,
+        "sha256": "8aa5121be0958ba34c30cd4850ce05c51a2445d1427aacc64653a74283259f6f"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "recovered",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 470,
+        "sha256": "fe85d8a5cc3fe7b8b167e7baa810da09bf0614ea2ed87e19455f926190a0961c"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "a failure with markup in its output",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=3a12f9d5a3620a10193d26d27e4e672a9ba39913ede09afe21498d25d4288f9c"
+      },
+      "body": {
+        "length": 686,
+        "sha256": "7acde03aba5b2e3e3ecda899c975ed93899d6c2f4082428580a4dd0537ccaaa2"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "a long triage, in its own block",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=25ce5302c636e2502742971f34c91abfef330b6fd4556b017e8e5cbec47a074a"
+      },
+      "body": {
+        "length": 4725,
+        "sha256": "b3618c0095481ef711c90dc6d9dc5fc9d61151cb4dbcfe74e3db8225571ca805"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "a long message with a fence",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=be67a31d2e34da8648893deaa99b4ab10fac1b24bf900cea67898442a9ad2451"
+      },
+      "body": {
+        "length": 10501,
+        "sha256": "48244e1e33b486f23686ec682e5554fce87e2455f079d29d61ceb0c78be83a2e"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "fences all the way past the cut",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=5e860d425f16cd9e623e1c0b8716193903c179035f83541acb96883ee44b29a9"
+      },
+      "body": {
+        "length": 18476,
+        "sha256": "e86c0eb8a602cc2ff35c9c2b822d42a32e5c0ab05bdb08f562a715bdb5d50c21"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "escapes that grow past the cut",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=819e3c5551adefec2f1ffbc72634905e1b9547b68e37aadf51a5c08d9cd76ce3"
+      },
+      "body": {
+        "length": 4870,
+        "sha256": "765a5f2117a653b8787dbcf01ca6f43e34621e74fc31e635fa0b38e5980bc007"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "accents and emoji",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=4521b401af2ea1d7eb5e9fc8f49cf00d17f14fc5b875439f2c7bcbd1b8178283"
+      },
+      "body": {
+        "length": 541,
+        "sha256": "95b62fb7964303a5693a14cefa87a7b5ff2eaf7483ecc97306c80817e37492a7"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "an empty triage",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=55846affaa77add25865f13077bb1541eee3bf25d0a092f68b0d9441df4b786c"
+      },
+      "body": {
+        "length": 698,
+        "sha256": "5b23f7c87d2b35ff03699648d889d3af9132bf328c4b3e6c40db35fb701916d4"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "a missed run",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=5d0758a507b7b6acd83a203eb379ee785dd2f98d28e2d19f4b7b21341c1e80c3"
+      },
+      "body": {
+        "length": 432,
+        "sha256": "82b5b9a49d4c518388669f1dfe5d0360e1ed6fb69243c6ef094801ec5e6708b5"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "a stuck run",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=5bf114529e288a1bbc853be6fb68c88869015351a81cd67289e549aaa95af7a4"
+      },
+      "body": {
+        "length": 629,
+        "sha256": "c1e9c1223605b2fb6e5d576c85901a821adc55d2862d92242ef2748c949c206b"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=04f7a29bfec73c4eb88543672e79e30dfbf0068224f62295c59cf8473b343739"
+      },
+      "body": {
+        "length": 1771,
+        "sha256": "2aa29946e839c3ac407354553b2de673fe99d0330bcd9b436afde70e62c36f59"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "slow",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=4fbe56bffde31fa003d6c7ffeee1193525683a2ba7e38225a299c6bf998124f9"
+      },
+      "body": {
+        "length": 489,
+        "sha256": "8aa5121be0958ba34c30cd4850ce05c51a2445d1427aacc64653a74283259f6f"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "recovered",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=f2bd7777c19eeea9507f8fbfb870149185c3bf38c208bb1832782bc3e777f2f6"
+      },
+      "body": {
+        "length": 470,
+        "sha256": "fe85d8a5cc3fe7b8b167e7baa810da09bf0614ea2ed87e19455f926190a0961c"
+      }
+    }
+  ],
+  "failures": [
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Slack webhook answered 500: no"
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Slack webhook answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "status": 404,
+      "body": "",
+      "error": "Slack webhook answered 404: "
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Slack webhook answered 500: no"
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Slack webhook answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "status": 404,
+      "body": "",
+      "error": "Slack webhook answered 404: "
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Discord webhook answered 500: no"
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Discord webhook answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "status": 404,
+      "body": "",
+      "error": "Discord webhook answered 404: "
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Discord webhook answered 500: no"
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Discord webhook answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "status": 404,
+      "body": "",
+      "error": "Discord webhook answered 404: "
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Webhook https://hooks.example.com answered 500"
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Webhook https://hooks.example.com answered 400"
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "status": 404,
+      "body": "",
+      "error": "Webhook https://hooks.example.com answered 404"
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Webhook https://hooks.example.com:8443 answered 500"
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Webhook https://hooks.example.com:8443 answered 400"
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "status": 404,
+      "body": "",
+      "error": "Webhook https://hooks.example.com:8443 answered 404"
+    }
+  ]
+}

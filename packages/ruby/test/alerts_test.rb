@@ -66,7 +66,8 @@ class AlertsTest < Minitest::Test
     block = body["blocks"][1]["text"]["text"]
     assert_equal 2, block.scan("```").length
     assert_match(/&lt;!channel&gt;/, block)
-    assert_match(/\n_Triage:_ &lt;b&gt; &amp; co\z/, block)
+    assert_match(/```\z/, block)
+    assert_equal "_Triage:_ &lt;b&gt; &amp; co", body["blocks"][2]["text"]["text"]
     assert_equal ":x: *j failed*", body["blocks"][0]["text"]["text"]
   end
 

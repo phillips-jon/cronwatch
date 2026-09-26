@@ -43,11 +43,15 @@ module Cronwatch
     #              string counts as unset. Pass nil to let handlers run without one.
     # retention:   how long finished runs are kept. Default "30d".
     # defaults:    grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
+    # redact:      applied to every run's output and error before it is stored, shown or sent to an alert
+    #              channel or triage. The default (Output.redact_secrets) blanks values that look like secrets
+    #              (password=..., URL credentials, bearer tokens, AWS, GitHub, Slack, Stripe and API key
+    #              formats). Pass your own callable, or false to keep output exactly as logged.
     # now:         the clock, a callable returning epoch milliseconds. Tests use this.
     # on_error:    called with (error, where) for anything that goes wrong outside a job: the store failing,
     #              an alert channel failing, a triage timeout.
-    def initialize(store: nil, alerts: nil, triage: nil, cron_secret: UNSET, retention: "30d", defaults: {}, now: nil,
-                   on_error: nil)
+    def initialize(store: nil, alerts: nil, triage: nil, cron_secret: UNSET, retention: "30d", defaults: {}, redact: nil,
+                   now: nil, on_error: nil)
       @using_default_store = store.nil?
       @store = store || Stores::Memory.new
       @alerts = alerts.nil? ? [Alerts::Console.new] : Array(alerts)
@@ -60,6 +64,11 @@ module Cronwatch
       unknown = @defaults.keys - DEFAULT_OPTIONS
       raise ArgumentError, "defaults may set #{DEFAULT_OPTIONS.join(", ")}, not #{unknown.join(", ")}" if unknown.any?
 
+      if !(redact.nil? || redact == false || redact.respond_to?(:call))
+        raise ArgumentError, "redact must be a callable, or false to keep output as logged"
+      end
+
+      @redact = redact == false ? ->(text) { text } : (redact || Output.method(:redact_secrets))
       @clock = now || -> { Process.clock_gettime(Process::CLOCK_REALTIME, :millisecond) }
       @on_error = on_error || method(:default_on_error)
       @definitions = {}
@@ -182,7 +191,8 @@ module Cronwatch
         run.status = :failed
         run.error = problem
       else
-        unmet = Serialize.check_expectation(definition.expect, run.output)
+        expect_text = recorder.expect_text || (result.is_a?(String) ? result : nil)
+        unmet = Serialize.check_expectation(definition.expect, expect_text)
         if unmet
           run.status = :failed
           run.error = unmet
@@ -190,9 +200,21 @@ module Cronwatch
           run.status = :ok
         end
       end
+      # Redacted after the expect check, so a rule can still match what was logged.
+      run.output = @redact.call(run.output) unless run.output.nil?
+      run.error = @redact.call(run.error) unless run.error.nil?
 
       stored = Serialize.to_stored(definition)
-      if recorded
+      if recorded && marked_timed_out?(run)
+        # A check gave up on this run while it was going and already counted
+        # it as a stuck failure. A late failure must not count twice; a late
+        # success still closes stuck and recovers.
+        begin
+          @store.update_run(run)
+        rescue StandardError => e
+          report(e, "recording #{name}")
+        end
+      elsif recorded
         finish_run(stored, run, finished_at, true)
       else
         # The start was never written; the store may be back by now.
@@ -451,6 +473,15 @@ module Cronwatch
       "#{alert.type}|#{alert.at}|#{alert.run&.id}"
     end
 
+    # Whether a check already marked this run as timed out, for a failure that finished late.
+    def marked_timed_out?(run)
+      return false if run.status == :ok
+
+      @store.get_run(run.id)&.status == :timeout
+    rescue StandardError
+      false
+    end
+
     # Record a finished run (ok, failed, or timed out by a check), evaluate it
     # against the job's state and send what that produces. Never raises.
     def finish_run(definition, run, at, write)
@@ -495,7 +526,7 @@ module Cronwatch
         run.status = :timeout
         run.finished_at = at
         run.duration_ms = at - run.started_at
-        run.error = "Still running after #{JS.round(Evaluate.timeout_ms(definition) / 60_000.0)} minutes; marked as timed out"
+        run.error = "Still running after #{Duration.format(Evaluate.timeout_ms(definition))}; marked as timed out"
         alerts.concat(finish_run(definition, run, at, true))
       end
 
