@@ -8,6 +8,9 @@ module Cronwatch
     # moves to the end, as it does in the SDK.
     def to_stored(definition)
       fields = definition.fields
+      # 15.minutes is stored as the milliseconds it means, the unit every
+      # reader (this gem, the SDK) takes a plain number in.
+      fields.each { |key, value| fields[key] = Duration.parse(value, key.to_s) if Duration.active_support?(value) }
       expect = fields.delete(:expect)
       unless expect.nil?
         fields[:expect] =

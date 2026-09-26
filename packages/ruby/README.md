@@ -122,8 +122,6 @@ Or from a crontab: `bin/rails cronwatch:check`. Give the scheduler and the `cron
 
 ```ruby
 # config/routes.rb
-require "cronwatch/web"
-
 Rails.application.routes.draw do
   mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
 end

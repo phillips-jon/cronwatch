@@ -614,8 +614,7 @@ class ClientTest < Minitest::Test
     ENV["CRON_SECRET"] = "from-env"
     assert_equal "from-env", Cronwatch.new.cron_secret
     assert_nil Cronwatch.new(cron_secret: "").cron_secret
-    assert Cronwatch.new(cron_secret: nil).secret_opt_out?
-    refute Cronwatch.new.secret_opt_out?
+    assert_nil Cronwatch.new(cron_secret: nil).cron_secret
   ensure
     ENV.delete("CRON_SECRET")
   end

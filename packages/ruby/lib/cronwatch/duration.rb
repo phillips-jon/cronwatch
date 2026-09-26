@@ -8,11 +8,16 @@ module Cronwatch
 
     module_function
 
+    # An ActiveSupport::Duration (15.minutes), when ActiveSupport is loaded.
+    def active_support?(value)
+      defined?(::ActiveSupport::Duration) && value.instance_of?(::ActiveSupport::Duration)
+    end
+
     # "15m" -> 900000. Accepts a plain number of milliseconds, and compound
     # strings such as "1h30m". Whitespace between parts is fine. An
     # ActiveSupport::Duration (15.minutes) is read as what it says.
     def parse(value, label = "duration")
-      if defined?(::ActiveSupport::Duration) && value.instance_of?(::ActiveSupport::Duration)
+      if active_support?(value)
         return JS.round(value.to_f * 1000)
       end
       if value.is_a?(Numeric)

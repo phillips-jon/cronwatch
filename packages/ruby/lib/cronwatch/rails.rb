@@ -11,6 +11,9 @@ require "rails"
 require "active_job"
 
 module Cronwatch
+  # So the mount line in config/routes.rb needs no require of its own.
+  autoload :Web, File.expand_path("web", __dir__) unless const_defined?(:Web, false)
+
   module Stores
     autoload :ActiveRecord, File.expand_path("stores/active_record", __dir__) unless const_defined?(:ActiveRecord, false)
   end

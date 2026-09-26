@@ -82,6 +82,27 @@ class RailsIntegrationTest < Minitest::Test
     Cronwatch.client.runs(name)
   end
 
+  def test_an_active_support_duration_is_stored_as_milliseconds
+    job = Cronwatch.client.job("durations", schedule: "every 1h", grace: 15.minutes, timeout: 2.hours)
+    job.run { nil }
+    stored = Cronwatch.client.store.get_job("durations").definition.to_h
+    assert_equal 900_000, stored["grace"]
+    assert_equal 7_200_000, stored["timeout"]
+  end
+
+  def test_the_dashboard_needs_no_require_of_its_own_in_rails
+    assert_equal "constant", defined?(Cronwatch::Web)
+  end
+
+  def test_development_follows_rails_env
+    before = [ENV.fetch("RAILS_ENV", nil), ENV.fetch("RACK_ENV", nil)]
+    ENV.delete("RAILS_ENV")
+    ENV.delete("RACK_ENV")
+    assert Cronwatch::Client.development?, "Rails.env is #{Rails.env}"
+  ensure
+    ENV["RAILS_ENV"], ENV["RACK_ENV"] = before
+  end
+
   def test_the_job_name_is_the_class_name_without_job_dasherized
     assert_equal "nightly-report", NightlyReportJob.cronwatch_name
     assert_equal "flaky", FlakyJob.cronwatch_name

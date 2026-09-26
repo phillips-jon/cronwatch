@@ -39,8 +39,8 @@ module Cronwatch
     # store:       where jobs, runs and state live. Defaults to an in-memory store that forgets on restart.
     # alerts:      where alerts go: objects with #call(alert) and #name. Defaults to the console.
     # triage:      a callable taking a TriageContext and returning a short diagnosis, added to every alert but recoveries.
-    # cron_secret: the bearer secret request handlers require. Defaults to ENV["CRON_SECRET"]; an empty
-    #              string counts as unset. Pass nil to let handlers run without one.
+    # cron_secret: a second bearer Cronwatch::Web accepts for /api/check, for an outside cron. Defaults to
+    #              ENV["CRON_SECRET"]; an empty string counts as unset. Pass nil for none.
     # retention:   how long finished runs are kept. Default "30d".
     # defaults:    grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
     # redact:      applied to every run's output and error before it is stored, shown or sent to an alert
@@ -58,7 +58,6 @@ module Cronwatch
       @triage = triage
       secret = cron_secret.equal?(UNSET) ? ENV.fetch("CRON_SECRET", nil) : cron_secret
       @cron_secret = secret.nil? || secret.to_s.empty? ? nil : secret.to_s
-      @secret_opt_out = cron_secret.nil?
       @retention_ms = Duration.parse(retention || "30d", "retention")
       @defaults = (defaults || {}).transform_keys(&:to_sym)
       unknown = @defaults.keys - DEFAULT_OPTIONS
@@ -97,11 +96,6 @@ module Cronwatch
     # Epoch milliseconds, from the clock the client was given.
     def now
       @clock.call
-    end
-
-    # cron_secret was passed as nil: request handlers may run without a secret.
-    def secret_opt_out?
-      @secret_opt_out
     end
 
     # Declare a job. Call it once, when the app loads, and keep the handle.
@@ -346,18 +340,11 @@ module Cronwatch
       nil
     end
 
-    # True when RAILS_ENV or RACK_ENV says development or test. Request handlers
-    # without a secret only serve then.
+    # True in development or test: Rails.env when Rails is loaded, otherwise
+    # RAILS_ENV or RACK_ENV. Cronwatch::Web without a token only serves then.
     def self.development?
-      %w[development test].include?(ENV["RAILS_ENV"] || ENV.fetch("RACK_ENV", nil))
-    end
-
-    # Reports, once, that a handler refused a request for want of a secret.
-    def warn_no_secret
-      return if @warned_no_secret
-
-      @warned_no_secret = true
-      report(RuntimeError.new("a handler refused a request because no CRON_SECRET is set; pass cron_secret: nil to allow unauthenticated requests"), "handler")
+      env = defined?(::Rails) && ::Rails.respond_to?(:env) ? ::Rails.env.to_s : (ENV["RAILS_ENV"] || ENV.fetch("RACK_ENV", nil))
+      %w[development test].include?(env)
     end
 
     # Hands an error to on_error. An on_error that raises is not allowed to

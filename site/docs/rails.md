@@ -72,8 +72,6 @@ CronWatch is installed. Next:
    Outside development it needs CRONWATCH_TOKEN set to sign in.
 ```
 
-The mount line needs `require "cronwatch/web"` above it, as shown [below](#mount-the-dashboard).
-
 ## The initializer
 
 The generated one, trimmed to what it sets:
@@ -203,8 +201,6 @@ If the scheduler itself stops, the check stops with it, and nothing inside the a
 
 ```ruby
 # config/routes.rb
-require "cronwatch/web"
-
 Rails.application.routes.draw do
   mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
 end

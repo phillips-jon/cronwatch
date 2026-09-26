@@ -110,6 +110,20 @@ class WebRoutesTest < Minitest::Test
     assert_equal "/cronwatch/", elsewhere.headers["location"], "a foreign referer is not followed"
   end
 
+  def test_without_a_token_a_forwarded_host_or_a_remote_peer_is_not_local
+    with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
+      cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
+      web = Cronwatch::Web.new(cw, base_path: "/cronwatch")
+      local = Rack::MockRequest.env_for("http://localhost:3000/cronwatch/api/jobs", "REMOTE_ADDR" => "127.0.0.1")
+      assert_equal 200, web.call(local)[0]
+      forwarded = Rack::MockRequest.env_for("http://evil.example/cronwatch/api/jobs",
+                                            "REMOTE_ADDR" => "127.0.0.1", "HTTP_X_FORWARDED_HOST" => "localhost")
+      assert_equal 503, web.call(forwarded)[0], "X-Forwarded-Host is set by the client"
+      remote = Rack::MockRequest.env_for("http://localhost/cronwatch/api/jobs", "REMOTE_ADDR" => "203.0.113.9")
+      assert_equal 503, web.call(remote)[0], "a Host of localhost from another machine"
+    end
+  end
+
   def unconfigured(token: Cronwatch::Web::UNSET, host: "localhost")
     cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
     web = if token.equal?(Cronwatch::Web::UNSET)

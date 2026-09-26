@@ -82,13 +82,23 @@ module Cronwatch
 
     private
 
+    # The Host header as sent and the peer's address, never X-Forwarded-Host
+    # (which Rack's #hostname follows and any client can set).
+    def local_request?(request)
+      host = (request.env["HTTP_HOST"] || request.env["SERVER_NAME"] || "").sub(/:\d+\z/, "")
+      return false unless LOOPBACK.include?(host)
+
+      peer = request.env["REMOTE_ADDR"]
+      peer.nil? || peer.start_with?("127.") || ["::1", "::ffff:127.0.0.1"].include?(peer)
+    end
+
     def serve(request, path, wants_html, base)
       cw = client
       method = request.verb
 
       # No token: fail closed, except for a developer on their own machine. The
       # Host check also stops a DNS-rebinding page from reaching a dev server.
-      if !@token && !@opted_out && !(@developing && LOOPBACK.include?(request.hostname))
+      if !@token && !@opted_out && !(@developing && local_request?(request))
         return wants_html ? html(HTML.message_page("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token: to Cronwatch::Web.new). Without one the routes only answer localhost in development.", base), 503) : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503)
       end
 
