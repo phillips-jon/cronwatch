@@ -6,7 +6,7 @@ order: 9
 
 # MCP server
 
-`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts with `cw.routes()`, so it needs a URL and the token, and nothing else.
+`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts: `cw.routes()` in a TypeScript app, or `Cronwatch::Web` in a Ruby or Rails one, which serves the same API at the same paths. It needs a URL and the token, and nothing else. It runs on Node through `npx` either way; a Rails app does not need Node for anything else.
 
 ## Claude Code
 
@@ -33,7 +33,7 @@ Any client that launches stdio servers:
 }
 ```
 
-`--url` and `--token` work as flags too. For a local app leave the token out and the routes open in development.
+`--url` and `--token` work as flags too. The URL is the mount point (`/cronwatch` in the examples, wherever `cw.routes()` or `mount Cronwatch::Web` put it). For a local app leave the token out: both serve `localhost` without one in development.
 
 ## Tools
 
@@ -45,7 +45,7 @@ Any client that launches stdio servers:
 | `silence_job` | stop alerts for a duration, for example during a fix |
 | `unsilence_job` | resume them |
 | `forget_job` | remove a job that no longer exists in the code |
-| `get_setup_guide` | the code to add CronWatch to a job, so the agent writes it correctly |
+| `get_setup_guide` | the TypeScript code to add CronWatch to a job, so the agent writes it correctly (for Rails, point it at [Ruby on Rails](/docs/rails/)) |
 
 The tools return prose an agent can act on, not raw JSON. A typical exchange: "why did invoice-run fail last night" becomes `get_job`, a read of the error and the earlier runs, and a suggested fix in your code.
 
