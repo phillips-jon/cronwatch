@@ -20,10 +20,12 @@ Ruby 3.2 or newer; the Rails integration is tested on Rails 7.2, 8.0 and 8.1. Th
 | `cronwatch` | the client, the memory store, and the Slack, Discord, webhook and console channels | |
 | `cronwatch/active_record` | the ActiveRecord store | `activerecord` |
 | `cronwatch/rails` | the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task, the install generator | `railties`, `activejob` |
+| `cronwatch/sidekiq` | `Cronwatch::Sidekiq` for `Sidekiq::Job` classes, its server middleware, `Cronwatch::Sidekiq::CheckWorker` | `sidekiq` 7 or newer |
+| `cronwatch/scheduler` | schedules read from Solid Queue's or sidekiq-cron's config, `Cronwatch.declare_from_scheduler!` | |
 | `cronwatch/web` | the dashboard and JSON API as a Rack app | `rack` |
 | `cronwatch/triage/anthropic` | Claude triage | `anthropic` |
 
-In a Rails app, `gem "cronwatch"` also loads `cronwatch/rails` (Bundler requires it after Rails), and the ActiveRecord store loads on first use. `cronwatch/web` and `cronwatch/triage/anthropic` are always required by hand.
+In a Rails app, `gem "cronwatch"` also loads `cronwatch/rails` and `cronwatch/scheduler` (Bundler requires it after Rails), `cronwatch/sidekiq` when Sidekiq is in the bundle, and the ActiveRecord store on first use. `cronwatch/web` and `cronwatch/triage/anthropic` are always required by hand.
 
 ## Plain Ruby
 
@@ -87,9 +89,35 @@ end
 
 Every `perform` is recorded as a run with the trigger `"active_job"`. The name defaults to the class name without `Job`, dasherized, with `::` as `:` (`Reports::NightlyJob` is `reports:nightly`); pass `name:` to choose another. Jobs are declared once the app has booted, so a check knows a job that has never run. A job that raises still raises after the run is recorded, so ActiveJob retries and your error reporter see it as before.
 
+### Sidekiq
+
+```ruby
+class HardWorker
+  include Sidekiq::Job
+  include Cronwatch::Sidekiq
+  cronwatch schedule: "*/15 * * * *"   # name: "hard-worker"
+
+  def perform
+    cronwatch.log("Done")
+  end
+end
+```
+
+The same `cronwatch` as for ActiveJob, for classes that include `Sidekiq::Job` (or `Sidekiq::Worker`) directly. `Cronwatch::Sidekiq::ServerMiddleware` records each `perform` with the trigger `"sidekiq"` and raises the job's error on to Sidekiq, so retries and error handlers behave as before. In Rails the Railtie adds it to the Sidekiq server; elsewhere add it in `Sidekiq.configure_server` and call `Cronwatch::Sidekiq.ready!` once `Cronwatch.configure` has run. An ActiveJob class on Sidekiq's adapter keeps `Cronwatch::ActiveJob`; the middleware passes ActiveJob's wrapper through, so it is recorded once.
+
+### Schedules from the scheduler's config
+
+```ruby
+cronwatch schedule: :from_scheduler, grace: "15m"   # ActiveJob or Sidekiq
+```
+
+reads the class's one entry in Solid Queue's `config/recurring.yml` (the section for `Rails.env`) or sidekiq-cron's `config/schedule.yml`, so the schedule is written once. Fugit phrases such as `every day at 3am` or `every hour at minute 12` become the cron expression Fugit makes of them (`0 3 * * *`, `12 * * * *`), in the zone the scheduler reads them in. Each conversion is checked against Fugit's own next run times; anything CronWatch would not expect at exactly those times is refused at boot rather than approximated: every other week (`%`), days counted back from the month's end other than the last, random times (`~`), offsets instead of IANA zones, and a time that daylight saving skips (Fugit skips that run; CronWatch would report it missed). A class with no entry, or with two, also stops the boot.
+
+`Cronwatch.declare_from_scheduler!(grace: "10m")` in the initializer watches every enabled entry once the app has booted: classes that call `cronwatch` declare themselves, other classes are named as `cronwatch` would name them and their runs are recorded, and Solid Queue `command:` tasks are named after their key. `except:` leaves keys out. `Cronwatch::Scheduler.sources` sets where to read, when the defaults (Solid Queue's file when Solid Queue is loaded, sidekiq-cron's when sidekiq-cron is) are not right.
+
 ### Scheduling the check
 
-Failures are caught as they happen, but a run that never started or never finished can only be noticed by looking. `Cronwatch::CheckJob` looks: it loads `app/jobs` when the app does not eager load, declares every monitored job and runs the check. Run it every five minutes.
+Failures are caught as they happen, but a run that never started or never finished can only be noticed by looking. `Cronwatch::CheckJob` looks: it loads `app/jobs` (and `app/workers`) when the app does not eager load, declares every monitored job and runs the check. Run it every five minutes.
 
 Solid Queue:
 
@@ -98,7 +126,7 @@ Solid Queue:
 production:
   nightly_report:
     class: NightlyReportJob
-    schedule: "0 2 * * * UTC"
+    schedule: every day at 2am
   cronwatch_check:
     class: Cronwatch::CheckJob
     schedule: every 5 minutes
@@ -113,10 +141,10 @@ nightly_report:
   class: "NightlyReportJob"
 cronwatch_check:
   cron: "*/5 * * * *"
-  class: "Cronwatch::CheckJob"
+  class: "Cronwatch::CheckJob"   # Cronwatch::Sidekiq::CheckWorker when ActiveJob does not use Sidekiq
 ```
 
-Or from a crontab: `bin/rails cronwatch:check`. Give the scheduler and the `cronwatch` declaration the same cron expression, so a job the scheduler never fires is still reported missing.
+Or from a crontab: `bin/rails cronwatch:check`.
 
 ### Mounting the dashboard
 
@@ -198,7 +226,7 @@ bundle install
 bundle exec rake test
 ```
 
-`rake test` runs three suites, each in its own process: `rake test:core` (the client, channels, conformance, the Rack app), `rake test:active_record` (the store, on SQLite, and on Postgres when `CRONWATCH_TEST_PG` is set) and `rake test:rails` (a small Rails app: ActiveJob, `CheckJob`, the rake task, the generator).
+`rake test` runs three suites, each in its own process: `rake test:core` (the client, channels, conformance, the Rack app, Sidekiq without Rails, schedule conversion checked against Fugit), `rake test:active_record` (the store, on SQLite, and on Postgres when `CRONWATCH_TEST_PG` is set) and `rake test:rails` (a small Rails app: ActiveJob, Sidekiq, schedules from `recurring.yml` and `schedule.yml`, `CheckJob`, the rake task, the generator).
 
 ```sh
 CRONWATCH_TEST_PG=postgres://postgres:pw@127.0.0.1:5432/cw bundle exec rake test
@@ -217,7 +245,7 @@ BUNDLE_GEMFILE=test/rails/gemfiles/rails_7_2.gemfile bundle install
 BUNDLE_GEMFILE=test/rails/gemfiles/rails_7_2.gemfile bundle exec rake test
 ```
 
-`rails_8_0.gemfile` and `rails_8_1.gemfile` work the same way. CI runs Ruby 3.2 with Rails 7.2, Ruby 3.4 with Rails 8.0 and 8.1, and Ruby 4.0 with Rails 8.1, all against Postgres.
+`rails_8_0.gemfile` and `rails_8_1.gemfile` work the same way. Sidekiq and sidekiq-cron are test gems too: Rails 8.0 and 8.1 resolve Sidekiq 8, and `rails_7_2.gemfile` pins Sidekiq 7 (`CRONWATCH_SIDEKIQ=7`), so both majors are tested. CI runs Ruby 3.2 with Rails 7.2, Ruby 3.4 with Rails 8.0 and 8.1, and Ruby 4.0 with Rails 8.1, all against Postgres.
 
 When the SDK's routes or pages change, regenerate the dashboard fixture from the repository root:
 

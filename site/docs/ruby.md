@@ -20,10 +20,12 @@ Ruby 3.2 or newer; the Rails integration is tested on Rails 7.2, 8.0 and 8.1. Th
 | `cronwatch` | the client, the memory store, and the Slack, Discord, webhook and console channels | |
 | `cronwatch/active_record` | the ActiveRecord store | `activerecord` |
 | `cronwatch/rails` | the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task, the install generator | `railties`, `activejob` |
+| `cronwatch/sidekiq` | `Cronwatch::Sidekiq` for jobs that include `Sidekiq::Job`, its server middleware, `Cronwatch::Sidekiq::CheckWorker` | `sidekiq` 7 or newer |
+| `cronwatch/scheduler` | schedules read from Solid Queue's `config/recurring.yml` or sidekiq-cron's schedule, and `Cronwatch.declare_from_scheduler!` | |
 | `cronwatch/web` | the dashboard and JSON API as a Rack app | `rack` |
 | `cronwatch/triage/anthropic` | Claude triage | `anthropic` |
 
-In a Rails app, `require "cronwatch"` (which Bundler does for `gem "cronwatch"`) also loads `cronwatch/rails`, and the ActiveRecord store loads on first use. `cronwatch/web` and `cronwatch/triage/anthropic` are always required by hand. [Ruby on Rails](/docs/rails/) has the rest.
+In a Rails app, `require "cronwatch"` (which Bundler does for `gem "cronwatch"`) also loads `cronwatch/rails`, `cronwatch/scheduler`, and `cronwatch/sidekiq` when Sidekiq is in the bundle; the ActiveRecord store loads on first use. `cronwatch/web` and `cronwatch/triage/anthropic` are always required by hand. [Ruby on Rails](/docs/rails/) has the rest.
 
 ## Create one client
 
@@ -88,6 +90,25 @@ CW.close
 0 3 * * *    cd /srv/app && bundle exec ruby bin/nightly-backup
 */5 * * * *  cd /srv/app && bundle exec ruby bin/cronwatch-check
 ```
+
+## Sidekiq without Rails
+
+A Sidekiq app without Rails includes `Cronwatch::Sidekiq` in each job it watches, as a Rails app does (see [Sidekiq](/docs/rails/#sidekiq)), and adds the middleware to its server itself:
+
+```ruby
+require "cronwatch/sidekiq"
+
+Cronwatch.configure do |c|
+  c.store = Cronwatch::Stores::ActiveRecord.new   # or another store every process shares
+end
+
+Sidekiq.configure_server do |config|
+  config.server_middleware { |chain| chain.add Cronwatch::Sidekiq::ServerMiddleware }
+  config.on(:startup) { Cronwatch::Sidekiq.ready! }
+end
+```
+
+`Cronwatch::Sidekiq.ready!` does what the Railtie does after boot: it declares every class that has called `cronwatch` (and what `Cronwatch.declare_from_scheduler!` asked for), and from then on a class declares itself as it loads. Call it once `Cronwatch.configure` has run and the job classes are loaded. Schedule `Cronwatch::Sidekiq::CheckWorker` every five minutes, with sidekiq-cron or anything else. With sidekiq-cron loaded, `schedule: :from_scheduler` reads its schedule file (`config/schedule.yml` unless its configuration names another) from the working directory; set `Cronwatch::Scheduler.sources` to read something else.
 
 ## The dashboard in any Rack app
 
