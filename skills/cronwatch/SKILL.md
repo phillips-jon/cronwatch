@@ -1,12 +1,12 @@
 ---
 name: cronwatch
-description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, cronwatch.dev or the cronwatch MCP server.
+description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, the cronwatch gem, cronwatch.dev or the cronwatch MCP server.
 version: 0.3.0
 ---
 
 # CronWatch
 
-CronWatch is a library, not a service: `@cronwatch/sdk` records every run of a scheduled job inside the app that runs it, and alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. The MCP server `@cronwatch/mcp` reads the same data so an agent can ask what failed and why.
+CronWatch is a library, not a service: `@cronwatch/sdk` (TypeScript) or the `cronwatch` gem (Ruby, Rails) records every run of a scheduled job inside the app that runs it, and alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. The MCP server `@cronwatch/mcp` reads the same data so an agent can ask what failed and why.
 
 ## Adding monitoring to a job
 
@@ -34,6 +34,10 @@ export const nightlyReport = cw.job("nightly-report", {
   schedule: "0 2 * * *", timezone: "UTC", grace: "15m", timeout: "30m", expect: "Report written",
 });
 ```
+
+## Rails and Ruby apps
+
+For a Ruby app, use the `cronwatch` gem instead of the npm package; it is a port with the same options (snake_case), conditions and alert text. In Rails: add `gem "cronwatch"` (it loads the Rails integration itself), run `bin/rails generate cronwatch:install` and `bin/rails db:migrate`, keep the ActiveRecord store the generated `config/initializers/cronwatch.rb` sets and add channels there, and in each scheduled ActiveJob `include Cronwatch::ActiveJob` with `cronwatch schedule: "<the same cron the scheduler uses>"` (the name defaults to the class name without `Job`, dasherized: `NightlyReportJob` is `nightly-report`), logging through `cronwatch.log` and `cronwatch.metric` inside `perform`. A `Sidekiq::Job` class includes `Cronwatch::Sidekiq` and calls `cronwatch` the same way. When Solid Queue (`config/recurring.yml`) or sidekiq-cron (`config/schedule.yml`) schedules the job, `cronwatch schedule: :from_scheduler` reads the schedule from there, and `Cronwatch.declare_from_scheduler!` in the initializer watches every entry at once. Schedule `Cronwatch::CheckJob` every five minutes in `config/recurring.yml` (Solid Queue) or the sidekiq-cron schedule, or run `bin/rails cronwatch:check` from a crontab. For the dashboard, mount `Cronwatch::Web.new(Cronwatch.client)` at `/cronwatch` in `config/routes.rb` (Rails autoloads it, so no `require` is needed; outside Rails, `require "cronwatch/web"`); it needs `CRONWATCH_TOKEN` outside development, or `token: nil` when mounted behind the app's own auth. There is no `handler()`: for a job triggered over HTTP, wrap the controller action's body in the job handle's `run`. The MCP server works against it unchanged. Docs: https://cronwatch.dev/docs/rails/
 
 ## Investigating a failure
 

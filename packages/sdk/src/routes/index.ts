@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { CronWatch } from "../client.js";
 import { constantTimeEqual, json } from "../http.js";
 import { parseDuration } from "../duration.js";
@@ -10,9 +10,10 @@ export interface RoutesOptions {
    * Required to reach anything. Send it as `Authorization: Bearer <token>`,
    * or open the dashboard once with `?token=<token>` and a cookie is set.
    * Defaults to process.env.CRONWATCH_TOKEN; an empty string counts as unset.
-   * With no token, the routes answer only requests to localhost while NODE_ENV
-   * is "development" or "test", and 503 otherwise. Pass `null` to opt out and serve them
-   * open everywhere, for example behind your own auth.
+   * With no token while NODE_ENV is "development" or "test", the routes make
+   * a random one and print a sign-in link to the server log on their first
+   * request; with no token otherwise they answer 503. Pass `null` to opt out
+   * and serve them open everywhere, for example behind your own auth.
    *
    * The check endpoint (/api/check) also accepts the client's cronSecret, so
    * a platform cron that sends `Authorization: Bearer <CRON_SECRET>` can
@@ -39,7 +40,6 @@ function cookieValue(token: string): string {
   return createHash("sha256").update(`cronwatch-cookie:${token}`).digest("hex");
 }
 
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const DEFAULT_RUNS = 20;
 const MAX_RUNS = 500;
 
@@ -48,6 +48,29 @@ const CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:
 // `Origin: null` on form posts, which the CSRF check would refuse, and the
 // forms redirect back to the page named by the same-origin Referer.
 const SECURITY_HEADERS = { "x-content-type-options": "nosniff", "referrer-policy": "same-origin", "x-robots-tag": "noindex" };
+
+/**
+ * A token for one routes instance in development, when none is configured:
+ * 32 random bytes, base64url (43 characters).
+ */
+function developmentToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+/**
+ * The line a development token is announced with, printed once with
+ * console.info on the routes' first request:
+ *
+ *   [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: <origin><base>/?token=<token>
+ *
+ * <origin> is the first request's URL origin (scheme, host and any port),
+ * <base> the base path without a trailing slash ("" when mounted at the
+ * root), and <token> the token as generated (base64url, so nothing needs
+ * escaping).
+ */
+function developmentSignInLine(origin: string, base: string, token: string): string {
+  return `[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: ${origin}${base}/?token=${token}`;
+}
 
 function safeDecode(value: string): string | null {
   try {
@@ -127,18 +150,28 @@ function runsLimit(value: string | null): number {
  */
 export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes {
   const optedOut = options.token === null;
-  const token = optedOut ? null : (options.token || process.env.CRONWATCH_TOKEN || null);
+  const configured = optedOut ? null : (options.token || process.env.CRONWATCH_TOKEN || null);
   const base = (options.basePath ?? "/cronwatch").replace(/\/+$/, "");
   const developing = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  // A fetch handler cannot tell a local caller from a remote one (proxies,
+  // tunnels and `next dev` listening on every interface all look alike), so
+  // development gets a token too: made here, and shown only in the server log.
+  const generated = !configured && !optedOut && developing;
+  const token = generated ? developmentToken() : configured;
+  let announced = false;
 
   const serve = async (request: Request, url: URL, path: string, wantsHtml: boolean): Promise<Response> => {
     const method = request.method.toUpperCase();
 
-    // No token: fail closed, except for a developer on their own machine. The
-    // Host check also stops a DNS-rebinding page from reaching a dev server.
-    if (!token && !optedOut && !(developing && LOOPBACK.has(url.hostname))) {
+    if (generated && !announced) {
+      announced = true;
+      console.info(developmentSignInLine(url.origin, base, token!));
+    }
+
+    // No token outside development: fail closed.
+    if (!token && !optedOut) {
       return wantsHtml
-        ? html(messagePage("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token to cw.routes()). Without one the routes only answer localhost in development.", base), 503)
+        ? html(messagePage("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token to cw.routes()), or pass token: null to serve them open behind your own auth.", base), 503)
         : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503);
     }
 
@@ -160,6 +193,11 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
         : query !== null ? constantTimeEqual(query, token)
         : cookie !== null && constantTimeEqual(cookie, cookieValue(token));
       if (!cronSecretOk && !tokenOk) {
+        if (generated) {
+          return wantsHtml
+            ? html(messagePage("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base), 401)
+            : api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401);
+        }
         return wantsHtml
           ? html(messagePage("Sign in", `Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.`, base), 401)
           : api({ ok: false, error: "Unauthorized" }, 401);

@@ -8,6 +8,8 @@ order: 1
 
 CronWatch is a library. You install it in the app that runs your scheduled jobs, it records every run in a database you already have, and it alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. There is nothing to sign up for and no server to run.
 
+This page sets up the TypeScript library. For Ruby and Rails there is the `cronwatch` gem, a port with the same rules, alerts and stored rows: see [Ruby on Rails](/docs/rails/) and [Ruby](/docs/ruby/).
+
 ## Install
 
 ```bash
@@ -99,7 +101,7 @@ import { cw } from "@/lib/cronwatch";
 export const { GET, POST, DELETE } = cw.routes();
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without a token the routes answer only `localhost` while `NODE_ENV` is `development` or `test` (or you pass `token: null`), and answer 503 everywhere else.
+Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without one, while `NODE_ENV` is `development` or `test`, the routes make a token of their own and print a sign-in link to the server log on the first request; anywhere else they answer 503 (unless you pass `token: null` to serve them open).
 
 ## Run the check
 

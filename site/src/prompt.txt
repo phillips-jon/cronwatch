@@ -1,8 +1,17 @@
 Add CronWatch to this project so that every scheduled job is recorded and I am
 told when one is missed, fails, gets stuck, runs slow or goes over budget.
 
-CronWatch is an open source TypeScript library. It runs inside my app and writes
-to my own database. There is no hosted service, no account and no API key.
+CronWatch is an open source library: @cronwatch/sdk for TypeScript and Node,
+and the cronwatch gem for Ruby and Rails. It runs inside my app and writes to my
+own database. There is no hosted service, no account and no API key.
+
+First decide which one this project needs. A package.json with a Node server,
+Next.js or other JavaScript runtime means the TypeScript steps below. A Gemfile
+means the Ruby steps (a Rails app follows them as written; plain Ruby, see
+https://cronwatch.dev/docs/ruby/). If the scheduled jobs live in both, set up
+each side where its jobs run; they can share one database.
+
+TypeScript and Node
 
 1. Install it with the driver for the store you will use in step 2 (it needs
    Node 22 or newer). The drivers are optional peers, so install one yourself.
@@ -57,6 +66,62 @@ to my own database. There is no hosted service, no account and no API key.
 6. Set the environment variables you referenced: CRON_SECRET, CRONWATCH_TOKEN,
    and whichever alert channel you chose. Do not invent other names.
 
+Ruby on Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
+
+1. Install the gem, generate the migration and initializer, and migrate:
+
+   bundle add cronwatch
+   bin/rails generate cronwatch:install
+   bin/rails db:migrate
+
+2. Leave the ActiveRecord store the initializer sets (web, workers and the
+   check must see the same runs), and set the alert channel there:
+
+   # config/initializers/cronwatch.rb
+   Cronwatch.configure do |c|
+     c.store  = Cronwatch::Stores::ActiveRecord.new
+     c.alerts = [Cronwatch::Alerts::Slack.new(webhook_url: ENV["SLACK_WEBHOOK_URL"])]
+   end
+
+3. Watch each scheduled job in its class. For ActiveJob:
+
+   class NightlyReportJob < ApplicationJob
+     include Cronwatch::ActiveJob
+     cronwatch schedule: "0 2 * * *", grace: "15m", timeout: "20m"
+
+     def perform
+       cronwatch.log("Report written")
+     end
+   end
+
+   For a Sidekiq job class, include Cronwatch::Sidekiq after Sidekiq::Job and
+   call cronwatch the same way. When the job is scheduled by Solid Queue
+   (config/recurring.yml) or sidekiq-cron (config/schedule.yml), use
+   schedule: :from_scheduler instead of copying the schedule. To watch every
+   entry in that file at once, add Cronwatch.declare_from_scheduler!(grace: "10m")
+   to the initializer after Cronwatch.configure.
+
+4. Schedule Cronwatch::CheckJob every 5 minutes, beside the other recurring
+   jobs, so missed and stuck runs are noticed. In config/recurring.yml:
+
+   production:
+     cronwatch_check:
+       class: Cronwatch::CheckJob
+       schedule: every 5 minutes
+
+   With sidekiq-cron, add the same class with cron "*/5 * * * *". With neither,
+   a crontab line runs bin/rails cronwatch:check every 5 minutes.
+
+5. Mount the dashboard in config/routes.rb (no require needed in Rails):
+
+   mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
+
+   Outside development it needs CRONWATCH_TOKEN. Behind the app's own admin
+   auth, pass token: nil instead.
+
+6. Set the environment variables you referenced: CRONWATCH_TOKEN and whichever
+   alert channel you chose. Do not invent other names.
+
 Rules for you:
 - Declare every existing scheduled job in this project, not just one. Find them
   in cron config, workflow files, queue schedulers and any crontab.
@@ -66,13 +131,15 @@ Rules for you:
 - Do not add a retry loop or an uptime ping. CronWatch records what happened; it
   does not re-run work.
 - If this project already has a dashboard route or auth, mount cw.routes()
-  behind that auth with cw.routes({ token: null }) rather than exposing it.
+  or Cronwatch::Web behind that auth with its token set to null (nil in Ruby)
+  rather than exposing it.
 - Make sure the process that runs the check knows every job it should expect,
   or a job that never starts at all goes unnoticed. If installs differ, declare
   a job there only where that install runs it.
 - A job that runs where the network or the app's secrets are unavailable gets
-  its own client with deliver: "check" and the same store; the next check sends
-  its alerts.
+  its own client with deliver: "check" (deliver = :check in Ruby) and the same
+  store; the next check sends its alerts.
 
 Docs: https://cronwatch.dev/docs/
+Rails docs: https://cronwatch.dev/docs/rails/
 MCP server for agents: npx -y @cronwatch/mcp

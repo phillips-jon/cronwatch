@@ -48,23 +48,32 @@ function frontmatter(text) {
 }
 
 /**
- * Minimal, safe syntax colouring for TypeScript, shell and JSON blocks.
+ * Minimal, safe syntax colouring for TypeScript, Ruby, shell, YAML and JSON blocks.
  * Strings and comments are found in one left-to-right pass, so a // or # inside
  * a string (a URL, say) stays part of the string. A comment marker only counts
- * at the start of a line or after whitespace: // in code, # in shell and YAML.
+ * at the start of a line or after whitespace: // in code, # in Ruby, shell and YAML.
+ * Ruby also gets its keywords, symbols (:name, and name: as a key) in the
+ * string colour, and constants (Cronwatch::ActiveJob) in ink.
  */
 const STRING = /&quot;(?:[^&]|&(?!quot;))*?&quot;|&#39;[^\n]*?&#39;|'[^'\n]*'|`[^`]*`/.source;
 const COMMENT = { code: /(?<=^|\s)\/\/[^\n]*/.source, shell: /(?<=^|\s)#(?![{!])[^\n]*/.source };
+const RUBY = new RegExp([
+  /\b(alias|and|begin|break|case|class|def|defined\?|do|else|elsif|end|ensure|extend|false|for|if|in|include|module|next|nil|not|or|prepend|private|protected|public|raise|redo|require|require_relative|rescue|retry|return|self|super|then|true|undef|unless|until|when|while|yield)(?![\w?!:])/.source,
+  /((?<![\w:]):[A-Za-z_]\w*[?!]?|\b[a-z_]\w*[?!]?:(?=\s))/.source,
+  /(\b[A-Z]\w*)/.source,
+].join("|"), "g");
 function highlight(code, lang) {
   const esc = escape(code);
-  if (!["ts", "tsx", "js", "typescript", "javascript", "json", "bash", "sh", "shell", "yaml", "yml"].includes(lang)) return esc;
+  if (!["ts", "tsx", "js", "typescript", "javascript", "json", "bash", "sh", "shell", "yaml", "yml", "ruby", "rb"].includes(lang)) return esc;
   const tokens = [];
   const stash = (html) => `\u0000${tokens.push(html) - 1}\u0000`;
-  const shell = lang.startsWith("sh") || lang === "bash" || lang.startsWith("y");
+  const ruby = lang === "ruby" || lang === "rb";
+  const shell = ruby || lang.startsWith("sh") || lang === "bash" || lang.startsWith("y");
   const lexer = new RegExp(`(${shell ? COMMENT.shell : COMMENT.code})|${STRING}`, "gm");
-  let out = esc
-    .replace(lexer, (m, c) => stash(`<span class="${c ? "c" : "s"}">${m}</span>`))
-    .replace(/\b(import|export|from|const|let|var|async|await|return|function|new|if|else|throw|try|catch|finally|type|interface|extends|default|for|of|in|while|null|true|false|undefined)\b/g, '<span class="k">$1</span>');
+  let out = esc.replace(lexer, (m, c) => stash(`<span class="${c ? "c" : "s"}">${m}</span>`));
+  out = ruby
+    ? out.replace(RUBY, (m, k, s) => `<span class="${k ? "k" : s ? "s" : "n"}">${m}</span>`)
+    : out.replace(/\b(import|export|from|const|let|var|async|await|return|function|new|if|else|throw|try|catch|finally|type|interface|extends|default|for|of|in|while|null|true|false|undefined)\b/g, '<span class="k">$1</span>');
   out = out.replace(/\u0000(\d+)\u0000/g, (m, i) => tokens[Number(i)]);
   return out;
 }
@@ -140,7 +149,7 @@ ${body}
   </main>
   <footer>
     <p>© ${new Date().getFullYear()} CronWatch. MIT. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>. Every alert, reply and mark here is real output from the library, for six sample jobs.</p>
-    <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
+    <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
   </footer>
 </div>
 </body>
@@ -362,7 +371,7 @@ function build() {
   for (const [key, value] of Object.entries(demoContent())) landing = landing.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), () => value);
   writeFileSync(path.join(DIST, "index.html"), layout({
     title: "CronWatch",
-    description: "Open source cron and scheduled-job monitoring that lives inside your TypeScript app. Every run recorded in your own database; alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. MCP server included. No server to run.",
+    description: "Open source cron and scheduled-job monitoring that lives inside your TypeScript or Ruby on Rails app. Every run recorded in your own database; alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. MCP server included. No server to run.",
     body: landing,
     path: "/",
     kind: "landing",
@@ -386,10 +395,10 @@ function build() {
     writeFileSync(path.join(dir, "index.html"), layout({ title: page.meta.title, description: page.meta.description ?? "", body, path: page.route, kind: "docs" }));
   }
 
+  // The 50x page serves 500, 502, 503 and 504 alike, so it shows no code.
   const lost = (code, heading, line, note) => `
 <section class="lost">
-  <p class="code" aria-hidden="true">${code}</p>
-  <h1>${heading}</h1>
+${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${heading}</h1>
   <p class="line">${line}</p>
   <div class="actions"><a class="prompt-btn" href="/">Go to the start</a><a class="ghost-btn" href="/docs/">Read the docs</a></div>
   <p class="note">${note}</p>
@@ -400,12 +409,12 @@ function build() {
   }));
   writeFileSync(path.join(DIST, "50x.html"), layout({
     title: "Something went wrong", description: "The server hit an error.", path: "/50x", kind: "docs", index: false,
-    body: lost("500", "Something went wrong", "The server hit an error on its end. Try again in a minute.", `If it keeps happening, <a href="${GITHUB}/issues">tell us on GitHub</a>.`),
+    body: lost(null, "Something went wrong", "The server hit an error on its end, or is briefly unavailable. Try again in a minute.", `If it keeps happening, <a href="${GITHUB}/issues">tell us on GitHub</a>.`),
   }));
 
   const prompt = readFileSync(path.join(SRC, "prompt.txt"), "utf8");
   writeFileSync(path.join(DIST, "prompt.txt"), prompt);
-  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a TypeScript library. Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nMCP server: npx -y @cronwatch/mcp\n`);
+  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript and Node, and the cronwatch gem for Ruby and Rails. Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nMCP server: npx -y @cronwatch/mcp\n`);
 
   const urls = ["/", ...pages.map((p) => p.route)];
   writeFileSync(path.join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${SITE}${u}</loc></url>`).join("\n")}\n</urlset>\n`);

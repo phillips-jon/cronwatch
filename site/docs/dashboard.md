@@ -20,7 +20,15 @@ Every request needs the token, as `Authorization: Bearer <token>` or as the cook
 
 To sign in to the dashboard, open any page once with `?token=<token>`. The response moves it into an HttpOnly cookie that lasts thirty days (holding a digest of the token, not the token) and redirects to the same URL without it. `?token=` is read only there, on a `GET` of a page; the JSON API and every `POST` or `DELETE` ignore it, so use the bearer header or the cookie.
 
-With no token configured, the routes answer only requests to `localhost` while `NODE_ENV` is `development` or `test`, which also keeps a DNS-rebinding page off a dev server. Anywhere else, including a LAN address or tunnel URL, including when `NODE_ENV` is unset, they answer 503. Pass `token: null` to serve them open everywhere, for example when the mount already sits behind your own auth:
+With no token configured while `NODE_ENV` is `development` or `test`, the routes make one: 32 random bytes, new each time the routes are created (so each dev server restart or reload signs you out). On the first request they print a sign-in link to the server log, once:
+
+```text
+[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
+```
+
+The link is built from the origin of that first request and the base path. Open it and the cookie is set as with any token. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a fetch handler cannot tell a caller on this machine from one elsewhere (Next.js keeps an `X-Forwarded-For` the client sent, `next dev` listens on every interface, and tunnels rewrite `Host`), so the log, which only you can read, is the proof. With no token and `NODE_ENV` anything else, or unset, the routes answer 503.
+
+Pass `token: null` to serve them open everywhere, for example when the mount already sits behind your own auth:
 
 ```ts
 // app/admin/cronwatch/[[...path]]/route.ts: your guard is the lock
@@ -93,6 +101,10 @@ interface JobSummary {
   stats: { runs: number; okRate: number; p50Ms: number | null; p95Ms: number | null };
 }
 ```
+
+A job CronWatch cannot evaluate, for example one whose stored schedule or timeout no longer parses, shows as `failing` (or `silenced` while it is) with `nextExpectedAt: null`, and the reason goes to `onError`. Every other job is listed and checked as usual.
+
+The `state` the silence endpoints return is the job's stored `JobState`, including its `version`, which goes up by one on every write (see [stores](/docs/stores/#two-processes-one-store)).
 
 ## Run
 

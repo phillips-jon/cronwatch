@@ -114,4 +114,6 @@ app.post("/internal/reindex", (c) => reindex.handler(async () => { /* ... */ }, 
 
 Without a secret the response never includes the job's error text, only its status.
 
+The routes want `CRONWATCH_TOKEN` in the same way. Without it, while `NODE_ENV` is `development` or `test`, they make a token and print a sign-in link to the process's log on their first request (`[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...`); open it once. With `NODE_ENV` anything else they answer 503 until a token is set. See [access](/docs/dashboard/#access).
+
 The stores use Node drivers (`better-sqlite3`, `pg`), so the process needs Node compatibility. `better-sqlite3` crashes in Bun; on Bun, use the Postgres store.

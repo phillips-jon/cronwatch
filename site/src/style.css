@@ -70,7 +70,7 @@ code, pre, kbd, .mono { font-family: var(--mono); }
 h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.006em; }
 p { margin: 0; }
 pre { margin: 0; font: 400 13.5px/1.62 var(--mono); color: var(--body); overflow-x: auto; }
-pre .k { color: var(--ink); font-weight: 500; } pre .s { color: var(--ok); } pre .c { color: var(--muted); }
+pre .k { color: var(--ink); font-weight: 500; } pre .s { color: var(--ok); } pre .c { color: var(--muted); } pre .n { color: var(--ink); }
 pre b { font-weight: 600; color: var(--ink); }
 pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { color: var(--ok); }
 .skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--sheet); padding: 8px 12px; }
@@ -99,6 +99,8 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .opening .then { margin-top: 24px; color: var(--body); max-width: 52ch; text-wrap: pretty; }
 .install { display: inline-flex; align-items: center; gap: 14px; margin-top: 26px; background: var(--sunk); border: 1px solid var(--rule); border-radius: 3px; padding: 10px 10px 10px 14px; font: 400 14px/1.4 var(--mono); }
 .install code::before { content: "$ "; color: var(--muted); }
+.installs { display: inline-grid; gap: 8px; margin-top: 26px; }
+.installs .install { margin-top: 0; justify-content: space-between; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 22px; }
 .prompt-btn { display: inline-flex; align-items: center; gap: 9px; font: 500 14px/1 var(--mono); color: var(--sheet); background: var(--ink); border: 1px solid var(--ink); border-radius: 3px; padding: 11px 14px; }
 .prompt-btn:hover { opacity: .85; }
@@ -214,7 +216,7 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 footer { padding: 34px 0 52px; border-top: 1px solid var(--rule); margin-top: 40px; font-size: 16px; color: var(--muted); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; }
 footer a { color: var(--muted); }
 footer a:hover { color: var(--ink); }
-footer nav { display: flex; gap: 20px; }
+footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 footer button { color: var(--muted); text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: .14em; }
 footer button:hover { color: var(--ink); }
 
@@ -282,6 +284,7 @@ footer button:hover { color: var(--ink); }
   .top { padding-top: 20px; }
   .opening { padding: 36px 0 32px; }
   .install { display: flex; width: 100%; }
+  .installs { display: grid; }
   .catches li { grid-template-columns: minmax(0, 1fr); gap: 3px; }
   .board .sm { display: none; }
   .board td, .board th { padding-left: 10px; padding-right: 10px; }

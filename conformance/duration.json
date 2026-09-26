@@ -1,0 +1,390 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.3.0",
+  "parse": [
+    {
+      "input": "15m",
+      "ms": 900000
+    },
+    {
+      "input": "1h30m",
+      "ms": 5400000
+    },
+    {
+      "input": "90s",
+      "ms": 90000
+    },
+    {
+      "input": "2d",
+      "ms": 172800000
+    },
+    {
+      "input": "1w",
+      "ms": 604800000
+    },
+    {
+      "input": "250ms",
+      "ms": 250
+    },
+    {
+      "input": " 1h 5m ",
+      "ms": 3900000
+    },
+    {
+      "input": "1.5h",
+      "ms": 5400000
+    },
+    {
+      "input": "0.1s",
+      "ms": 100
+    },
+    {
+      "input": "1H",
+      "ms": 3600000
+    },
+    {
+      "input": "10 M",
+      "ms": 600000
+    },
+    {
+      "input": "1m 30s",
+      "ms": 90000
+    },
+    {
+      "input": "1.25s",
+      "ms": 1250
+    },
+    {
+      "input": "0.0005s",
+      "ms": 1
+    },
+    {
+      "input": "0.0004s",
+      "ms": 0
+    },
+    {
+      "input": "2w3d",
+      "ms": 1468800000
+    },
+    {
+      "input": "1h\t30m",
+      "ms": 5400000
+    },
+    {
+      "input": "1h 30m",
+      "ms": 5400000
+    },
+    {
+      "input": " 1m ",
+      "ms": 60000
+    },
+    {
+      "input": "1ms1s",
+      "ms": 1001
+    },
+    {
+      "input": "5m5m",
+      "ms": 600000
+    },
+    {
+      "input": "0m",
+      "ms": 0
+    },
+    {
+      "input": "0.5ms",
+      "ms": 1
+    },
+    {
+      "input": "1.5ms",
+      "ms": 2
+    },
+    {
+      "input": "2.5ms",
+      "ms": 3
+    },
+    {
+      "input": "999999999w",
+      "ms": 604799999395200000
+    },
+    {
+      "input": "1d23h59m59s999ms",
+      "ms": 172799999
+    },
+    {
+      "input": "",
+      "error": "duration is empty"
+    },
+    {
+      "input": "   ",
+      "error": "duration is empty"
+    },
+    {
+      "input": "abc",
+      "error": "duration \"abc\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "5",
+      "error": "duration \"5\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "5 minutes",
+      "error": "duration \"5 minutes\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "-1m",
+      "error": "duration \"-1m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "1m2",
+      "error": "duration \"1m2\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "1.m",
+      "error": "duration \"1.m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": ".5m",
+      "error": "duration \".5m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "m",
+      "error": "duration \"m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "1mm",
+      "error": "duration \"1mm\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "1 h 30",
+      "error": "duration \"1 h 30\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "1y",
+      "error": "duration \"1y\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "1h,30m",
+      "error": "duration \"1h,30m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "+1m",
+      "error": "duration \"+1m\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": 1234,
+      "ms": 1234
+    },
+    {
+      "input": 0,
+      "ms": 0
+    },
+    {
+      "input": 1.5,
+      "ms": 1.5
+    },
+    {
+      "input": -5,
+      "error": "duration must be a non-negative number of milliseconds"
+    },
+    {
+      "input": {
+        "special": "NaN"
+      },
+      "error": "duration must be a non-negative number of milliseconds"
+    },
+    {
+      "input": {
+        "special": "Infinity"
+      },
+      "error": "duration must be a non-negative number of milliseconds"
+    },
+    {
+      "input": {
+        "special": "-Infinity"
+      },
+      "error": "duration must be a non-negative number of milliseconds"
+    },
+    {
+      "input": "soon",
+      "label": "grace",
+      "error": "grace \"soon\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "",
+      "label": "timeout",
+      "error": "timeout is empty"
+    },
+    {
+      "input": -1,
+      "label": "maxDuration",
+      "error": "maxDuration must be a non-negative number of milliseconds"
+    },
+    {
+      "input": "every",
+      "label": "schedule interval",
+      "error": "schedule interval \"every\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "2h",
+      "label": "silence duration",
+      "ms": 7200000
+    }
+  ],
+  "format": [
+    {
+      "ms": 0,
+      "text": "0ms"
+    },
+    {
+      "ms": 1,
+      "text": "1ms"
+    },
+    {
+      "ms": 0.4,
+      "text": "0ms"
+    },
+    {
+      "ms": 0.5,
+      "text": "1ms"
+    },
+    {
+      "ms": 499.5,
+      "text": "500ms"
+    },
+    {
+      "ms": 999.4,
+      "text": "999ms"
+    },
+    {
+      "ms": 999.5,
+      "text": "1000ms"
+    },
+    {
+      "ms": 1000,
+      "text": "1s"
+    },
+    {
+      "ms": 1499,
+      "text": "1s"
+    },
+    {
+      "ms": 1500,
+      "text": "2s"
+    },
+    {
+      "ms": 1999,
+      "text": "2s"
+    },
+    {
+      "ms": 59999,
+      "text": "1m"
+    },
+    {
+      "ms": 60000,
+      "text": "1m"
+    },
+    {
+      "ms": 61000,
+      "text": "1m 1s"
+    },
+    {
+      "ms": 90000,
+      "text": "1m 30s"
+    },
+    {
+      "ms": 3599499,
+      "text": "59m 59s"
+    },
+    {
+      "ms": 3600000,
+      "text": "1h"
+    },
+    {
+      "ms": 3660000,
+      "text": "1h 1m"
+    },
+    {
+      "ms": 93900000,
+      "text": "1d 2h"
+    },
+    {
+      "ms": 90061000,
+      "text": "1d 1h"
+    },
+    {
+      "ms": 34560000000,
+      "text": "400d"
+    },
+    {
+      "ms": 172800000,
+      "text": "2d"
+    },
+    {
+      "ms": -5,
+      "text": "-5ms"
+    },
+    {
+      "ms": -1500,
+      "text": "-1500ms"
+    },
+    {
+      "ms": {
+        "special": "NaN"
+      },
+      "text": "?"
+    },
+    {
+      "ms": {
+        "special": "Infinity"
+      },
+      "text": "?"
+    }
+  ],
+  "relative": [
+    {
+      "at": 1000000,
+      "now": 1120000,
+      "text": "2m ago"
+    },
+    {
+      "at": 1120000,
+      "now": 1000000,
+      "text": "in 2m"
+    },
+    {
+      "at": 1000000,
+      "now": 1002000,
+      "text": "now"
+    },
+    {
+      "at": 1000000,
+      "now": 1004999,
+      "text": "now"
+    },
+    {
+      "at": 1000000,
+      "now": 1005000,
+      "text": "5s ago"
+    },
+    {
+      "at": 1005000,
+      "now": 1000000,
+      "text": "in 5s"
+    },
+    {
+      "at": 1767605400000,
+      "now": 1767605400000,
+      "text": "now"
+    },
+    {
+      "at": 1767605400000,
+      "now": 1767879000000,
+      "text": "3d 4h ago"
+    },
+    {
+      "at": 1767610800000,
+      "now": 1767605400000,
+      "text": "in 1h 30m"
+    }
+  ]
+}

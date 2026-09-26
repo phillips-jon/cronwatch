@@ -133,7 +133,19 @@ function unconfigured(token?: string | null, host = "localhost") {
   return (path: string) => routes.GET(new Request(`http://${host}${path}`));
 }
 
-test("without a token: open only to localhost in development and test, locked otherwise", async () => {
+/** Captures console.info while `fn` runs. */
+async function logged<T>(fn: () => Promise<T>): Promise<{ lines: string[]; result: T }> {
+  const lines: string[] = [];
+  const info = console.info;
+  console.info = (...parts: unknown[]) => { lines.push(parts.map(String).join(" ")); };
+  try {
+    return { lines, result: await fn() };
+  } finally {
+    console.info = info;
+  }
+}
+
+test("without a token outside development the routes are locked", async () => {
   for (const env of [undefined, "production", "staging", ""]) {
     await withEnv({ NODE_ENV: env, CRONWATCH_TOKEN: undefined }, async () => {
       const get = unconfigured();
@@ -141,12 +153,46 @@ test("without a token: open only to localhost in development and test, locked ot
       assert.equal((await get("/cronwatch")).status, 503, `NODE_ENV=${env}`);
     });
   }
+});
+
+test("without a token in development, a made-up token is printed once and required from everyone", async () => {
   for (const env of ["development", "test"]) {
     await withEnv({ NODE_ENV: env, CRONWATCH_TOKEN: undefined }, async () => {
-      assert.equal((await unconfigured()("/cronwatch/api/jobs")).status, 200, `NODE_ENV=${env}`);
-      assert.equal((await unconfigured(undefined, "127.0.0.1:3000")("/cronwatch/api/jobs")).status, 200, `NODE_ENV=${env}`);
-      assert.equal((await unconfigured(undefined, "192.168.1.20:3000")("/cronwatch/api/jobs")).status, 503, `a LAN address, NODE_ENV=${env}`);
-      assert.equal((await unconfigured(undefined, "evil.example")("/cronwatch/api/jobs")).status, 503, `a rebinding host, NODE_ENV=${env}`);
+      const cw = cronwatch({ alerts: [capture()], cronSecret: null });
+      const routes = cw.routes({ basePath: "/cronwatch/" });
+      const { lines } = await logged(async () => {
+        // Every request is refused without the token, whatever it claims about where it came from.
+        for (const [url, headers] of [
+          ["http://localhost:3000/cronwatch/api/jobs", {}],
+          ["http://localhost:3000/cronwatch/api/jobs", { host: "localhost:3000", "x-forwarded-for": "127.0.0.1" }],
+          ["http://127.0.0.1:3000/cronwatch/", {}],
+          ["http://192.168.1.20:3000/cronwatch/api/jobs", {}],
+        ] as [string, Record<string, string>][]) {
+          assert.equal((await routes.GET(new Request(url, { headers }))).status, 401, `${url} NODE_ENV=${env}`);
+        }
+      });
+      assert.equal(lines.length, 1, "announced once, on the first request");
+      const match = /^\[cronwatch\] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard\. Sign in: http:\/\/localhost:3000\/cronwatch\/\?token=([A-Za-z0-9_-]{43})$/.exec(lines[0]!);
+      assert.ok(match, lines[0]);
+      const token = match[1]!;
+
+      const page = await routes.GET(new Request("http://localhost:3000/cronwatch/"));
+      assert.equal(page.status, 401);
+      assert.match(await page.text(), /sign-in link is in the server log/);
+      const api = await routes.GET(new Request("http://localhost:3000/cronwatch/api/jobs"));
+      assert.match((await api.json()).error, /in the server log/);
+
+      const signIn = await routes.GET(new Request(`http://localhost:3000/cronwatch/?token=${token}`));
+      assert.equal(signIn.status, 303);
+      assert.equal(signIn.headers.get("location"), "/cronwatch/");
+      const cookie = signIn.headers.get("set-cookie")!.split(";")[0]!;
+      assert.equal((await routes.GET(new Request("http://localhost:3000/cronwatch/", { headers: { cookie } }))).status, 200);
+      assert.equal((await routes.GET(new Request("http://localhost:3000/cronwatch/api/jobs", { headers: { authorization: `Bearer ${token}` } }))).status, 200);
+
+      const other = cronwatch({ alerts: [capture()], cronSecret: null }).routes({ basePath: "/" });
+      const { lines: second } = await logged(async () => other.GET(new Request("https://dev.example:8443/api/jobs")));
+      assert.match(second[0]!, /Sign in: https:\/\/dev\.example:8443\/\?token=[A-Za-z0-9_-]{43}$/, "the origin as requested, and a root mount");
+      assert.notEqual(second[0]!.slice(-43), token, "each routes instance makes its own");
     });
   }
 });
@@ -156,6 +202,16 @@ test("an empty token counts as unset; null opts out explicitly", async () => {
     assert.equal((await unconfigured()("/cronwatch/api/jobs")).status, 503);
     assert.equal((await unconfigured("")("/cronwatch/api/jobs")).status, 503);
     assert.equal((await unconfigured(null, "app.test")("/cronwatch/api/jobs")).status, 200, "token: null serves open");
+  });
+  await withEnv({ NODE_ENV: "development", CRONWATCH_TOKEN: undefined }, async () => {
+    const { lines, result } = await logged(async () => unconfigured(null, "app.test")("/cronwatch/api/jobs"));
+    assert.equal(result.status, 200, "token: null serves open in development too");
+    assert.deepEqual(lines, [], "and makes no token");
+  });
+  await withEnv({ NODE_ENV: "development", CRONWATCH_TOKEN: "envtok" }, async () => {
+    const { lines, result } = await logged(async () => unconfigured()("/cronwatch/api/jobs"));
+    assert.equal(result.status, 401, "a configured token is used in development");
+    assert.deepEqual(lines, []);
   });
   await withEnv({ NODE_ENV: "production", CRONWATCH_TOKEN: "envtok" }, async () => {
     const cw = cronwatch({ alerts: [capture()], cronSecret: null });

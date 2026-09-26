@@ -38,6 +38,8 @@ The key comes from the Anthropic SDK's usual environment, normally `ANTHROPIC_AP
 
 Triage runs only when an alert is sent, never per run, so it costs roughly one short request per incident: every missed, failed, stuck, slow and over-budget alert, but never a recovery. It gets 25 seconds; if the request is slower or fails, the alert goes out without a diagnosis and the error is reported through `onError`. The request is made once, without retries, and is cancelled when the 25 seconds are up, so it never runs on after the alert has gone.
 
+Triage runs once per alert, whatever happens to it. When it gives nothing (it threw, timed out or answered empty) the alert's `triage` is `null`, and it is not asked again when the alert is retried. An alert that no channel accepted is queued with its diagnosis, so a later retry sends the same one. Alerts queued by a `deliver: "check"` process are triaged by the check that first retries them, within that check's 20 second retry budget.
+
 ## What is sent
 
 The alert title and message, the job's stored definition, the triggering run (status, timing, metrics, up to 3 KB of error and 3 KB of output tail), and one line each for up to four earlier runs. Values that look like secrets are redacted before a run is stored, so they never reach triage, but the patterns cannot catch everything; log less or leave triage off for jobs that handle secrets.

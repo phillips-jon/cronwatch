@@ -6,6 +6,8 @@ order: 4
 
 # Schedules, grace and timeouts
 
+The rules here are the same in the TypeScript SDK and the Ruby gem; the examples use the TypeScript names (`cw.check()` is `client.check` in Ruby, `timezone:` and `grace:` are spelled the same). In Rails, a job can take its schedule and timezone from Solid Queue or sidekiq-cron instead; see [Schedule the job](/docs/rails/#schedule-the-job).
+
 ## Schedule syntax
 
 | Form | Example | Notes |
@@ -44,7 +46,7 @@ A cron read in a timezone with daylight saving follows that zone's clock. When c
 
 Every run is recorded as `running` when it starts. Normally it is updated to `ok` or `failed` within the same call. If the process dies first, the row stays `running`. Each check marks any run older than the job's `timeout` (default `1h`) as `timeout`, counts it as a failure, and opens a **stuck** condition. The next run's start closes it, and the next successful run sends the recovery. If the timed-out run does finish later, a success closes stuck and recovers, and a failure is not counted a second time.
 
-Inside the process, `job.signal` is an `AbortSignal` that fires when the timeout elapses, so work that can stop early may honour it; nothing is killed for you.
+Inside the process, `job.signal` is an `AbortSignal` that fires when the timeout elapses, so work that can stop early may honour it; nothing is killed for you. In Ruby, `job.aborted?` turns true and `job.signal.check!` raises once the timeout has passed.
 
 ## Next due
 

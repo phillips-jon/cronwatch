@@ -58,14 +58,16 @@ cw.job("export", { expect: /wrote \d+ files/ });             // or match the pat
 cw.job("export", { expect: (out) => out.split("\n").length > 3 });   // or pass a function
 ```
 
+In Ruby, `expect:` takes a string, a `Regexp` or a callable in the same way.
+
 ## Baselines
 
 Baselines use the last twenty successful runs, reading past any failures in between, and need at least five. Before that, only explicit limits apply. A job's history is its own: a slow job is compared to itself.
 
 ## Silence
 
-`cw.silence(name, "2h")`, the dashboard button, or the MCP tool. While silenced, nothing new is recorded as an incident and no alerts are sent; conditions that clear during the silence do clear. When the silence ends, the next problem alerts normally.
+`cw.silence(name, "2h")` (in Ruby, `silence(name, for: "2h")`), the dashboard button, or the MCP tool. While silenced, nothing new is recorded as an incident and no alerts are sent; conditions that clear during the silence do clear. When the silence ends, the next problem alerts normally.
 
 ## Output and metrics
 
-Output, whether logged or returned, and errors are capped at 16 KB per run, keeping the tail. Before either is stored, values that look like secrets are replaced with `[redacted]`: `password=`, `api_key:` and similar pairs, credentials in URLs, bearer tokens, and AWS, GitHub, Slack, Stripe and API key formats. `expect` rules see the output before redaction. Pass `redact` to `cronwatch()` to use your own function, or `false` to turn it off. Metrics are numbers keyed by name; report as many as you like. Both are stored with the run, shown on the dashboard and in alerts, and handed to the MCP server and to triage.
+Output, whether logged or returned, and errors are capped at 16 KB per run, keeping the tail. Before either is stored, values that look like secrets are replaced with `[redacted]`: `password=`, `api_key:`, `:secret => "..."` and similar pairs (quoted values in full), credentials in URLs, `Bearer`, `Basic` and `Token` authorization values, PEM private keys, JWTs, Slack and Discord webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats. NUL bytes are removed. `expect` rules see the output before redaction. Pass `redact` to `cronwatch()` (or `Cronwatch.new`, or `c.redact` in `Cronwatch.configure`) to use your own function, or `false` to turn it off. Metrics are numbers keyed by name; report as many as you like. Both are stored with the run, shown on the dashboard and in alerts, and handed to the MCP server and to triage.

@@ -190,3 +190,47 @@ test("markup in definitions, output and metrics stays escaped on every page", as
     assert.doesNotMatch(html, /<img|<t>|<e>|<o>|<k>|<x>/, path);
   }
 });
+
+/** No token in development: the routes as a dev server would serve them, with the sign-in line swallowed. */
+function devRoutes() {
+  const before = { NODE_ENV: process.env.NODE_ENV, CRONWATCH_TOKEN: process.env.CRONWATCH_TOKEN };
+  process.env.NODE_ENV = "development";
+  delete process.env.CRONWATCH_TOKEN;
+  try {
+    const cw = cronwatch({ alerts: [capture()], cronSecret: null });
+    return cw.routes({ basePath: "/cronwatch" });
+  } finally {
+    for (const [k, v] of Object.entries(before)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
+
+test("without a token in development, nothing a request says about itself lets it in", async () => {
+  const routes = devRoutes();
+  const info = console.info;
+  console.info = () => {};
+  try {
+    const local = "http://localhost:3000/cronwatch/api/jobs";
+    // What Next.js hands a route handler for a browser on this machine, and
+    // what the old loopback check let through: all of it can be forged, since
+    // Next.js keeps a client's X-Forwarded-For and a tunnel rewrites Host.
+    const looksLocal: Record<string, string>[] = [
+      {},
+      { host: "localhost:3000", "x-forwarded-host": "localhost:3000", "x-forwarded-for": "::ffff:127.0.0.1", "x-forwarded-port": "3000", "x-forwarded-proto": "http" },
+      { host: "127.0.0.1:3000", "x-forwarded-for": "::1" },
+      { host: "[::1]:3000", forwarded: 'for="[::1]:51234";host=localhost;proto=http' },
+      { host: "localhost", "x-real-ip": "127.0.0.1" },
+    ];
+    for (const headers of looksLocal) {
+      const res = await routes.GET(new Request(local, { headers }));
+      assert.equal(res.status, 401, JSON.stringify(headers));
+      assert.equal((await res.json()).ok, false);
+    }
+    const write = await routes.POST(new Request("http://localhost:3000/cronwatch/api/check", { method: "POST", headers: { host: "localhost:3000" } }));
+    assert.equal(write.status, 401);
+  } finally {
+    console.info = info;
+  }
+});
+

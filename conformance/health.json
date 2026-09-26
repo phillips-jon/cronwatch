@@ -1,0 +1,3319 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.3.0",
+  "jobHealth": [
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "ok",
+        "job": "j",
+        "status": "ok",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767605400001,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "silenced"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "ok",
+        "job": "j",
+        "status": "ok",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767605400000,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "failing"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "run",
+        "job": "j",
+        "status": "running",
+        "startedAt": 1767605040000,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "stuck"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "run",
+        "job": "j",
+        "status": "running",
+        "startedAt": 1767605100000,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "healthy"
+    },
+    {
+      "definition": {},
+      "lastRun": {
+        "id": "run",
+        "job": "j",
+        "status": "running",
+        "startedAt": 1767601740000,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "stuck"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "ok",
+        "job": "j",
+        "status": "ok",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "stuck": 1
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "stuck"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "f",
+        "job": "j",
+        "status": "failed",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": "Error: boom",
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "failing"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "t",
+        "job": "j",
+        "status": "timeout",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "failing"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "ok",
+        "job": "j",
+        "status": "ok",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1,
+          "missed": 2
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "failing"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "ok",
+        "job": "j",
+        "status": "ok",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "missed": 1
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "late"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": null,
+      "state": {
+        "job": "j",
+        "open": {
+          "missed": 1
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "late"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": null,
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "never_ran"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "ok",
+        "job": "j",
+        "status": "ok",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "slow": 1,
+          "over_budget": 2
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "healthy"
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "lastRun": {
+        "id": "ok",
+        "job": "j",
+        "status": "ok",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "health": "healthy"
+    }
+  ],
+  "summarize": [
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "createdAt": 1767497400000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [],
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "nextExpectedAt": null,
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "health": "never_ran",
+        "open": [],
+        "lastRun": null,
+        "nextExpectedAt": null,
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "stats": {
+          "runs": 0,
+          "okRate": 1,
+          "p50Ms": null,
+          "p95Ms": null
+        }
+      }
+    },
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "createdAt": 1767497400000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [
+        {
+          "id": "run",
+          "job": "j",
+          "status": "running",
+          "startedAt": 1767605340000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      ],
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "nextExpectedAt": 1767607200000,
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "health": "healthy",
+        "open": [],
+        "lastRun": {
+          "id": "run",
+          "job": "j",
+          "status": "running",
+          "startedAt": 1767605340000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "nextExpectedAt": 1767607200000,
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "stats": {
+          "runs": 0,
+          "okRate": 1,
+          "p50Ms": null,
+          "p95Ms": null
+        }
+      }
+    },
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "createdAt": 1767497400000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [
+        {
+          "id": "run",
+          "job": "j",
+          "status": "running",
+          "startedAt": 1767605340000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "f",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767601801000,
+          "durationMs": 1000,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o0",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598201000,
+          "durationMs": 1000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o1",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767594600000,
+          "finishedAt": 1767594602000,
+          "durationMs": 2000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o2",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767591000000,
+          "finishedAt": 1767591003000,
+          "durationMs": 3000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o3",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767587400000,
+          "finishedAt": 1767587404000,
+          "durationMs": 4000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o4",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767583800000,
+          "finishedAt": 1767583805000,
+          "durationMs": 5000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o5",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767580200000,
+          "finishedAt": 1767580206000,
+          "durationMs": 6000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o6",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767576600000,
+          "finishedAt": 1767576607000,
+          "durationMs": 7000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o7",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767573000000,
+          "finishedAt": 1767573008000,
+          "durationMs": 8000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o8",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767569400000,
+          "finishedAt": 1767569409000,
+          "durationMs": 9000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o9",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767565800000,
+          "finishedAt": 1767565810000,
+          "durationMs": 10000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o10",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767562200000,
+          "finishedAt": 1767562211000,
+          "durationMs": 11000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o11",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767558600000,
+          "finishedAt": 1767558612000,
+          "durationMs": 12000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o12",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767555000000,
+          "finishedAt": 1767555013000,
+          "durationMs": 13000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o13",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767551400000,
+          "finishedAt": 1767551414000,
+          "durationMs": 14000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o14",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767547800000,
+          "finishedAt": 1767547815000,
+          "durationMs": 15000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o15",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767544200000,
+          "finishedAt": 1767544216000,
+          "durationMs": 16000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o16",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767540600000,
+          "finishedAt": 1767540617000,
+          "durationMs": 17000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o17",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767537000000,
+          "finishedAt": 1767537018000,
+          "durationMs": 18000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o18",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767533400000,
+          "finishedAt": 1767533419000,
+          "durationMs": 19000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o19",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767529800000,
+          "finishedAt": 1767529820000,
+          "durationMs": 20000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o20",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767526200000,
+          "finishedAt": 1767526221000,
+          "durationMs": 21000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o21",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767522600000,
+          "finishedAt": 1767522622000,
+          "durationMs": 22000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o22",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767519000000,
+          "finishedAt": 1767519023000,
+          "durationMs": 23000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o23",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767515400000,
+          "finishedAt": 1767515424000,
+          "durationMs": 24000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o24",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767511800000,
+          "finishedAt": 1767511825000,
+          "durationMs": 25000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      ],
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "nextExpectedAt": 1767607200000,
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "health": "healthy",
+        "open": [],
+        "lastRun": {
+          "id": "run",
+          "job": "j",
+          "status": "running",
+          "startedAt": 1767605340000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "nextExpectedAt": 1767607200000,
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "stats": {
+          "runs": 19,
+          "okRate": 0.9473684210526315,
+          "p50Ms": 9000,
+          "p95Ms": 18000
+        }
+      }
+    },
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "createdAt": 1767497400000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [
+        {
+          "id": "x0",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605400333,
+          "durationMs": 333,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x1",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767601800666,
+          "durationMs": 666,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x2",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598200999,
+          "durationMs": 999,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x3",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767594600000,
+          "finishedAt": 1767594601332,
+          "durationMs": 1332,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x4",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767591000000,
+          "finishedAt": 1767591001665,
+          "durationMs": 1665,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x5",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767587400000,
+          "finishedAt": 1767587401998,
+          "durationMs": 1998,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x6",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767583800000,
+          "finishedAt": 1767583802331,
+          "durationMs": 2331,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      ],
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "nextExpectedAt": 1767607200000,
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "health": "failing",
+        "open": [],
+        "lastRun": {
+          "id": "x0",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605400333,
+          "durationMs": 333,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "nextExpectedAt": 1767607200000,
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "stats": {
+          "runs": 7,
+          "okRate": 0.5714285714285714,
+          "p50Ms": 999,
+          "p95Ms": 1998
+        }
+      }
+    },
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "createdAt": 1767497400000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [
+        {
+          "id": "t",
+          "job": "j",
+          "status": "timeout",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767602400000,
+          "durationMs": 600000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      ],
+      "state": {
+        "job": "j",
+        "open": {
+          "stuck": 1767601800000
+        },
+        "consecutiveFailures": 1,
+        "silencedUntil": null,
+        "lastAlertAt": 1767601800000,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "nextExpectedAt": 1767607200000,
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "health": "stuck",
+        "open": [
+          "stuck"
+        ],
+        "lastRun": {
+          "id": "t",
+          "job": "j",
+          "status": "timeout",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767602400000,
+          "durationMs": 600000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "nextExpectedAt": 1767607200000,
+        "consecutiveFailures": 1,
+        "silencedUntil": null,
+        "stats": {
+          "runs": 2,
+          "okRate": 0.5,
+          "p50Ms": null,
+          "p95Ms": null
+        }
+      }
+    },
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "createdAt": 1767497400000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [
+        {
+          "id": "o1",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767601801500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o2",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598202500,
+          "durationMs": 2500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      ],
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767609000000,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "nextExpectedAt": 1767607200000,
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "every 1h",
+          "timeout": "10m"
+        },
+        "health": "silenced",
+        "open": [],
+        "lastRun": {
+          "id": "o1",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767601801500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "nextExpectedAt": 1767607200000,
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767609000000,
+        "stats": {
+          "runs": 2,
+          "okRate": 1,
+          "p50Ms": 1500,
+          "p95Ms": 2500
+        }
+      }
+    }
+  ],
+  "percentile": [
+    {
+      "values": [],
+      "p": 50,
+      "percentile": null
+    },
+    {
+      "values": [],
+      "p": 90,
+      "percentile": null
+    },
+    {
+      "values": [],
+      "p": 95,
+      "percentile": null
+    },
+    {
+      "values": [],
+      "p": 99,
+      "percentile": null
+    },
+    {
+      "values": [],
+      "p": 100,
+      "percentile": null
+    },
+    {
+      "values": [],
+      "p": 0,
+      "percentile": null
+    },
+    {
+      "values": [],
+      "p": 1,
+      "percentile": null
+    },
+    {
+      "values": [
+        5
+      ],
+      "p": 50,
+      "percentile": 5
+    },
+    {
+      "values": [
+        5
+      ],
+      "p": 90,
+      "percentile": 5
+    },
+    {
+      "values": [
+        5
+      ],
+      "p": 95,
+      "percentile": 5
+    },
+    {
+      "values": [
+        5
+      ],
+      "p": 99,
+      "percentile": 5
+    },
+    {
+      "values": [
+        5
+      ],
+      "p": 100,
+      "percentile": 5
+    },
+    {
+      "values": [
+        5
+      ],
+      "p": 0,
+      "percentile": 5
+    },
+    {
+      "values": [
+        5
+      ],
+      "p": 1,
+      "percentile": 5
+    },
+    {
+      "values": [
+        3,
+        1,
+        2
+      ],
+      "p": 50,
+      "percentile": 2
+    },
+    {
+      "values": [
+        3,
+        1,
+        2
+      ],
+      "p": 90,
+      "percentile": 3
+    },
+    {
+      "values": [
+        3,
+        1,
+        2
+      ],
+      "p": 95,
+      "percentile": 3
+    },
+    {
+      "values": [
+        3,
+        1,
+        2
+      ],
+      "p": 99,
+      "percentile": 3
+    },
+    {
+      "values": [
+        3,
+        1,
+        2
+      ],
+      "p": 100,
+      "percentile": 3
+    },
+    {
+      "values": [
+        3,
+        1,
+        2
+      ],
+      "p": 0,
+      "percentile": 1
+    },
+    {
+      "values": [
+        3,
+        1,
+        2
+      ],
+      "p": 1,
+      "percentile": 1
+    },
+    {
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "p": 50,
+      "percentile": 2
+    },
+    {
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "p": 90,
+      "percentile": 4
+    },
+    {
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "p": 95,
+      "percentile": 4
+    },
+    {
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "p": 99,
+      "percentile": 4
+    },
+    {
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "p": 100,
+      "percentile": 4
+    },
+    {
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "p": 0,
+      "percentile": 1
+    },
+    {
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "p": 1,
+      "percentile": 1
+    },
+    {
+      "values": [
+        10,
+        1,
+        100,
+        1000,
+        5,
+        7,
+        7,
+        7,
+        2,
+        3
+      ],
+      "p": 50,
+      "percentile": 7
+    },
+    {
+      "values": [
+        10,
+        1,
+        100,
+        1000,
+        5,
+        7,
+        7,
+        7,
+        2,
+        3
+      ],
+      "p": 90,
+      "percentile": 100
+    },
+    {
+      "values": [
+        10,
+        1,
+        100,
+        1000,
+        5,
+        7,
+        7,
+        7,
+        2,
+        3
+      ],
+      "p": 95,
+      "percentile": 1000
+    },
+    {
+      "values": [
+        10,
+        1,
+        100,
+        1000,
+        5,
+        7,
+        7,
+        7,
+        2,
+        3
+      ],
+      "p": 99,
+      "percentile": 1000
+    },
+    {
+      "values": [
+        10,
+        1,
+        100,
+        1000,
+        5,
+        7,
+        7,
+        7,
+        2,
+        3
+      ],
+      "p": 100,
+      "percentile": 1000
+    },
+    {
+      "values": [
+        10,
+        1,
+        100,
+        1000,
+        5,
+        7,
+        7,
+        7,
+        2,
+        3
+      ],
+      "p": 0,
+      "percentile": 1
+    },
+    {
+      "values": [
+        10,
+        1,
+        100,
+        1000,
+        5,
+        7,
+        7,
+        7,
+        2,
+        3
+      ],
+      "p": 1,
+      "percentile": 1
+    },
+    {
+      "values": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000,
+        15000,
+        16000,
+        17000,
+        18000,
+        19000,
+        20000
+      ],
+      "p": 50,
+      "percentile": 10000
+    },
+    {
+      "values": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000,
+        15000,
+        16000,
+        17000,
+        18000,
+        19000,
+        20000
+      ],
+      "p": 90,
+      "percentile": 18000
+    },
+    {
+      "values": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000,
+        15000,
+        16000,
+        17000,
+        18000,
+        19000,
+        20000
+      ],
+      "p": 95,
+      "percentile": 19000
+    },
+    {
+      "values": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000,
+        15000,
+        16000,
+        17000,
+        18000,
+        19000,
+        20000
+      ],
+      "p": 99,
+      "percentile": 20000
+    },
+    {
+      "values": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000,
+        15000,
+        16000,
+        17000,
+        18000,
+        19000,
+        20000
+      ],
+      "p": 100,
+      "percentile": 20000
+    },
+    {
+      "values": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000,
+        15000,
+        16000,
+        17000,
+        18000,
+        19000,
+        20000
+      ],
+      "p": 0,
+      "percentile": 1000
+    },
+    {
+      "values": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000,
+        15000,
+        16000,
+        17000,
+        18000,
+        19000,
+        20000
+      ],
+      "p": 1,
+      "percentile": 1000
+    },
+    {
+      "values": [
+        0.5,
+        0.25,
+        0.125
+      ],
+      "p": 50,
+      "percentile": 0.25
+    },
+    {
+      "values": [
+        0.5,
+        0.25,
+        0.125
+      ],
+      "p": 90,
+      "percentile": 0.5
+    },
+    {
+      "values": [
+        0.5,
+        0.25,
+        0.125
+      ],
+      "p": 95,
+      "percentile": 0.5
+    },
+    {
+      "values": [
+        0.5,
+        0.25,
+        0.125
+      ],
+      "p": 99,
+      "percentile": 0.5
+    },
+    {
+      "values": [
+        0.5,
+        0.25,
+        0.125
+      ],
+      "p": 100,
+      "percentile": 0.5
+    },
+    {
+      "values": [
+        0.5,
+        0.25,
+        0.125
+      ],
+      "p": 0,
+      "percentile": 0.125
+    },
+    {
+      "values": [
+        0.5,
+        0.25,
+        0.125
+      ],
+      "p": 1,
+      "percentile": 0.125
+    },
+    {
+      "values": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "p": 50,
+      "percentile": 2
+    },
+    {
+      "values": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "p": 90,
+      "percentile": 3
+    },
+    {
+      "values": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "p": 95,
+      "percentile": 3
+    },
+    {
+      "values": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "p": 99,
+      "percentile": 3
+    },
+    {
+      "values": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "p": 100,
+      "percentile": 3
+    },
+    {
+      "values": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "p": 0,
+      "percentile": 2
+    },
+    {
+      "values": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "p": 1,
+      "percentile": 2
+    }
+  ],
+  "median": [
+    {
+      "values": [],
+      "median": null
+    },
+    {
+      "values": [
+        5
+      ],
+      "median": 5
+    },
+    {
+      "values": [
+        3,
+        1,
+        2
+      ],
+      "median": 2
+    },
+    {
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "median": 2.5
+    },
+    {
+      "values": [
+        10,
+        1,
+        100,
+        1000,
+        5,
+        7,
+        7,
+        7,
+        2,
+        3
+      ],
+      "median": 7
+    },
+    {
+      "values": [
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000,
+        7000,
+        8000,
+        9000,
+        10000,
+        11000,
+        12000,
+        13000,
+        14000,
+        15000,
+        16000,
+        17000,
+        18000,
+        19000,
+        20000
+      ],
+      "median": 10500
+    },
+    {
+      "values": [
+        0.5,
+        0.25,
+        0.125
+      ],
+      "median": 0.25
+    },
+    {
+      "values": [
+        2,
+        2,
+        3,
+        3
+      ],
+      "median": 2.5
+    }
+  ],
+  "normalizeState": [
+    {
+      "state": null,
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1
+        },
+        "consecutiveFailures": 2,
+        "silencedUntil": null,
+        "lastAlertAt": 5
+      },
+      "normalized": {
+        "job": "j",
+        "open": {
+          "failed": 1
+        },
+        "consecutiveFailures": 2,
+        "silencedUntil": null,
+        "lastAlertAt": 5,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": 99,
+        "lastAlertAt": null,
+        "pendingRecovery": [
+          "missed"
+        ]
+      },
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": 99,
+        "lastAlertAt": null,
+        "pendingRecovery": [
+          "missed"
+        ],
+        "undelivered": []
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": {
+          "stuck": 7,
+          "slow": 8
+        },
+        "consecutiveFailures": 1,
+        "silencedUntil": null,
+        "lastAlertAt": 6,
+        "pendingRecovery": [
+          "missed",
+          "failed"
+        ],
+        "undelivered": []
+      },
+      "normalized": {
+        "job": "j",
+        "open": {
+          "stuck": 7,
+          "slow": 8
+        },
+        "consecutiveFailures": 1,
+        "silencedUntil": null,
+        "lastAlertAt": 6,
+        "pendingRecovery": [
+          "missed",
+          "failed"
+        ],
+        "undelivered": []
+      }
+    }
+  ],
+  "muteOpens": [
+    {
+      "previous": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "next": {
+        "job": "j",
+        "open": {
+          "slow": 1767605400001
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "muted": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "previous": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "next": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000,
+          "missed": 1767605400001
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "muted": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "previous": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "next": {
+        "job": "j",
+        "open": {
+          "missed": 1767605400000
+        },
+        "consecutiveFailures": 3,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [
+          "failed"
+        ],
+        "undelivered": []
+      },
+      "muted": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 3,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [
+          "failed"
+        ],
+        "undelivered": []
+      }
+    }
+  ],
+  "isStuck": [
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "run": {
+        "id": "a",
+        "job": "j",
+        "status": "running",
+        "startedAt": 1767605100000,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "now": 1767605400000,
+      "stuck": false
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "run": {
+        "id": "a",
+        "job": "j",
+        "status": "running",
+        "startedAt": 1767605099999,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "now": 1767605400000,
+      "stuck": true
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "run": {
+        "id": "a",
+        "job": "j",
+        "status": "ok",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601801000,
+        "durationMs": 1000,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "now": 1767605400000,
+      "stuck": false
+    },
+    {
+      "definition": {},
+      "run": {
+        "id": "a",
+        "job": "j",
+        "status": "running",
+        "startedAt": 1767601799999,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "now": 1767605400000,
+      "stuck": true
+    },
+    {
+      "definition": {
+        "timeout": 1000
+      },
+      "run": {
+        "id": "a",
+        "job": "j",
+        "status": "running",
+        "startedAt": 1767605398999,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "now": 1767605400000,
+      "stuck": true
+    }
+  ],
+  "unevaluableSummary": [
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "not a schedule",
+          "timeout": "soon"
+        },
+        "createdAt": 1767519000000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [],
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "not a schedule",
+          "timeout": "soon"
+        },
+        "health": "failing",
+        "open": [],
+        "lastRun": null,
+        "nextExpectedAt": null,
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "stats": {
+          "runs": 0,
+          "okRate": 1,
+          "p50Ms": null,
+          "p95Ms": null
+        }
+      }
+    },
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "not a schedule",
+          "timeout": "soon"
+        },
+        "createdAt": 1767519000000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [
+        {
+          "id": "run",
+          "job": "j",
+          "status": "running",
+          "startedAt": 1767605340000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "f",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767601801000,
+          "durationMs": 1000,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o0",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598201000,
+          "durationMs": 1000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o1",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767594600000,
+          "finishedAt": 1767594602000,
+          "durationMs": 2000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o2",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767591000000,
+          "finishedAt": 1767591003000,
+          "durationMs": 3000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o3",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767587400000,
+          "finishedAt": 1767587404000,
+          "durationMs": 4000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o4",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767583800000,
+          "finishedAt": 1767583805000,
+          "durationMs": 5000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o5",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767580200000,
+          "finishedAt": 1767580206000,
+          "durationMs": 6000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o6",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767576600000,
+          "finishedAt": 1767576607000,
+          "durationMs": 7000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o7",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767573000000,
+          "finishedAt": 1767573008000,
+          "durationMs": 8000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o8",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767569400000,
+          "finishedAt": 1767569409000,
+          "durationMs": 9000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o9",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767565800000,
+          "finishedAt": 1767565810000,
+          "durationMs": 10000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o10",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767562200000,
+          "finishedAt": 1767562211000,
+          "durationMs": 11000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o11",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767558600000,
+          "finishedAt": 1767558612000,
+          "durationMs": 12000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o12",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767555000000,
+          "finishedAt": 1767555013000,
+          "durationMs": 13000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o13",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767551400000,
+          "finishedAt": 1767551414000,
+          "durationMs": 14000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o14",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767547800000,
+          "finishedAt": 1767547815000,
+          "durationMs": 15000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o15",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767544200000,
+          "finishedAt": 1767544216000,
+          "durationMs": 16000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o16",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767540600000,
+          "finishedAt": 1767540617000,
+          "durationMs": 17000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o17",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767537000000,
+          "finishedAt": 1767537018000,
+          "durationMs": 18000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o18",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767533400000,
+          "finishedAt": 1767533419000,
+          "durationMs": 19000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o19",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767529800000,
+          "finishedAt": 1767529820000,
+          "durationMs": 20000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o20",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767526200000,
+          "finishedAt": 1767526221000,
+          "durationMs": 21000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o21",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767522600000,
+          "finishedAt": 1767522622000,
+          "durationMs": 22000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o22",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767519000000,
+          "finishedAt": 1767519023000,
+          "durationMs": 23000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o23",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767515400000,
+          "finishedAt": 1767515424000,
+          "durationMs": 24000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o24",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767511800000,
+          "finishedAt": 1767511825000,
+          "durationMs": 25000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      ],
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1767601800000
+        },
+        "consecutiveFailures": 3,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "not a schedule",
+          "timeout": "soon"
+        },
+        "health": "failing",
+        "open": [
+          "failed"
+        ],
+        "lastRun": {
+          "id": "run",
+          "job": "j",
+          "status": "running",
+          "startedAt": 1767605340000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "nextExpectedAt": null,
+        "consecutiveFailures": 3,
+        "silencedUntil": null,
+        "stats": {
+          "runs": 19,
+          "okRate": 0.9473684210526315,
+          "p50Ms": 9000,
+          "p95Ms": 18000
+        }
+      }
+    },
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "not a schedule",
+          "timeout": "soon"
+        },
+        "createdAt": 1767519000000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [
+        {
+          "id": "x0",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605400333,
+          "durationMs": 333,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x1",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767601800666,
+          "durationMs": 666,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x2",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598200999,
+          "durationMs": 999,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x3",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767594600000,
+          "finishedAt": 1767594601332,
+          "durationMs": 1332,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x4",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767591000000,
+          "finishedAt": 1767591001665,
+          "durationMs": 1665,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x5",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767587400000,
+          "finishedAt": 1767587401998,
+          "durationMs": 1998,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "x6",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767583800000,
+          "finishedAt": 1767583802331,
+          "durationMs": 2331,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      ],
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767609000000,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "not a schedule",
+          "timeout": "soon"
+        },
+        "health": "silenced",
+        "open": [],
+        "lastRun": {
+          "id": "x0",
+          "job": "j",
+          "status": "failed",
+          "startedAt": 1767605400000,
+          "finishedAt": 1767605400333,
+          "durationMs": 333,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "nextExpectedAt": null,
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767609000000,
+        "stats": {
+          "runs": 7,
+          "okRate": 0.5714285714285714,
+          "p50Ms": 999,
+          "p95Ms": 1998
+        }
+      }
+    },
+    {
+      "stored": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "not a schedule",
+          "timeout": "soon"
+        },
+        "createdAt": 1767519000000,
+        "updatedAt": 1767605400000
+      },
+      "recent": [
+        {
+          "id": "o1",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767601801500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        {
+          "id": "o2",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598202500,
+          "durationMs": 2500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      ],
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767605400000,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "now": 1767605400000,
+      "summary": {
+        "name": "j",
+        "definition": {
+          "name": "j",
+          "schedule": "not a schedule",
+          "timeout": "soon"
+        },
+        "health": "failing",
+        "open": [],
+        "lastRun": {
+          "id": "o1",
+          "job": "j",
+          "status": "ok",
+          "startedAt": 1767601800000,
+          "finishedAt": 1767601801500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "nextExpectedAt": null,
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767605400000,
+        "stats": {
+          "runs": 2,
+          "okRate": 1,
+          "p50Ms": 1500,
+          "p95Ms": 2500
+        }
+      }
+    }
+  ],
+  "applySilence": [
+    {
+      "previous": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "evaluation": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": null,
+            "details": {
+              "consecutiveFailures": 1,
+              "threshold": 1
+            }
+          }
+        ]
+      },
+      "now": 1767605400000,
+      "result": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": null,
+            "details": {
+              "consecutiveFailures": 1,
+              "threshold": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "previous": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767605400001,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "evaluation": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 1,
+          "silencedUntil": 1767605400001,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": null,
+            "details": {
+              "consecutiveFailures": 1,
+              "threshold": 1
+            }
+          }
+        ]
+      },
+      "now": 1767605400000,
+      "result": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": 1767605400001,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "previous": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767605400000,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "evaluation": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 1,
+          "silencedUntil": 1767605400000,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": null,
+            "details": {
+              "consecutiveFailures": 1,
+              "threshold": 1
+            }
+          }
+        ]
+      },
+      "now": 1767605400000,
+      "result": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 1,
+          "silencedUntil": 1767605400000,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": null,
+            "details": {
+              "consecutiveFailures": 1,
+              "threshold": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "previous": {
+        "job": "j",
+        "open": {
+          "slow": 1
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767609000000,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "evaluation": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 0,
+          "silencedUntil": 1767609000000,
+          "lastAlertAt": null,
+          "pendingRecovery": [
+            "slow"
+          ],
+          "undelivered": []
+        },
+        "alerts": []
+      },
+      "now": 1767605400000,
+      "result": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": 1767609000000,
+          "lastAlertAt": null,
+          "pendingRecovery": [
+            "slow"
+          ],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    }
+  ],
+  "staleAlert": [
+    {
+      "alert": {
+        "type": "failed",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": false
+    },
+    {
+      "alert": {
+        "type": "failed",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "failed",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1767605460000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "failed",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "stuck": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "missed",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "missed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": false
+    },
+    {
+      "alert": {
+        "type": "stuck",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "stuck": 1767605399999
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "slow",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "slow": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": 1767609000000,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": false
+    },
+    {
+      "alert": {
+        "type": "over_budget",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {
+          "after": [
+            "failed"
+          ]
+        }
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": false
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {
+          "after": [
+            "failed",
+            "slow"
+          ]
+        }
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "missed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": false
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {
+          "after": [
+            "failed",
+            "slow"
+          ]
+        }
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "slow": 1767605460000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {
+          "after": []
+        }
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": false
+    }
+  ]
+}

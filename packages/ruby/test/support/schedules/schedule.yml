@@ -1,0 +1,20 @@
+# A sidekiq-cron config/schedule.yml: cron lines, a Fugit phrase, a
+# timezone at the end of the cron, a disabled job and the check.
+hard_worker:
+  cron: "*/15 * * * *"
+  class: "HardWorker"
+  queue: critical
+morning_report:
+  cron: "every day at 9am Europe/London"
+  class: "ReportWorker"
+  description: "Report for the London office"
+weekly_cleanup:
+  cron: "30 4 * * sun America/New_York"
+  klass: "CleanupWorker"
+old_import:
+  cron: "0 1 * * *"
+  class: "ImportWorker"
+  status: disabled
+cronwatch_check:
+  cron: "*/5 * * * *"
+  class: "Cronwatch::Sidekiq::CheckWorker"

@@ -264,6 +264,27 @@ export function isSilenced(state: JobState, now: number): boolean {
   return state.silencedUntil !== null && state.silencedUntil > now;
 }
 
+/**
+ * An evaluation as it is saved and sent: while the job was silenced when it
+ * began, nothing opens and nothing is sent.
+ */
+export function applySilence(previous: JobState, evaluation: Evaluation, now: number): Evaluation {
+  if (!isSilenced(previous, now)) return evaluation;
+  return { state: muteOpens(previous, evaluation.state), alerts: [] };
+}
+
+/**
+ * Whether an alert waiting to be retried no longer describes the job, so it
+ * is dropped rather than sent late. An alert for a condition is stale once
+ * that condition has closed, or has closed and opened again (it opened at a
+ * time other than the alert's). A recovery is stale when any condition it
+ * names is open again; while they all stay closed it is kept.
+ */
+export function staleAlert(alert: AlertDraft & { at: number }, state: JobState): boolean {
+  if (alert.type === "recovered") return alert.details.after.some((condition) => state.open[condition] !== undefined);
+  return state.open[alert.type] !== alert.at;
+}
+
 /** How a job looks at a glance. Silence wins, then stuck, failing and late. */
 export function jobHealth(def: Pick<JobDefinition, "timeout">, lastRun: Run | null, state: JobState, now: number): JobHealth {
   const open = openConditions(state);
@@ -281,6 +302,20 @@ export function jobHealth(def: Pick<JobDefinition, "timeout">, lastRun: Run | nu
  * the percentiles are over the successful ones among them.
  */
 export function summarize(stored: StoredJob, recent: Run[], state: JobState, nextExpectedAt: number | null, now: number): JobSummary {
+  return summary(stored, recent, state, nextExpectedAt, (lastRun) => jobHealth(stored.definition, lastRun, state, now));
+}
+
+/**
+ * The summary of a job that could not be evaluated, say because its stored
+ * schedule no longer parses. It reads nothing from the definition. The job
+ * shows as failing (or silenced, while it is), since it needs a look, and
+ * nothing is known about when it is next due.
+ */
+export function unevaluableSummary(stored: StoredJob, recent: Run[], state: JobState, now: number): JobSummary {
+  return summary(stored, recent, state, null, () => (isSilenced(state, now) ? "silenced" : "failing"));
+}
+
+function summary(stored: StoredJob, recent: Run[], state: JobState, nextExpectedAt: number | null, health: (lastRun: Run | null) => JobHealth): JobSummary {
   const window = recent.slice(0, BASELINE_WINDOW);
   const lastRun = window[0] ?? null;
   const finished = window.filter((r) => r.status !== "running");
@@ -288,7 +323,7 @@ export function summarize(stored: StoredJob, recent: Run[], state: JobState, nex
   return {
     name: stored.name,
     definition: stored.definition,
-    health: jobHealth(stored.definition, lastRun, state, now),
+    health: health(lastRun),
     open: openConditions(state),
     lastRun,
     nextExpectedAt,

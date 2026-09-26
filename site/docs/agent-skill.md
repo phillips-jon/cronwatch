@@ -25,7 +25,7 @@ curl -sL https://raw.githubusercontent.com/phillips-jon/cronwatch/main/skills/cr
 
 ## What it teaches
 
-**Adding monitoring.** Find where the job runs, pick the store the app already has, declare the job once with its real schedule and timezone, wrap the work, mount the routes, make sure something calls the check, add a channel. It tells the agent to ask before adding dependencies and to keep job names stable.
+**Adding monitoring.** Find where the job runs, pick the store the app already has, declare the job once with its real schedule and timezone, wrap the work, mount the routes, make sure something calls the check, add a channel. It tells the agent to ask before adding dependencies and to keep job names stable. In a Rails app it uses the gem instead: the install generator, `cronwatch` in ActiveJob and Sidekiq classes (or `schedule: :from_scheduler`), `Cronwatch::CheckJob` on the scheduler, and `Cronwatch::Web` mounted in the routes.
 
 **Investigating.** With the [MCP server](/docs/mcp/) configured: list jobs, read the failing run's error and output before changing code, fix the cause rather than the monitor, silence only during a known fix, and confirm recovery after deploying.
 

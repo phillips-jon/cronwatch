@@ -106,6 +106,11 @@ export interface JobState {
   pendingRecovery?: Condition[];
   /** Alerts that no channel accepted. Each check retries them once. */
   undelivered?: Alert[];
+  /**
+   * Goes up by one on every write, so a store can refuse a write made from a
+   * stale read (see Store.compareAndSetState). Absent counts as 0.
+   */
+  version?: number;
 }
 
 export type AlertType = Condition | "recovered";
@@ -140,8 +145,12 @@ interface AlertBase {
   title: string;
   /** A few lines of plain text with the specifics. */
   message: string;
-  /** A short diagnosis from the triage function, when one is configured. */
-  triage?: string;
+  /**
+   * A short diagnosis from the triage function, when one is configured. Null
+   * when triage was tried and gave nothing (it threw, timed out or answered
+   * empty); it is not tried again for this alert.
+   */
+  triage?: string | null;
   at: number;
 }
 
@@ -170,7 +179,17 @@ export interface Store {
   lastRun(job: string): Promise<Run | null>;
   runningRuns(): Promise<Run[]>;
   getState(job: string): Promise<JobState | null>;
+  /** Write a job's state unconditionally. Used only when compareAndSetState is missing. */
   setState(state: JobState): Promise<void>;
+  /**
+   * Write `state` only when the stored state's version (see JobState.version;
+   * absent, or no row at all, counts as 0) equals `expectedVersion`. Returns
+   * whether it wrote. This is what keeps two processes sharing a store from
+   * overwriting each other's updates: the client reads, computes, and on a
+   * refused write reads again. A store without it falls back to setState,
+   * which is safe only when one process at a time writes a job's state.
+   */
+  compareAndSetState?(state: JobState, expectedVersion: number): Promise<boolean>;
   /** Delete finished runs that started before this time. Returns how many. */
   prune(before: number): Promise<number>;
   close?(): Promise<void>;
