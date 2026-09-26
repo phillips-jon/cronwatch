@@ -8,6 +8,8 @@ order: 1
 
 CronWatch is a library. You install it in the app that runs your scheduled jobs, it records every run in a database you already have, and it alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. There is nothing to sign up for and no server to run.
 
+This page sets up the TypeScript library. For Ruby and Rails there is the `cronwatch` gem, a port with the same rules, alerts and stored rows: see [Ruby on Rails](/docs/rails/) and [Ruby](/docs/ruby/).
+
 ## Install
 
 ```bash

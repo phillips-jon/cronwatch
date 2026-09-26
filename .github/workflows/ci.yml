@@ -1,6 +1,7 @@
 # Every push and pull request: the dash check (files and commit messages),
 # typecheck, tests, a build, and the packed packages used from a scratch
-# project, on the two Node majors better-sqlite3 13 supports.
+# project, on the two Node majors better-sqlite3 13 supports. The Ruby gem's
+# tests run on the oldest and newest Ruby it supports.
 # A green run on main is what lets deploy.yml ship the site.
 name: CI
 
@@ -67,3 +68,37 @@ jobs:
       # import and require every entry, typecheck them (node16 ESM and CJS,
       # bundler) and run Are the Types Wrong.
       - run: npm run check:packages
+
+  # The gem's tests replay conformance/ and compare against the built SDK, so
+  # the SDK is built first. Postgres store tests run against the service.
+  ruby:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ruby: ["3.2", "3.4"]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build --workspace packages/sdk
+      - uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+          working-directory: packages/ruby
+      - run: bundle exec rake test
+        working-directory: packages/ruby
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw

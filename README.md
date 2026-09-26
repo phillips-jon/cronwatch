@@ -43,6 +43,7 @@ export const { GET, POST, DELETE } = cw.routes();
 | Package | What |
 |---|---|
 | [`@cronwatch/sdk`](packages/sdk) | the library: jobs, runs, checks, stores (memory, SQLite, Postgres), alerts (Slack, Discord, webhook), dashboard and API, optional Claude triage |
+| [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob integration, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
 | [`site`](site) | cronwatch.dev, a static landing page and docs |
@@ -59,6 +60,23 @@ The SDK needs Node 22 or newer and depends only on `croner`. Each driver is an o
 
 The store entry points' type declarations refer to the driver's types, so a TypeScript project using them without `@types/better-sqlite3` or `@types/pg` fails with TS7016 unless `skipLibCheck` is on. The package ships ESM and CommonJS, each with its own types.
 
+## Ruby and Rails
+
+The `cronwatch` gem is a port of the SDK, not a new design: it writes the same tables and sends the same alerts, so a Rails app and a Node service can share one database and one dashboard.
+
+```ruby
+class NightlyReportJob < ApplicationJob
+  include Cronwatch::ActiveJob
+  cronwatch schedule: "0 2 * * *", grace: "15m", expect: "Report written"
+
+  def perform
+    cronwatch.log("Report written")
+  end
+end
+```
+
+`bin/rails generate cronwatch:install` adds the migration and initializer; schedule `Cronwatch::CheckJob` every five minutes and mount `Cronwatch::Web` for the dashboard. See [packages/ruby](packages/ruby) and [cronwatch.dev/docs/rails](https://cronwatch.dev/docs/rails/). The TypeScript SDK is the source of truth: `npm run conformance` generates cases in `conformance/` that the gem's tests replay.
+
 ## Why a library and not a service
 
 A hosted monitor gives you an observer that is alive when your job is not. That is real, and it is the one thing a library cannot do: if your whole app is down, nothing inside it can alert (pair it with any uptime monitor for that case). Everything else, from a job that never fires to one that costs three times what it should, is caught from within, with your run history in your own database and nothing to sign up for.
@@ -73,6 +91,15 @@ npm run check          # dash check, typecheck, tests
 npm run build          # every package and the site
 npm run dev --workspace site    # the site on http://localhost:4321, rebuilding on change
 npm run check:packages # pack both packages and use them from a scratch project (after build)
+npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem
+```
+
+The gem (Ruby 3.2 or newer):
+
+```bash
+cd packages/ruby
+bundle install
+bundle exec rake test
 ```
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
