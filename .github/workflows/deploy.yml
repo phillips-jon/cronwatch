@@ -1,0 +1,35 @@
+# Push to main -> run the deploy script on the server over SSH.
+#
+# Stays off until the repository variable DEPLOY_ENABLED is "true". Needs two
+# repository secrets:
+#   DEPLOY_SSH_KEY      private key whose public half is in ~joncphillips/.ssh/authorized_keys
+#                       on the server, restricted there to running deploy/release-deploy only
+#   DEPLOY_KNOWN_HOSTS  output of: ssh-keyscan -p 2222 cronwatch.dev
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never run two deploys at once.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Run the deploy script on the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -p 2222 -o IdentitiesOnly=yes -o BatchMode=yes joncphillips@cronwatch.dev deploy

@@ -1,0 +1,121 @@
+---
+title: Getting started
+description: Install @cronwatch/sdk, declare a job, wrap it, mount the dashboard and run the first check.
+order: 1
+---
+
+# Getting started
+
+CronWatch is a library. You install it in the app that runs your scheduled jobs, it records every run in a database you already have, and it alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. There is nothing to sign up for and no server to run.
+
+## Install
+
+```bash
+npm install @cronwatch/sdk
+```
+
+Pick a store. SQLite for one server, Postgres for anything on Vercel, Neon, Supabase or Railway:
+
+```bash
+npm install better-sqlite3     # Node 22 or newer for better-sqlite3 13
+# or
+npm install pg
+```
+
+## Create one client
+
+One client per app, at module level, in a file everything else imports from.
+
+```ts
+// lib/cronwatch.ts
+import { cronwatch } from "@cronwatch/sdk";
+import { sqlite } from "@cronwatch/sdk/sqlite";
+import { slack } from "@cronwatch/sdk/slack";
+
+export const cw = cronwatch({
+  store: sqlite({ path: "./data/cronwatch.db" }),
+  alerts: [slack({ webhookUrl: process.env.SLACK_WEBHOOK_URL! })],
+});
+```
+
+Without a store, runs live in memory and vanish on restart. Without alerts, they go to the console. Both are fine while trying it out.
+
+## Declare each job
+
+The declaration is the schedule the job is supposed to keep. Declare it once, next to the client, and export the handle.
+
+```ts
+export const nightlyReport = cw.job("nightly-report", {
+  schedule: "0 2 * * *",      // cron, "@hourly", or "every 15m"
+  timezone: "UTC",            // Vercel and GitHub Actions run crons in UTC
+  grace: "15m",               // how late a start may be before it is missed
+  timeout: "30m",             // a run still going after this is stuck
+  expect: "Report written",   // the output must contain this, or the run failed
+  budget: { cost: 2 },        // a run reporting cost above 2 is over budget
+});
+```
+
+Every option is optional. A job with no schedule is still watched for failures, duration and budgets; it just cannot be missed.
+
+## Wrap the work
+
+For an HTTP-triggered job (Vercel cron, GitHub Actions calling an endpoint), wrap a fetch-style handler:
+
+```ts
+// app/api/cron/nightly-report/route.ts
+import { nightlyReport } from "@/lib/cronwatch";
+
+export const GET = nightlyReport.handler(async (job, request) => {
+  const report = await buildReport();
+  job.log("Report written:", report.path);   // kept with the run, shown in alerts
+  job.metric("cost", report.usdCost);        // watched against budgets and baselines
+});
+```
+
+The handler checks `Authorization: Bearer <CRON_SECRET>` (from `process.env.CRON_SECRET`) before running, answers 200 with the run id on success and 500 on failure, and records the run either way. Return a `Response` yourself if you need to; a 4xx or 5xx counts as a failure.
+
+For anything else, wrap a function:
+
+```ts
+await nightlyReport.run(async (job) => {
+  job.log("starting");
+  // ...
+});
+```
+
+Whatever the function throws is recorded as the failure and rethrown, so your own error handling still works.
+
+## Mount the dashboard
+
+The routes serve a small dashboard and the JSON API the MCP server uses. In Next.js:
+
+```ts
+// app/cronwatch/[[...path]]/route.ts
+import { cw } from "@/lib/cronwatch";
+export const { GET, POST, DELETE } = cw.routes();
+```
+
+Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without a token the routes are open in development and refuse to serve in production.
+
+## Run the check
+
+Failures are caught as they happen. A run that never started, or never finished, can only be noticed by looking: that is `cw.check()`. Make sure something calls it every few minutes.
+
+In a long-running server, once at startup:
+
+```ts
+cw.start();          // every minute; cw.start("5m") to change it
+```
+
+On a serverless platform, add a cron that hits the check endpoint with either the dashboard token or the cron secret as a bearer:
+
+```
+GET /cronwatch/api/check
+Authorization: Bearer <CRON_SECRET>
+```
+
+See [Next.js and Vercel](/docs/nextjs/) and [Servers and scripts](/docs/node/) for the full shapes.
+
+## What you get
+
+Open `/cronwatch` and every job is there with its health, last run, next due time and a sparkline of recent durations. Click through for the run history with errors, output tails and metrics. Alerts arrive in your channel with the specifics, and, if you turn on [triage](/docs/triage/), with a short diagnosis. Point the [MCP server](/docs/mcp/) at the same URL and your agent can read all of it.

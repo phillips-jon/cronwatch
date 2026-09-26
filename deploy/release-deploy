@@ -1,0 +1,162 @@
+#!/bin/bash
+# Deploy cronwatch.dev (the static site in site/dist). Runs on the server as
+# the joncphillips user:
+#
+#   ssh joncpu /var/www/cronwatch.dev/deploy/release-deploy [--force | --prepare]
+#
+# The GitHub Action runs it on every push to main. Each deploy builds a new
+# release beside the live one, so a build never touches what is serving:
+#
+#   /var/www/cronwatch.dev-repo.git          bare clone that fetches from GitHub
+#   /var/www/cronwatch.dev-releases/<name>/  one git worktree per release, built where it sits
+#   /var/www/cronwatch.dev                   symlink to the live release; nginx serves its site/dist
+#
+# A new release gets npm ci and `npm run build:site`. The output must contain
+# an index.html that mentions CronWatch. Only then is the release marked
+# .release-ok and the symlink moved (one rename). nginx follows the symlink,
+# so there is no service to restart. The newest releases that went live are
+# kept for ./rollback.
+#
+#   --force    build a release even when the live one is current
+#   --prepare  build and check a release but don't switch to it (the first
+#              release, before the live path became a symlink)
+
+set -Eeuo pipefail
+# With SIGPIPE ignored, a dropped SSH connection makes the next write fail
+# (and trips the ERR trap) instead of killing this script mid-step.
+trap '' PIPE
+
+SITE=cronwatch.dev
+LIVE=/var/www/$SITE
+REPO=/var/www/$SITE-repo.git
+RELEASES=/var/www/$SITE-releases
+NODE_PREFIX=${CRONWATCH_NODE:-/opt/node-cronwatch}
+WEB_ROOT=site/dist
+KEEP=3
+
+MODE="${1:-}"
+PREPARE=false
+[ "$MODE" = "--prepare" ] && PREPARE=true
+
+if [ "$(id -u)" -eq 0 ]; then
+    echo "Run this as joncphillips, not root." >&2
+    exit 1
+fi
+for path in "$REPO" "$RELEASES" "$NODE_PREFIX/bin/node"; do
+    if [ ! -e "$path" ]; then
+        echo "Missing $path, so the release layout isn't set up (deploy/README.md)." >&2
+        exit 1
+    fi
+done
+if [ -e "$LIVE" ] && [ ! -L "$LIVE" ] && ! $PREPARE; then
+    echo "$LIVE is not a symlink to a release yet; build one with --prepare and switch to it by hand." >&2
+    exit 1
+fi
+export PATH="$NODE_PREFIX/bin:$PATH"
+
+# One deploy at a time; rollback takes the same lock.
+exec 9>"/tmp/${SITE//./-}-deploy.lock"
+flock -n 9 || { echo "Another deploy is already running." >&2; exit 1; }
+
+echo "Fetching..."
+git -C "$REPO" fetch --quiet origin
+NEW=$(git -C "$REPO" rev-parse refs/remotes/origin/main)
+CURRENT=""
+CURRENT_DIR=""
+if [ -L "$LIVE" ]; then
+    CURRENT_DIR=$(readlink -f "$LIVE")
+    CURRENT=$(git -C "$CURRENT_DIR" rev-parse HEAD 2>/dev/null || true)
+fi
+if [ "$NEW" = "$CURRENT" ] && [ "$MODE" != "--force" ] && ! $PREPARE; then
+    echo "Already live: $(git -C "$REPO" log -1 --format='%h %s' "$NEW")"
+    exit 0
+fi
+
+# Release names start with their build time, and rollback and pruning go by
+# that order, so no two releases may share a second.
+STAMP=$(date +%Y%m%d-%H%M%S)
+while ls -d "$RELEASES/$STAMP"-* >/dev/null 2>&1; do
+    sleep 1
+    STAMP=$(date +%Y%m%d-%H%M%S)
+done
+DIR="$RELEASES/$STAMP-$(git -C "$REPO" rev-parse --short "$NEW")"
+CREATED=false
+
+abandon() {
+    # set -E hands this trap to $(...) subshells too. A failure in one ends
+    # only that subshell; the main shell then sees its command fail.
+    [ "${BASH_SUBSHELL:-0}" -gt 0 ] && exit 1
+    trap - ERR INT TERM HUP
+    set +e
+    echo "Deploy failed. The live site is unchanged; removing the unfinished release." >&2
+    cd /
+    # Only a release this run created, and never the live one.
+    if $CREATED && [ "$(readlink -f "$LIVE")" != "$DIR" ]; then
+        git -C "$REPO" worktree remove --force "$DIR" 2>/dev/null || rm -rf "$DIR"
+    fi
+    git -C "$REPO" worktree prune
+    exit 1
+}
+trap abandon ERR INT TERM HUP
+
+echo "Building $(basename "$DIR")..."
+git -C "$REPO" worktree add --quiet --detach "$DIR" "$NEW"
+CREATED=true
+cd "$DIR"
+
+echo "Installing npm packages (Node $(node -v))..."
+# 9>&-: nothing started here may hold the deploy lock. The site only needs
+# marked, but the workspace install is what package-lock.json describes.
+npm ci --no-audit --no-fund --ignore-scripts 9>&-
+
+echo "Building the site..."
+npm run build:site 9>&-
+[ -f "$WEB_ROOT/index.html" ] || { echo "The build left no $WEB_ROOT/index.html." >&2; false; }
+grep -q "CronWatch" "$WEB_ROOT/index.html" || { echo "$WEB_ROOT/index.html does not look like the site." >&2; false; }
+[ -f "$WEB_ROOT/docs/index.html" ] || { echo "The build left no docs." >&2; false; }
+# The build output is all nginx serves; node_modules is not needed after this.
+rm -rf node_modules
+touch .release-ok
+
+if $PREPARE; then
+    trap - ERR INT TERM HUP
+    echo "Prepared $DIR (not live)."
+    exit 0
+fi
+
+# Go live: the symlink moves in one rename, so each request sees either the
+# old release or the new one, never a mix.
+trap - ERR INT TERM HUP
+ln -sfn "$DIR" "$LIVE.next"
+mv -T "$LIVE.next" "$LIVE"
+echo "Live: $(git log -1 --format='%h %s')"
+
+# Confirm nginx serves the new release. It follows the symlink, so nothing
+# needs restarting; a failure here means nginx itself is unwell.
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://$SITE/" || true)
+if [ "$code" != "200" ]; then
+    echo "https://$SITE/ answered $code after the switch." >&2
+    if [ -n "$CURRENT_DIR" ]; then
+        ln -sfn "$CURRENT_DIR" "$LIVE.next"
+        mv -T "$LIVE.next" "$LIVE"
+        echo "Went back to $(basename "$CURRENT_DIR")." >&2
+    fi
+    rm -f "$DIR/.release-ok"
+    exit 1
+fi
+
+# Keep the newest releases that went live, for rollback; anything else goes.
+LIVE_DIR=$(readlink -f "$LIVE")
+kept=0
+for old in $(ls -1d "$RELEASES"/*/ 2>/dev/null | sed 's#/$##' | sort -r); do
+    if [ "$old" = "$LIVE_DIR" ]; then
+        kept=$((kept + 1))
+    elif [ -f "$old/.release-ok" ] && [ "$kept" -lt "$KEEP" ]; then
+        kept=$((kept + 1))
+    else
+        git -C "$REPO" worktree remove --force "$old" 2>/dev/null || rm -rf "$old"
+    fi
+done
+git -C "$REPO" worktree prune || true
+
+echo "Deployed $(git log -1 --format=%h)."

@@ -1,0 +1,217 @@
+{
+  "capturedAt": 1790116949197,
+  "jobs": [
+    {
+      "name": "backup-to-s3",
+      "definition": {
+        "schedule": "0 5 * * *",
+        "timezone": "UTC",
+        "timeout": "2h",
+        "name": "backup-to-s3"
+      },
+      "health": "healthy",
+      "open": [],
+      "lastRun": {
+        "id": "7561578f-3c13-41d3-bc56-c47e7e517490",
+        "job": "backup-to-s3",
+        "status": "running",
+        "startedAt": 1790116829197,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "nextExpectedAt": 1790139600000,
+      "consecutiveFailures": 0,
+      "silencedUntil": null,
+      "stats": {
+        "runs": 7,
+        "okRate": 1,
+        "p50Ms": 540000,
+        "p95Ms": 540000
+      }
+    },
+    {
+      "name": "daily-digest",
+      "definition": {
+        "schedule": "0 4 * * *",
+        "timezone": "UTC",
+        "budget": {
+          "cost": 2
+        },
+        "tags": [
+          "agent"
+        ],
+        "name": "daily-digest"
+      },
+      "health": "healthy",
+      "open": [
+        "over_budget"
+      ],
+      "lastRun": {
+        "id": "d6c895f6-6e8f-481b-a79a-277a1ee8a316",
+        "job": "daily-digest",
+        "status": "ok",
+        "startedAt": 1790049600000,
+        "finishedAt": 1790049644000,
+        "durationMs": 44000,
+        "error": null,
+        "output": "Digest sent to 412 subscribers",
+        "metrics": {
+          "tokens": 131000,
+          "cost": 3.4
+        },
+        "trigger": "run"
+      },
+      "nextExpectedAt": 1790136000000,
+      "consecutiveFailures": 0,
+      "silencedUntil": null,
+      "stats": {
+        "runs": 8,
+        "okRate": 1,
+        "p50Ms": 41000,
+        "p95Ms": 44000
+      }
+    },
+    {
+      "name": "embeddings-refresh",
+      "definition": {
+        "schedule": "every 15m",
+        "grace": "3m",
+        "name": "embeddings-refresh"
+      },
+      "health": "healthy",
+      "open": [],
+      "lastRun": {
+        "id": "c972a665-9d7a-4053-8003-61a0e8f8822c",
+        "job": "embeddings-refresh",
+        "status": "ok",
+        "startedAt": 1790116649197,
+        "finishedAt": 1790116890197,
+        "durationMs": 241000,
+        "error": null,
+        "output": null,
+        "metrics": {
+          "documents": 1801
+        },
+        "trigger": "run"
+      },
+      "nextExpectedAt": 1790117549197,
+      "consecutiveFailures": 0,
+      "silencedUntil": null,
+      "stats": {
+        "runs": 12,
+        "okRate": 1,
+        "p50Ms": 246000,
+        "p95Ms": 252000
+      }
+    },
+    {
+      "name": "invoice-run",
+      "definition": {
+        "schedule": "0 3 * * *",
+        "timezone": "UTC",
+        "grace": "10m",
+        "timeout": "20m",
+        "name": "invoice-run"
+      },
+      "health": "failing",
+      "open": [
+        "failed"
+      ],
+      "lastRun": {
+        "id": "41d9cb4f-d7c9-4fa6-b3b4-5d3264a3d326",
+        "job": "invoice-run",
+        "status": "failed",
+        "startedAt": 1790046000000,
+        "finishedAt": 1790046000412,
+        "durationMs": 412,
+        "error": "Error: connect ECONNREFUSED 10.0.0.12:5432\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1615:16)",
+        "output": "Loading 1,204 open invoices\nConnecting to billing database",
+        "metrics": {},
+        "trigger": "run"
+      },
+      "nextExpectedAt": 1790132400000,
+      "consecutiveFailures": 1,
+      "silencedUntil": null,
+      "stats": {
+        "runs": 8,
+        "okRate": 0.875,
+        "p50Ms": 20600,
+        "p95Ms": 21800
+      }
+    },
+    {
+      "name": "nightly-report",
+      "definition": {
+        "schedule": "0 2 * * *",
+        "timezone": "UTC",
+        "grace": "15m",
+        "description": "Builds the PDF and emails it to finance",
+        "name": "nightly-report"
+      },
+      "health": "healthy",
+      "open": [],
+      "lastRun": {
+        "id": "03bee74a-1a62-44aa-b4c1-36995227ebd8",
+        "job": "nightly-report",
+        "status": "ok",
+        "startedAt": 1790042400000,
+        "finishedAt": 1790042472000,
+        "durationMs": 72000,
+        "error": null,
+        "output": "Rendering 14 pages\nReport written: /reports/today.pdf",
+        "metrics": {
+          "pages": 14
+        },
+        "trigger": "run"
+      },
+      "nextExpectedAt": 1790128800000,
+      "consecutiveFailures": 0,
+      "silencedUntil": null,
+      "stats": {
+        "runs": 8,
+        "okRate": 1,
+        "p50Ms": 72700,
+        "p95Ms": 76300
+      }
+    },
+    {
+      "name": "sync-crm",
+      "definition": {
+        "schedule": "every 30m",
+        "grace": "5m",
+        "name": "sync-crm"
+      },
+      "health": "late",
+      "open": [
+        "missed"
+      ],
+      "lastRun": {
+        "id": "2a671359-05d2-4e2e-a9a5-61fc20607864",
+        "job": "sync-crm",
+        "status": "ok",
+        "startedAt": 1790113339197,
+        "finishedAt": 1790113347197,
+        "durationMs": 8000,
+        "error": null,
+        "output": null,
+        "metrics": {
+          "contacts": 122
+        },
+        "trigger": "run"
+      },
+      "nextExpectedAt": 1790115139197,
+      "consecutiveFailures": 0,
+      "silencedUntil": null,
+      "stats": {
+        "runs": 5,
+        "okRate": 1,
+        "p50Ms": 8000,
+        "p95Ms": 8000
+      }
+    }
+  ]
+}

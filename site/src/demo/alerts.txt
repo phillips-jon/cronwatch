@@ -1,0 +1,21 @@
+[cronwatch] invoice-run failed
+Started 2026-09-22 03:00:00 UTC (now), ran 412ms.
+Error: Error: connect ECONNREFUSED 10.0.0.12:5432
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1615:16)
+Output (tail):
+Loading 1,204 open invoices
+Connecting to billing database
+
+[cronwatch] daily-digest went over budget
+tokens: 131,000, limit 90,000 (three times the usual 30,000).
+cost: 3.4, limit 2 (budget).
+Started 2026-09-22 04:00:00 UTC (44s ago).
+
+[cronwatch] sync-crm missed its scheduled run
+Due 2026-09-22 22:12:19 UTC (30m 10s ago), and no run had started by 2026-09-22 22:17:19 UTC (25m 10s ago) (grace 5m).
+Schedule: every 30m.
+Last run: ok 2026-09-22 21:42:19 UTC (1h 10s ago).
+
+[cronwatch] invoice-run recovered
+A run 2026-09-22 09:41:00 UTC (20s ago) succeeded after: failed.
+Ran 20s.

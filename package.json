@@ -1,0 +1,22 @@
+{
+  "name": "cronwatch-monorepo",
+  "private": true,
+  "description": "CronWatch: cron and scheduled-job monitoring that lives inside your app. SDK, MCP server and the cronwatch.dev site.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/sdk",
+    "packages/mcp",
+    "site"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check:dashes": "node scripts/check-dashes.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run check:dashes && npm test --workspaces --if-present",
+    "build": "npm run check:dashes && npm run build --workspaces --if-present",
+    "build:site": "npm run build --workspace site",
+    "check": "npm run check:dashes && npm run typecheck && npm test"
+  }
+}

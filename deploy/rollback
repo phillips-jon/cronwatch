@@ -1,0 +1,38 @@
+#!/bin/bash
+# Point cronwatch.dev back at an earlier release. It only moves the symlink
+# nginx serves through, so it takes effect at once:
+#
+#   ssh joncpu /var/www/cronwatch.dev/deploy/rollback          # the release before the live one
+#   ssh joncpu /var/www/cronwatch.dev/deploy/rollback <name>   # one listed in /var/www/cronwatch.dev-releases
+#
+# Only releases that passed their build check (marked .release-ok) qualify.
+# The next push to main deploys as usual, so push a fix (or a revert) next.
+
+set -euo pipefail
+
+SITE=cronwatch.dev
+LIVE=/var/www/$SITE
+RELEASES=/var/www/$SITE-releases
+
+current=$(readlink -f "$LIVE")
+if [ -n "${1:-}" ]; then
+    target="$RELEASES/$(basename "$1")"
+else
+    # Release names start with their build time, so they sort oldest first.
+    target=$(for d in $(ls -1d "$RELEASES"/*/ 2>/dev/null | sed 's#/$##' | sort); do
+        if [ -f "$d/.release-ok" ]; then echo "$d"; fi
+    done | awk -v cur="$current" '$0 == cur { print prev } { prev = $0 }')
+fi
+
+if [ -z "$target" ] || [ ! -f "$target/.release-ok" ] || [ "$(readlink -f "$target")" = "$current" ]; then
+    echo "No earlier release that passed its checks to roll back to (live: $(basename "$current"))." >&2
+    exit 1
+fi
+
+# Never at the same time as a deploy.
+exec 9>"/tmp/${SITE//./-}-deploy.lock"
+flock -n 9 || { echo "A deploy is running; try again when it finishes." >&2; exit 1; }
+
+ln -sfn "$target" "$LIVE.next"
+mv -T "$LIVE.next" "$LIVE"
+echo "Rolled back to $(basename "$target"): $(git -C "$target" log -1 --format='%h %s')"

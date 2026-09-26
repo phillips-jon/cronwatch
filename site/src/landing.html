@@ -1,0 +1,152 @@
+<section class="opening">
+  <p class="say"><b>CronWatch</b> records every run of your scheduled jobs in your own database, and speaks up when one is missed, fails, gets stuck, runs slow or costs too much.</p>
+  <p class="then">It is a TypeScript library, not a service. No server to run, no account to make, and no copy of your job output on anybody else’s machine. <a href="{{GITHUB}}">MIT licensed</a> and small enough to read in an afternoon.</p>
+  <div class="install"><code translate="no">npm install @cronwatch/sdk</code><button class="copy" type="button" aria-label="Copy the install command">Copy</button></div>
+  <div class="actions">
+    <button class="prompt-btn" type="button" data-prompt aria-label="Copy the setup instructions for a coding agent">Copy setup prompt for your AI</button>
+    <p class="prompt-note">Paste it into Claude Code, Cursor or any coding agent and it will wire up every job in your project. Also at <a href="/prompt.txt">/prompt.txt</a>.</p>
+  </div>
+</section>
+
+<section class="row day">
+  <p class="label">Runs</p>
+  <div class="body">
+    <h2>Every run six jobs made today, against every run they owed.</h2>
+    <div class="scroll">{{STRIP}}</div>
+    <p class="small">Each faint tick is a moment a job was <b>due</b>, worked out from its schedule by the same parser the library uses, so you can read a job’s cadence straight off its row: one a day, one every half hour, one every quarter of an hour. Each solid mark is a run it actually recorded, as wide as the run took. The gap between those two things is the entire product. {{DAY_META}}, and every mark is real output, not a mockup.</p>
+  </div>
+</section>
+
+<section class="row">
+  <p class="label">Failure</p>
+  <div class="body">
+    <h2>The invoice run failed. Here is what each of them said.</h2>
+    <div class="pair">
+      <figure class="side">
+        <figcaption><b>Before</b> plain cron</figcaption>
+        <div class="out">
+          <p class="from"><span>cron</span><span>{{T_FAILED}}</span></p>
+          <div class="silence"><span>no output</span></div>
+        </div>
+      </figure>
+      <div class="arrow" aria-hidden="true">
+        <svg viewBox="0 0 78 46" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+          <path d="M7 32.4c7.6-6.2 15.1-8.9 22.6-8 4.8.6 8.2 2.4 12.7 2.8 6.1.5 11.7-2 17.6-6.3"/>
+          <path d="M52.4 12.2c3 3.1 5.6 5.5 8.3 7.7-3 1.8-5.8 3.9-8.5 6.8"/>
+        </svg>
+      </div>
+      <figure class="side">
+        <figcaption><b>After</b> with CronWatch</figcaption>
+        <div class="out">
+          <p class="from"><span>CronWatch</span><span>{{T_FAILED}}</span></p>
+          <pre translate="no">{{ALERT_FAILED}}</pre>
+        </div>
+      </figure>
+    </div>
+    <p class="small">A handler that answers 4xx or 5xx counts as failed too, and so does a run whose output does not contain what you told it to <code>expect</code>: the job that exits cleanly and did nothing. With a Claude key, a two-sentence diagnosis rides along.</p>
+  </div>
+</section>
+
+<section class="row">
+  <p class="label">Code</p>
+  <div class="body">
+    <h2>Say it where the job lives.</h2>
+    <p>One client per app, each job declared once, and a wrapper around the work. The schedule, the grace period and the timeout sit next to the code they describe, and every run lands in the SQLite file or Postgres database you already have.</p>
+    <div class="out code">
+      <p class="from"><span translate="no">app/api/cron/nightly/route.ts</span><span>TypeScript</span></p>
+<pre><code translate="no"><span class="k">import</span> { cronwatch } <span class="k">from</span> <span class="s">"@cronwatch/sdk"</span>;
+<span class="k">import</span> { sqlite } <span class="k">from</span> <span class="s">"@cronwatch/sdk/sqlite"</span>;
+<span class="k">import</span> { slack } <span class="k">from</span> <span class="s">"@cronwatch/sdk/slack"</span>;
+
+<span class="k">const</span> cw = cronwatch({
+  store: sqlite({ path: <span class="s">"./data/cronwatch.db"</span> }),
+  alerts: [slack({ webhookUrl: process.env.SLACK_WEBHOOK_URL! })],
+});
+
+<span class="k">const</span> nightlyReport = cw.job(<span class="s">"nightly-report"</span>, {
+  schedule: <span class="s">"0 2 * * *"</span>,
+  grace: <span class="s">"15m"</span>,
+});
+
+<span class="k">export const</span> GET = nightlyReport.handler(<span class="k">async</span> (job) =&gt; {
+  <span class="k">const</span> report = <span class="k">await</span> buildReport();
+  job.log(<span class="s">"Report written:"</span>, report.path);
+});</code></pre>
+    </div>
+    <p class="small">Vercel cron, Next.js, node-cron, BullMQ, GitHub Actions, Hono, Bun, or a script from crontab. Anywhere a fetch handler or an async function runs.</p>
+  </div>
+</section>
+
+<section class="row">
+  <p class="label">Checks</p>
+  <div class="body">
+    <h2>It notices what never ran.</h2>
+    <p>Nothing threw and nothing ran, so nothing was logged. That is the failure cron never reports, and the one a check finds. The same check catches the run that started and never finished, and the one that cost three times what it should.</p>
+    <div class="out"><p class="from"><span>CronWatch</span><span>{{T_MISSED}}</span></p><pre translate="no">{{ALERT_MISSED}}</pre></div>
+    <div class="out"><p class="from"><span>CronWatch</span><span>{{T_BUDGET}}</span></p><pre translate="no">{{ALERT_BUDGET}}</pre></div>
+    <div class="out"><p class="from"><span>CronWatch</span><span>{{T_RECOVERED}}</span></p><pre translate="no">{{ALERT_RECOVERED}}</pre></div>
+    <p class="small">Every condition sends one message when it opens and one when the next run succeeds. A job that fails all night pages you once, and the fix announces itself. The check runs from <code>cw.start()</code> in a long-running server, or from a cron hitting <code>/cronwatch/api/check</code> on Vercel.</p>
+  </div>
+</section>
+
+<section class="row">
+  <p class="label">Conditions</p>
+  <div class="body">
+    <h2>Six conditions. That is the whole product.</h2>
+    <ul class="catches">
+      <li><code class="warn">missed</code><span>A run was due and none started within the grace period. Cron expressions, <code>@hourly</code>, or <code>every 15m</code>, in any timezone.</span></li>
+      <li><code class="bad">failed</code><span>The function threw, the handler answered 4xx or 5xx, or the output did not satisfy <code>expect</code>.</span></li>
+      <li><code class="bad">stuck</code><span>A run started and never reported finishing. A killed process, a serverless timeout, a deploy mid-run.</span></li>
+      <li><code class="warn">slow</code><span>A successful run took longer than <code>maxDuration</code>, or more than twice the job’s own recent p95.</span></li>
+      <li><code class="warn">over_budget</code><span>A number you reported with <code>job.metric()</code> went above its ceiling, or three times its usual median.</span></li>
+      <li><code class="ok">recovered</code><span>A run succeeded after any of the above. One message, naming what it recovered from.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="row">
+  <p class="label">Agents</p>
+  <div class="body">
+    <h2>Your agent reads the same records.</h2>
+    <p>CronWatch ships an MCP server. Claude Code, Cursor or any MCP client can list what is failing, read the error and the output, and silence a job while it fixes it. A <a href="/docs/agent-skill/">Claude Code skill</a> in the repo teaches the agent to add monitoring to a job as it writes it.</p>
+    <div class="install"><code translate="no">claude mcp add cronwatch -e CRONWATCH_URL=… -e CRONWATCH_TOKEN=… -- npx -y @cronwatch/mcp</code><button class="copy" type="button" aria-label="Copy the MCP command">Copy</button></div>
+    <p class="small">To get it installed in the first place, hand your agent the setup prompt. It names the store to pick, the shape of a job, the check endpoint and the environment variables, and it tells the agent to declare every job already scheduled in the project rather than one example.</p>
+    <div class="actions">
+      <button class="prompt-btn" type="button" data-prompt aria-label="Copy the setup instructions for a coding agent">Copy setup prompt for your AI</button>
+      <p class="prompt-note">Or point it at <a href="/prompt.txt">/prompt.txt</a> and <a href="/llms.txt">/llms.txt</a>.</p>
+    </div>
+    <details class="peek">
+      <summary>Read the prompt first</summary>
+      <div class="out"><p class="from"><span translate="no">prompt.txt</span><span>for a coding agent</span></p><pre translate="no" id="prompt-text">{{PROMPT}}</pre></div>
+    </details>
+    <div class="out tall"><p class="from"><span translate="no">@cronwatch/mcp</span><span>stdio</span></p><pre translate="no"><span class="prompt">list_jobs()</span>
+
+{{MCP_LIST_JOBS}}</pre></div>
+  </div>
+</section>
+
+<section class="row board">
+  <p class="label">Dashboard</p>
+  <div class="body">
+    <h2>And a dashboard, mounted inside your app.</h2>
+    <p>At <code>/cronwatch</code>, behind whatever auth you already have. The same records the agent reads, with the run history, output and metrics of every job.</p>
+    <div class="out">
+      <p class="from"><span translate="no">/cronwatch</span><span>{{BOARD_META}}</span></p>
+      {{JOBS_BOARD}}
+    </div>
+  </div>
+</section>
+
+<section class="row">
+  <p class="label">Why</p>
+  <div class="body">
+    <h2>Why a library, and not a service.</h2>
+    <p>The hosted monitors are good, and you pay for them with a monthly bill, an account, and a copy of your job output on someone else’s servers. A library needs none of that. It lives in the app that runs the jobs, writes to the database you already have, and sends the alert straight from your app to your channel.</p>
+    <p>The one thing it cannot see is an app that is entirely down, because nothing inside a dead process can alert. Pair it with any uptime monitor for that. Everything else, from a job that never fires to one that costs three times what it should, it catches from the inside. Stores: SQLite or Postgres. Alerts: Slack, Discord, a signed webhook, the console, or your own function.</p>
+  </div>
+</section>
+
+<section class="end">
+  <p>Give it one job tonight, and find out in the morning whether it ran.</p>
+  <p class="go"><a href="/docs/">Read the docs</a> <a href="{{GITHUB}}">Source on GitHub</a></p>
+</section>

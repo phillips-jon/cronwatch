@@ -1,0 +1,40 @@
+{
+  "name": "@cronwatch/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for CronWatch. Lets Claude Code, Cursor and other agents list jobs, read failures, run a check and silence alerts in an app that uses @cronwatch/sdk.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phillips-jon/cronwatch.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://cronwatch.dev/docs/mcp",
+  "keywords": ["mcp", "model context protocol", "cron", "monitoring", "agents", "claude"],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "cronwatch-mcp": "./dist/cli.js"
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test test/*.test.ts",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

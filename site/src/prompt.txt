@@ -1,0 +1,67 @@
+Add CronWatch to this project so that every scheduled job is recorded and I am
+told when one is missed, fails, gets stuck, runs slow or goes over budget.
+
+CronWatch is an open source TypeScript library. It runs inside my app and writes
+to my own database. There is no hosted service, no account and no API key.
+
+1. Install it.
+
+   npm install @cronwatch/sdk
+
+2. Create one client for the whole app, in its own module, and export it.
+   Pick the store that matches this project: sqlite for a long running server,
+   postgres for serverless or anything with more than one instance.
+
+   import { cronwatch } from "@cronwatch/sdk";
+   import { sqlite } from "@cronwatch/sdk/sqlite";      // or: postgres from "@cronwatch/sdk/postgres"
+   import { slack } from "@cronwatch/sdk/slack";        // or: discord, webhook, or omit for console
+
+   export const cw = cronwatch({
+     store: sqlite({ path: "./data/cronwatch.db" }),
+     alerts: [slack({ webhookUrl: process.env.SLACK_WEBHOOK_URL! })],
+   });
+
+3. Declare each scheduled job once, next to the code that runs it. The schedule
+   is a cron expression, "@hourly", or "every 15m". Add a grace period, and a
+   timeout for anything that can hang.
+
+   export const nightlyReport = cw.job("nightly-report", {
+     schedule: "0 2 * * *",
+     timezone: "UTC",
+     grace: "15m",
+     timeout: "20m",
+   });
+
+4. Wrap the work. In a route handler use .handler(); anywhere else use .run().
+   .handler() checks the Authorization bearer against CRON_SECRET for you.
+
+   export const GET = nightlyReport.handler(async (job) => {
+     const report = await buildReport();
+     job.log("Report written:", report.path);
+     job.metric("pages", report.pages);
+   });
+
+5. Make missed and stuck runs detectable. A job that never fires cannot report
+   itself, so something has to look. In a long running server call cw.start()
+   once at boot. On serverless, mount the routes and point a cron at the check
+   endpoint every few minutes.
+
+   export const { GET, POST } = cw.routes({ token: process.env.CRONWATCH_TOKEN });
+   // then: GET /cronwatch/api/check every 5 minutes, with the bearer token
+
+6. Set the environment variables you referenced: CRON_SECRET, CRONWATCH_TOKEN,
+   and whichever alert channel you chose. Do not invent other names.
+
+Rules for you:
+- Declare every existing scheduled job in this project, not just one. Find them
+  in cron config, workflow files, queue schedulers and any crontab.
+- Use the real schedules already in use. Do not change when anything runs.
+- Keep the job names stable and human readable; they are the identity of the
+  job across restarts and deploys.
+- Do not add a retry loop or an uptime ping. CronWatch records what happened; it
+  does not re-run work.
+- If this project already has a dashboard route or auth, mount cw.routes()
+  behind that auth rather than exposing it.
+
+Docs: https://cronwatch.dev/docs/
+MCP server for agents: npx -y @cronwatch/mcp

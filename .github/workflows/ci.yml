@@ -1,0 +1,37 @@
+# Every push and pull request: the dash check, typecheck, tests and a build,
+# on the two Node majors better-sqlite3 13 supports.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check:dashes
+      - run: npm run typecheck
+      - run: npm test
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+      - run: npm run build

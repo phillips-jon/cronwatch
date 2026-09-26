@@ -1,0 +1,114 @@
+{
+  "name": "@cronwatch/sdk",
+  "version": "0.1.0",
+  "description": "Cron and scheduled-job monitoring that lives inside your app. Wrap a job, mount a route, get told when it is missed, failed, slow or over budget. No server to run.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phillips-jon/cronwatch.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://cronwatch.dev",
+  "keywords": [
+    "cron",
+    "monitoring",
+    "scheduled jobs",
+    "heartbeat",
+    "vercel cron",
+    "nextjs",
+    "agents",
+    "mcp"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./sqlite": {
+      "types": "./dist/sqlite.d.ts",
+      "import": "./dist/sqlite.js",
+      "require": "./dist/sqlite.cjs",
+      "default": "./dist/sqlite.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres.d.ts",
+      "import": "./dist/postgres.js",
+      "require": "./dist/postgres.cjs",
+      "default": "./dist/postgres.js"
+    },
+    "./slack": {
+      "types": "./dist/slack.d.ts",
+      "import": "./dist/slack.js",
+      "require": "./dist/slack.cjs",
+      "default": "./dist/slack.js"
+    },
+    "./discord": {
+      "types": "./dist/discord.d.ts",
+      "import": "./dist/discord.js",
+      "require": "./dist/discord.cjs",
+      "default": "./dist/discord.js"
+    },
+    "./webhook": {
+      "types": "./dist/webhook.d.ts",
+      "import": "./dist/webhook.js",
+      "require": "./dist/webhook.cjs",
+      "default": "./dist/webhook.js"
+    },
+    "./anthropic": {
+      "types": "./dist/anthropic.d.ts",
+      "import": "./dist/anthropic.js",
+      "require": "./dist/anthropic.cjs",
+      "default": "./dist/anthropic.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "TZ=UTC node --import tsx --test test/*.test.ts",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "croner": "^10.0.1"
+  },
+  "peerDependencies": {
+    "better-sqlite3": ">=9",
+    "pg": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.19.0",
+    "@types/pg": "^8.15.0",
+    "better-sqlite3": "^13.0.3",
+    "pg": "^8.23.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

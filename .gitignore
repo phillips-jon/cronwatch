@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
+site/dist/
+.release-ok

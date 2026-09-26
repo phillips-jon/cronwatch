@@ -1,0 +1,13 @@
+{
+  "name": "cronwatch-site",
+  "private": true,
+  "description": "cronwatch.dev: static landing page and docs, built from site/src and site/docs into site/dist.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --serve"
+  },
+  "devDependencies": {
+    "marked": "^18.0.0"
+  }
+}
