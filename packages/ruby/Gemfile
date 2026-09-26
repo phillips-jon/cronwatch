@@ -6,3 +6,19 @@ gemspec
 
 gem "minitest", ">= 5.16"
 gem "rake", ">= 13"
+
+# The ActiveRecord store and the Rails integration are tested against one
+# Rails at a time: 8.0 by default, or the one CRONWATCH_RAILS names ("7.2").
+# test/rails/gemfiles has a Gemfile per version with its own lockfile, so
+# switching does not rewrite this one:
+#
+#   BUNDLE_GEMFILE=test/rails/gemfiles/rails_7_2.gemfile bundle install
+#   BUNDLE_GEMFILE=test/rails/gemfiles/rails_7_2.gemfile bundle exec rake test
+rails = ENV.fetch("CRONWATCH_RAILS", "8.0")
+group :test do
+  gem "activejob", "~> #{rails}.0"
+  gem "activerecord", "~> #{rails}.0"
+  gem "pg", ">= 1.5"
+  gem "railties", "~> #{rails}.0"
+  gem "sqlite3", Gem::Version.new(rails) >= Gem::Version.new("8.0") ? ">= 2.1" : ">= 1.4"
+end

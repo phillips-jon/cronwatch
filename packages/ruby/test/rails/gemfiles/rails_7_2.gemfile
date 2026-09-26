@@ -1,0 +1,5 @@
+# frozen_string_literal: true
+
+# The gem's Gemfile with Rails 7.2, locked on its own. See ../../../Gemfile.
+ENV["CRONWATCH_RAILS"] = "7.2"
+eval_gemfile File.expand_path("../../../Gemfile", __dir__)
