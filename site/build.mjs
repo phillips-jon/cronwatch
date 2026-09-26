@@ -386,9 +386,21 @@ function build() {
     writeFileSync(path.join(dir, "index.html"), layout({ title: page.meta.title, description: page.meta.description ?? "", body, path: page.route, kind: "docs" }));
   }
 
+  const lost = (code, heading, line, note) => `
+<section class="lost">
+  <p class="code" aria-hidden="true">${code}</p>
+  <h1>${heading}</h1>
+  <p class="line">${line}</p>
+  <div class="actions"><a class="prompt-btn" href="/">Go to the start</a><a class="ghost-btn" href="/docs/">Read the docs</a></div>
+  <p class="note">${note}</p>
+</section>`;
   writeFileSync(path.join(DIST, "404.html"), layout({
     title: "Not found", description: "That page is not here.", path: "/404", kind: "docs", index: false,
-    body: `<article class="doc"><h1>Not found</h1><p>Nothing is scheduled at this address. Try the <a href="/docs/">docs</a> or the <a href="/">front page</a>.</p></article>`,
+    body: lost("404", "That page is not here", "The address may be old, or it may have a typo in it.", `If a link on this site sent you here, <a href="${GITHUB}/issues">tell us on GitHub</a>.`),
+  }));
+  writeFileSync(path.join(DIST, "50x.html"), layout({
+    title: "Something went wrong", description: "The server hit an error.", path: "/50x", kind: "docs", index: false,
+    body: lost("500", "Something went wrong", "The server hit an error on its end. Try again in a minute.", `If it keeps happening, <a href="${GITHUB}/issues">tell us on GitHub</a>.`),
   }));
 
   const prompt = readFileSync(path.join(SRC, "prompt.txt"), "utf8");
