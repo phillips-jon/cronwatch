@@ -6,3 +6,6 @@ gemspec
 
 gem "minitest", ">= 5.16"
 gem "rake", ">= 13"
+
+# Cronwatch::Web (require "cronwatch/web") is a Rack app; rack stays optional for apps.
+gem "rack", ">= 2.2"
