@@ -5,6 +5,7 @@ export default defineConfig({
     index: "src/index.ts",
     sqlite: "src/stores/sqlite.ts",
     postgres: "src/stores/postgres.ts",
+    d1: "src/stores/d1.ts",
     slack: "src/alerts/slack.ts",
     discord: "src/alerts/discord.ts",
     webhook: "src/alerts/webhook.ts",

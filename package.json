@@ -24,6 +24,8 @@
     "release": "node scripts/release.mjs"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.18.5"
+    "@arethetypeswrong/cli": "^0.18.5",
+    "esbuild": "^0.27.7",
+    "miniflare": "^4.20260730.0"
   }
 }

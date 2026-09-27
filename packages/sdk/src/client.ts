@@ -1,4 +1,5 @@
 import { formatDuration, parseDuration } from "./duration.js";
+import { isDevelopment, readEnv } from "./env.js";
 import {
   applySilence,
   BASELINE_WINDOW,
@@ -75,7 +76,8 @@ export interface CronWatchOptions {
   triage?: TriageFn;
   /**
    * Shared secret that handler() requests must carry. Defaults to
-   * process.env.CRON_SECRET; an empty string counts as unset. Pass null to
+   * process.env.CRON_SECRET (on Cloudflare Workers, which have no process,
+   * pass env.CRON_SECRET); an empty string counts as unset. Pass null to
    * let handlers run without one.
    */
   cronSecret?: string | null;
@@ -208,7 +210,7 @@ export class CronWatch {
     this.store = options.store ?? (this.usingDefaultStore = true, memory());
     this.alerts = options.alerts ?? [consoleChannel()];
     this.triage = options.triage;
-    const secret = options.cronSecret === undefined ? process.env.CRON_SECRET : options.cronSecret;
+    const secret = options.cronSecret === undefined ? readEnv("CRON_SECRET") : options.cronSecret;
     this.cronSecret = secret ? secret : null;
     this.secretOptOut = options.cronSecret === null;
     this.retentionMs = parseDuration(options.retention ?? "30d", "retention");
@@ -323,7 +325,7 @@ export class CronWatch {
     if (!this.ready) {
       this.ready = (async () => {
         if (this.store.init) await this.store.init();
-        if (this.usingDefaultStore && process.env.NODE_ENV === "production") {
+        if (this.usingDefaultStore && readEnv("NODE_ENV") === "production") {
           console.warn("[cronwatch] using the in-memory store: runs and state are lost on restart. Pass a store from @cronwatch/sdk/sqlite or @cronwatch/sdk/postgres.");
         }
       })().catch((error: unknown) => {
@@ -712,7 +714,11 @@ export class CronWatch {
     return createRoutes(this, options);
   }
 
-  /** Check on an interval, for long-running servers. Default every minute. */
+  /**
+   * Check on an interval, for long-running servers. Default every minute.
+   * Not for serverless functions or Cloudflare Workers, where nothing runs
+   * between requests: call check() from a cron there instead.
+   */
   start(every: Duration = "1m"): void {
     if (this.timer) return;
     const ms = Math.max(5_000, parseDuration(every, "check interval"));
@@ -853,10 +859,6 @@ export class CronWatch {
       this.onError(e, `triage for ${alert.job}`);
     }
   }
-}
-
-function isDevelopment(): boolean {
-  return process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
 }
 
 /** A whole number in range, or the fallback for anything that is not a number. */

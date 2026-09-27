@@ -40,6 +40,7 @@ const expected = {
   "@cronwatch/sdk/discord": ["discord"],
   "@cronwatch/sdk/webhook": ["webhook"],
   "@cronwatch/sdk/anthropic": ["anthropic"],
+  "@cronwatch/sdk/d1": ["d1"],
 };
 for (const e of entries) {
   if (!expected[e]) throw new Error(`check-packages: add ${e} to the expected exports`);
@@ -115,6 +116,8 @@ try {
     `void summary;`,
     `void m2.postgres({ connectionString: "postgres://x" });`,
     `void m6.anthropic({ context: "types" });`,
+    // A stand-in with only the shape of a D1 binding: no @cloudflare/workers-types needed.
+    `void ${bindings.find((b) => b.name === "@cronwatch/sdk/d1").alias}.d1({ prepare(): never { throw new Error("no D1 here"); }, async batch() { return []; } }, { prefix: "cw_" });`,
     `const server = mcp.createServer({ baseUrl: "https://example.com/cronwatch", token: null });`,
     `void server;`,
   ];

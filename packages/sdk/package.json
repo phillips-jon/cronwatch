@@ -40,6 +40,9 @@
       "postgres": [
         "./dist/postgres.d.cts"
       ],
+      "d1": [
+        "./dist/d1.d.cts"
+      ],
       "slack": [
         "./dist/slack.d.cts"
       ],
@@ -83,6 +86,16 @@
       "require": {
         "types": "./dist/postgres.d.cts",
         "default": "./dist/postgres.cjs"
+      }
+    },
+    "./d1": {
+      "import": {
+        "types": "./dist/d1.d.ts",
+        "default": "./dist/d1.js"
+      },
+      "require": {
+        "types": "./dist/d1.d.cts",
+        "default": "./dist/d1.cjs"
       }
     },
     "./slack": {

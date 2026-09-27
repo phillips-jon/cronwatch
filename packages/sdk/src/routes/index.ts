@@ -1,5 +1,5 @@
-import { createHash, randomBytes } from "node:crypto";
 import type { CronWatch } from "../client.js";
+import { isDevelopment, readEnv } from "../env.js";
 import { constantTimeEqual, json } from "../http.js";
 import { parseDuration } from "../duration.js";
 import type { Duration, Run } from "../types.js";
@@ -9,7 +9,8 @@ export interface RoutesOptions {
   /**
    * Required to reach anything. Send it as `Authorization: Bearer <token>`,
    * or open the dashboard once with `?token=<token>` and a cookie is set.
-   * Defaults to process.env.CRONWATCH_TOKEN; an empty string counts as unset.
+   * Defaults to process.env.CRONWATCH_TOKEN (on Cloudflare Workers, which
+   * have no process, pass env.CRONWATCH_TOKEN); an empty string counts as unset.
    * With no token while NODE_ENV is "development" or "test", the routes make
    * a random one and print a sign-in link to the server log on their first
    * request; with no token otherwise they answer 503. Pass `null` to opt out
@@ -35,9 +36,14 @@ export interface Routes {
 
 const COOKIE = "cronwatch_token";
 
-/** The cookie holds a digest of the token, so a leaked cookie does not reveal the bearer token itself. */
-function cookieValue(token: string): string {
-  return createHash("sha256").update(`cronwatch-cookie:${token}`).digest("hex");
+/**
+ * The cookie holds a digest of the token, so a leaked cookie does not reveal
+ * the bearer token itself: the SHA-256 of "cronwatch-cookie:<token>", as hex.
+ * Web Crypto, so the routes need nothing from node: and run on Workers too.
+ */
+async function cookieValue(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`cronwatch-cookie:${token}`));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 const DEFAULT_RUNS = 20;
@@ -54,7 +60,8 @@ const SECURITY_HEADERS = { "x-content-type-options": "nosniff", "referrer-policy
  * 32 random bytes, base64url (43 characters).
  */
 function developmentToken(): string {
-  return randomBytes(32).toString("base64url");
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /**
@@ -150,15 +157,18 @@ function runsLimit(value: string | null): number {
  */
 export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes {
   const optedOut = options.token === null;
-  const configured = optedOut ? null : (options.token || process.env.CRONWATCH_TOKEN || null);
+  const configured = optedOut ? null : (options.token || readEnv("CRONWATCH_TOKEN") || null);
   const base = (options.basePath ?? "/cronwatch").replace(/\/+$/, "");
-  const developing = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  const developing = isDevelopment();
   // A fetch handler cannot tell a local caller from a remote one (proxies,
   // tunnels and `next dev` listening on every interface all look alike), so
   // development gets a token too: made here, and shown only in the server log.
   const generated = !configured && !optedOut && developing;
   const token = generated ? developmentToken() : configured;
   let announced = false;
+  // Worked out on the first request that needs it, then kept.
+  let cookie: Promise<string> | null = null;
+  const expectedCookie = (value: string) => (cookie ??= cookieValue(value));
 
   const serve = async (request: Request, url: URL, path: string, wantsHtml: boolean): Promise<Response> => {
     const method = request.method.toUpperCase();
@@ -185,13 +195,13 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
     if (token) {
       // ?token= is only the sign-in that moves the token into a cookie.
       const query = wantsHtml && method === "GET" ? url.searchParams.get("token") : null;
-      const cookie = readCookie(request, COOKIE);
+      const sent = readCookie(request, COOKIE);
       const isCheck = path === "/api/check";
       const cronSecretOk = isCheck && bearer !== null && cw.cronSecret !== null && constantTimeEqual(bearer, cw.cronSecret);
       const tokenOk =
         bearer !== null ? constantTimeEqual(bearer, token)
         : query !== null ? constantTimeEqual(query, token)
-        : cookie !== null && constantTimeEqual(cookie, cookieValue(token));
+        : sent !== null && constantTimeEqual(sent, await expectedCookie(token));
       if (!cronSecretOk && !tokenOk) {
         if (generated) {
           return wantsHtml
@@ -207,7 +217,7 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
         url.searchParams.delete("token");
         const secure = url.protocol === "https:" ? "; Secure" : "";
         return redirect(url.pathname + (url.search || ""), {
-          "set-cookie": `${COOKIE}=${cookieValue(token)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`,
+          "set-cookie": `${COOKIE}=${await expectedCookie(token)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`,
         });
       }
     }
