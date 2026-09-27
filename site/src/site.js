@@ -52,6 +52,18 @@
     });
   }
 
+  // The contact form sends how long the page was open, measured here, so a
+  // clock that is wrong on either side does not matter. The service turns
+  // away a form sent within three seconds of loading; without script the
+  // field stays empty and the message still goes.
+  var opened = Date.now();
+  document.querySelectorAll("form.contact").forEach(function (form) {
+    form.addEventListener("submit", function () {
+      var t = form.querySelector('input[name="t"]');
+      if (t) t.value = String(Date.now() - opened);
+    });
+  });
+
   document.querySelectorAll(".copy").forEach(function (button) {
     button.addEventListener("click", function () {
       var box = button.closest(".install, .out");
