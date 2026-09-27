@@ -52,7 +52,7 @@ module Cronwatch
       def to_h = { "job" => job.to_h, "runs" => runs.map(&:to_h) }
     end
 
-    attr_reader :store, :alerts, :triage, :cron_secret, :retention_ms, :defaults
+    attr_reader :store, :alerts, :triage, :cron_secret, :retention_ms, :defaults, :sources
 
     # store:       where jobs, runs and state live. Defaults to an in-memory store that forgets on restart.
     # alerts:      where alerts go: objects with #call(alert) and #name. Defaults to the console.
@@ -70,11 +70,18 @@ module Cronwatch
     # now:         the clock, a callable returning epoch milliseconds. Tests use this.
     # on_error:    called with (error, where) for anything that goes wrong outside a job: the store failing,
     #              an alert channel failing, a triage timeout.
+    # sources:     where runs this process does not wrap come from, such as pg_cron jobs
+    #              (Cronwatch::Sources::PgCron). Each is synced at the start of every check; one that
+    #              raises is reported to on_error and the check carries on. See "Sources" in DESIGN.md.
     def initialize(store: nil, alerts: nil, triage: nil, cron_secret: UNSET, retention: "30d", defaults: {}, redact: nil,
-                   deliver: :now, now: nil, on_error: nil)
+                   deliver: :now, now: nil, on_error: nil, sources: nil)
       @using_default_store = store.nil?
       @store = store || Stores::Memory.new
       @alerts = alerts.nil? ? [Alerts::Console.new] : Array(alerts)
+      @sources = sources.nil? ? [] : Array(sources)
+      @sources.each do |source|
+        raise ArgumentError, "a source must respond to sync(host)" unless source.respond_to?(:sync)
+      end
       @triage = triage
       secret = cron_secret.equal?(UNSET) ? ENV.fetch("CRON_SECRET", nil) : cron_secret
       @cron_secret = secret.nil? || secret.to_s.empty? ? nil : secret.to_s
@@ -260,6 +267,75 @@ module Cronwatch
       raise error if threw && interrupted?(error)
 
       ExecuteResult.new(run: run, result: result, error: error, threw: threw)
+    end
+
+    # Record a run that happened outside this process, for a source. Its job
+    # must be declared with job first. Runs are keyed by id: a new one is
+    # inserted, a stored one still running is updated when this one is not,
+    # and anything else is left alone, so recording the same run twice
+    # changes nothing. A finished run is judged as if it had been wrapped
+    # here (expect, failures, duration, budgets) and its output and error are
+    # redacted the same way. `evaluate: false` stores it without judging it,
+    # for history imported on first sight. Returns the alerts it sent.
+    #
+    # `run` is a Cronwatch::Run, or a hash of its fields (camelCase or snake_case keys).
+    def record_run(run, evaluate: true)
+      after_fork_check
+      input = run.is_a?(Run) ? run : Run.from_h(run.is_a?(Hash) ? run.to_h { |k, v| [Naming.camel(k), v] } : run)
+      declared = @registry.synchronize { @definitions[input.job] }
+      raise ArgumentError, "record_run: job \"#{input.job}\" is not declared; call job first" unless declared
+
+      sync(declared)
+      run = input.dup
+      run.status = run.status&.to_sym
+      run.metrics = (run.metrics || {}).transform_keys(&:to_s)
+      run.output = Output.utf8(run.output.to_s) unless run.output.nil?
+      run.error = Output.utf8(run.error.to_s) unless run.error.nil?
+      if run.status == :ok
+        unmet = Serialize.check_expectation(declared.expect, run.output)
+        if unmet
+          run.status = :failed
+          run.error = unmet
+        end
+      end
+      run.output = Output.strip_nul(@redact.call(Output.cap(run.output))) unless run.output.nil?
+      run.error = Output.strip_nul(@redact.call(Output.cap(run.error))) unless run.error.nil?
+      definition = Serialize.to_stored(declared)
+
+      stored = @store.get_run(run.id)
+      if stored
+        return [] if stored.status != :running || run.status == :running
+
+        unless evaluate
+          @store.update_run(run)
+          return []
+        end
+        return finish_run(definition, run, now, true)
+      end
+      begin
+        @store.insert_run(run)
+      rescue StandardError
+        # Another process recorded it first.
+        already = begin
+          @store.get_run(run.id)
+        rescue StandardError
+          nil
+        end
+        return [] if already
+
+        raise
+      end
+      return [] unless evaluate
+
+      update_state(run.job) { |before| [Evaluate.on_run_start(before), nil] }
+      return [] if run.status == :running
+
+      finish_run(definition, run, now, false)
+    end
+
+    # Hands an error to on_error, as a source reports what went wrong. See #report.
+    def on_error(error, where)
+      report(error, where)
     end
 
     # Look for missed and stuck runs across every job, send alerts, retry
@@ -655,9 +731,16 @@ module Cronwatch
 
     def run_check
       ensure_ready
+      alerts = []
+      # Sources first, so what they record is evaluated in this check.
+      @sources.each do |source|
+        found = source.sync(self)
+        alerts.concat(Array(found)) if found.is_a?(Array)
+      rescue StandardError => e
+        report(e, "source #{channel_name(source)}")
+      end
       defined_jobs.each { |definition| sync(definition) }
       at = now
-      alerts = []
 
       # Runs that never reported back. One that cannot be judged (its job's
       # stored timeout no longer parses, say) is reported and skipped.

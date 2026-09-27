@@ -17,7 +17,8 @@ Ruby 3.2 or newer; the Rails integration is tested on Rails 7.2, 8.0 and 8.1. Th
 
 | Require | For | Needs |
 |---|---|---|
-| `cronwatch` | the client, the memory store, and the Slack, Discord, webhook and console channels | |
+| `cronwatch` | the client, the memory store, and the Slack, Discord, webhook, console, email (Resend, Postmark, SendGrid, Mailgun, SES), Twilio and error tracker (Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, New Relic) channels | |
+| `cronwatch/pg_cron` | `Cronwatch::Sources::PgCron`, which watches pg_cron jobs through an ActiveRecord or pg connection | |
 | `cronwatch/active_record` | the ActiveRecord store | `activerecord` |
 | `cronwatch/rails` | the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task, the install generator | `railties`, `activejob` |
 | `cronwatch/sidekiq` | `Cronwatch::Sidekiq` for `Sidekiq::Job` classes, its server middleware, `Cronwatch::Sidekiq::CheckWorker` | `sidekiq` 7 or newer |
@@ -181,6 +182,9 @@ Cronwatch::Alerts::Slack.new(webhook_url: ENV.fetch("SLACK_WEBHOOK_URL"))
 Cronwatch::Alerts::Discord.new(webhook_url: ENV.fetch("DISCORD_WEBHOOK_URL"))
 Cronwatch::Alerts::Webhook.new(url: "https://hooks.example.com/cronwatch", secret: ENV["CRONWATCH_WEBHOOK_SECRET"])
 Cronwatch::Alerts::Console.new   # the default
+Cronwatch::Alerts::Resend.new(api_key: ENV.fetch("RESEND_API_KEY"), from: "alerts@example.com", to: "ops@example.com")
+Cronwatch::Alerts::Sentry.new(dsn: ENV.fetch("SENTRY_DSN"))
+# and Postmark, Sendgrid, Mailgun, Ses, Twilio, Honeybadger, Datadog, Rollbar, Bugsnag, NewRelic
 
 Cronwatch::Alerts::Custom.new("pagerduty") do |alert|
   next if alert.type == :recovered

@@ -97,7 +97,7 @@ Cronwatch.configure do |c|
 end
 ```
 
-`Cronwatch.configure` builds the one client the app uses, and `Cronwatch.client` returns it. Configuring again replaces the client. The settings are `store`, `alerts`, `triage`, `cron_secret`, `retention`, `defaults`, `redact`, `deliver`, `on_error` and `now`, the same as `Cronwatch.new` takes (see [Ruby](/docs/ruby/#api)); anything left unset takes the client's default. Errors outside jobs (the store, a channel, triage) go to `Rails.logger` unless `on_error` says otherwise.
+`Cronwatch.configure` builds the one client the app uses, and `Cronwatch.client` returns it. Configuring again replaces the client. The settings are `store`, `alerts`, `triage`, `cron_secret`, `retention`, `defaults`, `redact`, `deliver`, `sources`, `on_error` and `now`, the same as `Cronwatch.new` takes (see [Ruby](/docs/ruby/#api)); anything left unset takes the client's default. Errors outside jobs (the store, a channel, triage) go to `Rails.logger` unless `on_error` says otherwise.
 
 The store takes `prefix:` and `connection_class:`. To keep the tables in another database, pass a class that `connects_to` it:
 
@@ -110,6 +110,45 @@ A class name is looked up on first use, so the initializer does not have to load
 On Postgres the store never joins a transaction your code has open. A job that runs inside `ActiveRecord::Base.transaction` has its run recorded as it happens, and the run stays recorded if the transaction rolls back, so its alert is not sent again on the next failure. To do that the store connects through a pool of its own, with the writing database config of `connection_class` (`ActiveRecord::Base` by default): each process may open up to that config's `pool` (5 unless set) more connections, only as it needs them. Count them against your database's connection limit, or point `connection_class` at a class whose config sets a smaller `pool`. SQLite allows one writer at a time, so there the store uses your pool and, inside an open transaction, runs in a savepoint of it: a store error cannot abort your transaction, and the rows commit or roll back with it.
 
 Postgres and SQLite are supported and tested. MySQL is not supported yet: the SDK's statements use `ON CONFLICT` and `TEXT` primary keys, and any other adapter is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter` when the store is first used.
+
+## Email, SMS and error trackers
+
+Besides Slack, Discord and webhooks, the gem sends alerts by email (Resend, Postmark, SendGrid, Mailgun, Amazon SES), by text (Twilio) and to error trackers (Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, New Relic), all on the standard library. Keep the keys in credentials or the environment:
+
+```ruby
+# config/initializers/cronwatch.rb
+Cronwatch.configure do |c|
+  c.store = Cronwatch::Stores::ActiveRecord.new
+  link = ->(alert) { "https://app.example.com/cronwatch/jobs/#{alert.job}" }
+  c.alerts = [
+    Cronwatch::Alerts::Postmark.new(
+      server_token: Rails.application.credentials.dig(:postmark, :server_token),
+      from: "CronWatch <alerts@example.com>", to: %w[ops@example.com], subject_prefix: "[#{Rails.env}]", link: link,
+    ),
+    Cronwatch::Alerts::Sentry.new(dsn: ENV.fetch("SENTRY_DSN"), environment: Rails.env),
+    (Cronwatch::Alerts::Twilio.new(account_sid: ENV["TWILIO_ACCOUNT_SID"], auth_token: ENV["TWILIO_AUTH_TOKEN"],
+                                   from: ENV["TWILIO_FROM"], to: ENV["ONCALL_PHONE"]) if ENV["TWILIO_ACCOUNT_SID"].present?),
+  ].compact
+end
+```
+
+Each raises `ArgumentError` at boot when a key or address is missing, so a typo in credentials shows up when the app starts rather than at 3 a.m. The Sentry channel sends CronWatch's own events to Sentry; it does not need, and does not touch, the `sentry-ruby` gem your app may already use. The options for every channel are in [Ruby](/docs/ruby/#email-sms-and-error-trackers), and what each sends in [Alerts](/docs/alerts/#email-sms-and-error-trackers).
+
+## pg_cron
+
+A Rails app on Supabase, or any Postgres with pg_cron, can watch the jobs pg_cron runs inside the database beside its own. Give the reader the app's ActiveRecord connection:
+
+```ruby
+# config/initializers/cronwatch.rb
+require "cronwatch/pg_cron"
+
+Cronwatch.configure do |c|
+  c.store = Cronwatch::Stores::ActiveRecord.new
+  c.sources = [Cronwatch::Sources::PgCron.new(ActiveRecord::Base, prefix: "db:", options: { grace: "5m" })]
+end
+```
+
+Each check (`Cronwatch::CheckJob`, or `/cronwatch/api/check`) then reads `cron.job` and `cron.job_run_details` through a connection checked out of that class's pool for each query, declares every pg_cron job with its schedule, and copies new runs in, so the dashboard lists them beside your ActiveRecord and Sidekiq jobs and they alert the same way. Pass another class (one that `connects_to` the database where pg_cron lives) if that is not the primary. The role needs to read the `cron` schema, and pg_cron's row level security shows a role only the jobs it scheduled: connect as that role (`postgres` on Supabase) or see [Supabase and pg_cron](/docs/supabase/#permissions) for a monitoring role. The options are in [Ruby](/docs/ruby/#pg-cron).
 
 ## Watch a job
 

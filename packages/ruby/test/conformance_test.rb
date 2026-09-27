@@ -480,21 +480,35 @@ class ConformanceTest < Minitest::Test
   CHANNELS = fixture("channels.json")
   CHANNEL_ALERTS = CHANNELS["alerts"].to_h { |a| [a["name"], a["alert"]] }
 
-  # Stands in for Net::HTTP, keeping the last request.
+  # Stands in for Net::HTTP, keeping every request.
   class FakeHTTP
     attr_accessor :status, :body
-    attr_reader :last
+    attr_reader :requests
 
     def initialize
       @status = 200
       @body = ""
+      @requests = []
     end
 
+    def last = @requests.last
+
     def post(url, body, headers)
-      @last = { "url" => url, "headers" => headers, "body" => body }
+      @requests << { "url" => url, "headers" => headers, "body" => body }
       Cronwatch::HTTP::Response.new(status: @status, body: @body)
     end
   end
+
+  # The provider channels' options, camelCase in the fixtures, as the gem's
+  # snake_case keywords. `link: true` stands for the usual link and
+  # `now: <ms>` for a clock fixed at that time.
+  PROVIDERS = {
+    "resend" => Cronwatch::Alerts::Resend, "postmark" => Cronwatch::Alerts::Postmark,
+    "sendgrid" => Cronwatch::Alerts::Sendgrid, "mailgun" => Cronwatch::Alerts::Mailgun, "ses" => Cronwatch::Alerts::Ses,
+    "twilio" => Cronwatch::Alerts::Twilio, "sentry" => Cronwatch::Alerts::Sentry,
+    "honeybadger" => Cronwatch::Alerts::Honeybadger, "datadog" => Cronwatch::Alerts::Datadog,
+    "rollbar" => Cronwatch::Alerts::Rollbar, "bugsnag" => Cronwatch::Alerts::Bugsnag, "newrelic" => Cronwatch::Alerts::NewRelic,
+  }.freeze
 
   def channel_for(c, http)
     options = c["options"]
@@ -503,7 +517,47 @@ class ConformanceTest < Minitest::Test
     when "slack" then Cronwatch::Alerts::Slack.new(webhook_url: options["webhookUrl"], link: link, http: http)
     when "discord" then Cronwatch::Alerts::Discord.new(webhook_url: options["webhookUrl"], link: link, http: http)
     when "webhook" then Cronwatch::Alerts::Webhook.new(url: options["url"], headers: options["headers"] || {}, secret: options["secret"], http: http)
+    else
+      keywords = options.each_with_object({}) do |(key, value), out|
+        case key
+        when "link" then out[:link] = link if value
+        when "now" then out[:now] = -> { value }
+        else out[Cronwatch::Naming.snake(key)] = value
+        end
+      end
+      PROVIDERS.fetch(c["channel"]).new(**keywords, http: http)
     end
+  end
+
+  def test_provider_payloads
+    each_case(CHANNELS["providerSends"]) do |c|
+      http = FakeHTTP.new
+      channel_for(c, http).call(Cronwatch::Alert.from_h(CHANNEL_ALERTS.fetch(c["alert"])))
+      requests = http.requests.map { |r| { "url" => r["url"], "headers" => r["headers"], "body" => digest(r["body"]) } }
+      differs(c["requests"], requests)
+    end
+  end
+
+  def test_provider_failures
+    first = Cronwatch::Alert.from_h(CHANNELS["alerts"][0]["alert"])
+    each_case(CHANNELS["providerFailures"]) do |c|
+      http = FakeHTTP.new
+      http.status = c["status"]
+      http.body = c["body"]
+      begin
+        channel_for(c, http).call(first)
+        next "expected an error: #{c["error"]}" unless c["error"].nil?
+
+        nil
+      rescue RuntimeError => e
+        differs(c["error"].to_s, e.message)
+      end
+    end
+  end
+
+  def test_provider_cases_cover_every_channel
+    assert_equal PROVIDERS.keys.sort, CHANNELS["providerSends"].map { |c| c["channel"] }.uniq.sort
+    assert_operator CHANNELS["providerSends"].length, :>=, 288
   end
 
   def test_channel_payloads
