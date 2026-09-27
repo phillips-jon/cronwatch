@@ -25,24 +25,44 @@ export function origin(url: string): string {
   }
 }
 
+/** How much of a provider's error body goes into the error message. */
+export const ERROR_BODY_MAX = 200;
+
 /**
  * POSTs and throws on a non-2xx answer. The error names the provider and the
  * URL's origin, plus the start of the response body with every secret the
- * channel holds cut out, in case a provider echoes one back.
+ * channel holds cut out, in case a provider echoes one back. Secrets are cut
+ * from a prefix long enough to hold one that starts inside the first
+ * ERROR_BODY_MAX characters, and only then is it cut to that length, so no
+ * part of a secret survives at the edge. A redirect is refused rather than
+ * followed: the credential headers would go with it to wherever it points.
  */
 export async function post(provider: string, url: string, init: { headers: Record<string, string>; body: string }, secrets: (string | undefined)[] = []): Promise<Response> {
-  const response = await fetch(url, { method: "POST", headers: init.headers, body: init.body, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const response = await fetch(url, { method: "POST", headers: init.headers, body: init.body, redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!response.ok) {
     let text = "";
     try {
-      text = (await response.text()).slice(0, 200);
+      text = await response.text();
     } catch {
       // The status is enough.
     }
-    for (const secret of secrets) if (secret && secret.length >= 4) text = text.split(secret).join("[redacted]");
-    throw new Error(`${provider} ${origin(url)} answered ${response.status}${text ? `: ${text}` : ""}`);
+    throw new Error(`${provider} ${origin(url)} answered ${response.status}${text ? `: ${errorBody(text, secrets)}` : ""}`);
   }
   return response;
+}
+
+/** The start of an error body, secrets cut out first, then cut to ERROR_BODY_MAX on a code point. */
+export function errorBody(text: string, secrets: (string | undefined)[] = []): string {
+  const kept = secrets.filter((s): s is string => typeof s === "string" && s.length >= 4);
+  const longest = kept.reduce((n, s) => Math.max(n, s.length), 0);
+  let head = cut(text, ERROR_BODY_MAX + longest);
+  for (const secret of kept) head = head.split(secret).join("[redacted]");
+  return cut(head, ERROR_BODY_MAX);
+}
+
+/** A credential with the spaces and newlines a paste leaves around it taken off. Anything not a string is empty. */
+export function trimmed(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
 /** Base64 of UTF-8, without Buffer. */

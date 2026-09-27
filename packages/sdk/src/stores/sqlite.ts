@@ -3,7 +3,7 @@ import { chmodSync, closeSync, mkdirSync, openSync } from "node:fs";
 import path from "node:path";
 import type { Store, StoredJob, StoredJobDefinition } from "../types.js";
 import { retryBusy } from "./busy.js";
-import { params, rowToJob, rowToRun, rowToState, schema, statements, tablePrefix, type JobRow, type RunRow, type StateRow } from "./sql.js";
+import { params, rowToJob, rowToRun, rowToState, schema, statements, tablePrefix, updateRunIfSql, type JobRow, type RunRow, type StateRow } from "./sql.js";
 
 export interface SqliteOptions {
   /** File path. The directory is created if missing. ":memory:" works too. */
@@ -95,6 +95,10 @@ export function sqlite(options: SqliteOptions = {}): Store {
     },
     async updateRun(run) {
       stmt(sql.updateRun).run(...params.updateRun(run));
+    },
+    async updateRunIf(run, fromStatuses) {
+      if (fromStatuses.length === 0) return false;
+      return stmt(updateRunIfSql("sqlite", p, fromStatuses.length)).run(...params.updateRunIf(run, fromStatuses)).changes > 0;
     },
     async getRun(id) {
       const r = stmt(sql.getRun).get(id) as RunRow | undefined;

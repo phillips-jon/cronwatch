@@ -86,4 +86,10 @@ same.log("sent 40 emails");
 await same.finish();                                  // or same.fail(error)
 ```
 
-Starting closes missed and stuck like any run starting. Finishing is judged like any run finishing: `expect`, failures, duration from the start, budgets. It opens nothing a finished `run()` would not, and a finish that comes twice is ignored. A run that is never finished is marked stuck after the job's `timeout`, so set `timeout` to cover the whole span, waits included. See [the run handle](/docs/api/#the-run-handle).
+Starting closes missed and stuck like any run starting. Finishing is judged like any run finishing: `expect`, failures, duration from the start, budgets. It opens nothing a finished `run()` would not. A run that is never finished is marked stuck after the job's `timeout`, so set `timeout` to cover the whole span, waits included. See [the run handle](/docs/api/#the-run-handle).
+
+A run is judged once, however many times it is finished. The finish is written only while the stored run is still running (or marked timed out by a check), in one step, so when two processes finish the same run at once (a queue that delivers the completion twice, say) one records it and counts it, and the other gets `null` and hears through `onError` that the run was already finished. The built-in stores do this; a custom store without `updateRunIf` falls back to a read then a write, which is only safe when one process finishes a given run. A finish that arrives after a check marked the run stuck is still recorded: a success closes stuck with a recovery, and a failure is not counted a second time.
+
+- `expect` sees what `run()` would: the handle keeps the first 16 KB of everything logged through it, so a line logged early still matches after `flush()` has sent it on and the stored output kept only the tail.
+- A run belongs to the job that started it. `start({ id })` with an id another job holds throws, whether that job's start is still in flight or long done, and a handle that finds another job's run under its id finishes and flushes nothing. Ids starting with `pgcron:` are the [pg_cron reader's](/docs/supabase/) and are refused.
+- When the store fails during `finish()`, nothing is recorded, the error goes to `onError`, and the handle stays active: call `finish()` again once the store is back. The lines and metrics logged are kept.

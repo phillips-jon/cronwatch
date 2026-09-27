@@ -27,6 +27,8 @@ export function discord(options: DiscordOptions): AlertChannel {
       const response = await fetch(options.webhookUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
+        // Refused, not followed: a webhook URL is its own credential.
+        redirect: "error",
         signal: AbortSignal.timeout(TIMEOUT_MS),
         body: JSON.stringify({
           content: alert.title,

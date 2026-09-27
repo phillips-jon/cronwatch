@@ -8859,6 +8859,1375 @@
           }
         }
       ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a failure with markup in its output",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-4decc12d0e5ddc824b937dea51ece9be"
+          },
+          "body": {
+            "length": 880,
+            "sha256": "f18714a304966eb3d61a568cf167eef2a826e3e6ecb5c442d22f49315416b041"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a long triage, in its own block",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-4decc12d0e5ddc824b937dea51ece9be"
+          },
+          "body": {
+            "length": 9014,
+            "sha256": "13cc8dc847599e7201aa288312030561d3b2c57c2c8ff6cd26f6478a978949af"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a long message with a fence",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-4decc12d0e5ddc824b937dea51ece9be"
+          },
+          "body": {
+            "length": 10730,
+            "sha256": "f04e64d6faeadeafe56921003e63f81e7f5389a5cccd731b3357a328458d3f18"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "fences all the way past the cut",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-4decc12d0e5ddc824b937dea51ece9be"
+          },
+          "body": {
+            "length": 33648,
+            "sha256": "341e3c1918f282a4722d82b316a6189fccf291e6fdb192f52afa03e3e67726a9"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "escapes that grow past the cut",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-4decc12d0e5ddc824b937dea51ece9be"
+          },
+          "body": {
+            "length": 12642,
+            "sha256": "2afcfca3de1c3b1ec139eca511baba4dd02b4f43cde55a3582147da42f436297"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "accents and emoji",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-4decc12d0e5ddc824b937dea51ece9be"
+          },
+          "body": {
+            "length": 788,
+            "sha256": "4fe7d512b9ac79a83441101e9849793389fb41d64c92a9db728c909aeefc7e62"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "an empty triage",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-4decc12d0e5ddc824b937dea51ece9be"
+          },
+          "body": {
+            "length": 880,
+            "sha256": "f18714a304966eb3d61a568cf167eef2a826e3e6ecb5c442d22f49315416b041"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a missed run",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-0df0f91e6d54adabaa5415c6aaaf14e9"
+          },
+          "body": {
+            "length": 846,
+            "sha256": "948a17237ed6ccf5cc3a5edf0823da8af6e27dca866a4a267c03c36887ed3e57"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a stuck run",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-6f20926fc7b32a0afd2cfaba0f70f2f6"
+          },
+          "body": {
+            "length": 958,
+            "sha256": "de58e249d760880891e2352347cb591dc7a0f7081e9f1df0dda413df1d385d73"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-a938c7f57569e3a44189189f21834d16"
+          },
+          "body": {
+            "length": 3226,
+            "sha256": "42c61206f865c47954d5bafac79ecd3aa1a07ca2ca7c39cd3221ced4f7486270"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "slow",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-2421bf7d61938a2ed237f3be907289e8"
+          },
+          "body": {
+            "length": 658,
+            "sha256": "e5b1e4661922d869c8e4f97b78be866febb4218b0e3b532460c0fa4c86622443"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "recovered",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-97923180a31cd7fc98b5b24c8fd1b59d"
+          },
+          "body": {
+            "length": 669,
+            "sha256": "ffb9bd1585afc629bc7239b7af98a9793f62610367369f7bbd52a0e4f224f405"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "a failure with markup in its output",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=a0701fa1365f851888554b4a91a5d43b7f0b0af8cb84c47b4396c222b929e366"
+          },
+          "body": {
+            "length": 1082,
+            "sha256": "a0a249c661cfb12c640ba07771674d941354b2e7181d01f2e9d68b0fdcc4f3ad"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "a long triage, in its own block",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=394a82ec4904e5d605bbccfccac18bc53330b78bbd5a1a012fd28fee45cec6c8"
+          },
+          "body": {
+            "length": 9216,
+            "sha256": "6cf99f14b55c43d89bcb9221db4ba898a8c916aa1aea87415a6d1a59924befea"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "a long message with a fence",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=068daa732237546b5896e8d9a6cbacc9f67b92adef430664608bf53cc4add716"
+          },
+          "body": {
+            "length": 10932,
+            "sha256": "e85ee38f589b388163a911b17be4168b67500bf8012eececcdb05288357add64"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "fences all the way past the cut",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=45a8d793214d1486bb6493a6a45e8fbc7efa3f46f34608a04a9b0cbef1fe8f53"
+          },
+          "body": {
+            "length": 33850,
+            "sha256": "97c57fa7b42091e40115c9741ceccae7506f56e54d4a9c9f5dbd44bc57e09e70"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "escapes that grow past the cut",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=cedb21c7a411464b960852f9d121de1c3d4f9044b36442ed5bfd7253dbe94092"
+          },
+          "body": {
+            "length": 12844,
+            "sha256": "3b52c378f002363b0ce5ebd196e63af241eec13598e7341c3cd5103b8218ebe3"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "accents and emoji",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=4f47eecab8b51b90446790805913d7c247aa509ef7017679a885e5558e417713"
+          },
+          "body": {
+            "length": 990,
+            "sha256": "f09a265f6f2ed858798767864d72ef2dc9c9953875b6339690664be62407f8cf"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "an empty triage",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=a0701fa1365f851888554b4a91a5d43b7f0b0af8cb84c47b4396c222b929e366"
+          },
+          "body": {
+            "length": 1082,
+            "sha256": "a0a249c661cfb12c640ba07771674d941354b2e7181d01f2e9d68b0fdcc4f3ad"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "a missed run",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=8e93f83ea3234602b2f32b17805557c24304f78ce174d6bf6887875731296c6e"
+          },
+          "body": {
+            "length": 1048,
+            "sha256": "ff839652c3d39d7366b4ca0ce1ce0c15189d06a171e528a636b3e54296cd3143"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "a stuck run",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=08614e9590b1d87de7b53b6c4acf046c5ca4eadf21e56c2ca1b3010ae34582b2"
+          },
+          "body": {
+            "length": 1160,
+            "sha256": "d3a8e2c213fc8b7053d6b527facec1445e664efc0d42b2d742487310cab49c88"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=030b5b8d65c71c2eae318d10ae682362357269e646eae08e7d4b369b073b8a7d"
+          },
+          "body": {
+            "length": 3428,
+            "sha256": "4891b76921cad3d669a87c5b07f6a8506da1d0d53472334e795d177219910113"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "slow",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=eb255dd56f9ab7c655539083b79213700abf354bd965d95813093283aad88eae"
+          },
+          "body": {
+            "length": 860,
+            "sha256": "2fedea04106acdd1958f8d8583252d63cbc34092bc8e8a6834e9b4034d89c931"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "recovered",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=c17bcac84581895047f40c34aed8ea5ebff3f0d9fce4513f67c1b4aa8a1ce3a8"
+          },
+          "body": {
+            "length": 871,
+            "sha256": "5b9f6e81c573aae6208bb0ffb7e2586dc044a666b9ff07ac327d256630961853"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "a failure with markup in its output",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+failed%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29%2C+ran+2s.%0AError%3A+boom+%26+%3Cb%3Ebust%3C%2Fb%3E%0AOutput+%28tail%29%3A%0Abefore%0A%60%60%60%0A%40everyone+%3C%21channel%3E+%5Bclick%5D%28https%3A%2F%2Fevil.example%29+*bold*+_it_+%7Es%7E+%7Cpipe%7C+%5Cback"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "a long triage, in its own block",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+failed%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29%2C+ran+2s.%0AError%3A+boom+%26+%3Cb%3Ebust%3C%2Fb%3E%0AOutput+%28tail%29%3A%0Abefore%0A%60%60%60%0A%40everyone+%3C%21channel%3E+%5Bclick%5D%28https%3A%2F%2Fevil.example%29+*bold*+_it_+%7Es%7E+%7Cpipe%7C+%5Cback%0ATria..."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "a long message with a fence",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+failed%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29%2C+ran+2s.%0AError%3A+long%0AOutput+%28tail%29%3A%0A%60%60%60%60%0Azzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz..."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "fences all the way past the cut",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "length": 484,
+            "sha256": "3a4911ee0d18151d7f04c2df996ed041a2daf3c03c3ff5ab41aad9bf8081f51d"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "escapes that grow past the cut",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "length": 1264,
+            "sha256": "206cd4666c6ddc661bf971c9f52f74bd6e7b61cabe2bededb5fcbfd36809445a"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "accents and emoji",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+failed%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29%2C+ran+2s.%0AError%3A+caf%C3%A9+%F0%9F%98%80%0AOutput+%28tail%29%3A%0Ar%C3%A9sum%C3%A9+%F0%9F%9A%80+done%0ATriage%3A+%C3%A9t%C3%A9+%F0%9F%98%80+%60code%60+%5Blink%5D%28x%29"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "an empty triage",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+failed%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29%2C+ran+2s.%0AError%3A+boom+%26+%3Cb%3Ebust%3C%2Fb%3E%0AOutput+%28tail%29%3A%0Abefore%0A%60%60%60%0A%40everyone+%3C%21channel%3E+%5Bclick%5D%28https%3A%2F%2Fevil.example%29+*bold*+_it_+%7Es%7E+%7Cpipe%7C+%5Cback"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "a missed run",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+missed+its+scheduled+run%0ADue+2026-01-05+09%3A00%3A00+UTC+%2830m+ago%29%2C+and+no+run+had+started+by+2026-01-05+09%3A15%3A00+UTC+%2815m+ago%29+%28grace+15m%29.%0ASchedule%3A+0+2+*+*+*.%0ALast+run%3A+never."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "a stuck run",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+is+stuck%0AStarted+2026-01-05+09%3A30%3A00+UTC+%281h+ago%29+and+never+reported+finishing.+Marked+as+timed+out+after+1h.%0AOutput+so+far+%28tail%29%3A%0Astarted%0AIf+the+process+was+killed+mid-run+%28a+serverless+timeout%2C+a+deploy%29%2C+this+is+what+that+looks+like."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+went+over+budget%0Acost%3A+1.2%2C+limit+1+%28budget%29.%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29.%0ATriage%3A+Check+*this*+_now_+%7Emaybe%7E+%60x%60+%7C+y+%28z%29+%5Ba%5D+%3Cb%3E+%5C+dddddddddddddddddddddddddddddddddddddddddddddddd..."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "slow",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+was+slow%0ATook+15s%3B+the+limit+is+10s+%28maxDuration%29.%0AStarted+2026-01-05+09%3A30%3A00+UTC+%28now%29."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "recovered",
+      "requests": []
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "a failure with markup in its output",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 873,
+            "sha256": "703f9251481c1de7386d11b0cd16240c1441723ad8a905209680f938fa103ca1"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "a long triage, in its own block",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 4912,
+            "sha256": "9c68ec4486d9c1689a7907d3ab5a0fc51aed6b7df2d9359d590d2a96d034a446"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "a long message with a fence",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 5789,
+            "sha256": "940ebd2a925993bac53e9c8cdf2f895eca3615d99f6bbaad6158e69e76b1a4b2"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "fences all the way past the cut",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 8677,
+            "sha256": "0daa9291bda36f7a83994463752ac586648b638396aca875300ff4daf7dbbf37"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "escapes that grow past the cut",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 2965,
+            "sha256": "e81f32083d0d0bd8e6aa47be49ac4bd12c467a1b3edcb97ab76315f3c5e305c5"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "accents and emoji",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 818,
+            "sha256": "bb3d005209290a7a9c0ade601be93806005a7da4f4f41231b2eb7f53ed309bda"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "an empty triage",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 873,
+            "sha256": "703f9251481c1de7386d11b0cd16240c1441723ad8a905209680f938fa103ca1"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "a missed run",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 803,
+            "sha256": "5c7309c9752c8503239098dd1f1a2d07090aed39b5347a2cd8ea3489a3cd0e04"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "a stuck run",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 923,
+            "sha256": "41b3aeba4de2a5ab03be169f7657183fd40f5d5fb9a9c1569f694d6c9a6dd737"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 2074,
+            "sha256": "72342df79c4dfae3b684a81272f43252cbb3461045fafb7a0ed2ab3007aa3588"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "slow",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 788,
+            "sha256": "ee420e3e15240b98a13672f1ab8673b82b089cb47ae33d791aa5e4b685ed0872"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "recovered",
+      "requests": []
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "a failure with markup in its output",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 777,
+            "sha256": "05b56de2612be779296390d4892d7d11396b8f93e4f63cf0a5d61d1360c11f3f"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "a long triage, in its own block",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 4817,
+            "sha256": "f24d65f43a97cf3b7f12f28b207d4fc35efa9118dfd26879ca67595d4b5dc9bb"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "a long message with a fence",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 5694,
+            "sha256": "159db621fbc0e06ce6d32ab3fcec53d79b39d1b0c5c62861148a28380a212160"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "fences all the way past the cut",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 8773,
+            "sha256": "b36339c5e343d620d9c38380e2f0440d0eae4cabcf3e6cd162d2455cf32bc02c"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "escapes that grow past the cut",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 2870,
+            "sha256": "7c23a3c90e0e824ce00ce0e120e7a2ce59287e2bcc34fbb11654293bb8b380dc"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "accents and emoji",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 722,
+            "sha256": "596ccbb16f0fdd8cdcd8e8e431483bd6e72b5b66a7d22428b1f9baa0c1aaf011"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "an empty triage",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 777,
+            "sha256": "05b56de2612be779296390d4892d7d11396b8f93e4f63cf0a5d61d1360c11f3f"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "a missed run",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 707,
+            "sha256": "86c7f0714d758362d9aff88dd8bcccf3836a966ac2c888c9333272ca0a4190fe"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "a stuck run",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 828,
+            "sha256": "7ffb5c38a7dc8f4f919a0ae7cf66fabfc6ff9c7e3b0c11e38b7680cceb8f9248"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "over budget, with a triage full of markdown",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 1974,
+            "sha256": "6117663edb5ca0294102bcda8d51428eaf3d77da655f6b3f059dac44dddbd54f"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "slow",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 694,
+            "sha256": "2ac82861fdda3de4b76361a5e9d1c5d69ac87b7e19ae6f661d6e6818b6da59a2"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "recovered",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 677,
+            "sha256": "25642f92fa903010ac4202ed014f303e289828acbc32b69206f1a42d666be01e"
+          }
+        }
+      ]
     }
   ],
   "providerFailures": [
@@ -10109,6 +11478,514 @@
       "status": 401,
       "body": "bad key nr-secret given",
       "error": "New Relic https://insights-collector.eu01.nr-data.net answered 401: bad key [redacted] given"
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Resend https://api.resend.com answered 500: no"
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Resend https://api.resend.com answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "status": 404,
+      "body": "",
+      "error": "Resend https://api.resend.com answered 404"
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "status": 401,
+      "body": "bad key  re_secret\n given",
+      "error": "Resend https://api.resend.com answered 401: bad key  [redacted]\n given"
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "status": 500,
+      "body": "no",
+      "error": "SES https://email.us-east-1.amazonaws.com answered 500: no"
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "SES https://email.us-east-1.amazonaws.com answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "status": 404,
+      "body": "",
+      "error": "SES https://email.us-east-1.amazonaws.com answered 404"
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "status": 401,
+      "body": "bad key wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n given",
+      "error": "SES https://email.us-east-1.amazonaws.com answered 401: bad key [redacted]\n given"
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Twilio https://api.twilio.com answered 500: no"
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Twilio https://api.twilio.com answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "status": 404,
+      "body": "",
+      "error": "Twilio https://api.twilio.com answered 404"
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "status": 401,
+      "body": "bad key tw-secret\n given",
+      "error": "Twilio https://api.twilio.com answered 401: bad key [redacted]\n given"
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Bugsnag https://notify.bugsnag.com answered 500: no"
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Bugsnag https://notify.bugsnag.com answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "status": 404,
+      "body": "",
+      "error": "Bugsnag https://notify.bugsnag.com answered 404"
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "status": 401,
+      "body": "bad key \tbs-secret  given",
+      "error": "Bugsnag https://notify.bugsnag.com answered 401: bad key \t[redacted]  given"
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "status": 500,
+      "body": "no",
+      "error": "Sentry https://o1.ingest.sentry.io answered 500: no"
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "status": 400,
+      "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "Sentry https://o1.ingest.sentry.io answered 400: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "status": 404,
+      "body": "",
+      "error": "Sentry https://o1.ingest.sentry.io answered 404"
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "status": 401,
+      "body": "bad key pubkey given",
+      "error": "Sentry https://o1.ingest.sentry.io answered 401: bad key [redacted] given"
     }
-  ]
+  ],
+  "twilioPartial": {
+    "options": {
+      "accountSid": "AC00000000000000000000000000000000",
+      "authToken": "tw-secret",
+      "from": "+15005550006",
+      "to": [
+        "+15551110000",
+        "+15552220000",
+        "+15553330000"
+      ]
+    },
+    "cases": [
+      {
+        "statuses": [
+          201,
+          400,
+          201
+        ],
+        "requests": [
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15551110000",
+            "redirect": "error"
+          },
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15552220000",
+            "redirect": "error"
+          },
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15553330000",
+            "redirect": "error"
+          }
+        ],
+        "error": null,
+        "reported": [
+          "Twilio https://api.twilio.com answered 400: {\"message\":\"refused +15552220000 with [redacted]\"} (to ********0000; 2 of 3 numbers took the alert)"
+        ]
+      },
+      {
+        "statuses": [
+          400,
+          400,
+          201
+        ],
+        "requests": [
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15551110000",
+            "redirect": "error"
+          },
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15552220000",
+            "redirect": "error"
+          },
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15553330000",
+            "redirect": "error"
+          }
+        ],
+        "error": null,
+        "reported": [
+          "Twilio https://api.twilio.com answered 400: {\"message\":\"refused +15551110000 with [redacted]\"} (to ********0000; 1 of 3 numbers took the alert)",
+          "Twilio https://api.twilio.com answered 400: {\"message\":\"refused +15552220000 with [redacted]\"} (to ********0000; 1 of 3 numbers took the alert)"
+        ]
+      },
+      {
+        "statuses": [
+          500,
+          400,
+          401
+        ],
+        "requests": [
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15551110000",
+            "redirect": "error"
+          },
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15552220000",
+            "redirect": "error"
+          },
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15553330000",
+            "redirect": "error"
+          }
+        ],
+        "error": "Twilio https://api.twilio.com answered 500: {\"message\":\"refused +15551110000 with [redacted]\"} (3 of 3 numbers failed)",
+        "reported": []
+      },
+      {
+        "statuses": [
+          201,
+          201,
+          201
+        ],
+        "requests": [
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15551110000",
+            "redirect": "error"
+          },
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15552220000",
+            "redirect": "error"
+          },
+          {
+            "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+            "to": "+15553330000",
+            "redirect": "error"
+          }
+        ],
+        "error": null,
+        "reported": []
+      }
+    ]
+  },
+  "textCuts": {
+    "errorBodies": [
+      {
+        "text": "no",
+        "secrets": [],
+        "body": "no"
+      },
+      {
+        "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "secrets": [],
+        "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀tail",
+        "secrets": [],
+        "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxinvalid key key-0123456789abcdef0123456789abcdef",
+        "secrets": [
+          "key-0123456789abcdef0123456789abcdef"
+        ],
+        "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxinvalid key [redacte"
+      },
+      {
+        "text": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyysekretzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+        "secrets": [
+          "sekret",
+          "abc",
+          null,
+          "longer-secret-value"
+        ],
+        "body": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy[reda"
+      },
+      {
+        "text": "sekret sekret 😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "secrets": [
+          "sekret"
+        ],
+        "body": "[redacted] [redacted] 😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+      }
+    ],
+    "subjects": [
+      {
+        "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀",
+        "subjectPrefix": null,
+        "subject": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "title": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb😀c",
+        "subjectPrefix": null,
+        "subject": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb😀"
+      },
+      {
+        "title": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt😀",
+        "subjectPrefix": "[prod]",
+        "subject": "[prod] tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt😀"
+      },
+      {
+        "title": "line one\r\nline two",
+        "subjectPrefix": "[x]",
+        "subject": "[x] line one line two"
+      }
+    ],
+    "smsSegments": [
+      {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "segments": 1
+      },
+      {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "segments": 2
+      },
+      {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "segments": 3
+      },
+      {
+        "text": "€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€",
+        "segments": 1
+      },
+      {
+        "text": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "segments": 1
+      },
+      {
+        "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "segments": 3
+      },
+      {
+        "text": "café 中",
+        "segments": 1
+      }
+    ],
+    "smsBodies": [
+      {
+        "segments": 1,
+        "body": {
+          "text": "nightly failed\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...\nhttps://app.example/j"
+        }
+      },
+      {
+        "segments": 3,
+        "body": {
+          "length": 457,
+          "sha256": "945ebdb06d1b630cccb1d0a32293178b5a712cb6689ed3776e75db5524f6acad"
+        }
+      },
+      {
+        "segments": 10,
+        "body": {
+          "length": 1521,
+          "sha256": "1fe842c90fa42702a7911d3c4d79d5624bbd661e9407a1e0f58203b9834600bb"
+        }
+      },
+      {
+        "segments": 12,
+        "body": {
+          "length": 1521,
+          "sha256": "1fe842c90fa42702a7911d3c4d79d5624bbd661e9407a1e0f58203b9834600bb"
+        }
+      },
+      {
+        "segments": 0,
+        "body": {
+          "text": "nightly failed\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...\nhttps://app.example/j"
+        }
+      },
+      {
+        "segments": -1,
+        "body": {
+          "text": "nightly failed\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...\nhttps://app.example/j"
+        }
+      },
+      {
+        "segments": 2.7,
+        "body": {
+          "text": "nightly failed\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa{\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...\nhttps://app.example/j"
+        }
+      },
+      {
+        "segments": null,
+        "body": {
+          "length": 457,
+          "sha256": "945ebdb06d1b630cccb1d0a32293178b5a712cb6689ed3776e75db5524f6acad"
+        }
+      },
+      {
+        "segments": 10,
+        "link": "long",
+        "body": {
+          "length": 1600,
+          "sha256": "3c9590e07c921d95a4b0660dd2fe13288e742e36d6b6d16f1c896f4e87cd26fa"
+        }
+      }
+    ]
+  }
 }

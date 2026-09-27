@@ -1,5 +1,5 @@
 import type { Store, StoredJob } from "../types.js";
-import { params, rowToJob, rowToRun, rowToState, schema, statements, tablePrefix, type JobRow, type RunRow, type StateRow } from "./sql.js";
+import { params, rowToJob, rowToRun, rowToState, schema, statements, tablePrefix, updateRunIfSql, type JobRow, type RunRow, type StateRow } from "./sql.js";
 
 /**
  * The parts of a Cloudflare D1 binding this store uses. Written out here so
@@ -87,6 +87,10 @@ export function d1(database: D1DatabaseLike, options: D1Options = {}): Store {
     },
     async updateRun(run) {
       await stmt(sql.updateRun, params.updateRun(run)).run();
+    },
+    async updateRunIf(run, fromStatuses) {
+      if (fromStatuses.length === 0) return false;
+      return (await changes(updateRunIfSql("sqlite", p, fromStatuses.length), params.updateRunIf(run, fromStatuses))) > 0;
     },
     async getRun(id) {
       const r = await first<RunRow>(sql.getRun, [id]);

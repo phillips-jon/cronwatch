@@ -5,7 +5,7 @@
  * DSN and X-Sentry-Auth: https://develop.sentry.dev/sdk/foundations/transport/authentication/
  */
 import type { Alert, AlertChannel } from "../types.js";
-import { alertId, cut, post, runSummary, severity } from "./shared.js";
+import { alertId, cut, post, runSummary, severity, trimmed } from "./shared.js";
 
 export interface SentryOptions {
   /** The project's DSN, "https://<key>@o0.ingest.sentry.io/<project>". */
@@ -39,8 +39,10 @@ export function parseDsn(dsn: string): Dsn {
 
 /** Sends alerts to Sentry as events, one issue per job and alert type. */
 export function sentry(options: SentryOptions): AlertChannel {
-  if (!options.dsn) throw new Error("sentry() needs a dsn");
-  const { endpoint, publicKey } = parseDsn(options.dsn);
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const dsn = trimmed(options.dsn);
+  if (!dsn) throw new Error("sentry() needs a dsn");
+  const { endpoint, publicKey } = parseDsn(dsn);
   return {
     name: "sentry",
     async send(alert) {

@@ -6,7 +6,7 @@
  * SELECT * FROM CronWatchAlert WHERE job = 'nightly'.
  */
 import type { Alert, AlertChannel } from "../types.js";
-import { cut, post, severity } from "./shared.js";
+import { cut, post, severity, trimmed } from "./shared.js";
 
 export interface NewRelicOptions {
   /** The account id, the number in your New Relic URLs. */
@@ -22,7 +22,9 @@ export interface NewRelicOptions {
 
 /** Records alerts as New Relic custom events. */
 export function newrelic(options: NewRelicOptions): AlertChannel {
-  if (!options.apiKey) throw new Error("newrelic() needs an apiKey");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const apiKey = trimmed(options.apiKey);
+  if (!apiKey) throw new Error("newrelic() needs an apiKey");
   const account = String(options.accountId ?? "");
   if (!/^\d+$/.test(account)) throw new Error("newrelic() needs a numeric accountId");
   const host = options.region === "eu" ? "https://insights-collector.eu01.nr-data.net" : "https://insights-collector.newrelic.com";
@@ -51,9 +53,9 @@ export function newrelic(options: NewRelicOptions): AlertChannel {
         if (run.durationMs !== null) event.durationMs = run.durationMs;
       }
       await post("New Relic", url, {
-        headers: { "content-type": "application/json", "api-key": options.apiKey },
+        headers: { "content-type": "application/json", "api-key": apiKey },
         body: JSON.stringify([event]),
-      }, [options.apiKey]);
+      }, [apiKey]);
     },
   };
 }

@@ -1,0 +1,294 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.3.1",
+  "schedules": [
+    {
+      "schedule": "30 seconds",
+      "result": "every 30s"
+    },
+    {
+      "schedule": "1 second",
+      "result": "every 1s"
+    },
+    {
+      "schedule": "5  seconds",
+      "result": "every 5s"
+    },
+    {
+      "schedule": "0 0 $ * *",
+      "result": "0 0 L * *"
+    },
+    {
+      "schedule": "0 0 1-$ * *",
+      "result": "0 0 1-L * *"
+    },
+    {
+      "schedule": " */5  * * * * ",
+      "result": "*/5 * * * *"
+    },
+    {
+      "schedule": "0 5 * * * *",
+      "result": "0 5 * * *"
+    },
+    {
+      "schedule": "* * * * * *",
+      "result": "* * * * *"
+    },
+    {
+      "schedule": "0 0 $ * * extra",
+      "result": "0 0 L * *"
+    },
+    {
+      "schedule": "@reboot",
+      "result": null
+    },
+    {
+      "schedule": "@hourly",
+      "result": "@hourly"
+    },
+    {
+      "schedule": "@daily",
+      "result": "@daily"
+    },
+    {
+      "schedule": "0 3 * * 7",
+      "result": "0 3 * * 7"
+    },
+    {
+      "schedule": "nonsense",
+      "result": "nonsense"
+    }
+  ],
+  "names": [
+    {
+      "job": {
+        "jobid": 7,
+        "jobname": "nightly vacuum"
+      },
+      "name": "nightly-vacuum"
+    },
+    {
+      "job": {
+        "jobid": 7,
+        "jobname": null
+      },
+      "name": "pg_cron:7"
+    },
+    {
+      "job": {
+        "jobid": 7,
+        "jobname": "  "
+      },
+      "name": "pg_cron:7"
+    },
+    {
+      "job": {
+        "jobid": 8,
+        "jobname": "--db:roll.up_1"
+      },
+      "name": "db:roll.up_1"
+    },
+    {
+      "job": {
+        "jobid": 9,
+        "jobname": "été job"
+      },
+      "name": "t-job"
+    },
+    {
+      "job": {
+        "jobid": 10,
+        "jobname": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+  ],
+  "runs": [
+    {
+      "row": {
+        "runid": 1,
+        "jobid": 3,
+        "status": "succeeded",
+        "return_message": "VACUUM\n",
+        "start_time": "2026-01-05T03:00:00.123Z",
+        "end_time": "2026-01-05T03:00:02.987Z"
+      },
+      "fallbackAt": null,
+      "run": {
+        "id": "pgcron:db:1",
+        "job": "db:j",
+        "status": "ok",
+        "startedAt": 1767582000123,
+        "finishedAt": 1767582002987,
+        "durationMs": 2864,
+        "error": null,
+        "output": "VACUUM",
+        "metrics": {},
+        "trigger": "pg_cron"
+      }
+    },
+    {
+      "row": {
+        "runid": 2,
+        "jobid": 3,
+        "status": "failed",
+        "return_message": "ERROR:  deadlock detected\n",
+        "start_time": "2026-01-05T03:00:00.000Z",
+        "end_time": "2026-01-05T03:00:01.000Z"
+      },
+      "fallbackAt": null,
+      "run": {
+        "id": "pgcron:db:2",
+        "job": "db:j",
+        "status": "failed",
+        "startedAt": 1767582000000,
+        "finishedAt": 1767582001000,
+        "durationMs": 1000,
+        "error": "ERROR:  deadlock detected",
+        "output": null,
+        "metrics": {},
+        "trigger": "pg_cron"
+      }
+    },
+    {
+      "row": {
+        "runid": 3,
+        "jobid": 3,
+        "status": "failed",
+        "return_message": "   ",
+        "start_time": "2026-01-05T03:00:00.000Z",
+        "end_time": "2026-01-05T03:00:01.000Z"
+      },
+      "fallbackAt": null,
+      "run": {
+        "id": "pgcron:db:3",
+        "job": "db:j",
+        "status": "failed",
+        "startedAt": 1767582000000,
+        "finishedAt": 1767582001000,
+        "durationMs": 1000,
+        "error": "pg_cron reported the run as failed",
+        "output": null,
+        "metrics": {},
+        "trigger": "pg_cron"
+      }
+    },
+    {
+      "row": {
+        "runid": 4,
+        "jobid": 3,
+        "status": "running",
+        "return_message": null,
+        "start_time": "2026-01-05T03:00:00.000Z",
+        "end_time": null
+      },
+      "fallbackAt": null,
+      "run": {
+        "id": "pgcron:db:4",
+        "job": "db:j",
+        "status": "running",
+        "startedAt": 1767582000000,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "pg_cron"
+      }
+    },
+    {
+      "row": {
+        "runid": 5,
+        "jobid": 3,
+        "status": "starting",
+        "return_message": null,
+        "start_time": null,
+        "end_time": null
+      },
+      "fallbackAt": 1767605400000,
+      "run": null
+    },
+    {
+      "row": {
+        "runid": 6,
+        "jobid": 3,
+        "status": "failed",
+        "return_message": "server restarted",
+        "start_time": null,
+        "end_time": null
+      },
+      "fallbackAt": 1767601800000,
+      "run": {
+        "id": "pgcron:db:6",
+        "job": "db:j",
+        "status": "failed",
+        "startedAt": 1767601800000,
+        "finishedAt": 1767601800000,
+        "durationMs": 0,
+        "error": "server restarted",
+        "output": null,
+        "metrics": {},
+        "trigger": "pg_cron"
+      }
+    },
+    {
+      "row": {
+        "runid": 7,
+        "jobid": 3,
+        "status": "failed",
+        "return_message": "server restarted",
+        "start_time": null,
+        "end_time": "2026-01-05T03:00:05.000Z"
+      },
+      "fallbackAt": 1767605400000,
+      "run": {
+        "id": "pgcron:db:7",
+        "job": "db:j",
+        "status": "failed",
+        "startedAt": 1767582005000,
+        "finishedAt": 1767582005000,
+        "durationMs": 0,
+        "error": "server restarted",
+        "output": null,
+        "metrics": {},
+        "trigger": "pg_cron"
+      }
+    },
+    {
+      "row": {
+        "runid": 8,
+        "jobid": 3,
+        "status": "succeeded",
+        "return_message": "1 row",
+        "start_time": "2026-01-05T03:00:05.000Z",
+        "end_time": "2026-01-05T03:00:04.000Z"
+      },
+      "fallbackAt": null,
+      "run": {
+        "id": "pgcron:db:8",
+        "job": "db:j",
+        "status": "ok",
+        "startedAt": 1767582005000,
+        "finishedAt": 1767582005000,
+        "durationMs": 0,
+        "error": null,
+        "output": "1 row",
+        "metrics": {},
+        "trigger": "pg_cron"
+      }
+    },
+    {
+      "row": {
+        "runid": "9",
+        "jobid": 3,
+        "status": "connecting",
+        "return_message": null,
+        "start_time": null,
+        "end_time": null
+      },
+      "fallbackAt": 1767605400000,
+      "run": null
+    }
+  ],
+  "holdMs": 600000
+}

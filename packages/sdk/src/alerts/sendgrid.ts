@@ -5,7 +5,7 @@
  */
 import type { AlertChannel } from "../types.js";
 import { composeEmail, parseAddress, recipients, type EmailOptions } from "./email.js";
-import { post } from "./shared.js";
+import { post, trimmed } from "./shared.js";
 
 export interface SendgridOptions extends EmailOptions {
   /** An API key with Mail Send access, "SG...". */
@@ -16,7 +16,9 @@ export interface SendgridOptions extends EmailOptions {
 
 /** Sends alerts as email through SendGrid. */
 export function sendgrid(options: SendgridOptions): AlertChannel {
-  if (!options.apiKey) throw new Error("sendgrid() needs an apiKey");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const apiKey = trimmed(options.apiKey);
+  if (!apiKey) throw new Error("sendgrid() needs an apiKey");
   const to = recipients("sendgrid", options);
   const url = options.region === "eu" ? "https://api.eu.sendgrid.com/v3/mail/send" : "https://api.sendgrid.com/v3/mail/send";
   return {
@@ -24,7 +26,7 @@ export function sendgrid(options: SendgridOptions): AlertChannel {
     async send(alert) {
       const email = composeEmail(alert, options, to);
       await post("SendGrid", url, {
-        headers: { "content-type": "application/json", authorization: `Bearer ${options.apiKey}` },
+        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
           personalizations: [{ to: email.to.map(parseAddress) }],
           from: parseAddress(email.from),
@@ -36,7 +38,7 @@ export function sendgrid(options: SendgridOptions): AlertChannel {
           ],
           categories: ["cronwatch"],
         }),
-      }, [options.apiKey]);
+      }, [apiKey]);
     },
   };
 }

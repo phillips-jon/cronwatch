@@ -39,6 +39,8 @@ export function memory(): Store {
       for (const [id, run] of runs) if (run.job === name) { runs.delete(id); order.delete(id); }
     },
     async insertRun(run) {
+      // Like SQL's primary key: an id already recorded is refused, never overwritten.
+      if (runs.has(run.id)) throw new Error(`run ${run.id} already exists`);
       runs.set(run.id, clone(run));
       order.set(run.id, ++seq);
     },
@@ -48,6 +50,13 @@ export function memory(): Store {
       if (!existing) return;
       const { status, finishedAt, durationMs, error, output, metrics } = clone(run);
       runs.set(run.id, { ...existing, status, finishedAt, durationMs, error, output, metrics });
+    },
+    async updateRunIf(run, fromStatuses) {
+      const existing = runs.get(run.id);
+      if (!existing || !fromStatuses.includes(existing.status)) return false;
+      const { status, finishedAt, durationMs, error, output, metrics } = clone(run);
+      runs.set(run.id, { ...existing, status, finishedAt, durationMs, error, output, metrics });
+      return true;
     },
     async getRun(id) {
       const r = runs.get(id);

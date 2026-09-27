@@ -49,6 +49,25 @@ export async function conformance(name: string, make: () => Store, skip: string 
     assert.deepEqual(r3.metrics, { cost: 0.25 });
     assert.deepEqual((await store.runningRuns()).map((r) => r.id), ["rb", "rc"]);
 
+    // updateRunIf: writes only over a row whose status is one of those given, and says whether it did.
+    await assert.rejects(store.insertRun(run("r3", "a", "running", 3000)), Error, "an id already recorded is refused");
+    await store.upsertJob({ name: "q" }, 300);
+    await store.insertRun(run("rx", "q", "running", 2500));
+    const once = store.updateRunIf!.bind(store);
+    assert.equal(await once({ ...run("rx", "q", "failed", 2500), error: "first" }, ["running"]), true);
+    assert.equal(await once({ ...run("rx", "q", "ok", 2500), output: "second" }, ["running"]), false, "a second finish over the first is refused");
+    assert.equal((await store.getRun("rx"))!.error, "first");
+    assert.equal(await once({ ...run("rx", "q", "ok", 2500), output: "late" }, ["running", "timeout"]), false);
+    await store.updateRun({ ...run("rx", "q", "timeout", 2500), error: "stuck" });
+    assert.equal(await once({ ...run("rx", "q", "ok", 2500), output: "late", metrics: { m: 2 } }, ["running", "timeout"]), true, "any of the statuses given");
+    const late = (await store.getRun("rx"))!;
+    assert.deepEqual([late.status, late.output, late.error, late.metrics, late.job, late.trigger], ["ok", "late", null, { m: 2 }, "q", "run"]);
+    assert.equal(await once(run("missing", "q", "ok", 1), ["running"]), false, "a run that is not there is not written");
+    assert.equal(await store.getRun("missing"), null);
+    assert.equal(await once(run("rx", "q", "failed", 2500), []), false, "no statuses, no write");
+    assert.equal((await store.getRun("rx"))!.status, "ok");
+    await store.deleteJob("q");
+
     // Forgetting a job while one of its runs is in flight: the run finishing later changes nothing.
     await store.deleteJob("B");
     await store.updateRun({ ...run("rb", "B", "ok", 2000), output: "late" });

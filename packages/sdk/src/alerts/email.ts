@@ -4,7 +4,7 @@
  * entry point; resend, postmark, sendgrid, mailgun and ses each bundle it.
  */
 import type { Alert } from "../types.js";
-import { plainText } from "./shared.js";
+import { cut, plainText } from "./shared.js";
 
 /** The options every email channel takes. */
 export interface EmailOptions {
@@ -37,7 +37,7 @@ export function recipients(name: string, options: EmailOptions): string[] {
 export function composeEmail(alert: Alert, options: EmailOptions, to: string[]): Email {
   const link = safeLink(options.link?.(alert));
   // One line: a newline in a subject is a header injection or a rejected send.
-  const subject = `${options.subjectPrefix ? `${options.subjectPrefix} ` : ""}${alert.title}`.replace(/[\r\n]+/g, " ").slice(0, 250);
+  const subject = cut(`${options.subjectPrefix ? `${options.subjectPrefix} ` : ""}${alert.title}`.replace(/[\r\n]+/g, " "), 250);
   return { from: options.from, to, subject, text: plainText(alert, link), html: html(alert, link) };
 }
 

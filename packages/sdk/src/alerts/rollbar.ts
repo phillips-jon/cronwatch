@@ -3,7 +3,7 @@
  * POST https://api.rollbar.com/api/1/item/ with X-Rollbar-Access-Token.
  */
 import type { Alert, AlertChannel } from "../types.js";
-import { alertId, asUuid, cut, post, runSummary, severity } from "./shared.js";
+import { alertId, asUuid, cut, post, runSummary, severity, trimmed } from "./shared.js";
 
 export interface RollbarOptions {
   /** A project access token with the post_server_item scope. */
@@ -19,7 +19,9 @@ const ENDPOINT = "https://api.rollbar.com/api/1/item/";
 
 /** Reports alerts to Rollbar, one item per job and alert type. */
 export function rollbar(options: RollbarOptions): AlertChannel {
-  if (!options.accessToken) throw new Error("rollbar() needs an accessToken");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const accessToken = trimmed(options.accessToken);
+  if (!accessToken) throw new Error("rollbar() needs an accessToken");
   return {
     name: "rollbar",
     async send(alert) {
@@ -47,9 +49,9 @@ export function rollbar(options: RollbarOptions): AlertChannel {
         },
       };
       await post("Rollbar", ENDPOINT, {
-        headers: { "content-type": "application/json", "x-rollbar-access-token": options.accessToken },
+        headers: { "content-type": "application/json", "x-rollbar-access-token": accessToken },
         body: JSON.stringify(item),
-      }, [options.accessToken]);
+      }, [accessToken]);
     },
   };
 }

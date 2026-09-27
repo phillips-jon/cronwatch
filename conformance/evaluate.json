@@ -10848,6 +10848,238 @@
       ]
     },
     {
+      "name": "a run finished twice is judged once; the second finish is ignored",
+      "definition": {
+        "name": "twice",
+        "failuresBeforeAlert": 2
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "a",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "twice",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "a",
+          "at": 1767605460000,
+          "status": "failed",
+          "error": "Error: boom",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "twice",
+              "open": {},
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "a",
+          "at": 1767605520000,
+          "status": "failed",
+          "error": "Error: boom",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "twice",
+              "open": {},
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "ignored": "was already finished as failed"
+          }
+        },
+        {
+          "op": "finish",
+          "id": "a",
+          "at": 1767605580000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "twice",
+              "open": {},
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "ignored": "was already finished as failed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a late failure after a stuck mark is written once, and a finish after it is ignored",
+      "definition": {
+        "name": "latefail",
+        "timeout": "1m"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "a",
+          "at": 1767605400000,
+          "expect": {
+            "state": {
+              "job": "latefail",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605520000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "stuck",
+                "run": {
+                  "id": "a",
+                  "job": "latefail",
+                  "status": "timeout",
+                  "startedAt": 1767605400000,
+                  "finishedAt": 1767605520000,
+                  "durationMs": 120000,
+                  "error": "Still running after 1m; marked as timed out",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 1,
+                  "threshold": 1
+                },
+                "job": "latefail",
+                "definition": {
+                  "name": "latefail",
+                  "timeout": "1m"
+                },
+                "title": "latefail is stuck",
+                "message": "Started 2026-01-05 09:30:00 UTC (2m ago) and never reported finishing. Marked as timed out after 2m.\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+                "at": 1767605520000
+              }
+            ],
+            "state": {
+              "job": "latefail",
+              "open": {
+                "stuck": 1767605520000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "latefail",
+              "definition": {
+                "name": "latefail",
+                "timeout": "1m"
+              },
+              "health": "stuck",
+              "open": [
+                "stuck"
+              ],
+              "lastRun": {
+                "id": "a",
+                "job": "latefail",
+                "status": "timeout",
+                "startedAt": 1767605400000,
+                "finishedAt": 1767605520000,
+                "durationMs": 120000,
+                "error": "Still running after 1m; marked as timed out",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 0,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "a",
+          "at": 1767605580000,
+          "status": "failed",
+          "error": "Error: gave up",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "latefail",
+              "open": {
+                "stuck": 1767605520000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "a",
+          "at": 1767605640000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "latefail",
+              "open": {
+                "stuck": 1767605520000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "ignored": "was already finished as failed"
+          }
+        }
+      ]
+    },
+    {
       "name": "stuck messages name the timeout as a duration",
       "definition": {
         "name": "odd",

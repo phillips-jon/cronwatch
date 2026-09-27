@@ -121,7 +121,7 @@ ses({
 
 ### SMS: Twilio
 
-Texts each number in `to` separately. The message is the title, then as many lines of the message and triage as fit in `segments` SMS segments (3 by default), then the link, kept whole. Recoveries are not texted unless you pass `recovered: true`.
+Texts each number in `to` separately, all at once. The message is the title, then as many lines of the message and triage as fit in `segments` SMS segments (3 by default, 10 at most, which keeps it inside Twilio's 1600 character limit), then the link, kept whole. Segments are counted as phones pack them: an extension character such as `{` or `€`, or an emoji, never straddles two. Recoveries are not texted unless you pass `recovered: true`.
 
 ```ts
 import { twilio } from "@cronwatch/sdk/twilio";
@@ -133,7 +133,7 @@ twilio({
 });
 ```
 
-If some numbers fail, the others are still texted and the error says how many failed.
+The alert counts as sent when any number took it, so the next check never texts the numbers that already have it again; each number that refused it is reported to `onError` (with all but its last four digits hidden). Only when every number refuses it is the alert a failure, kept and retried at the next check, with an error that says how many failed. The credentials are trimmed of the spaces and newlines a paste leaves, and a redirect from Twilio is an error rather than followed, so the Authorization header goes nowhere else.
 
 ### Error trackers
 

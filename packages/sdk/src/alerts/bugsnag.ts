@@ -5,7 +5,7 @@
  * POST https://notify.bugsnag.com/ with Bugsnag-Api-Key.
  */
 import type { Alert, AlertChannel } from "../types.js";
-import { cut, post, runSummary, severity } from "./shared.js";
+import { cut, post, runSummary, severity, trimmed } from "./shared.js";
 
 export interface BugsnagOptions {
   /** The project's notifier API key. */
@@ -23,7 +23,9 @@ export interface BugsnagOptions {
 
 /** Reports alerts to Bugsnag, grouped per job and alert type. */
 export function bugsnag(options: BugsnagOptions): AlertChannel {
-  if (!options.apiKey) throw new Error("bugsnag() needs an apiKey");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const apiKey = trimmed(options.apiKey);
+  if (!apiKey) throw new Error("bugsnag() needs an apiKey");
   const url = options.endpoint ?? "https://notify.bugsnag.com/";
   const now = options.now ?? Date.now;
   return {
@@ -32,7 +34,7 @@ export function bugsnag(options: BugsnagOptions): AlertChannel {
       if (alert.type === "recovered" && !options.recovered) return;
       const link = options.link?.(alert);
       const payload = {
-        apiKey: options.apiKey,
+        apiKey,
         payloadVersion: "5",
         // The notifier's own version, not the SDK's; Bugsnag asks for one.
         notifier: { name: "cronwatch", version: "1.0.0", url: "https://cronwatch.dev" },
@@ -62,12 +64,12 @@ export function bugsnag(options: BugsnagOptions): AlertChannel {
       await post("Bugsnag", url, {
         headers: {
           "content-type": "application/json",
-          "bugsnag-api-key": options.apiKey,
+          "bugsnag-api-key": apiKey,
           "bugsnag-payload-version": "5",
           "bugsnag-sent-at": new Date(now()).toISOString(),
         },
         body: JSON.stringify(payload),
-      }, [options.apiKey]);
+      }, [apiKey]);
     },
   };
 }

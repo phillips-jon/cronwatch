@@ -4,7 +4,7 @@
  * form encoded, with basic auth. One recipient per request.
  */
 import type { Alert, AlertChannel } from "../types.js";
-import { basicAuth, post } from "./shared.js";
+import { basicAuth, cut, post, trimmed } from "./shared.js";
 
 export interface TwilioOptions {
   /** The account SID, "AC...". It is in the URL whichever credentials sign the request. */
@@ -22,50 +22,67 @@ export interface TwilioOptions {
   to: string | string[];
   /** Also text when a job recovers. Defaults to false: a text is for what needs a person. */
   recovered?: boolean;
-  /** How many SMS segments a message may use. Defaults to 3. */
+  /** How many SMS segments a message may use, 1 to 10. Defaults to 3. */
   segments?: number;
   link?: (alert: Alert) => string;
 }
 
-/** Texts alerts through Twilio. */
+/** The most segments a message may use, which keeps it inside Twilio's 1600 character Body limit. */
+export const MAX_SEGMENTS = 10;
+/** Twilio refuses a Body longer than this. */
+export const MAX_BODY = 1600;
+
+/**
+ * Texts alerts through Twilio, to every number at once. The alert counts as
+ * delivered when any number took it; each number that refused it is
+ * reported to the client's onError. It fails only when every number did.
+ */
 export function twilio(options: TwilioOptions): AlertChannel {
-  if (!options.accountSid) throw new Error("twilio() needs an accountSid");
-  const user = options.apiKeySid ?? options.accountSid;
-  const password = options.apiKeySid ? options.apiKeySecret : options.authToken;
+  // A pasted credential often carries a stray space or newline, which the Authorization header would refuse or send.
+  const accountSid = trimmed(options.accountSid);
+  if (!accountSid) throw new Error("twilio() needs an accountSid");
+  const apiKeySid = trimmed(options.apiKeySid);
+  const user = apiKeySid || accountSid;
+  const password = apiKeySid ? trimmed(options.apiKeySecret) : trimmed(options.authToken);
   if (!password) throw new Error("twilio() needs an authToken, or an apiKeySid and apiKeySecret");
   if (!options.from && !options.messagingServiceSid) throw new Error("twilio() needs a from number or a messagingServiceSid");
   const to = (Array.isArray(options.to) ? options.to : [options.to]).filter((n) => typeof n === "string" && n.trim() !== "").map((n) => n.trim());
   if (to.length === 0) throw new Error("twilio() needs at least one to number");
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(options.accountSid)}/Messages.json`;
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`;
   const authorization = basicAuth(user, password);
-  const segments = Math.max(1, Math.floor(options.segments ?? 3));
+  const segments = segmentBudget(options.segments);
   return {
     name: "twilio",
-    async send(alert) {
+    async send(alert, context) {
       if (alert.type === "recovered" && !options.recovered) return;
       const body = smsBody(alert, options.link?.(alert), segments);
-      let first: unknown = null;
-      let failed = 0;
-      // Every number is tried; one bad number does not stop the others.
-      for (const number of to) {
+      const results = await Promise.allSettled(to.map((number) => {
         const form = new URLSearchParams();
         form.append("To", number);
         if (options.messagingServiceSid) form.append("MessagingServiceSid", options.messagingServiceSid);
         else form.append("From", options.from!);
         form.append("Body", body);
-        try {
-          await post("Twilio", url, { headers: { "content-type": "application/x-www-form-urlencoded", authorization }, body: form.toString() }, [password]);
-        } catch (error) {
-          failed += 1;
-          first ??= error;
-        }
+        return post("Twilio", url, { headers: { "content-type": "application/x-www-form-urlencoded", authorization }, body: form.toString() }, [password]);
+      }));
+      const failed = results.flatMap((r, i) => (r.status === "rejected" ? [{ number: to[i]!, error: r.reason as Error }] : []));
+      if (failed.length === 0) return;
+      if (failed.length === to.length) {
+        const message = failed[0]!.error.message;
+        throw new Error(to.length > 1 ? `${message} (${failed.length} of ${to.length} numbers failed)` : message);
       }
-      if (first) {
-        const message = (first as Error).message;
-        throw new Error(to.length > 1 ? `${message} (${failed} of ${to.length} numbers failed)` : message);
+      // Delivered to someone: counted as sent, so a retry never texts the numbers that took it again.
+      for (const { number, error } of failed) {
+        const report = new Error(`${error.message} (to ${maskNumber(number)}; ${to.length - failed.length} of ${to.length} numbers took the alert)`);
+        if (context) context.onError(report);
+        else console.error("[cronwatch] alert channel twilio:", report);
       }
     },
   };
+}
+
+/** A number with all but its last four digits hidden, for an error message. */
+function maskNumber(number: string): string {
+  return number.length <= 4 ? number : `${"*".repeat(Math.min(number.length - 4, 8))}${number.slice(-4)}`;
 }
 
 // The GSM 03.38 alphabet: a message in it takes 153 characters a segment
@@ -73,34 +90,55 @@ export function twilio(options: TwilioOptions): AlertChannel {
 const GSM = "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
 const GSM_EXTENDED = "^{}\\[~]|€\f";
 
-function gsmLength(text: string): number | null {
-  let n = 0;
+/**
+ * The segments `text` takes. A character is never split across two: an
+ * extension character (two septets) or a surrogate pair (two UCS-2 units)
+ * that would straddle a boundary starts the next segment, as phones pack them.
+ */
+export function smsSegments(text: string): number {
+  const units: number[] = [];
+  let gsm = true;
   for (const ch of text) {
-    if (GSM.includes(ch)) n += 1;
-    else if (GSM_EXTENDED.includes(ch)) n += 2;
-    else return null;
+    if (GSM.includes(ch)) units.push(1);
+    else if (GSM_EXTENDED.includes(ch)) units.push(2);
+    else {
+      gsm = false;
+      break;
+    }
   }
-  return n;
+  const [single, per, sizes] = gsm ? [160, 153, units] : [70, 67, Array.from(text, (ch) => ch.length)];
+  const total = sizes.reduce((n, u) => n + u, 0);
+  if (total <= single) return 1;
+  let count = 1;
+  let used = 0;
+  for (const u of sizes) {
+    if (used + u > per) {
+      count += 1;
+      used = 0;
+    }
+    used += u;
+  }
+  return count;
 }
 
-/** Fits `text` within `segments` SMS segments, as GSM-7 when it can be and UCS-2 when not. */
+/** Fits `text` within `segments` SMS segments and Twilio's Body limit. */
 function fits(text: string, segments: number): boolean {
-  const gsm = gsmLength(text);
-  if (gsm !== null) return gsm <= (segments === 1 ? 160 : 153 * segments);
-  return text.length <= (segments === 1 ? 70 : 67 * segments);
+  return text.length <= MAX_BODY && smsSegments(text) <= segments;
 }
 
 /**
  * The title, then as many lines of the message (and the triage) as fit, then
  * the link. The link is kept whole; the text before it is cut to make room.
+ * `segments` is clamped to 1 to 10.
  */
 export function smsBody(alert: Alert, link: string | undefined, segments = 3): string {
+  const budget = segmentBudget(segments);
   const tail = link ? `\n${link}` : "";
   const lines = [alert.title, ...alert.message.split("\n").filter((l) => l.trim() !== ""), ...(alert.triage ? [`Triage: ${alert.triage}`] : [])];
   let text = "";
   for (const line of lines) {
     const next = text ? `${text}\n${line}` : line;
-    if (fits(next + tail, segments)) {
+    if (fits(next + tail, budget)) {
       text = next;
       continue;
     }
@@ -111,11 +149,18 @@ export function smsBody(alert: Alert, link: string | undefined, segments = 3): s
     while (lo < hi) {
       const mid = Math.ceil((lo + hi) / 2);
       const candidate = (text ? `${text}\n` : "") + chars.slice(0, mid).join("") + "...";
-      if (fits(candidate + tail, segments)) lo = mid;
+      if (fits(candidate + tail, budget)) lo = mid;
       else hi = mid - 1;
     }
     if (lo > 0) text = (text ? `${text}\n` : "") + chars.slice(0, lo).join("") + "...";
     break;
   }
-  return text + tail;
+  // Only a link too long for any budget gets here too long; Twilio would refuse it whole.
+  return cut(text + tail, MAX_BODY);
+}
+
+/** A segment count clamped to 1 to MAX_SEGMENTS; 3 for anything not a number. */
+function segmentBudget(segments: number | undefined): number {
+  const n = typeof segments === "number" && Number.isFinite(segments) ? Math.floor(segments) : 3;
+  return Math.min(MAX_SEGMENTS, Math.max(1, n));
 }

@@ -4,7 +4,7 @@
  */
 import type { AlertChannel } from "../types.js";
 import { composeEmail, recipients, type EmailOptions } from "./email.js";
-import { post } from "./shared.js";
+import { post, trimmed } from "./shared.js";
 
 export interface PostmarkOptions extends EmailOptions {
   /** A server API token, from the server's API Tokens tab. */
@@ -17,14 +17,16 @@ const ENDPOINT = "https://api.postmarkapp.com/email";
 
 /** Sends alerts as email through Postmark. */
 export function postmark(options: PostmarkOptions): AlertChannel {
-  if (!options.serverToken) throw new Error("postmark() needs a serverToken");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const serverToken = trimmed(options.serverToken);
+  if (!serverToken) throw new Error("postmark() needs a serverToken");
   const to = recipients("postmark", options);
   return {
     name: "postmark",
     async send(alert) {
       const email = composeEmail(alert, options, to);
       await post("Postmark", ENDPOINT, {
-        headers: { "content-type": "application/json", accept: "application/json", "x-postmark-server-token": options.serverToken },
+        headers: { "content-type": "application/json", accept: "application/json", "x-postmark-server-token": serverToken },
         body: JSON.stringify({
           From: email.from,
           To: email.to.join(", "),
@@ -34,7 +36,7 @@ export function postmark(options: PostmarkOptions): AlertChannel {
           MessageStream: options.messageStream ?? "outbound",
           Tag: "cronwatch",
         }),
-      }, [options.serverToken]);
+      }, [serverToken]);
     },
   };
 }
