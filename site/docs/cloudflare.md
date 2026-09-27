@@ -1,7 +1,8 @@
 ---
 title: Cloudflare Workers
 description: Cron Triggers, the D1 store, the check on a trigger of its own, the dashboard in fetch, and secrets with wrangler.
-order: 2.5
+order: 3.391
+group: More platforms
 ---
 
 # Cloudflare Workers

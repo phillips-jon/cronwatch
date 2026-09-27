@@ -1,7 +1,8 @@
 ---
 title: Supabase and pg_cron
 description: Watch pg_cron jobs, including Supabase Cron, by reading cron.job and cron.job_run_details on every check.
-order: 3.5
+order: 3.392
+group: More platforms
 ---
 
 # Supabase and pg_cron
