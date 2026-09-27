@@ -6,11 +6,11 @@ order: 5
 
 # What it catches
 
-Every condition is opened once, sends one alert, and stays open until it clears. Once it has cleared, the next successful run that leaves nothing open sends one **recovered** message naming what was recovered from. A job failing all night pages you once.
+Every condition is opened once, sends one alert, and stays open until it clears. Once it has cleared, the next successful run that leaves nothing open sends one **recovered** message naming what was recovered from, or, for a job that lost its schedule while missed, the next check does (see [recovered](#recovered)). A job failing all night pages you once.
 
 ## missed
 
-The schedule said a run was due and none started within the grace period. Decided by `cw.check()`; see [Schedules](/docs/schedules/). Closes when a run starts; the recovered message follows the next successful run.
+The schedule said a run was due and none started within the grace period. Decided by `cw.check()`; see [Schedules](/docs/schedules/). Closes when a run starts; the recovered message follows the next successful run. If the job loses its schedule while missed is open, the next check closes it with a recovery of its own.
 
 ## failed
 
@@ -49,6 +49,8 @@ All breaching metrics are listed in one alert. Closes when a run's metrics are a
 ## recovered
 
 A run succeeded and no condition remains open. The message names everything that alerted and has cleared since the last recovery, for example "after: missed, failed". A condition that closed while another stayed open waits for this message, so every alert is answered by a recovery once the job is healthy again.
+
+One recovery comes from a check rather than a run. When a job with missed open no longer has a schedule (it was declared again without one, or the [pg_cron reader](/docs/supabase/) retired a job that was renamed, unscheduled or paused), nothing is due any more, so the next check closes missed and sends a recovered alert titled "nightly is no longer scheduled", with the message "Missed since 2026-01-05 03:15:00 UTC (6h ago). It has no schedule now, so nothing is due; the missed alert is closed." Its details are `{ after: ["missed"], reason: "unscheduled", since }`, where `since` is when missed opened. It answers missed alone: failed, stuck, slow and over budget stay open until a successful run closes them, and that run's recovery names them but not missed again. Channels treat it like any recovery (Twilio, Honeybadger and Bugsnag send it only with `recovered: true`). While the job is silenced, missed closes without a message.
 
 ## expect rules
 

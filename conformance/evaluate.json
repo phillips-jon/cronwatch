@@ -7405,6 +7405,1129 @@
       ]
     },
     {
+      "name": "a schedule removed while missed is open recovers missed once, and the next run owes nothing",
+      "definition": {
+        "name": "j",
+        "schedule": "every 1h",
+        "grace": "5m"
+      },
+      "createdAt": 1767605400000,
+      "events": [
+        {
+          "op": "check",
+          "at": 1767609600000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": null,
+                "details": {
+                  "dueAt": 1767609000000,
+                  "deadline": 1767609300000,
+                  "graceMs": 300000,
+                  "lastRunAt": null
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "schedule": "every 1h",
+                  "grace": "5m"
+                },
+                "title": "j missed its scheduled run",
+                "message": "Due 2026-01-05 10:30:00 UTC (10m ago), and no run had started by 2026-01-05 10:35:00 UTC (5m ago) (grace 5m).\nSchedule: every 1h.\nLast run: never.",
+                "at": 1767609600000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "missed": 1767609600000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767609000000,
+            "dueAt": 1767609000000,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j",
+                "schedule": "every 1h",
+                "grace": "5m"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": null,
+              "nextExpectedAt": 1767609000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "definition": {
+            "name": "j"
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767609660000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": null,
+                "details": {
+                  "after": [
+                    "missed"
+                  ],
+                  "reason": "unscheduled",
+                  "since": 1767609600000
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j"
+                },
+                "title": "j is no longer scheduled",
+                "message": "Missed since 2026-01-05 10:40:00 UTC (1m ago). It has no schedule now, so nothing is due; the missed alert is closed.",
+                "at": 1767609660000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j"
+              },
+              "health": "never_ran",
+              "open": [],
+              "lastRun": null,
+              "nextExpectedAt": null,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767609720000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j"
+              },
+              "health": "never_ran",
+              "open": [],
+              "lastRun": null,
+              "nextExpectedAt": null,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767610200000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767610201000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "define",
+          "definition": {
+            "name": "j",
+            "schedule": "every 1h",
+            "grace": "5m"
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767616200000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": {
+                  "id": "r1",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767610200000,
+                  "finishedAt": 1767610201000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "dueAt": 1767613800000,
+                  "deadline": 1767614100000,
+                  "graceMs": 300000,
+                  "lastRunAt": 1767610200000
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "schedule": "every 1h",
+                  "grace": "5m"
+                },
+                "title": "j missed its scheduled run",
+                "message": "Due 2026-01-05 11:50:00 UTC (40m ago), and no run had started by 2026-01-05 11:55:00 UTC (35m ago) (grace 5m).\nSchedule: every 1h.\nLast run: ok 2026-01-05 10:50:00 UTC (1h 40m ago).",
+                "at": 1767616200000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "missed": 1767616200000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767613800000,
+            "dueAt": 1767613800000,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j",
+                "schedule": "every 1h",
+                "grace": "5m"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": {
+                "id": "r1",
+                "job": "j",
+                "status": "ok",
+                "startedAt": 1767610200000,
+                "finishedAt": 1767610201000,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767613800000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unscheduled recovery names missed alone, and failed keeps its own recovery",
+      "definition": {
+        "name": "j",
+        "schedule": "every 30m",
+        "grace": "1m"
+      },
+      "createdAt": 1767605400000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767605460000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767605461000,
+          "status": "failed",
+          "error": "Error: boom",
+          "expect": {
+            "alerts": [
+              {
+                "type": "failed",
+                "run": {
+                  "id": "r1",
+                  "job": "j",
+                  "status": "failed",
+                  "startedAt": 1767605460000,
+                  "finishedAt": 1767605461000,
+                  "durationMs": 1000,
+                  "error": "Error: boom",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "consecutiveFailures": 1,
+                  "threshold": 1
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "schedule": "every 30m",
+                  "grace": "1m"
+                },
+                "title": "j failed",
+                "message": "Started 2026-01-05 09:31:00 UTC (now), ran 1s.\nError: boom",
+                "at": 1767605461000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "failed": 1767605461000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767607800000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": {
+                  "id": "r1",
+                  "job": "j",
+                  "status": "failed",
+                  "startedAt": 1767605460000,
+                  "finishedAt": 1767605461000,
+                  "durationMs": 1000,
+                  "error": "Error: boom",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "dueAt": 1767607260000,
+                  "deadline": 1767607320000,
+                  "graceMs": 60000,
+                  "lastRunAt": 1767605460000
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "schedule": "every 30m",
+                  "grace": "1m"
+                },
+                "title": "j missed its scheduled run",
+                "message": "Due 2026-01-05 10:01:00 UTC (9m ago), and no run had started by 2026-01-05 10:02:00 UTC (8m ago) (grace 1m).\nSchedule: every 30m.\nLast run: failed 2026-01-05 09:31:00 UTC (39m ago).",
+                "at": 1767607800000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "failed": 1767605461000,
+                "missed": 1767607800000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767607260000,
+            "dueAt": 1767607260000,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j",
+                "schedule": "every 30m",
+                "grace": "1m"
+              },
+              "health": "failing",
+              "open": [
+                "failed",
+                "missed"
+              ],
+              "lastRun": {
+                "id": "r1",
+                "job": "j",
+                "status": "failed",
+                "startedAt": 1767605460000,
+                "finishedAt": 1767605461000,
+                "durationMs": 1000,
+                "error": "Error: boom",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767607260000,
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 0,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "definition": {
+            "name": "j"
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767607860000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "r1",
+                  "job": "j",
+                  "status": "failed",
+                  "startedAt": 1767605460000,
+                  "finishedAt": 1767605461000,
+                  "durationMs": 1000,
+                  "error": "Error: boom",
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "missed"
+                  ],
+                  "reason": "unscheduled",
+                  "since": 1767607800000
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j"
+                },
+                "title": "j is no longer scheduled",
+                "message": "Missed since 2026-01-05 10:10:00 UTC (1m ago). It has no schedule now, so nothing is due; the missed alert is closed.",
+                "at": 1767607860000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "failed": 1767605461000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j"
+              },
+              "health": "failing",
+              "open": [
+                "failed"
+              ],
+              "lastRun": {
+                "id": "r1",
+                "job": "j",
+                "status": "failed",
+                "startedAt": 1767605460000,
+                "finishedAt": 1767605461000,
+                "durationMs": 1000,
+                "error": "Error: boom",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 0,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 1767608400000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {
+                "failed": 1767605461000
+              },
+              "consecutiveFailures": 1,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 1767608401000,
+          "status": "ok",
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "r2",
+                  "job": "j",
+                  "status": "ok",
+                  "startedAt": 1767608400000,
+                  "finishedAt": 1767608401000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "failed"
+                  ]
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j"
+                },
+                "title": "j recovered",
+                "message": "A run 2026-01-05 10:20:00 UTC (now) succeeded after: failed.\nRan 1s.",
+                "at": 1767608401000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "missed reopened with a recovery already pending is recovered once when unscheduled",
+      "definition": {
+        "name": "cron",
+        "schedule": "*/5 * * * *",
+        "grace": "1m",
+        "timeout": "2h"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "check",
+          "at": 1767605520000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": null,
+                "details": {
+                  "dueAt": 1767519000000,
+                  "deadline": 1767519060000,
+                  "graceMs": 60000,
+                  "lastRunAt": null
+                },
+                "job": "cron",
+                "definition": {
+                  "name": "cron",
+                  "schedule": "*/5 * * * *",
+                  "grace": "1m",
+                  "timeout": "2h"
+                },
+                "title": "cron missed its scheduled run",
+                "message": "Due 2026-01-04 09:30:00 UTC (1d 2m ago), and no run had started by 2026-01-04 09:31:00 UTC (1d 1m ago) (grace 1m).\nSchedule: */5 * * * *.\nLast run: never.",
+                "at": 1767605520000
+              }
+            ],
+            "state": {
+              "job": "cron",
+              "open": {
+                "missed": 1767605520000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767605700000,
+            "dueAt": 1767519000000,
+            "summary": {
+              "name": "cron",
+              "definition": {
+                "name": "cron",
+                "schedule": "*/5 * * * *",
+                "grace": "1m",
+                "timeout": "2h"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": null,
+              "nextExpectedAt": 1767605700000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "slow",
+          "at": 1767605580000,
+          "expect": {
+            "state": {
+              "job": "cron",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "missed"
+              ],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605820000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": {
+                  "id": "slow",
+                  "job": "cron",
+                  "status": "running",
+                  "startedAt": 1767605580000,
+                  "finishedAt": null,
+                  "durationMs": null,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "dueAt": 1767605700000,
+                  "deadline": 1767605760000,
+                  "graceMs": 60000,
+                  "lastRunAt": 1767605580000
+                },
+                "job": "cron",
+                "definition": {
+                  "name": "cron",
+                  "schedule": "*/5 * * * *",
+                  "grace": "1m",
+                  "timeout": "2h"
+                },
+                "title": "cron missed its scheduled run",
+                "message": "Due 2026-01-05 09:35:00 UTC (2m ago), and no run had started by 2026-01-05 09:36:00 UTC (1m ago) (grace 1m).\nSchedule: */5 * * * *.\nLast run: running 2026-01-05 09:33:00 UTC (4m ago).",
+                "at": 1767605820000
+              }
+            ],
+            "state": {
+              "job": "cron",
+              "open": {
+                "missed": 1767605820000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "missed"
+              ],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767606000000,
+            "dueAt": 1767605700000,
+            "summary": {
+              "name": "cron",
+              "definition": {
+                "name": "cron",
+                "schedule": "*/5 * * * *",
+                "grace": "1m",
+                "timeout": "2h"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": {
+                "id": "slow",
+                "job": "cron",
+                "status": "running",
+                "startedAt": 1767605580000,
+                "finishedAt": null,
+                "durationMs": null,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767606000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "definition": {
+            "name": "cron",
+            "timeout": "2h"
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605880000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "slow",
+                  "job": "cron",
+                  "status": "running",
+                  "startedAt": 1767605580000,
+                  "finishedAt": null,
+                  "durationMs": null,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "missed"
+                  ],
+                  "reason": "unscheduled",
+                  "since": 1767605820000
+                },
+                "job": "cron",
+                "definition": {
+                  "name": "cron",
+                  "timeout": "2h"
+                },
+                "title": "cron is no longer scheduled",
+                "message": "Missed since 2026-01-05 09:37:00 UTC (1m ago). It has no schedule now, so nothing is due; the missed alert is closed.",
+                "at": 1767605880000
+              }
+            ],
+            "state": {
+              "job": "cron",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "cron",
+              "definition": {
+                "name": "cron",
+                "timeout": "2h"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "slow",
+                "job": "cron",
+                "status": "running",
+                "startedAt": 1767605580000,
+                "finishedAt": null,
+                "durationMs": null,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "slow",
+          "at": 1767605940000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "cron",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a schedule removed while silenced closes missed quietly",
+      "definition": {
+        "name": "j",
+        "schedule": "every 1h",
+        "grace": "5m"
+      },
+      "createdAt": 1767605400000,
+      "events": [
+        {
+          "op": "check",
+          "at": 1767609600000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": null,
+                "details": {
+                  "dueAt": 1767609000000,
+                  "deadline": 1767609300000,
+                  "graceMs": 300000,
+                  "lastRunAt": null
+                },
+                "job": "j",
+                "definition": {
+                  "name": "j",
+                  "schedule": "every 1h",
+                  "grace": "5m"
+                },
+                "title": "j missed its scheduled run",
+                "message": "Due 2026-01-05 10:30:00 UTC (10m ago), and no run had started by 2026-01-05 10:35:00 UTC (5m ago) (grace 5m).\nSchedule: every 1h.\nLast run: never.",
+                "at": 1767609600000
+              }
+            ],
+            "state": {
+              "job": "j",
+              "open": {
+                "missed": 1767609600000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767609000000,
+            "dueAt": 1767609000000,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j",
+                "schedule": "every 1h",
+                "grace": "5m"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": null,
+              "nextExpectedAt": 1767609000000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "silence",
+          "until": 1767612600000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {
+                "missed": 1767609600000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": 1767612600000,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "define",
+          "definition": {
+            "name": "j"
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767609660000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": 1767612600000,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j"
+              },
+              "health": "silenced",
+              "open": [],
+              "lastRun": null,
+              "nextExpectedAt": null,
+              "consecutiveFailures": 0,
+              "silencedUntil": 1767612600000,
+              "stats": {
+                "runs": 0,
+                "okRate": 1,
+                "p50Ms": null,
+                "p95Ms": null
+              }
+            }
+          }
+        },
+        {
+          "op": "unsilence",
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767610200000,
+          "expect": {
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767610201000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767616200000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "j",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": null,
+            "dueAt": null,
+            "summary": {
+              "name": "j",
+              "definition": {
+                "name": "j"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "r1",
+                "job": "j",
+                "status": "ok",
+                "startedAt": 1767610200000,
+                "finishedAt": 1767610201000,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": null,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "a job without a schedule is never missed",
       "definition": {
         "name": "j"

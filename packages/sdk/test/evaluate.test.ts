@@ -159,6 +159,53 @@ test("a job without a schedule is never missed", () => {
   assert.equal(e.nextExpectedAt, null);
 });
 
+test("a schedule removed while missed is open closes missed with a recovery of its own", () => {
+  const d = { name: "j", schedule: "every 1h", grace: "5m" };
+  const stored: StoredJob = { name: "j", definition: d, createdAt: T0 - 2 * HOUR, updatedAt: T0 };
+  const missed = onCheck(d, stored, null, emptyState("j"), T0);
+  assert.deepEqual(missed.alerts.map((a) => a.type), ["missed"]);
+  const bare = { name: "j" };
+  const gone = onCheck(bare, { ...stored, definition: bare }, null, missed.state, T0 + MIN);
+  assert.equal(gone.alerts.length, 1);
+  assert.deepEqual(details(gone.alerts[0], "recovered"), { after: ["missed"], reason: "unscheduled", since: T0 });
+  assert.equal(gone.alerts[0]!.run, null);
+  assert.deepEqual(gone.state.open, {});
+  assert.deepEqual(gone.state.pendingRecovery, []);
+  assert.equal(gone.nextExpectedAt, null);
+  assert.deepEqual(onCheck(bare, { ...stored, definition: bare }, null, gone.state, T0 + 2 * MIN).alerts, [], "once");
+  // The next successful run has nothing left to recover.
+  const ok = onRunFinish(bare, run("j", "ok", T0 + HOUR), onRunStart(gone.state), [], T0 + HOUR + 1000);
+  assert.deepEqual(ok.alerts, []);
+});
+
+test("an unscheduled recovery names missed alone; other conditions keep their own rules", () => {
+  const d = { name: "j", schedule: "every 30m", grace: "1m" };
+  const stored: StoredJob = { name: "j", definition: d, createdAt: T0, updatedAt: T0 };
+  const failedRun = run("j", "failed", T0 + MIN);
+  const failed = onRunFinish(d, failedRun, onRunStart(emptyState("j")), [], T0 + MIN + 1000);
+  const missed = onCheck(d, stored, failedRun, failed.state, T0 + 40 * MIN);
+  assert.deepEqual(missed.alerts.map((a) => a.type), ["missed"]);
+  // An earlier missed, closed by a run start, may already be waiting in pendingRecovery.
+  const waiting = { ...missed.state, pendingRecovery: ["missed" as const] };
+  const bare = { name: "j" };
+  const gone = onCheck(bare, { ...stored, definition: bare }, failedRun, waiting, T0 + 41 * MIN);
+  assert.deepEqual(details(gone.alerts[0], "recovered"), { after: ["missed"], reason: "unscheduled", since: T0 + 40 * MIN });
+  assert.equal(gone.alerts[0]!.run?.id, failedRun.id);
+  assert.deepEqual(Object.keys(gone.state.open), ["failed"], "failed stays open");
+  assert.deepEqual(gone.state.pendingRecovery, [], "missed is not owed a second recovery");
+  const ok = onRunFinish(bare, run("j", "ok", T0 + HOUR), onRunStart(gone.state), [failedRun], T0 + HOUR + 1000);
+  assert.deepEqual(details(ok.alerts[0], "recovered"), { after: ["failed"] }, "the normal recovery names failed only");
+});
+
+test("a job without a schedule and no open missed gets nothing from a check", () => {
+  const bare = { name: "j" };
+  const stored: StoredJob = { name: "j", definition: bare, createdAt: T0 - HOUR, updatedAt: T0 };
+  const state = { ...emptyState("j"), open: { failed: T0 }, pendingRecovery: ["missed" as const] };
+  const e = onCheck(bare, stored, null, state, T0);
+  assert.deepEqual(e.alerts, []);
+  assert.deepEqual(e.state, state, "a missed already closed waits for the next successful run");
+});
+
 test("missed closed by a run start still recovers, even when that run fails quietly", () => {
   const d = { name: "j", schedule: "every 1h", failuresBeforeAlert: 3 };
   const stored: StoredJob = { name: "j", definition: d, createdAt: T0 - 3 * HOUR, updatedAt: T0 };

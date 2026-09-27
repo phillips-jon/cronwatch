@@ -240,7 +240,7 @@ interface Alert {
 | `failed`, `stuck` | `{ consecutiveFailures, threshold }` |
 | `slow` | `{ durationMs, thresholdMs, basis }` |
 | `over_budget` | `{ breaches: { metric, value, limit, basis }[] }` |
-| `recovered` | `{ after: Condition[] }` |
+| `recovered` | `{ after: Condition[], reason?: "unscheduled", since?: number }`; `reason` is set when a check closed missed because the job no longer has a schedule, and `since` is when missed opened |
 
 ```ts
 custom("latency", (alert) => {

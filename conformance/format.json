@@ -970,6 +970,133 @@
         "message": "A run just now succeeded after: stuck.",
         "at": 1767605400000
       }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": null,
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": 1767594600000
+        }
+      },
+      "definition": {
+        "name": "nightly"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "recovered",
+        "run": null,
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": 1767594600000
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly"
+        },
+        "title": "nightly is no longer scheduled",
+        "message": "Missed since 2026-01-05 06:30:00 UTC (3h ago). It has no schedule now, so nothing is due; the missed alert is closed.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767519000000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": 1767432600000
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "timezone": "America/New_York"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 1767519000000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": 1767432600000
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "timezone": "America/New_York"
+        },
+        "title": "nightly is no longer scheduled",
+        "message": "Missed since 2026-01-03 09:30:00 UTC (2d ago). It has no schedule now, so nothing is due; the missed alert is closed.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": null,
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled"
+        }
+      },
+      "definition": {
+        "name": "nightly"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "recovered",
+        "run": null,
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled"
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly"
+        },
+        "title": "nightly is no longer scheduled",
+        "message": "It has no schedule now, so nothing is due; the missed alert is closed.",
+        "at": 1767605400000
+      }
     }
   ],
   "numbers": [

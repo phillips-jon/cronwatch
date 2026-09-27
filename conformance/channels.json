@@ -380,6 +380,28 @@
         "message": "A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\nRan 2s.",
         "at": 1767605460000
       }
+    },
+    {
+      "name": "no longer scheduled",
+      "alert": {
+        "type": "recovered",
+        "run": null,
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": 1767594600000
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "grace": "15m"
+        },
+        "title": "nightly is no longer scheduled",
+        "message": "Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.",
+        "at": 1767605460000
+      }
     }
   ],
   "sends": [
@@ -559,6 +581,21 @@
       },
       "body": {
         "text": "{\"text\":\"nightly recovered\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\":white_check_mark: *nightly recovered*\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"```A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.```\"}}]}"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "no longer scheduled",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 459,
+        "sha256": "6d36a9d162221a13f42acd7b69387fe93c170d16f93bcaaba3a5cbcef5642b62"
       }
     },
     {
@@ -753,6 +790,22 @@
       }
     },
     {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 511,
+        "sha256": "75d8b75d90419212029fb413c613e4fb23f014db9c73a34681d001e77361ee21"
+      }
+    },
+    {
       "channel": "discord",
       "options": {
         "webhookUrl": "https://discord.example/api/webhooks/1/x"
@@ -924,6 +977,20 @@
       },
       "body": {
         "text": "{\"content\":\"nightly recovered\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly recovered\",\"description\":\"```\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "no longer scheduled",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly is no longer scheduled\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly is no longer scheduled\",\"description\":\"```\\nMissed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
       }
     },
     {
@@ -1116,6 +1183,21 @@
       }
     },
     {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly is no longer scheduled\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly is no longer scheduled\",\"url\":\"https://app.example/cronwatch/jobs/nightly\",\"description\":\"```\\nMissed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
+      }
+    },
+    {
       "channel": "webhook",
       "options": {
         "url": "https://hooks.example.com/cronwatch?key=secret"
@@ -1305,6 +1387,21 @@
       "body": {
         "length": 470,
         "sha256": "fe85d8a5cc3fe7b8b167e7baa810da09bf0614ea2ed87e19455f926190a0961c"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "no longer scheduled",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "text": "{\"type\":\"recovered\",\"run\":null,\"details\":{\"after\":[\"missed\"],\"reason\":\"unscheduled\",\"since\":1767594600000},\"job\":\"nightly\",\"definition\":{\"name\":\"nightly\",\"grace\":\"15m\"},\"title\":\"nightly is no longer scheduled\",\"message\":\"Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\",\"at\":1767605460000}"
       }
     },
     {
@@ -1569,6 +1666,27 @@
       "body": {
         "length": 470,
         "sha256": "fe85d8a5cc3fe7b8b167e7baa810da09bf0614ea2ed87e19455f926190a0961c"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "no longer scheduled",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=aa2478396e713982959c2cf19a4d814653855d003b9e45bde0da621417168279"
+      },
+      "body": {
+        "text": "{\"type\":\"recovered\",\"run\":null,\"details\":{\"after\":[\"missed\"],\"reason\":\"unscheduled\",\"since\":1767594600000},\"job\":\"nightly\",\"definition\":{\"name\":\"nightly\",\"grace\":\"15m\"},\"title\":\"nightly is no longer scheduled\",\"message\":\"Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\",\"at\":1767605460000}"
       }
     }
   ],
@@ -2095,6 +2213,34 @@
       "channel": "resend",
       "options": {
         "apiKey": "re_secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "subjectPrefix": "[prod]",
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-97923180a31cd7fc98b5b24c8fd1b59d"
+          },
+          "body": {
+            "length": 966,
+            "sha256": "acf3850553cba326224baceafdf223b5bc0379f7db8d57c81e372e9b76334f07"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": "re_secret",
         "from": "alerts@example.com",
         "to": "ops@example.com"
       },
@@ -2363,6 +2509,29 @@
           "body": {
             "length": 669,
             "sha256": "ffb9bd1585afc629bc7239b7af98a9793f62610367369f7bbd52a0e4f224f405"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": "re_secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-97923180a31cd7fc98b5b24c8fd1b59d"
+          },
+          "body": {
+            "length": 778,
+            "sha256": "ee89f147b9fba051d143932b73ecc809d922a674a6ab796f72c47c38f9a2cbca"
           }
         }
       ]
@@ -2695,6 +2864,33 @@
       "channel": "postmark",
       "options": {
         "serverToken": "pm-secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.postmarkapp.com/email",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-postmark-server-token": "pm-secret"
+          },
+          "body": {
+            "length": 1009,
+            "sha256": "7fffb6ac13e136da05450dd1f60b0714d777398e286f50e46356db13ab522f2a"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "postmark",
+      "options": {
+        "serverToken": "pm-secret",
         "from": "alerts@example.com",
         "to": "ops@example.com",
         "messageStream": "alerts",
@@ -2987,6 +3183,31 @@
           "body": {
             "length": 725,
             "sha256": "64f5ee4a6ae3463ede58a4f58bc1c96d9b4c7eecbaa7815792f2d6473e506ab6"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "postmark",
+      "options": {
+        "serverToken": "pm-secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "messageStream": "alerts",
+        "subjectPrefix": "[prod]"
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.postmarkapp.com/email",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-postmark-server-token": "pm-secret"
+          },
+          "body": {
+            "length": 834,
+            "sha256": "d170242cf782f32758713cb7ca21c16b6cdde1eacf896231a19a5e8af8e1412d"
           }
         }
       ]
@@ -3307,6 +3528,32 @@
       "channel": "sendgrid",
       "options": {
         "apiKey": "SG.secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "Ops <ops@example.com>",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.sendgrid.com/v3/mail/send",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer SG.secret"
+          },
+          "body": {
+            "length": 1116,
+            "sha256": "6b1b90ba2967ef4e98e491792a1b8fe866f2102280c27a4a6e5a7d31fc8972be"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sendgrid",
+      "options": {
+        "apiKey": "SG.secret",
         "from": "alerts@example.com",
         "to": "ops@example.com",
         "region": "eu"
@@ -3575,6 +3822,29 @@
           "body": {
             "length": 796,
             "sha256": "49193efe81aa0584deeba542712230a5f3ea2b6726bb619c1d6da4cf27371c05"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sendgrid",
+      "options": {
+        "apiKey": "SG.secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "region": "eu"
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.eu.sendgrid.com/v3/mail/send",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer SG.secret"
+          },
+          "body": {
+            "length": 905,
+            "sha256": "59921800528b455e05e9f4e444849296c8a3e5e56a8af76dd1714484d69b456f"
           }
         }
       ]
@@ -3908,6 +4178,33 @@
       "options": {
         "apiKey": "key-secret",
         "domain": "mg.example.com",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.mailgun.net/v3/mg.example.com/messages",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
+          },
+          "body": {
+            "length": 1181,
+            "sha256": "6cc90dc90f38e8c27b480a6c03418f4b0ed7a9f05ebf082c4f07e66af3469e3c"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mailgun",
+      "options": {
+        "apiKey": "key-secret",
+        "domain": "mg.example.com",
         "from": "alerts@example.com",
         "to": "ops@example.com",
         "region": "eu"
@@ -4187,6 +4484,30 @@
           "body": {
             "length": 827,
             "sha256": "81a797102b2d742bfc6db0454597f76f2cc6e0aa675e670567f343ea637f26ef"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mailgun",
+      "options": {
+        "apiKey": "key-secret",
+        "domain": "mg.example.com",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "region": "eu"
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.eu.mailgun.net/v3/mg.example.com/messages",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
+          },
+          "body": {
+            "length": 934,
+            "sha256": "3ed1861c5c5f3bf3a5c7b3e271b54155875ed775c81fc0eb4f30036fa8fb094c"
           }
         }
       ]
@@ -4554,6 +4875,36 @@
     {
       "channel": "ses",
       "options": {
+        "region": "us-east-1",
+        "accessKeyId": "AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "now": 1767605400000,
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=13e38224ec3fd9a931ff4bd703610294ae195641d51e1d4d70a186f637e884dd"
+          },
+          "body": {
+            "length": 1161,
+            "sha256": "c1096f712fe9121207fa7bbce421e12471501c3bd7bfd197117121f74a5c82f3"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
         "region": "eu-west-1",
         "accessKeyId": "AKIDEXAMPLE",
         "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
@@ -4895,6 +5246,35 @@
           "body": {
             "length": 903,
             "sha256": "a305507cbb2ab8ab40f5940bcd85cff3391e877928d26211e6571e6eed9a9daf"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "eu-west-1",
+        "accessKeyId": "AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "sessionToken": "session-token",
+        "configurationSetName": "alerts",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767609000000
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://email.eu-west-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T103000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/eu-west-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=41d9fc05b61ce9fcc4dacdc3b52246d5dd91ccc52eeb9af5269fda82bb394451"
+          },
+          "body": {
+            "length": 1012,
+            "sha256": "a6921ecb7f7a9f8b979162e730c72d88c6fddef21eb6978daeeeb7d45697eb8e"
           }
         }
       ]
@@ -5318,6 +5698,21 @@
       "channel": "twilio",
       "options": {
         "accountSid": "AC00000000000000000000000000000000",
+        "authToken": "tw-secret",
+        "from": "+15005550006",
+        "to": [
+          "+15551110000",
+          "+15552220000"
+        ],
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": []
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": "AC00000000000000000000000000000000",
         "apiKeySid": "SK00000000000000000000000000000000",
         "apiKeySecret": "sk-secret",
         "messagingServiceSid": "MG00000000000000000000000000000000",
@@ -5616,6 +6011,31 @@
       ]
     },
     {
+      "channel": "twilio",
+      "options": {
+        "accountSid": "AC00000000000000000000000000000000",
+        "apiKeySid": "SK00000000000000000000000000000000",
+        "apiKeySecret": "sk-secret",
+        "messagingServiceSid": "MG00000000000000000000000000000000",
+        "to": "+15551110000",
+        "recovered": true,
+        "segments": 1
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic U0swMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDpzay1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&MessagingServiceSid=MG00000000000000000000000000000000&Body=nightly+is+no+longer+scheduled%0AMissed+since+2026-01-05+06%3A30%3A00+UTC+%283h+1m+ago%29.+It+has+no+schedule+now%2C+so+nothing+is+due%3B+the+missed+alert+is+closed."
+          }
+        }
+      ]
+    },
+    {
       "channel": "sentry",
       "options": {
         "dsn": "https://pubkey@o1.ingest.sentry.io/42",
@@ -5863,6 +6283,27 @@
           "body": {
             "length": 729,
             "sha256": "835c87d36a60e0d8accbbe2cc78eebda337da011ab0d5f43590be1cfa7ca2753"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": "https://pubkey@o1.ingest.sentry.io/42",
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 714,
+            "sha256": "0579bcf4e0d5e07ac32779c934114593b58e7f2381bb9941e5e0d55bf06091d7"
           }
         }
       ]
@@ -6132,6 +6573,17 @@
       "requests": []
     },
     {
+      "channel": "sentry",
+      "options": {
+        "dsn": "https://pubkey@sentry.example.com/prefix/7",
+        "environment": "staging",
+        "release": "app@1.2.3",
+        "recovered": false
+      },
+      "alert": "no longer scheduled",
+      "requests": []
+    },
+    {
       "channel": "honeybadger",
       "options": {
         "apiKey": "hb-secret",
@@ -6380,6 +6832,15 @@
         "link": true
       },
       "alert": "recovered",
+      "requests": []
+    },
+    {
+      "channel": "honeybadger",
+      "options": {
+        "apiKey": "hb-secret",
+        "link": true
+      },
+      "alert": "no longer scheduled",
       "requests": []
     },
     {
@@ -6671,6 +7132,30 @@
       ]
     },
     {
+      "channel": "honeybadger",
+      "options": {
+        "apiKey": "hb-secret",
+        "environment": "staging",
+        "endpoint": "https://eu-api.honeybadger.io",
+        "recovered": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://eu-api.honeybadger.io/v1/notices",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-api-key": "hb-secret"
+          },
+          "body": {
+            "length": 652,
+            "sha256": "c2220e15ceb1c3dd0453df2082d73a5d5f067282205521c4f77e27b8a4934857"
+          }
+        }
+      ]
+    },
+    {
       "channel": "datadog",
       "options": {
         "apiKey": "dd-secret",
@@ -6927,6 +7412,28 @@
           },
           "body": {
             "text": "{\"title\":\"nightly recovered\",\"text\":\"nightly recovered\\n\\nA run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\\n\\nOpen: https://app.example/cronwatch/jobs/nightly\",\"alert_type\":\"success\",\"aggregation_key\":\"cronwatch:nightly:recovered\",\"date_happened\":1767605460,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:recovered\"]}"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "datadog",
+      "options": {
+        "apiKey": "dd-secret",
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.datadoghq.com/api/v1/events",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "dd-api-key": "dd-secret"
+          },
+          "body": {
+            "length": 429,
+            "sha256": "1c675226fedd0010c88a01d55e8f9dd98ffb5e5e7afc2be6bec504b169dceddf"
           }
         }
       ]
@@ -7241,6 +7748,32 @@
       ]
     },
     {
+      "channel": "datadog",
+      "options": {
+        "apiKey": "dd-secret",
+        "site": "datadoghq.eu",
+        "tags": [
+          "env:prod"
+        ],
+        "host": "worker-1"
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.datadoghq.eu/api/v1/events",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "dd-api-key": "dd-secret"
+          },
+          "body": {
+            "length": 406,
+            "sha256": "04ad3d726d48ec71f20b6bcde7c3d4d436bcc8d279c63a4b92b049c10aa6655d"
+          }
+        }
+      ]
+    },
+    {
       "channel": "rollbar",
       "options": {
         "accessToken": "rb-secret",
@@ -7496,6 +8029,27 @@
       "channel": "rollbar",
       "options": {
         "accessToken": "rb-secret",
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.rollbar.com/api/1/item/",
+          "headers": {
+            "content-type": "application/json",
+            "x-rollbar-access-token": "rb-secret"
+          },
+          "body": {
+            "length": 574,
+            "sha256": "675dc769850f5f3937be736863fa9f89478d77ebe52bfa013d88efcfaa5a4034"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "rollbar",
+      "options": {
+        "accessToken": "rb-secret",
         "environment": "staging",
         "recovered": false
       },
@@ -7742,6 +8296,16 @@
         "recovered": false
       },
       "alert": "recovered",
+      "requests": []
+    },
+    {
+      "channel": "rollbar",
+      "options": {
+        "accessToken": "rb-secret",
+        "environment": "staging",
+        "recovered": false
+      },
+      "alert": "no longer scheduled",
       "requests": []
     },
     {
@@ -8016,6 +8580,16 @@
         "link": true
       },
       "alert": "recovered",
+      "requests": []
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "bs-secret",
+        "now": 1767605400000,
+        "link": true
+      },
+      "alert": "no longer scheduled",
       "requests": []
     },
     {
@@ -8331,6 +8905,32 @@
       ]
     },
     {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "bs-secret",
+        "releaseStage": "staging",
+        "endpoint": "https://notify.bugsnag.example.com/",
+        "recovered": true,
+        "now": 1767605400000
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.example.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 758,
+            "sha256": "c758db39d365ad41c03c29a0c24d097e57ce40737009464a6677579d8940bb1d"
+          }
+        }
+      ]
+    },
+    {
       "channel": "newrelic",
       "options": {
         "accountId": "12345",
@@ -8586,6 +9186,27 @@
           },
           "body": {
             "text": "[{\"eventType\":\"CronWatchAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly recovered\",\"message\":\"A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"link\":\"https://app.example/cronwatch/jobs/nightly\",\"runId\":\"r1\",\"runStatus\":\"ok\",\"durationMs\":1500}]"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "newrelic",
+      "options": {
+        "accountId": "12345",
+        "apiKey": "nr-secret",
+        "link": true
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://insights-collector.newrelic.com/v1/accounts/12345/events",
+          "headers": {
+            "content-type": "application/json",
+            "api-key": "nr-secret"
+          },
+          "body": {
+            "text": "[{\"eventType\":\"CronWatchAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly is no longer scheduled\",\"message\":\"Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\",\"link\":\"https://app.example/cronwatch/jobs/nightly\"}]"
           }
         }
       ]
@@ -8856,6 +9477,28 @@
           },
           "body": {
             "text": "[{\"eventType\":\"CronJobAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly recovered\",\"message\":\"A run 2026-01-05 09:30:00 UTC (1m ago) succeeded after: missed, over budget.\\nRan 2s.\",\"runId\":\"r1\",\"runStatus\":\"ok\",\"durationMs\":1500}]"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "newrelic",
+      "options": {
+        "accountId": 12345,
+        "apiKey": "nr-secret",
+        "region": "eu",
+        "eventType": "CronJobAlert"
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://insights-collector.eu01.nr-data.net/v1/accounts/12345/events",
+          "headers": {
+            "content-type": "application/json",
+            "api-key": "nr-secret"
+          },
+          "body": {
+            "text": "[{\"eventType\":\"CronJobAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly is no longer scheduled\",\"message\":\"Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\"}]"
           }
         }
       ]
@@ -9132,6 +9775,29 @@
           "body": {
             "length": 669,
             "sha256": "ffb9bd1585afc629bc7239b7af98a9793f62610367369f7bbd52a0e4f224f405"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-97923180a31cd7fc98b5b24c8fd1b59d"
+          },
+          "body": {
+            "length": 778,
+            "sha256": "ee89f147b9fba051d143932b73ecc809d922a674a6ab796f72c47c38f9a2cbca"
           }
         }
       ]
@@ -9473,6 +10139,34 @@
       ]
     },
     {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=62bc0e41fbc7cdaaee2a382140151f11c9b355d1f24578f55e6d76ef21342223"
+          },
+          "body": {
+            "length": 980,
+            "sha256": "7f7c5ca0d50e97285eeeb08b3694ee0c15f780c011e5dfef15abe5225c8b4fcd"
+          }
+        }
+      ]
+    },
+    {
       "channel": "twilio",
       "options": {
         "accountSid": " AC00000000000000000000000000000000 ",
@@ -9725,6 +10419,17 @@
         "to": "+15551110000"
       },
       "alert": "recovered",
+      "requests": []
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "no longer scheduled",
       "requests": []
     },
     {
@@ -9990,6 +10695,15 @@
       "requests": []
     },
     {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "no longer scheduled",
+      "requests": []
+    },
+    {
       "channel": "sentry",
       "options": {
         "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
@@ -10225,6 +10939,26 @@
           "body": {
             "length": 677,
             "sha256": "25642f92fa903010ac4202ed014f303e289828acbc32b69206f1a42d666be01e"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "no longer scheduled",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 662,
+            "sha256": "cfbed1e0c70e3fe160d6e0497f9f5456f971fa38ae7e6ff67a5438b9596745ba"
           }
         }
       ]

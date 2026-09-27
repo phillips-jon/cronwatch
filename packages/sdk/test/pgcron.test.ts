@@ -137,14 +137,20 @@ test("pg_cron: jobs are declared, history is copied quietly, and imports are ide
   assert.deepEqual(later.alerts.map((a) => `${a.type} ${a.job}`).sort(), ["missed db:nightly-vacuum", "recovered db:pg_cron:2"]);
   assert.ok(!(await cw.check()).alerts.length, "each condition alerts once");
 
-  // Unscheduled: its name keeps its history but loses its schedule, so it is never missed again.
+  // Unscheduled: its name keeps its history but loses its schedule, so it is never missed again,
+  // and the missed alert it had open closes with a recovery that says so.
   cron.jobs.splice(0, 1);
   c.set(Date.UTC(2026, 0, 8, 3, 11, 0));
   const gone = await cw.check();
   const vacuumNow = gone.jobs.find((j) => j.name === "db:nightly-vacuum")!;
   assert.equal(vacuumNow.definition.schedule, undefined);
   assert.match(vacuumNow.definition.description!, /no longer watched/);
-  assert.ok(!gone.alerts.some((a) => a.job === "db:nightly-vacuum"), "no alert for an unscheduled job");
+  assert.deepEqual(vacuumNow.open, ["failed"], "its failure stays open until a successful run");
+  const closed = gone.alerts.filter((a) => a.job === "db:nightly-vacuum");
+  assert.deepEqual(closed.map((a) => a.type), ["recovered"]);
+  assert.equal(closed[0]!.title, "db:nightly-vacuum is no longer scheduled");
+  assert.deepEqual(closed[0]!.details, { after: ["missed"], reason: "unscheduled", since: Date.UTC(2026, 0, 6, 3, 11, 0) });
+  assert.ok(!(await cw.check()).alerts.some((a) => a.job === "db:nightly-vacuum"), "once");
   assert.equal((await cw.runs("db:nightly-vacuum", 100)).length, 20, "its history is kept");
 });
 
@@ -273,6 +279,28 @@ test("pg_cron: a renamed job leaves no scheduled ghost, in this process or the n
   await cw.check();
   assert.deepEqual(alerts.alerts.filter((a) => a.job !== "rollup-v3").map((a) => `${a.type} ${a.job}`), [], "only the job's current name can be missed");
   assert.deepEqual(errors.filter((e) => !/cron\.|row level/.test(e)), []);
+});
+
+test("pg_cron: a job paused or renamed while missed closes missed with a recovery", async () => {
+  const c = clock();
+  const cron = fakeCron();
+  cron.jobs.push(job(1, "hourly", "0 * * * *"), job(2, "rollup", "0 * * * *"));
+  cron.add(1, "succeeded", T0 - 3 * HOUR, T0 - 3 * HOUR + 1000);
+  cron.add(2, "succeeded", T0 - 3 * HOUR, T0 - 3 * HOUR + 1000);
+  const alerts = capture();
+  const cw = cronwatch({ store: memory(), alerts: [alerts], now: c.now, sources: [pgCron(cron.db)] });
+  await cw.check();
+  assert.deepEqual(alerts.alerts.map((a) => `${a.type} ${a.job}`).sort(), ["missed hourly", "missed rollup"]);
+  cron.jobs[0]!.active = false;
+  cron.jobs[1]!.jobname = "rollup-v2";
+  c.advance(MIN);
+  const r = await cw.check();
+  assert.deepEqual(r.alerts.map((a) => `${a.type} ${a.job} ${a.title}`).sort(), [
+    "recovered hourly hourly is no longer scheduled",
+    "recovered rollup rollup is no longer scheduled",
+  ]);
+  c.advance(MIN);
+  assert.deepEqual((await cw.check()).alerts, []);
 });
 
 test("pg_cron: a run marked timeout by a check is still read, and its late finish recorded", async () => {

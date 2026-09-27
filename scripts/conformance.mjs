@@ -578,6 +578,37 @@ function evaluateCases() {
       steps: [check(T0 + 70 * MIN), { op: "define", definition: { name: "j", schedule: "every 1h", grace: "30m" } }, check(T0 + 71 * MIN), run(T0 + 72 * MIN)],
     },
     {
+      name: "a schedule removed while missed is open recovers missed once, and the next run owes nothing",
+      definition: { name: "j", schedule: "every 1h", grace: "5m" },
+      createdAt: T0,
+      steps: [
+        check(T0 + 70 * MIN),
+        { op: "define", definition: { name: "j" } },
+        check(T0 + 71 * MIN),
+        check(T0 + 72 * MIN),
+        run(T0 + 80 * MIN),
+        { op: "define", definition: { name: "j", schedule: "every 1h", grace: "5m" } },
+        check(T0 + 3 * HOUR),
+      ],
+    },
+    {
+      name: "an unscheduled recovery names missed alone, and failed keeps its own recovery",
+      definition: { name: "j", schedule: "every 30m", grace: "1m" },
+      createdAt: T0,
+      steps: [fail(T0 + MIN), check(T0 + 40 * MIN), { op: "define", definition: { name: "j" } }, check(T0 + 41 * MIN), run(T0 + 50 * MIN)],
+    },
+    {
+      name: "missed reopened with a recovery already pending is recovered once when unscheduled",
+      definition: { name: "cron", schedule: "*/5 * * * *", grace: "1m", timeout: "2h" },
+      steps: [check(T0 + 2 * MIN), start(T0 + 3 * MIN, "slow"), check(T0 + 7 * MIN), { op: "define", definition: { name: "cron", timeout: "2h" } }, check(T0 + 8 * MIN), finish("slow", T0 + 9 * MIN)],
+    },
+    {
+      name: "a schedule removed while silenced closes missed quietly",
+      definition: { name: "j", schedule: "every 1h", grace: "5m" },
+      createdAt: T0,
+      steps: [check(T0 + 70 * MIN), { op: "silence", until: T0 + 2 * HOUR }, { op: "define", definition: { name: "j" } }, check(T0 + 71 * MIN), { op: "unsilence" }, run(T0 + 80 * MIN), check(T0 + 3 * HOUR)],
+    },
+    {
       name: "a job without a schedule is never missed",
       definition: { name: "j" },
       createdAt: T0 - 30 * DAY,
@@ -726,6 +757,9 @@ function formatCases() {
     [{ type: "recovered", run: sampleRun({ status: "ok" }), details: { after: ["missed", "over_budget", "failed"] } }, def, T0 + 2 * MIN],
     [{ type: "recovered", run: sampleRun({ status: "ok", durationMs: null }), details: { after: [] } }, def, T0],
     [{ type: "recovered", run: null, details: { after: ["stuck"] } }, def, T0],
+    [{ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: T0 - 3 * HOUR } }, { name: "nightly" }, T0],
+    [{ type: "recovered", run: sampleRun({ startedAt: T0 - DAY }), details: { after: ["missed"], reason: "unscheduled", since: T0 - 2 * DAY } }, { name: "nightly", timezone: NY }, T0],
+    [{ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled" } }, { name: "nightly" }, T0],
   ];
   const numbers = [
     0, 1, -1, 12, 999, 1000, 1234, 12345.6789, 1234567.891, 0.5, 0.1 + 0.2, 1.00005, 0.00005, 0.00004, 1234.56785,
@@ -868,6 +902,8 @@ function healthCases() {
     [queuedAlert("recovered", T0, { after: ["failed", "slow"] }), state({ open: { missed: T0 } })],
     [queuedAlert("recovered", T0, { after: ["failed", "slow"] }), state({ open: { slow: T0 + MIN } })],
     [queuedAlert("recovered", T0, { after: [] }), state({ open: { failed: T0 } })],
+    [queuedAlert("recovered", T0, { after: ["missed"], reason: "unscheduled", since: T0 - HOUR }), state({ open: { failed: T0 } })],
+    [queuedAlert("recovered", T0, { after: ["missed"], reason: "unscheduled", since: T0 - HOUR }), state({ open: { missed: T0 + MIN } })],
   ];
   const staleCases = staleInputs.map(([alert, s]) => ({ alert, state: s, stale: staleAlert(alert, s) }));
 
@@ -1188,6 +1224,7 @@ function channelAlerts() {
     { name: "over budget, with a triage full of markdown", alert: { ...clone(sdk.composeAlert({ type: "over_budget", run: sampleRun({ status: "ok", metrics: { cost: 1.2 } }), details: { breaches: [{ metric: "cost", value: 1.2, limit: 1, basis: "budget" }] } }, def, T0)), triage: "Check *this* _now_ ~maybe~ `x` | y (z) [a] <b> \\ " + "d".repeat(1200) } },
     { name: "slow", alert: clone(sdk.composeAlert({ type: "slow", run: sampleRun({ status: "ok", durationMs: 15_000 }), details: { durationMs: 15_000, thresholdMs: 10_000, basis: "maxDuration" } }, def, T0)) },
     { name: "recovered", alert: clone(sdk.composeAlert({ type: "recovered", run: sampleRun({ status: "ok" }), details: { after: ["missed", "over_budget"] } }, def, T0 + MIN)) },
+    { name: "no longer scheduled", alert: clone(sdk.composeAlert({ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: T0 - 3 * HOUR } }, { name: "nightly", grace: "15m" }, T0 + MIN)) },
   ];
 }
 
