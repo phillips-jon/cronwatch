@@ -131,6 +131,12 @@ await cw.check();
 
 const routes = cw.routes({ token: TOKEN, basePath: BASE });
 createServer(async (req, res) => {
+  // Only the dashboard lives here; the browser's /favicon.ico and the like get a plain 404.
+  const url = req.url ?? "/";
+  if (url !== BASE && !url.startsWith(`${BASE}/`) && !url.startsWith(`${BASE}?`)) {
+    res.writeHead(404, { "content-type": "text/plain" }).end("Not found. The dashboard is at " + BASE + "\n");
+    return;
+  }
   clock = Date.now();
   const chunks = [];
   for await (const c of req) chunks.push(c);
