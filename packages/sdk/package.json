@@ -54,6 +54,9 @@
       ],
       "anthropic": [
         "./dist/anthropic.d.cts"
+      ],
+      "pg-cron": [
+        "./dist/pg-cron.d.cts"
       ]
     }
   },
@@ -136,6 +139,16 @@
       "require": {
         "types": "./dist/anthropic.d.cts",
         "default": "./dist/anthropic.cjs"
+      }
+    },
+    "./pg-cron": {
+      "import": {
+        "types": "./dist/pg-cron.d.ts",
+        "default": "./dist/pg-cron.js"
+      },
+      "require": {
+        "types": "./dist/pg-cron.d.cts",
+        "default": "./dist/pg-cron.cjs"
       }
     },
     "./package.json": "./package.json"

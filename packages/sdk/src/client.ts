@@ -67,9 +67,45 @@ export interface JobHandle {
   handler<T>(fn: HandlerFn<T>, options?: HandlerOptions): (request: Request) => Promise<Response>;
 }
 
+/**
+ * What a Source may use of the client: declare jobs, read the store, and
+ * record runs it found elsewhere. A CronWatch is one.
+ */
+export interface SourceHost {
+  /** Declare a job, as CronWatch.job(). Throws for an invalid name or option. */
+  job(name: string, options?: JobOptions): unknown;
+  /** See CronWatch.recordRun(). */
+  recordRun(run: Run, options?: RecordRunOptions): Promise<Alert[]>;
+  readonly store: Store;
+  readonly now: () => number;
+  readonly onError: (error: unknown, where: string) => void;
+}
+
+/**
+ * Runs that happen somewhere CronWatch cannot wrap, such as inside the
+ * database (see @cronwatch/sdk/pg-cron). check() calls sync() on each source
+ * first, so what it records is evaluated in the same check.
+ */
+export interface Source {
+  name: string;
+  /** Declare the jobs and record their new runs. Returns the alerts recording them sent. */
+  sync(host: SourceHost): Promise<Alert[] | void>;
+}
+
+export interface RecordRunOptions {
+  /** False stores the run without evaluating it, for history imported on first sight. Default true. */
+  evaluate?: boolean;
+}
+
 export interface CronWatchOptions {
   /** Where jobs, runs and state live. Defaults to an in-memory store that forgets on restart. */
   store?: Store;
+  /**
+   * Where runs this process does not wrap come from, such as pg_cron jobs.
+   * Each is synced at the start of every check(); one that throws is
+   * reported to onError and the check carries on.
+   */
+  sources?: Source[];
   /** Where alerts go. Defaults to the console. */
   alerts?: AlertChannel[];
   /** Adds a short diagnosis to every alert except recoveries. See @cronwatch/sdk/anthropic. */
@@ -182,6 +218,7 @@ export class CronWatch {
   readonly store: Store;
   readonly alerts: AlertChannel[];
   readonly triage: TriageFn | undefined;
+  readonly sources: Source[];
   /** The secret handler() requests must carry, or null when none is set. */
   readonly cronSecret: string | null;
   readonly retentionMs: number;
@@ -210,6 +247,7 @@ export class CronWatch {
     this.store = options.store ?? (this.usingDefaultStore = true, memory());
     this.alerts = options.alerts ?? [consoleChannel()];
     this.triage = options.triage;
+    this.sources = options.sources ?? [];
     const secret = options.cronSecret === undefined ? readEnv("CRON_SECRET") : options.cronSecret;
     this.cronSecret = secret ? secret : null;
     this.secretOptOut = options.cronSecret === null;
@@ -505,6 +543,54 @@ export class CronWatch {
     return { run, result, error, threw };
   }
 
+  /**
+   * Record a run that happened outside this process, for a Source. Its job
+   * must be declared with job() first. Runs are keyed by id: a new one is
+   * inserted, a stored one still running is updated when this one is not,
+   * and anything else is left alone, so recording the same run twice
+   * changes nothing. A finished run is judged as if it had been wrapped
+   * here (expect, failures, duration, budgets) and its output and error are
+   * redacted the same way. Returns the alerts it sent.
+   */
+  async recordRun(input: Run, options: RecordRunOptions = {}): Promise<Alert[]> {
+    const declared = this.definitions.get(input.job);
+    if (!declared) throw new Error(`recordRun: job "${input.job}" is not declared; call job() first`);
+    await this.sync(declared);
+    const run: Run = { ...input, metrics: { ...input.metrics } };
+    if (run.status === "ok") {
+      const unmet = checkExpectation(declared.expect, run.output);
+      if (unmet) {
+        run.status = "failed";
+        run.error = unmet;
+      }
+    }
+    if (run.output !== null) run.output = stripNul(this.redact(capOutput(run.output)));
+    if (run.error !== null) run.error = stripNul(this.redact(capOutput(run.error)));
+    const evaluate = options.evaluate !== false;
+    const definition = toStored(declared);
+
+    const stored = await this.store.getRun(run.id);
+    if (stored) {
+      if (stored.status !== "running" || run.status === "running") return [];
+      if (!evaluate) {
+        await this.store.updateRun(run);
+        return [];
+      }
+      return this.finishRun(definition, run, this.now(), true);
+    }
+    try {
+      await this.store.insertRun(run);
+    } catch (e) {
+      // Another process recorded it first.
+      if (await this.store.getRun(run.id).catch(() => null)) return [];
+      throw e;
+    }
+    if (!evaluate) return [];
+    await this.updateState(run.job, (before) => ({ state: onRunStart(before), result: undefined }));
+    if (run.status === "running") return [];
+    return this.finishRun(definition, run, this.now(), false);
+  }
+
   /** Whether a check already marked this run as timed out, for a failure that finished late. */
   private async markedTimedOut(run: Run): Promise<boolean> {
     if (run.status === "ok") return false;
@@ -566,9 +652,16 @@ export class CronWatch {
 
   private async runCheck(): Promise<CheckResult> {
     await this.ensureReady();
+    const alerts: Alert[] = [];
+    for (const source of this.sources) {
+      try {
+        alerts.push(...((await source.sync(this)) ?? []));
+      } catch (e) {
+        this.onError(e, `source ${source.name}`);
+      }
+    }
     for (const definition of this.definitions.values()) await this.sync(definition);
     const now = this.now();
-    const alerts: Alert[] = [];
 
     // Runs that never reported back. One that cannot be judged (its job's
     // stored timeout no longer parses, say) is reported and skipped.

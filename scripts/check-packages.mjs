@@ -41,6 +41,7 @@ const expected = {
   "@cronwatch/sdk/webhook": ["webhook"],
   "@cronwatch/sdk/anthropic": ["anthropic"],
   "@cronwatch/sdk/d1": ["d1"],
+  "@cronwatch/sdk/pg-cron": ["pgCron"],
 };
 for (const e of entries) {
   if (!expected[e]) throw new Error(`check-packages: add ${e} to the expected exports`);

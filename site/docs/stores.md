@@ -49,6 +49,8 @@ A `prefix` must be a plain lowercase identifier: lowercase letters, digits and u
 
 The tables are created inside a transaction that holds an advisory lock for the prefix, so many instances starting at once (serverless cold starts, several replicas) take turns instead of racing `CREATE TABLE IF NOT EXISTS`.
 
+Jobs that pg_cron runs inside the same database (Supabase Cron included) can be watched too, by reading pg_cron's own tables on every check: see [Supabase and pg_cron](/docs/supabase/).
+
 ## D1
 
 For Cloudflare Workers. D1 is SQLite, so this store uses the SQLite store's tables, statements and row mapping, through D1's `prepare`, `bind` and `batch`. It needs no driver and nothing from `@cloudflare/workers-types`: it takes the binding as it comes.
