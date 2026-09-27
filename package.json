@@ -22,7 +22,7 @@
     "dev:dashboard": "node scripts/dev-dashboard.mjs",
     "check": "npm run check:dashes && npm run typecheck && npm test && npm run check:conformance",
     "conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs",
-    "check:conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs --check && TZ=UTC node packages/ruby/test/web/golden.mjs --check",
+    "check:conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs --check && TZ=UTC node packages/ruby/test/web/golden.mjs --check && node scripts/make-dashboard-icons.mjs --check",
     "check:packages": "node scripts/check-packages.mjs",
     "release": "node scripts/release.mjs"
   },

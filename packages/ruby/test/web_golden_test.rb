@@ -72,7 +72,13 @@ class WebGoldenTest < Minitest::Test
       label = "#{capture["method"]} #{capture["path"]}"
       path = capture["path"].sub(/\{run:([^:}]+):(\d+)\}/) { cw.runs(Regexp.last_match(1), 50)[Regexp.last_match(2).to_i].id }
       res = send_request(web, capture["method"], path, capture["headers"], capture["body"])
-      body = res.body.gsub(UUID) { |id| ids[id] ||= "<id:#{ids.size}>" }
+      body =
+        if res.headers["content-type"] == "image/png"
+          # PNGs are kept as base64, so the fixture stays text.
+          "base64:#{[res.body].pack("m0")}"
+        else
+          res.body.gsub(UUID) { |id| ids[id] ||= "<id:#{ids.size}>" }
+        end
 
       assert_equal capture["status"], res.status, label
       headers = res.headers.reject { |k, _| IGNORED_HEADERS.include?(k) }

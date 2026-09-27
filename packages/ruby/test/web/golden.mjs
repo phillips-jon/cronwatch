@@ -117,6 +117,21 @@ const requests = [
   ["POST", "/cronwatch/jobs/never-ran/forget", bearer],
   ["GET", "/cronwatch/api/jobs", bearer],
   ["GET", "/cronwatch/", bearer],
+  // The app shell, served without the token.
+  ["GET", "/cronwatch/manifest.webmanifest"],
+  ["GET", "/cronwatch/sw.js"],
+  ["GET", "/cronwatch/app.js"],
+  ["GET", "/cronwatch/offline"],
+  ["GET", "/cronwatch/offline/", cookie],
+  ["GET", "/cronwatch/icons/icon.svg"],
+  ["GET", "/cronwatch/icons/maskable.svg"],
+  ["GET", "/cronwatch/icons/icon-192.png"],
+  ["GET", "/cronwatch/icons/icon-512.png"],
+  ["GET", "/cronwatch/icons/maskable-512.png"],
+  ["GET", "/cronwatch/icons/apple-touch-icon.png"],
+  ["GET", "/cronwatch/icons/nope.png"],
+  ["GET", "/cronwatch/icons/nope.png", bearer],
+  ["POST", "/cronwatch/sw.js", bearer],
 ];
 
 const captures = [];
@@ -125,7 +140,11 @@ for (const [method, template, headers = {}, body] of requests) {
   const response = await routes.handler(new Request(`http://app.test${path}`, { method, headers, body }));
   const responseHeaders = {};
   for (const [k, v] of response.headers) responseHeaders[k] = v;
-  captures.push({ method, path: template, headers, body: body ?? null, status: response.status, responseHeaders, responseBody: await response.text() });
+  // PNGs are kept as base64, so the fixture stays text.
+  const responseBody = responseHeaders["content-type"] === "image/png"
+    ? `base64:${Buffer.from(await response.arrayBuffer()).toString("base64")}`
+    : await response.text();
+  captures.push({ method, path: template, headers, body: body ?? null, status: response.status, responseHeaders, responseBody });
 }
 
 async function resolve(template) {

@@ -51,8 +51,13 @@ module Cronwatch
     BOARD_PAGE_RUNS = 20
     COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
-    CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; " \
-          "frame-ancestors 'none'; base-uri 'none'"
+    # 'self' only for what the app shell needs: app.js (which registers the
+    # service worker and nothing else), the manifest, the worker and the icons.
+    # No inline script, and the pages work without any.
+    CSP = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; " \
+          "manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+    # For the SVG icons, should one be opened on its own.
+    ASSET_CSP = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
     # same-origin rather than no-referrer: under no-referrer browsers send
     # `Origin: null` on form posts, which the CSRF check would refuse, and the
     # forms redirect back to the page named by the same-origin Referer.
@@ -138,6 +143,18 @@ module Cronwatch
 
       announce(request, base) if @generated && !@announced
 
+      # The app shell: the manifest, icons, service worker, app.js and the
+      # offline page. Served to anyone, since a browser fetches some of it
+      # without cookies and none of it says anything about the jobs.
+      if %w[GET HEAD].include?(method)
+        if path == "/offline"
+          return html(HTML.message_page("You are offline", "CronWatch shows live data from your app, so it needs a connection.", base), 200, "no-cache")
+        end
+
+        asset = PWA.asset(path, base)
+        return shell(asset, base) if asset
+      end
+
       # No token outside development: fail closed.
       if !@token && !@opted_out
         return wants_html ? html(HTML.message_page("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token: to Cronwatch::Web.new), or pass token: nil to serve them open behind your own auth.", base), 503) : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503)
@@ -162,9 +179,9 @@ module Cronwatch
           end
         unless cron_secret_ok || token_ok
           if @generated
-            return wants_html ? html(HTML.message_page("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base), 401) : api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401)
+            return wants_html ? html(HTML.message_page("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base, sign_in: true), 401) : api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401)
           end
-          return wants_html ? html(HTML.message_page("Sign in", "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.", base), 401) : api({ ok: false, error: "Unauthorized" }, 401)
+          return wants_html ? html(HTML.message_page("Sign in", "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.", base, sign_in: true), 401) : api({ ok: false, error: "Unauthorized" }, 401)
         end
         unless query.nil?
           # Move the token from the URL into a cookie so it is not in history or logs.
@@ -445,9 +462,19 @@ module Cronwatch
       [303, { "location" => location, "cache-control" => "no-store", **SECURITY_HEADERS, **headers }, []]
     end
 
-    def html(body, status = 200)
+    # An app shell file. The worker may be scoped to the base (it is served
+    # from there anyway); the SVGs get a CSP of their own.
+    def shell(asset, base)
+      headers = { "content-type" => asset.type, "cache-control" => asset.cache, **SECURITY_HEADERS }
+      headers["content-security-policy"] = ASSET_CSP if asset.type == "image/svg+xml"
+      headers["service-worker-allowed"] = "#{base}/" if asset.worker
+      headers["content-length"] = asset.body.bytesize.to_s
+      [200, headers, [asset.body]]
+    end
+
+    def html(body, status = 200, cache = "no-store")
       [status, {
-        "content-type" => "text/html; charset=utf-8", "cache-control" => "no-store",
+        "content-type" => "text/html; charset=utf-8", "cache-control" => cache,
         "content-security-policy" => CSP, "x-frame-options" => "DENY", "content-length" => body.bytesize.to_s,
         **SECURITY_HEADERS,
       }, [body]]

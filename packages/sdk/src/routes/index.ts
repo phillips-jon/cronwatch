@@ -4,6 +4,7 @@ import { constantTimeEqual, json } from "../http.js";
 import { parseDuration } from "../duration.js";
 import type { Duration, JobSummary, Run } from "../types.js";
 import { dashboardPage, jobPage, messagePage } from "./html.js";
+import { staticAsset, type StaticAsset } from "./pwa.js";
 import { BOARD_BEHIND_MS, BOARD_LANES, BOARD_RUNS, weekRunsLimit, type LaneInput } from "./timeline.js";
 
 export interface RoutesOptions {
@@ -86,7 +87,12 @@ async function boardLanes(cw: CronWatch, entries: { job: JobSummary; runs: Run[]
   }));
 }
 
-const CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+// 'self' only for what the app shell needs: app.js (which registers the
+// service worker and nothing else), the manifest, the worker and the icons.
+// No inline script, and the pages work without any.
+const CSP = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+/** For the SVG icons, should one be opened on its own. */
+const ASSET_CSP = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";
 // same-origin rather than no-referrer: under no-referrer browsers send
 // `Origin: null` on form posts, which the CSRF check would refuse, and the
 // forms redirect back to the page named by the same-origin Referer.
@@ -263,6 +269,17 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
       console.info(developmentSignInLine(publicOrigin, base, token!));
     }
 
+    // The app shell: the manifest, icons, service worker, app.js and the
+    // offline page. Served to anyone, since a browser fetches some of it
+    // without cookies and none of it says anything about the jobs.
+    if (method === "GET" || method === "HEAD") {
+      if (path === "/offline") {
+        return html(messagePage("You are offline", "CronWatch shows live data from your app, so it needs a connection.", base), 200, "no-cache");
+      }
+      const asset = staticAsset(path, base);
+      if (asset) return shell(asset, base);
+    }
+
     // No token outside development: fail closed.
     if (!token && !optedOut) {
       return wantsHtml
@@ -290,11 +307,11 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
       if (!cronSecretOk && !tokenOk) {
         if (generated) {
           return wantsHtml
-            ? html(messagePage("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base), 401)
+            ? html(messagePage("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base, true), 401)
             : api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401);
         }
         return wantsHtml
-          ? html(messagePage("Sign in", `Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.`, base), 401)
+          ? html(messagePage("Sign in", `Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.`, base, true), 401)
           : api({ ok: false, error: "Unauthorized" }, 401);
       }
       if (query !== null) {
@@ -442,12 +459,23 @@ function redirect(location: string, headers: Record<string, string> = {}): Respo
   return new Response(null, { status: 303, headers: { location, "cache-control": "no-store", ...SECURITY_HEADERS, ...headers } });
 }
 
-function html(body: string, status = 200): Response {
+/**
+ * An app shell file. The worker may be scoped to the base (it is served from
+ * there anyway); the SVGs get a CSP of their own.
+ */
+function shell(asset: StaticAsset, base: string): Response {
+  const headers: Record<string, string> = { "content-type": asset.type, "cache-control": asset.cache, ...SECURITY_HEADERS };
+  if (asset.type === "image/svg+xml") headers["content-security-policy"] = ASSET_CSP;
+  if (asset.worker) headers["service-worker-allowed"] = `${base}/`;
+  return new Response(asset.body, { status: 200, headers });
+}
+
+function html(body: string, status = 200, cache = "no-store"): Response {
   return new Response(body, {
     status,
     headers: {
       "content-type": "text/html; charset=utf-8",
-      "cache-control": "no-store",
+      "cache-control": cache,
       "content-security-policy": CSP,
       "x-frame-options": "DENY",
       ...SECURITY_HEADERS,

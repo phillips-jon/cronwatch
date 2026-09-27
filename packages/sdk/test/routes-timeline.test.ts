@@ -64,7 +64,7 @@ test("the board draws a day timeline: due ticks, runs as wide as they took, a mi
   assert.match(html, /<span class="nowlabel"[^>]*>now 09:30<\/span>/);
   assert.match(html, /<ul class="vh"><li>busy \(every 5m\): /, "the same in words for screen readers");
   assert.match(html, /@media\(prefers-reduced-motion:reduce\)\{[^}]*animation:none!important/);
-  assert.doesNotMatch(html, /<script/i);
+  assert.doesNotMatch(html.replace(`<script src="/cronwatch/app.js" defer></script>`, ""), /<script/i, "drawn without script");
   assert.equal(/<p class="headline">(.*?)<\/p>/.exec(html)![1], "4 jobs, <b>2 needing attention</b>.");
 });
 

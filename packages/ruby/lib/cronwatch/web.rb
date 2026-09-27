@@ -13,6 +13,8 @@ rescue LoadError => e
 end
 
 require "cronwatch" unless defined?(Cronwatch::Client)
+require_relative "web/icons"
+require_relative "web/pwa"
 require_relative "web/html"
 require_relative "web/timeline"
 require_relative "web/app"

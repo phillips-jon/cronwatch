@@ -356,6 +356,8 @@ end
 
 Without Devise, a routing constraint does the same job: `constraints ->(request) { AdminSession.valid?(request) } do ... end` around the mount.
 
+The dashboard installs as an app on a desktop, an Android phone or an iPhone ([Install it as an app](/docs/dashboard/#install-it-as-an-app)): its manifest, icons and service worker are served under the mount point without the token, and hold nothing about your jobs. Browsers fetch the manifest without cookies, so behind your own sign in the dashboard installs only if that check lets the shell paths (`manifest.webmanifest`, `icons/`, `sw.js`, `app.js` and `offline` under the mount) through; otherwise it stays a web page. On an iPhone the home screen app keeps its own cookies, so paste the token into the sign-in page's form once inside the app.
+
 A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` as the rest of Rails does, so there is no `trustProxy` option as in the TypeScript routes. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign. Behind more than one proxy, set `origin:`: where `X-Forwarded-Host` or `X-Forwarded-Proto` lists several values, Rack takes the last, the hop nearest the app, rather than the public one. The host is compared lowercased, as browsers send it. To pin it instead, pass `origin:`:
 
 ```ruby
