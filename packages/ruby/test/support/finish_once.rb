@@ -74,8 +74,12 @@ module FinishOnceAcrossProcesses
     at_once(-> { one[:cw].record_run(done) }, -> { two[:cw].record_run(done) })
     assert_equal 1, one[:cw].store.get_state("db:rollup").consecutive_failures
     assert_equal [], one[:alerts].types + two[:alerts].types
-    assert((one[:errors] + two[:errors]).any? { |e| e.include?("pgcron:9 of db:rollup was already finished as failed; ignored") },
-           (one[:errors] + two[:errors]).inspect)
+    # Threads really race here, unlike the SDK's Promise.all: the second
+    # process either collides with the first write and reports it, or reads
+    # the run after it finished and skips it quietly. Both judge it once.
+    errors = one[:errors] + two[:errors]
+    assert(errors.all? { |e| e.include?("pgcron:9 of db:rollup was already finished as failed; ignored") }, errors.inspect)
+    assert_operator errors.length, :<=, 1, errors.inspect
   end
 
   def test_many_processes_starting_and_finishing_one_id_exactly_one_finish_is_recorded
