@@ -148,7 +148,7 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 ${body}
   </main>
   <footer>
-    <p>© ${new Date().getFullYear()} CronWatch. MIT. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>. Every alert, reply, mark and board row here is real output from the library, for six sample jobs. The two diagrams labelled as illustrations are drawn by hand.</p>
+    <p>© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>.</p>
     <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
   </footer>
 </div>
