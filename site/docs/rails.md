@@ -336,7 +336,7 @@ end
 - `client`: the client to serve. Leave it out and each request uses `Cronwatch.client` at that moment.
 - `token`: leave it out to read `CRONWATCH_TOKEN`. An empty string, passed or in the variable, counts as unset. `nil` opts out of the token entirely and serves the app to anyone who reaches it, for a mount that sits behind your own sign in.
 - `base_path`: where it is mounted, so links resolve. It defaults to the mount point Rack reports (`SCRIPT_NAME`), which is right under Rails' `mount` and Rack's `map`.
-- `origin`: the public origin, such as `"https://app.example.com"`, to use in place of each request's own (see below). An empty string counts as unset; anything that is not an absolute `http` or `https` URL raises `ArgumentError` when the routes load.
+- `origin`: the public origin, such as `"https://app.example.com"`, to use in place of each request's own (see below). It is read as the TypeScript routes read it: whitespace around it is dropped, the host is lowercased and a host that is not ASCII becomes punycode (through the `simpleidn` gem, or Addressable when the app has it; without either, write it as `xn--...`). An empty string counts as unset; anything that is not an absolute `http` or `https` URL, or has a port outside 1 to 65535, raises `ArgumentError` when the routes load.
 
 Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token, while `Rails.env` is `development` or `test`, it makes a token of its own (32 random bytes, new each time the app boots) and prints a sign-in link to the server's standard output on its first request:
 
@@ -356,7 +356,7 @@ end
 
 Without Devise, a routing constraint does the same job: `constraints ->(request) { AdminSession.valid?(request) } do ... end` around the mount.
 
-A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` as the rest of Rails does, so there is no `trustProxy` option as in the TypeScript routes. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign. To pin it instead, pass `origin:`:
+A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` as the rest of Rails does, so there is no `trustProxy` option as in the TypeScript routes. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign. Behind more than one proxy, set `origin:`: where `X-Forwarded-Host` or `X-Forwarded-Proto` lists several values, Rack takes the last, the hop nearest the app, rather than the public one. The host is compared lowercased, as browsers send it. To pin it instead, pass `origin:`:
 
 ```ruby
 mount Cronwatch::Web.new(Cronwatch.client, origin: ENV["APP_ORIGIN"]) => "/cronwatch"

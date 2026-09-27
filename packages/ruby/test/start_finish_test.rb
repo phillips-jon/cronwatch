@@ -238,4 +238,61 @@ class StartFinishTest < Minitest::Test
     assert_equal "first\nsecond", finished.output
     assert_equal({ "n" => 2 }, cw.get_run(run.id).metrics)
   end
+
+  # An Interrupt (or Timeout) while finish writes: it is raised, the run is
+  # still running, and the handle takes finish again with its lines.
+  def test_an_interrupt_mid_finish_leaves_the_handle_retryable
+    store = Class.new(Cronwatch::Stores::Memory) do
+      attr_accessor :boom
+
+      def update_run(run)
+        if boom
+          self.boom = false
+          raise Interrupt
+        end
+        super
+      end
+    end.new
+    cw, = client(store: store)
+    run = cw.job("sync", timeout: "5m").start
+    run.log("working")
+    store.boom = true
+    assert_raises(Interrupt) { run.finish }
+    assert run.active?
+    assert_equal :running, store.get_run(run.id).status
+    finished = run.finish
+    assert_equal :ok, finished.status
+    assert_equal "working", store.get_run(run.id).output
+    refute run.active?
+    assert_equal [], @errors
+  end
+
+  # A start whose row later reads as missing (written inside a transaction
+  # that rolled back) is inserted at finish, as execute inserts a start it
+  # could not record.
+  def test_a_started_run_gone_from_the_store_is_inserted_at_finish
+    inner = Cronwatch::Stores::Memory.new
+    cw, = client(store: inner)
+    run = cw.job("sync").start
+    run.log("done")
+    inner.instance_variable_get(:@runs).delete(run.id)
+    finished = run.finish
+    assert_equal :ok, finished.status
+    assert_equal :ok, cw.get_run(run.id).status
+    assert_equal "done", cw.get_run(run.id).output
+    assert_equal 1, cw.runs("sync").size
+  end
+
+  # A resumed run that is gone at finish (its job forgotten, say) is not
+  # recreated: only a start this handle made is inserted again.
+  def test_a_resumed_run_gone_from_the_store_is_not_recreated
+    inner = Cronwatch::Stores::Memory.new
+    cw, = client(store: inner)
+    job = cw.job("sync")
+    job.start(id: "evt-1")
+    run = job.resume("evt-1")
+    inner.instance_variable_get(:@runs).delete("evt-1")
+    run.finish
+    assert_nil cw.get_run("evt-1")
+  end
 end

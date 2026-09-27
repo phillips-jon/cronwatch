@@ -113,7 +113,17 @@ module Cronwatch
           next nil
         end
 
-        @finish.call(@state.synchronize { @recorder }, outcome)
+        begin
+          @finish.call(@state.synchronize { @recorder }, outcome)
+        rescue Exception # rubocop:disable Lint/RescueException
+          # An Interrupt or Timeout mid-finish: the run may still be running,
+          # so the handle stays open (lines kept) for finish to be called again.
+          @state.synchronize do
+            @finish_called = false
+            @finished = false
+          end
+          raise
+        end
       end
     end
 

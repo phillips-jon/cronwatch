@@ -108,6 +108,84 @@ class WebOriginTest < Minitest::Test
     assert_nil Cronwatch::Web.configured_origin("")
   end
 
+  # What `new URL(value).origin` gives for each, in Node 24.
+  def test_the_origin_is_read_as_the_url_parser_reads_it
+    {
+      " https://app.example.com " => "https://app.example.com",
+      "\thttps://a.example\n" => "https://a.example",
+      "https://app.exa\tmple.com" => "https://app.example.com",
+      "https://APP.example.com." => "https://app.example.com.",
+      "https://user:pw@app.example.com" => "https://app.example.com",
+      "https://app.example.com:" => "https://app.example.com",
+      "https:app.example.com" => "https://app.example.com",
+      "https:/app.example.com" => "https://app.example.com",
+      "https:\\\\app.example.com" => "https://app.example.com",
+      "https://[::1]:8080" => "https://[::1]:8080",
+      "https://[0:0::1]" => "https://[::1]",
+      "https://127.1" => "https://127.0.0.1",
+      "https://0x7f.1" => "https://127.0.0.1",
+      "https://app.example.com:0080" => "https://app.example.com:80",
+      "https://a_b.example.com" => "https://a_b.example.com",
+      "https://%61pp.example" => "https://app.example",
+      "https://xn--bcher-kva.example" => "https://xn--bcher-kva.example",
+      "https://65535.example:65535" => "https://65535.example:65535",
+    }.each do |given, expected|
+      assert_equal expected, Cronwatch::Web.configured_origin(given), given.inspect
+    end
+  end
+
+  def test_an_origin_with_a_port_outside_1_to_65535_or_a_bad_host_raises
+    ["https://app.example.com:0", "https://app.example.com:65536", "https://app.example.com:99999999999"].each do |given|
+      error = assert_raises(ArgumentError, given) { Cronwatch::Web.configured_origin(given) }
+      assert_equal "routes: origin has a port outside 1 to 65535, got #{Cronwatch::JS.json(given)}", error.message
+    end
+    ["https://ex ample.com", "https://app.example.com:8x", "https://[::1", "https://[nope]", "https://256.1.1.1", "https://1.2.3.4.5",
+     "https://%zz.example", "https://%ff.example", "http://", "https:", "https://@", "https://a<b"].each do |given|
+      error = assert_raises(ArgumentError, given) { Cronwatch::Web.configured_origin(given) }
+      assert_match(/\Aroutes: origin must be an absolute URL/, error.message, given)
+    end
+    assert_raises(ArgumentError) { Cronwatch::Web.configured_origin(:sym) }
+  end
+
+  # A non-ASCII host becomes punycode through URI::IDNA, the simpleidn gem
+  # or Addressable, whichever is there; with none of them it raises clearly.
+  def test_a_non_ascii_host_is_converted_to_punycode_or_refused_clearly
+    idna = Cronwatch::Web::Origin
+    if defined?(::SimpleIDN) || defined?(::Addressable::IDNA) || defined?(URI::IDNA)
+      assert_equal "https://xn--bcher-kva.example", Cronwatch::Web.configured_origin("https://Bücher.example")
+    else
+      stub = Module.new do
+        def self.to_ascii(host) = host == "bücher.example" ? "xn--bcher-kva.example" : raise("unexpected #{host}")
+      end
+      Object.const_set(:SimpleIDN, stub)
+      begin
+        assert_equal "https://xn--bcher-kva.example", Cronwatch::Web.configured_origin("https://Bücher.example")
+      ensure
+        Object.send(:remove_const, :SimpleIDN)
+      end
+      # As in an app without the simpleidn gem.
+      idna.define_singleton_method(:require) { |_name| raise LoadError }
+      begin
+        error = assert_raises(ArgumentError) { Cronwatch::Web.configured_origin("https://bücher.example") }
+        assert_equal 'routes: origin has a host that is not ASCII, got "https://bücher.example"; write it in punycode ' \
+                     "(xn--...) or add the simpleidn gem", error.message
+      ensure
+        idna.singleton_class.send(:remove_method, :require)
+      end
+    end
+  end
+
+  # Rack's base_url keeps the Host header's case; browsers send Origin lowercased.
+  def test_a_mixed_case_host_matches_the_browsers_lowercase_origin
+    cw, _, send = app("http://App.Example.com")
+    cw.run("x") { nil }
+    ok = send.call("POST", "/cronwatch/check", COOKIE.merge("origin" => "http://app.example.com", "host" => "App.Example.com"))
+    assert_equal 303, ok.status
+    forwarded = { "x-forwarded-proto" => "https", "x-forwarded-host" => "App.Example.com" }
+    ok = send.call("POST", "/cronwatch/check", COOKIE.merge(forwarded, "origin" => "https://app.example.com"))
+    assert_equal 303, ok.status
+  end
+
   def test_the_development_sign_in_line_uses_the_public_origin
     lines = []
     with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do

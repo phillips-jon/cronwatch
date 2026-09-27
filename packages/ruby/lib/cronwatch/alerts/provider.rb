@@ -34,7 +34,8 @@ module Cronwatch
         response = http.post(url, body, headers)
         return response if response.ok?
 
-        text = JS.head16(Output.utf8(response.body.to_s), 200)
+        # response.text() drops a leading byte order mark.
+        text = JS.head16(Output.utf8(response.body.to_s).delete_prefix("\u{FEFF}"), 200)
         secrets.each do |secret|
           next if secret.nil? || JS.length16(secret.to_s) < 4
 

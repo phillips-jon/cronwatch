@@ -73,4 +73,43 @@ class ActiveRecordPgCronTest < Minitest::Test
     end
     assert_empty errors
   end
+
+  # A class with a replica that cannot be reached, as a lagging or absent one would be.
+  def self.replicated_class
+    @replicated_class ||= begin
+      klass = Class.new(ActiveRecord::Base) { self.abstract_class = true }
+      Object.const_set("CronwatchTestPgCronReplicatedRecord", klass)
+      replica = URI(PGCRON).tap { |u| u.port = 1 }.to_s
+      klass.connects_to(database: { writing: PGCRON, reading: replica })
+      klass
+    end
+  end
+
+  # The reader, like the store, reads on the writing role whatever role the app has switched to.
+  def test_the_reader_uses_the_writing_role_inside_connected_to_reading
+    @klass.connection_pool.with_connection do |conn|
+      conn.exec_query("SELECT cron.schedule($1, '1 seconds', 'SELECT 1')", "schedule", ["#{@tag}-role"])
+    end
+    sleep 2.5
+    store = Cronwatch::Stores::ActiveRecord.new(prefix: @prefix, connection_class: @klass)
+    picks = ->(job) { job.jobname.to_s.start_with?(@tag) }
+    cases = {
+      "replica configured" => [self.class.replicated_class, -> { ActiveRecord::Base.connected_to(role: :reading, prevent_writes: true) { yield_check } }],
+      "no replica" => [@klass, -> { ActiveRecord::Base.connected_to(role: :reading) { yield_check } }],
+      "preventing writes" => [@klass, -> { ActiveRecord::Base.while_preventing_writes { yield_check } }],
+    }
+    cases.each_with_index do |(label, (db, around)), i|
+      errors = []
+      client = Cronwatch.new(store: store, alerts: [], cron_secret: nil, on_error: ->(e, where) { errors << "#{where}: #{e.class}: #{e.message}" },
+                             sources: [Cronwatch::Sources::PgCron.new(db, jobs: picks, prefix: "r#{i}:")])
+      @check = -> { client.check }
+      around.call
+      assert_empty errors, label
+      refute_empty client.runs("r#{i}:#{@tag}-role"), label
+    end
+  end
+
+  def yield_check
+    @check.call
+  end
 end

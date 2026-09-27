@@ -807,7 +807,7 @@ module Cronwatch
           report(e, "starting #{name}")
         end
       end
-      run_handle(definition, run.id, run, recorded, nil)
+      run_handle(definition, run.id, run, recorded, nil, started: true)
     end
 
     # A handle on a stored run. One still running, or marked timeout by a check, can be finished.
@@ -824,11 +824,12 @@ module Cronwatch
     # whether its start is in the store, and `inactive` why finish has
     # nothing to do, or nil. The handle keeps its lines and metrics until
     # flush or finish merges them onto a fresh read of the stored run.
-    def run_handle(definition, id, base, recorded, inactive)
+    # `started` is true for a handle whose run this process inserted.
+    def run_handle(definition, id, base, recorded, inactive, started: false)
       name = definition.name
       RunHandle.new(
         id: id, job: name, started_at: base&.started_at, inactive: inactive,
-        finish: ->(recorder, outcome) { finish_handle(definition, id, base, recorded, recorder, outcome) },
+        finish: ->(recorder, outcome) { finish_handle(definition, id, base, recorded, recorder, outcome, started) },
         flush: recorded ? ->(lines, metrics) { flush_handle(name, id, lines, metrics) } : nil,
         ignored: ->(why) { ignore_finish(id, name, why) },
       )
@@ -843,12 +844,21 @@ module Cronwatch
     # RunHandle#finish, in turn with the handle's flushes: the stored run,
     # read again, with the handle's lines and metrics added, judged like any
     # run. Returns the run as recorded, or nil when nothing was.
-    def finish_handle(definition, id, base, recorded, recorder, outcome)
+    def finish_handle(definition, id, base, recorded, recorder, outcome, started = false)
       name = definition.name
       from = base
       if recorded
         begin
-          from = @store.get_run(id) || base
+          stored = @store.get_run(id)
+          if stored
+            from = stored
+          elsif started
+            # Inserted by this process, yet gone: the start was written
+            # inside a transaction that rolled back (on SQLite the store
+            # joins the app's). Insert it now, as execute does for a start
+            # it could not record.
+            recorded = false
+          end
         rescue StandardError => e
           report(e, "finishing #{name}")
         end
