@@ -20,6 +20,7 @@
  */
 import { createHash, createHmac } from "node:crypto";
 import { createServer } from "node:http";
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 export const MAX_BODY = 16 * 1024;
@@ -225,7 +226,9 @@ export function createContactServer(config, { log = (line) => console.log(line) 
 
 /* ---- Run ---- */
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// The unit starts this through the /var/www/cronwatch.dev symlink, and Node
+// reports import.meta.url with symlinks resolved, so compare real paths.
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   let config;
   try {
     config = readConfig(process.env);
