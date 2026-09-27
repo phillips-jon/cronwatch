@@ -163,14 +163,20 @@ class PgCronTest < Minitest::Test
     assert_equal ["missed db:nightly-vacuum", "recovered db:pg_cron:2"], later.alerts.map { |a| "#{a.type} #{a.job}" }.sort
     assert_empty cw.check.alerts, "each condition alerts once"
 
-    # Unscheduled: its name keeps its history but loses its schedule, so it is never missed again.
+    # Unscheduled: its name keeps its history but loses its schedule, so it is never missed again,
+    # and the missed alert it had open closes with a recovery that says so.
     cron.jobs.shift
     clock.now = Time.utc(2026, 1, 8, 3, 11).to_i * 1000
     gone = cw.check
     vacuum_now = job_named(gone, "db:nightly-vacuum")
     assert_nil vacuum_now.definition.schedule
     assert_match(/no longer watched/, vacuum_now.definition.description)
-    refute(gone.alerts.any? { |a| a.job == "db:nightly-vacuum" }, "no alert for an unscheduled job")
+    assert_equal [:failed], vacuum_now.open, "its failure stays open until a successful run"
+    closed = gone.alerts.select { |a| a.job == "db:nightly-vacuum" }
+    assert_equal [:recovered], closed.map(&:type)
+    assert_equal "db:nightly-vacuum is no longer scheduled", closed[0].title
+    assert_equal({ after: [:missed], reason: :unscheduled, since: Time.utc(2026, 1, 6, 3, 11).to_i * 1000 }, closed[0].details)
+    refute(cw.check.alerts.any? { |a| a.job == "db:nightly-vacuum" }, "once")
     assert_equal 20, cw.runs("db:nightly-vacuum", 100).length, "its history is kept"
   end
 
@@ -287,6 +293,28 @@ class PgCronTest < Minitest::Test
     assert_equal "* * * * *", PgCron.schedule("* * * * * *")
     assert_equal "0 0 L * *", PgCron.schedule("0 0 $ * * extra")
     assert_equal "@hourly", PgCron.schedule("@hourly")
+  end
+
+  def test_a_job_paused_or_renamed_while_missed_closes_missed_with_a_recovery
+    clock = Clock.new
+    cron = FakeCron.new
+    cron.job(1, "hourly", "0 * * * *")
+    cron.job(2, "rollup", "0 * * * *")
+    cron.add(1, "succeeded", T0 - (3 * HOUR), T0 - (3 * HOUR) + 1000)
+    cron.add(2, "succeeded", T0 - (3 * HOUR), T0 - (3 * HOUR) + 1000)
+    capture = Capture.new
+    cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [capture], now: clock.to_proc, cron_secret: nil,
+                       sources: [PgCron.new(cron)])
+    cw.check
+    assert_equal ["missed hourly", "missed rollup"], capture.alerts.map { |a| "#{a.type} #{a.job}" }.sort
+    cron.jobs[0]["active"] = false
+    cron.jobs[1]["jobname"] = "rollup-v2"
+    clock.advance(MIN)
+    result = cw.check
+    assert_equal ["recovered hourly hourly is no longer scheduled", "recovered rollup rollup is no longer scheduled"],
+                 result.alerts.map { |a| "#{a.type} #{a.job} #{a.title}" }.sort
+    clock.advance(MIN)
+    assert_equal [], cw.check.alerts
   end
 
   def test_a_renamed_job_leaves_no_scheduled_ghost_in_this_process_or_the_next

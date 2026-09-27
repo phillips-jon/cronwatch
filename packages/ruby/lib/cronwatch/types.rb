@@ -226,6 +226,7 @@ module Cronwatch
       run = Naming.fetch(hash, "run")
       details = Naming.from_json_value(Naming.fetch(hash, "details") || {})
       details[:after] = details[:after].map(&:to_sym) if details[:after].is_a?(Array)
+      details[:reason] = details[:reason].to_sym if details[:reason].is_a?(String)
       alert = new(
         type: Naming.fetch(hash, "type")&.to_sym,
         run: run && Run.from_h(run),

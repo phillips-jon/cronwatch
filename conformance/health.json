@@ -3314,6 +3314,58 @@
         "undelivered": []
       },
       "stale": false
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": 1767601800000
+        }
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": false
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": 1767601800000
+        }
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "missed": 1767605460000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
     }
   ]
 }

@@ -55,6 +55,6 @@ With the MCP server configured (`claude mcp add cronwatch -e CRONWATCH_URL=... -
 - stuck: a run started and never reported finishing within `timeout` (default 1h); it is marked timeout. Often a killed process.
 - slow: a successful run took longer than `maxDuration`, or, without one, more than twice the recent p95 and over 10s once there are five runs to compare.
 - over_budget: a metric went above its `budget` ceiling, or, without one, three times the recent median once there are five runs to compare.
-- recovered: not a condition but the alert sent when a successful run leaves nothing open. One message names everything that closed.
+- recovered: not a condition but the alert sent when a successful run leaves nothing open. One message names everything that closed. A job that loses its schedule while missed gets one from the next check instead, titled "<job> is no longer scheduled", for missed alone.
 
 Docs: https://cronwatch.dev/docs

@@ -129,7 +129,13 @@ export interface AlertDetails {
   stuck: { consecutiveFailures: number; threshold: number };
   slow: { durationMs: number; thresholdMs: number; basis: string };
   over_budget: { breaches: BudgetBreach[] };
-  recovered: { after: Condition[] };
+  /**
+   * `after` names the conditions that closed. A recovery with `reason`
+   * "unscheduled" closes missed alone because the job no longer has a
+   * schedule; `since` is when missed opened. Without `reason`, a successful
+   * run closed everything that was open.
+   */
+  recovered: { after: Condition[]; reason?: "unscheduled"; since?: number };
 }
 
 /** An alert before it has a title and message. See composeAlert(). */

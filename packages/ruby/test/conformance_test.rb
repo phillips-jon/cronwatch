@@ -280,6 +280,7 @@ class ConformanceTest < Minitest::Test
   def draft_from(hash)
     details = Cronwatch::Naming.from_json_value(hash["details"])
     details[:after] = details[:after].map(&:to_sym) if details[:after]
+    details[:reason] = details[:reason].to_sym if details[:reason]
     Cronwatch::AlertDraft.new(type: hash["type"].to_sym, run: hash["run"] && Cronwatch::Run.from_h(hash["run"]), details: details)
   end
 
