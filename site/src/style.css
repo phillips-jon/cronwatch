@@ -222,13 +222,15 @@ footer button:hover { color: var(--ink); }
 
 /* Docs */
 .docs { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; align-items: start; padding: 40px 0; }
-.docs-side { position: sticky; top: 24px; }
+.docs-side { position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; }
 .docs-side p { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
 .docs-side ol, .docs-menu ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .docs-side a, .docs-menu a { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline; padding: 4px 0; text-decoration: none; font-size: 17px; color: var(--body); }
 .docs-side a span:first-child, .docs-menu a span:first-child { font: 400 11px/1 var(--mono); color: var(--muted); }
 .docs-side a:hover, .docs-menu a:hover { color: var(--ink); }
 .docs-side a.here, .docs-menu a.here { color: var(--ink); font-weight: 600; }
+.docs-side .group p, .docs-menu .group p { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 12px 0 4px 30px; }
+.docs-side .group ol, .docs-menu .group ol { padding: 0 0 12px; }
 .docs-menu { display: none; }
 .doc { min-width: 0; max-width: 66ch; }
 .doc > * + * { margin-top: 16px; }

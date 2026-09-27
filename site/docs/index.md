@@ -120,7 +120,7 @@ GET /cronwatch/api/check
 Authorization: Bearer <CRON_SECRET>
 ```
 
-See [Next.js and Vercel](/docs/nextjs/) and [Servers and scripts](/docs/node/) for the full shapes.
+See [Next.js and Vercel](/docs/nextjs/) and [Servers and scripts](/docs/node/) for the full shapes. Other frameworks and schedulers have pages of their own: [SvelteKit](/docs/sveltekit/), [Nuxt and Nitro](/docs/nuxt/), [React Router and Remix](/docs/react-router/), [NestJS](/docs/nestjs/), [Strapi](/docs/strapi/), [Netlify](/docs/netlify/), [Firebase](/docs/firebase/), [Convex](/docs/convex/), [Trigger.dev](/docs/trigger-dev/) and [Inngest](/docs/inngest/).
 
 ## What you get
 

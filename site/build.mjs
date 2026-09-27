@@ -383,7 +383,21 @@ function build() {
     const route = name === "index" ? "/docs/" : `/docs/${name}/`;
     return { name, route, meta, body, order: Number(meta.order ?? 999) };
   }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-  const docList = (here) => `<ol>${pages.map((p, i) => `<li><a href="${p.route}"${p.route === here ? ' class="here" aria-current="page"' : ""}><span>${String(i + 1).padStart(2, "0")}</span><span>${escape(p.meta.title)}</span></a></li>`).join("")}</ol>`;
+  // Pages that share a frontmatter `group` are listed under its name. Give
+  // them neighbouring `order` values, or the group is started twice.
+  const docList = (here) => {
+    let html = "", open = null;
+    for (const [i, p] of pages.entries()) {
+      const group = p.meta.group || null;
+      if (group !== open) {
+        if (open) html += "</ol></li>";
+        if (group) html += `<li class="group"><p>${escape(group)}</p><ol>`;
+        open = group;
+      }
+      html += `<li><a href="${p.route}"${p.route === here ? ' class="here" aria-current="page"' : ""}><span>${String(i + 1).padStart(2, "0")}</span><span>${escape(p.meta.title)}</span></a></li>`;
+    }
+    return `<ol>${html}${open ? "</ol></li>" : ""}</ol>`;
+  };
 
   for (const [i, page] of pages.entries()) {
     const html = curlyApostrophes(marked.parse(page.body));
