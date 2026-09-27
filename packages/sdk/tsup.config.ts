@@ -9,6 +9,7 @@ export default defineConfig({
     discord: "src/alerts/discord.ts",
     webhook: "src/alerts/webhook.ts",
     anthropic: "src/triage/anthropic.ts",
+    "pg-cron": "src/sources/pgcron.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

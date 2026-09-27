@@ -12,7 +12,7 @@ export function cronwatch(options: CronWatchOptions = {}): CronWatch {
 }
 
 export { CronWatch, consoleChannel, custom } from "./client.js";
-export type { CronWatchOptions, HandlerFn, HandlerOptions, JobFn, JobHandle } from "./client.js";
+export type { CronWatchOptions, HandlerFn, HandlerOptions, JobFn, JobHandle, RecordRunOptions, Source, SourceHost } from "./client.js";
 export type { JobContext } from "./job.js";
 export { memory } from "./stores/memory.js";
 export { createRoutes } from "./routes/index.js";

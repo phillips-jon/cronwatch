@@ -49,6 +49,8 @@ A `prefix` must be a plain lowercase identifier: lowercase letters, digits and u
 
 The tables are created inside a transaction that holds an advisory lock for the prefix, so many instances starting at once (serverless cold starts, several replicas) take turns instead of racing `CREATE TABLE IF NOT EXISTS`.
 
+Jobs that pg_cron runs inside the same database (Supabase Cron included) can be watched too, by reading pg_cron's own tables on every check: see [Supabase and pg_cron](/docs/supabase/).
+
 ## Retention
 
 Finished runs older than `retention` (default `30d`) are deleted by `check()`, at most once an hour. Pruning happens only there: recording runs never deletes anything, so an app that never checks (no `cw.start()`, no cron hitting the check endpoint, no `cw.check()` of its own) keeps every run until something does. Running rows are never pruned, and neither is each job's newest run, so a job that runs less often than the retention is not mistaken for one that never ran.
