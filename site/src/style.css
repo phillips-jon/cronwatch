@@ -96,7 +96,7 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .opening .say { font-weight: 400; font-size: clamp(1.6rem, 3.4vw, 2.6rem); line-height: 1.26; letter-spacing: -0.015em; max-width: 19em; text-wrap: pretty; }
 .opening .say b { font-weight: 600; }
 .opening .say i { font-style: italic; color: var(--muted); }
-.opening .then { margin-top: 24px; color: var(--body); max-width: 52ch; text-wrap: pretty; }
+.opening .then { margin-top: 24px; color: var(--ink); max-width: 52ch; text-wrap: pretty; }
 .install { display: inline-flex; align-items: center; gap: 14px; margin-top: 26px; background: var(--sunk); border: 1px solid var(--rule); border-radius: 3px; padding: 10px 10px 10px 14px; font: 400 14px/1.4 var(--mono); }
 .install code::before { content: "$ "; color: var(--muted); }
 /* One install box per language, side by side, each under a small label. */
@@ -107,7 +107,7 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .prompt-btn { display: inline-flex; align-items: center; gap: 9px; font: 500 14px/1 var(--mono); color: var(--sheet); background: var(--ink); border: 1px solid var(--ink); border-radius: 3px; padding: 11px 14px; }
 .prompt-btn:hover { opacity: .85; }
 .prompt-btn::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sheet); flex: none; }
-.prompt-note { font-size: 15px; color: var(--muted); }
+.prompt-note { font-size: 15px; color: var(--ink); }
 .prompt-note a { color: var(--ink); }
 details.peek { margin-top: 18px; }
 details.peek > summary { list-style: none; cursor: pointer; font: 400 13px/1.5 var(--mono); color: var(--muted); }
@@ -126,8 +126,8 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .row .body > h2 { font-size: 1.62rem; line-height: 1.22; max-width: 40ch; text-wrap: pretty; }
 /* Wide enough for every section heading to sit on one line: keep it there. */
 @media (min-width: 1100px) { .row .body > h2 { max-width: none; white-space: nowrap; } }
-.row .body > p { color: var(--body); max-width: 58ch; margin-top: 18px; text-wrap: pretty; }
-.row .body > p.small { font-size: 17px; color: var(--muted); }
+.row .body > p { color: var(--ink); max-width: 58ch; margin-top: 18px; text-wrap: pretty; }
+.row .body > p.small { font-size: 17px; color: var(--ink); }
 .row .body > p code, .row .body > p.small code { font-size: .86em; color: var(--ink); }
 .row .body > * + .out, .row .body > * + .install, .row .body > * + .catches { margin-top: 30px; }
 .row .body > * + p.small, .row .body > * + details.peek { margin-top: 24px; }
@@ -157,7 +157,7 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 
 /* A section's wide part: runs under both the label and the body. */
 .row > .span { grid-column: 1 / -1; min-width: 0; }
-.row .caption { margin-top: 14px; font-size: 16px; color: var(--muted); }
+.row .caption { margin-top: 14px; font-size: 16px; color: var(--ink); }
 .row .body > p.example { margin-top: 26px; font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .row .body > .example + .pair { margin-top: 14px; }
 
@@ -377,20 +377,20 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .catches li:first-child { border-top: 0; padding-top: 0; }
 .catches li code { font: 500 13px/1.5 var(--mono); }
 .catches li code.bad { color: var(--bad); } .catches li code.warn { color: var(--warn); } .catches li code.ok { color: var(--ok); }
-.catches li span { color: var(--body); font-size: 17px; }
+.catches li span { color: var(--ink); font-size: 17px; }
 .catches li span code { font-size: .82em; color: var(--ink); }
 
 /* Not found and server error: one centred block, nothing else. */
 .lost { display: grid; justify-items: center; text-align: center; padding: clamp(64px, 14vh, 150px) 0 clamp(72px, 16vh, 170px); }
 .lost .code { font: 300 clamp(5rem, 13vw, 8.5rem)/1 var(--serif); letter-spacing: -0.03em; color: var(--rule-2); }
 .lost h1 { margin-top: 10px; font-size: clamp(1.9rem, 4vw, 2.7rem); line-height: 1.15; letter-spacing: -0.015em; }
-.lost .line { margin-top: 14px; color: var(--body); max-width: 40ch; }
+.lost .line { margin-top: 14px; color: var(--ink); max-width: 40ch; }
 .lost .actions { justify-content: center; margin-top: 28px; }
 .lost .prompt-btn { text-decoration: none; }
 .lost .prompt-btn::before { display: none; }
 .ghost-btn { display: inline-flex; align-items: center; font: 500 14px/1 var(--mono); color: var(--ink); text-decoration: none; border: 1px solid var(--rule-2); border-radius: 3px; padding: 11px 14px; }
 .ghost-btn:hover { border-color: var(--ink); }
-.lost .note { margin-top: 26px; font-size: 16px; color: var(--muted); max-width: 44ch; }
+.lost .note { margin-top: 26px; font-size: 16px; color: var(--ink); max-width: 44ch; }
 .lost .note a { color: var(--muted); }
 .lost .note a:hover { color: var(--ink); }
 
@@ -427,7 +427,7 @@ footer button:hover { color: var(--ink); }
 .doc h3 { font-size: 1.15rem; margin-top: 26px; scroll-margin-top: 24px; }
 .doc .anchor { text-decoration: none; color: inherit; }
 .doc h2 .anchor:hover::after, .doc h3 .anchor:hover::after { content: " #"; color: var(--muted); }
-.doc p, .doc li { color: var(--body); }
+.doc p, .doc li { color: var(--ink); }
 .doc p > code, .doc li > code, .doc td > code, .doc h2 code, .doc h3 code { font-size: .8em; background: var(--sunk); border: 1px solid var(--rule); padding: 1px 4px; border-radius: 2px; color: var(--ink); }
 .doc ul, .doc ol { padding-left: 1.2em; margin: 0; }
 .doc li + li { margin-top: 5px; }
