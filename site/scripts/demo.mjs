@@ -3,13 +3,13 @@
 //
 //   node site/scripts/demo.mjs            serve it on http://localhost:4399/cronwatch/
 //   node site/scripts/demo.mjs --capture  write src/demo/alerts.txt, mcp.json,
-//                                         jobs.json and runs.json, which the
-//                                         landing page quotes (run with TZ=UTC)
+//                                         jobs.json and dashboard.html, which
+//                                         the landing page quotes (run with TZ=UTC)
 import { createServer } from "node:http";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { cronwatch, memory, parseSchedule, nextFire } from "../../packages/sdk/dist/index.js";
+import { cronwatch, memory } from "../../packages/sdk/dist/index.js";
 
 const MIN = 60_000, HOUR = 3_600_000;
 let clock = Date.now();
@@ -61,13 +61,15 @@ await at(T(3, 0), "invoice-run", 412, (j) => {
   throw err;
 });
 await at(T(4, 0), "daily-digest", 44_000, (j) => { j.metrics({ tokens: 131_000, cost: 3.4 }); j.log("Digest sent to 412 subscribers"); });
-for (let i = 12; i >= 1; i--) {
-  await at(now - (i - 1) * 15 * MIN - 5 * MIN, "embeddings-refresh", 240_000 + i * 1000, (j) => { j.metric("documents", 1_800 + i); });
+// A full day of the frequent jobs, so the dashboard's last-24-hours lanes
+// show the cadence they keep.
+for (let i = 96; i >= 1; i--) {
+  await at(now - (i - 1) * 15 * MIN - 5 * MIN, "embeddings-refresh", 230_000 + (i % 12) * 1000, (j) => { j.metric("documents", 1_800 + i); });
 }
 // sync-crm stops: its last run was 35m30s ago, so with a 5m grace its
 // deadline passed 30s before the check below, which is when a server calling
 // cw.start() would have said so.
-for (let i = 5; i >= 1; i--) {
+for (let i = 44; i >= 1; i--) {
   await at(now - (i - 1) * 30 * MIN - 35 * MIN - 30_000, "sync-crm", 8_000, (j) => { j.metric("contacts", 120 + i); });
 }
 // A backup that is running right now.
@@ -87,42 +89,10 @@ if (process.argv.includes("--capture")) {
   const jobsResponse = await routes.handler(new Request("http://localhost/cronwatch/api/jobs"));
   const { jobs: jobList } = await jobsResponse.json();
   writeFileSync(path.join(out, "jobs.json"), JSON.stringify({ capturedAt: clock, jobs: jobList }, null, 2) + "\n");
-
-  // Every time each job was *due* today, from the same parser the library
-  // uses, so the strip can show the cadence a job keeps and the slot it missed.
-  const expectedFor = (definition, runs, from, to) => {
-    const parsed = parseSchedule(definition.schedule, definition.timezone);
-    const out = [];
-    if (parsed.kind === "interval") {
-      // Intervals are anchored to the last run, so anchor the grid to a real
-      // one; otherwise the ticks would not line up with what happened.
-      const anchor = runs.length ? runs[0].startedAt : from;
-      for (let t = anchor; t >= from; t -= parsed.everyMs) out.unshift(t);
-      for (let t = anchor + parsed.everyMs; t <= to; t += parsed.everyMs) out.push(t);
-      return out;
-    }
-    let t = from - 1;
-    for (let i = 0; i < 500; i++) {
-      const next = nextFire(parsed, t, null);
-      if (next == null || next > to) break;
-      out.push(next);
-      t = next;
-    }
-    return out;
-  };
-
-  // Every run of the day so far, per job, for the strip on the landing page.
-  const dayStart = today.getTime();
-  const dayRuns = [];
-  for (const j of jobList) {
-    const runs = (await cw.runs(j.name, 200))
-      .filter((r) => r.startedAt >= dayStart)
-      .map((r) => ({ startedAt: r.startedAt, finishedAt: r.finishedAt, status: r.status, durationMs: r.durationMs }))
-      .sort((a, b) => a.startedAt - b.startedAt);
-    const expected = expectedFor(j.definition, runs, dayStart, dayStart + 86_400_000);
-    dayRuns.push({ name: j.name, schedule: j.definition.schedule, health: j.health, open: j.open, missedAt: j.open.includes("missed") ? j.nextExpectedAt : null, runs, expected });
-  }
-  writeFileSync(path.join(out, "runs.json"), JSON.stringify({ capturedAt: clock, dayStart, jobs: dayRuns }, null, 2) + "\n");
+  // The dashboard page itself, as cw.routes() serves it: the landing page
+  // redraws its last-24-hours timeline and its board from this.
+  const page = await routes.handler(new Request("http://localhost/cronwatch/"));
+  writeFileSync(path.join(out, "dashboard.html"), await page.text());
 
   // A real exchange with the MCP server, over stdio, against this same data.
   const server = createServer(async (req, res) => {
@@ -151,7 +121,7 @@ if (process.argv.includes("--capture")) {
   // After the capture: the fix ships, and the next night's invoice run succeeds.
   await at(T(3, 0, 1), "invoice-run", 19_600, (j) => { j.log("Loading 1,204 open invoices"); j.log("Sent 37 invoices"); j.metric("invoices", 37); });
   writeFileSync(path.join(out, "alerts.txt"), printed.join("\n\n") + "\n");
-  console.log(`wrote ${out}/alerts.txt, mcp.json, jobs.json and runs.json`);
+  console.log(`wrote ${out}/alerts.txt, mcp.json, jobs.json and dashboard.html`);
   await cw.close();
   process.exit(0);
 }

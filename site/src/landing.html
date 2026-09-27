@@ -14,16 +14,20 @@
 <section class="row day">
   <p class="label">Runs</p>
   <div class="body">
-    <h2>Six jobs, one day: what was due, and what ran.</h2>
-    <div class="scroll">{{STRIP}}</div>
-    <p class="small">Each faint tick is a moment a job was <b>due</b>, worked out from its schedule by the same parser the library uses, so you can read a job’s cadence straight off its row: one a day, one every half hour, one every quarter of an hour. Each solid mark is a run it actually recorded, as wide as the run took. The gap between those two things is the entire product. {{DAY_META}}, and every mark is real output, not a mockup.</p>
+    <h2>The dashboard, showing a day of six jobs.</h2>
+    <p>It mounts inside your app at <code>/cronwatch</code>. Each lane is a job: a faint tick each time it was due, a bar for each run it recorded, as long as the run took, and a dashed box where a run should have been and none came. The gap between the ticks and the bars is the whole product.</p>
+  </div>
+  <div class="span">
+    {{RUNS_FRAME}}
+    <p class="caption">The real dashboard, drawn from a demo store of six jobs. Nothing here is a mockup.</p>
   </div>
 </section>
 
 <section class="row">
   <p class="label">Failure</p>
   <div class="body">
-    <h2>The invoice run failed. Here is what each of them said.</h2>
+    <h2>When a job fails, cron says nothing. CronWatch tells you what broke.</h2>
+    <p class="example">Example: a nightly invoice job</p>
     <div class="pair">
       <figure class="side">
         <figcaption><b>Before</b> plain cron</figcaption>
@@ -86,10 +90,17 @@
   <div class="body">
     <h2>It notices what never ran.</h2>
     <p>Nothing threw and nothing ran, so nothing was logged. That is the failure cron never reports, and the one a check finds. The same check catches the run that started and never finished, and the one that cost three times what it should.</p>
-    <div class="out"><p class="from"><span>CronWatch</span><span>{{T_MISSED}}</span></p><pre translate="no">{{ALERT_MISSED}}</pre></div>
-    <div class="out"><p class="from"><span>CronWatch</span><span>{{T_BUDGET}}</span></p><pre translate="no">{{ALERT_BUDGET}}</pre></div>
-    <div class="out"><p class="from"><span>CronWatch</span><span>{{T_RECOVERED}}</span></p><pre translate="no">{{ALERT_RECOVERED}}</pre></div>
+    <figure class="out ill play-on-view">
+      <figcaption class="from"><span>Illustration</span><span>how the checks decide</span></figcaption>
+      <div class="illbox">{{CHECKS_ILL}}</div>
+    </figure>
     <p class="small">Every condition sends one message when it opens. When a successful run leaves nothing open, one recovered message names everything that was. A job that fails all night pages you once, and the fix announces itself. The check runs from <code>cw.start()</code> in a long-running server, from a cron hitting <code>/cronwatch/api/check</code> on Vercel, from a Cron Trigger of its own on Workers, or in Rails as <code>Cronwatch::CheckJob</code>, scheduled every five minutes beside your other recurring jobs.</p>
+    <details class="peek">
+      <summary>Example alerts</summary>
+      <div class="out"><p class="from"><span>CronWatch</span><span>{{T_MISSED}}</span></p><pre translate="no">{{ALERT_MISSED}}</pre></div>
+      <div class="out"><p class="from"><span>CronWatch</span><span>{{T_BUDGET}}</span></p><pre translate="no">{{ALERT_BUDGET}}</pre></div>
+      <div class="out"><p class="from"><span>CronWatch</span><span>{{T_RECOVERED}}</span></p><pre translate="no">{{ALERT_RECOVERED}}</pre></div>
+    </details>
   </div>
 </section>
 
@@ -111,33 +122,34 @@
 <section class="row">
   <p class="label">Agents</p>
   <div class="body">
-    <h2>Your agent reads the same records.</h2>
-    <p>CronWatch ships an MCP server. Claude Code, Cursor or any MCP client can list what is failing, read the error and the output, and silence a job while it fixes it. A <a href="/docs/agent-skill/">Claude Code skill</a> in the repo teaches the agent to add monitoring to a job as it writes it.</p>
+    <h2>Ask your coding agent what failed, and why.</h2>
+    <p>CronWatch comes with an MCP server, so Claude Code, Cursor or any MCP client reads the same records you do. It can tell you what broke overnight, read the error and the output, and silence the job while it ships the fix.</p>
     <div class="install"><code translate="no">claude mcp add cronwatch -e CRONWATCH_URL=… -e CRONWATCH_TOKEN=… -- npx -y @cronwatch/mcp</code><button class="copy" type="button" aria-label="Copy the MCP command">Copy</button></div>
-    <p class="small">To get it installed in the first place, hand your agent the setup prompt. It works out whether the project is TypeScript or Rails, names the store to pick, the shape of a job, the check endpoint and the environment variables, and it tells the agent to declare every job already scheduled in the project rather than one example.</p>
     <div class="actions">
       <button class="prompt-btn" type="button" data-prompt aria-label="Copy the setup instructions for a coding agent">Copy setup prompt for your AI</button>
-      <p class="prompt-note">Or point it at <a href="/prompt.txt">/prompt.txt</a> and <a href="/llms.txt">/llms.txt</a>.</p>
+      <p class="prompt-note">It sets up CronWatch and declares every job you already have. Also at <a href="/prompt.txt">/prompt.txt</a>.</p>
     </div>
     <details class="peek">
       <summary>Read the prompt first</summary>
       <div class="out"><p class="from"><span translate="no">prompt.txt</span><span>for a coding agent</span></p><pre translate="no" id="prompt-text">{{PROMPT}}</pre></div>
     </details>
-    <div class="out tall"><p class="from"><span translate="no">@cronwatch/mcp</span><span>stdio</span></p><pre translate="no"><span class="prompt">list_jobs()</span>
+    <details class="peek">
+      <summary>See what the agent reads</summary>
+      <div class="out tall"><p class="from"><span translate="no">@cronwatch/mcp</span><span>stdio</span></p><pre translate="no"><span class="prompt">list_jobs()</span>
 
 {{MCP_LIST_JOBS}}</pre></div>
+    </details>
   </div>
 </section>
 
 <section class="row board">
   <p class="label">Dashboard</p>
   <div class="body">
-    <h2>And a dashboard, mounted inside your app.</h2>
-    <p>At <code>/cronwatch</code>, from <code>cw.routes()</code> or, in Rails, <code>mount Cronwatch::Web</code>, behind a token you set in <code>CRONWATCH_TOKEN</code> or behind your app’s own sign in. The same records the agent reads, with the run history, output and metrics of every job.</p>
-    <div class="out">
-      <p class="from"><span translate="no">/cronwatch</span><span>{{BOARD_META}}</span></p>
-      {{JOBS_BOARD}}
-    </div>
+    <h2>And a board of every job, in your own app.</h2>
+    <p>Mount it with <code>cw.routes()</code>, or <code>mount Cronwatch::Web</code> in Rails, behind a token in <code>CRONWATCH_TOKEN</code> or your app’s own sign in. Open a job for its week, its runs and their output.</p>
+  </div>
+  <div class="span">
+    {{BOARD_FRAME}}
   </div>
 </section>
 
@@ -145,8 +157,10 @@
   <p class="label">Why</p>
   <div class="body">
     <h2>Why a library, and not a service.</h2>
-    <p>The hosted monitors are good, and you pay for them with a monthly bill, an account, and a copy of your job output on someone else’s servers. A library needs none of that. It lives in the app that runs the jobs, writes to the database you already have, and sends the alert straight from your app to your channel.</p>
-    <p>The one thing it cannot see is an app that is entirely down, because nothing inside a dead process can alert. Pair it with any uptime monitor for that. Everything else, from a job that never fires to one that costs three times what it should, it catches from the inside. Stores: SQLite, Postgres or D1, or ActiveRecord in Rails; a Rails app and a Node service can share one database and one dashboard. Alerts: Slack, Discord, a signed webhook, email (Resend, Postmark, SendGrid, Mailgun, SES), SMS through Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New Relic, the console, or your own function.</p>
+    <p>A hosted monitor works by your app pinging their servers, which then alert you. You pay for it with a monthly bill, an account, and a copy of your job output on someone else’s machine.</p>
+    <p>CronWatch lives in the app that runs the jobs. It writes every run to the database you already have, and sends each alert straight from your app to Slack, Discord, email, SMS, a webhook or your error tracker.</p>
+    <div class="versus">{{VERSUS}}</div>
+    <p class="small">It cannot see an app that is down entirely, so pair it with any uptime monitor for that.</p>
   </div>
 </section>
 

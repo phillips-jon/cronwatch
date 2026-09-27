@@ -17,6 +17,8 @@
     "test": "npm run check:dashes && npm test --workspaces --if-present",
     "build": "npm run check:dashes && npm run build --workspaces --if-present",
     "build:site": "npm run build --workspace site",
+    "dev:site": "npm run dev --workspace site",
+    "dev:dashboard": "node scripts/dev-dashboard.mjs",
     "check": "npm run check:dashes && npm run typecheck && npm test && npm run check:conformance",
     "conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs",
     "check:conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs --check && TZ=UTC node packages/ruby/test/web/golden.mjs --check",

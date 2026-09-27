@@ -34,6 +34,24 @@
     });
   });
 
+  // Figures that animate do so once, when they first scroll into view. Until
+  // this runs they are drawn complete, so a reader without script, or who
+  // asked for less motion, sees the finished picture.
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduce && "IntersectionObserver" in window) {
+    var seen = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("play");
+        seen.unobserve(entry.target);
+      });
+    }, { threshold: 0.35 });
+    document.querySelectorAll(".play-on-view").forEach(function (el) {
+      el.classList.add("armed");
+      seen.observe(el);
+    });
+  }
+
   document.querySelectorAll(".copy").forEach(function (button) {
     button.addEventListener("click", function () {
       var box = button.closest(".install, .out");
