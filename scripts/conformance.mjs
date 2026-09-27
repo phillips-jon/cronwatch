@@ -1,8 +1,9 @@
 /**
  * Writes conformance/*.json: cases produced by running the TypeScript SDK,
- * which the Ruby gem (packages/ruby/test/conformance_test.rb) replays to
- * prove it behaves the same. A behaviour change lands in TypeScript first,
- * these files are regenerated, and the gem is fixed until it passes.
+ * which the Ruby gem (packages/ruby/test/conformance_test.rb) and the Python
+ * package (packages/python/tests/test_conformance.py) replay to prove they
+ * behave the same. A behaviour change lands in TypeScript first, these files
+ * are regenerated, and the ports are fixed until they pass.
  *
  * The public API comes from the built package (packages/sdk/dist). The pure
  * functions it does not export are imported from packages/sdk/src, so this
@@ -1535,7 +1536,7 @@ for (const [name, content] of Object.entries(files)) {
 }
 
 if (checking && stale.length > 0) {
-  console.error(`conformance: ${stale.join(", ")} would change. Run \`npm run conformance\`, then make the Ruby gem pass.`);
+  console.error(`conformance: ${stale.join(", ")} would change. Run \`npm run conformance\`, then make the Ruby gem and the Python package pass.`);
   process.exit(1);
 }
 console.log(checking ? "conformance: fixtures are current" : `conformance: wrote ${Object.keys(files).length} files to conformance/`);

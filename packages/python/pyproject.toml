@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cronwatch-sdk"
+version = "0.4.0"
+description = "Cron and scheduled-job monitoring that lives inside your app."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "Jon C. Phillips" }]
+keywords = ["cron", "monitoring", "scheduled jobs", "alerts", "heartbeat", "celery", "django"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: System :: Monitoring",
+  "Typing :: Typed",
+]
+# The core has no dependencies: cron parsing is a port of croner, and zones come from zoneinfo.
+dependencies = []
+
+[project.optional-dependencies]
+# zoneinfo reads the system's zone database; Windows has none, so install this there.
+tzdata = ["tzdata"]
+
+[project.urls]
+Homepage = "https://cronwatch.dev"
+Documentation = "https://cronwatch.dev/docs/"
+Source = "https://github.com/phillips-jon/cronwatch/tree/main/packages/python"
+Issues = "https://github.com/phillips-jon/cronwatch/issues"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cronwatch"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/cronwatch", "README.md", "LICENSE", "DESIGN.md", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
