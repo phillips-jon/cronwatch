@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { expectation, nextFire, parseSchedule, runCovers } from "../src/schedule.js";
+import { expectation, firesBetween, nextFire, parseSchedule, runCovers } from "../src/schedule.js";
 import { MIN, HOUR } from "./helpers.js";
 
 const DAY = 86_400_000;
@@ -107,4 +107,20 @@ test("runCovers allows a minute of early start, at most half the gap to the next
   assert.ok(!runCovers(due - 61_000, due));
   assert.ok(runCovers(due - 30_000, due, due + MIN));
   assert.ok(!runCovers(due - 31_000, due, due + MIN));
+});
+
+test("firesBetween lists a cron's fires in a span, the same ones nextFire gives, or null past the limit", () => {
+  const hourly = parseSchedule("0 * * * *", "UTC");
+  const from = Date.UTC(2026, 0, 5, 9, 30);
+  const fires = firesBetween(hourly, from, from + 24 * HOUR, 100)!;
+  assert.equal(fires.length, 24);
+  let t = from;
+  for (const fire of fires) assert.equal(fire, (t = nextFire(hourly, t, null)!));
+  assert.equal(firesBetween(hourly, from, from + 24 * HOUR, 23), null);
+  assert.deepEqual(firesBetween(parseSchedule("0 3 * * *", "UTC"), from, from + HOUR, 5), []);
+  // The night clocks go back in New York: fires only ever move forward.
+  const ny = parseSchedule("30 * * * *", "America/New_York");
+  const night = firesBetween(ny, Date.UTC(2026, 10, 1, 4), Date.UTC(2026, 10, 1, 9), 20)!;
+  assert.ok(night.every((x, i) => i === 0 || x > night[i - 1]!));
+  assert.ok(night.length >= 4 && night.length <= 5, String(night.length));
 });

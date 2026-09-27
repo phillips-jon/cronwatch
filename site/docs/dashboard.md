@@ -84,10 +84,16 @@ The first value of each comma-separated header is used, and whichever header is 
 
 | Path | What |
 |---|---|
-| `/` | every job: health, schedule, last run, next due, durations |
-| `/jobs/:name` | one job: definition, stats, and the last fifty runs with errors, output and metrics |
+| `/` | counts by health, a timeline of the last day, and every job: health, schedule, last run, next due, recent runs |
+| `/jobs/:name` | one job: its state and figures, its last seven days, the last fifty runs with errors, output and metrics, and its definition |
 
-Pages refresh every minute and are marked `noindex`.
+The board opens with how many jobs there are and how many need attention (any health but healthy), then a count for each health: failing, stuck, late, healthy, silenced and never ran.
+
+Under it is the day. Each job gets a lane across the last 24 hours and the next three, in UTC. A faint tick marks every time the job was due, worked out from its schedule with the same code the checks use: for a cron, each time it fires; for an interval, one period after each run started, and once a period after the last one for as long as nothing runs. Ticks still ahead are dashed. Every run the store recorded is a mark on top, as wide as it took and coloured by how it ended: green for ok, red for failed, a pale red box for timed out, amber for the last run when it went over budget or ran slow, and an outline for a run still going (red once it is past its timeout). A dashed red box is the slot the check reported missed, and every later slot whose grace has run out. A solid vertical line marks now. The empty part of a lane carries a short note about anything open, such as `due 22:36, nothing ran`, `failed at 03:00, 2 in a row` or `running since 22:40`. A job due more often than every five minutes shows its cadence as a dotted line rather than a tick per fire.
+
+The timeline draws the first thirty jobs and says so when there are more; the table below lists every job. Hovering a mark shows what it was, and a visually hidden list says the same for screen readers. A job page draws the same thing for that job, one lane per UTC day for the last seven days, today first, and reads as many runs as that takes (up to 500).
+
+Times on the pages are UTC: without script a page cannot know your time zone. Pages refresh every minute and are marked `noindex`. They follow the system's light or dark setting, need no JavaScript, and load nothing from anywhere. Marks arrive in time order when a page loads and open problems pulse slowly; with reduced motion turned on in the system settings nothing moves.
 
 ## Endpoints
 

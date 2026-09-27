@@ -57,12 +57,20 @@ test("dashboard and job pages render, JSON API answers", async () => {
   assert.match(dash, /Builds the PDF/);
   assert.match(dash, /healthy/);
   assert.match(dash, /failing/);
+  assert.match(dash, /<p class="headline">2 jobs, <b>1 needing attention<\/b>\.<\/p>/);
+  assert.match(dash, /<div class="bad"><dt><i class="sq bad" aria-hidden="true"><\/i>failing<\/dt><dd>1<\/dd><\/div>/, "counts by health");
+  assert.match(dash, /<section class="sec" aria-label="Last 24 hours">[\s\S]*<figure class="timeline day">/);
+  assert.match(dash, /<table class="board">/);
+  assert.match(dash, /<form class="inline" method="post" action="\/cronwatch\/check"><button class="primary" type="submit">Run check now<\/button><\/form>/);
 
   const page = await get("/cronwatch/jobs/broken", { headers: auth });
   assert.equal(page.status, 200);
   const html = await page.text();
   assert.match(html, /kaboom &lt;script&gt;/, "error text is escaped");
   assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /<h1 class="jobname">broken<\/h1>/);
+  assert.match(html, /<figure class="timeline week">/);
+  assert.match(html, /<details class="out error" open><summary>error<\/summary><pre>Error: kaboom &lt;script&gt;/);
 
   const list = await (await get("/cronwatch/api/jobs", { headers: auth })).json();
   assert.equal(list.jobs.length, 2);

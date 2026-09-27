@@ -71,6 +71,35 @@ function fireAfter(parsed: ParsedSchedule, from: number): number | null {
   return null;
 }
 
+/**
+ * Every fire of a cron strictly after `from` and at or before `to`,
+ * ascending, or null when there are more than `limit`. Asks croner for fires
+ * in batches, which is far cheaper than one nextFire per fire, and drops any
+ * that do not move forward (see fireAfter).
+ */
+export function firesBetween(parsed: ParsedSchedule, from: number, to: number, limit: number): number[] | null {
+  const cron = crons.get(parsed);
+  if (!cron) throw new Error(`schedule "${parsed.source}" was not made by parseSchedule`);
+  const out: number[] = [];
+  let probe = from;
+  let last = from;
+  for (let guard = 0; guard < 1000; guard++) {
+    const batch = cron.nextRuns(Math.min(limit + 1 - out.length, 24), new Date(probe));
+    if (batch.length === 0) return out;
+    for (const date of batch) {
+      const t = date.getTime();
+      if (t <= last) continue;
+      if (t > to) return out;
+      out.push(t);
+      last = t;
+      if (out.length > limit) return null;
+    }
+    const end = batch[batch.length - 1]!.getTime();
+    probe = end > probe ? end : probe + 3_600_000;
+  }
+  return out;
+}
+
 /** The next time the schedule fires strictly after `from`. For an interval, counted from the last run when there is one. */
 export function nextFire(parsed: ParsedSchedule, from: number, lastRunAt: number | null): number | null {
   if (parsed.kind === "interval") {

@@ -2,8 +2,9 @@ import type { CronWatch } from "../client.js";
 import { isDevelopment, readEnv } from "../env.js";
 import { constantTimeEqual, json } from "../http.js";
 import { parseDuration } from "../duration.js";
-import type { Duration, Run } from "../types.js";
+import type { Duration, JobSummary, Run } from "../types.js";
 import { dashboardPage, jobPage, messagePage } from "./html.js";
+import { BOARD_BEHIND_MS, BOARD_LANES, BOARD_RUNS, weekRunsLimit, type LaneInput } from "./timeline.js";
 
 export interface RoutesOptions {
   /**
@@ -66,6 +67,24 @@ async function cookieValue(token: string): Promise<string> {
 
 const DEFAULT_RUNS = 20;
 const MAX_RUNS = 500;
+/** Runs per job the board reads in one go: the table's sparkline, and most jobs' lanes. */
+const BOARD_PAGE_RUNS = 20;
+
+/**
+ * The board's timeline lanes, the first BOARD_LANES jobs. The runs already
+ * read for the table usually cover the last day; only a job whose twenty
+ * newest runs all fall inside it (one that runs more often than every hour or so) is
+ * read again, deeper, and those reads go out together.
+ */
+async function boardLanes(cw: CronWatch, entries: { job: JobSummary; runs: Run[] }[], now: number): Promise<LaneInput[]> {
+  const from = now - BOARD_BEHIND_MS;
+  return Promise.all(entries.slice(0, BOARD_LANES).map(async ({ job, runs }) => {
+    const short = runs.length >= BOARD_PAGE_RUNS && runs[runs.length - 1]!.startedAt > from;
+    if (!short) return { job, runs, complete: true };
+    const deeper = await cw.runs(job.name, BOARD_RUNS);
+    return { job, runs: deeper, complete: deeper.length < BOARD_RUNS };
+  }));
+}
 
 const CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 // same-origin rather than no-referrer: under no-referrer browsers send
@@ -300,14 +319,19 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
 
     // HTML
     if (method === "GET" && path === "/") {
-      const entries = await cw.jobsWithRuns(20);
+      const entries = await cw.jobsWithRuns(BOARD_PAGE_RUNS);
+      const now = cw.now();
       const runsByJob = new Map<string, Run[]>(entries.map((entry) => [entry.job.name, entry.runs]));
-      return html(dashboardPage(entries.map((entry) => entry.job), runsByJob, cw.now(), base, null));
+      return html(dashboardPage(entries.map((entry) => entry.job), runsByJob, now, base, null, await boardLanes(cw, entries, now)));
     }
     if (method === "GET" && parts[0] === "jobs" && parts.length === 2) {
       const job = await cw.jobSummary(parts[1]!);
       if (!job) return html(messagePage("No such job", `${parts[1]} is not in the store.`, base), 404);
-      return html(jobPage(job, await cw.runs(job.name, 50), cw.now(), base));
+      const now = cw.now();
+      // Enough runs to draw the job's week; the page lists the newest fifty.
+      const limit = weekRunsLimit(job, now);
+      const runs = await cw.runs(job.name, limit);
+      return html(jobPage(job, runs, now, base, runs.length < limit));
     }
     if (method === "POST" && path === "/check") {
       await cw.check();
