@@ -11,6 +11,7 @@ order: 12
 | Option | Default | |
 |---|---|---|
 | `store` | in memory | a [store](/docs/stores/) |
+| `sources` | `[]` | where runs this process does not wrap come from, such as [`pgCron(pool)`](/docs/supabase/). Each source is synced at the start of every `check()`; one that throws is reported to `onError` and the check carries on |
 | `alerts` | console | an array of [channels](/docs/alerts/) |
 | `triage` | | a [triage function](/docs/triage/) |
 | `cronSecret` | `process.env.CRON_SECRET` | what `handler()` requires as a bearer. Empty counts as unset, and with none set handlers answer 503 outside development. `null` lets handlers run without one |
@@ -90,11 +91,20 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 | `definedJobs()` | the definitions declared in this process |
 | `close()` | stop the interval and close the store |
 | `resumeRun(name, runId)` | `job(name).resume(runId)` for a job declared in this process; rejects for one that is not |
+| `recordRun(run, { evaluate? })` | record a run that happened outside this process, for a source. Its job must be declared first. Runs are keyed by id: a new one is inserted, a stored one still running is updated when this one is not, and anything else is left alone, so recording the same run twice changes nothing. A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets) and redacted the same way. `evaluate: false` stores it without judging it, for history imported on first sight. Resolves to the alerts it sent |
 
 ## Exports
 
-`@cronwatch/sdk`: `cronwatch`, `CronWatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails` and `ParsedSchedule`.
+`@cronwatch/sdk`: `cronwatch`, `CronWatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails`, `ParsedSchedule`, `JobContext`, `RunHandle`, `StartOptions`, `RunOutcome`, `RecordRunOptions`, `Source` and `SourceHost` (the interface a source is given: `job()`, `recordRun()`, `store`, `now` and `onError`), and `FetchHandler`, `Routes` and `RoutesOptions`.
 
-`@cronwatch/sdk/sqlite`, `/postgres`, `/slack`, `/discord`, `/webhook`, `/anthropic`: one adapter each. `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies. `/anthropic` needs `@anthropic-ai/sdk`, which you install yourself. `/slack`, `/discord` and `/webhook` need nothing.
+Stores: `@cronwatch/sdk/sqlite` (`sqlite`), `/postgres` (`postgres`) and `/d1` (`d1`). `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies; `/d1` needs nothing.
+
+Sources: `@cronwatch/sdk/pg-cron` (`pgCron`), which reads pg_cron's jobs and runs through the pool you pass it. See [Supabase and pg_cron](/docs/supabase/).
+
+Alert channels, one function each, named after the entry: `/slack`, `/discord`, `/webhook`, `/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses`, `/twilio`, `/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag` and `/newrelic`. None needs a dependency. See [Alerts](/docs/alerts/).
+
+Triage: `@cronwatch/sdk/anthropic` (`anthropic`) needs `@anthropic-ai/sdk`, which you install yourself.
+
+The core, `/d1`, `/pg-cron` and every channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun. `/sqlite`, `/postgres` and `/node` need Node.
 
 `@cronwatch/sdk/node`: `toNodeHandler(fetchHandler, { trustProxy?, basePath? })` turns a fetch-style handler (the routes, or a job's `handler()`) into `(req, res, next?)` for `http.createServer`, Express or Connect, NestJS and Firebase `onRequest`; `toKoaMiddleware(fetchHandler, options?)` does the same for Koa; `toRequest(req, options?)` and `writeResponse(res, response)` are the two halves. Node only; see [Express, Koa and plain Node servers](/docs/node/#express-koa-and-plain-node-servers).

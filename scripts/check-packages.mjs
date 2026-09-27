@@ -7,6 +7,9 @@
  *   - the MCP package loads, and its bin runs,
  *   - tsc accepts both under node16 ESM, node16 CJS (.cts) and bundler
  *     resolution, with skipLibCheck off,
+ *   - the entries meant for Cloudflare Workers (the core, D1, pg-cron and
+ *     every channel) typecheck with only @cloudflare/workers-types, and
+ *     bundle for workerd without a single node: import,
  *   - Are the Types Wrong finds no problems.
  *
  * The scratch project is deleted afterwards; pass --keep to leave it.
@@ -15,6 +18,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { build } from "esbuild";
 
 const ROOT = process.cwd();
 const keep = process.argv.includes("--keep");
@@ -42,7 +46,6 @@ const expected = {
   "@cronwatch/sdk/anthropic": ["anthropic"],
   "@cronwatch/sdk/d1": ["d1"],
   "@cronwatch/sdk/pg-cron": ["pgCron"],
-  // Appended, so the m<index> aliases below keep pointing at the same entries.
   "@cronwatch/sdk/resend": ["resend"],
   "@cronwatch/sdk/postmark": ["postmark"],
   "@cronwatch/sdk/sendgrid": ["sendgrid"],
@@ -60,6 +63,10 @@ const expected = {
 for (const e of entries) {
   if (!expected[e]) throw new Error(`check-packages: add ${e} to the expected exports`);
 }
+// The entries that must run on Cloudflare Workers with no nodejs_compat:
+// everything except the Node drivers, the Node adapter and Anthropic triage.
+const NODE_ONLY = ["@cronwatch/sdk/sqlite", "@cronwatch/sdk/postgres", "@cronwatch/sdk/node", "@cronwatch/sdk/anthropic"];
+const workersEntries = entries.filter((e) => !NODE_ONLY.includes(e));
 
 // Are the Types Wrong. The MCP package is ESM only by design.
 run("npx", ["attw", "--pack", "packages/sdk"], ROOT);
@@ -84,6 +91,7 @@ try {
     ...tarballs,
     ...peers.map((p) => `${p}@${dev[p]}`),
     `typescript@${dev.typescript ?? rootPkg.devDependencies?.typescript}`,
+    `@cloudflare/workers-types@${rootPkg.devDependencies["@cloudflare/workers-types"]}`,
   ], dir);
 
   // Runtime: ESM import and CJS require of every entry.
@@ -121,18 +129,25 @@ try {
 
   // Types: one file per module kind, each touching every entry.
   const bindings = checks.map(([name, keys], i) => ({ name, keys, alias: `m${i}` }));
+  const alias = (name) => {
+    const found = bindings.find((b) => b.name === name);
+    if (!found) throw new Error(`check-packages: no binding for ${name}`);
+    return found.alias;
+  };
   const uses = bindings.flatMap(({ keys, alias }) => keys.map((k) => `void ${alias}.${k};`));
+  const sdk = alias("@cronwatch/sdk");
+  // A stand-in with only the shape of a D1 binding: no @cloudflare/workers-types needed.
+  const d1Stub = `{ prepare(): never { throw new Error("no D1 here"); }, async batch() { return []; } }`;
   const typed = [
-    `const cw = m0.cronwatch({ store: m1.sqlite({ path: ":memory:" }) });`,
+    `const cw = ${sdk}.cronwatch({ store: ${alias("@cronwatch/sdk/sqlite")}.sqlite({ path: ":memory:" }) });`,
     `const job = cw.job("typed", { schedule: "every 5m", budget: { cost: 1 } });`,
     `const handler: (request: Request) => Promise<Response> = job.handler(async (j) => { j.log("x"); j.metric("cost", 0.1); });`,
     `void handler;`,
-    `const summary: Promise<m0.JobSummary[]> = cw.jobs();`,
+    `const summary: Promise<${sdk}.JobSummary[]> = cw.jobs();`,
     `void summary;`,
-    `void m2.postgres({ connectionString: "postgres://x" });`,
-    `void m6.anthropic({ context: "types" });`,
-    // A stand-in with only the shape of a D1 binding: no @cloudflare/workers-types needed.
-    `void ${bindings.find((b) => b.name === "@cronwatch/sdk/d1").alias}.d1({ prepare(): never { throw new Error("no D1 here"); }, async batch() { return []; } }, { prefix: "cw_" });`,
+    `void ${alias("@cronwatch/sdk/postgres")}.postgres({ connectionString: "postgres://x" });`,
+    `void ${alias("@cronwatch/sdk/anthropic")}.anthropic({ context: "types" });`,
+    `void ${alias("@cronwatch/sdk/d1")}.d1(${d1Stub}, { prefix: "cw_" });`,
     `const server = mcp.createServer({ baseUrl: "https://example.com/cronwatch", token: null });`,
     `void server;`,
   ];
@@ -159,6 +174,60 @@ try {
     run(path.join(dir, "node_modules/.bin/tsc"), ["-p", file], dir);
     console.log(`tsc ${file}: ok`);
   }
+
+  // Workers: the entries meant for it, typechecked with the Workers types
+  // and no Node types at all, so a declaration that leans on Node fails.
+  const workerBindings = bindings.filter((b) => workersEntries.includes(b.name));
+  writeFileSync(path.join(dir, "types-workers.ts"), [
+    ...workerBindings.map(({ name, alias }) => `import * as ${alias} from "${name}";`),
+    ...workerBindings.flatMap(({ keys, alias }) => keys.map((k) => `void ${alias}.${k};`)),
+    `interface Env { DB: D1Database; CRONWATCH_TOKEN: string }`,
+    `export default {`,
+    `  async scheduled(_controller, env, ctx) {`,
+    `    const cw = ${sdk}.cronwatch({ store: ${alias("@cronwatch/sdk/d1")}.d1(env.DB), sources: [${alias("@cronwatch/sdk/pg-cron")}.pgCron({ query: async () => ({ rows: [] }) })] });`,
+    `    ctx.waitUntil(cw.check());`,
+    `  },`,
+    `  async fetch(request, env) {`,
+    `    const cw = ${sdk}.cronwatch({ store: ${alias("@cronwatch/sdk/d1")}.d1(env.DB) });`,
+    `    return cw.routes({ token: env.CRONWATCH_TOKEN }).handler(request);`,
+    `  },`,
+    `} satisfies ExportedHandler<Env>;`,
+  ].join("\n"));
+  writeFileSync(path.join(dir, "tsconfig.workers.json"), JSON.stringify({
+    compilerOptions: { strict: true, noEmit: true, skipLibCheck: false, target: "ES2022", lib: ["ES2022"], module: "esnext", moduleResolution: "bundler", types: ["@cloudflare/workers-types"] },
+    files: ["types-workers.ts"],
+  }, null, 2));
+  run(path.join(dir, "node_modules/.bin/tsc"), ["-p", "tsconfig.workers.json"], dir);
+  console.log("tsc tsconfig.workers.json: ok");
+
+  // Workers: bundle the same entries as wrangler would (browser platform,
+  // workerd conditions) and fail on any Node built-in, with or without node:.
+  writeFileSync(path.join(dir, "worker.mjs"), [
+    ...workerBindings.map(({ name, alias }) => `import * as ${alias} from "${name}";`),
+    `export default [${workerBindings.map((b) => b.alias).join(", ")}];`,
+  ].join("\n"));
+  const nodeImports = [];
+  await build({
+    absWorkingDir: dir,
+    entryPoints: ["worker.mjs"],
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "browser",
+    conditions: ["workerd", "worker", "browser"],
+    logLevel: "silent",
+    plugins: [{
+      name: "no-node",
+      setup(b) {
+        b.onResolve({ filter: /^node:/ }, (args) => {
+          nodeImports.push(`${args.path} from ${path.relative(dir, args.importer)}`);
+          return { path: args.path, external: true };
+        });
+      },
+    }],
+  });
+  if (nodeImports.length > 0) throw new Error(`the Workers entries import Node built-ins: ${nodeImports.join(", ")}`);
+  console.log(`esbuild workerd bundle of ${workerBindings.length} entries: ok`);
   console.log("\ncheck-packages: clean");
 } finally {
   if (keep) console.log(`kept ${dir}`);

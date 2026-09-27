@@ -2,7 +2,9 @@
 # typecheck, tests, a build, and the packed packages used from a scratch
 # project, on the two Node majors better-sqlite3 13 supports. The Ruby gem's
 # tests run on the oldest and newest Ruby it supports, against each
-# supported Rails series.
+# supported Rails series. One Node and one Ruby entry also run the pg_cron
+# tests against a Postgres with the extension, and the built site's links
+# are checked.
 # A green run on main is what lets deploy.yml ship the site.
 name: CI
 
@@ -61,6 +63,26 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check:dashes
       - run: npm run typecheck
+      # A second Postgres with pg_cron, for the pg_cron source's tests against
+      # the real extension. The stock image has the PGDG apt repository, so
+      # the extension is installed before the server starts. The entrypoint's
+      # setup server only listens on its socket, so a TCP query that sees
+      # pg_cron preloaded means the real server is up (pg_isready would pass
+      # during setup). The URL goes to $GITHUB_ENV for the steps after this.
+      - name: Start Postgres with pg_cron
+        if: matrix.node == 24
+        run: |
+          docker run -d --name pgcron -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 5433:5432 postgres:16 \
+            bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-cron > /dev/null && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw'
+          for _ in $(seq 1 90); do
+            if [ "$(docker exec pgcron psql postgres://postgres:pw@127.0.0.1:5432/cw -tAc 'show shared_preload_libraries' 2>/dev/null)" = "pg_cron" ]; then
+              echo "CRONWATCH_TEST_PGCRON=postgres://postgres:pw@127.0.0.1:5433/cw" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs pgcron
+          exit 1
       - run: npm test
         env:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
@@ -69,6 +91,9 @@ jobs:
       # import and require every entry, typecheck them (node16 ESM and CJS,
       # bundler) and run Are the Types Wrong.
       - run: npm run check:packages
+      # Every internal link and #fragment in the built site resolves.
+      - run: npm run build:site
+      - run: node scripts/check-links.mjs site/dist
 
   # The gem's tests replay conformance/ and compare against the built SDK, so
   # the SDK is built (and the fixtures checked) first. Postgres store tests run against the service.
@@ -111,6 +136,26 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
           working-directory: packages/ruby
+      # A second Postgres with pg_cron, for the pg_cron source's tests against
+      # the real extension. The stock image has the PGDG apt repository, so
+      # the extension is installed before the server starts. The entrypoint's
+      # setup server only listens on its socket, so a TCP query that sees
+      # pg_cron preloaded means the real server is up (pg_isready would pass
+      # during setup). The URL goes to $GITHUB_ENV for the steps after this.
+      - name: Start Postgres with pg_cron
+        if: matrix.ruby == '3.4' && matrix.rails == '8.1'
+        run: |
+          docker run -d --name pgcron -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 5433:5432 postgres:16 \
+            bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-cron > /dev/null && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw'
+          for _ in $(seq 1 90); do
+            if [ "$(docker exec pgcron psql postgres://postgres:pw@127.0.0.1:5432/cw -tAc 'show shared_preload_libraries' 2>/dev/null)" = "pg_cron" ]; then
+              echo "CRONWATCH_TEST_PGCRON=postgres://postgres:pw@127.0.0.1:5433/cw" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs pgcron
+          exit 1
       - run: bundle exec rake test
         working-directory: packages/ruby
         env:
@@ -129,7 +174,10 @@ jobs:
           cd "$dir"
           ruby -e '
             require "cronwatch"
-            cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [], cron_secret: nil)
+            require "cronwatch/pg_cron"
+            resend = Cronwatch::Alerts::Resend.new(api_key: "re_smoke", from: "alerts@example.com", to: "ops@example.com")
+            source = Cronwatch::Sources::PgCron.new(Class.new { def query(_sql, _params) = [] }.new)
+            cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [resend], sources: [source], cron_secret: nil)
             job = cw.job("smoke", schedule: "*/5 * * * *", timezone: "UTC")
             abort "run returned the wrong value" unless job.run { |j| j.log("ok"); 42 } == 42
             run = cw.runs("smoke").first

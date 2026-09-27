@@ -9,7 +9,7 @@ group: More platforms
 
 The shape on Workers: Cron Triggers call the Worker's `scheduled` handler, which runs your jobs and, on a trigger of its own, the check. The runs and state live in D1. The dashboard is served from `fetch`.
 
-The core (`@cronwatch/sdk`) runs in the Workers runtime as it is. It imports nothing from Node and reads `process` only where there is one, so the `nodejs_compat` flag is not needed for it, the D1 store, or the Slack and Discord channels.
+The core (`@cronwatch/sdk`) runs in the Workers runtime as it is. It imports nothing from Node and reads `process` only where there is one, so the `nodejs_compat` flag is not needed for it, the D1 store, or any alert channel.
 
 ```bash
 npm install @cronwatch/sdk

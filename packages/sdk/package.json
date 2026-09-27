@@ -17,7 +17,14 @@
     "vercel cron",
     "nextjs",
     "agents",
-    "mcp"
+    "mcp",
+    "cloudflare",
+    "workers",
+    "d1",
+    "supabase",
+    "pg_cron",
+    "sentry",
+    "email"
   ],
   "type": "module",
   "sideEffects": false,

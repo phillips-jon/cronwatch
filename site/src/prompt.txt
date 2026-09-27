@@ -1,12 +1,14 @@
 Add CronWatch to this project so that every scheduled job is recorded and I am
 told when one is missed, fails, gets stuck, runs slow or goes over budget.
 
-CronWatch is an open source library: @cronwatch/sdk for TypeScript and Node,
-and the cronwatch gem for Ruby and Rails. It runs inside my app and writes to my
+CronWatch is an open source library: @cronwatch/sdk for TypeScript (Node,
+Cloudflare Workers, Deno, Bun), and the cronwatch gem for Ruby and Rails. It runs inside my app and writes to my
 own database. There is no hosted service, no account and no API key.
 
 First decide which one this project needs. A package.json with a Node server,
-Next.js or other JavaScript runtime means the TypeScript steps below. A Gemfile
+Next.js or other JavaScript runtime means the TypeScript steps below; a
+wrangler.toml (or wrangler.jsonc) means Cloudflare Workers, which follow the
+same steps with the Workers notes in each. A Gemfile
 means the Ruby steps (a Rails app follows them as written; plain Ruby, see
 https://cronwatch.dev/docs/ruby/). If the scheduled jobs live in both, set up
 each side where its jobs run; they can share one database.
@@ -18,19 +20,33 @@ TypeScript and Node
 
    npm install @cronwatch/sdk better-sqlite3     # for sqlite
    npm install @cronwatch/sdk pg                 # for postgres
+   npm install @cronwatch/sdk                    # for d1 on Workers: no driver
 
 2. Create one client for the whole app, in its own module, and export it.
    Pick the store that matches this project: sqlite for a long running server,
-   postgres for serverless or anything with more than one instance.
+   postgres for serverless or anything with more than one instance, d1 on
+   Cloudflare Workers.
 
    import { cronwatch } from "@cronwatch/sdk";
    import { sqlite } from "@cronwatch/sdk/sqlite";      // or: postgres from "@cronwatch/sdk/postgres"
-   import { slack } from "@cronwatch/sdk/slack";        // or: discord, webhook, or omit for console
+   import { slack } from "@cronwatch/sdk/slack";
+   // Other channels, one import each: discord, webhook, resend, postmark,
+   // sendgrid, mailgun, ses, twilio, sentry, honeybadger, datadog, rollbar,
+   // bugsnag, newrelic. Omit alerts for the console.
 
    export const cw = cronwatch({
      store: sqlite({ path: "./data/cronwatch.db" }),
      alerts: [slack({ webhookUrl: process.env.SLACK_WEBHOOK_URL! })],
    });
+
+   On Workers there is no module-level env: make the client inside the
+   handler with store: d1(env.DB) from "@cronwatch/sdk/d1", passing every
+   secret from env. See https://cronwatch.dev/docs/cloudflare/
+
+   If the project uses pg_cron (Supabase Cron included), add
+   sources: [pgCron(pool)] from "@cronwatch/sdk/pg-cron" with a pg Pool on
+   that database; each check then reads pg_cron's own tables. Do not declare
+   those jobs yourself. See https://cronwatch.dev/docs/supabase/
 
 3. Declare each scheduled job once, next to the code that runs it. The schedule
    is a cron expression, "@hourly", or "every 15m". Add a grace period, and a
@@ -53,10 +69,15 @@ TypeScript and Node
      job.metric("pages", report.pages);
    });
 
+   .handler() and cw.routes() are fetch handlers. For Express, Koa, NestJS
+   or a plain Node server, wrap them with toNodeHandler (or toKoaMiddleware)
+   from "@cronwatch/sdk/node".
+
 5. Make missed and stuck runs detectable. A job that never fires cannot report
    itself, so something has to look. In a long running server call cw.start()
    once at boot. On serverless, mount the routes and point a cron at the check
-   endpoint every few minutes.
+   endpoint every few minutes. On Workers, give the check a Cron Trigger of
+   its own that calls cw.check() in scheduled(); never cw.start() there.
 
    // app/cronwatch/[[...path]]/route.ts in Next.js; elsewhere mount it at
    // /cronwatch or pass basePath to cw.routes()
@@ -82,6 +103,10 @@ Ruby on Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
      c.store  = Cronwatch::Stores::ActiveRecord.new
      c.alerts = [Cronwatch::Alerts::Slack.new(webhook_url: ENV["SLACK_WEBHOOK_URL"])]
    end
+
+   Other channels under Cronwatch::Alerts: Discord, Webhook, Resend, Postmark,
+   Sendgrid, Mailgun, Ses, Twilio, Sentry, Honeybadger, Datadog, Rollbar,
+   Bugsnag, NewRelic, Console. Their options: https://cronwatch.dev/docs/ruby/
 
 3. Watch each scheduled job in its class. For ActiveJob:
 
@@ -136,6 +161,9 @@ Rules for you:
 - Make sure the process that runs the check knows every job it should expect,
   or a job that never starts at all goes unnoticed. If installs differ, declare
   a job there only where that install runs it.
+- Work that starts in one call and finishes in another (a webhook, a queue
+  step, a workflow) uses await job.start({ id }) where it begins and
+  (await job.resume(id)).finish() where it ends, with the same id both times.
 - A job that runs where the network or the app's secrets are unavailable gets
   its own client with deliver: "check" (deliver = :check in Ruby) and the same
   store; the next check sends its alerts.

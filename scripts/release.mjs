@@ -38,7 +38,7 @@ const PUBLISH = [
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */
-const GEM_REQUIRED = ["lib/cronwatch.rb", "lib/cronwatch/client.rb"];
+const GEM_REQUIRED = ["lib/cronwatch.rb", "lib/cronwatch/client.rb", "lib/cronwatch/pg_cron.rb", "lib/cronwatch/run_handle.rb"];
 const GEM_FORBIDDEN = ["test/", "conformance/"];
 
 /** npm packages `--deprecate` covers. RubyGems has no deprecation; yank only a broken gem. */
@@ -49,6 +49,11 @@ const REGENERATED = ["package-lock.json", "conformance/*.json (sdkVersion)", "pa
 
 const ROOT = process.cwd();
 const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+
+/** "a", "a and b", "a, b and c". */
+function listed(items) {
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
 
 function fail(message) {
   console.error(`release: ${message}`);
@@ -148,7 +153,7 @@ function checkGem(file, ruby) {
   const extra = contents.filter((f) => GEM_FORBIDDEN.some((prefix) => f.startsWith(prefix)));
   if (missing.length > 0) fail(`the gem is missing ${missing.join(", ")}; check spec.files in packages/ruby/cronwatch.gemspec`);
   if (extra.length > 0) fail(`the gem carries ${extra.join(", ")}; check spec.files in packages/ruby/cronwatch.gemspec`);
-  console.log(`${contents.length} files, with ${GEM_REQUIRED.join(" and ")}, and nothing under ${GEM_FORBIDDEN.join(" or ")}.`);
+  console.log(`${contents.length} files, with ${listed(GEM_REQUIRED)}, and nothing under ${GEM_FORBIDDEN.join(" or ")}.`);
 }
 
 /** The edits to make, one per file, after checking every row holds the current version. */
@@ -271,7 +276,7 @@ if (options.dryRun) {
     const env = Object.entries(opts.env ?? {}).map(([k, v]) => `${k}=${v} `).join("");
     const cwd = opts.cwd ? `(cd ${path.relative(ROOT, opts.cwd)}) ` : "";
     console.log(`  ${label}: ${cwd}${env}${[cmd, ...args].join(" ")}`);
-    if (opts.after) console.log(`    then check it carries ${GEM_REQUIRED.join(" and ")} and nothing under ${GEM_FORBIDDEN.join(" or ")}`);
+    if (opts.after) console.log(`    then check it carries ${listed(GEM_REQUIRED)} and nothing under ${GEM_FORBIDDEN.join(" or ")}`);
   }
   console.log(`  Commit: git add -u && git commit -m "Release ${next}"`);
   console.log(`  Tag: git tag -a ${tag} -m "Release ${next}"`);

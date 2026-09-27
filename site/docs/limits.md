@@ -24,7 +24,7 @@ A job always runs, whatever the store is doing. If recording the run fails, the 
 
 ## Alert delivery
 
-Each channel gets 15 seconds per alert (Slack, Discord and webhook requests give up after 10). If no channel accepts an alert, it is kept with the job's state and each check tries it once more until one does. A process created with `deliver: "check"` uses the same queue on purpose, so another process sends its alerts. That is a retry of the same alert, not a reminder.
+Each channel gets 15 seconds per alert (every built-in channel's request gives up after 10). If no channel accepts an alert, it is kept with the job's state and each check tries it once more until one does. A process created with `deliver: "check"` uses the same queue on purpose, so another process sends its alerts. That is a retry of the same alert, not a reminder.
 
 A queued alert that no longer describes the job is dropped instead of sent late: one whose condition has closed since, or closed and opened again (the newer alert is queued too), and a recovery once any condition it names is open again. A recovery whose conditions all stay closed is still sent. One check spends at most 20 seconds of retries across all jobs; whatever is left waits for the next check. More than twenty queued alerts for one job drops the oldest, and says so through `onError`. Otherwise an alert is only lost if the process dies while sending it.
 
