@@ -11,7 +11,7 @@ module Cronwatch
       attr_reader :name
 
       def initialize(account_id:, api_key:, region: nil, event_type: nil, link: nil, http: HTTP.default)
-        @api_key = Provider.require_option(api_key, "Cronwatch::Alerts::NewRelic needs an api_key")
+        @api_key = Provider.require_credential(api_key, "Cronwatch::Alerts::NewRelic needs an api_key")
         account = account_id.nil? ? "" : account_id.to_s
         raise ArgumentError, "Cronwatch::Alerts::NewRelic needs a numeric account_id" unless /\A\d+\z/.match?(account)
 

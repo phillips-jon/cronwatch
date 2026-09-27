@@ -207,19 +207,28 @@ class StartFinishTest < Minitest::Test
     assert_equal [], capture.types
   end
 
-  def test_a_store_failing_at_finish_is_reported_not_raised
+  def test_a_store_failing_at_finish_is_reported_not_raised_and_the_handle_can_finish_again
     broken = Set.new
     cw, = client(store: Flaky.new(Cronwatch::Stores::Memory.new, broken))
     run = cw.job("flaky").start
     run.log("working")
-    broken << :get_run << :update_run
+    broken << :get_run << :update_run << :update_run_if
     run.flush
     assert_equal "flushing flaky", @errors.last[1]
+    assert_nil run.finish, "nothing recorded"
+    assert(@errors.any? { |_, where| where == "finishing flaky" })
+    assert run.active?, "still active, to finish again"
+    # The read works but the write fails: still retryable.
+    broken.delete(:get_run)
+    assert_nil run.finish
+    assert run.active?
+    broken.clear
+    assert_equal :running, cw.get_run(run.id).status, "nothing written yet"
     finished = run.finish
     assert_equal :ok, finished.status
-    assert(@errors.any? { |_, where| where == "finishing flaky" })
-    broken.clear
-    assert_equal :running, cw.get_run(run.id).status, "left for the stuck check"
+    assert_equal "working", finished.output, "the lines logged before the failures are kept"
+    refute run.active?
+    assert_nil run.finish, "finished once only"
   end
 
   # Not in the SDK's file: a failed flush keeps its lines for finish, ahead of those logged since.
@@ -229,7 +238,7 @@ class StartFinishTest < Minitest::Test
     run = cw.job("kept").start
     run.log("first")
     run.metric(:n, 1)
-    broken << :update_run
+    broken << :update_run_if
     run.flush
     broken.clear
     run.log("second")
@@ -245,7 +254,7 @@ class StartFinishTest < Minitest::Test
     store = Class.new(Cronwatch::Stores::Memory) do
       attr_accessor :boom
 
-      def update_run(run)
+      def update_run_if(run, from_statuses)
         if boom
           self.boom = false
           raise Interrupt

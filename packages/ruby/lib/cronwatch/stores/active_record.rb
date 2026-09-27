@@ -216,6 +216,18 @@ module Cronwatch
         nil
       end
 
+      # update_run, only while the stored status is one of `from_statuses`,
+      # in one statement (sql.ts updateRunIfSql). Returns whether it wrote.
+      def update_run_if(run, from_statuses)
+        statuses = Array(from_statuses).map(&:to_s)
+        return false if statuses.empty?
+
+        binds = [run.status.to_s, run.finished_at, run.duration_ms, run.error, run.output,
+                 JS.json(run.metrics || {}), run.id, *statuses]
+        changed = with_connection { |conn| conn.exec_update(update_run_if_sql(conn, statuses.length), NAME, binds) }
+        changed.to_i.positive?
+      end
+
       def get_run(id)
         row = read(:get_run, [id]).first
         row && row_to_run(row)
@@ -311,6 +323,17 @@ module Cronwatch
       def sql(conn, key)
         dialect = self.class.dialect(conn)
         (@statements[dialect] ||= statements(dialect)).fetch(key)
+      end
+
+      # sql.ts `updateRunIfSql`: update_run's statement, only while the
+      # stored status is one of `count` statuses, bound value by value.
+      def update_run_if_sql(conn, count)
+        text = "UPDATE #{@prefix}runs SET status = ?, finished_at = ?, duration_ms = ?, error = ?, output = ?, metrics = ? " \
+               "WHERE id = ? AND status IN (#{Array.new(count, "?").join(", ")})"
+        return text unless self.class.dialect(conn) == :postgres
+
+        n = 0
+        text.gsub("?") { "$#{n += 1}" }
       end
 
       # sql.ts `statements`: the same text, with `?` numbered for Postgres.

@@ -13,7 +13,7 @@ module Cronwatch
       # endpoint: another notify endpoint, for on-premise installs.
       # now:      the clock for the Bugsnag-Sent-At header, a callable returning epoch milliseconds. For tests.
       def initialize(api_key:, release_stage: nil, endpoint: nil, recovered: false, now: nil, link: nil, http: HTTP.default)
-        @api_key = Provider.require_option(api_key, "Cronwatch::Alerts::Bugsnag needs an api_key")
+        @api_key = Provider.require_credential(api_key, "Cronwatch::Alerts::Bugsnag needs an api_key")
         @url = endpoint.nil? ? "https://notify.bugsnag.com/" : endpoint.to_s
         @release_stage = release_stage
         @recovered = recovered

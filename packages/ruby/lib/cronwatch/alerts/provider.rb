@@ -27,21 +27,40 @@ module Cronwatch
         Webhook.origin(url)
       end
 
+      # How much of a provider's error body goes into the error message.
+      ERROR_BODY_MAX = 200
+
       # POSTs and raises on a non-2xx answer. The error names the provider and
       # the URL's origin, plus the start of the response body with every
-      # secret the channel holds cut out, in case a provider echoes one back.
+      # secret the channel holds cut out, in case a provider echoes one back
+      # (see error_body). A redirect is not followed (Net::HTTP never follows
+      # one): its 3xx is an error like any other answer outside 2xx, so the
+      # credential headers never go where it points.
       def post(http, provider, url, headers, body, secrets = [])
         response = http.post(url, body, headers)
         return response if response.ok?
 
         # response.text() drops a leading byte order mark.
-        text = JS.head16(Output.utf8(response.body.to_s).delete_prefix("\u{FEFF}"), 200)
-        secrets.each do |secret|
-          next if secret.nil? || JS.length16(secret.to_s) < 4
+        text = Output.utf8(response.body.to_s).delete_prefix("\u{FEFF}")
+        raise "#{provider} #{origin(url)} answered #{response.status}#{text.empty? ? "" : ": #{error_body(text, secrets)}"}"
+      end
 
-          text = text.split(secret.to_s, -1).join("[redacted]")
-        end
-        raise "#{provider} #{origin(url)} answered #{response.status}#{text.empty? ? "" : ": #{text}"}"
+      # The start of an error body: secrets are cut out of a prefix long
+      # enough to hold one that starts inside the first ERROR_BODY_MAX
+      # characters, and only then is it cut to that length, on a code point,
+      # so no part of a secret survives at the edge.
+      def error_body(text, secrets = [])
+        kept = secrets.select { |s| s.is_a?(String) && JS.length16(s) >= 4 }
+        longest = kept.map { |s| JS.length16(s) }.max || 0
+        head = JS.head16(text, ERROR_BODY_MAX + longest)
+        kept.each { |secret| head = head.split(secret, -1).join("[redacted]") }
+        JS.head16(head, ERROR_BODY_MAX)
+      end
+
+      # A credential with the spaces and newlines a paste leaves around it
+      # taken off, as it goes in a header. Anything not a String is "".
+      def trimmed(value)
+        value.is_a?(String) ? JS.trim(value) : ""
       end
 
       # Base64 of UTF-8, on one line.
@@ -119,6 +138,16 @@ module Cronwatch
         raise ArgumentError, message if value.nil? || value.to_s.empty?
 
         value.to_s
+      end
+
+      # A required credential, trimmed (see trimmed): raises when it is missing,
+      # not a String, or only whitespace. A pasted credential often carries a
+      # stray space or newline, which a header would refuse or send.
+      def require_credential(value, message)
+        credential = trimmed(value)
+        raise ArgumentError, message if credential.empty?
+
+        credential
       end
 
       # The recovered option. `default` is what the SDK does when it is not given.

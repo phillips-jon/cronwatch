@@ -7,7 +7,10 @@ module Cronwatch
     # POSTs the alert as JSON to any URL. The body is the alert's JSON:
     # { type, run, details, job, definition, title, message, at, triage }.
     # With a secret, each request carries `X-CronWatch-Signature: sha256=<hex>`,
-    # the HMAC-SHA256 of the raw body, so the receiver can verify it.
+    # the HMAC-SHA256 of the raw body, so the receiver can verify it. Header
+    # values are trimmed. A redirect is an error, not followed (the headers
+    # and the signature would go with it): point the url at where the
+    # receiver really is.
     class Webhook
       attr_reader :name
 
@@ -23,7 +26,9 @@ module Cronwatch
 
       def call(alert)
         body = JS.json(alert.to_h)
-        headers = { "content-type" => "application/json", "user-agent" => "cronwatch" }.merge(@headers.transform_keys(&:to_s))
+        headers = { "content-type" => "application/json", "user-agent" => "cronwatch" }
+        # A pasted Authorization value often carries a stray space or newline, which a header would refuse.
+        @headers.each { |name, value| headers[name.to_s] = value.is_a?(String) ? JS.trim(value) : value }
         if @secret && !@secret.empty?
           headers["x-cronwatch-signature"] = "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", @secret, body)}"
         end

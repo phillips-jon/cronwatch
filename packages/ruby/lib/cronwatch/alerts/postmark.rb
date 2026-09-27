@@ -11,7 +11,7 @@ module Cronwatch
       attr_reader :name
 
       def initialize(server_token:, from:, to:, message_stream: nil, subject_prefix: nil, link: nil, http: HTTP.default)
-        @server_token = Provider.require_option(server_token, "Cronwatch::Alerts::Postmark needs a server_token")
+        @server_token = Provider.require_credential(server_token, "Cronwatch::Alerts::Postmark needs a server_token")
         @to = Email.recipients("Postmark", from, to)
         @from = from
         @message_stream = message_stream

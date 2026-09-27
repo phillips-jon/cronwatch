@@ -15,13 +15,14 @@ class PgCronTest < Minitest::Test
 
   # cron.job and cron.job_run_details in memory, answering the reader's queries.
   class FakeCron
-    attr_reader :jobs, :details, :queries
+    attr_reader :jobs, :details, :queries, :settings
 
     def initialize
       @jobs = []
       @details = []
       @runid = 0
       @queries = []
+      @settings = { "cron.timezone" => "GMT", "cron.log_run" => "on" }
     end
 
     def job(jobid, jobname, schedule, active = true)
@@ -37,7 +38,10 @@ class PgCronTest < Minitest::Test
 
     def query(text, values = [])
       @queries << text
-      return [{ "value" => values[0] == "cron.timezone" ? "GMT" : "on" }] if text.include?("current_setting")
+      if text.include?("pg_settings")
+        value = @settings[values[0]]
+        return value.nil? ? [] : [{ "setting" => value }]
+      end
       return @jobs.map { |j| j.merge("jobid" => j["jobid"].to_s) } if text.include?("FROM cron.job ORDER BY")
       if text.include?("ORDER BY d.runid DESC")
         return out(@details.select { |d| d.jobid == values[0] }.sort_by { |d| -d.runid }.first(20))
@@ -45,7 +49,8 @@ class PgCronTest < Minitest::Test
       if text.include?("unnest")
         ids, afters, open = values
         after = ids.zip(afters).to_h
-        return out(@details.select { |d| after.key?(d.jobid) && (d.runid > after[d.jobid] || open.include?(d.runid)) }.sort_by(&:runid).first(500))
+        return out(@details.select { |d| (after.key?(d.jobid) && d.runid > after[d.jobid]) || open.map(&:to_i).include?(d.runid) }
+                           .sort_by(&:runid).first(500))
       end
       raise "unexpected query #{text}"
     end
@@ -87,7 +92,13 @@ class PgCronTest < Minitest::Test
     assert_equal "pg_cron reported the run as failed", PgCron.run(row.merge("return_message" => " "), "vacuum", "pgcron:").error
     going = PgCron.run(row.merge("status" => "running", "end_time" => nil), "vacuum", "pgcron:")
     assert_equal [:running, nil, nil, nil], [going.status, going.finished_at, going.duration_ms, going.error]
-    assert_nil PgCron.run(row.merge("start_time" => nil), "vacuum", "pgcron:")
+    assert_nil PgCron.run(row.merge("status" => "starting", "start_time" => nil, "end_time" => nil), "vacuum", "pgcron:"),
+               "not started yet"
+    # A run a server restart cut off: failed, no start_time; it starts at its end_time, else at the fallback.
+    cut = PgCron.run(row.merge("start_time" => nil, "return_message" => "server restarted"), "vacuum", "pgcron:", T0 - HOUR)
+    assert_equal [:failed, T0 + 2500, T0 + 2500, 0, "server restarted"], [cut.status, cut.started_at, cut.finished_at, cut.duration_ms, cut.error]
+    timeless = PgCron.run(row.merge("start_time" => nil, "end_time" => nil), "vacuum", "pgcron:", T0 - HOUR)
+    assert_equal [T0 - HOUR, T0 - HOUR, 0], [timeless.started_at, timeless.finished_at, timeless.duration_ms]
   end
 
   def test_jobs_are_declared_history_is_copied_quietly_and_imports_are_idempotent
@@ -147,11 +158,20 @@ class PgCronTest < Minitest::Test
 
     # The nightly job stops running: missed, from its schedule, with no run details at all.
     clock.now = Time.utc(2026, 1, 6, 3, 11).to_i * 1000
-    cron.jobs.shift
     cron.add(2, "succeeded", clock.now - 2000, clock.now - 1000, "1 row")
     later = cw.check
     assert_equal ["missed db:nightly-vacuum", "recovered db:pg_cron:2"], later.alerts.map { |a| "#{a.type} #{a.job}" }.sort
     assert_empty cw.check.alerts, "each condition alerts once"
+
+    # Unscheduled: its name keeps its history but loses its schedule, so it is never missed again.
+    cron.jobs.shift
+    clock.now = Time.utc(2026, 1, 8, 3, 11).to_i * 1000
+    gone = cw.check
+    vacuum_now = job_named(gone, "db:nightly-vacuum")
+    assert_nil vacuum_now.definition.schedule
+    assert_match(/no longer watched/, vacuum_now.definition.description)
+    refute(gone.alerts.any? { |a| a.job == "db:nightly-vacuum" }, "no alert for an unscheduled job")
+    assert_equal 20, cw.runs("db:nightly-vacuum", 100).length, "its history is kept"
   end
 
   def test_job_options_apply_and_an_unreadable_schedule_is_reported
@@ -175,7 +195,7 @@ class PgCronTest < Minitest::Test
   def test_warnings_come_once
     cron = FakeCron.new
     def cron.query(text, values = [])
-      raise "permission denied" if text.include?("current_setting")
+      raise "permission denied" if text.include?("pg_settings")
 
       super
     end
@@ -201,6 +221,161 @@ class PgCronTest < Minitest::Test
     end.new
     assert_equal [{ "value" => "UTC" }], PgCron.adapter(pg).query("SELECT $1", [[1, 2], 3, "x"])
     assert_equal [["SELECT $1", ["{1,2}", 3, "x"]]], pg.calls
+  end
+
+  def at(ms) = Time.at(Rational(ms, 1000)).utc
+
+  def test_a_run_cut_off_by_a_restart_is_recorded_and_one_held_run_never_stops_the_others
+    clock = Clock.new
+    cron = FakeCron.new
+    cron.job(1, "fast", "30 seconds")
+    cron.job(2, "other", "0 * * * *")
+    errors = []
+    capture = Capture.new
+    cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [capture], now: clock.to_proc, cron_secret: nil,
+                       on_error: ->(e, _where) { errors << e.message }, sources: [PgCron.new(cron)])
+    cron.add(1, "succeeded", T0 - 60_000, T0 - 59_000, "1 row")
+    cw.check
+    # pg_cron restarts while a run is queued: it marks it failed, "server restarted", with no times at all.
+    restarted = cron.add(1, "failed", nil, nil, "server restarted")
+    # The fast job then runs far more than a page's worth, and the other job fails after all of them.
+    520.times { |i| cron.add(1, "succeeded", T0 - 50_000 + i, T0 - 50_000 + i + 1, "1 row") }
+    failure = cron.add(2, "failed", T0 - 1000, T0 - 500, "ERROR:  disk full")
+    queued = cron.add(1, "starting", nil, nil)
+    clock.advance(1000)
+    cw.check
+    cw.check
+    cut = cw.run("pgcron:#{restarted.runid}")
+    assert_equal [:failed, "server restarted"], [cut.status, cut.error]
+    assert_equal T0 - 60_000, cut.started_at, "placed at the job's newest run before it"
+    assert_equal :failed, cw.run("pgcron:#{failure.runid}")&.status, "the other job's failure is not starved"
+    assert(capture.alerts.any? { |a| a.type == :failed && a.job == "other" })
+    assert_nil cw.run("pgcron:#{queued.runid}"), "a queued run is held"
+
+    # Held only so long: then it is copied as running from when it was first seen, and a late start updates nothing but its end.
+    clock.advance(11 * MIN)
+    cw.check
+    waiting = cw.run("pgcron:#{queued.runid}")
+    assert_equal [:running, T0 + 1000], [waiting.status, waiting.started_at]
+    queued.status = "succeeded"
+    queued.start_time = at(clock.now - 2000)
+    queued.end_time = at(clock.now - 1000)
+    clock.advance(1000)
+    cw.check
+    assert_equal :ok, cw.run("pgcron:#{queued.runid}").status
+    assert_equal [], errors.grep_v(/cron\.|row level/)
+  end
+
+  def test_first_sight_never_judges_history_even_with_a_held_or_cut_off_run_among_the_newest
+    clock = Clock.new
+    cron = FakeCron.new
+    cron.job(1, "nightly", "0 3 * * *")
+    30.times { |i| cron.add(1, "failed", T0 - ((40 - i) * HOUR), T0 - ((40 - i) * HOUR) + 1000, "ERROR:  old") }
+    cron.add(1, "failed", nil, nil, "server restarted")
+    19.times { |i| cron.add(1, "succeeded", T0 - ((10 - (i / 2.0)) * HOUR).to_i, T0 - ((10 - (i / 2.0)) * HOUR).to_i + 1000, "ok") }
+    capture = Capture.new
+    cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [capture], now: clock.to_proc, cron_secret: nil,
+                       sources: [PgCron.new(cron)])
+    cw.check
+    cw.check
+    assert_equal 20, cw.runs("nightly", 500).length, "only the newest twenty are copied"
+    assert_equal [], capture.types, "no alert from history"
+  end
+
+  def test_pg_cron_ignores_fields_past_the_fifth_and_so_does_the_reader
+    assert_equal "0 5 * * *", PgCron.schedule("0 5 * * * *")
+    assert_equal "* * * * *", PgCron.schedule("* * * * * *")
+    assert_equal "0 0 L * *", PgCron.schedule("0 0 $ * * extra")
+    assert_equal "@hourly", PgCron.schedule("@hourly")
+  end
+
+  def test_a_renamed_job_leaves_no_scheduled_ghost_in_this_process_or_the_next
+    clock = Clock.new
+    cron = FakeCron.new
+    cron.job(1, "rollup", "*/5 * * * *")
+    cron.add(1, "succeeded", T0 - 60_000, T0 - 59_000, "1 row")
+    store = Cronwatch::Stores::Memory.new
+    capture = Capture.new
+    errors = []
+    make = lambda do
+      Cronwatch.new(store: store, alerts: [capture], now: clock.to_proc, cron_secret: nil,
+                    on_error: ->(e, _where) { errors << e.message }, sources: [PgCron.new(cron)])
+    end
+    cw = make.call
+    cw.check
+    cron.jobs[0]["jobname"] = "rollup-v2"
+    running = cron.add(1, "running", T0 - 1000, nil)
+    cw.check
+    summary = cw.jobs
+    old = summary.find { |j| j.name == "rollup" }
+    assert_nil old.definition.schedule, "the old name has no schedule"
+    assert_match(/renamed to rollup-v2/, old.definition.description)
+    assert_equal "*/5 * * * *", summary.find { |j| j.name == "rollup-v2" }.definition.schedule
+    assert_equal "rollup-v2", cw.run("pgcron:#{running.runid}").job
+    running.status = "succeeded"
+    running.end_time = at(T0)
+    clock.advance(HOUR)
+    cron.add(1, "succeeded", clock.now - 2000, clock.now - 1000, "1 row")
+    cw.check
+    assert_equal :ok, cw.run("pgcron:#{running.runid}").status
+    refute(capture.alerts.any? { |a| a.job == "rollup" }, "the old name is never missed")
+
+    # Renamed again while no process watched: the next process retires the name the store still schedules.
+    cron.jobs[0]["jobname"] = "rollup-v3"
+    cw = make.call
+    clock.advance(MIN)
+    cw.check
+    summary = cw.jobs
+    v2 = summary.find { |j| j.name == "rollup-v2" }
+    assert_nil v2.definition.schedule
+    assert_match(/renamed to rollup-v3/, v2.definition.description)
+    assert_equal "*/5 * * * *", summary.find { |j| j.name == "rollup-v3" }.definition.schedule
+    assert_equal 0, cw.runs("rollup-v3").length, "runs already copied under an old name are not copied again"
+    clock.advance(HOUR)
+    cw.check
+    assert_equal [], capture.alerts.reject { |a| a.job == "rollup-v3" }.map { |a| "#{a.type} #{a.job}" },
+                 "only the job's current name can be missed"
+    assert_equal [], errors.grep_v(/cron\.|row level/)
+  end
+
+  def test_a_run_marked_timeout_by_a_check_is_still_read_and_its_late_finish_recorded
+    clock = Clock.new
+    cron = FakeCron.new
+    cron.job(1, "vacuum", "0 3 * * *")
+    capture = Capture.new
+    cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [capture], now: clock.to_proc, cron_secret: nil,
+                       sources: [PgCron.new(cron, options: { timeout: "30m" })])
+    long = cron.add(1, "running", T0, nil)
+    cw.check
+    assert_equal :running, cw.run("pgcron:#{long.runid}").status
+    clock.advance(45 * MIN)
+    cw.check
+    assert_equal :timeout, cw.run("pgcron:#{long.runid}").status
+    assert_equal [:stuck], capture.types
+    clock.advance(10 * MIN)
+    long.status = "succeeded"
+    long.end_time = at(clock.now - 60_000)
+    long.return_message = "VACUUM"
+    cw.check
+    done = cw.run("pgcron:#{long.runid}")
+    assert_equal [:ok, "VACUUM"], [done.status, done.output]
+    assert_equal %i[stuck recovered], capture.types
+    assert_equal :healthy, cw.job_summary("vacuum").health
+  end
+
+  def test_settings_a_role_may_not_read_are_assumed_and_reported_once
+    cron = FakeCron.new
+    cron.settings.delete("cron.timezone")
+    cron.settings.delete("cron.log_run")
+    cron.job(1, "nightly", "0 3 * * *")
+    errors = []
+    cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [], cron_secret: nil,
+                       on_error: ->(e, _where) { errors << e.message }, sources: [PgCron.new(cron)])
+    first = cw.check
+    cw.check
+    assert_equal "UTC", first.jobs[0].definition.timezone
+    assert_equal 1, errors.grep(/cron\.timezone/).length
+    refute(errors.any? { |e| e.include?("log_run") }, "log_run unreadable is taken as on")
   end
 
   # ---------------------------------------------------------------- a real pg_cron
@@ -281,7 +456,7 @@ class PgCronTest < Minitest::Test
       assert_operator after.length, :>, before, "later runs imported"
       assert_equal after.length, after.map(&:id).uniq.length
 
-      # The ok job is unscheduled: it is missed once its grace passes.
+      # The ok job is unscheduled: it is gone, not late, so it is never missed.
       admin.exec_params("SELECT cron.unschedule($1)", [names[:ok]])
       admin.exec_params("SELECT cron.alter_job(jobid, active := false) FROM cron.job WHERE jobname = $1", [names[:fail]])
       sleep 1.5
@@ -293,7 +468,10 @@ class PgCronTest < Minitest::Test
       assert_equal [detail_count(admin, names[:fail]), settled].min, cw.runs(names[:fail], 500).length
       offset = 2 * MIN
       late = cw.check
-      assert(late.alerts.any? { |a| a.type == :missed && a.job == names[:ok] }, "unscheduled job reported missed")
+      refute(late.alerts.any? { |a| a.type == :missed && a.job == names[:ok] }, "unscheduled job not missed: it is gone, not late")
+      ok_job = late.jobs.find { |j| j.name == names[:ok] }
+      assert_nil ok_job.definition.schedule
+      assert_match(/no longer in cron\.job/, ok_job.definition.description)
       refute(late.alerts.any? { |a| a.job == names[:fail] && a.type == :missed }, "paused job not missed")
     ensure
       begin
@@ -302,6 +480,117 @@ class PgCronTest < Minitest::Test
         nil
       end
       conn&.close
+      admin&.close
+    end
+  end
+
+  DETAIL_COLUMNS = "jobid, runid, database, username, command, status, return_message, start_time, end_time"
+
+  def test_against_a_real_pg_cron_restart_rows_a_crowded_job_first_sight_and_a_rename
+    skip "set CRONWATCH_TEST_PGCRON to the URL of a Postgres with pg_cron (in cron.database_name) to run" unless PGCRON
+
+    conn = pg_connect
+    tag = "cwrbrow#{Process.pid}"
+    names = { busy: "#{tag}-busy", quiet: "#{tag}-quiet", hist: "#{tag}-hist" }
+    insert = lambda do |jobid, status, times, message|
+      conn.exec_params("INSERT INTO cron.job_run_details (#{DETAIL_COLUMNS}) SELECT $1, nextval('cron.runid_seq'), 'postgres', " \
+                       "'postgres', 'select 1', $2, $3, #{times} RETURNING runid", [jobid, status, message]).first
+    end
+    begin
+      conn.exec("CREATE EXTENSION IF NOT EXISTS pg_cron")
+      ids = {}
+      names.each_value do |name|
+        ids[name] = conn.exec_params("SELECT cron.schedule($1, '0 3 * * *', 'SELECT 1') AS id", [name]).first["id"].to_i
+        # Paused, so pg_cron itself adds no rows while the test writes its own.
+        conn.exec_params("SELECT cron.alter_job($1, active := false)", [ids[name]])
+      end
+      # First sight of a job whose newest rows include a run cut off by a restart, and older failures.
+      conn.exec_params("INSERT INTO cron.job_run_details (#{DETAIL_COLUMNS}) SELECT $1, nextval('cron.runid_seq'), 'postgres', 'postgres', " \
+                       "'select 1', 'failed', 'ERROR: old', now() - interval '3 days', now() - interval '3 days' FROM generate_series(1, 5)",
+                       [ids[names[:hist]]])
+      insert.call(ids[names[:hist]], "failed", "NULL, NULL", "server restarted")
+      conn.exec_params("INSERT INTO cron.job_run_details (#{DETAIL_COLUMNS}) SELECT $1, nextval('cron.runid_seq'), 'postgres', 'postgres', " \
+                       "'select 1', 'succeeded', '1 row', now() - make_interval(mins => 30 - g), now() - make_interval(mins => 30 - g) " \
+                       "FROM generate_series(1, 19) g", [ids[names[:hist]]])
+
+      capture = Capture.new
+      errors = []
+      cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [capture], cron_secret: nil,
+                         on_error: ->(e, _where) { errors << e.message },
+                         sources: [PgCron.new(conn, jobs: ->(j) { j.jobname.to_s.start_with?(tag) }, timezone: "UTC")])
+      cw.check
+      assert_equal 20, cw.runs(names[:hist], 500).length, "twenty newest copied"
+      assert_equal [], capture.alerts.map(&:job), "history is never judged"
+      cw.check
+      assert_equal 20, cw.runs(names[:hist], 500).length, "and never read again"
+
+      # A restart cuts off a busy job's queued run; the busy job then runs past a page; then the quiet job fails.
+      cut = insert.call(ids[names[:busy]], "failed", "NULL, NULL", "server restarted")
+      conn.exec_params("INSERT INTO cron.job_run_details (#{DETAIL_COLUMNS}) SELECT $1, nextval('cron.runid_seq'), 'postgres', 'postgres', " \
+                       "'select 1', 'succeeded', '1 row', now() - make_interval(secs => 600 - g), now() - make_interval(secs => 600 - g) " \
+                       "FROM generate_series(1, 520) g", [ids[names[:busy]]])
+      disk = insert.call(ids[names[:quiet]], "failed", "now(), now()", "ERROR: disk full")
+      3.times { cw.check }
+      assert_equal "server restarted", cw.run("pgcron:#{cut["runid"]}")&.error
+      assert_equal :failed, cw.run("pgcron:#{disk["runid"]}")&.status, "the quiet job's failure is read"
+      assert(capture.alerts.any? { |a| a.type == :failed && a.job == names[:quiet] })
+
+      # Renamed in pg_cron: the old name keeps its runs and loses its schedule.
+      conn.exec_params("UPDATE cron.job SET jobname = $1 WHERE jobid = $2", ["#{names[:quiet]}-v2", ids[names[:quiet]]])
+      conn.exec_params("SELECT cron.alter_job($1, active := true)", [ids[names[:quiet]]])
+      cw.check
+      jobs = cw.jobs
+      old = jobs.find { |j| j.name == names[:quiet] }
+      assert_nil old.definition.schedule
+      assert_match(/renamed to/, old.definition.description)
+      assert_equal "0 3 * * *", jobs.find { |j| j.name == "#{names[:quiet]}-v2" }.definition.schedule
+      assert_equal [], errors.grep_v(/cron\.|row level/)
+    ensure
+      begin
+        conn&.exec_params("SELECT cron.unschedule(jobid) FROM cron.job WHERE jobname LIKE $1", ["#{tag}%"])
+      rescue StandardError
+        nil
+      end
+      conn&.close
+    end
+  end
+
+  def test_against_a_real_pg_cron_a_role_that_may_not_read_cron_settings_never_aborts_the_callers_transaction
+    skip "set CRONWATCH_TEST_PGCRON to the URL of a Postgres with pg_cron (in cron.database_name) to run" unless PGCRON
+
+    admin = pg_connect
+    role = "cwrbrole#{Process.pid}"
+    client = nil
+    begin
+      admin.exec("CREATE EXTENSION IF NOT EXISTS pg_cron")
+      admin.exec("CREATE ROLE #{role} LOGIN PASSWORD 'pw'")
+      admin.exec("GRANT USAGE ON SCHEMA cron TO #{role}")
+      admin.exec("GRANT SELECT ON cron.job, cron.job_run_details TO #{role}")
+      url = URI(PGCRON)
+      url.user = role
+      url.password = "pw"
+      client = PG.connect(url.to_s)
+      client.set_notice_receiver { |_result| nil }
+      client.exec_params("SELECT cron.schedule($1, '0 3 * * *', 'SELECT 1')", ["#{role}-job"])
+      errors = []
+      cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [], cron_secret: nil,
+                         on_error: ->(e, _where) { errors << e.message }, sources: [PgCron.new(client)])
+      client.exec("BEGIN")
+      result = cw.check
+      assert_equal "1", client.exec("SELECT 1 AS one").first["one"], "the transaction is still usable"
+      client.exec("ROLLBACK")
+      job = result.jobs.find { |j| j.name == "#{role}-job" }
+      assert_equal "UTC", job.definition.timezone, "assumed"
+      assert_equal "0 3 * * *", job.definition.schedule, "cron.log_run unreadable is taken as on"
+      assert(errors.any? { |e| e.include?("could not read cron.timezone") }, errors.inspect)
+    ensure
+      client&.close
+      # Every job of the role goes before the role: pg_cron's scheduler stops on a job whose role is gone.
+      ["SELECT cron.unschedule(jobid) FROM cron.job WHERE username = '#{role}'", "DROP OWNED BY #{role}", "DROP ROLE IF EXISTS #{role}"].each do |sql|
+        admin.exec(sql)
+      rescue StandardError
+        nil
+      end
       admin&.close
     end
   end

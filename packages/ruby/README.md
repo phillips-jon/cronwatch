@@ -62,7 +62,7 @@ run.log("Report written:", path)
 run.finish                          # or run.fail(error); finish("text") and finish(result: x) work like run's return value
 ```
 
-Neither raises for the store: failures go to `on_error`, and a finish of a run already finished, or not found, records nothing and returns nil. A run never finished is marked stuck after the job's `timeout`.
+Neither raises for the store: failures go to `on_error`, and a finish of a run already finished, not found, or of another job records nothing and returns nil. A run is judged once, however many processes finish it at once, and a store that fails during `finish` leaves the handle active to finish again. A run never finished is marked stuck after the job's `timeout`.
 
 Client options: `store`, `alerts`, `triage`, `cron_secret`, `retention` (default `"30d"`), `defaults`, `redact` (default: blank values that look like secrets; `false` keeps output as logged, or pass a callable), `deliver` (`:now` by default; `:check` queues alerts for another process's check to send, for a worker that cannot reach Slack), `on_error` and `now`. Methods: `job`, `run`, `resume_run`, `check`, `start`/`stop`, `silence(name, for: "2h")`/`unsilence`, `forget`, `jobs`, `jobs_with_runs`, `job_summary`, `runs`, `get_run`, `defined_jobs`, `close`. [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/#api) has each one.
 

@@ -18,15 +18,19 @@ module Cronwatch
                      subject_prefix: nil, link: nil, now: nil, http: HTTP.default)
         region = Provider.require_option(region, "Cronwatch::Alerts::Ses needs a region")
         raise ArgumentError, "Cronwatch::Alerts::Ses needs a region like us-east-1" unless /\A[a-z0-9-]+\z/.match?(region)
-        if access_key_id.nil? || access_key_id.to_s.empty? || secret_access_key.nil? || secret_access_key.to_s.empty?
+        # A pasted credential often carries a stray space or newline, which would spoil the signature.
+        access_key_id = Provider.trimmed(access_key_id)
+        secret_access_key = Provider.trimmed(secret_access_key)
+        if access_key_id.empty? || secret_access_key.empty?
           raise ArgumentError, "Cronwatch::Alerts::Ses needs an access_key_id and secret_access_key"
         end
 
         @to = Email.recipients("Ses", from, to)
         @region = region
-        @access_key_id = access_key_id.to_s
-        @secret_access_key = secret_access_key.to_s
-        @session_token = session_token
+        @access_key_id = access_key_id
+        @secret_access_key = secret_access_key
+        session_token = Provider.trimmed(session_token)
+        @session_token = session_token.empty? ? nil : session_token
         @configuration_set_name = configuration_set_name
         @from = from
         @subject_prefix = subject_prefix
