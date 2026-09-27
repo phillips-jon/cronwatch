@@ -42,6 +42,19 @@ const expected = {
   "@cronwatch/sdk/anthropic": ["anthropic"],
   "@cronwatch/sdk/d1": ["d1"],
   "@cronwatch/sdk/pg-cron": ["pgCron"],
+  // Appended, so the m<index> aliases below keep pointing at the same entries.
+  "@cronwatch/sdk/resend": ["resend"],
+  "@cronwatch/sdk/postmark": ["postmark"],
+  "@cronwatch/sdk/sendgrid": ["sendgrid"],
+  "@cronwatch/sdk/mailgun": ["mailgun"],
+  "@cronwatch/sdk/ses": ["ses"],
+  "@cronwatch/sdk/twilio": ["twilio"],
+  "@cronwatch/sdk/sentry": ["sentry"],
+  "@cronwatch/sdk/honeybadger": ["honeybadger"],
+  "@cronwatch/sdk/datadog": ["datadog"],
+  "@cronwatch/sdk/rollbar": ["rollbar"],
+  "@cronwatch/sdk/bugsnag": ["bugsnag"],
+  "@cronwatch/sdk/newrelic": ["newrelic"],
 };
 for (const e of entries) {
   if (!expected[e]) throw new Error(`check-packages: add ${e} to the expected exports`);

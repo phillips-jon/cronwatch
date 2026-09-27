@@ -1,6 +1,6 @@
 ---
 title: Alerts
-description: Slack, Discord, signed webhooks, the console, custom channels, and the alert payload.
+description: Slack, Discord, signed webhooks, email, SMS, error trackers, the console, custom channels, and the alert payload.
 order: 6
 ---
 
@@ -49,6 +49,149 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 const expected = "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
 const ok = timingSafeEqual(Buffer.from(expected), Buffer.from(request.headers.get("x-cronwatch-signature") ?? ""));
 ```
+
+## Email, SMS and error trackers
+
+Each provider below is its own entry point, with nothing to install: they use only `fetch` and Web Crypto, so they run on Node, Cloudflare Workers, Deno and Bun. Every request gives up after 10 seconds. A failure names the provider and the URL's origin, with any key the channel holds cut out of the response it quotes. Every channel takes an optional `link: (alert) => string`, shown as an "Open" link.
+
+### Email
+
+All five email channels send the same message: the subject is the alert title (after `subjectPrefix`, if you set one), and the body is the title, the message, the triage and the link, as plain text and as a small HTML part with everything escaped and no remote images. They share these options:
+
+| Option | |
+|---|---|
+| `from` | The sender, `"alerts@example.com"` or `"CronWatch <alerts@example.com>"`. The provider must allow it. |
+| `to` | One address or an array. |
+| `subjectPrefix` | Put before the title, `"[prod]"` say. |
+| `link` | `(alert) => string`. Only `http` and `https` links are included. |
+
+#### Resend
+
+```ts
+import { resend } from "@cronwatch/sdk/resend";
+resend({ apiKey: process.env.RESEND_API_KEY!, from: "CronWatch <alerts@example.com>", to: "ops@example.com" });
+```
+
+Each request carries an `Idempotency-Key` derived from the alert, so Resend delivers a resent alert once.
+
+#### Postmark
+
+```ts
+import { postmark } from "@cronwatch/sdk/postmark";
+postmark({ serverToken: process.env.POSTMARK_SERVER_TOKEN!, from: "alerts@example.com", to: ["ops@example.com", "dev@example.com"] });
+```
+
+`messageStream` defaults to `"outbound"`, the transactional stream.
+
+#### SendGrid
+
+```ts
+import { sendgrid } from "@cronwatch/sdk/sendgrid";
+sendgrid({ apiKey: process.env.SENDGRID_API_KEY!, from: "alerts@example.com", to: "ops@example.com" });
+```
+
+`region: "eu"` sends through `api.eu.sendgrid.com`, for EU regional subusers.
+
+#### Mailgun
+
+```ts
+import { mailgun } from "@cronwatch/sdk/mailgun";
+mailgun({ apiKey: process.env.MAILGUN_API_KEY!, domain: "mg.example.com", from: "alerts@mg.example.com", to: "ops@example.com" });
+```
+
+`region: "eu"` is for a domain in Mailgun's EU region.
+
+#### Amazon SES
+
+Sends with the SES v2 `SendEmail` API, signed with AWS Signature Version 4, so no AWS SDK is needed. The from address (or its domain) must be a verified identity in `region`, and the credentials need `ses:SendEmail`.
+
+```ts
+import { ses } from "@cronwatch/sdk/ses";
+ses({
+  region: "us-east-1",
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  sessionToken: process.env.AWS_SESSION_TOKEN,   // optional, for temporary credentials
+  from: "alerts@example.com",
+  to: "ops@example.com",
+});
+```
+
+`configurationSetName` is optional.
+
+### SMS: Twilio
+
+Texts each number in `to` separately. The message is the title, then as many lines of the message and triage as fit in `segments` SMS segments (3 by default), then the link, kept whole. Recoveries are not texted unless you pass `recovered: true`.
+
+```ts
+import { twilio } from "@cronwatch/sdk/twilio";
+twilio({
+  accountSid: process.env.TWILIO_ACCOUNT_SID!,
+  authToken: process.env.TWILIO_AUTH_TOKEN!,   // or apiKeySid and apiKeySecret
+  from: "+15005550006",                         // or messagingServiceSid
+  to: ["+15551110000", "+15552220000"],
+});
+```
+
+If some numbers fail, the others are still texted and the error says how many failed.
+
+### Error trackers
+
+These report each alert as an event, grouped so that each job's condition is one issue: the fingerprint (or grouping key) is `cronwatch:<job>:<type>`. Failed, stuck and missed are errors, slow and over budget are warnings, and a recovery is informational.
+
+#### Sentry
+
+```ts
+import { sentry } from "@cronwatch/sdk/sentry";
+sentry({ dsn: process.env.SENTRY_DSN!, environment: "production", release: "app@1.2.3" });
+```
+
+Sends an event to the project's envelope endpoint, tagged `job` and `type`, with the triage, link, details and run under Additional Data. The event id is derived from the alert, so Sentry drops a resend. `recovered: false` leaves recoveries out.
+
+#### Honeybadger
+
+```ts
+import { honeybadger } from "@cronwatch/sdk/honeybadger";
+honeybadger({ apiKey: process.env.HONEYBADGER_API_KEY!, environment: "production" });
+```
+
+Reports an error notice (not a Check-in, which is a separate Honeybadger product) with a class such as `CronWatch::Failed`. Honeybadger has no levels, so recoveries are only sent with `recovered: true`. For the EU region, pass `endpoint: "https://eu-api.honeybadger.io"`.
+
+#### Datadog
+
+```ts
+import { datadog } from "@cronwatch/sdk/datadog";
+datadog({ apiKey: process.env.DD_API_KEY!, site: "datadoghq.eu", tags: ["env:prod"] });
+```
+
+Posts to the Events API with `alert_type` `error`, `warning` or `success`, an aggregation key per job and type, and the tags `cronwatch`, `job:<name>` and `alert:<type>`. `site` defaults to `datadoghq.com`; `host` is optional. Datadog rejects events more than 18 hours old, which matters only if an alert was queued that long.
+
+#### Rollbar
+
+```ts
+import { rollbar } from "@cronwatch/sdk/rollbar";
+rollbar({ accessToken: process.env.ROLLBAR_ACCESS_TOKEN!, environment: "production" });
+```
+
+Needs a token with the `post_server_item` scope. `recovered: false` leaves recoveries out.
+
+#### Bugsnag
+
+```ts
+import { bugsnag } from "@cronwatch/sdk/bugsnag";
+bugsnag({ apiKey: process.env.BUGSNAG_API_KEY!, releaseStage: "production" });
+```
+
+Sends a handled event with a grouping hash per job and type and the details under a `cronwatch` metadata tab. Recoveries are only sent with `recovered: true`. `endpoint` points it at an on-premise install.
+
+#### New Relic
+
+```ts
+import { newrelic } from "@cronwatch/sdk/newrelic";
+newrelic({ accountId: 1234567, apiKey: process.env.NEW_RELIC_LICENSE_KEY!, region: "us" });
+```
+
+Records a `CronWatchAlert` custom event (rename it with `eventType`) with `job`, `alertType`, `severity`, `title`, `message`, `triage`, `link`, `runId`, `runStatus` and `durationMs`, which you can chart or alert on with NRQL: `SELECT count(*) FROM CronWatchAlert WHERE severity = 'error' FACET job`. The key is an ingest license key; `region: "eu"` is for EU accounts.
 
 ## Console and custom
 

@@ -52,6 +52,42 @@
       "webhook": [
         "./dist/webhook.d.cts"
       ],
+      "resend": [
+        "./dist/resend.d.cts"
+      ],
+      "postmark": [
+        "./dist/postmark.d.cts"
+      ],
+      "sendgrid": [
+        "./dist/sendgrid.d.cts"
+      ],
+      "mailgun": [
+        "./dist/mailgun.d.cts"
+      ],
+      "ses": [
+        "./dist/ses.d.cts"
+      ],
+      "twilio": [
+        "./dist/twilio.d.cts"
+      ],
+      "sentry": [
+        "./dist/sentry.d.cts"
+      ],
+      "honeybadger": [
+        "./dist/honeybadger.d.cts"
+      ],
+      "datadog": [
+        "./dist/datadog.d.cts"
+      ],
+      "rollbar": [
+        "./dist/rollbar.d.cts"
+      ],
+      "bugsnag": [
+        "./dist/bugsnag.d.cts"
+      ],
+      "newrelic": [
+        "./dist/newrelic.d.cts"
+      ],
       "anthropic": [
         "./dist/anthropic.d.cts"
       ],
@@ -129,6 +165,126 @@
       "require": {
         "types": "./dist/webhook.d.cts",
         "default": "./dist/webhook.cjs"
+      }
+    },
+    "./resend": {
+      "import": {
+        "types": "./dist/resend.d.ts",
+        "default": "./dist/resend.js"
+      },
+      "require": {
+        "types": "./dist/resend.d.cts",
+        "default": "./dist/resend.cjs"
+      }
+    },
+    "./postmark": {
+      "import": {
+        "types": "./dist/postmark.d.ts",
+        "default": "./dist/postmark.js"
+      },
+      "require": {
+        "types": "./dist/postmark.d.cts",
+        "default": "./dist/postmark.cjs"
+      }
+    },
+    "./sendgrid": {
+      "import": {
+        "types": "./dist/sendgrid.d.ts",
+        "default": "./dist/sendgrid.js"
+      },
+      "require": {
+        "types": "./dist/sendgrid.d.cts",
+        "default": "./dist/sendgrid.cjs"
+      }
+    },
+    "./mailgun": {
+      "import": {
+        "types": "./dist/mailgun.d.ts",
+        "default": "./dist/mailgun.js"
+      },
+      "require": {
+        "types": "./dist/mailgun.d.cts",
+        "default": "./dist/mailgun.cjs"
+      }
+    },
+    "./ses": {
+      "import": {
+        "types": "./dist/ses.d.ts",
+        "default": "./dist/ses.js"
+      },
+      "require": {
+        "types": "./dist/ses.d.cts",
+        "default": "./dist/ses.cjs"
+      }
+    },
+    "./twilio": {
+      "import": {
+        "types": "./dist/twilio.d.ts",
+        "default": "./dist/twilio.js"
+      },
+      "require": {
+        "types": "./dist/twilio.d.cts",
+        "default": "./dist/twilio.cjs"
+      }
+    },
+    "./sentry": {
+      "import": {
+        "types": "./dist/sentry.d.ts",
+        "default": "./dist/sentry.js"
+      },
+      "require": {
+        "types": "./dist/sentry.d.cts",
+        "default": "./dist/sentry.cjs"
+      }
+    },
+    "./honeybadger": {
+      "import": {
+        "types": "./dist/honeybadger.d.ts",
+        "default": "./dist/honeybadger.js"
+      },
+      "require": {
+        "types": "./dist/honeybadger.d.cts",
+        "default": "./dist/honeybadger.cjs"
+      }
+    },
+    "./datadog": {
+      "import": {
+        "types": "./dist/datadog.d.ts",
+        "default": "./dist/datadog.js"
+      },
+      "require": {
+        "types": "./dist/datadog.d.cts",
+        "default": "./dist/datadog.cjs"
+      }
+    },
+    "./rollbar": {
+      "import": {
+        "types": "./dist/rollbar.d.ts",
+        "default": "./dist/rollbar.js"
+      },
+      "require": {
+        "types": "./dist/rollbar.d.cts",
+        "default": "./dist/rollbar.cjs"
+      }
+    },
+    "./bugsnag": {
+      "import": {
+        "types": "./dist/bugsnag.d.ts",
+        "default": "./dist/bugsnag.js"
+      },
+      "require": {
+        "types": "./dist/bugsnag.d.cts",
+        "default": "./dist/bugsnag.cjs"
+      }
+    },
+    "./newrelic": {
+      "import": {
+        "types": "./dist/newrelic.d.ts",
+        "default": "./dist/newrelic.js"
+      },
+      "require": {
+        "types": "./dist/newrelic.d.cts",
+        "default": "./dist/newrelic.cjs"
       }
     },
     "./anthropic": {
