@@ -121,13 +121,15 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .copy:hover { color: var(--ink); border-color: var(--muted); }
 
 /* Rows: a small label down the left, the thing itself on the right. */
-.row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 40px; align-items: start; padding: 40px 0; border-top: 1px solid var(--rule); }
+.row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 40px; row-gap: 40px; align-items: start; padding: clamp(64px, 8vw, 96px) 0; border-top: 1px solid var(--rule); }
 .row > .label { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-top: 6px; }
-.row .body > h2 { font-size: 1.5rem; line-height: 1.24; max-width: 46ch; text-wrap: pretty; }
-.row .body > p { color: var(--body); max-width: 58ch; margin-top: 14px; text-wrap: pretty; }
+.row .body > h2 { font-size: 1.62rem; line-height: 1.22; max-width: 40ch; text-wrap: pretty; }
+.row .body > p { color: var(--body); max-width: 58ch; margin-top: 18px; text-wrap: pretty; }
 .row .body > p.small { font-size: 17px; color: var(--muted); }
 .row .body > p code, .row .body > p.small code { font-size: .86em; color: var(--ink); }
-.row .body > * + .out, .row .body > * + .install, .row .body > * + .catches { margin-top: 22px; }
+.row .body > * + .out, .row .body > * + .install, .row .body > * + .catches { margin-top: 30px; }
+.row .body > * + p.small, .row .body > * + details.peek { margin-top: 24px; }
+.row .body > details.peek + details.peek { margin-top: 12px; }
 
 /* Printed things: what the library actually put on a screen. */
 .out { background: var(--sunk); border: 1px solid var(--rule); border-radius: 3px; }
@@ -151,40 +153,221 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .pair .arrow { display: grid; place-items: center; color: var(--muted); margin-top: 26px; }
 .pair .arrow svg { width: 74px; height: auto; overflow: visible; }
 
-/* The day, drawn from the library's own records. */
-.day .scroll { overflow-x: auto; margin-left: -190px; }
-.strip { display: block; width: 100%; min-width: 880px; height: auto; }
-.strip .grid { stroke: var(--rule); stroke-width: 1; }
-.strip .base { stroke: var(--rule); stroke-width: 1; }
-.strip .tick { stroke: var(--tick); stroke-width: 1.5; }
-.strip .tick.ahead { stroke-dasharray: 2 2; }
-.strip .axis { fill: var(--muted); font: 400 11px/1 var(--mono); letter-spacing: .06em; }
-.strip .axis.now-label { fill: var(--ink); }
-.strip .job { fill: var(--ink); font: 500 13px/1 var(--mono); }
-.strip .sched { fill: var(--muted); font: 400 10.5px/1 var(--mono); }
-/* A note can sit across a row of due ticks; a stroke in the sheet colour,
-   painted under the letters, knocks the ticks out behind it. */
-.strip .note { fill: var(--muted); font: italic 400 13px/1 var(--serif); stroke: var(--sheet); stroke-width: 6px; stroke-linejoin: round; paint-order: stroke; }
-.strip .lead { stroke: var(--rule-2); stroke-width: 1; }
-.strip .run.ok { fill: var(--ok); }
-.strip .run.bad { fill: var(--bad); }
-.strip .run.warn { fill: var(--warn); }
-.strip .run.missed { fill: none; stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 3 2.5; }
-.strip .run.running { fill: none; stroke: var(--ink); stroke-width: 1.5; }
-.strip .now { stroke: var(--ink); stroke-width: 1.5; }
-.strip .legend { fill: var(--muted); font: 400 11.5px/1 var(--mono); }
+/* A section's wide part: runs under both the label and the body. */
+.row > .span { grid-column: 1 / -1; min-width: 0; }
+.row .caption { margin-top: 14px; font-size: 16px; color: var(--muted); }
+.row .body > p.example { margin-top: 26px; font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.row .body > .example + .pair { margin-top: 14px; }
 
-/* The board, as the dashboard draws it. */
-.board .rows { overflow-x: auto; }
-.board table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.board th { text-align: left; font: 400 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; border-bottom: 1px solid var(--rule); }
-.board td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: middle; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; color: var(--body); }
-.board tr:last-child td { border-bottom: 0; }
-.board td.name { font-weight: 500; color: var(--ink); }
-.board td.bad, .state.bad { color: var(--bad); }
-.state { font-weight: 500; }
-.state.ok { color: var(--ok); } .state.warn { color: var(--warn); } .state.muted, .state.info { color: var(--muted); }
+/* A flat browser window: a thin frame, three dots and the address, nothing
+   else. What sits inside is the dashboard, redrawn from its capture. */
+.browser { margin: 0; border: 1px solid var(--rule-2); border-radius: 6px; background: var(--sheet); overflow: hidden; }
+.browser .chrome { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; align-items: center; gap: 12px; padding: 9px 12px; background: var(--sunk); border-bottom: 1px solid var(--rule); }
+.browser .dots { display: flex; gap: 6px; }
+.browser .dots i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--rule-2); }
+.browser .url { justify-self: center; width: min(100%, 380px); padding: 5px 12px; background: var(--sheet); border: 1px solid var(--rule); border-radius: 3px; font: 400 12px/1.4 var(--mono); color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.browser .screen { padding: 0 clamp(16px, 3vw, 32px) 8px; }
+
+/* The dashboard's own furniture, at the dashboard's sizes. */
+.dtop { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0 15px; }
+.dbrand { display: flex; align-items: center; gap: 9px; font: 600 17px/1.2 var(--serif); letter-spacing: -0.01em; color: var(--ink); }
+.dmark { width: 22px; height: 22px; flex: none; color: var(--ink); }
+.dact { display: flex; align-items: center; gap: 12px; }
+.dact .meta { font: 400 12px/1.4 var(--mono); color: var(--muted); }
+.dact .fake { font: 500 12px/1 var(--mono); color: var(--sheet); background: var(--ink); border-radius: 3px; padding: 8px 11px; }
+.dsec { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px 32px; padding: 26px 0; border-top: 1px solid var(--rule); }
+.dlabel { font: 500 11px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-top: 5px; }
+.dsec .lede { color: var(--muted); font-size: 16px; max-width: 64ch; text-wrap: pretty; }
+.dwide { grid-column: 1 / -1; min-width: 0; margin-top: 8px; }
+.headline { font: 400 clamp(22px, 2.6vw, 28px)/1.2 var(--serif); letter-spacing: -0.01em; }
+.headline b { font-weight: 600; }
+.sq { display: inline-block; width: 8px; height: 8px; border-radius: 1.5px; background: currentColor; margin-right: 7px; vertical-align: 1px; flex: none; }
+.sq.muted { background: none; border: 1.5px solid var(--tick); }
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); margin: 20px 0 0; border-top: 1px solid var(--rule); }
+.figures > div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 4px; padding: 14px 16px 2px 0; }
+.figures dt { display: flex; align-items: center; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.figures dd { margin: 0; font: 400 30px/1.1 var(--serif); font-variant-numeric: tabular-nums; color: var(--ink); }
+.figures .zero dd { color: var(--rule-2); }
+.figures .bad dd { color: var(--bad); } .figures .warn dd { color: var(--warn); }
+.figures .bad .sq, .figures .zero .sq.bad { color: var(--bad); } .figures .warn .sq, .figures .zero .sq.warn { color: var(--warn); } .figures .ok .sq { color: var(--ok); }
+.state { font: 500 12.5px/1.4 var(--mono); white-space: nowrap; }
+.state.ok { color: var(--ok); } .state.warn { color: var(--warn); } .state.bad { color: var(--bad); } .state.muted { color: var(--muted); } .state.info { color: var(--ink); }
 .state + .state::before { content: " · "; color: var(--muted); font-weight: 400; }
+.counts { display: flex; flex-wrap: wrap; gap: 4px 18px; padding-top: 3px; }
+.counts .state + .state::before { content: none; }
+
+/* The last 24 hours, one SVG per width: every mark sits where the dashboard
+   put it, in its 1000-unit lane, scaled across. */
+.tlbox .tl { display: block; width: 100%; height: auto; overflow: visible; }
+.tlbox .tl.narrow { display: none; }
+.tl .future { fill: var(--sunk); }
+.tl .gl, .tl .edge { stroke: var(--rule); stroke-width: 1; }
+.tl .hour { fill: var(--muted); font: 400 11px/1 var(--mono); letter-spacing: .04em; }
+.tl .hour:not([text-anchor]) { text-anchor: middle; }
+.tl .hour.nowlabel { fill: var(--ink); font-weight: 500; }
+.tl .name { fill: var(--ink); font: 500 13px/1 var(--mono); }
+.tl .sched { fill: var(--muted); font: 400 11px/1 var(--mono); }
+.tl .sq { fill: var(--ok); } .tl .sq.bad { fill: var(--bad); } .tl .sq.warn { fill: var(--warn); }
+.tl .sq.muted { fill: none; stroke: var(--tick); stroke-width: 1.5; }
+.tl .note { fill: var(--muted); font: italic 400 14px/1 var(--serif); stroke: var(--sheet); stroke-width: 5px; stroke-linejoin: round; paint-order: stroke; }
+.tl.narrow .note { font-size: 12.5px; }
+.tl.narrow .name { font-size: 12.5px; }
+.tl .now { stroke: var(--ink); stroke-width: 1.5; }
+.tl .marks * { vector-effect: non-scaling-stroke; }
+.tl .base, .legend .base { stroke: var(--rule); stroke-width: 1; }
+.tl .tick, .legend .tick { stroke: var(--tick); stroke-width: 1.5; }
+.tl .tick.ahead { stroke-dasharray: 2 2; opacity: .75; }
+.tl .cadence { stroke: var(--tick); stroke-width: 2; stroke-dasharray: 1 3; }
+.tl .run, .legend .run { stroke-width: 2; stroke-linejoin: round; }
+.tl .run.ok, .legend .run.ok { fill: var(--ok); stroke: var(--ok); }
+.tl .run.bad, .legend .run.bad { fill: var(--bad); stroke: var(--bad); }
+.tl .run.timeout, .legend .run.timeout { fill: var(--bad); fill-opacity: .28; stroke: var(--bad); stroke-width: 1.5; }
+.tl .run.warn, .legend .run.warn { fill: var(--warn); stroke: var(--warn); }
+.tl .run.running, .legend .run.running { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.tl .run.stuck, .legend .run.stuck { fill: var(--bad); fill-opacity: .12; stroke: var(--bad); stroke-width: 1.5; }
+.tl .missed, .legend .missed { fill: none; stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 3 2.5; }
+.tl .unloaded, .tl .ahead { fill: var(--sunk); }
+.dwide .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 16px 0 0; padding-left: 19.44%; font: 400 11.5px/1.4 var(--mono); color: var(--muted); }
+.dwide .legend span { display: inline-flex; align-items: center; gap: 7px; }
+.dwide .key { width: 16px; height: 12px; overflow: visible; }
+
+/* The jobs table, as the dashboard sets it. */
+.browser table.board { width: 100%; border-collapse: collapse; }
+.board th { text-align: left; font: 500 10.5px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 14px 10px 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.board td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--rule); vertical-align: top; font: 400 12.5px/1.5 var(--mono); color: var(--body); }
+.board tbody tr:last-child td { border-bottom: 0; }
+.board td.job { min-width: 160px; }
+.board td.job .name { font: 500 13.5px/1.5 var(--mono); color: var(--ink); }
+.board td.job .desc { display: block; margin: 2px 0 0; font: 400 14px/1.4 var(--serif); color: var(--muted); }
+.board td .tz, .board td .sub { display: block; color: var(--muted); font-size: 11.5px; }
+.board .nowrap { white-space: nowrap; }
+.board .muted { color: var(--muted); }
+.spark { display: block; overflow: visible; }
+.spark rect { fill: var(--tick); } .spark rect.bad { fill: var(--bad); } .spark rect.warn { fill: var(--warn); }
+.spark rect.running { fill: none; stroke: var(--ink); stroke-width: 1; }
+
+/* Concept illustrations: drawn by hand to explain, and labelled as such. */
+.ill { margin: 0; }
+.row .body > * + .ill { margin-top: 30px; }
+.ill .illbox { padding: 22px 20px 16px; }
+.ill svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ill svg.narrow { display: none; }
+.ill .lt { fill: var(--ink); font: 500 13px/1 var(--mono); }
+.ill .ls { fill: var(--muted); font: italic 400 14px/1 var(--serif); }
+.ill .base { stroke: var(--rule-2); stroke-width: 1; }
+.ill .tick { stroke: var(--tick); stroke-width: 1.5; }
+.ill .cap { fill: var(--muted); font: 400 11px/1 var(--mono); }
+.ill .cap:not([text-anchor]) { text-anchor: middle; }
+.ill .bar.ok { fill: var(--ok); }
+.ill .bar.running { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.ill .bar.stuck { fill: var(--bad); fill-opacity: .12; stroke: var(--bad); stroke-width: 1.5; }
+.ill .grace { fill: var(--rule); }
+.ill .missed { fill: none; stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 3 2.5; }
+.ill .limit { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; }
+.ill .usual { stroke: var(--tick); stroke-width: 1; stroke-dasharray: 1 3; }
+.ill .cost.ok { fill: var(--ok); } .ill .cost.warn { fill: var(--warn); }
+.ill .alert { color: var(--bad); } .ill .alert.warn { color: var(--warn); }
+.ill .alert line { stroke: currentColor; stroke-width: 1.5; }
+.ill .alert circle { fill: currentColor; }
+.ill .alert text { fill: currentColor; font: 500 12px/1 var(--mono); }
+.ill .head { display: none; }
+.ill .head line { stroke: var(--ink); stroke-width: 1.5; }
+
+/* Where the records go. */
+.versus { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 30px; }
+.vs { margin: 0; padding: 12px 16px 16px; background: var(--sunk); border: 1px solid var(--rule); border-radius: 3px; }
+.vs figcaption { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.versus-svg { display: block; width: 100%; height: auto; margin-top: 12px; overflow: visible; }
+.versus-svg .node { fill: var(--sheet); stroke: var(--rule-2); stroke-width: 1; }
+.versus-svg .node.theirs { stroke-dasharray: 4 3; stroke: var(--muted); }
+.versus-svg .node.lib { fill: var(--sunk); stroke: var(--ink); }
+.versus-svg .nl { fill: var(--ink); font: 500 13px/1 var(--mono); text-anchor: middle; }
+.versus-svg .ns { fill: var(--muted); font: italic 400 13px/1 var(--serif); text-anchor: middle; }
+.versus-svg .flow { stroke: var(--muted); stroke-width: 1.2; }
+.versus-svg .headp { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+.versus-svg .fl { fill: var(--muted); font: 400 11px/1 var(--mono); }
+
+/* Motion. Only once site.js has seen the figure scroll into view (it adds
+   .armed straight away and .play when the figure shows), and never when the
+   reader asked for less motion. Without script, everything simply sits in
+   its final place. */
+@media (prefers-reduced-motion: no-preference) {
+  .armed:not(.play) .tl .marks > :not(.base), .armed:not(.play) .tl .note, .armed:not(.play) .tl .now, .armed:not(.play) .tl .nowlabel { opacity: 0; }
+  .armed.play .tl .marks > * { animation: cw-fade .45s ease-out both; }
+  .armed.play .tl .marks > .base { animation: none; }
+  .armed.play .tl .marks .run, .armed.play .tl .marks .missed { transform-box: fill-box; transform-origin: 0 50%; animation-name: cw-grow; animation-duration: .6s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+  .armed.play .tl .marks .missed, .armed.play .tl .marks .run.running, .armed.play .tl .marks .run.stuck { animation-name: cw-grow, cw-breathe; animation-duration: .6s, 2.6s; animation-iteration-count: 1, infinite; animation-direction: normal, alternate; animation-timing-function: cubic-bezier(.2, .8, .2, 1), ease-in-out; }
+  .armed.play .tl .now { transform-box: fill-box; transform-origin: top; animation: cw-drop .7s 1.8s cubic-bezier(.2, .8, .2, 1) both; }
+  .armed.play .tl .nowlabel { animation: cw-fade .5s 2.1s both; }
+  .armed.play .tl .note { animation: cw-fade .7s 2.2s both; }
+  .armed.play .tl .d1 { animation-delay: 70ms; }
+  .armed.play .tl .d2 { animation-delay: 140ms; }
+  .armed.play .tl .d3 { animation-delay: 210ms; }
+  .armed.play .tl .d4 { animation-delay: 280ms; }
+  .armed.play .tl .d5 { animation-delay: 350ms; }
+  .armed.play .tl .d6 { animation-delay: 420ms; }
+  .armed.play .tl .d7 { animation-delay: 490ms; }
+  .armed.play .tl .d8 { animation-delay: 560ms; }
+  .armed.play .tl .d9 { animation-delay: 630ms; }
+  .armed.play .tl .d10 { animation-delay: 700ms; }
+  .armed.play .tl .d11 { animation-delay: 770ms; }
+  .armed.play .tl .d12 { animation-delay: 840ms; }
+  .armed.play .tl .d13 { animation-delay: 910ms; }
+  .armed.play .tl .d14 { animation-delay: 980ms; }
+  .armed.play .tl .d15 { animation-delay: 1050ms; }
+  .armed.play .tl .d16 { animation-delay: 1120ms; }
+  .armed.play .tl .d17 { animation-delay: 1190ms; }
+  .armed.play .tl .d18 { animation-delay: 1260ms; }
+  .armed.play .tl .d19 { animation-delay: 1330ms; }
+  .armed.play .tl .d20 { animation-delay: 1400ms; }
+  .armed.play .tl .d21 { animation-delay: 1470ms; }
+  .armed.play .tl .d22 { animation-delay: 1540ms; }
+  .armed.play .tl .d23 { animation-delay: 1610ms; }
+  .armed.play .tl .d24 { animation-delay: 1680ms; }
+
+  /* The checks: a playhead crosses in seven seconds, and each mark arrives
+     as it passes (pN is the moment it is N twentieths of the way across). */
+  .armed:not(.play) .ill svg > :not(title):not(.base):not(.lt):not(.ls):not(.head) { opacity: 0; }
+  .armed.play .ill svg > * { animation: cw-fade .4s ease-out both; }
+  .armed.play .ill svg > .base, .armed.play .ill svg > .lt, .armed.play .ill svg > .ls { animation: none; }
+  .armed.play .ill .bar, .armed.play .ill .grace { transform-box: fill-box; transform-origin: 0 50%; animation-name: cw-grow; }
+  .armed.play .ill .grace { animation-duration: 1.26s; animation-timing-function: linear; }
+  .armed.play .ill .bar.running { animation-duration: 2.8s; animation-timing-function: linear; }
+  .armed.play .ill .bar.stuck { animation-name: cw-grow, cw-breathe; animation-duration: 3.36s, 2.6s; animation-timing-function: linear, ease-in-out; animation-iteration-count: 1, infinite; animation-direction: normal, alternate; }
+  .armed.play .ill .missed { animation-name: cw-fade, cw-breathe; animation-duration: .4s, 2.6s; animation-iteration-count: 1, infinite; animation-direction: normal, alternate; }
+  .armed.play .ill .cost { transform-box: fill-box; transform-origin: 50% 100%; animation-name: cw-grow-up; animation-duration: .5s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+  .armed.play .ill .alert { animation-name: cw-pop; animation-duration: .45s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+  .armed.play .ill .head { display: inline; animation: cw-sweep-w 7s linear both; }
+  .armed.play .ill svg.narrow .head { animation-name: cw-sweep-n; }
+  .armed.play .ill .p1 { animation-delay: 0.35s; }
+  .armed.play .ill .p2 { animation-delay: 0.70s; }
+  .armed.play .ill .p3 { animation-delay: 1.05s; }
+  .armed.play .ill .p4 { animation-delay: 1.40s; }
+  .armed.play .ill .p5 { animation-delay: 1.75s; }
+  .armed.play .ill .p6 { animation-delay: 2.10s; }
+  .armed.play .ill .p7 { animation-delay: 2.45s; }
+  .armed.play .ill .p8 { animation-delay: 2.80s; }
+  .armed.play .ill .p9 { animation-delay: 3.15s; }
+  .armed.play .ill .p10 { animation-delay: 3.50s; }
+  .armed.play .ill .p11 { animation-delay: 3.85s; }
+  .armed.play .ill .p12 { animation-delay: 4.20s; }
+  .armed.play .ill .p13 { animation-delay: 4.55s; }
+  .armed.play .ill .p14 { animation-delay: 4.90s; }
+  .armed.play .ill .p15 { animation-delay: 5.25s; }
+  .armed.play .ill .p16 { animation-delay: 5.60s; }
+  .armed.play .ill .p17 { animation-delay: 5.95s; }
+  .armed.play .ill .p18 { animation-delay: 6.30s; }
+  .armed.play .ill .p19 { animation-delay: 6.65s; }
+  .armed.play .ill .p20 { animation-delay: 7.00s; }
+}
+@keyframes cw-fade { from { opacity: 0; } }
+@keyframes cw-grow { from { opacity: 0; transform: scaleX(0); } }
+@keyframes cw-drop { from { opacity: 0; transform: scaleY(0); } }
+@keyframes cw-grow-up { from { opacity: 0; transform: scaleY(0); } }
+@keyframes cw-pop { from { opacity: 0; transform: translateY(4px); } }
+@keyframes cw-breathe { to { stroke-opacity: .3; } }
+@keyframes cw-sweep-w { from { transform: translateX(-830px); } 96% { opacity: 1; } to { transform: none; opacity: 0; } }
+@keyframes cw-sweep-n { from { transform: translateX(-360px); } 96% { opacity: 1; } to { transform: none; opacity: 0; } }
 
 /* The six conditions, set as a glossary. */
 .catches { list-style: none; margin: 0; padding: 0; }
@@ -210,7 +393,7 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .lost .note a:hover { color: var(--ink); }
 
 /* The close. */
-.end { padding: 48px 0 8px; border-top: 1px solid var(--rule); }
+.end { padding: clamp(64px, 8vw, 96px) 0 24px; border-top: 1px solid var(--rule); }
 .end p { font-size: clamp(1.35rem, 2.4vw, 1.9rem); line-height: 1.3; max-width: 22ch; letter-spacing: -0.01em; }
 .end .go { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 24px; align-items: center; font-size: 18px; max-width: none; }
 
@@ -260,8 +443,11 @@ footer button:hover { color: var(--ink); }
 .pager .next { text-align: right; margin-left: auto; }
 
 @media (max-width: 900px) {
-  .row { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-  .day .scroll { margin-left: 0; }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 14px; row-gap: 14px; }
+  .row > .span { margin-top: 18px; }
+  .dsec { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .dwide .legend { padding-left: 0; }
+  .versus { grid-template-columns: minmax(0, 1fr); }
   .row > .label { padding-top: 0; }
   .pair { grid-template-columns: minmax(0, 1fr); margin-top: 24px; }
   .pair .side + .side figcaption { margin-top: 0; }
@@ -291,6 +477,24 @@ footer button:hover { color: var(--ink); }
   .installs { display: grid; }
   .installs .install { justify-content: space-between; }
   .catches li { grid-template-columns: minmax(0, 1fr); gap: 3px; }
-  .board .sm { display: none; }
-  .board td, .board th { padding-left: 10px; padding-right: 10px; }
+  .row { padding: 56px 0; }
+  .tlbox .tl.wide, .ill svg.wide { display: none; }
+  .tlbox .tl.narrow, .ill svg.narrow { display: block; }
+  .ill .illbox { padding: 18px 12px 12px; }
+  .browser .chrome { grid-template-columns: auto minmax(0, 1fr); }
+  .browser .chrome > span:last-child { display: none; }
+  .browser .screen { padding: 0 14px 6px; }
+  .dact .fake { display: none; }
+  .figures { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .figures > div { padding-right: 8px; }
+  .figures dd { font-size: 24px; }
+  .figures dt { font-size: 10px; letter-spacing: .04em; }
+  .board .hide-sm { display: none; }
+  .board thead { display: none; }
+  .board tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .board tbody tr:last-child { border-bottom: 0; }
+  .board td { border: 0; padding: 0; }
+  .board td.job { min-width: 0; }
+  .board td.last { grid-column: 1 / -1; margin-top: 4px; white-space: normal; }
+  .board td.last .sub { display: inline; margin-left: 8px; }
 }

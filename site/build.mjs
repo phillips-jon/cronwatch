@@ -148,7 +148,7 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 ${body}
   </main>
   <footer>
-    <p>© ${new Date().getFullYear()} CronWatch. MIT. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>. Every alert, reply and mark here is real output from the library, for six sample jobs.</p>
+    <p>© ${new Date().getFullYear()} CronWatch. MIT. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>. Every alert, reply, mark and board row here is real output from the library, for six sample jobs. The two diagrams labelled as illustrations are drawn by hand.</p>
     <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
   </footer>
 </div>
@@ -156,17 +156,6 @@ ${body}
 </html>
 `;
 }
-
-/** Formatting for the board and the strip, matching the library's own dashboard. */
-const hhmm = (t) => new Date(t).toISOString().slice(11, 16);
-function duration(ms) {
-  if (ms == null) return "";
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
-  const m = Math.floor(ms / 60_000), sec = Math.round((ms % 60_000) / 1000);
-  return sec ? `${m}m ${sec}s` : `${m}m`;
-}
-const HEALTH = { healthy: "ok", late: "warn", failing: "bad", stuck: "bad", silenced: "muted", never_ran: "muted" };
 
 /** Colour the health line of an MCP reply the way the board does. */
 function colourReply(text) {
@@ -192,141 +181,256 @@ function alertTime(alerts, needle, which = 0) {
   return times[which] ? `${times[which][1]} UTC` : "";
 }
 
+const hhmm = (t) => new Date(t).toISOString().slice(11, 16);
+const f1 = (n) => n.toFixed(1);
+const need = (re, text, what) => {
+  const m = re.exec(text);
+  if (!m) throw new Error(`dashboard.html has no ${what}`);
+  return m;
+};
+
 /**
- * The day as an SVG. Hours across the top, one row per job. Every time a job
- * was *due* is a faint tick, so you can see the cadence it keeps; every run it
- * actually recorded is a solid mark on top. A dashed box is a slot that came
- * and went with nothing in it. The empty part of each row carries a note
- * saying what happened, which is the whole point of the picture.
+ * The dashboard page as cw.routes() served it for the demo jobs, taken
+ * apart: the hour labels, grid and now line of its last-24-hours timeline,
+ * each lane's marks and note, its legend, and the rows of its jobs table.
+ * The landing page redraws these under its own stylesheet, because its CSP
+ * allows no style attributes and the dashboard places things with them.
  */
-function strip(alerts) {
-  const { capturedAt, dayStart, jobs } = JSON.parse(readFileSync(path.join(DEMO, "runs.json"), "utf8"));
-  const DAY = 86_400_000, W = 1400, L = 196, R = 26, TOP = 40, ROW = 52, LEG = 58;
-  const H = TOP + jobs.length * ROW + LEG;
-  const x = (t) => L + ((t - dayStart) / DAY) * (W - L - R);
-  const f = (n) => n.toFixed(1);
-  const nx = x(capturedAt), late = nx > W - 170;
+function readDashboard() {
+  const html = readFileSync(path.join(DEMO, "dashboard.html"), "utf8");
+  const figure = need(/<figure class="timeline day">([\s\S]*?)<\/figure>/, html, "day timeline")[1];
+  const hours = need(/<div class="hours">([\s\S]*?)<\/div><\/div>/, figure, "hour labels")[1];
+  const labels = [...hours.matchAll(/<span class="([^"]*)" style="left:([\d.]+)%">([^<]*)<\/span>/g)].map((m) => ({ cls: m[1], at: Number(m[2]), text: m[3] }));
+  const grid = [...figure.matchAll(/<i class="gl" style="left:([\d.]+)%"><\/i>/g)].map((m) => Number(m[1]));
+  const now = Number(need(/<i class="now" style="left:([\d.]+)%">/, figure, "now line")[1]);
+  const lanes = [...figure.matchAll(/<li class="lane">([\s\S]*?)<\/li>/g)].map(([, lane]) => {
+    const note = /<span class="note( before)?" style="(?:left|right):([\d.]+)%;max-width:([\d.]+)%">([^<]*)<\/span>/.exec(lane);
+    return {
+      tone: need(/<i class="sq (\w+)"/, lane, "lane state")[1],
+      name: need(/class="name"[^>]*>([^<]*)</, lane, "lane name")[1],
+      sched: need(/<span class="sched">([^<]*)</, lane, "lane schedule")[1],
+      marks: need(/<svg class="marks"[^>]*>([\s\S]*?)<\/svg>/, lane, "lane marks")[1],
+      note: note ? { before: Boolean(note[1]), at: note[1] ? 100 - Number(note[2]) : Number(note[2]), room: Number(note[3]), text: note[4] } : null,
+    };
+  });
+  return {
+    clock: need(/<span class="meta">([^<]*)</, html, "clock")[1],
+    lede: need(/aria-label="Last 24 hours">[\s\S]*?<p class="lede">([^<]*)</, html, "timeline lede")[1],
+    labels, grid, now, lanes,
+    legend: need(/<p class="legend"[\s\S]*?<\/p>/, figure, "legend")[0],
+    words: need(/<ul class="vh">[\s\S]*?<\/ul>/, figure, "lane words")[0],
+    boardHead: need(/<table class="board">\s*<thead>([\s\S]*?)<\/thead>/, html, "board header")[1],
+    // Job names link to job pages that exist only inside an app.
+    boardRows: need(/<tbody>([\s\S]*?)<\/tbody>/, html, "board rows")[1].replace(/<a class="name" href="[^"]*">([^<]*)<\/a>/g, '<span class="name">$1</span>'),
+  };
+}
 
-  /** The metrics the captured over-budget alert names, e.g. ["tokens", "cost"]. */
-  function overBudget(j) {
-    const a = alerts.find((x) => x.startsWith(`[cronwatch] ${j.name} went over budget`)) ?? "";
-    const metrics = [...a.matchAll(/^(\w+): [\d.,]+, limit/gm)].map((m) => m[1]);
-    return `went over budget${metrics.length ? ` on ${metrics.join(" and ")}` : ""}`;
+/**
+ * A lane's marks, as the dashboard drew them in its 1000-unit lane, with each
+ * animation delay moved from a style attribute to a class (d0 to d24).
+ */
+function marks(svg) {
+  return svg.replace(/ style="--d:(\d+)ms"/g, (m, ms) => ` data-d="${Math.min(24, Math.round(Number(ms) / 40))}"`)
+    .replace(/class="([^"]*)"([^>]*?) data-d="(\d+)"/g, 'class="$1 d$3"$2');
+}
+
+/** A note cut to fit the room the dashboard gave it, at about `em` units a letter. */
+function fit(text, room, em) {
+  const plain = text.replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+  const max = Math.floor(room / em);
+  return escape(plain.length > max ? `${plain.slice(0, Math.max(1, max - 1)).trimEnd()}…` : plain);
+}
+
+/**
+ * The dashboard's last-24-hours timeline as one SVG: hour labels across the
+ * top, a lane per job with its name and schedule, the marks exactly as the
+ * dashboard placed them, the notes, and the now line. `narrow` sets each
+ * job's name above its lane, for a phone.
+ */
+function timelineSvg(d, narrow) {
+  const W = narrow ? 360 : 1080, L = narrow ? 0 : 210, TW = W - L;
+  const AX = 24, LANE = narrow ? 58 : 42, TRACK = narrow ? 34 : LANE / 2;
+  const H = AX + d.lanes.length * LANE;
+  const px = (pct) => L + (pct / 100) * TW;
+  const nowX = px(d.now);
+  let s = `<svg class="tl ${narrow ? "narrow" : "wide"}" viewBox="0 0 ${W} ${H + 2}" aria-hidden="true" focusable="false">`;
+  s += `<rect class="future" x="${f1(nowX)}" y="${AX}" width="${f1(W - nowX)}" height="${H - AX}"/>`;
+  for (const g of d.grid) s += `<line class="gl" x1="${f1(px(g))}" y1="${AX}" x2="${f1(px(g))}" y2="${H}"/>`;
+  s += `<line class="edge" x1="0" y1="${AX}" x2="${W}" y2="${AX}"/><line class="edge" x1="0" y1="${H}" x2="${W}" y2="${H}"/>`;
+  const nowLabel = d.labels.find((l) => l.cls === "nowlabel");
+  for (const l of d.labels) {
+    if (l.cls === "nowlabel") continue;
+    if (narrow && (l.cls === "minor" || Math.abs(px(l.at) - nowX) < 64 || px(l.at) < 18)) continue;
+    s += `<text class="hour${l.cls ? ` ${l.cls}` : ""}" x="${f1(px(l.at))}" y="15">${l.text}</text>`;
   }
-
-  /** What this row is worth saying out loud, anchored to the mark it is about. */
-  function note(j) {
-    const r = j.runs.length ? j.runs[j.runs.length - 1] : null;
-    if (j.missedAt) return { at: j.missedAt, text: `due ${hhmm(j.missedAt)}, and nothing ran` };
-    if (r && r.status === "failed") return { at: r.startedAt, text: `threw at ${hhmm(r.startedAt)}, and cron said nothing` };
-    if (j.open.includes("over_budget")) return { at: r ? r.startedAt : null, text: `${r?.status === "ok" ? "finished fine, and " : ""}${overBudget(j)}` };
-    if (r && r.status === "running") return { at: r.startedAt, text: `started ${hhmm(r.startedAt)}, still going` };
-    return null;
+  if (nowLabel) {
+    const right = nowX > W - 50;
+    s += `<text class="hour nowlabel" x="${f1(right ? nowX + 4 : nowX)}" y="15"${right ? ' text-anchor="end"' : ""}>${nowLabel.text}</text>`;
   }
-
-  /** The same row in words, for anyone who cannot see the picture. */
-  function words(j) {
-    const due = (j.expected ?? []).filter((t) => t >= dayStart && t <= capturedAt).length;
-    const ok = j.runs.filter((r) => r.status === "ok").length;
-    const parts = [`due ${due === 1 ? "once" : `${due} times`} so far`];
-    parts.push(`${j.runs.length} ${j.runs.length === 1 ? "run" : "runs"} recorded${!j.runs.length ? "" : ok === j.runs.length ? `, ${ok === 1 ? "ok" : "all ok"}` : ok ? `, ${ok} ok` : ""}`);
-    for (const r of j.runs) {
-      if (r.status === "running") parts.push(`running since ${hhmm(r.startedAt)} UTC`);
-      else if (r.status !== "ok") parts.push(`${r.status} at ${hhmm(r.startedAt)} UTC after ${duration(r.durationMs)}`);
+  d.lanes.forEach((lane, i) => {
+    const top = AX + i * LANE;
+    const mid = narrow ? top + 16 + TRACK / 2 : top + LANE / 2;
+    if (narrow) {
+      s += `<rect class="sq ${lane.tone}" x="0.5" y="${top + 7.5}" width="7" height="7" rx="1.5"/>`;
+      s += `<text class="name" x="14" y="${top + 15}">${lane.name}<tspan class="sched" dx="8">${lane.sched}</tspan></text>`;
+    } else {
+      s += `<rect class="sq ${lane.tone}" x="0.5" y="${f1(mid - 11)}" width="7" height="7" rx="1.5"/>`;
+      s += `<text class="name" x="15" y="${f1(mid - 3)}">${lane.name}</text>`;
+      s += `<text class="sched" x="15" y="${f1(mid + 11)}">${lane.sched}</text>`;
     }
-    if (j.missedAt) parts.push(`due at ${hhmm(j.missedAt)} UTC and never started`);
-    if (j.open.includes("over_budget")) parts.push(`the last run ${overBudget(j)}`);
-    return `${j.name} (${j.schedule}): ${parts.join("; ")}.`;
-  }
-
-  let s = `<svg class="strip" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false">`;
-  for (let h = 0; h <= 24; h += 2) {
-    const gx = f(x(dayStart + h * 3_600_000));
-    s += `<line class="grid" x1="${gx}" y1="${TOP}" x2="${gx}" y2="${TOP + jobs.length * ROW}"/>`;
-    const clear = late ? gx > nx + 30 || gx < nx - 110 : gx < nx - 30 || gx > nx + 110;
-    if (h < 24 && clear) s += `<text class="axis" x="${gx}" y="${TOP - 14}">${String(h).padStart(2, "0")}</text>`;
-  }
-
-  jobs.forEach((j, i) => {
-    const cy = TOP + i * ROW + ROW / 2;
-    s += `<text class="job" x="0" y="${cy - 1}">${escape(j.name)}</text>`;
-    s += `<text class="sched" x="0" y="${cy + 14}">${escape(j.schedule)}</text>`;
-    s += `<line class="base" x1="${L}" y1="${f(cy)}" x2="${W - R}" y2="${f(cy)}"/>`;
-
-    for (const t of j.expected ?? []) {
-      if (t < dayStart || t > dayStart + DAY) continue;
-      s += `<line class="tick${t > capturedAt ? " ahead" : ""}" x1="${f(x(t))}" y1="${cy - 5}" x2="${f(x(t))}" y2="${cy + 5}"/>`;
-    }
-
-    for (const r of j.runs) {
-      const end = r.finishedAt ?? capturedAt;
-      const x1 = x(r.startedAt), x2 = Math.max(x(end), x1 + 4);
-      const tone = r.status === "running" ? "running" : r.status !== "ok" ? "bad" : j.open.includes("over_budget") && r === j.runs[j.runs.length - 1] ? "warn" : "ok";
-      const what = r.status === "running" ? `running since ${hhmm(r.startedAt)} UTC` : `${r.status} at ${hhmm(r.startedAt)} UTC, ${duration(r.durationMs)}`;
-      s += `<rect class="run ${tone}" x="${f(x1)}" y="${cy - 7}" width="${f(x2 - x1)}" height="14" rx="2"><title>${escape(`${j.name}: ${what}`)}</title></rect>`;
-    }
-    if (j.missedAt) {
-      s += `<rect class="run missed" x="${f(x(j.missedAt) - 5.5)}" y="${cy - 7}" width="11" height="14" rx="2"><title>${escape(`${j.name}: due ${hhmm(j.missedAt)} UTC, no run started`)}</title></rect>`;
-    }
-
-    // Put the note wherever this row is actually empty, so it never sits on
-    // top of the marks it is describing.
-    const n = note(j);
-    if (n) {
-      const spans = j.runs.map((r) => [x(r.startedAt), Math.max(x(r.finishedAt ?? capturedAt), x(r.startedAt) + 4)]);
-      if (j.missedAt) spans.push([x(j.missedAt) - 6, x(j.missedAt) + 6]);
-      const busyMin = spans.length ? Math.min(...spans.map((a) => a[0])) : nx;
-      const busyMax = spans.length ? Math.max(...spans.map((a) => a[1])) : nx;
-      const width = n.text.length * 6.1;
-      const right = (W - R - busyMax) >= (busyMin - L);
-      if (right ? W - R - busyMax > width + 40 : busyMin - L > width + 40) {
-        const tx = right ? busyMax + 22 : busyMin - 22;
-        s += `<text class="note" x="${f(tx)}" y="${f(cy + 4)}"${right ? "" : ' text-anchor="end"'}>${escape(n.text)}</text>`;
-      }
+    s += `<g class="marks" transform="translate(${L} ${f1(mid - 12)}) scale(${(TW / 1000).toFixed(4)} 1)">${marks(lane.marks)}</g>`;
+    if (lane.note) {
+      const x = px(lane.note.at);
+      const room = (lane.note.room / 100) * TW;
+      s += `<text class="note" x="${f1(x)}" y="${f1(mid + 4.5)}"${lane.note.before ? ' text-anchor="end"' : ""}>${fit(lane.note.text, room, narrow ? 6.2 : 6.9)}</text>`;
     }
   });
+  s += `<line class="now" x1="${f1(nowX)}" y1="${AX - 6}" x2="${f1(nowX)}" y2="${H}"/>`;
+  return `${s}</svg>`;
+}
 
-  s += `<line class="now" x1="${f(nx)}" y1="${TOP - 6}" x2="${f(nx)}" y2="${TOP + jobs.length * ROW}"/>`;
-  s += `<text class="axis now-label" x="${f(late ? nx - 8 : nx + 8)}" y="${TOP - 14}"${late ? ' text-anchor="end"' : ""}>now ${hhmm(capturedAt)} UTC</text>`;
+/** The mark from the dashboard's header. */
+const DASH_MARK = `<svg class="dmark" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><rect x="1" y="1" width="38" height="38" rx="9.5" fill="none" stroke="currentColor" stroke-opacity=".22" stroke-width="1.5"/><circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 12.5V20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-  let lx = L;
-  const ly = H - 14;
-  s += `<line class="tick" x1="${lx + 1}" y1="${ly - 11}" x2="${lx + 1}" y2="${ly - 1}"/><text class="legend" x="${lx + 10}" y="${ly}">due</text>`;
-  lx += 10 + 26 + 26;
-  for (const [cls, label] of [["ok", "ran"], ["bad", "failed"], ["warn", "over budget"], ["missed", "never started"], ["running", "running now"]]) {
-    s += `<rect class="run ${cls}" x="${lx}" y="${ly - 11}" width="15" height="12" rx="2"/><text class="legend" x="${lx + 22}" y="${ly}">${label}</text>`;
-    lx += 22 + label.length * 6.9 + 28;
+/** A flat browser window around a page from inside an app. */
+function browser(inner, label) {
+  return `<figure class="browser" aria-label="${escape(label)}"><div class="chrome" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">yourapp.com/cronwatch</span><span></span></div><div class="screen">${inner}</div></figure>`;
+}
+
+const HEALTH_ORDER = [["failing", "bad"], ["stuck", "bad"], ["late", "warn"], ["healthy", "ok"], ["silenced", "muted"], ["never_ran", "muted"]];
+
+/** The dashboard's health row, counted from the captured jobs. */
+function healthRow(jobs) {
+  const attention = jobs.filter((j) => j.health !== "healthy").length;
+  const figures = HEALTH_ORDER.map(([health, cls]) => {
+    const n = jobs.filter((j) => j.health === health).length;
+    return `<div class="${n === 0 ? "zero" : cls}"><dt><i class="sq ${cls}" aria-hidden="true"></i>${health.replace("_", " ")}</dt><dd>${n}</dd></div>`;
+  }).join("");
+  return `<p class="headline">${jobs.length} jobs, <b>${attention} needing attention</b>.</p><dl class="figures">${figures}</dl>`;
+}
+
+function dashTop(clock) {
+  return `<div class="dtop"><p class="dbrand">${DASH_MARK}<span>CronWatch</span></p><p class="dact"><span class="meta">${escape(clock)}</span><span class="fake" aria-hidden="true">Run check now</span></p></div>`;
+}
+
+/* ---- Concept illustrations. Not recorded output, and labelled as such. ---- */
+
+/**
+ * How each check decides, on one clock. A playhead sweeps left to right; each
+ * mark arrives as it passes, so the missed alert fires when the grace window
+ * runs out, the stuck alert when the run passes its timeout, and the budget
+ * alert on the run that costs three times the usual. `narrow` stacks each
+ * lane's label above it.
+ */
+function checksSvg(narrow) {
+  const W = narrow ? 360 : 1000, L = narrow ? 0 : 170, TW = W - L;
+  const x = (t) => L + t * TW;
+  const lanes = [
+    { key: "missed", title: "Missed", sub: "due, then nothing within the grace", h: 56 },
+    { key: "stuck", title: "Stuck", sub: "started, never finished", h: 56 },
+    { key: "budget", title: "Over budget", sub: "cost three times the usual", h: 112 },
+  ];
+  const HEAD = narrow ? 24 : 0, GAP = narrow ? 22 : 30, TOP = 18;
+  let y = TOP;
+  const tops = lanes.map((l) => { const t = y + HEAD; y = t + l.h + GAP; return t; });
+  const H = y - GAP + 16;
+  // Delay classes p0 to p20: the playhead passes t = n / 20.
+  const at = (t) => `p${Math.round(t * 20)}`;
+  let s = `<svg class="ill ${narrow ? "narrow" : "wide"}" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="ill-${narrow ? "n" : "w"}"><title id="ill-${narrow ? "n" : "w"}">Illustration: a job due with nothing run by the end of its grace window raises missed; a run that passes its timeout raises stuck; a run that costs three times its usual raises over budget.</title>`;
+  lanes.forEach((l, i) => {
+    const top = tops[i], mid = top + (l.key === "budget" ? l.h - 12 : l.h / 2);
+    if (narrow) {
+      s += `<text class="lt" x="0" y="${top - 10}">${l.title}<tspan class="ls" dx="8">${l.sub}</tspan></text>`;
+    } else {
+      s += `<text class="lt" x="0" y="${mid - 3}">${l.title}</text><text class="ls" x="0" y="${mid + 13}">${l.sub}</text>`;
+    }
+    s += `<line class="base" x1="${L}" y1="${mid}" x2="${W}" y2="${mid}"/>`;
+    const tick = (t, label) => `<line class="tick ${at(t)}" x1="${f1(x(t))}" y1="${mid - 7}" x2="${f1(x(t))}" y2="${mid + 7}"/>${label ? `<text class="cap ${at(t)}" x="${f1(x(t))}" y="${mid + 22}">${label}</text>` : ""}`;
+    const bar = (t0, t1, cls) => `<rect class="bar ${cls} ${at(t0)}" x="${f1(x(t0))}" y="${mid - 7}" width="${f1(x(t1) - x(t0))}" height="14" rx="1.5"/>`;
+    const alert = (t, text, tone, right = true) => `<g class="alert ${tone} ${at(t)}"><line x1="${f1(x(t))}" y1="${mid - 20}" x2="${f1(x(t))}" y2="${mid - 9}"/><circle cx="${f1(x(t))}" cy="${mid - 22}" r="2.5"/><text x="${f1(x(t) + (right ? 7 : -7))}" y="${mid - 18.5}"${right ? "" : ' text-anchor="end"'}>${text}</text></g>`;
+    if (l.key === "missed") {
+      s += tick(0.08) + bar(0.08, 0.1, "ok") + tick(0.34) + bar(0.34, 0.36, "ok") + tick(0.6, "due");
+      s += `<rect class="grace grow ${at(0.6)}" x="${f1(x(0.6))}" y="${mid - 12}" width="${f1(x(0.78) - x(0.6))}" height="24"/>`;
+      s += `<text class="cap ${at(0.6)}" x="${f1((x(0.6) + x(0.78)) / 2)}" y="${mid - 16}">grace</text>`;
+      s += `<rect class="missed ${at(0.78)}" x="${f1(x(0.6))}" y="${mid - 7}" width="${f1(x(0.78) - x(0.6))}" height="14" rx="1.5"/>`;
+      s += alert(0.78, narrow ? "missed" : "missed alert", "bad");
+      s += tick(0.86) + `<text class="cap ${at(0.86)}" x="${f1(x(0.86))}" y="${mid + 22}">still nothing</text>`;
+    } else if (l.key === "stuck") {
+      s += tick(0.12, "started") + `<rect class="bar running grow slow ${at(0.12)}" x="${f1(x(0.12))}" y="${mid - 7}" width="${f1(x(0.52) - x(0.12))}" height="14" rx="1.5"/>`;
+      s += `<line class="limit ${at(0.12)}" x1="${f1(x(0.52))}" y1="${mid - 13}" x2="${f1(x(0.52))}" y2="${mid + 13}"/><text class="cap ${at(0.12)}" x="${f1(x(0.52))}" y="${mid + 25}">timeout</text>`;
+      s += `<rect class="bar stuck grow slower ${at(0.52)}" x="${f1(x(0.52))}" y="${mid - 7}" width="${f1(x(1) - x(0.52))}" height="14" rx="1.5"/>`;
+      s += alert(0.56, narrow ? "stuck" : "stuck alert", "bad");
+    } else {
+      const base = mid, unit = 2.4;
+      const usual = 10, ceiling = 3 * usual;
+      const runs = [[0.08, 10], [0.23, 11], [0.38, 9], [0.53, 10], [0.68, 11], [0.84, 34]];
+      s += `<line class="usual" x1="${L}" y1="${f1(base - usual * unit)}" x2="${W}" y2="${f1(base - usual * unit)}"/><text class="cap" x="${W}" y="${f1(base - usual * unit - 5)}" text-anchor="end">usual</text>`;
+      s += `<line class="limit" x1="${L}" y1="${f1(base - ceiling * unit)}" x2="${W}" y2="${f1(base - ceiling * unit)}"/><text class="cap" x="${W}" y="${f1(base - ceiling * unit - 5)}" text-anchor="end">ceiling</text>`;
+      for (const [t, cost] of runs) {
+        const over = cost > ceiling, hgt = cost * unit;
+        s += `<rect class="cost ${over ? "warn" : "ok"} ${at(t)}" x="${f1(x(t) - 6)}" y="${f1(base - hgt)}" width="12" height="${f1(hgt)}" rx="1.5"/>`;
+      }
+      s += `<g class="alert warn ${at(0.84)}"><text x="${f1(x(0.84) + 6)}" y="${f1(base - 34 * unit - 8)}" text-anchor="end">${narrow ? "over budget" : "over budget alert"}</text></g>`;
+    }
+  });
+  // The playhead: where "now" is. Drawn at the end when nothing moves.
+  s += `<g class="head"><line x1="${f1(x(1))}" y1="4" x2="${f1(x(1))}" y2="${H - 8}"/></g>`;
+  return `${s}</svg>`;
+}
+
+/**
+ * Where the records go, as a flat diagram: a hosted monitor, where your app
+ * sends pings and output to their servers and they alert you, against
+ * CronWatch, where the library in your app writes to your own database and
+ * alerts you itself.
+ */
+function versusSvg(which) {
+  const W = 400, H = 214;
+  const box = (x, y, w, h, label, sub, cls = "") => `<rect class="node${cls ? ` ${cls}` : ""}" x="${x}" y="${y}" width="${w}" height="${h}" rx="3"/><text class="nl" x="${x + w / 2}" y="${y + h / 2 + (sub ? -3 : 5)}">${label}</text>${sub ? `<text class="ns" x="${x + w / 2}" y="${y + h / 2 + 14}">${sub}</text>` : ""}`;
+  const arrow = (x1, y1, x2, y2, label, lx, ly, anchor = "middle") => `<line class="flow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#${which}-head)"/>${label ? `<text class="fl" x="${lx}" y="${ly}" text-anchor="${anchor}">${label}</text>` : ""}`;
+  let s = `<svg class="versus-svg" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false"><defs><marker id="${which}-head" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="headp" d="M1 1L7 4L1 7"/></marker></defs>`;
+  if (which === "hosted") {
+    s += box(8, 20, 130, 58, "Your app", "runs the jobs");
+    s += box(262, 20, 130, 58, "Their servers", "a paid account", "theirs");
+    s += box(262, 150, 130, 48, "You", "");
+    s += arrow(140, 40, 258, 40, "pings", 199, 32);
+    s += arrow(140, 60, 258, 60, "job output", 199, 76);
+    s += arrow(327, 80, 327, 146, "alert", 334, 118, "start");
+  } else {
+    s += `<rect class="node" x="8" y="12" width="150" height="100" rx="3"/><text class="nl" x="83" y="36">Your app</text>`;
+    s += box(22, 52, 122, 44, "CronWatch", "", "lib");
+    s += box(262, 45, 130, 58, "Your database", "SQLite, Postgres, D1");
+    s += box(18, 150, 130, 48, "You", "");
+    s += arrow(146, 74, 258, 74, "runs, output", 202, 66);
+    s += arrow(83, 114, 83, 146, "alert", 90, 134, "start");
   }
-  const list = `<ul class="vh">${jobs.map((j) => `<li>${escape(words(j))}</li>`).join("")}</ul>`;
-  return `${s}</svg>${list}`;
+  return `${s}</svg>`;
 }
 
 /** The captured demo output, rendered for the landing page. */
 function demoContent() {
-  const out = { BOARD_META: "", JOBS_BOARD: "", MCP_GET_JOB: "", MCP_LIST_JOBS: "", ALERT_MISSED: "", ALERT_BUDGET: "", ALERT_FAILED: "", ALERT_RECOVERED: "", T_FAILED: "", T_MISSED: "", T_BUDGET: "", T_RECOVERED: "", STRIP: "", DAY_META: "" };
+  const out = { MCP_LIST_JOBS: "", ALERT_MISSED: "", ALERT_BUDGET: "", ALERT_FAILED: "", ALERT_RECOVERED: "", T_FAILED: "", T_MISSED: "", T_BUDGET: "", T_RECOVERED: "", RUNS_FRAME: "", BOARD_FRAME: "", CHECKS_ILL: "", VERSUS: "" };
   try {
     const { capturedAt, jobs } = JSON.parse(readFileSync(path.join(DEMO, "jobs.json"), "utf8"));
-    const attention = jobs.filter((j) => j.health !== "healthy").length;
-    out.BOARD_META = `${jobs.length} jobs, ${attention} needing attention<span class="sm"> · ${hhmm(capturedAt)} UTC</span>`;
-    const rows = jobs.map((j) => {
-      const r = j.lastRun;
-      const last = !r ? "never" : r.status === "running" ? '<span class="state info">running</span>' : escape(`${r.status}, ${duration(r.durationMs)}`);
-      const extras = j.open.filter((c) => !["missed", "failed", "stuck"].includes(c)).map((c) => `<span class="state warn">${escape(c.replace("_", " "))}</span>`).join("");
-      return `<tr><td class="name">${escape(j.name)}</td><td class="mono sm">${escape(j.definition.schedule)}</td><td><span class="state ${HEALTH[j.health]}">${escape(j.health.replace("_", " "))}</span>${extras}</td><td class="mono${r?.status === "failed" ? " bad" : ""}">${last}</td><td class="mono sm">${hhmm(j.nextExpectedAt)}</td></tr>`;
-    });
-    out.JOBS_BOARD = `<div class="rows"><table><thead><tr><th>Job</th><th class="sm">Schedule</th><th>Health</th><th>Last run</th><th class="sm">Next due</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
-
+    const dash = readDashboard();
     const alerts = readFileSync(path.join(DEMO, "alerts.txt"), "utf8").split(/\n\n+/).map((a) => a.trim()).filter(Boolean);
 
-    const day = JSON.parse(readFileSync(path.join(DEMO, "runs.json"), "utf8"));
-    const total = day.jobs.reduce((n, j) => n + j.runs.length, 0);
-    out.DAY_META = `${new Date(day.dayStart).toISOString().slice(0, 10)} · ${total} runs by ${hhmm(day.capturedAt)} UTC`;
-    out.STRIP = strip(alerts);
+    out.RUNS_FRAME = browser(`${dashTop(dash.clock)}
+<div class="dsec"><p class="dlabel">Health</p><div>${healthRow(jobs)}</div></div>
+<div class="dsec"><p class="dlabel">Last 24 hours</p><p class="lede">${dash.lede}</p>
+<div class="dwide play-on-view"><div class="tlbox">${timelineSvg(dash, false)}${timelineSvg(dash, true)}</div>${dash.legend}${dash.words}</div></div>`, "The CronWatch dashboard: health and the last 24 hours");
+
+    const counts = HEALTH_ORDER.map(([health, cls]) => [health, cls, jobs.filter((j) => j.health === health).length]).filter(([, , n]) => n > 0)
+      .map(([health, cls, n]) => `<span class="state ${cls}"><i class="sq ${cls}" aria-hidden="true"></i>${n} ${health.replace("_", " ")}</span>`).join("");
+    out.BOARD_FRAME = browser(`${dashTop(dash.clock)}
+<div class="dsec"><p class="dlabel">Jobs</p><div><p class="counts">${counts}</p></div>
+<div class="dwide"><table class="board"><thead>${dash.boardHead}</thead><tbody>${dash.boardRows}</tbody></table></div></div>`, "The CronWatch dashboard: the jobs table");
+
+    out.CHECKS_ILL = `${checksSvg(false)}${checksSvg(true)}`;
+    out.VERSUS = `<figure class="vs"><figcaption>A hosted monitor</figcaption>${versusSvg("hosted")}</figure><figure class="vs"><figcaption>CronWatch</figcaption>${versusSvg("cw")}</figure>`;
 
     const mcp = JSON.parse(readFileSync(path.join(DEMO, "mcp.json"), "utf8"));
-    const reply = (tool) => mcp.find((x) => x.tool === tool)?.reply ?? "";
-    out.MCP_GET_JOB = colourReply(reply("get_job"));
-    out.MCP_LIST_JOBS = colourReply(reply("list_jobs"));
+    out.MCP_LIST_JOBS = colourReply(mcp.find((x) => x.tool === "list_jobs")?.reply ?? "");
 
     out.ALERT_MISSED = alertBlock(alerts, "sync-crm missed");
     out.ALERT_BUDGET = alertBlock(alerts, "daily-digest went over budget");
@@ -334,7 +438,7 @@ function demoContent() {
     out.ALERT_FAILED = alertBlock(alerts, "invoice-run failed");
     out.T_FAILED = alertTime(alerts, "invoice-run failed");
     // The missed alert went out at the check the capture ran, just past its deadline.
-    out.T_MISSED = `${hhmm(JSON.parse(readFileSync(path.join(DEMO, "jobs.json"), "utf8")).capturedAt)} UTC`;
+    out.T_MISSED = `${hhmm(capturedAt)} UTC`;
     out.T_BUDGET = alertTime(alerts, "daily-digest went over budget");
     out.T_RECOVERED = alertTime(alerts, "invoice-run recovered");
     const empty = Object.keys(out).filter((k) => !out[k]);

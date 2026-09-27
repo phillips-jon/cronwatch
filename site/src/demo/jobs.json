@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1790376139000,
+  "capturedAt": 1790462539000,
   "jobs": [
     {
       "name": "backup-to-s3",
@@ -12,10 +12,10 @@
       "health": "healthy",
       "open": [],
       "lastRun": {
-        "id": "77607b9d-ef0c-4b22-9895-349d145ef50b",
+        "id": "cfee5697-6594-4ca7-bc13-c06dfcc0bd77",
         "job": "backup-to-s3",
         "status": "running",
-        "startedAt": 1790376019000,
+        "startedAt": 1790462419000,
         "finishedAt": null,
         "durationMs": null,
         "error": null,
@@ -23,7 +23,7 @@
         "metrics": {},
         "trigger": "run"
       },
-      "nextExpectedAt": 1790398800000,
+      "nextExpectedAt": 1790485200000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
@@ -51,11 +51,11 @@
         "over_budget"
       ],
       "lastRun": {
-        "id": "559ee994-37ac-4bba-b2eb-f6e00ef9b4ac",
+        "id": "4889ef00-7c6c-45f9-8e6d-a67af53acee3",
         "job": "daily-digest",
         "status": "ok",
-        "startedAt": 1790308800000,
-        "finishedAt": 1790308844000,
+        "startedAt": 1790395200000,
+        "finishedAt": 1790395244000,
         "durationMs": 44000,
         "error": null,
         "output": "Digest sent to 412 subscribers",
@@ -65,7 +65,7 @@
         },
         "trigger": "run"
       },
-      "nextExpectedAt": 1790395200000,
+      "nextExpectedAt": 1790481600000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
@@ -85,12 +85,12 @@
       "health": "healthy",
       "open": [],
       "lastRun": {
-        "id": "821dfaf7-50ea-4133-939d-f4c605c11b4f",
+        "id": "37f853bd-71b5-4a5e-b4ad-71c7ffc5f08c",
         "job": "embeddings-refresh",
         "status": "ok",
-        "startedAt": 1790375839000,
-        "finishedAt": 1790376080000,
-        "durationMs": 241000,
+        "startedAt": 1790462239000,
+        "finishedAt": 1790462470000,
+        "durationMs": 231000,
         "error": null,
         "output": null,
         "metrics": {
@@ -98,14 +98,14 @@
         },
         "trigger": "run"
       },
-      "nextExpectedAt": 1790376739000,
+      "nextExpectedAt": 1790463139000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
-        "runs": 12,
+        "runs": 20,
         "okRate": 1,
-        "p50Ms": 246000,
-        "p95Ms": 252000
+        "p50Ms": 235000,
+        "p95Ms": 240000
       }
     },
     {
@@ -122,18 +122,18 @@
         "failed"
       ],
       "lastRun": {
-        "id": "40ab198f-fa5f-4e56-be51-37033adf4c9a",
+        "id": "b646531a-d6de-4f9c-9bfd-682e8618c54a",
         "job": "invoice-run",
         "status": "failed",
-        "startedAt": 1790305200000,
-        "finishedAt": 1790305200412,
+        "startedAt": 1790391600000,
+        "finishedAt": 1790391600412,
         "durationMs": 412,
         "error": "Error: connect ECONNREFUSED 10.0.0.12:5432\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1615:16)",
         "output": "Loading 1,204 open invoices\nConnecting to billing database",
         "metrics": {},
         "trigger": "run"
       },
-      "nextExpectedAt": 1790391600000,
+      "nextExpectedAt": 1790478000000,
       "consecutiveFailures": 1,
       "silencedUntil": null,
       "stats": {
@@ -155,11 +155,11 @@
       "health": "healthy",
       "open": [],
       "lastRun": {
-        "id": "362e9795-d5c9-41ed-b65e-78965d55b363",
+        "id": "5ddb05de-3f8b-4a26-82b1-aee05417dcfa",
         "job": "nightly-report",
         "status": "ok",
-        "startedAt": 1790301600000,
-        "finishedAt": 1790301672000,
+        "startedAt": 1790388000000,
+        "finishedAt": 1790388072000,
         "durationMs": 72000,
         "error": null,
         "output": "Rendering 14 pages\nReport written: /reports/today.pdf",
@@ -168,7 +168,7 @@
         },
         "trigger": "run"
       },
-      "nextExpectedAt": 1790388000000,
+      "nextExpectedAt": 1790474400000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
@@ -190,11 +190,11 @@
         "missed"
       ],
       "lastRun": {
-        "id": "8ff941a2-3521-4b14-a15f-be63592e82e5",
+        "id": "f8941995-a1ff-4e50-9017-92f4ac73d04c",
         "job": "sync-crm",
         "status": "ok",
-        "startedAt": 1790374009000,
-        "finishedAt": 1790374017000,
+        "startedAt": 1790460409000,
+        "finishedAt": 1790460417000,
         "durationMs": 8000,
         "error": null,
         "output": null,
@@ -203,11 +203,11 @@
         },
         "trigger": "run"
       },
-      "nextExpectedAt": 1790375809000,
+      "nextExpectedAt": 1790462209000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
-        "runs": 5,
+        "runs": 20,
         "okRate": 1,
         "p50Ms": 8000,
         "p95Ms": 8000
