@@ -28,13 +28,18 @@
   <div class="body">
     <h2>When a job fails, cron says nothing. CronWatch tells you what broke.</h2>
     <p class="example">Example: a nightly invoice job</p>
-    <div class="pair">
+    <div class="pair play-on-view">
       <figure class="side">
         <figcaption><b>Before</b> plain cron</figcaption>
-        <div class="out">
-          <p class="from"><span>cron</span><span>{{T_FAILED}}</span></p>
-          <div class="silence"><span>no output</span></div>
+        <div class="term">
+          <p class="bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span>cron on app-1</span><span></span></p>
+          <pre translate="no"><span class="c">$</span> crontab -l
+{{FAILED_CRON}} invoice-run
+<span class="l1"><span class="c">$</span> tail -f /var/log/syslog</span>
+<span class="l2">{{FAILED_AT}} CRON: (app) CMD (invoice-run)</span>
+<span class="cursor" aria-hidden="true"></span></pre>
         </div>
+        <p class="quiet">It failed {{FAILED_RAN}} later. Nothing was logged, and nobody was told. <span>(No MAILTO, and no one watching the log.)</span></p>
       </figure>
       <div class="arrow" aria-hidden="true">
         <svg viewBox="0 4 80 36" fill="currentColor" focusable="false">
@@ -45,9 +50,13 @@
       </div>
       <figure class="side">
         <figcaption><b>After</b> with CronWatch</figcaption>
-        <div class="out">
-          <p class="from"><span>CronWatch</span><span>{{T_FAILED}}</span></p>
-          <pre translate="no">{{ALERT_FAILED}}</pre>
+        <div class="chan">
+          <p class="bar"><span>#ops</span></p>
+          <div class="msg">
+            <svg class="who" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><rect x="1" y="1" width="38" height="38" rx="9.5" fill="none" stroke="currentColor" stroke-opacity=".22" stroke-width="1.5"/><circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 12.5V20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <p class="from"><b>CronWatch</b><span>{{T_FAILED}}</span></p>
+            <pre translate="no">{{ALERT_FAILED}}</pre>
+          </div>
         </div>
       </figure>
     </div>

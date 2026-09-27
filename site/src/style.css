@@ -144,14 +144,31 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .out .prompt { color: var(--ink); font-weight: 600; }
 .out .prompt::before { content: "> "; color: var(--muted); font-weight: 400; }
 .out.tall pre { max-height: 440px; overflow-y: auto; }
+/* The failure pair: a terminal where cron started the job and then said
+   nothing, and the channel where CronWatch's alert arrived. */
 .pair { display: grid; grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1.28fr); align-items: stretch; margin-top: 34px; }
 .pair .side { display: flex; flex-direction: column; margin: 0; min-width: 0; }
 .pair .side figcaption { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
 .pair .side figcaption b { color: var(--ink); font-weight: 500; }
-.pair .out { flex: 1; display: flex; flex-direction: column; margin-top: 0; }
-.pair .out pre { flex: 1; }
-.pair .silence { flex: 1; display: grid; place-items: center; min-height: 140px; padding: 24px 16px; }
-.pair .silence span { font: 400 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.pair .bar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--rule); font: 400 11.5px/1.5 var(--mono); color: var(--muted); }
+.pair .bar > span:nth-child(2) { justify-self: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pair .dots { display: flex; gap: 5px; }
+.pair .dots i { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--rule-2); }
+.pair .term { flex: 1; display: flex; flex-direction: column; background: var(--sunk); border: 1px solid var(--rule); border-radius: 4px; }
+.pair .term pre { flex: 1; padding: 13px 15px 18px; font-size: 12.5px; white-space: pre-wrap; word-break: break-word; color: var(--ink); }
+.pair .term .c { color: var(--muted); }
+.pair .term .l2 { color: var(--body); }
+.pair .cursor { display: inline-block; width: .6em; height: 1.1em; vertical-align: -.2em; background: var(--ink); opacity: .75; }
+.pair .quiet { margin-top: 12px; font-size: 16px; line-height: 1.45; font-style: italic; color: var(--ink); }
+.pair .quiet span { color: var(--muted); }
+.pair .chan { flex: 1; background: var(--sheet); border: 1px solid var(--rule-2); border-radius: 4px; }
+.pair .chan .bar { display: flex; font-weight: 500; color: var(--ink); background: var(--sunk); border-radius: 4px 4px 0 0; }
+.pair .msg { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 0 11px; padding: 14px 15px 16px 13px; }
+.pair .who { width: 30px; height: 30px; color: var(--ink); }
+.pair .msg .from { display: flex; align-items: baseline; gap: 9px; min-width: 0; font: 400 11.5px/1.4 var(--mono); color: var(--muted); }
+.pair .msg .from b { font: 600 16px/1.3 var(--serif); color: var(--ink); letter-spacing: -0.005em; }
+.pair .msg pre { grid-column: 2; margin-top: 8px; padding: 1px 0 1px 12px; border-left: 2px solid var(--bad); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+.pair .msg pre .t { font-weight: 600; color: var(--bad); }
 .pair .arrow { display: grid; place-items: center; color: var(--muted); margin-top: 26px; }
 .pair .arrow svg { width: 74px; height: auto; overflow: visible; }
 
@@ -361,7 +378,21 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
   .armed.play .ill .p18 { animation-delay: 6.30s; }
   .armed.play .ill .p19 { animation-delay: 6.65s; }
   .armed.play .ill .p20 { animation-delay: 7.00s; }
+  /* The failure pair, about three and a half seconds: cron logs the start
+     and the cursor waits; the alert arrives in the channel; then the quiet
+     note says what cron never did. */
+  .pair.armed:not(.play) .term .l1, .pair.armed:not(.play) .term .l2, .pair.armed:not(.play) .chan .msg, .pair.armed:not(.play) .quiet { opacity: 0; }
+  .pair.armed:not(.play) .arrow svg { clip-path: inset(0 100% 0 0); }
+  .pair.armed.play .term .l1 { animation: cw-fade .3s .25s both; }
+  .pair.armed.play .term .l2 { animation: cw-fade .35s .75s both; }
+  .pair.armed.play .cursor { animation: cw-blink 1.05s 1.1s steps(1, end) 3 both; }
+  .pair.armed.play .arrow svg { animation: cw-wipe .7s 1.25s cubic-bezier(.4, 0, .2, 1) both; }
+  .pair.armed.play .chan .msg { animation: cw-arrive .6s 1.8s cubic-bezier(.2, .8, .2, 1) both; }
+  .pair.armed.play .quiet { animation: cw-fade .9s 2.9s ease-out both; }
 }
+@keyframes cw-blink { 50% { opacity: 0; } }
+@keyframes cw-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes cw-arrive { from { opacity: 0; transform: translateY(10px); } }
 @keyframes cw-fade { from { opacity: 0; } }
 @keyframes cw-grow { from { opacity: 0; transform: scaleX(0); } }
 @keyframes cw-drop { from { opacity: 0; transform: scaleY(0); } }
@@ -453,7 +484,10 @@ footer button:hover { color: var(--ink); }
   .row > .label { padding-top: 0; }
   .pair { grid-template-columns: minmax(0, 1fr); margin-top: 24px; }
   .pair .side + .side figcaption { margin-top: 0; }
-  .pair .silence { min-height: 92px; }
+  .pair .term pre { padding-bottom: 14px; }
+  .pair .msg { padding: 12px 12px 14px; }
+  .pair .msg pre { grid-column: 1 / -1; margin-top: 10px; font-size: 12px; }
+  .pair .term pre { font-size: 12px; }
   .pair .arrow { margin: 10px 0 14px; justify-items: start; }
   .pair .arrow svg { width: 56px; transform: rotate(74deg); }
   .docs { grid-template-columns: minmax(0, 1fr); gap: 0; padding-top: 24px; }

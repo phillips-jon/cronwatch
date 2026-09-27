@@ -409,7 +409,7 @@ function versusSvg(which) {
 
 /** The captured demo output, rendered for the landing page. */
 function demoContent() {
-  const out = { MCP_LIST_JOBS: "", ALERT_MISSED: "", ALERT_BUDGET: "", ALERT_FAILED: "", ALERT_RECOVERED: "", T_FAILED: "", T_MISSED: "", T_BUDGET: "", T_RECOVERED: "", RUNS_FRAME: "", BOARD_FRAME: "", CHECKS_ILL: "", VERSUS: "" };
+  const out = { MCP_LIST_JOBS: "", ALERT_MISSED: "", ALERT_BUDGET: "", ALERT_FAILED: "", ALERT_RECOVERED: "", T_FAILED: "", FAILED_CRON: "", FAILED_AT: "", FAILED_RAN: "", T_MISSED: "", T_BUDGET: "", T_RECOVERED: "", RUNS_FRAME: "", BOARD_FRAME: "", CHECKS_ILL: "", VERSUS: "" };
   try {
     const { capturedAt, jobs } = JSON.parse(readFileSync(path.join(DEMO, "jobs.json"), "utf8"));
     const dash = readDashboard();
@@ -437,6 +437,12 @@ function demoContent() {
     out.ALERT_RECOVERED = alertBlock(alerts, "invoice-run recovered");
     out.ALERT_FAILED = alertBlock(alerts, "invoice-run failed");
     out.T_FAILED = alertTime(alerts, "invoice-run failed");
+    // The plain cron pane on the left of the failure pair: the job's own
+    // schedule, the second it started and how long it ran, all as captured.
+    out.FAILED_CRON = escape(jobs.find((j) => j.name === "invoice-run")?.definition.schedule ?? "");
+    const failed = alerts.find((x) => x.includes("invoice-run failed")) ?? "";
+    out.FAILED_AT = /Started \S+ (\d{2}:\d{2}:\d{2}) UTC/.exec(failed)?.[1] ?? "";
+    out.FAILED_RAN = escape(/, ran ([^.\s]+)\./.exec(failed)?.[1] ?? "");
     // The missed alert went out at the check the capture ran, just past its deadline.
     out.T_MISSED = `${hhmm(capturedAt)} UTC`;
     out.T_BUDGET = alertTime(alerts, "daily-digest went over budget");
