@@ -93,6 +93,34 @@ module Cronwatch
       nil
     end
 
+    # Every fire of a cron strictly after `from` and at or before `to`,
+    # ascending, or nil when there are more than `limit`. Walks the fires in
+    # batches, as firesBetween in schedule.ts asks croner for them, and drops
+    # any that do not move forward (see fire_after).
+    def fires_between(parsed, from, to, limit)
+      raise ArgumentError, "schedule \"#{parsed.source}\" was not made by Schedule.parse" unless parsed.pattern
+
+      out = []
+      probe = from
+      last = from
+      1000.times do
+        batch = next_runs(parsed, [limit + 1 - out.length, 24].min, probe)
+        return out if batch.empty?
+
+        batch.each do |t|
+          next if t <= last
+          return out if t > to
+
+          out << t
+          last = t
+          return nil if out.length > limit
+        end
+        finish = batch.last
+        probe = finish > probe ? finish : probe + 3_600_000
+      end
+      out
+    end
+
     # Up to `count` fires, each found from the one before, as croner's nextRuns.
     def next_runs(parsed, count, from)
       runs = []

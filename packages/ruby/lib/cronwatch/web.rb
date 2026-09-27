@@ -14,5 +14,6 @@ end
 
 require "cronwatch" unless defined?(Cronwatch::Client)
 require_relative "web/html"
+require_relative "web/timeline"
 require_relative "web/app"
 require_relative "web/origin"

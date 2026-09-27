@@ -59,11 +59,19 @@ class WebRoutesTest < Minitest::Test
     assert_match(/Builds the PDF/, dash)
     assert_match(/healthy/, dash)
     assert_match(/failing/, dash)
+    assert_match(%r{<p class="headline">2 jobs, <b>1 needing attention</b>\.</p>}, dash)
+    assert_match(%r{<div class="bad"><dt><i class="sq bad" aria-hidden="true"></i>failing</dt><dd>1</dd></div>}, dash, "counts by health")
+    assert_match(/<section class="sec" aria-label="Last 24 hours">.*<figure class="timeline day">/m, dash)
+    assert_match(/<table class="board">/, dash)
+    assert_match(%r{<form class="inline" method="post" action="/cronwatch/check"><button class="primary" type="submit">Run check now</button></form>}, dash)
 
     page = send_request(web, "GET", "/cronwatch/jobs/broken", BEARER)
     assert_equal 200, page.status
     assert_match(/kaboom &lt;script&gt;/, page.body, "error text is escaped")
     refute_match(/<script>/, page.body)
+    assert_match(%r{<h1 class="jobname">broken</h1>}, page.body)
+    assert_match(/<figure class="timeline week">/, page.body)
+    assert_match(%r{<details class="out error" open><summary>error</summary><pre>[^<]*kaboom &lt;script&gt;}, page.body)
 
     list = send_request(web, "GET", "/cronwatch/api/jobs", BEARER).json
     assert_equal 2, list["jobs"].length
@@ -246,10 +254,10 @@ class WebRoutesTest < Minitest::Test
     page = send_request(web, "GET", "/admin/cronwatch/jobs/m", BEARER, script_name: "/admin/cronwatch")
     assert_equal 200, page.status
     assert_includes page.body, %(action="/admin/cronwatch/jobs/m/silence")
-    assert_includes page.body, %(<a href="/admin/cronwatch/">CronWatch</a>)
+    assert_includes page.body, %(<a href="/admin/cronwatch/"><svg viewBox=)
     root = send_request(web, "GET", "/admin/cronwatch", BEARER, script_name: "/admin/cronwatch")
     assert_equal 200, root.status
-    assert_includes root.body, %(<a href="/admin/cronwatch/jobs/m">m</a>)
+    assert_includes root.body, %(<a class="name" href="/admin/cronwatch/jobs/m">m</a>)
     forget = send_request(web, "POST", "/admin/cronwatch/jobs/m/forget", BEARER, script_name: "/admin/cronwatch")
     assert_equal "/admin/cronwatch/", forget.headers["location"]
     assert_equal 200, send_request(web, "GET", "/admin/cronwatch/api/jobs", BEARER, script_name: "/admin/cronwatch").status

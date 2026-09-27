@@ -128,7 +128,7 @@ map "/cronwatch" do
 end
 ```
 
-Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules, reading `Rails.env` (when Rails is loaded), `RAILS_ENV` or `RACK_ENV` where the SDK reads `NODE_ENV`. It reads forms through Rack, so it works behind `Rack::MethodOverride` and with a request body that can be read only once.
+Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules: the board's counts by health, a timeline of the last day with a lane per job (a tick each time it was due, a mark for each run as long as it took, a dashed box for a missed slot) and the table of every job, and for each job its last seven days, runs and definition, all drawn on the server with no script, reading `Rails.env` (when Rails is loaded), `RAILS_ENV` or `RACK_ENV` where the SDK reads `NODE_ENV`. It reads forms through Rack, so it works behind `Rack::MethodOverride` and with a request body that can be read only once.
 
 `Cronwatch::Web.new(client = nil, token:, base_path:, origin:)`:
 

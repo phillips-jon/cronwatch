@@ -331,7 +331,7 @@ Rails.application.routes.draw do
 end
 ```
 
-`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch::Web.new(client = nil, token:, base_path:, origin:)` takes:
+`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. The board counts jobs by health, draws the last 24 hours as a lane per job (when each was due, every run as long as it took, any slot it missed) above a table of every job, and each job's page draws its last seven days above its runs and definition; [Dashboard and API](/docs/dashboard/#pages) describes what the marks mean. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch::Web.new(client = nil, token:, base_path:, origin:)` takes:
 
 - `client`: the client to serve. Leave it out and each request uses `Cronwatch.client` at that moment.
 - `token`: leave it out to read `CRONWATCH_TOKEN`. An empty string, passed or in the variable, counts as unset. `nil` opts out of the token entirely and serves the app to anyone who reaches it, for a mount that sits behind your own sign in.

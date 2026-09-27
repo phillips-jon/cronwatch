@@ -47,6 +47,8 @@ module Cronwatch
     COOKIE = "cronwatch_token"
     DEFAULT_RUNS = 20
     MAX_RUNS = 500
+    # Runs per job the board reads in one go: the table's sparkline, and most jobs' lanes.
+    BOARD_PAGE_RUNS = 20
     COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
     CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self'; " \
@@ -179,15 +181,20 @@ module Cronwatch
 
       # HTML
       if method == "GET" && path == "/"
-        entries = cw.jobs_with_runs(20)
+        entries = cw.jobs_with_runs(BOARD_PAGE_RUNS)
+        now = cw.now
         runs_by_job = entries.to_h { |entry| [entry.job.name, entry.runs] }
-        return html(HTML.dashboard_page(entries.map(&:job), runs_by_job, cw.now, base, nil))
+        return html(HTML.dashboard_page(entries.map(&:job), runs_by_job, now, base, nil, board_lanes(cw, entries, now)))
       end
       if method == "GET" && parts[0] == "jobs" && parts.length == 2
         job = cw.job_summary(parts[1])
         return html(HTML.message_page("No such job", "#{parts[1]} is not in the store.", base), 404) unless job
 
-        return html(HTML.job_page(job, cw.runs(job.name, 50), cw.now, base))
+        now = cw.now
+        # Enough runs to draw the job's week; the page lists the newest fifty.
+        limit = Timeline.week_runs_limit(job, now)
+        runs = cw.runs(job.name, limit)
+        return html(HTML.job_page(job, runs, now, base, runs.length < limit))
       end
       if method == "POST" && path == "/check"
         cw.check
@@ -268,6 +275,22 @@ module Cronwatch
         return run ? api({ ok: true, run: run }) : api({ ok: false, error: "No such run" }, 404)
       end
       api({ ok: false, error: "Not found" }, 404)
+    end
+
+    # The board's timeline lanes, the first Timeline::BOARD_LANES jobs. The
+    # runs already read for the table usually cover the last day; only a job
+    # whose twenty newest runs all fall inside it (one that runs more often
+    # than every hour or so) is read again, deeper.
+    def board_lanes(cw, entries, now)
+      from = now - Timeline::BOARD_BEHIND_MS
+      entries.first(Timeline::BOARD_LANES).map do |entry|
+        runs = entry.runs
+        short = runs.length >= BOARD_PAGE_RUNS && runs.last.started_at > from
+        next Timeline::LaneInput.new(job: entry.job, runs: runs, complete: true) unless short
+
+        deeper = cw.runs(entry.job.name, Timeline::BOARD_RUNS)
+        Timeline::LaneInput.new(job: entry.job, runs: deeper, complete: deeper.length < Timeline::BOARD_RUNS)
+      end
     end
 
     # Prints the development sign-in link, once per app.
