@@ -18,6 +18,7 @@ import { marked } from "marked";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.join(here, "src");
 const DOCS = path.join(here, "docs");
+const PAGES = path.join(here, "pages");
 const DEMO = path.join(SRC, "demo");
 const DIST = path.join(here, "dist");
 const SITE = "https://cronwatch.dev";
@@ -148,8 +149,9 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 ${body}
   </main>
   <footer>
-    <p>© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>.</p>
     <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
+    <nav class="legal" aria-label="Site policies"><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/contact/">Contact</a></nav>
+    <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>.</p>
   </footer>
 </div>
 </body>
@@ -453,6 +455,71 @@ function demoContent() {
   return out;
 }
 
+/* ---- Terms, privacy and the contact form. ---- */
+
+/** A page with its mono label down the left, the way the landing sets a section. */
+function solo(label, inner) {
+  return `<div class="solo"><p class="label">${escape(label)}</p><article class="doc">${inner}</article></div>`;
+}
+
+/**
+ * The contact form. It posts to /contact, which nginx hands to
+ * deploy/contact/server.mjs; the service answers with a redirect to
+ * /contact/sent/ or /contact/error/, so it works without script. site.js
+ * fills `t` with how long the page was open before sending, measured in the
+ * browser; the service turns away anything sent in under three seconds.
+ * `website` is a trap for bots and stays empty for people.
+ */
+const CONTACT_FORM = `<form class="contact" method="post" action="/contact">
+<p class="field"><label for="c-name">Name</label><input id="c-name" name="name" type="text" required maxlength="200" autocomplete="name"></p>
+<p class="field"><label for="c-email">Email</label><input id="c-email" name="email" type="email" required maxlength="320" autocomplete="email" spellcheck="false"></p>
+<p class="field"><label for="c-message">Message</label><textarea id="c-message" name="message" required maxlength="5000" rows="8"></textarea></p>
+<p class="vh" aria-hidden="true"><label for="c-website">Leave this empty</label><input id="c-website" name="website" type="text" tabindex="-1" autocomplete="off"></p>
+<input type="hidden" name="t" value="">
+<p><button class="prompt-btn" type="submit">Send</button></p>
+</form>`;
+
+const CONTACT_INTRO = `<h1>Contact</h1>
+<p>Questions, bug reports, or a request to delete something you sent: write here and it goes to Jon Phillips, who maintains CronWatch, by email. The reply comes from a person, to the address you give.</p>
+<p>For bugs and feature requests, <a href="${GITHUB}/issues">GitHub issues</a> are public and often faster. What you send here is used only to reply to you; the <a href="/privacy/">privacy page</a> says what happens to it.</p>`;
+
+/** Terms and privacy from pages/*.md, and the contact page with its two answers. */
+function buildPages() {
+  const write = (route, page) => {
+    const dir = path.join(DIST, route);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "index.html"), layout({ path: route, kind: "page", ...page }));
+  };
+  const indexed = [];
+  for (const file of readdirSync(PAGES).filter((f) => f.endsWith(".md")).sort()) {
+    const { meta, body } = frontmatter(readFileSync(path.join(PAGES, file), "utf8"));
+    const route = `/${file.replace(/\.md$/, "")}/`;
+    const updated = meta.updated ? `<p class="updated">Last updated ${escape(meta.updated)}</p>` : "";
+    const html = curlyApostrophes(marked.parse(body)).replace(/(<\/h1>\n)/, `$1${updated}`);
+    write(route, { title: meta.title, description: meta.description ?? "", body: solo(meta.label ?? meta.title, html) });
+    indexed.push(route);
+  }
+
+  write("/contact/", {
+    title: "Contact", description: "Send a message to the maintainer of CronWatch.",
+    body: solo("Contact", `${CONTACT_INTRO}${CONTACT_FORM}`),
+  });
+  indexed.push("/contact/");
+  write("/contact/sent/", {
+    title: "Message sent", description: "Your message was sent.", index: false,
+    body: solo("Contact", `<h1>Sent</h1>
+<p class="notice ok" role="status">Thank you. Your message is on its way, and the reply will come to the email address you gave.</p>
+<p><a href="/">Back to the start</a></p>`),
+  });
+  write("/contact/error/", {
+    title: "Message not sent", description: "Your message was not sent.", index: false,
+    body: solo("Contact", `<h1>Not sent</h1>
+<p class="notice bad" role="alert">Your message did not go through, so nothing was sent. Check that each field is filled in and the email address is complete, then try again. If it keeps failing, wait a minute, or open an issue on <a href="${GITHUB}/issues">GitHub</a>.</p>
+${CONTACT_FORM}`),
+  });
+  return { indexed, count: indexed.length + 2 };
+}
+
 function build() {
   rmSync(DIST, { recursive: true, force: true });
   mkdirSync(path.join(DIST, "assets"), { recursive: true });
@@ -530,15 +597,17 @@ ${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${headi
     body: lost(null, "Something went wrong", "The server hit an error on its end, or is briefly unavailable. Try again in a minute.", `If it keeps happening, <a href="${GITHUB}/issues">tell us on GitHub</a>.`),
   }));
 
+  const extra = buildPages();
+
   const prompt = readFileSync(path.join(SRC, "prompt.txt"), "utf8");
   writeFileSync(path.join(DIST, "prompt.txt"), prompt);
   writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), and the cronwatch gem for Ruby and Rails. Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nPlatforms: Vercel cron, Next.js, SvelteKit, Nuxt, React Router, NestJS, Strapi, Netlify, Firebase, Convex, Trigger.dev, Inngest, Cloudflare Workers with D1, pg_cron and Supabase Cron, node-cron, BullMQ, GitHub Actions, Rails with ActiveJob, Solid Queue or Sidekiq.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nMCP server: npx -y @cronwatch/mcp\n`);
 
-  const urls = ["/", ...pages.map((p) => p.route)];
+  const urls = ["/", ...pages.map((p) => p.route), ...extra.indexed];
   writeFileSync(path.join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${SITE}${u}</loc></url>`).join("\n")}\n</urlset>\n`);
   writeFileSync(path.join(DIST, "robots.txt"), `User-agent: *\nAllow: /\nSitemap: ${SITE}/sitemap.xml\n`);
 
-  console.log(`built ${pages.length + 2} pages -> ${path.relative(process.cwd(), DIST) || "."}`);
+  console.log(`built ${pages.length + 2 + extra.count} pages -> ${path.relative(process.cwd(), DIST) || "."}`);
 }
 
 build();
@@ -551,8 +620,8 @@ if (WATCHING) {
       try { build(); } catch (e) { console.error(e); }
     }, 80);
   };
-  for (const dir of [SRC, DOCS]) watch(dir, { recursive: true }, rebuild);
-  console.log("watching src/ and docs/");
+  for (const dir of [SRC, DOCS, PAGES]) watch(dir, { recursive: true }, rebuild);
+  console.log("watching src/, docs/ and pages/");
 }
 
 if (args.includes("--serve")) {

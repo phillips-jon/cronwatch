@@ -406,6 +406,30 @@ footer a:hover { color: var(--ink); }
 footer nav { display: flex; flex-wrap: wrap; gap: 8px 20px; }
 footer button { color: var(--muted); text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: .14em; }
 footer button:hover { color: var(--ink); }
+/* The project's links on the left, the site's policies on the right, and
+   the copyright on its own line beneath. On a phone the policies wrap below. */
+footer .legal { margin-left: auto; }
+footer .rights { flex-basis: 100%; }
+@media (max-width: 700px) { footer .legal { margin-left: 0; } }
+
+/* Terms, privacy and contact: a label down the left, the text beside it. */
+.solo { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; align-items: start; padding: 40px 0 24px; }
+.solo > .label { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-top: 14px; }
+.solo .updated { font: 400 13px/1.5 var(--mono); color: var(--muted); }
+.solo .notice { border-left: 2px solid var(--rule-2); padding: 2px 0 2px 16px; }
+.solo .notice.ok { border-left-color: var(--ok); }
+.solo .notice.bad { border-left-color: var(--bad); }
+.contact { display: grid; gap: 20px; max-width: 34rem; margin-top: 30px; }
+.contact label { display: block; font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.contact input, .contact textarea { display: block; width: 100%; font: 400 17px/1.5 var(--serif); color: var(--ink); background: var(--sheet); border: 1px solid var(--rule-2); border-radius: 3px; padding: 9px 12px; margin: 0; }
+.contact textarea { min-height: 11em; resize: vertical; }
+.contact input:hover, .contact textarea:hover { border-color: var(--tick); }
+.contact input:focus-visible, .contact textarea:focus-visible { border-color: var(--ink); outline: 1px solid var(--ink); outline-offset: 0; }
+.contact button:hover { opacity: .85; }
+@media (max-width: 900px) {
+  .solo { grid-template-columns: minmax(0, 1fr); gap: 8px; padding-top: 24px; }
+  .solo > .label { padding-top: 0; }
+}
 
 /* Docs */
 .docs { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 48px; align-items: start; padding: 40px 0; }

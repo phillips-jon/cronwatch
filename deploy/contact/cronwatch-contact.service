@@ -1,0 +1,49 @@
+# The cronwatch.dev contact form service (deploy/contact/server.mjs).
+#
+# Install as /etc/systemd/system/cronwatch-contact.service (deploy/README.md).
+# ExecStart goes through /var/www/cronwatch.dev, the symlink to the live
+# release, so a restart runs the live release's copy. release-deploy runs
+# without sudo and does not restart this; after a deploy that changes
+# deploy/contact/, run `sudo systemctl restart cronwatch-contact`.
+#
+# systemd reads the EnvironmentFile as root before it drops to the user, so
+# the file stays mode 600, owned by joncphillips.
+
+[Unit]
+Description=cronwatch.dev contact form
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=joncphillips
+Group=joncphillips
+EnvironmentFile=/home/joncphillips/.config/cronwatch-contact.env
+ExecStart=/opt/node-cronwatch/bin/node /var/www/cronwatch.dev/deploy/contact/server.mjs
+Restart=always
+RestartSec=5
+UMask=0077
+
+# Hardening. The service reads its own code and talks to SES over HTTPS;
+# it writes nothing to disk.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

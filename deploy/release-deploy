@@ -174,4 +174,10 @@ for old in $(ls -1d "$RELEASES"/*/ 2>/dev/null | sed 's#/$##' | sort -r); do
 done
 git -C "$REPO" worktree prune || true
 
+# The contact form service keeps running the code it started with. This runs
+# without sudo, so it only says when a restart is needed.
+if [ -n "$CURRENT" ] && ! git -C "$REPO" diff --quiet "$CURRENT" "$NEW" -- deploy/contact 2>/dev/null; then
+    echo "deploy/contact changed: run 'sudo systemctl restart cronwatch-contact' to pick it up."
+fi
+
 echo "Deployed $(git log -1 --format=%h)."
