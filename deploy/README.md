@@ -9,7 +9,7 @@ The site is static: `site/dist`, built by `npm run build:site`. On the server it
 /opt/node-cronwatch                      the Node the builds run on
 ```
 
-`release-deploy` fetches, builds a new worktree beside the live one (installing only the site workspace), checks that `site/dist/index.html` carries the strip of runs and that the docs exist, marks the release `.release-ok`, moves the symlink in one rename, and confirms `https://cronwatch.dev/` answers 200 with exactly the `index.html` it just built (switching back if not; on a first deploy, with nothing to switch back to, it says so loudly and exits non-zero). nginx follows the symlink, so nothing restarts (the contact form service is the one exception; see [Contact form](#contact-form)). The newest three releases that went live are kept; `rollback` switches to the previous one at once.
+`release-deploy` fetches, builds a new worktree beside the live one (installing only the site workspace), checks that `site/dist/index.html` carries the timeline of runs drawn from the demo captures and that the docs exist, marks the release `.release-ok`, moves the symlink in one rename, and confirms `https://cronwatch.dev/` answers 200 with exactly the `index.html` it just built (switching back if not; on a first deploy, with nothing to switch back to, it says so loudly and exits non-zero). nginx follows the symlink, so nothing restarts (the contact form service is the one exception; see [Contact form](#contact-form)). The newest three releases that went live are kept; `rollback` switches to the previous one at once.
 
 ## One-time setup
 

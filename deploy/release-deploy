@@ -116,7 +116,7 @@ echo "Building the site..."
 npm run build:site 9>&-
 [ -f "$WEB_ROOT/index.html" ] || { echo "The build left no $WEB_ROOT/index.html." >&2; false; }
 grep -q "CronWatch" "$WEB_ROOT/index.html" || { echo "$WEB_ROOT/index.html does not look like the site." >&2; false; }
-grep -q 'class="strip"' "$WEB_ROOT/index.html" || { echo "$WEB_ROOT/index.html has no strip of runs; are the demo captures missing?" >&2; false; }
+grep -q '<svg class="tl wide"' "$WEB_ROOT/index.html" || { echo "$WEB_ROOT/index.html has no timeline of runs; are the demo captures missing?" >&2; false; }
 [ -f "$WEB_ROOT/docs/index.html" ] || { echo "The build left no docs." >&2; false; }
 # The build output is all nginx serves; node_modules is not needed after this.
 rm -rf node_modules
