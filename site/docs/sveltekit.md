@@ -76,7 +76,7 @@ export const DELETE = GET;
 
 Set `CRONWATCH_TOKEN` and open `/cronwatch?token=<it>` once. SvelteKit redirects `/cronwatch/` to `/cronwatch`, which is harmless here.
 
-The dashboard's forms post back to the same origin and CronWatch refuses cross-site posts, so the request URL SvelteKit builds must have the public origin. On `adapter-node` behind a proxy, set `ORIGIN` (or `PROTOCOL_HEADER` and `HOST_HEADER`) as the adapter's docs describe; SvelteKit's own CSRF check needs the same.
+The dashboard's forms post back to the same origin and CronWatch refuses cross-site posts, so the request URL SvelteKit builds must have the public origin. On `adapter-node` behind a proxy, set `ORIGIN` (or `PROTOCOL_HEADER` and `HOST_HEADER`) as the adapter's docs describe; SvelteKit's own CSRF check needs the same. Setting the adapter's `ORIGIN` is the fix for both; the routes' `origin` option ([behind a proxy](/docs/dashboard/#behind-a-proxy)) would only cover CronWatch's check.
 
 ## Where the check runs
 

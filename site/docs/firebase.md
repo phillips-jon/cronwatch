@@ -77,17 +77,20 @@ A secret has to be bound to each function that reads it. To keep the Slack webho
 
 ## The dashboard
 
-`onRequest` hands over Express-style request and response objects, and Firebase keeps the body as `req.rawBody`. The `toRequest` and `send` helpers from the [Node adapter on the NestJS page](/docs/nestjs/#the-dashboard) convert them.
+`onRequest` hands over Express-style request and response objects, and `toNodeHandler` from `@cronwatch/sdk/node` turns the routes into a function that takes them. Firebase reads the request body before the function runs and keeps it as `req.rawBody`, which the adapter passes on.
 
 ```ts
 import { onRequest } from "firebase-functions/v2/https";
-import { send, toRequest } from "./node-fetch.js";
+import { toNodeHandler } from "@cronwatch/sdk/node";
 
 const routes = cw.routes({ basePath: "" });
 
-export const cronwatchDashboard = onRequest({ secrets: [...secrets, "CRONWATCH_TOKEN"] }, async (req, res) => {
-  await send(res, await routes.handler(await toRequest(req, req.rawBody)));
-});
+export const cronwatchDashboard = onRequest(
+  { secrets: [...secrets, "CRONWATCH_TOKEN"] },
+  toNodeHandler(routes.handler, { trustProxy: true }),
+);
 ```
 
 With `basePath: ""` the dashboard sits at the root of the function's own URL, which `firebase deploy` prints. Open it once with `?token=<CRONWATCH_TOKEN>`. To serve it under your site instead, add a Hosting rewrite from `/cronwatch` and `/cronwatch/**` to the function and set `basePath` to `/cronwatch`.
+
+Google's front end terminates TLS and tells the function with `X-Forwarded-Proto`, which `trustProxy: true` lets it follow; without it the function sees plain `http` and refuses the dashboard's forms as cross-site. Behind the Hosting rewrite, also pass the site's origin to the routes (`cw.routes({ basePath: "/cronwatch", origin: "https://example.com" })`), since the request reaches the function under the function's own host.

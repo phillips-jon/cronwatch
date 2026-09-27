@@ -23,6 +23,7 @@ export default defineConfig({
     newrelic: "src/alerts/newrelic.ts",
     anthropic: "src/triage/anthropic.ts",
     "pg-cron": "src/sources/pgcron.ts",
+    node: "src/node.ts",
   },
   format: ["esm", "cjs"],
   dts: true,

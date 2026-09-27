@@ -26,7 +26,7 @@ With no token configured while `NODE_ENV` is `development` or `test`, the routes
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
 ```
 
-The link is built from the origin of that first request and the base path. Open it and the cookie is set as with any token. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a fetch handler cannot tell a caller on this machine from one elsewhere (Next.js keeps an `X-Forwarded-For` the client sent, `next dev` listens on every interface, and tunnels rewrite `Host`), so the log, which only you can read, is the proof. With no token and `NODE_ENV` anything else, or unset, the routes answer 503.
+The link is built from the origin of that first request (the [public origin](#behind-a-proxy) when `origin` or `trustProxy` is set) and the base path. Open it and the cookie is set as with any token. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a fetch handler cannot tell a caller on this machine from one elsewhere (Next.js keeps an `X-Forwarded-For` the client sent, `next dev` listens on every interface, and tunnels rewrite `Host`), so the log, which only you can read, is the proof. With no token and `NODE_ENV` anything else, or unset, the routes answer 503.
 
 Pass `token: null` to serve them open everywhere, for example when the mount already sits behind your own auth:
 
@@ -54,11 +54,31 @@ The token grants everything, including silencing and forgetting jobs. Treat it l
 
 ## Cross-site requests
 
-A `POST` or `DELETE` is refused with 403 when it carries an `Origin` header that is not the request's own origin, or a `Sec-Fetch-Site` header other than `same-origin` or `none`. Browsers send these on every form post, so another site cannot use a signed-in cookie to silence or forget a job. Scripts, crons and the MCP server send neither and are unaffected. If the app sits behind a proxy, make sure the request URL it sees carries the public host and scheme, or same-origin posts from the dashboard will look foreign.
+A `POST` or `DELETE` is refused with 403 when it carries an `Origin` header that is not the request's own origin, or a `Sec-Fetch-Site` header other than `same-origin` or `none`. Browsers send these on every form post, so another site cannot use a signed-in cookie to silence or forget a job. Scripts, crons and the MCP server send neither and are unaffected. The request's own origin is the request URL's, unless the app sits [behind a proxy](#behind-a-proxy) and says otherwise.
 
 `GET /api/check` runs the check only when the request has an `Authorization` bearer (the token or the cron secret), which a page on another site cannot add. Signed in with the cookie, use `POST /api/check`; a cookie `GET` answers 405. The dashboard's "Run check now" button posts, so it is unaffected.
 
 Pages are served with a Content Security Policy that allows no scripts, frames or outside origins, plus `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` and `X-Content-Type-Options: nosniff`. JSON responses carry `nosniff` and `Cache-Control: no-store`.
+
+## Behind a proxy
+
+Behind a proxy or load balancer that terminates TLS, the request URL the app sees often has the internal scheme and host (`http://10.0.0.5:8080`) while the browser is on `https://app.example.com`. The browser's `Origin` then never matches, and every dashboard form is refused as cross-site. Where the framework already builds the request URL with the public origin (SvelteKit's `ORIGIN`, for one), nothing more is needed; otherwise tell the routes the public origin.
+
+```ts
+const routes = cw.routes({ basePath: "/cronwatch", origin: "https://app.example.com" });
+```
+
+`origin` is used instead of the request URL's origin in three places: the cross-site check on `POST` and `DELETE`, the sign-in redirect (the cookie is marked `Secure` when the origin is `https`, and a form's redirect back follows a `Referer` on this origin), and the development sign-in line printed to the log. It must be an `http` or `https` URL; only its origin is kept, and anything else throws when the routes are made.
+
+When the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`, `trustProxy: true` reads the origin from them instead:
+
+```ts
+const routes = cw.routes({ basePath: "/cronwatch", trustProxy: true });
+```
+
+The first value of each comma-separated header is used, and whichever header is missing falls back to the request URL's scheme or host. A scheme that is not `http` or `https`, or a host carrying a path or credentials, is ignored. Turn it on only when the proxy sets or overwrites both headers rather than appending to them, because a client can send them too. `origin`, when set, wins over `trustProxy`. With neither, the default, forwarded headers change nothing.
+
+`toNodeHandler` and `toKoaMiddleware` from `@cronwatch/sdk/node` take their own `trustProxy`, which builds the whole request URL from the forwarded headers; see [Express, Koa and plain Node servers](/docs/node/#express-koa-and-plain-node-servers).
 
 ## Pages
 
