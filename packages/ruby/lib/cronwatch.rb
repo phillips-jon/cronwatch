@@ -20,6 +20,21 @@ require_relative "cronwatch/alerts/custom"
 require_relative "cronwatch/alerts/slack"
 require_relative "cronwatch/alerts/discord"
 require_relative "cronwatch/alerts/webhook"
+require_relative "cronwatch/alerts/provider"
+require_relative "cronwatch/alerts/email"
+require_relative "cronwatch/alerts/sigv4"
+require_relative "cronwatch/alerts/resend"
+require_relative "cronwatch/alerts/postmark"
+require_relative "cronwatch/alerts/sendgrid"
+require_relative "cronwatch/alerts/mailgun"
+require_relative "cronwatch/alerts/ses"
+require_relative "cronwatch/alerts/twilio"
+require_relative "cronwatch/alerts/sentry"
+require_relative "cronwatch/alerts/honeybadger"
+require_relative "cronwatch/alerts/datadog"
+require_relative "cronwatch/alerts/rollbar"
+require_relative "cronwatch/alerts/bugsnag"
+require_relative "cronwatch/alerts/newrelic"
 require_relative "cronwatch/client"
 
 # Cron and scheduled-job monitoring that lives inside your app.
@@ -32,7 +47,7 @@ require_relative "cronwatch/client"
 module Cronwatch
   # The options Cronwatch.configure sets. Anything left unset takes the client's default.
   class Configuration
-    OPTIONS = %i[store alerts triage cron_secret retention defaults redact deliver now on_error].freeze
+    OPTIONS = %i[store alerts triage cron_secret retention defaults redact deliver now on_error sources].freeze
 
     attr_accessor(*OPTIONS)
 

@@ -5,7 +5,8 @@
 ## Rules
 
 - Ruby 3.2 or newer; Rails 7.2, 8.0 and 8.1. The only runtime dependency is `fugit` (the cron parser Solid Queue and sidekiq-cron already bring). Everything else is optional and loaded only from its own entry point, like the SDK's, each raising a `LoadError` that names the gem to add when it is missing:
-  - `require "cronwatch"`: the client, the memory store, the Slack, Discord, webhook, console and custom channels (standard library only)
+  - `require "cronwatch"`: the client, the memory store, the Slack, Discord, webhook, console and custom channels, and the provider channels (Resend, Postmark, SendGrid, Mailgun, SES, Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, New Relic) (standard library only)
+  - `require "cronwatch/pg_cron"`: `Cronwatch::Sources::PgCron`, the pg_cron reader. No gem of its own: it queries through what it is given, an ActiveRecord class, pool or connection (`exec_query`), a `PG::Connection` (`exec_params`), or anything with `query(sql, params)`
   - `require "cronwatch/active_record"`: the ActiveRecord store (needs `activerecord`)
   - `require "cronwatch/rails"`: the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, `Cronwatch::Web`, the `cronwatch:check` task and the install generator (needs `railties` and `activejob`; Rails brings `rack`)
   - `require "cronwatch/sidekiq"`: `Cronwatch::Sidekiq`, its server middleware and `Cronwatch::Sidekiq::CheckWorker` (needs `sidekiq` 7 or newer)
@@ -52,6 +53,12 @@ packages/ruby/
     client.rb       the client: job, run, check, start/stop, silence, unsilence, forget, jobs, job_summary, runs, close
     stores/memory.rb
     alerts/console.rb slack.rb discord.rb webhook.rb custom.rb
+    alerts/provider.rb  what the provider channels share (alerts/shared.ts): the POST with redacted errors, alert ids, run summaries
+    alerts/email.rb     subject, text and HTML for every email channel (alerts/email.ts)
+    alerts/sigv4.rb     AWS Signature Version 4 on OpenSSL (alerts/sigv4.ts)
+    alerts/resend.rb postmark.rb sendgrid.rb mailgun.rb ses.rb twilio.rb
+    alerts/sentry.rb honeybadger.rb datadog.rb rollbar.rb bugsnag.rb newrelic.rb
+    pg_cron.rb      Sources::PgCron and its ActiveRecord and PG::Connection adapters (sources/pgcron.ts)
     active_record.rb  stores/active_record.rb
     monitored.rb    what Cronwatch::ActiveJob and Cronwatch::Sidekiq share: the `cronwatch` macro, declarations
     scheduler.rb    schedules from Solid Queue and sidekiq-cron, converted and checked against Fugit
@@ -61,7 +68,9 @@ packages/ruby/
     triage/anthropic.rb
   lib/generators/cronwatch/install/install_generator.rb
                     the migration and initializer templates, kept in the generator so the gem ships only Ruby
-  test/             core tests; test/slow (the year-long schedule walk), test/active_record, test/rails
+  test/             core tests; test/slow (the year-long schedule walk), test/active_record, test/rails.
+                    test/pg_cron_test.rb and test/active_record/pg_cron_test.rb run against a real pg_cron when
+                    CRONWATCH_TEST_PGCRON is set
 ```
 
 ## The Ruby API
@@ -121,6 +130,18 @@ The job name defaults to the class name without `Job`, dasherized (`NightlyRepor
 Every read-modify-write of a job's state goes through `Client#update_state`: in turn with the process's other updates to the job, it reads the state, works out the next one, and writes it only when it changed, with `version` one higher, through the store's `compare_and_set_state` against the version read. A refused write is worked out again from a fresh read, up to `Client::STATE_ATTEMPTS` times. A store without `compare_and_set_state` gets `set_state`, as the SDK does.
 
 Each channel sends in a thread of its own with a 15 second timeout, and triage gets 25 seconds. A channel (or triage) that times out is left to finish; until it has, nothing more is sent to it (the alert counts as not delivered there, and is retried) and no second triage starts, so a hung channel holds one thread rather than one per alert.
+
+## Channels
+
+Every channel is an object with `name` and `call(alert)` that raises on failure, and takes `http:` (anything with `post(url, body, headers)` returning `HTTP::Response`; `HTTP.default` is `Net::HTTP` with 10 second timeouts), which is how the tests replay requests without a network. The provider channels are the SDK's, request for request: the same URL, headers (lowercase names, in the SDK's order) and body, written with `JS.json` so the bytes are identical; the same stable alert id (the first 32 hex characters of SHA-256 of job, type and time) for idempotency keys, event ids and UUIDs; the same error text, `"<Provider> <origin> answered <status>: <first 200 UTF-16 units of the body>"` with every secret of four or more characters replaced by `[redacted]`; lengths, cuts and SMS segments counted in UTF-16 units and GSM-7 septets as JavaScript counts them; the same recovered defaults (sent by Sentry, Rollbar, Datadog, New Relic and the email channels; not by Twilio, Honeybadger or Bugsnag unless `recovered: true`). Constructor checks raise `ArgumentError` with the Ruby option names (`api_key`, not `apiKey`). The fixtures' `providerSends` and `providerFailures` replay all of it; SigV4 is also checked against the AWS test suite cases the SDK's tests use.
+
+## Sources
+
+`sources:` takes objects with `name` and `sync(host)`, as the SDK's `sources` does. `check` calls each, in order, after the store is ready and before anything else; one that raises is reported to `on_error` as `"source <name>"` and the check carries on, and the alerts a sync returns are added to the check's result. The host is the client: `job`, `record_run`, `store`, `now`, and `on_error(error, where)`.
+
+`Client#record_run(run, evaluate: true)` is the SDK's `recordRun`: keyed by the run's id, a new run is inserted, a stored run still `running` is updated once this one is not, and anything else is left alone. Before that the output and error are made UTF-8, an `ok` run is checked against `expect`, and both are capped, redacted and cleared of NUL. A new run then goes through `on_run_start` and, once finished, `finish_run`; a stored running run that finished goes straight to `finish_run`. An insert that fails because another process inserted the run first returns nothing; any other failure raises. `evaluate: false` writes without judging. The job must be declared in this process, or it raises `ArgumentError`.
+
+`Sources::PgCron` is `sources/pgcron.ts` line for line: the same SQL, the same mapping from rows to runs, the per-job cursor found from the store the first time (so a restart copies nothing twice), the first-sight import of the twenty newest runs judged only from the newest finished one, a not-yet-started run holding its job's cursor, `cron.log_run` off declaring jobs without schedules, and the one-time warnings for an unreadable `cron.timezone`, `log_run` off and an empty `cron.job` (row level security). Parameters that are arrays go to Postgres as array literals; timestamps come back as `Time` (ActiveRecord decodes them) or text (the pg gem), both read to the millisecond.
 
 ## Keeping the two in step
 

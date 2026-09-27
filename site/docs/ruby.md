@@ -186,7 +186,38 @@ Cronwatch::Alerts::Custom.new("pagerduty") do |alert|
 end
 ```
 
-They use only the standard library. Every alert goes to every channel at once; a channel that raises, or takes longer than 15 seconds, goes to `on_error` and never holds up the others. A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>` as the SDK's does, and its body is the same JSON. Verifying it in Ruby:
+They use only the standard library. Every alert goes to every channel at once; a channel that raises, or takes longer than 15 seconds, goes to `on_error` and never holds up the others.
+
+### Email, SMS and error trackers
+
+The SDK's provider channels are here too, in the core gem and on the standard library alone (`Net::HTTP`, with OpenSSL signing the SES requests), so they need no gem of their own:
+
+```ruby
+# Email. Each takes from:, to: (one address or an array), subject_prefix: and link:.
+Cronwatch::Alerts::Resend.new(api_key: ENV.fetch("RESEND_API_KEY"), from: "CronWatch <alerts@example.com>", to: "ops@example.com")
+Cronwatch::Alerts::Postmark.new(server_token: ENV.fetch("POSTMARK_SERVER_TOKEN"), from: "alerts@example.com", to: "ops@example.com")
+Cronwatch::Alerts::Sendgrid.new(api_key: ENV.fetch("SENDGRID_API_KEY"), from: "alerts@example.com", to: "ops@example.com")
+Cronwatch::Alerts::Mailgun.new(api_key: ENV.fetch("MAILGUN_API_KEY"), domain: "mg.example.com", region: "eu",
+                               from: "alerts@example.com", to: "ops@example.com")
+Cronwatch::Alerts::Ses.new(region: "us-east-1", access_key_id: ENV.fetch("AWS_ACCESS_KEY_ID"),
+                           secret_access_key: ENV.fetch("AWS_SECRET_ACCESS_KEY"), from: "alerts@example.com", to: "ops@example.com")
+
+# SMS, one message per number. Recoveries are not texted unless recovered: true.
+Cronwatch::Alerts::Twilio.new(account_sid: ENV.fetch("TWILIO_ACCOUNT_SID"), auth_token: ENV.fetch("TWILIO_AUTH_TOKEN"),
+                              from: "+15005550006", to: ["+15551110000"])
+
+# Error trackers: one issue per job and alert type.
+Cronwatch::Alerts::Sentry.new(dsn: ENV.fetch("SENTRY_DSN"))
+Cronwatch::Alerts::Honeybadger.new(api_key: ENV.fetch("HONEYBADGER_API_KEY"))
+Cronwatch::Alerts::Datadog.new(api_key: ENV.fetch("DD_API_KEY"), site: "datadoghq.eu", tags: ["env:prod"])
+Cronwatch::Alerts::Rollbar.new(access_token: ENV.fetch("ROLLBAR_ACCESS_TOKEN"))
+Cronwatch::Alerts::Bugsnag.new(api_key: ENV.fetch("BUGSNAG_API_KEY"))
+Cronwatch::Alerts::NewRelic.new(account_id: ENV.fetch("NEW_RELIC_ACCOUNT_ID"), api_key: ENV.fetch("NEW_RELIC_LICENSE_KEY"))
+```
+
+The options are the SDK's in snake_case: `subject_prefix`, `message_stream` (Postmark), `region` (`"eu"` for SendGrid, Mailgun and New Relic; the AWS region for SES), `session_token` and `configuration_set_name` (SES), `api_key_sid`, `api_key_secret`, `messaging_service_sid` and `segments` (Twilio), `environment` and `release` (Sentry), `endpoint` (Honeybadger, Bugsnag), `host` (Datadog), `release_stage` (Bugsnag), `event_type` (New Relic), and `recovered` and `link` wherever the SDK has them. A missing key, address or account raises `ArgumentError` when the channel is made. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
+
+Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the gem's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever side sent it. Each request gives up after 10 seconds. A refused request raises `"<Provider> <origin> answered <status>: <start of the body>"`, with the channel's keys cut out of the body in case the provider echoes one, and never the URL's path. Recoveries go to Sentry and Rollbar as info events and to Datadog and New Relic as events, but not to Twilio, Honeybadger or Bugsnag unless `recovered: true`. A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>` as the SDK's does, and its body is the same JSON. Verifying it in Ruby:
 
 ```ruby
 expected = "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", secret, request.raw_post)}"
@@ -206,6 +237,34 @@ RECORDER = Cronwatch.new(store: Cronwatch::Stores::ActiveRecord.new, deliver: :c
 It still records every run and evaluates it, but instead of sending an alert it queues it with the job's state. The next check in a process that sends normally (a `start` thread, `Cronwatch::CheckJob`, or whatever calls the check endpoint) delivers it, adds triage if that process has it, and marks it sent. Both processes must use the same store. Calling `start` in the recording process is allowed but sends nothing, so it warns once on standard error. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send).
 
 An alert no channel accepted waits in the same queue, and each check tries it once more. A queued alert that no longer describes the job is dropped instead of sent late: one whose condition has closed since, or closed and opened again, and a recovery once any condition it names is open again. One check spends at most 20 seconds of retries across all jobs, and whatever is left waits for the next check. More than twenty queued alerts for one job drops the oldest and says so through `on_error` (`"alert queue for <job>"`).
+
+## pg_cron
+
+pg_cron runs jobs inside Postgres, where nothing can wrap them. `Cronwatch::Sources::PgCron` reads what pg_cron records instead: on every check it reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a job that stops running is missed, a failed run alerts and a run that never ends is stuck. It needs no gem of its own; it queries through the connection you give it.
+
+```ruby
+require "cronwatch/pg_cron"
+
+CW = Cronwatch.new(
+  store: Cronwatch::Stores::ActiveRecord.new,
+  sources: [Cronwatch::Sources::PgCron.new(PG.connect(ENV.fetch("DATABASE_URL")), prefix: "db:")],
+)
+CW.start
+```
+
+The first argument is an ActiveRecord class, connection pool or connection (queried with `exec_query`, a connection checked out for each query), a `PG::Connection` from the pg gem (`exec_params`), or anything with `query(sql, params)` that returns rows as hashes with string keys. The options:
+
+| Option | Default | |
+|---|---|---|
+| `jobs` | every job the role can see | names or ids (`["nightly-vacuum", 7]`), or a callable given a `Cronwatch::Sources::PgCron::Job` (`jobid`, `jobname`, `schedule`, `database`, `username`, `active`) |
+| `prefix` | `""` | put before every job name, and inside run ids, to keep them apart from your own |
+| `job_name` | the jobname, cleaned | a callable giving the name for a Job; `pg_cron:<jobid>` for a job with no name |
+| `options` | | `grace`, `timeout`, `max_duration`, `expect` (tested against pg_cron's return message, such as `"1 row"`), `failures_before_alert`, `description` and `tags`, as a hash or a callable given the Job. The schedule and timezone always come from pg_cron |
+| `timezone` | `cron.timezone`, or UTC | the zone pg_cron reads its cron expressions in |
+
+It reads the same tables with the same SQL as the SDK's `@cronwatch/sdk/pg-cron`, and maps them the same way: run ids `pgcron:<runid>`, trigger `pg_cron`, `$` for the last day of the month read as `L`, `N seconds` as `every Ns`, a paused job declared without its schedule. The first time it sees a job it copies its twenty newest runs quietly and judges only from the newest finished one; after that it carries on from the newest run in the store, so a restart copies nothing twice. It warns once through `on_error` when it cannot read `cron.timezone`, when `cron.log_run` is off, and when `cron.job` shows no jobs (row level security shows a role only the jobs it scheduled). Roles, Supabase and purging are covered in [Supabase and pg_cron](/docs/supabase/).
+
+A source of your own is any object with `name` and `sync(host)`. Each check calls `sync` first with the client as the host, whose `job`, `record_run`, `store`, `now` and `on_error(error, where)` it may use, and adds the alerts `sync` returns to its result. `client.record_run(run, evaluate: true)` records a run that happened elsewhere, keyed by its id: a new one is inserted, one stored as running is updated once it finishes, and anything else is left alone, so recording a run twice changes nothing. A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets), its output and error capped and redacted the same way, and the alerts it sent are returned. `evaluate: false` stores it without judging it, for history. The job must be declared first.
 
 ## Redaction
 
@@ -265,6 +324,7 @@ A triage of your own is any callable that takes the context (`alert`, `recent_ru
 | `defaults` | | `grace`, `timeout`, `timezone`, `failures_before_alert` applied to every job that does not set its own |
 | `redact` | secret patterns | a callable applied to output and errors before they are stored or sent; `false` keeps them as logged. One that raises or returns something other than a String is reported to `on_error` and the default is used. See [Redaction](#redaction) |
 | `deliver` | `:now` | `:check` sends nothing from this process: alerts are queued in the store and the next check in a process that delivers now sends them, with triage. See [processes that cannot send](#processes-that-cannot-send) |
+| `sources` | | where runs this process does not wrap come from, such as [pg_cron](#pg-cron). Each is synced at the start of every check; one that raises is reported to `on_error` (as `"source <name>"`) and the check carries on |
 | `on_error` | `Rails.logger`, or a warning on standard error | `->(error, where) { ... }` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a callable returning epoch milliseconds; for tests |
 
@@ -284,6 +344,7 @@ The client:
 | `runs(name, limit = 50)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath. Each returns the job's stored state, `version` included |
 | `forget(name)` | remove a job and its runs |
+| `record_run(run, evaluate: true)` | record a run that happened elsewhere, for a source; see [pg_cron](#pg-cron). Returns the alerts it sent |
 | `defined_jobs` | the definitions declared in this process |
 | `close` | stop the thread and close the store |
 
