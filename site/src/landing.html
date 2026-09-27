@@ -55,7 +55,7 @@
   <p class="label">Code</p>
   <div class="body">
     <h2>Say it where the job lives.</h2>
-    <p>One client per app, each job declared once, and a wrapper around the work. The schedule, the grace period and the timeout sit next to the code they describe, and every run lands in the SQLite file or Postgres database you already have.</p>
+    <p>One client per app, each job declared once, and a wrapper around the work. The schedule, the grace period and the timeout sit next to the code they describe, and every run lands in the SQLite file, Postgres or D1 database you already have.</p>
     <div class="out code">
       <p class="from"><span translate="no">app/api/cron/nightly/route.ts</span><span>TypeScript</span></p>
 <pre><code translate="no"><span class="k">import</span> { cronwatch } <span class="k">from</span> <span class="s">"@cronwatch/sdk"</span>;
@@ -77,7 +77,7 @@
   job.log(<span class="s">"Report written:"</span>, report.path);
 });</code></pre>
     </div>
-    <p class="small">Vercel cron, Next.js, node-cron, BullMQ, GitHub Actions, Hono, Bun with the Postgres store, or a script from crontab. Anywhere a fetch handler or an async function runs. In Rails: ActiveJob on Solid Queue or any adapter, Sidekiq and sidekiq-cron, with the schedule read from the scheduler’s own config (<a href="/docs/rails/">Rails docs</a>).</p>
+    <p class="small">Vercel cron, Next.js, SvelteKit, Nuxt, NestJS, Cloudflare Workers, Supabase Cron, Inngest and a dozen more platforms (<a href="/docs/">see the docs</a>), or a script from crontab. Anywhere a fetch handler or an async function runs. In Rails: ActiveJob on Solid Queue or any adapter, Sidekiq and sidekiq-cron, with the schedule read from the scheduler’s own config (<a href="/docs/rails/">Rails docs</a>).</p>
   </div>
 </section>
 
@@ -89,7 +89,7 @@
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_MISSED}}</span></p><pre translate="no">{{ALERT_MISSED}}</pre></div>
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_BUDGET}}</span></p><pre translate="no">{{ALERT_BUDGET}}</pre></div>
     <div class="out"><p class="from"><span>CronWatch</span><span>{{T_RECOVERED}}</span></p><pre translate="no">{{ALERT_RECOVERED}}</pre></div>
-    <p class="small">Every condition sends one message when it opens. When a successful run leaves nothing open, one recovered message names everything that was. A job that fails all night pages you once, and the fix announces itself. The check runs from <code>cw.start()</code> in a long-running server, from a cron hitting <code>/cronwatch/api/check</code> on Vercel, or in Rails as <code>Cronwatch::CheckJob</code>, scheduled every five minutes beside your other recurring jobs.</p>
+    <p class="small">Every condition sends one message when it opens. When a successful run leaves nothing open, one recovered message names everything that was. A job that fails all night pages you once, and the fix announces itself. The check runs from <code>cw.start()</code> in a long-running server, from a cron hitting <code>/cronwatch/api/check</code> on Vercel, from a Cron Trigger of its own on Workers, or in Rails as <code>Cronwatch::CheckJob</code>, scheduled every five minutes beside your other recurring jobs.</p>
   </div>
 </section>
 
@@ -146,7 +146,7 @@
   <div class="body">
     <h2>Why a library, and not a service.</h2>
     <p>The hosted monitors are good, and you pay for them with a monthly bill, an account, and a copy of your job output on someone else’s servers. A library needs none of that. It lives in the app that runs the jobs, writes to the database you already have, and sends the alert straight from your app to your channel.</p>
-    <p>The one thing it cannot see is an app that is entirely down, because nothing inside a dead process can alert. Pair it with any uptime monitor for that. Everything else, from a job that never fires to one that costs three times what it should, it catches from the inside. Stores: SQLite or Postgres, or ActiveRecord in Rails; a Rails app and a Node service can share one database and one dashboard. Alerts: Slack, Discord, a signed webhook, the console, or your own function.</p>
+    <p>The one thing it cannot see is an app that is entirely down, because nothing inside a dead process can alert. Pair it with any uptime monitor for that. Everything else, from a job that never fires to one that costs three times what it should, it catches from the inside. Stores: SQLite, Postgres or D1, or ActiveRecord in Rails; a Rails app and a Node service can share one database and one dashboard. Alerts: Slack, Discord, a signed webhook, email (Resend, Postmark, SendGrid, Mailgun, SES), SMS through Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag or New Relic, the console, or your own function.</p>
   </div>
 </section>
 

@@ -78,6 +78,12 @@ export function composeAlert(draft: AlertDraft, def: StoredJobDefinition, now: n
       break;
     }
     case "recovered": {
+      if (draft.details.reason === "unscheduled") {
+        title = `${name} is no longer scheduled`;
+        const since = draft.details.since;
+        lines.push(`${since === undefined ? "" : `Missed since ${when(since, now)}. `}It has no schedule now, so nothing is due; the missed alert is closed.`);
+        break;
+      }
       title = `${name} recovered`;
       const after = draft.details.after.map((c) => c.replace("_", " ")).join(", ");
       lines.push(`A run ${run ? when(run.startedAt, now) : "just now"} succeeded${after ? ` after: ${after}` : ""}.`);

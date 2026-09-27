@@ -16,7 +16,7 @@ This page sets up the TypeScript library. For Ruby and Rails there is the `cronw
 npm install @cronwatch/sdk
 ```
 
-Pick a store. SQLite for one server, Postgres for anything on Vercel, Neon, Supabase or Railway:
+Pick a store. SQLite for one server, Postgres for anything on Vercel, Neon, Supabase or Railway, D1 on [Cloudflare Workers](/docs/cloudflare/) (no driver to install):
 
 ```bash
 npm install better-sqlite3     # Node 22 or newer for better-sqlite3 13
@@ -120,7 +120,7 @@ GET /cronwatch/api/check
 Authorization: Bearer <CRON_SECRET>
 ```
 
-See [Next.js and Vercel](/docs/nextjs/) and [Servers and scripts](/docs/node/) for the full shapes.
+See [Next.js and Vercel](/docs/nextjs/) and [Servers and scripts](/docs/node/) for the full shapes. Other frameworks and schedulers have pages of their own: [SvelteKit](/docs/sveltekit/), [Nuxt and Nitro](/docs/nuxt/), [React Router and Remix](/docs/react-router/), [NestJS](/docs/nestjs/), [Strapi](/docs/strapi/), [Netlify](/docs/netlify/), [Firebase](/docs/firebase/), [Convex](/docs/convex/), [Trigger.dev](/docs/trigger-dev/), [Inngest](/docs/inngest/), [Cloudflare Workers](/docs/cloudflare/), and [Supabase and pg_cron](/docs/supabase/).
 
 ## What you get
 

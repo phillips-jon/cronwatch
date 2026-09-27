@@ -42,8 +42,8 @@ export const { GET, POST, DELETE } = cw.routes();
 
 | Package | What |
 |---|---|
-| [`@cronwatch/sdk`](packages/sdk) | the library: jobs, runs, checks, stores (memory, SQLite, Postgres), alerts (Slack, Discord, webhook), dashboard and API, optional Claude triage |
-| [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob and Sidekiq integration, schedules read from Solid Queue or sidekiq-cron, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
+| [`@cronwatch/sdk`](packages/sdk) | the library for Node, Cloudflare Workers, Deno and Bun: jobs, runs, checks, stores (memory, SQLite, Postgres, D1), pg_cron jobs read from Postgres, alerts (Slack, Discord, webhook, email, SMS, error trackers), dashboard and API, adapters for Node servers, optional Claude triage |
+| [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob and Sidekiq integration, schedules read from Solid Queue or sidekiq-cron, pg_cron jobs, the same alert channels, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
 | [`site`](site) | cronwatch.dev, a static landing page and docs |
@@ -52,13 +52,15 @@ export const { GET, POST, DELETE } = cw.routes();
 
 TypeScript and Node: `npm install @cronwatch/sdk`. Ruby and Rails: `bundle add cronwatch` (see [Ruby and Rails](#ruby-and-rails)).
 
-The SDK needs Node 22 or newer and depends only on `croner`. Each driver is an optional peer, installed only when you use its entry point:
+The SDK depends only on `croner`. The core, the D1 store, the pg_cron source and every alert channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun; the SQLite and Postgres stores and `@cronwatch/sdk/node` need Node. Each driver is an optional peer, installed only when you use its entry point:
 
 | Entry point | Install |
 |---|---|
 | `@cronwatch/sdk/sqlite` | `better-sqlite3` (and `@types/better-sqlite3` for TypeScript) |
 | `@cronwatch/sdk/postgres` | `pg` (and `@types/pg` for TypeScript) |
 | `@cronwatch/sdk/anthropic` | `@anthropic-ai/sdk` 0.115 or newer |
+| `@cronwatch/sdk/pg-cron` | nothing: it queries through the `pg` Pool (or anything with `query()`) you pass it |
+| `@cronwatch/sdk/d1`, `/node`, and the channels (`/slack`, `/discord`, `/webhook`, `/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses`, `/twilio`, `/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag`, `/newrelic`) | nothing |
 
 The store entry points' type declarations refer to the driver's types, so a TypeScript project using them without `@types/better-sqlite3` or `@types/pg` fails with TS7016 unless `skipLibCheck` is on. The package ships ESM and CommonJS, each with its own types.
 

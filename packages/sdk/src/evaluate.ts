@@ -205,7 +205,9 @@ export function onRunFinish(
 /**
  * Called by check(). Decides whether the schedule has been missed: the run
  * the schedule wants next (see expectation()) has not started and its grace
- * has run out. `lastRun` is the most recent run of any status.
+ * has run out. `lastRun` is the most recent run of any status. A job with no
+ * schedule is never missed, and one whose schedule was removed while missed
+ * was open gets a recovered alert (reason "unscheduled") for missed alone.
  */
 export function onCheck(
   def: StoredJobDefinition,
@@ -216,7 +218,20 @@ export function onCheck(
 ): Evaluation & { nextExpectedAt: number | null; dueAt: number | null } {
   const next = cloneState(state);
   const alerts: AlertDraft[] = [];
-  if (!def.schedule) return { state: next, alerts, nextExpectedAt: null, dueAt: null };
+  if (!def.schedule) {
+    const since = next.open.missed;
+    if (since !== undefined) {
+      // The schedule went away while missed was open (the job was declared
+      // again without one, or a source retired it), so nothing is due any
+      // more. Missed closes now with a recovery of its own; other open
+      // conditions keep their own rules. Missed is taken out of the pending
+      // recovery too, so the next successful run does not name it again.
+      delete next.open.missed;
+      next.pendingRecovery = (next.pendingRecovery ?? []).filter((c) => c !== "missed");
+      alerts.push({ type: "recovered", run: lastRun, details: { after: ["missed"], reason: "unscheduled", since } });
+    }
+    return { state: next, alerts, nextExpectedAt: null, dueAt: null };
+  }
 
   const parsed = parseSchedule(def.schedule, def.timezone);
   const grace = graceMs(def);

@@ -74,10 +74,16 @@ module Cronwatch
           lines << "Started #{at_time(run.started_at, now)}." if run
           "#{name} went over budget"
         when :recovered
-          after = details[:after].map { |c| c.to_s.sub("_", " ") }.join(", ")
-          lines << "A run #{run ? at_time(run.started_at, now) : "just now"} succeeded#{after.empty? ? "" : " after: #{after}"}."
-          lines << "Ran #{Duration.format(run.duration_ms)}." if run && !run.duration_ms.nil?
-          "#{name} recovered"
+          if details[:reason]&.to_sym == :unscheduled
+            since = details[:since]
+            lines << "#{since.nil? ? "" : "Missed since #{at_time(since, now)}. "}It has no schedule now, so nothing is due; the missed alert is closed."
+            "#{name} is no longer scheduled"
+          else
+            after = details[:after].map { |c| c.to_s.sub("_", " ") }.join(", ")
+            lines << "A run #{run ? at_time(run.started_at, now) : "just now"} succeeded#{after.empty? ? "" : " after: #{after}"}."
+            lines << "Ran #{Duration.format(run.duration_ms)}." if run && !run.duration_ms.nil?
+            "#{name} recovered"
+          end
         else
           raise ArgumentError, "unknown alert type #{draft.type.inspect}"
         end

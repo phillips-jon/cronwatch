@@ -129,7 +129,13 @@ export interface AlertDetails {
   stuck: { consecutiveFailures: number; threshold: number };
   slow: { durationMs: number; thresholdMs: number; basis: string };
   over_budget: { breaches: BudgetBreach[] };
-  recovered: { after: Condition[] };
+  /**
+   * `after` names the conditions that closed. A recovery with `reason`
+   * "unscheduled" closes missed alone because the job no longer has a
+   * schedule; `since` is when missed opened. Without `reason`, a successful
+   * run closed everything that was open.
+   */
+  recovered: { after: Condition[]; reason?: "unscheduled"; since?: number };
 }
 
 /** An alert before it has a title and message. See composeAlert(). */
@@ -159,9 +165,19 @@ export type Alert = {
   [K in AlertType]: AlertBase & { type: K; details: AlertDetails[K] };
 }[AlertType];
 
+/** What the client hands a channel with each alert. */
+export interface ChannelContext {
+  /**
+   * Report a problem that did not stop the alert going out, such as one of
+   * several recipients refusing it. Goes to the client's onError.
+   */
+  onError(error: unknown): void;
+}
+
 export interface AlertChannel {
   name: string;
-  send(alert: Alert): Promise<void>;
+  /** Resolves once the alert went out (to at least one recipient); throws when it went nowhere. */
+  send(alert: Alert, context?: ChannelContext): Promise<void>;
 }
 
 export interface Store {
@@ -173,6 +189,16 @@ export interface Store {
   deleteJob(name: string): Promise<void>;
   insertRun(run: Run): Promise<void>;
   updateRun(run: Run): Promise<void>;
+  /**
+   * Write a run's status, finishedAt, durationMs, error, output and metrics
+   * only when its stored status is one of `fromStatuses`, in one step (SQL:
+   * `UPDATE ... WHERE id = ? AND status IN (...)`). Returns whether it wrote.
+   * This is what lets exactly one of several processes finishing the same run
+   * evaluate it; the others see false and report the run as already finished.
+   * A store without it falls back to getRun then updateRun, which is safe only
+   * when one process at a time finishes a given run.
+   */
+  updateRunIf?(run: Run, fromStatuses: Run["status"][]): Promise<boolean>;
   getRun(id: string): Promise<Run | null>;
   /** Newest first. */
   listRuns(job: string, limit: number): Promise<Run[]>;

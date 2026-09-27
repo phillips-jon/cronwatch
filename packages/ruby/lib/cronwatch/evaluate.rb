@@ -218,12 +218,25 @@ module Cronwatch
 
     # Called by check. Decides whether the schedule has been missed: the run
     # the schedule wants next (see Schedule.expectation) has not started and its
-    # grace has run out. `last_run` is the most recent run of any status.
+    # grace has run out. `last_run` is the most recent run of any status. A job
+    # with no schedule is never missed, and one whose schedule was removed while
+    # missed was open gets a recovered alert (reason :unscheduled) for missed alone.
     def on_check(definition, stored, last_run, state, now)
       next_state = clone_state(state)
       alerts = []
       schedule = definition.schedule
       if schedule.nil? || schedule == ""
+        since = next_state.open[:missed]
+        unless since.nil?
+          # The schedule went away while missed was open (the job was declared
+          # again without one, or a source retired it), so nothing is due any
+          # more. Missed closes now with a recovery of its own; other open
+          # conditions keep their own rules. Missed is taken out of the pending
+          # recovery too, so the next successful run does not name it again.
+          next_state.open.delete(:missed)
+          next_state.pending_recovery = (next_state.pending_recovery || []).reject { |c| c == :missed }
+          alerts << AlertDraft.new(type: :recovered, run: last_run, details: { after: [:missed], reason: :unscheduled, since: since })
+        end
         return CheckEvaluation.new(state: next_state, alerts: alerts, next_expected_at: nil, due_at: nil)
       end
 

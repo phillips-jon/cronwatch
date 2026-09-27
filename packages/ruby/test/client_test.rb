@@ -111,6 +111,64 @@ class ClientTest < Minitest::Test
     assert_equal :healthy, cw.job_summary("sync").health
   end
 
+  def test_a_job_declared_again_without_its_schedule_closes_missed_with_a_recovery_once
+    cw, clock, alerts = make
+    cw.job("sync", schedule: "every 1h", grace: "10m")
+    cw.check
+    clock.now = T0 + (70 * MIN) + 1
+    assert_equal [:missed], cw.check.alerts.map(&:type)
+    job = cw.job("sync")
+    clock.advance(MIN)
+    result = cw.check
+    assert_equal [:recovered], result.alerts.map(&:type)
+    alert = result.alerts[0]
+    assert_equal "sync is no longer scheduled", alert.title
+    assert_equal "Missed since 2026-01-05 10:40:00 UTC (1m ago). It has no schedule now, so nothing is due; the missed alert is closed.",
+                 alert.message
+    assert_equal({ after: [:missed], reason: :unscheduled, since: T0 + (70 * MIN) + 1 }, alert.details)
+    assert_equal alert.to_h, Cronwatch::Alert.from_h(JSON.parse(alert.to_json)).to_h, "the reason survives the undelivered queue"
+    assert_equal :never_ran, result.jobs[0].health
+    assert_equal [], cw.check.alerts, "no repeat"
+    job.run { nil }
+    assert_equal %i[missed recovered], alerts.types, "the next run owes nothing"
+  end
+
+  def test_an_unscheduled_recovery_names_missed_alone_and_failed_keeps_its_own
+    definition = Cronwatch::JobDefinition.from_h("name" => "j", "schedule" => "every 30m", "grace" => "1m")
+    stored = Cronwatch::StoredJob.new(name: "j", definition: definition, created_at: T0, updated_at: T0)
+    failed = Cronwatch::Run.new(id: "r1", job: "j", status: :failed, started_at: T0 + MIN, finished_at: T0 + MIN + 1000,
+                                duration_ms: 1000, error: "boom", output: nil, metrics: {}, trigger: "run")
+    state = Cronwatch::Evaluate.on_run_finish(definition, failed, Cronwatch::Evaluate.empty_state("j"), [], T0 + MIN + 1000).state
+    state = Cronwatch::Evaluate.on_check(definition, stored, failed, state, T0 + (40 * MIN)).state
+    state.pending_recovery = [:missed]
+    bare = Cronwatch::JobDefinition.from_h("name" => "j")
+    gone = Cronwatch::Evaluate.on_check(bare, stored.dup.tap { |s| s.definition = bare }, failed, state, T0 + (41 * MIN))
+    assert_equal [:recovered], gone.alerts.map(&:type)
+    assert_equal({ after: [:missed], reason: :unscheduled, since: T0 + (40 * MIN) }, gone.alerts[0].details)
+    assert_equal [:failed], gone.state.open.keys, "failed stays open"
+    assert_equal [], gone.state.pending_recovery, "missed is not owed a second recovery"
+    ok = Cronwatch::Run.new(id: "r2", job: "j", status: :ok, started_at: T0 + HOUR, finished_at: T0 + HOUR + 1000,
+                            duration_ms: 1000, error: nil, output: nil, metrics: {}, trigger: "run")
+    done = Cronwatch::Evaluate.on_run_finish(bare, ok, Cronwatch::Evaluate.on_run_start(gone.state), [failed], T0 + HOUR + 1000)
+    assert_equal [{ after: [:failed] }], done.alerts.map(&:details)
+  end
+
+  def test_a_schedule_removed_while_silenced_closes_missed_quietly
+    cw, clock, alerts = make
+    cw.job("sync", schedule: "every 1h", grace: "10m")
+    cw.check
+    clock.now = T0 + (70 * MIN) + 1
+    cw.check
+    cw.silence("sync", "1h")
+    cw.job("sync")
+    clock.advance(MIN)
+    assert_equal [], cw.check.alerts
+    assert_equal [], cw.job_summary("sync").open
+    clock.advance(2 * HOUR)
+    assert_equal [], cw.check.alerts
+    assert_equal [:missed], alerts.types
+  end
+
   def test_check_marks_a_run_that_never_finished_as_stuck
     cw, clock, alerts = make
     job = cw.job("long", timeout: "5m")

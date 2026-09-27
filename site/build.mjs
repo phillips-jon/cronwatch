@@ -371,7 +371,7 @@ function build() {
   for (const [key, value] of Object.entries(demoContent())) landing = landing.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), () => value);
   writeFileSync(path.join(DIST, "index.html"), layout({
     title: "CronWatch",
-    description: "Open source cron and scheduled-job monitoring that lives inside your TypeScript or Ruby on Rails app. Every run recorded in your own database; alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. MCP server included. No server to run.",
+    description: "Open source cron and scheduled-job monitoring that lives inside your app: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun) or the cronwatch gem for Ruby on Rails. Every run recorded in your own database; alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. MCP server included. No server to run.",
     body: landing,
     path: "/",
     kind: "landing",
@@ -383,7 +383,21 @@ function build() {
     const route = name === "index" ? "/docs/" : `/docs/${name}/`;
     return { name, route, meta, body, order: Number(meta.order ?? 999) };
   }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
-  const docList = (here) => `<ol>${pages.map((p, i) => `<li><a href="${p.route}"${p.route === here ? ' class="here" aria-current="page"' : ""}><span>${String(i + 1).padStart(2, "0")}</span><span>${escape(p.meta.title)}</span></a></li>`).join("")}</ol>`;
+  // Pages that share a frontmatter `group` are listed under its name. Give
+  // them neighbouring `order` values, or the group is started twice.
+  const docList = (here) => {
+    let html = "", open = null;
+    for (const [i, p] of pages.entries()) {
+      const group = p.meta.group || null;
+      if (group !== open) {
+        if (open) html += "</ol></li>";
+        if (group) html += `<li class="group"><p>${escape(group)}</p><ol>`;
+        open = group;
+      }
+      html += `<li><a href="${p.route}"${p.route === here ? ' class="here" aria-current="page"' : ""}><span>${String(i + 1).padStart(2, "0")}</span><span>${escape(p.meta.title)}</span></a></li>`;
+    }
+    return `<ol>${html}${open ? "</ol></li>" : ""}</ol>`;
+  };
 
   for (const [i, page] of pages.entries()) {
     const html = curlyApostrophes(marked.parse(page.body));
@@ -414,7 +428,7 @@ ${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${headi
 
   const prompt = readFileSync(path.join(SRC, "prompt.txt"), "utf8");
   writeFileSync(path.join(DIST, "prompt.txt"), prompt);
-  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript and Node, and the cronwatch gem for Ruby and Rails. Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nMCP server: npx -y @cronwatch/mcp\n`);
+  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), and the cronwatch gem for Ruby and Rails. Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nPlatforms: Vercel cron, Next.js, SvelteKit, Nuxt, React Router, NestJS, Strapi, Netlify, Firebase, Convex, Trigger.dev, Inngest, Cloudflare Workers with D1, pg_cron and Supabase Cron, node-cron, BullMQ, GitHub Actions, Rails with ActiveJob, Solid Queue or Sidekiq.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nMCP server: npx -y @cronwatch/mcp\n`);
 
   const urls = ["/", ...pages.map((p) => p.route)];
   writeFileSync(path.join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${SITE}${u}</loc></url>`).join("\n")}\n</urlset>\n`);

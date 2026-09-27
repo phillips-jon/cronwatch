@@ -115,6 +115,42 @@ test("check finds a missed run, once, and a later run recovers", async () => {
   assert.equal((await cw.jobSummary("sync"))!.health, "healthy");
 });
 
+test("a job declared again without its schedule closes missed with a recovery, once", async () => {
+  const { cw, c, alerts } = make();
+  cw.job("sync", { schedule: "every 1h", grace: "10m" });
+  await cw.check();
+  c.set(T0 + 70 * MIN + 1);
+  assert.deepEqual((await cw.check()).alerts.map((a) => a.type), ["missed"]);
+  const job = cw.job("sync");
+  c.advance(MIN);
+  const r = await cw.check();
+  assert.deepEqual(r.alerts.map((a) => a.type), ["recovered"]);
+  const alert = r.alerts[0]!;
+  assert.equal(alert.title, "sync is no longer scheduled");
+  assert.equal(alert.message, "Missed since 2026-01-05 10:40:00 UTC (1m ago). It has no schedule now, so nothing is due; the missed alert is closed.");
+  assert.deepEqual(alert.details, { after: ["missed"], reason: "unscheduled", since: T0 + 70 * MIN + 1 });
+  assert.equal(r.jobs[0]!.health, "never_ran");
+  assert.deepEqual((await cw.check()).alerts, [], "no repeat");
+  await job.run(async () => {});
+  assert.deepEqual(alerts.types(), ["missed", "recovered"], "the next run owes nothing");
+});
+
+test("a schedule removed while silenced closes missed quietly", async () => {
+  const { cw, c, alerts } = make();
+  cw.job("sync", { schedule: "every 1h", grace: "10m" });
+  await cw.check();
+  c.set(T0 + 70 * MIN + 1);
+  await cw.check();
+  await cw.silence("sync", "1h");
+  cw.job("sync");
+  c.advance(MIN);
+  assert.deepEqual((await cw.check()).alerts, []);
+  assert.deepEqual((await cw.jobSummary("sync"))!.open, []);
+  c.advance(2 * HOUR);
+  assert.deepEqual((await cw.check()).alerts, []);
+  assert.deepEqual(alerts.types(), ["missed"]);
+});
+
 test("check marks a run that never finished as stuck", async () => {
   const { cw, c, alerts } = make();
   const job = cw.job("long", { timeout: "5m" });

@@ -97,7 +97,7 @@ Cronwatch.configure do |c|
 end
 ```
 
-`Cronwatch.configure` builds the one client the app uses, and `Cronwatch.client` returns it. Configuring again replaces the client. The settings are `store`, `alerts`, `triage`, `cron_secret`, `retention`, `defaults`, `redact`, `deliver`, `on_error` and `now`, the same as `Cronwatch.new` takes (see [Ruby](/docs/ruby/#api)); anything left unset takes the client's default. Errors outside jobs (the store, a channel, triage) go to `Rails.logger` unless `on_error` says otherwise.
+`Cronwatch.configure` builds the one client the app uses, and `Cronwatch.client` returns it. Configuring again replaces the client. The settings are `store`, `alerts`, `triage`, `cron_secret`, `retention`, `defaults`, `redact`, `deliver`, `sources`, `on_error` and `now`, the same as `Cronwatch.new` takes (see [Ruby](/docs/ruby/#api)); anything left unset takes the client's default. Errors outside jobs (the store, a channel, triage) go to `Rails.logger` unless `on_error` says otherwise.
 
 The store takes `prefix:` and `connection_class:`. To keep the tables in another database, pass a class that `connects_to` it:
 
@@ -110,6 +110,45 @@ A class name is looked up on first use, so the initializer does not have to load
 On Postgres the store never joins a transaction your code has open. A job that runs inside `ActiveRecord::Base.transaction` has its run recorded as it happens, and the run stays recorded if the transaction rolls back, so its alert is not sent again on the next failure. To do that the store connects through a pool of its own, with the writing database config of `connection_class` (`ActiveRecord::Base` by default): each process may open up to that config's `pool` (5 unless set) more connections, only as it needs them. Count them against your database's connection limit, or point `connection_class` at a class whose config sets a smaller `pool`. SQLite allows one writer at a time, so there the store uses your pool and, inside an open transaction, runs in a savepoint of it: a store error cannot abort your transaction, and the rows commit or roll back with it.
 
 Postgres and SQLite are supported and tested. MySQL is not supported yet: the SDK's statements use `ON CONFLICT` and `TEXT` primary keys, and any other adapter is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter` when the store is first used.
+
+## Email, SMS and error trackers
+
+Besides Slack, Discord and webhooks, the gem sends alerts by email (Resend, Postmark, SendGrid, Mailgun, Amazon SES), by text (Twilio) and to error trackers (Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, New Relic), all on the standard library. Keep the keys in credentials or the environment:
+
+```ruby
+# config/initializers/cronwatch.rb
+Cronwatch.configure do |c|
+  c.store = Cronwatch::Stores::ActiveRecord.new
+  link = ->(alert) { "https://app.example.com/cronwatch/jobs/#{alert.job}" }
+  c.alerts = [
+    Cronwatch::Alerts::Postmark.new(
+      server_token: Rails.application.credentials.dig(:postmark, :server_token),
+      from: "CronWatch <alerts@example.com>", to: %w[ops@example.com], subject_prefix: "[#{Rails.env}]", link: link,
+    ),
+    Cronwatch::Alerts::Sentry.new(dsn: ENV.fetch("SENTRY_DSN"), environment: Rails.env),
+    (Cronwatch::Alerts::Twilio.new(account_sid: ENV["TWILIO_ACCOUNT_SID"], auth_token: ENV["TWILIO_AUTH_TOKEN"],
+                                   from: ENV["TWILIO_FROM"], to: ENV["ONCALL_PHONE"]) if ENV["TWILIO_ACCOUNT_SID"].present?),
+  ].compact
+end
+```
+
+Each raises `ArgumentError` at boot when a key or address is missing, so a typo in credentials shows up when the app starts rather than at 3 a.m. The Sentry channel sends CronWatch's own events to Sentry; it does not need, and does not touch, the `sentry-ruby` gem your app may already use. The options for every channel are in [Ruby](/docs/ruby/#email-sms-and-error-trackers), and what each sends in [Alerts](/docs/alerts/#email-sms-and-error-trackers).
+
+## pg_cron
+
+A Rails app on Supabase, or any Postgres with pg_cron, can watch the jobs pg_cron runs inside the database beside its own. Give the reader the app's ActiveRecord connection:
+
+```ruby
+# config/initializers/cronwatch.rb
+require "cronwatch/pg_cron"
+
+Cronwatch.configure do |c|
+  c.store = Cronwatch::Stores::ActiveRecord.new
+  c.sources = [Cronwatch::Sources::PgCron.new(ActiveRecord::Base, prefix: "db:", options: { grace: "5m" })]
+end
+```
+
+Each check (`Cronwatch::CheckJob`, or `/cronwatch/api/check`) then reads `cron.job` and `cron.job_run_details` through a connection checked out of that class's pool for each query, declares every pg_cron job with its schedule, and copies new runs in, so the dashboard lists them beside your ActiveRecord and Sidekiq jobs and they alert the same way. When several processes run the check, each finish pg_cron records is judged once. A job renamed or unscheduled in pg_cron keeps its history under its old name, which loses its schedule so it is never reported missed. The settings are read from `pg_settings`, so a check called inside one of the app's transactions never aborts it, even on a role that may not read them. Pass another class (one that `connects_to` the database where pg_cron lives) if that is not the primary. The role needs to read the `cron` schema, and pg_cron's row level security shows a role only the jobs it scheduled: connect as that role (`postgres` on Supabase) or see [Supabase and pg_cron](/docs/supabase/#permissions) for a monitoring role. The options are in [Ruby](/docs/ruby/#pg-cron).
 
 ## Watch a job
 
@@ -292,11 +331,12 @@ Rails.application.routes.draw do
 end
 ```
 
-`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch::Web.new(client = nil, token:, base_path:)` takes:
+`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch::Web.new(client = nil, token:, base_path:, origin:)` takes:
 
 - `client`: the client to serve. Leave it out and each request uses `Cronwatch.client` at that moment.
 - `token`: leave it out to read `CRONWATCH_TOKEN`. An empty string, passed or in the variable, counts as unset. `nil` opts out of the token entirely and serves the app to anyone who reaches it, for a mount that sits behind your own sign in.
 - `base_path`: where it is mounted, so links resolve. It defaults to the mount point Rack reports (`SCRIPT_NAME`), which is right under Rails' `mount` and Rack's `map`.
+- `origin`: the public origin, such as `"https://app.example.com"`, to use in place of each request's own (see below). It is read as the TypeScript routes read it: whitespace around it is dropped, the host is lowercased and a host that is not ASCII becomes punycode (through the `simpleidn` gem, or Addressable when the app has it; without either, write it as `xn--...`). An empty string counts as unset; anything that is not an absolute `http` or `https` URL, or has a port outside 1 to 65535, raises `ArgumentError` when the routes load.
 
 Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token, while `Rails.env` is `development` or `test`, it makes a token of its own (32 random bytes, new each time the app boots) and prints a sign-in link to the server's standard output on its first request:
 
@@ -316,7 +356,13 @@ end
 
 Without Devise, a routing constraint does the same job: `constraints ->(request) { AdminSession.valid?(request) } do ... end` around the mount.
 
-A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto`. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign.
+A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` as the rest of Rails does, so there is no `trustProxy` option as in the TypeScript routes. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign. Behind more than one proxy, set `origin:`: where `X-Forwarded-Host` or `X-Forwarded-Proto` lists several values, Rack takes the last, the hop nearest the app, rather than the public one. The host is compared lowercased, as browsers send it. To pin it instead, pass `origin:`:
+
+```ruby
+mount Cronwatch::Web.new(Cronwatch.client, origin: ENV["APP_ORIGIN"]) => "/cronwatch"
+```
+
+With `origin:` set, a write must carry that `Origin`, the sign-in cookie is `Secure` when it is `https`, a form redirects back only to a `Referer` on it, and the development sign-in line uses it, whatever the request's headers say.
 
 `/cronwatch/api/check` runs the check. It accepts the token or, on this path only, the client's `cron_secret` (`CRON_SECRET` by default) as a bearer, so a platform cron or an outside scheduler can call it instead of `CheckJob` without holding the dashboard token. A `GET` must carry a bearer, so a page cannot set it off with the dashboard's cookie. [Dashboard and API](/docs/dashboard/) has every endpoint and JSON shape.
 
@@ -348,6 +394,46 @@ end
 ```
 
 The run is recorded however the action ends; an error is recorded and raised on to Rails, which answers 500. The action checks the bearer itself, because nothing in the gem guards your own routes. `CRON_SECRET` still guards `GET /cronwatch/api/check` on the mounted dashboard, as above.
+
+## Runs that span jobs
+
+A run is normally one `perform`. Work that one job starts and a later job, or a webhook, finishes (an export a partner builds and reports back on, a batch fanned out to other workers) can be one run too: `start` records it as running, and `finish` on a handle from `resume` ends it, in whichever process gets there. Declare the job once, after `Cronwatch.configure`:
+
+```ruby
+# config/initializers/cronwatch.rb, after Cronwatch.configure
+PARTNER_EXPORT = Cronwatch.client.job("partner-export", schedule: "0 3 * * *", timeout: "3h", expect: "imported")
+```
+
+```ruby
+class RequestPartnerExportJob < ApplicationJob
+  def perform
+    export = Partner.request_export(callback_url: Rails.application.routes.url_helpers.partner_export_url)
+    run = PARTNER_EXPORT.start(id: export.id.to_s)   # a second start with this id finds the same run
+    run.log("requested export", export.id)
+    run.flush                                        # the line is on the dashboard while the partner works
+  end
+end
+
+class PartnerExportsController < ActionController::API
+  def create
+    run = PARTNER_EXPORT.resume(params.require(:export_id))
+    if params[:status] == "failed"
+      run.fail(params[:error].to_s)
+      return head(:ok)
+    end
+
+    rows = ImportPartnerRows.call(params.require(:file_url))
+    run.metric(:rows, rows)
+    run.finish("imported #{rows} rows")
+    head :ok
+  rescue StandardError => e
+    run&.fail(e)   # recorded, then raised on to Rails
+    raise
+  end
+end
+```
+
+The id is a String of 1 to 200 characters, not starting with `pgcron:` (the pg_cron reader's). `start` never raises for the store: a run it could not write is reported to `on_error` and written when that handle finishes it, while a `resume` elsewhere finds nothing. `resume` of a run that already finished, or that the store does not have, gives a handle whose `finish` records nothing and reports why to `on_error`, so a webhook delivered twice is harmless. Even two deliveries at once, in two workers, are judged once: the finish is written only over a run still running, in one statement, so one worker records it and the other gets nil and hears through `on_error` that the run was already finished. A store that fails during `finish` leaves the handle active, to be finished again. A run never finished is marked stuck by the first check after the job's `timeout`, so set `timeout` to cover the whole span, waiting included. The handle is described in [Ruby](/docs/ruby/#runs-that-span-calls).
 
 ## A worker that cannot send
 

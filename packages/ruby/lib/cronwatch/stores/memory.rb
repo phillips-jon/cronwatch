@@ -7,7 +7,8 @@ module Cronwatch
     # so a missed run cannot be noticed across one.
     #
     # Every store answers the same methods: init (optional), upsert_job,
-    # get_job, list_jobs, delete_job, insert_run, update_run, get_run,
+    # get_job, list_jobs, delete_job, insert_run, update_run, update_run_if
+    # (optional: without it the client reads the run, then writes it), get_run,
     # list_runs, last_run, running_runs, get_state, set_state, compare_and_set_state
     # (optional: without it the client falls back to set_state), prune and close
     # (optional). They take and return the types in types.rb.
@@ -56,8 +57,11 @@ module Cronwatch
         nil
       end
 
+      # Like SQL's primary key: an id already recorded is refused, never overwritten.
       def insert_run(run)
         sync do
+          raise "run #{run.id} already exists" if @runs.key?(run.id)
+
           @runs[run.id] = clone(run, Run)
           @order[run.id] = (@seq += 1)
         end
@@ -70,17 +74,23 @@ module Cronwatch
           existing = @runs[run.id]
           next unless existing
 
-          copy = clone(run, Run)
-          @runs[run.id] = existing.dup.tap do |r|
-            r.status = copy.status
-            r.finished_at = copy.finished_at
-            r.duration_ms = copy.duration_ms
-            r.error = copy.error
-            r.output = copy.output
-            r.metrics = copy.metrics
-          end
+          @runs[run.id] = finished_fields(existing, run)
         end
         nil
+      end
+
+      # update_run, only while the stored run's status is one of
+      # `from_statuses`, in one step. Returns whether it wrote. What lets
+      # exactly one of several processes finishing a run evaluate it.
+      def update_run_if(run, from_statuses)
+        statuses = Array(from_statuses).map(&:to_sym)
+        sync do
+          existing = @runs[run.id]
+          next false unless existing && statuses.include?(existing.status)
+
+          @runs[run.id] = finished_fields(existing, run)
+          true
+        end
       end
 
       def get_run(id)
@@ -148,6 +158,19 @@ module Cronwatch
       end
 
       private
+
+      # `existing` with the fields an update writes taken from `run`.
+      def finished_fields(existing, run)
+        copy = clone(run, Run)
+        existing.dup.tap do |r|
+          r.status = copy.status
+          r.finished_at = copy.finished_at
+          r.duration_ms = copy.duration_ms
+          r.error = copy.error
+          r.output = copy.output
+          r.metrics = copy.metrics
+        end
+      end
 
       def sync(&block)
         @lock.synchronize(&block)

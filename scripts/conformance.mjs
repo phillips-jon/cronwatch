@@ -44,6 +44,10 @@ import { median, percentile } from "../packages/sdk/src/stats.ts";
 import { capOutput, errorMessage, OUTPUT_CAP, redactSecrets } from "../packages/sdk/src/output.ts";
 import { createRecorder } from "../packages/sdk/src/job.ts";
 import { checkExpectation, toStored } from "../packages/sdk/src/serialize.ts";
+import { errorBody } from "../packages/sdk/src/alerts/shared.ts";
+import { composeEmail } from "../packages/sdk/src/alerts/email.ts";
+import { smsBody, smsSegments } from "../packages/sdk/src/alerts/twilio.ts";
+import { PG_CRON_HOLD_MS, pgCronJobName, pgCronRun, pgCronSchedule } from "../packages/sdk/src/sources/pgcron.ts";
 
 if (process.env.TZ !== "UTC") {
   console.error("conformance: run with TZ=UTC (npm run conformance does)");
@@ -320,6 +324,9 @@ class Sim {
 
   finish(id, now, fields) {
     const run = this.runs.find((r) => r.id === id);
+    // As the client's conditional write (Store.updateRunIf): a run already
+    // finished takes no second finish, and nothing is judged.
+    if (run.status === "ok" || run.status === "failed") return { alerts: [], state: clone(this.state), ignored: `was already finished as ${run.status}` };
     const markedTimedOut = run.status === "timeout";
     Object.assign(run, { finishedAt: now, durationMs: Math.max(0, now - run.startedAt), metrics: {}, output: null, error: null }, fields);
     // As the client does: a check already counted this run as stuck, so a
@@ -571,6 +578,37 @@ function evaluateCases() {
       steps: [check(T0 + 70 * MIN), { op: "define", definition: { name: "j", schedule: "every 1h", grace: "30m" } }, check(T0 + 71 * MIN), run(T0 + 72 * MIN)],
     },
     {
+      name: "a schedule removed while missed is open recovers missed once, and the next run owes nothing",
+      definition: { name: "j", schedule: "every 1h", grace: "5m" },
+      createdAt: T0,
+      steps: [
+        check(T0 + 70 * MIN),
+        { op: "define", definition: { name: "j" } },
+        check(T0 + 71 * MIN),
+        check(T0 + 72 * MIN),
+        run(T0 + 80 * MIN),
+        { op: "define", definition: { name: "j", schedule: "every 1h", grace: "5m" } },
+        check(T0 + 3 * HOUR),
+      ],
+    },
+    {
+      name: "an unscheduled recovery names missed alone, and failed keeps its own recovery",
+      definition: { name: "j", schedule: "every 30m", grace: "1m" },
+      createdAt: T0,
+      steps: [fail(T0 + MIN), check(T0 + 40 * MIN), { op: "define", definition: { name: "j" } }, check(T0 + 41 * MIN), run(T0 + 50 * MIN)],
+    },
+    {
+      name: "missed reopened with a recovery already pending is recovered once when unscheduled",
+      definition: { name: "cron", schedule: "*/5 * * * *", grace: "1m", timeout: "2h" },
+      steps: [check(T0 + 2 * MIN), start(T0 + 3 * MIN, "slow"), check(T0 + 7 * MIN), { op: "define", definition: { name: "cron", timeout: "2h" } }, check(T0 + 8 * MIN), finish("slow", T0 + 9 * MIN)],
+    },
+    {
+      name: "a schedule removed while silenced closes missed quietly",
+      definition: { name: "j", schedule: "every 1h", grace: "5m" },
+      createdAt: T0,
+      steps: [check(T0 + 70 * MIN), { op: "silence", until: T0 + 2 * HOUR }, { op: "define", definition: { name: "j" } }, check(T0 + 71 * MIN), { op: "unsilence" }, run(T0 + 80 * MIN), check(T0 + 3 * HOUR)],
+    },
+    {
       name: "a job without a schedule is never missed",
       definition: { name: "j" },
       createdAt: T0 - 30 * DAY,
@@ -666,6 +704,16 @@ function evaluateCases() {
       steps: [start(T0, "a"), check(T0 + MIN), finish("a", T0 + 2 * MIN)],
     },
     {
+      name: "a run finished twice is judged once; the second finish is ignored",
+      definition: { name: "twice", failuresBeforeAlert: 2 },
+      steps: [start(T0, "a"), finish("a", T0 + MIN, { status: "failed" }), finish("a", T0 + 2 * MIN, { status: "failed" }), finish("a", T0 + 3 * MIN)],
+    },
+    {
+      name: "a late failure after a stuck mark is written once, and a finish after it is ignored",
+      definition: { name: "latefail", timeout: "1m" },
+      steps: [start(T0, "a"), check(T0 + 2 * MIN), finish("a", T0 + 3 * MIN, { status: "failed", error: "Error: gave up" }), finish("a", T0 + 4 * MIN)],
+    },
+    {
       name: "stuck messages name the timeout as a duration",
       definition: { name: "odd", timeout: "1h30m" },
       steps: [start(T0, "a"), check(T0 + 2 * HOUR), { op: "define", definition: { name: "odd", timeout: 90_500 } }, start(T0 + 3 * HOUR, "b"), check(T0 + 3 * HOUR + 2 * MIN), { op: "define", definition: { name: "odd" } }, start(T0 + 4 * HOUR, "c"), check(T0 + 6 * HOUR)],
@@ -709,6 +757,9 @@ function formatCases() {
     [{ type: "recovered", run: sampleRun({ status: "ok" }), details: { after: ["missed", "over_budget", "failed"] } }, def, T0 + 2 * MIN],
     [{ type: "recovered", run: sampleRun({ status: "ok", durationMs: null }), details: { after: [] } }, def, T0],
     [{ type: "recovered", run: null, details: { after: ["stuck"] } }, def, T0],
+    [{ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: T0 - 3 * HOUR } }, { name: "nightly" }, T0],
+    [{ type: "recovered", run: sampleRun({ startedAt: T0 - DAY }), details: { after: ["missed"], reason: "unscheduled", since: T0 - 2 * DAY } }, { name: "nightly", timezone: NY }, T0],
+    [{ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled" } }, { name: "nightly" }, T0],
   ];
   const numbers = [
     0, 1, -1, 12, 999, 1000, 1234, 12345.6789, 1234567.891, 0.5, 0.1 + 0.2, 1.00005, 0.00005, 0.00004, 1234.56785,
@@ -851,6 +902,8 @@ function healthCases() {
     [queuedAlert("recovered", T0, { after: ["failed", "slow"] }), state({ open: { missed: T0 } })],
     [queuedAlert("recovered", T0, { after: ["failed", "slow"] }), state({ open: { slow: T0 + MIN } })],
     [queuedAlert("recovered", T0, { after: [] }), state({ open: { failed: T0 } })],
+    [queuedAlert("recovered", T0, { after: ["missed"], reason: "unscheduled", since: T0 - HOUR }), state({ open: { failed: T0 } })],
+    [queuedAlert("recovered", T0, { after: ["missed"], reason: "unscheduled", since: T0 - HOUR }), state({ open: { missed: T0 + MIN } })],
   ];
   const staleCases = staleInputs.map(([alert, s]) => ({ alert, state: s, stale: staleAlert(alert, s) }));
 
@@ -1122,7 +1175,30 @@ async function storeCases() {
     else await store.deleteJob(step.forget);
     cas.push({ ...step, ...(written === undefined ? {} : { written }), states: { a: await store.getState("a"), b: await store.getState("b") } });
   }
-  return { prune: out, compareAndSetState: cas };
+  // updateRunIf: a finish is written only over a row whose status is one of
+  // those given; it says whether it wrote. insertRun refuses an id it holds.
+  const once = sdk.memory();
+  await once.insertRun(r("u1", "a", "running", 1000));
+  const fin = (status, extra = {}) => ({ ...r("u1", "a", status, 1000), ...extra });
+  const updateSteps = [
+    { run: fin("failed", { error: "first" }), from: ["running"] },
+    { run: fin("ok", { output: "second" }), from: ["running"] },
+    { run: fin("ok", { output: "late" }), from: ["running", "timeout"] },
+    { set: fin("timeout", { error: "stuck" }) },
+    { run: fin("ok", { output: "late", metrics: { m: 2 } }), from: ["running", "timeout"] },
+    { run: fin("failed"), from: [] },
+    { run: { ...r("missing", "a", "ok", 5) }, from: ["running"] },
+    { insert: r("u1", "b", "running", 2000) },
+  ];
+  const updateRunIf = [];
+  for (const step of updateSteps) {
+    let outcome;
+    if (step.set) await once.updateRun(step.set);
+    else if (step.insert) outcome = await once.insertRun(step.insert).then(() => "inserted", () => "refused");
+    else outcome = await once.updateRunIf(step.run, step.from);
+    updateRunIf.push({ ...step, ...(outcome === undefined ? {} : { outcome }), stored: await once.getRun("u1") });
+  }
+  return { prune: out, compareAndSetState: cas, updateRunIf };
 }
 
 // ---------------------------------------------------------------- channels
@@ -1148,6 +1224,7 @@ function channelAlerts() {
     { name: "over budget, with a triage full of markdown", alert: { ...clone(sdk.composeAlert({ type: "over_budget", run: sampleRun({ status: "ok", metrics: { cost: 1.2 } }), details: { breaches: [{ metric: "cost", value: 1.2, limit: 1, basis: "budget" }] } }, def, T0)), triage: "Check *this* _now_ ~maybe~ `x` | y (z) [a] <b> \\ " + "d".repeat(1200) } },
     { name: "slow", alert: clone(sdk.composeAlert({ type: "slow", run: sampleRun({ status: "ok", durationMs: 15_000 }), details: { durationMs: 15_000, thresholdMs: 10_000, basis: "maxDuration" } }, def, T0)) },
     { name: "recovered", alert: clone(sdk.composeAlert({ type: "recovered", run: sampleRun({ status: "ok" }), details: { after: ["missed", "over_budget"] } }, def, T0 + MIN)) },
+    { name: "no longer scheduled", alert: clone(sdk.composeAlert({ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: T0 - 3 * HOUR } }, { name: "nightly", grace: "15m" }, T0 + MIN)) },
   ];
 }
 
@@ -1193,7 +1270,182 @@ async function channelCases() {
   } finally {
     globalThis.fetch = realFetch;
   }
-  return { alerts, sends, failures };
+  return { alerts, sends, failures, ...(await providerCases(alerts)), ...(await twilioPartialCases(alerts)), ...textCutCases(alerts) };
+}
+
+// The provider channels (email, SMS, error trackers). Kept apart from `sends`
+// and `failures` so a port can take them on one channel at a time. Each case
+// lists every request (twilio sends one per number; a skipped recovery sends
+// none). In `options`, `link: true` stands for the usual link function and
+// `now: <ms>` for a clock fixed at that time.
+async function providerCases(alerts) {
+  const load = async (name) => (await import(`../packages/sdk/dist/${name}.js`))[name];
+  const SECRET_KEY = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
+  const from = "CronWatch <alerts@example.com>";
+  const configs = [
+    ["resend", { apiKey: "re_secret", from, to: ["ops@example.com", "dev@example.com"], subjectPrefix: "[prod]", link: true }],
+    ["resend", { apiKey: "re_secret", from: "alerts@example.com", to: "ops@example.com" }],
+    ["postmark", { serverToken: "pm-secret", from, to: ["ops@example.com", "dev@example.com"], link: true }],
+    ["postmark", { serverToken: "pm-secret", from: "alerts@example.com", to: "ops@example.com", messageStream: "alerts", subjectPrefix: "[prod]" }],
+    ["sendgrid", { apiKey: "SG.secret", from, to: ["Ops <ops@example.com>", "dev@example.com"], link: true }],
+    ["sendgrid", { apiKey: "SG.secret", from: "alerts@example.com", to: "ops@example.com", region: "eu" }],
+    ["mailgun", { apiKey: "key-secret", domain: "mg.example.com", from, to: ["ops@example.com", "dev@example.com"], link: true }],
+    ["mailgun", { apiKey: "key-secret", domain: "mg.example.com", from: "alerts@example.com", to: "ops@example.com", region: "eu" }],
+    ["ses", { region: "us-east-1", accessKeyId: "AKIDEXAMPLE", secretAccessKey: SECRET_KEY, from, to: ["ops@example.com", "dev@example.com"], now: T0, link: true }],
+    ["ses", { region: "eu-west-1", accessKeyId: "AKIDEXAMPLE", secretAccessKey: SECRET_KEY, sessionToken: "session-token", configurationSetName: "alerts", from: "alerts@example.com", to: "ops@example.com", now: T0 + HOUR }],
+    ["twilio", { accountSid: "AC00000000000000000000000000000000", authToken: "tw-secret", from: "+15005550006", to: ["+15551110000", "+15552220000"], link: true }],
+    ["twilio", { accountSid: "AC00000000000000000000000000000000", apiKeySid: "SK00000000000000000000000000000000", apiKeySecret: "sk-secret", messagingServiceSid: "MG00000000000000000000000000000000", to: "+15551110000", recovered: true, segments: 1 }],
+    ["sentry", { dsn: "https://pubkey@o1.ingest.sentry.io/42", link: true }],
+    ["sentry", { dsn: "https://pubkey@sentry.example.com/prefix/7", environment: "staging", release: "app@1.2.3", recovered: false }],
+    ["honeybadger", { apiKey: "hb-secret", link: true }],
+    ["honeybadger", { apiKey: "hb-secret", environment: "staging", endpoint: "https://eu-api.honeybadger.io", recovered: true }],
+    ["datadog", { apiKey: "dd-secret", link: true }],
+    ["datadog", { apiKey: "dd-secret", site: "datadoghq.eu", tags: ["env:prod"], host: "worker-1" }],
+    ["rollbar", { accessToken: "rb-secret", link: true }],
+    ["rollbar", { accessToken: "rb-secret", environment: "staging", recovered: false }],
+    ["bugsnag", { apiKey: "bs-secret", now: T0, link: true }],
+    ["bugsnag", { apiKey: "bs-secret", releaseStage: "staging", endpoint: "https://notify.bugsnag.example.com/", recovered: true, now: T0 }],
+    ["newrelic", { accountId: "12345", apiKey: "nr-secret", link: true }],
+    ["newrelic", { accountId: 12345, apiKey: "nr-secret", region: "eu", eventType: "CronJobAlert" }],
+    // Credentials pasted with spaces and newlines around them are trimmed before they go in a header.
+    ["resend", { apiKey: " re_secret\n", from: "alerts@example.com", to: "ops@example.com" }],
+    ["ses", { region: "us-east-1", accessKeyId: " AKIDEXAMPLE", secretAccessKey: `${SECRET_KEY}\n`, sessionToken: " session-token ", from: "alerts@example.com", to: "ops@example.com", now: T0 }],
+    ["twilio", { accountSid: " AC00000000000000000000000000000000 ", authToken: "tw-secret\n", from: "+15005550006", to: "+15551110000" }],
+    ["bugsnag", { apiKey: "\tbs-secret ", now: T0 }],
+    ["sentry", { dsn: " https://pubkey@o1.ingest.sentry.io/42\n" }],
+  ];
+  const link = (alert) => `https://app.example/cronwatch/jobs/${alert.job}`;
+  const materialize = (options) => {
+    const { link: withLink, now, ...rest } = options;
+    return { ...rest, ...(withLink ? { link } : {}), ...(now !== undefined ? { now: () => now } : {}) };
+  };
+  const realFetch = globalThis.fetch;
+  let response = { status: 200, body: "" };
+  let requests = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push({ url: String(url), headers: { ...init.headers }, body: digest(init.body) });
+    return new Response(response.body, { status: response.status });
+  };
+  const providerSends = [];
+  const providerFailures = [];
+  try {
+    for (const [name, options] of configs) {
+      const channel = (await load(name))(materialize(options));
+      for (const { name: alert, alert: value } of alerts) {
+        response = { status: 200, body: "" };
+        requests = [];
+        await channel.send(clone(value));
+        providerSends.push({ channel: name, options, alert, requests });
+      }
+      for (const [status, body] of [[500, "no"], [400, "x".repeat(300)], [404, ""], [401, `bad key ${options.apiKey ?? options.serverToken ?? options.authToken ?? options.apiKeySecret ?? options.secretAccessKey ?? options.accessToken ?? "pubkey"} given`]]) {
+        response = { status, body };
+        requests = [];
+        let error = null;
+        try {
+          await channel.send(clone(alerts[0].alert));
+        } catch (e) {
+          error = e.message;
+        }
+        providerFailures.push({ channel: name, options, status, body, error });
+      }
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  return { providerSends, providerFailures };
+}
+
+// Twilio texts every number at once. Each case answers each number with its
+// own status; the alert went out when any number took it, and each refusal
+// is reported through the channel context (onError) instead of thrown.
+async function twilioPartialCases(alerts) {
+  const { twilio } = await import("../packages/sdk/dist/twilio.js");
+  const options = { accountSid: "AC00000000000000000000000000000000", authToken: "tw-secret", from: "+15005550006", to: ["+15551110000", "+15552220000", "+15553330000"] };
+  const realFetch = globalThis.fetch;
+  const cases = [];
+  try {
+    for (const statuses of [[201, 400, 201], [400, 400, 201], [500, 400, 401], [201, 201, 201]]) {
+      const requests = [];
+      globalThis.fetch = async (url, init) => {
+        const to = new URLSearchParams(init.body).get("To");
+        const status = statuses[options.to.indexOf(to)];
+        requests.push({ url: String(url), to, redirect: init.redirect });
+        return new Response(status < 400 ? "{}" : `{"message":"refused ${to} with tw-secret"}`, { status });
+      };
+      const reported = [];
+      let error = null;
+      try {
+        await twilio(options).send(clone(alerts[0].alert), { onError: (e) => reported.push(e.message) });
+      } catch (e) {
+        error = e.message;
+      }
+      cases.push({ statuses, requests, error, reported });
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  return { twilioPartial: { options, cases } };
+}
+
+// Text cut to a limit never ends in half a surrogate pair, and a provider's
+// error body has every secret taken out before it is cut.
+function textCutCases(alerts) {
+  const emoji = "\u{1F600}";
+  const errorBodies = [
+    ["no", []],
+    ["x".repeat(300), []],
+    ["a".repeat(199) + emoji + "tail", []],
+    ["x".repeat(180) + "invalid key key-0123456789abcdef0123456789abcdef", ["key-0123456789abcdef0123456789abcdef"]],
+    ["y".repeat(195) + "sekret" + "z".repeat(50), ["sekret", "abc", undefined, "longer-secret-value"]],
+    ["sekret sekret " + emoji.repeat(120), ["sekret"]],
+  ].map(([text, secrets]) => ({ text, secrets: secrets.map((x) => x ?? null), body: errorBody(text, secrets) }));
+  const subjects = [
+    { title: "a".repeat(249) + emoji, subjectPrefix: undefined },
+    { title: "b".repeat(248) + emoji + "c", subjectPrefix: undefined },
+    { title: "t".repeat(240) + emoji, subjectPrefix: "[prod]" },
+    { title: "line one\r\nline two", subjectPrefix: "[x]" },
+  ].map(({ title, subjectPrefix }) => {
+    const alert = { ...clone(alerts[0].alert), title };
+    const options = { from: "a@example.com", to: "b@example.com", ...(subjectPrefix ? { subjectPrefix } : {}) };
+    return { title, subjectPrefix: subjectPrefix ?? null, subject: composeEmail(alert, options, ["b@example.com"]).subject };
+  });
+  const segmentTexts = ["a".repeat(160), "a".repeat(161), "a".repeat(152) + "{" + "a".repeat(152), "€".repeat(80), emoji.repeat(35), "a".repeat(66) + emoji + "a".repeat(66), "café 中"];
+  const segments = segmentTexts.map((text) => ({ text, segments: smsSegments(text) }));
+  const long = { ...clone(alerts[0].alert), title: "nightly failed", message: ("a".repeat(152) + "{\n").repeat(12), triage: null };
+  const bodies = [1, 3, 10, 12, 0, -1, 2.7, null].map((n) => ({ segments: n, body: digest(smsBody(long, "https://app.example/j", n === null ? Number.NaN : n)) }));
+  bodies.push({ segments: 10, link: "long", body: digest(smsBody(long, `https://app.example/${"p".repeat(2000)}`, 10)) });
+  return { textCuts: { errorBodies, subjects, smsSegments: segments, smsBodies: bodies } };
+}
+
+// ---------------------------------------------------------------- pg_cron
+
+// The pg_cron source's pure parts: schedules (only the first five fields),
+// default names, and rows as runs (a finished row with no start_time starts
+// at its end_time, else at the fallback the reader passes). holdMs is how
+// long a run with no start_time is waited for before it is copied as running.
+function pgcronCases() {
+  const schedules = [
+    "30 seconds", "1 second", "5  seconds", "0 0 $ * *", "0 0 1-$ * *", " */5  * * * * ", "0 5 * * * *", "* * * * * *", "0 0 $ * * extra",
+    "@reboot", "@hourly", "@daily", "0 3 * * 7", "nonsense",
+  ].map((schedule) => ({ schedule, result: pgCronSchedule(schedule) }));
+  const names = [
+    { jobid: 7, jobname: "nightly vacuum" }, { jobid: 7, jobname: null }, { jobid: 7, jobname: "  " }, { jobid: 8, jobname: "--db:roll.up_1" },
+    { jobid: 9, jobname: "été job" }, { jobid: 10, jobname: "x".repeat(130) },
+  ].map((job) => ({ job, name: pgCronJobName(job) }));
+  const at = (iso) => new Date(iso);
+  const row = (runid, status, start, end, message = null) => ({ runid, jobid: 3, status, return_message: message, start_time: start, end_time: end });
+  const rows = [
+    [row(1, "succeeded", at("2026-01-05T03:00:00.123Z"), at("2026-01-05T03:00:02.987Z"), "VACUUM\n"), null],
+    [row(2, "failed", at("2026-01-05T03:00:00Z"), at("2026-01-05T03:00:01Z"), "ERROR:  deadlock detected\n"), null],
+    [row(3, "failed", at("2026-01-05T03:00:00Z"), at("2026-01-05T03:00:01Z"), "   "), null],
+    [row(4, "running", at("2026-01-05T03:00:00Z"), null), null],
+    [row(5, "starting", null, null), T0],
+    [row(6, "failed", null, null, "server restarted"), T0 - HOUR],
+    [row(7, "failed", null, at("2026-01-05T03:00:05Z"), "server restarted"), T0],
+    [row(8, "succeeded", at("2026-01-05T03:00:05Z"), at("2026-01-05T03:00:04Z"), "1 row"), null],
+    [row("9", "connecting", null, null), T0],
+  ].map(([r, fallbackAt]) => ({ row: r, fallbackAt, run: pgCronRun(r, "db:j", "pgcron:db:", fallbackAt ?? T0) }));
+  return { schedules, names, runs: rows, holdMs: PG_CRON_HOLD_MS };
 }
 
 // ---------------------------------------------------------------- triage
@@ -1266,6 +1518,7 @@ const files = {
   "store.json": await storeCases(),
   "channels.json": await channelCases(),
   "triage.json": await triageCases(),
+  "pgcron.json": pgcronCases(),
 };
 
 const checking = process.argv.includes("--check");

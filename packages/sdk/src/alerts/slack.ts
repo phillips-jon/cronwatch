@@ -30,6 +30,8 @@ export function slack(options: SlackOptions): AlertChannel {
       const response = await fetch(options.webhookUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
+        // Refused, not followed: a webhook URL is its own credential.
+        redirect: "error",
         signal: AbortSignal.timeout(TIMEOUT_MS),
         body: JSON.stringify({
           // The notification fallback is parsed as mrkdwn too, so it is escaped like the blocks.

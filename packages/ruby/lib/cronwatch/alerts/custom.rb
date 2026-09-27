@@ -17,8 +17,15 @@ module Cronwatch
         raise ArgumentError, "Cronwatch::Alerts::Custom needs a block" unless @send
       end
 
-      def call(alert)
-        @send.call(alert)
+      # `context` is the client's Client::ChannelContext: a block taking a
+      # second argument gets it, to report a problem that did not stop the
+      # alert going out (context.on_error(error)).
+      def call(alert, context = nil)
+        if Client.takes_context?(@send)
+          @send.call(alert, context)
+        else
+          @send.call(alert)
+        end
         nil
       end
     end

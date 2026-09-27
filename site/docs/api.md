@@ -11,6 +11,7 @@ order: 12
 | Option | Default | |
 |---|---|---|
 | `store` | in memory | a [store](/docs/stores/) |
+| `sources` | `[]` | where runs this process does not wrap come from, such as [`pgCron(pool)`](/docs/supabase/). Each source is synced at the start of every `check()`; one that throws is reported to `onError` and the check carries on |
 | `alerts` | console | an array of [channels](/docs/alerts/) |
 | `triage` | | a [triage function](/docs/triage/) |
 | `cronSecret` | `process.env.CRON_SECRET` | what `handler()` requires as a bearer. Empty counts as unset, and with none set handlers answer 503 outside development. `null` lets handlers run without one |
@@ -43,6 +44,8 @@ Returns a handle:
 |---|---|
 | `run(fn, { trigger? })` | runs `fn(job)`, records the run, returns its result, rethrows its error |
 | `handler(fn, { secret? })` | a `(request) => Promise<Response>` that checks the bearer secret, runs `fn(job, request)` and answers with JSON, or with the `Response` `fn` returned. `secret` defaults to the client's `cronSecret`; `null` accepts anyone, and then the JSON leaves out the error text |
+| `start({ trigger?, id? })` | records a running run now and returns a [run handle](#the-run-handle) to finish it later, perhaps in another process. `trigger` defaults to `"start"`. `id` (1 to 200 characters) is your own stable id, such as an Inngest run id: a start with an id already recorded returns a handle on that run instead of recording another. A store that fails is reported to `onError`, never thrown, and the run is written when it finishes |
+| `resume(runId)` | a run handle on a run started elsewhere, read from the store. One that already finished, or is not in the store, gives a handle whose `finish()` records nothing and reports why to `onError`. Throws only for a run of another job |
 
 ## The job context
 
@@ -56,6 +59,21 @@ Passed to your function.
 | `metric(name, value)` | report a number |
 | `metrics({ ... })` | several at once |
 
+## The run handle
+
+What `start()` and `resume()` return, for a run that spans several calls or processes. See [Runs that span calls](/docs/conditions/#runs-that-span-calls).
+
+| | |
+|---|---|
+| `id`, `job`, `startedAt` | `startedAt` is null when a resumed run could not be read |
+| `active` | false once finished, and from the start when a resumed run has already finished or was not found |
+| `log(...parts)`, `metric(name, value)`, `metrics({ ... })` | as on the job context; kept in the handle until `flush()` or `finish()` |
+| `flush()` | appends the lines and metrics so far to the stored run, which must still be running. Output is redacted as it is written. This reads, changes and writes the run's row, so when two processes append to one run at the same moment the last write wins and the other's lines are lost |
+| `finish(outcome?)` | finishes the run and judges it like any other. `finish()` or `finish({ status: "ok" })` is a success; `finish({ error })` a failure, recorded like an error `run()` caught; `finish("text")` or `finish({ result })` treats the value like `run()`'s return (a string is the output when nothing was logged and is checked by `expect`; a `Response` of 400 or above fails). Lines and metrics from the handle are added to those already stored, then `expect`, redaction and the 16 KB cap apply. Resolves to the recorded run, or null when nothing was recorded |
+| `fail(error)` | `finish({ error })` |
+
+A second `finish()` on a handle, or on a run another process has finished, records nothing: it resolves to null and is reported to `onError`, never thrown. When two processes finish one run at the same moment, only one records and judges it. If the store fails during `finish()`, the handle stays active so `finish()` can be called again. An id belongs to one job: `start()` or `resume()` with an id another job's run already has throws, and ids starting with `pgcron:` are reserved for the pg_cron source. A run that is never finished is marked stuck by the first check after the job's `timeout`; one finished after that follows the same rule as a late `run()`: a late failure is not counted again, and a late success closes stuck and recovers.
+
 ## The client
 
 | Method | |
@@ -63,7 +81,7 @@ Passed to your function.
 | `run(name, options?, fn)` | run without keeping a handle; declares the job on first use |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune. Returns `{ checkedAt, jobs, alerts, pruned }`. Concurrent calls share one check. A job that cannot be evaluated is reported to `onError` and listed as `failing`; the rest are checked as usual |
 | `start(every = "1m")`, `stop()` | check on an interval. With `deliver: "check"`, `start()` warns once on the console that these checks send nothing and another process must |
-| `routes({ token?, basePath? })` | the [dashboard and API](/docs/dashboard/) handlers. `token` defaults to `CRONWATCH_TOKEN` (empty counts as unset); with none, while `NODE_ENV` is `development` or `test` the routes make a random token and print a sign-in link to the server log on their first request, and otherwise answer 503. `token: null` opts out to serve them open. Cross-site writes are refused, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400 |
+| `routes({ token?, basePath?, origin?, trustProxy? })` | the [dashboard and API](/docs/dashboard/) handlers. `origin` (such as `"https://app.example.com"`) replaces the request URL's origin for the cross-site check, the sign-in redirect and cookie, and the development sign-in line; `trustProxy: true` takes it from the first `X-Forwarded-Proto` and `X-Forwarded-Host` instead, when present (see [behind a proxy](/docs/dashboard/#behind-a-proxy)); with neither, forwarded headers are ignored. `token` defaults to `CRONWATCH_TOKEN` (empty counts as unset); with none, while `NODE_ENV` is `development` or `test` the routes make a random token and print a sign-in link to the server log on their first request, and otherwise answer 503. `token: null` opts out to serve them open. Cross-site writes are refused, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400 |
 | `jobs()` | every job's summary, without alerting |
 | `jobsWithRuns(limit = 20)` | every job's summary with its newest `limit` runs, read together: `{ job, runs }[]` |
 | `jobSummary(name)`, `getRun(id)` | |
@@ -72,9 +90,21 @@ Passed to your function.
 | `forget(name)` | remove a job and its runs from the store |
 | `definedJobs()` | the definitions declared in this process |
 | `close()` | stop the interval and close the store |
+| `resumeRun(name, runId)` | `job(name).resume(runId)` for a job declared in this process; rejects for one that is not |
+| `recordRun(run, { evaluate? })` | record a run that happened outside this process, for a source. Its job must be declared first. Runs are keyed by id: a new one is inserted, a stored one still running is updated when this one is not, and anything else is left alone, so recording the same run twice changes nothing. A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets) and redacted the same way. `evaluate: false` stores it without judging it, for history imported on first sight. Resolves to the alerts it sent |
 
 ## Exports
 
-`@cronwatch/sdk`: `cronwatch`, `CronWatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails` and `ParsedSchedule`.
+`@cronwatch/sdk`: `cronwatch`, `CronWatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails`, `ParsedSchedule`, `JobContext`, `RunHandle`, `StartOptions`, `RunOutcome`, `RecordRunOptions`, `Source` and `SourceHost` (the interface a source is given: `job()`, `recordRun()`, `store`, `now` and `onError`), and `FetchHandler`, `Routes` and `RoutesOptions`.
 
-`@cronwatch/sdk/sqlite`, `/postgres`, `/slack`, `/discord`, `/webhook`, `/anthropic`: one adapter each. `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies. `/anthropic` needs `@anthropic-ai/sdk`, which you install yourself. `/slack`, `/discord` and `/webhook` need nothing.
+Stores: `@cronwatch/sdk/sqlite` (`sqlite`), `/postgres` (`postgres`) and `/d1` (`d1`). `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies; `/d1` needs nothing.
+
+Sources: `@cronwatch/sdk/pg-cron` (`pgCron`), which reads pg_cron's jobs and runs through the pool you pass it. See [Supabase and pg_cron](/docs/supabase/).
+
+Alert channels, one function each, named after the entry: `/slack`, `/discord`, `/webhook`, `/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses`, `/twilio`, `/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag` and `/newrelic`. None needs a dependency. See [Alerts](/docs/alerts/).
+
+Triage: `@cronwatch/sdk/anthropic` (`anthropic`) needs `@anthropic-ai/sdk`, which you install yourself.
+
+The core, `/d1`, `/pg-cron` and every channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun. `/sqlite`, `/postgres` and `/node` need Node.
+
+`@cronwatch/sdk/node`: `toNodeHandler(fetchHandler, { trustProxy?, basePath? })` turns a fetch-style handler (the routes, or a job's `handler()`) into `(req, res, next?)` for `http.createServer`, Express or Connect, NestJS and Firebase `onRequest`; `toKoaMiddleware(fetchHandler, options?)` does the same for Koa; `toRequest(req, options?)` and `writeResponse(res, response)` are the two halves. Node only; see [Express, Koa and plain Node servers](/docs/node/#express-koa-and-plain-node-servers).

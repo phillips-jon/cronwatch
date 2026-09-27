@@ -78,7 +78,13 @@ Each condition alerts once when it opens. When a successful run leaves nothing o
 | `@cronwatch/sdk` | `cronwatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, types |
 | `@cronwatch/sdk/sqlite` | `sqlite({ path })`, needs `better-sqlite3` (and `@types/better-sqlite3` in TypeScript) |
 | `@cronwatch/sdk/postgres` | `postgres({ connectionString })`, needs `pg` (and `@types/pg` in TypeScript) |
-| `@cronwatch/sdk/slack`, `/discord`, `/webhook` | alert channels |
+| `@cronwatch/sdk/d1` | `d1(env.DB)`, the Cloudflare D1 store; needs nothing |
+| `@cronwatch/sdk/pg-cron` | `pgCron(pool)`, a source that reads pg_cron jobs (Supabase Cron included) from Postgres on every check; pass it in `sources` |
+| `@cronwatch/sdk/node` | `toNodeHandler`, `toKoaMiddleware`, `toRequest`, `writeResponse`: fetch handlers on `http.createServer`, Express, Connect, NestJS and Koa |
+| `@cronwatch/sdk/slack`, `/discord`, `/webhook` | chat and signed webhook alert channels |
+| `@cronwatch/sdk/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses` | email alert channels |
+| `@cronwatch/sdk/twilio` | SMS alerts |
+| `@cronwatch/sdk/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag`, `/newrelic` | alerts as events in an error tracker |
 | `@cronwatch/sdk/anthropic` | `anthropic()` triage: a short diagnosis on every alert except recoveries, needs `@anthropic-ai/sdk` |
 
-Node 22 or newer. MIT.
+The core, `/d1`, `/pg-cron` and every channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun. The SQLite and Postgres stores and `/node` need Node 22 or newer. MIT.

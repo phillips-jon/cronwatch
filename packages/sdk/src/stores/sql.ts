@@ -103,6 +103,17 @@ export function statements(dialect: Dialect, p: string) {
   return sql;
 }
 
+/**
+ * updateRunIf: the update above, only while the stored status is one of
+ * `count` statuses. Built per count, since the list is bound value by value.
+ */
+export function updateRunIfSql(dialect: Dialect, p: string, count: number): string {
+  const text = `UPDATE ${p}runs SET status = ?, finished_at = ?, duration_ms = ?, error = ?, output = ?, metrics = ? WHERE id = ? AND status IN (${Array.from({ length: count }, () => "?").join(", ")})`;
+  if (dialect !== "postgres") return text;
+  let n = 0;
+  return text.replace(/\?/g, () => `$${++n}`);
+}
+
 // Parameters in statement order, so both drivers bind the same values.
 export const params = {
   upsertJob: (definition: StoredJobDefinition, now: number) => [definition.name, JSON.stringify(definition), now, now],
@@ -110,6 +121,9 @@ export const params = {
     run.id, run.job, run.status, run.startedAt, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.trigger,
   ],
   updateRun: (run: Run) => [run.status, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.id],
+  updateRunIf: (run: Run, fromStatuses: Run["status"][]) => [
+    run.status, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.id, ...fromStatuses,
+  ],
   setState: (state: JobState) => [state.job, JSON.stringify(state)],
   casInsert: (state: JobState) => [state.job, JSON.stringify(state)],
   casUpdate: (state: JobState, expectedVersion: number) => [JSON.stringify(state), state.job, expectedVersion],

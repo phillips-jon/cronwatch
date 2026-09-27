@@ -152,4 +152,84 @@ class AlertsTest < Minitest::Test
     assert_equal 10, http.write_timeout
     assert http.use_ssl?
   end
+
+  # A local server that answers `head` and then drips `bytes` one every `every` seconds.
+  def dripping_server(head, bytes, every)
+    server = TCPServer.new("127.0.0.1", 0)
+    Thread.new do
+      client = server.accept
+      client.readpartial(4096)
+      client.write(head)
+      bytes.times do
+        sleep every
+        client.write("x")
+      end
+      client.close
+    rescue StandardError
+      nil
+    end
+    server
+  end
+
+  def elapsed
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    yield
+    Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+  end
+
+  # The deadline is the whole request's, as AbortSignal.timeout(10_000) is:
+  # a body dripping in under each read timeout still stops at the deadline,
+  # and the status is kept with an empty body, as the SDK reads it.
+  def test_the_default_http_adapter_has_a_whole_request_deadline
+    server = dripping_server("HTTP/1.1 500 Oops\r\nContent-Length: 30\r\nConnection: close\r\n\r\n", 30, 0.2)
+    response = nil
+    took = elapsed { response = Cronwatch::HTTP::NetHTTP.new(timeout: 1).post("http://127.0.0.1:#{server.addr[1]}/", "{}", {}) }
+    assert_operator took, :<, 2.5
+    assert_equal 500, response.status
+    assert_equal "", response.body
+  ensure
+    server&.close
+  end
+
+  def test_the_default_http_adapter_raises_when_no_answer_comes_before_the_deadline
+    server = TCPServer.new("127.0.0.1", 0)
+    held = []
+    thread = Thread.new { loop { held << server.accept } }
+    error = nil
+    took = elapsed do
+      error = assert_raises(Cronwatch::HTTP::TimeoutError) do
+        Cronwatch::HTTP::NetHTTP.new(timeout: 0.5).post("http://127.0.0.1:#{server.addr[1]}/", "{}", {})
+      end
+    end
+    assert_operator took, :<, 2
+    assert_equal "The operation was aborted due to timeout", error.message
+  ensure
+    thread&.kill
+    held&.each(&:close)
+    server&.close
+  end
+
+  # fetch trims the whitespace around a header value; a credential read with
+  # a trailing newline must not make every send raise.
+  def test_the_default_http_adapter_trims_header_values
+    server = TCPServer.new("127.0.0.1", 0)
+    received = Queue.new
+    thread = Thread.new do
+      client = server.accept
+      head = +""
+      head << client.gets until head.end_with?("\r\n\r\n")
+      received << head
+      client.write("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n")
+      client.close
+    end
+    response = Cronwatch::HTTP.default.post("http://127.0.0.1:#{server.addr[1]}/", "{}",
+                                            { "authorization" => " Bearer abc\n", "x-key" => "\tk\r\n" })
+    assert_equal 204, response.status
+    head = received.pop
+    assert_match(/^authorization: Bearer abc\r$/i, head)
+    assert_match(/^x-key: k\r$/i, head)
+  ensure
+    thread&.join(1)
+    server&.close
+  end
 end

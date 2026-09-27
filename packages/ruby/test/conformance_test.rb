@@ -2,6 +2,7 @@
 
 require_relative "test_helper"
 require "digest"
+require "cronwatch/pg_cron"
 
 # Replays every case in conformance/ (written by scripts/conformance.mjs from
 # the TypeScript SDK) against the gem. Values are compared as the JSON the SDK
@@ -178,6 +179,12 @@ class ConformanceTest < Minitest::Test
 
     def finish(id, now, fields)
       run = @runs.find { |r| r.id == id }
+      # As the client's conditional write (the store's update_run_if): a run
+      # already finished takes no second finish, and nothing is judged.
+      if %i[ok failed].include?(run.status)
+        return { "alerts" => [], "state" => @state, "ignored" => "was already finished as #{run.status}" }
+      end
+
       marked_timed_out = run.status == :timeout
       run.finished_at = now
       run.duration_ms = [0, now - run.started_at].max
@@ -273,6 +280,7 @@ class ConformanceTest < Minitest::Test
   def draft_from(hash)
     details = Cronwatch::Naming.from_json_value(hash["details"])
     details[:after] = details[:after].map(&:to_sym) if details[:after]
+    details[:reason] = details[:reason].to_sym if details[:reason]
     Cronwatch::AlertDraft.new(type: hash["type"].to_sym, run: hash["run"] && Cronwatch::Run.from_h(hash["run"]), details: details)
   end
 
@@ -475,26 +483,43 @@ class ConformanceTest < Minitest::Test
     end
   end
 
+  # store.json's updateRunIf script is replayed by StoreConformance
+  # (memory_store_test.rb), against the memory store and the ActiveRecord store.
+
   # ---------------------------------------------------------------- channels
 
   CHANNELS = fixture("channels.json")
   CHANNEL_ALERTS = CHANNELS["alerts"].to_h { |a| [a["name"], a["alert"]] }
 
-  # Stands in for Net::HTTP, keeping the last request.
+  # Stands in for Net::HTTP, keeping every request.
   class FakeHTTP
     attr_accessor :status, :body
-    attr_reader :last
+    attr_reader :requests
 
     def initialize
       @status = 200
       @body = ""
+      @requests = []
     end
 
+    def last = @requests.last
+
     def post(url, body, headers)
-      @last = { "url" => url, "headers" => headers, "body" => body }
+      @requests << { "url" => url, "headers" => headers, "body" => body }
       Cronwatch::HTTP::Response.new(status: @status, body: @body)
     end
   end
+
+  # The provider channels' options, camelCase in the fixtures, as the gem's
+  # snake_case keywords. `link: true` stands for the usual link and
+  # `now: <ms>` for a clock fixed at that time.
+  PROVIDERS = {
+    "resend" => Cronwatch::Alerts::Resend, "postmark" => Cronwatch::Alerts::Postmark,
+    "sendgrid" => Cronwatch::Alerts::Sendgrid, "mailgun" => Cronwatch::Alerts::Mailgun, "ses" => Cronwatch::Alerts::Ses,
+    "twilio" => Cronwatch::Alerts::Twilio, "sentry" => Cronwatch::Alerts::Sentry,
+    "honeybadger" => Cronwatch::Alerts::Honeybadger, "datadog" => Cronwatch::Alerts::Datadog,
+    "rollbar" => Cronwatch::Alerts::Rollbar, "bugsnag" => Cronwatch::Alerts::Bugsnag, "newrelic" => Cronwatch::Alerts::NewRelic,
+  }.freeze
 
   def channel_for(c, http)
     options = c["options"]
@@ -503,7 +528,56 @@ class ConformanceTest < Minitest::Test
     when "slack" then Cronwatch::Alerts::Slack.new(webhook_url: options["webhookUrl"], link: link, http: http)
     when "discord" then Cronwatch::Alerts::Discord.new(webhook_url: options["webhookUrl"], link: link, http: http)
     when "webhook" then Cronwatch::Alerts::Webhook.new(url: options["url"], headers: options["headers"] || {}, secret: options["secret"], http: http)
+    else
+      keywords = options.each_with_object({}) do |(key, value), out|
+        case key
+        when "link" then out[:link] = link if value
+        when "now" then out[:now] = -> { value }
+        else out[Cronwatch::Naming.snake(key)] = value
+        end
+      end
+      PROVIDERS.fetch(c["channel"]).new(**keywords, http: http)
     end
+  end
+
+  def test_provider_payloads
+    each_case(CHANNELS["providerSends"]) do |c|
+      http = FakeHTTP.new
+      channel_for(c, http).call(Cronwatch::Alert.from_h(CHANNEL_ALERTS.fetch(c["alert"])))
+      sent = c["channel"] == "twilio" ? in_number_order(http.requests, c["options"]["to"]) : http.requests
+      requests = sent.map { |r| { "url" => r["url"], "headers" => r["headers"], "body" => digest(r["body"]) } }
+      differs(c["requests"], requests)
+    end
+  end
+
+  # Twilio texts every number at once, each from a thread of its own, so the
+  # requests reach the HTTP object in whatever order the threads run; the
+  # SDK's fetch calls are made in the numbers' order. Compared in that order.
+  def in_number_order(requests, to)
+    numbers = Array(to).map { |n| n.to_s.strip }
+    requests.sort_by { |r| numbers.index(URI.decode_www_form(r["body"]).to_h["To"]) || 0 }
+  end
+
+  def test_provider_failures
+    first = Cronwatch::Alert.from_h(CHANNELS["alerts"][0]["alert"])
+    each_case(CHANNELS["providerFailures"]) do |c|
+      http = FakeHTTP.new
+      http.status = c["status"]
+      http.body = c["body"]
+      begin
+        channel_for(c, http).call(first)
+        next "expected an error: #{c["error"]}" unless c["error"].nil?
+
+        nil
+      rescue RuntimeError => e
+        differs(c["error"].to_s, e.message)
+      end
+    end
+  end
+
+  def test_provider_cases_cover_every_channel
+    assert_equal PROVIDERS.keys.sort, CHANNELS["providerSends"].map { |c| c["channel"] }.uniq.sort
+    assert_operator CHANNELS["providerSends"].length, :>=, 288
   end
 
   def test_channel_payloads
@@ -527,6 +601,105 @@ class ConformanceTest < Minitest::Test
       rescue RuntimeError => e
         differs(c["error"], e.message)
       end
+    end
+  end
+
+  # Answers each Twilio number with its own status, as twilioPartialCases does.
+  class NumberedHTTP
+    attr_reader :requests
+
+    def initialize(numbers, statuses)
+      @answers = numbers.zip(statuses).to_h
+      @requests = []
+      @lock = Mutex.new
+    end
+
+    def post(url, body, _headers)
+      to = URI.decode_www_form(body).to_h.fetch("To")
+      @lock.synchronize { @requests << { "url" => url, "to" => to } }
+      status = @answers.fetch(to)
+      Cronwatch::HTTP::Response.new(status: status, body: status < 400 ? "{}" : "{\"message\":\"refused #{to} with tw-secret\"}")
+    end
+  end
+
+  # Each number refusing is reported through the channel context; the alert
+  # fails only when every number refused it. The SDK also records fetch's
+  # `redirect: "error"`; Net::HTTP never follows a redirect, so there is no
+  # option to compare.
+  def test_twilio_partial_delivery
+    partial = CHANNELS["twilioPartial"]
+    options = partial["options"]
+    alert = Cronwatch::Alert.from_h(CHANNELS["alerts"][0]["alert"])
+    each_case(partial["cases"]) do |c|
+      http = NumberedHTTP.new(options["to"], c["statuses"])
+      reported = []
+      context = Cronwatch::Client::ChannelContext.new(->(e) { reported << e.message })
+      channel = Cronwatch::Alerts::Twilio.new(account_sid: options["accountSid"], auth_token: options["authToken"],
+                                              from: options["from"], to: options["to"], http: http)
+      error = begin
+        channel.call(alert, context)
+        nil
+      rescue RuntimeError => e
+        e.message
+      end
+      requests = http.requests.sort_by { |r| options["to"].index(r["to"]) }
+      differs([c["requests"].map { |r| r.slice("url", "to") }, c["error"], c["reported"]], [requests, error, reported])
+    end
+  end
+
+  TEXT_CUTS = CHANNELS["textCuts"]
+
+  def test_error_bodies_cut_secrets_out_first
+    each_case(TEXT_CUTS["errorBodies"]) { |c| differs(c["body"], Cronwatch::Alerts::Provider.error_body(c["text"], c["secrets"])) }
+  end
+
+  def test_email_subjects_cut_on_a_code_point
+    alert = CHANNELS["alerts"][0]["alert"]
+    each_case(TEXT_CUTS["subjects"]) do |c|
+      email = Cronwatch::Alerts::Email.compose(Cronwatch::Alert.from_h(alert.merge("title" => c["title"])), from: "a@example.com",
+                                                                                  to: ["b@example.com"], subject_prefix: c["subjectPrefix"])
+      differs(c["subject"], email.subject)
+    end
+  end
+
+  def test_sms_segments
+    each_case(TEXT_CUTS["smsSegments"]) { |c| differs(c["segments"], Cronwatch::Alerts::Twilio.sms_segments(c["text"])) }
+  end
+
+  def test_sms_bodies
+    long = Cronwatch::Alert.from_h(CHANNELS["alerts"][0]["alert"].merge(
+                                     "title" => "nightly failed", "message" => "#{"a" * 152}{\n" * 12, "triage" => nil,
+                                   ))
+    each_case(TEXT_CUTS["smsBodies"]) do |c|
+      link = c["link"] == "long" ? "https://app.example/#{"p" * 2000}" : "https://app.example/j"
+      segments = c["segments"].nil? ? Float::NAN : c["segments"]
+      differs(c["body"], digest(Cronwatch::Alerts::Twilio.sms_body(long, link, segments)))
+    end
+  end
+
+  # ---------------------------------------------------------------- pg_cron
+
+  PGCRON = fixture("pgcron.json")
+
+  def test_pg_cron_hold_is_the_sdks
+    assert_equal PGCRON["holdMs"], Cronwatch::Sources::PgCron::HOLD_MS
+  end
+
+  def test_pg_cron_schedules
+    each_case(PGCRON["schedules"]) { |c| differs(c["result"], Cronwatch::Sources::PgCron.schedule(c["schedule"])) }
+  end
+
+  def test_pg_cron_names
+    each_case(PGCRON["names"]) do |c|
+      job = Cronwatch::Sources::PgCron::Job.new(jobid: c["job"]["jobid"], jobname: c["job"]["jobname"])
+      differs(c["name"], Cronwatch::Sources::PgCron.job_name(job))
+    end
+  end
+
+  def test_pg_cron_rows_as_runs
+    each_case(PGCRON["runs"]) do |c|
+      run = Cronwatch::Sources::PgCron.run(c["row"], "db:j", "pgcron:db:", c["fallbackAt"] || T0)
+      differs(c["run"], run&.to_h)
     end
   end
 end
