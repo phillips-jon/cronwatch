@@ -166,6 +166,6 @@ Then open `http://localhost:8787/cronwatch/?token=<the token in .dev.vars>`.
 
 **Killed runs.** A run cut off by a Worker limit cannot report back. It stays `running` until a check finds it past the job's `timeout` and sends a stuck alert, the same as a serverless function killed mid-run. Set `timeout` a little above the longest the job may take.
 
-**Channels.** Slack, Discord and custom channels need nothing more. The signed webhook channel (`@cronwatch/sdk/webhook`) signs with `node:crypto`, so it needs `compatibility_flags = ["nodejs_compat"]`. For triage, pass the key: `anthropic({ apiKey: env.ANTHROPIC_API_KEY })`.
+**Channels.** Every channel uses only `fetch` and Web Crypto, so Slack, Discord, the signed webhook, the email, SMS and error tracker channels, and custom channels all run without `nodejs_compat`; put their keys in secrets. For triage, pass the key: `anthropic({ apiKey: env.ANTHROPIC_API_KEY })`.
 
 **Stores.** The SQLite and Postgres stores are Node drivers; use D1. Pass `env.DB` itself, not a session from `withSession()`, so every read sees the last write: the store's conditional state writes depend on it. See [Stores](/docs/stores/#d1) for how the D1 store works.
