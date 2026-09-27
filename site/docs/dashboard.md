@@ -18,7 +18,7 @@ export const { GET, POST, DELETE } = cw.routes({ token: process.env.CRONWATCH_TO
 
 Every request needs the token, as `Authorization: Bearer <token>` or as the cookie the dashboard sets. Comparison is constant-time.
 
-To sign in to the dashboard, open any page once with `?token=<token>`. The response moves it into an HttpOnly cookie that lasts thirty days (holding a digest of the token, not the token) and redirects to the same URL without it. `?token=` is read only there, on a `GET` of a page; the JSON API and every `POST` or `DELETE` ignore it, so use the bearer header or the cookie.
+To sign in to the dashboard, open any page once with `?token=<token>`, or paste the token into the form on the sign-in page (it sends the same `?token=`). The response moves it into an HttpOnly cookie that lasts thirty days (holding a digest of the token, not the token) and redirects to the same URL without it. `?token=` is read only there, on a `GET` of a page; the JSON API and every `POST` or `DELETE` ignore it, so use the bearer header or the cookie.
 
 With no token configured while `NODE_ENV` is `development` or `test`, the routes make one: 32 random bytes, new each time the routes are created (so each dev server restart or reload signs you out). On the first request they print a sign-in link to the server log, once:
 
@@ -46,7 +46,7 @@ export const POST = guarded(routes.POST);
 export const DELETE = guarded(routes.DELETE);
 ```
 
-The cross-site checks below still apply to requests that pass your guard.
+The cross-site checks below still apply to requests that pass your guard. To keep the dashboard [installable](#install-it-as-an-app), let the app shell paths (`/manifest.webmanifest`, `/icons/...`, `/sw.js`, `/app.js` and `/offline` under the base) through the guard: browsers fetch the manifest and icons without cookies, and none of them says anything about your jobs.
 
 The check endpoint additionally accepts the client's `cronSecret` as a bearer, so a platform cron can call it.
 
@@ -58,7 +58,13 @@ A `POST` or `DELETE` is refused with 403 when it carries an `Origin` header that
 
 `GET /api/check` runs the check only when the request has an `Authorization` bearer (the token or the cron secret), which a page on another site cannot add. Signed in with the cookie, use `POST /api/check`; a cookie `GET` answers 405. The dashboard's "Run check now" button posts, so it is unaffected.
 
-Pages are served with a Content Security Policy that allows no scripts, frames or outside origins, plus `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` and `X-Content-Type-Options: nosniff`. JSON responses carry `nosniff` and `Cache-Control: no-store`.
+Pages are served with a Content Security Policy that allows no inline script, no frames and no outside origins, plus `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` and `X-Content-Type-Options: nosniff`:
+
+```text
+default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'
+```
+
+The one script is `app.js`, which registers the [service worker](#install-it-as-an-app) and does nothing else; the pages work the same without it. Pages and JSON responses carry `Cache-Control: no-store`, and JSON responses `nosniff`.
 
 ## Behind a proxy
 
@@ -93,7 +99,31 @@ Under it is the day. Each job gets a lane across the last 24 hours and the next 
 
 The timeline draws the first thirty jobs and says so when there are more; the table below lists every job. Hovering a mark shows what it was, and a visually hidden list says the same for screen readers. A job page draws the same thing for that job, one lane per UTC day for the last seven days, today first, and reads as many runs as that takes (up to 500).
 
-Times on the pages are UTC: without script a page cannot know your time zone. Pages refresh every minute and are marked `noindex`. They follow the system's light or dark setting, need no JavaScript, and load nothing from anywhere. Marks arrive in time order when a page loads and open problems pulse slowly; with reduced motion turned on in the system settings nothing moves.
+Times on the pages are UTC: without script a page cannot know your time zone. Pages refresh every minute and are marked `noindex`. They follow the system's light or dark setting, need no JavaScript, and load nothing from anywhere but the dashboard itself. Marks arrive in time order when a page loads and open problems pulse slowly; with reduced motion turned on in the system settings nothing moves.
+
+## Install it as an app
+
+The dashboard is an installable web app: it has a manifest, icons and a small service worker, so a browser can put it on the dock, the desktop or the home screen, where it opens in a window of its own with the header as its bar. It is the same dashboard, reading live from your app; nothing about your jobs is kept on the device.
+
+- **Chrome or Edge on a desktop.** Open the dashboard, signed in, and choose the install icon at the right of the address bar (or the menu's Cast, save and share, then Install page as app). The app shares the browser's cookie, so it is already signed in.
+- **Android.** In Chrome, open the dashboard, signed in, then the menu's Add to home screen, then Install. It shares Chrome's cookie too.
+- **iPhone and iPad.** In Safari, open the dashboard, then Share, then Add to Home Screen. A home screen app keeps its cookies apart from Safari's, so the first time it opens it shows the sign-in page: paste the token into the form there (a password manager can fill it) and it stays signed in, as a browser does, for thirty days at a time. There is no address bar in the app, so the form, rather than a `?token=` link, is the way in.
+
+The cookie's path is the base path, and the app's scope and start URL are the base path too, so the installed app sends the same cookie as the pages. A token change signs the app out like any browser.
+
+What makes it installable, all under the base path and served without the token, since browsers fetch some of it without cookies and none of it says anything about your jobs:
+
+| Path | What | Cache |
+|---|---|---|
+| `/manifest.webmanifest` | the manifest (`application/manifest+json`): name, start URL and scope at the base path, standalone display, colours, icons | `no-cache` |
+| `/icons/icon.svg`, `/icons/maskable.svg` | the clock on a dark rounded square, and a full square for masks | a year |
+| `/icons/icon-192.png`, `/icons/icon-512.png`, `/icons/maskable-512.png` | PNGs for the manifest | a year |
+| `/icons/apple-touch-icon.png` | the 180 pixel home screen icon iOS wants | a year |
+| `/sw.js` | the service worker, with `Service-Worker-Allowed` set to the base path | `no-cache` |
+| `/app.js` | registers the service worker | `no-cache` |
+| `/offline` | the page shown when the network is down | `no-cache` |
+
+The service worker keeps only that shell in its cache. Every page, form post and API call goes to the network as the browser made it and is never stored, since they carry job data (and are `no-store` anyway). When a page cannot be reached, it shows the offline page instead: "You are offline. CronWatch shows live data from your app, so it needs a connection." Service workers need a secure origin, so installing works over `https` or on `localhost`; elsewhere the dashboard is simply a web page.
 
 ## Endpoints
 

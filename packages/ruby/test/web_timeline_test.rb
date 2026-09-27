@@ -86,7 +86,7 @@ class WebTimelineTest < Minitest::Test
     assert_match %r{<span class="nowlabel"[^>]*>now 09:30</span>}, html
     assert_match(/<ul class="vh"><li>busy \(every 5m\): /, html, "the same in words for screen readers")
     assert_match(/@media\(prefers-reduced-motion:reduce\)\{[^}]*animation:none!important/, html)
-    refute_match(/<script/i, html)
+    refute_match(/<script/i, html.sub('<script src="/cronwatch/app.js" defer></script>', ""), "drawn without script")
     assert_equal "4 jobs, <b>2 needing attention</b>.", html[%r{<p class="headline">(.*?)</p>}, 1]
   end
 

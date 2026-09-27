@@ -1,6 +1,7 @@
 import { formatDuration, formatRelative } from "../duration.js";
 import type { JobSummary, Run } from "../types.js";
 import { escapeHtml } from "./escape.js";
+import { THEME_COLOR, THEME_COLOR_DARK } from "./pwa.js";
 import { BOARD_LANES, BOARD_AHEAD_MS, BOARD_BEHIND_MS, clock, dayTimeline, laneNote, missedAt, parsedSchedule, weekTimeline, when, type LaneInput } from "./timeline.js";
 
 export { escapeHtml };
@@ -10,9 +11,14 @@ const h = escapeHtml;
 /*
  * Set like cronwatch.dev: a printed sheet on grey paper, a serif for what a
  * person reads, a mono for what a machine printed, neutral greys, and colour
- * only for the states CronWatch reports. The page may load nothing (its CSP
- * is default-src 'none'), so the fonts are system stacks that echo the site's
- * Newsreader and IBM Plex Mono, and use them when they are installed.
+ * only for the states CronWatch reports. The page loads nothing but its own
+ * app shell (its CSP is default-src 'none' plus 'self' for the script, the
+ * manifest, the worker and images), so the fonts are system stacks that echo
+ * the site's Newsreader and IBM Plex Mono, and use them when they are installed.
+ *
+ * Installed as an app (display-mode: standalone) the header stays at the top
+ * as the app's bar, and the page keeps clear of notches and the home
+ * indicator with the safe-area insets (the viewport is viewport-fit=cover).
  *
  * Motion is CSS only and says something: marks arrive in time order, the now
  * line drops in last, and open problems (a missed slot, a running bar) breathe
@@ -89,6 +95,9 @@ dl.def dd{margin:0;font:400 13.5px/1.7 var(--mono);color:var(--body);overflow-wr
 .message{padding:clamp(56px,12vh,120px) 0;text-align:center}
 .message h1{margin:0;font:400 clamp(28px,4vw,40px)/1.15 var(--serif);letter-spacing:-.015em}
 .message p{margin:14px auto 0;max-width:52ch;color:var(--muted);text-wrap:pretty}
+.signin{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin:28px auto 0;max-width:420px}
+.signin label{font:500 11px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.signin input{flex:1 1 180px;min-width:0;font:400 16px/1.2 var(--mono);color:var(--ink);background:var(--sheet);border:1px solid var(--rule-2);border-radius:3px;padding:8px 10px}
 footer{display:flex;flex-wrap:wrap;gap:6px 18px;padding:20px 0 40px;border-top:1px solid var(--rule);font:400 12px/1.5 var(--mono);color:var(--muted)}
 .timeline{margin:18px 0 0}
 .timeline .axis,.timeline .under,.timeline .over,.timeline .lane{display:grid;grid-template-columns:var(--who) minmax(0,1fr)}
@@ -141,6 +150,12 @@ svg .nowline{stroke:var(--ink);stroke-width:1.5}
 @keyframes cw-drop{from{opacity:0;transform:scaleY(0)}}
 @keyframes cw-rise{from{opacity:0;transform:translateY(4px)}}
 @keyframes cw-breathe{to{opacity:.38}}
+body{padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+footer{padding-bottom:calc(40px + env(safe-area-inset-bottom))}
+@media(display-mode:standalone){
+.top{position:sticky;top:0;z-index:2;background:var(--sheet);padding-top:calc(14px + env(safe-area-inset-top));padding-bottom:13px;-webkit-user-select:none;user-select:none}
+.message{padding-top:clamp(40px,8vh,80px)}
+}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media(max-width:760px){
 .sec{grid-template-columns:minmax(0,1fr);gap:10px;padding:24px 0}
@@ -166,16 +181,33 @@ dl.def{grid-template-columns:minmax(0,1fr);gap:0}dl.def dd{margin-bottom:10px}
 /** The clock face from cronwatch.dev, in the text colour. */
 const MARK = `<svg viewBox="0 0 40 40" aria-hidden="true" focusable="false"><rect x="1" y="1" width="38" height="38" rx="9.5" fill="none" stroke="currentColor" stroke-opacity=".22" stroke-width="1.5"/><circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 12.5V20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-export function layout(title: string, body: string, options: { refresh?: number } = {}): string {
+/**
+ * A page. `base` is where the dashboard is mounted ("" at the root): the head
+ * links the web app manifest, the icons and app.js, the one script, which
+ * only registers the service worker (routes/pwa.ts). Everything works
+ * without it.
+ */
+export function layout(title: string, body: string, base: string, options: { refresh?: number } = {}): string {
+  const b = h(base);
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <meta name="color-scheme" content="light dark">
 ${options.refresh ? `<meta http-equiv="refresh" content="${options.refresh}">` : ""}
 <title>${h(title)}</title>
+<meta name="theme-color" content="${THEME_COLOR}" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="${THEME_COLOR_DARK}" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CronWatch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="${b}/manifest.webmanifest">
+<link rel="icon" href="${b}/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="${b}/icons/apple-touch-icon.png">
+<script src="${b}/app.js" defer></script>
 <style>${CSS}</style>
 </head>
 <body><div class="sheet">${body}</div></body>
@@ -301,7 +333,7 @@ ${jobs.length ? `<section class="sec" aria-label="Last 24 hours">
 </section>` : ""}
 </main>
 <footer><span>Refreshes every minute. Times are UTC.</span><a href="${h(base)}/api/jobs">JSON</a></footer>`;
-  return layout("CronWatch", body, { refresh: 60 });
+  return layout("CronWatch", body, base, { refresh: 60 });
 }
 
 /**
@@ -387,9 +419,16 @@ export function jobPage(job: JobSummary, runs: Run[], now: number, base: string,
 </section>
 </main>
 <footer><span>Refreshes every minute. Times are UTC.</span><a href="${h(base)}/api/jobs/${encodeURIComponent(job.name)}">JSON</a></footer>`;
-  return layout(`${job.name}: CronWatch`, body, { refresh: 60 });
+  return layout(`${job.name}: CronWatch`, body, base, { refresh: 60 });
 }
 
-export function messagePage(title: string, message: string, base: string): string {
-  return layout(title, `<header class="top">${brand(base)}</header><main class="message"><h1>${h(title)}</h1><p>${h(message)}</p></main>`);
+/**
+ * A page with one message. With `signIn`, a form under it takes the token
+ * and sends it as ?token=, which the routes move into the cookie: the way in
+ * where there is no address bar to open a link with, such as an app on an
+ * iPhone's home screen, which keeps its cookies apart from Safari's.
+ */
+export function messagePage(title: string, message: string, base: string, signIn = false): string {
+  const form = signIn ? `<form class="signin" method="get" action="${h(base)}/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>` : "";
+  return layout(title, `<header class="top">${brand(base)}</header><main class="message"><h1>${h(title)}</h1><p>${h(message)}</p>${form}</main>`, base);
 }

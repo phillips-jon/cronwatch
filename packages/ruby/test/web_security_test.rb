@@ -161,7 +161,7 @@ class WebSecurityTest < Minitest::Test
     assert_equal 404, send.call("POST", "/cronwatch/jobs/s/explode", form).status
   end
 
-  def test_pages_carry_a_strict_csp_and_security_headers_and_need_no_script
+  def test_pages_carry_a_strict_csp_and_security_headers_and_need_no_script_of_their_own
     cw, _, send = app
     cw.run("h") { nil }
     ["/cronwatch/", "/cronwatch/jobs/h", "/cronwatch/nope"].each do |path|
@@ -170,13 +170,16 @@ class WebSecurityTest < Minitest::Test
       assert_match(/default-src 'none'/, csp)
       assert_match(/frame-ancestors 'none'/, csp)
       assert_match(/form-action 'self'/, csp)
-      refute_match(/script-src/, csp)
+      # Scripts only from the dashboard itself (app.js, which registers the service worker).
+      assert_match(/script-src 'self';/, csp)
+      refute_match(/unsafe-eval|script-src[^;]*unsafe-inline/, csp)
       assert_equal "DENY", res.headers["x-frame-options"]
       assert_equal "nosniff", res.headers["x-content-type-options"]
       assert_equal "same-origin", res.headers["referrer-policy"]
       assert_equal "no-store", res.headers["cache-control"]
       assert_equal "noindex", res.headers["x-robots-tag"]
-      refute_match(/<script/i, res.body)
+      assert_equal ['<script src="/cronwatch/app.js" defer></script>'], res.body.scan(%r{<script[^>]*>[^<]*</script>}i), "one script, external, empty"
+      assert_equal 1, res.body.scan(/<script/i).length
       refute_match(/\son[a-z]+=/i, res.body, "no inline event handlers")
     end
     page = send.call("GET", "/cronwatch/jobs/h", BEARER).body

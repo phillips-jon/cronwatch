@@ -156,7 +156,7 @@ test("the silence form shows an error for a bad duration and 404s a missing job"
   assert.equal((await send("POST", "/cronwatch/jobs/s/explode", form)).status, 404);
 });
 
-test("pages carry a strict CSP and security headers, and need no script", async () => {
+test("pages carry a strict CSP and security headers, and need no script of their own", async () => {
   const { cw, send, bearer } = app();
   await cw.run("h", async () => {});
   for (const path of ["/cronwatch/", "/cronwatch/jobs/h", "/cronwatch/nope"]) {
@@ -165,13 +165,16 @@ test("pages carry a strict CSP and security headers, and need no script", async 
     assert.match(csp, /default-src 'none'/);
     assert.match(csp, /frame-ancestors 'none'/);
     assert.match(csp, /form-action 'self'/);
-    assert.doesNotMatch(csp, /script-src/);
+    // Scripts only from the dashboard itself (app.js, which registers the service worker).
+    assert.match(csp, /script-src 'self';/);
+    assert.doesNotMatch(csp, /unsafe-eval|script-src[^;]*unsafe-inline/);
     assert.equal(res.headers.get("x-frame-options"), "DENY");
     assert.equal(res.headers.get("x-content-type-options"), "nosniff");
     assert.equal(res.headers.get("referrer-policy"), "same-origin");
     assert.equal(res.headers.get("cache-control"), "no-store");
     const html = await res.text();
-    assert.doesNotMatch(html, /<script/i);
+    assert.deepEqual(html.match(/<script[^>]*>[^<]*<\/script>/gi), [`<script src="/cronwatch/app.js" defer></script>`], "one script, external, empty");
+    assert.equal(html.match(/<script/gi)!.length, 1);
     assert.doesNotMatch(html, /\son[a-z]+=/i, "no inline event handlers");
   }
   const page = await (await send("GET", "/cronwatch/jobs/h", bearer)).text();
