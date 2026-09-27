@@ -84,6 +84,10 @@ Each attempt runs the `run` function again from the start, so each attempt is it
 
 `maxDuration` counts CPU time in seconds and leaves out time spent in `wait.for` and in `triggerAndWait`. CronWatch's `timeout` is wall-clock time from the start of the attempt. For a task that waits, set `timeout` to cover the waits as well as the work, or the run is marked stuck while it is only waiting. A task stopped at `maxDuration` cannot record its end; the next check after `timeout` marks it stuck.
 
+## Work that spans tasks
+
+When a scheduled task hands its work to another task with `trigger()` and does not wait, `run()` around the scheduled task only covers the hand-off. To watch the whole of it as one run, call `digest.start({ id: ctx.run.id })` in the scheduled task, pass the id in the payload, and in the child call `digest.resume(id)` and then `finish()`, or `fail(error)` in its `catch`. A child that never finishes leaves the run to be marked stuck after `timeout`. See [the run handle](/docs/api/#the-run-handle).
+
 ## Where the check runs
 
 If your app already runs CronWatch with the same store, its check covers these jobs too. It learns about a job from its first run; to catch a task that has never run, declare the job in the app as well.

@@ -26,6 +26,8 @@ Alerts on the first failure by default. Set `failuresBeforeAlert: 3` to wait for
 
 A run started and never reported finishing within `timeout`. Marked as `timeout` by the next check, counted as a failure. Usually a killed process: a serverless limit, a deploy, an OOM. Closes when the next run starts; the recovered message follows the next successful run.
 
+A run started with `job.start()` and never finished is caught the same way. See [Runs that span calls](#runs-that-span-calls).
+
 ## slow
 
 A successful run took longer than it should. The threshold is:
@@ -71,3 +73,17 @@ Baselines use the last twenty successful runs, reading past any failures in betw
 ## Output and metrics
 
 Output, whether logged or returned, and errors are capped at 16 KB per run, keeping the tail. Before either is stored, values that look like secrets are replaced with `[redacted]`: `password=`, `api_key:`, `:secret => "..."` and similar pairs (quoted values in full), credentials in URLs, `Bearer`, `Basic` and `Token` authorization values, PEM private keys, JWTs, Slack and Discord webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats. NUL bytes are removed. `expect` rules see the output before redaction. Pass `redact` to `cronwatch()` (or `Cronwatch.new`, or `c.redact` in `Cronwatch.configure`) to use your own function, or `false` to turn it off. Metrics are numbers keyed by name; report as many as you like. Both are stored with the run, shown on the dashboard and in alerts, and handed to the MCP server and to triage.
+
+## Runs that span calls
+
+A run is normally one call to `run()`. Work that starts in one call and ends in another (the steps of an Inngest function, a queue that hands work to another process, a webhook that reports completion later) can be one run too: `job.start()` records it as running, and `finish()` on the handle it returns, or on one from `job.resume(runId)` in another process, ends it.
+
+```ts
+const run = await job.start({ id: event.id });      // records a running run
+// later, perhaps elsewhere
+const same = await job.resume(event.id);
+same.log("sent 40 emails");
+await same.finish();                                  // or same.fail(error)
+```
+
+Starting closes missed and stuck like any run starting. Finishing is judged like any run finishing: `expect`, failures, duration from the start, budgets. It opens nothing a finished `run()` would not, and a finish that comes twice is ignored. A run that is never finished is marked stuck after the job's `timeout`, so set `timeout` to cover the whole span, waits included. See [the run handle](/docs/api/#the-run-handle).

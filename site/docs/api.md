@@ -43,6 +43,8 @@ Returns a handle:
 |---|---|
 | `run(fn, { trigger? })` | runs `fn(job)`, records the run, returns its result, rethrows its error |
 | `handler(fn, { secret? })` | a `(request) => Promise<Response>` that checks the bearer secret, runs `fn(job, request)` and answers with JSON, or with the `Response` `fn` returned. `secret` defaults to the client's `cronSecret`; `null` accepts anyone, and then the JSON leaves out the error text |
+| `start({ trigger?, id? })` | records a running run now and returns a [run handle](#the-run-handle) to finish it later, perhaps in another process. `trigger` defaults to `"start"`. `id` (1 to 200 characters) is your own stable id, such as an Inngest run id: a start with an id already recorded returns a handle on that run instead of recording another. A store that fails is reported to `onError`, never thrown, and the run is written when it finishes |
+| `resume(runId)` | a run handle on a run started elsewhere, read from the store. One that already finished, or is not in the store, gives a handle whose `finish()` records nothing and reports why to `onError`. Throws only for a run of another job |
 
 ## The job context
 
@@ -55,6 +57,21 @@ Passed to your function.
 | `log(...parts)` | append a line of output (objects are JSON) |
 | `metric(name, value)` | report a number |
 | `metrics({ ... })` | several at once |
+
+## The run handle
+
+What `start()` and `resume()` return, for a run that spans several calls or processes. See [Runs that span calls](/docs/conditions/#runs-that-span-calls).
+
+| | |
+|---|---|
+| `id`, `job`, `startedAt` | `startedAt` is null when a resumed run could not be read |
+| `active` | false once finished, and from the start when a resumed run has already finished or was not found |
+| `log(...parts)`, `metric(name, value)`, `metrics({ ... })` | as on the job context; kept in the handle until `flush()` or `finish()` |
+| `flush()` | appends the lines and metrics so far to the stored run, which must still be running. Output is redacted as it is written. This reads, changes and writes the run's row, so when two processes append to one run at the same moment the last write wins and the other's lines are lost |
+| `finish(outcome?)` | finishes the run and judges it like any other. `finish()` or `finish({ status: "ok" })` is a success; `finish({ error })` a failure, recorded like an error `run()` caught; `finish("text")` or `finish({ result })` treats the value like `run()`'s return (a string is the output when nothing was logged and is checked by `expect`; a `Response` of 400 or above fails). Lines and metrics from the handle are added to those already stored, then `expect`, redaction and the 16 KB cap apply. Resolves to the recorded run, or null when nothing was recorded |
+| `fail(error)` | `finish({ error })` |
+
+A second `finish()` on a handle, or on a run another process has finished, records nothing: it resolves to null and is reported to `onError`, never thrown. A run that is never finished is marked stuck by the first check after the job's `timeout`; one finished after that follows the same rule as a late `run()`: a late failure is not counted again, and a late success closes stuck and recovers.
 
 ## The client
 
@@ -72,6 +89,7 @@ Passed to your function.
 | `forget(name)` | remove a job and its runs from the store |
 | `definedJobs()` | the definitions declared in this process |
 | `close()` | stop the interval and close the store |
+| `resumeRun(name, runId)` | `job(name).resume(runId)` for a job declared in this process; rejects for one that is not |
 
 ## Exports
 
