@@ -102,7 +102,8 @@ function curlyApostrophes(html) {
 }
 
 /* The mark: a clock at three, the hour the invoice run failed, in a rounded box. */
-const MARK = `<svg class="mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><rect x="0.5" y="0.5" width="39" height="39" rx="9.5" fill="var(--box)" stroke="var(--line)"/><circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 12.5V20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// The clock in a rounded box, as in the favicon; the box itself is CSS (.brand .mark).
+const MARK = `<span class="mark" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 12.5V20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
 const assets = { css: "", js: "", theme: "" };
 

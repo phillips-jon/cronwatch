@@ -88,7 +88,11 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .links a:hover, .links a.here { text-decoration-color: var(--ink); }
 .brand { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; font-weight: 600; font-size: 18px; color: var(--ink); letter-spacing: -0.01em; }
 .brand:hover { color: var(--ink); }
-.brand .mark { width: 26px; height: 26px; display: block; --box: var(--sunk); }
+/* The mark sits in a rounded box like the favicon: dark on light paper, light
+   on dark. The one gradient on the site, by the owner's choice. */
+.brand .mark { width: 26px; height: 26px; display: block; border-radius: 6.5px; background: linear-gradient(180deg, #3f3f46 0%, #09090b 100%); color: #fafafa; transform: translate(2px, -2px); }
+.brand .mark svg { width: 100%; height: 100%; display: block; }
+:root[data-theme="dark"] .brand .mark { background: linear-gradient(180deg, #fafafa 0%, #c9c9cf 100%); color: #09090b; }
 .menu { display: none; }
 
 /* The opening: the first paragraph does the work a slogan usually does. */
