@@ -1,0 +1,492 @@
+"""Everything public about a job, a run and an alert.
+
+Python names are snake_case (``failures_before_alert``, ``started_at``).
+Anything that leaves the process (store rows, JSON columns, webhook bodies)
+uses the SDK's exact camelCase field names and string values, so a Node, a
+Ruby and a Python process can share one database. Each type's ``to_dict()``
+is that JSON shape, with the SDK's key order, and ``from_dict()`` reads it
+(camelCase or snake_case keys).
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
+
+
+class RunStatus(StrEnum):
+    RUNNING = "running"
+    OK = "ok"
+    FAILED = "failed"
+    TIMEOUT = "timeout"
+
+
+class Condition(StrEnum):
+    MISSED = "missed"
+    FAILED = "failed"
+    STUCK = "stuck"
+    SLOW = "slow"
+    OVER_BUDGET = "over_budget"
+
+
+CONDITIONS: tuple[Condition, ...] = tuple(Condition)
+
+
+class AlertType(StrEnum):
+    MISSED = "missed"
+    FAILED = "failed"
+    STUCK = "stuck"
+    SLOW = "slow"
+    OVER_BUDGET = "over_budget"
+    RECOVERED = "recovered"
+
+
+class JobHealth(StrEnum):
+    HEALTHY = "healthy"
+    LATE = "late"
+    FAILING = "failing"
+    STUCK = "stuck"
+    SILENCED = "silenced"
+    NEVER_RAN = "never_ran"
+
+
+def camel(name: str) -> str:
+    """failures_before_alert -> failuresBeforeAlert."""
+    return re.sub(r"_([a-z0-9])", lambda m: m.group(1).upper(), name)
+
+
+def snake(name: str) -> str:
+    """failuresBeforeAlert -> failures_before_alert."""
+    return re.sub(r"([A-Z])", lambda m: "_" + m.group(1).lower(), name)
+
+
+def _enum(kind: type[StrEnum], value: Any) -> Any:
+    """A known wire string as its enum member; anything else as it came."""
+    try:
+        return kind(value)
+    except ValueError:
+        return value
+
+
+def _get(data: Mapping[str, Any], key: str, default: Any = None) -> Any:
+    """A camelCase field from a mapping with camelCase or snake_case keys."""
+    if key in data:
+        return data[key]
+    s = snake(key)
+    if s in data:
+        return data[s]
+    return default
+
+
+def _has(data: Mapping[str, Any], key: str) -> bool:
+    return key in data or snake(key) in data
+
+
+class JobDefinition:
+    """A job's options. Kept as an ordered set of fields, in camelCase, so its
+    JSON has the same keys in the same order as the SDK writes: defaults, then
+    options as given, then name, and a stored ``expect`` last. Fields this
+    version does not know (written by a newer one) are kept as they came."""
+
+    __slots__ = ("_fields",)
+
+    FIELDS: dict[str, str] = {
+        "name": "name",
+        "schedule": "schedule",
+        "timezone": "timezone",
+        "grace": "grace",
+        "timeout": "timeout",
+        "max_duration": "maxDuration",
+        "budget": "budget",
+        "expect": "expect",
+        "failures_before_alert": "failuresBeforeAlert",
+        "description": "description",
+        "tags": "tags",
+    }
+    OPTIONS: tuple[str, ...] = tuple(k for k in FIELDS if k != "name")
+
+    def __init__(self, fields: Mapping[str, Any] | None = None) -> None:
+        by_snake = JobDefinition.FIELDS
+        out: dict[str, Any] = {}
+        for key, value in (fields or {}).items():
+            out[by_snake.get(key, key)] = value
+        self._fields = out
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | JobDefinition | None) -> JobDefinition:
+        if isinstance(data, JobDefinition):
+            return data
+        return cls(data or {})
+
+    # The fields, by their snake_case names.
+    name = property(lambda self: self._fields.get("name"))
+    schedule = property(lambda self: self._fields.get("schedule"))
+    timezone = property(lambda self: self._fields.get("timezone"))
+    grace = property(lambda self: self._fields.get("grace"))
+    timeout = property(lambda self: self._fields.get("timeout"))
+    max_duration = property(lambda self: self._fields.get("maxDuration"))
+    budget = property(lambda self: self._fields.get("budget"))
+    expect = property(lambda self: self._fields.get("expect"))
+    failures_before_alert = property(lambda self: self._fields.get("failuresBeforeAlert"))
+    description = property(lambda self: self._fields.get("description"))
+    tags = property(lambda self: self._fields.get("tags"))
+
+    @property
+    def fields(self) -> dict[str, Any]:
+        """The fields in order, camelCase keys, as given."""
+        return dict(self._fields)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._fields.get(JobDefinition.FIELDS.get(key, key), default)
+
+    def replace(self, **changes: Any) -> JobDefinition:
+        """A copy with some fields changed, or added at the end as in JavaScript."""
+        fields = dict(self._fields)
+        for key, value in changes.items():
+            fields[JobDefinition.FIELDS.get(key, key)] = value
+        return JobDefinition(fields)
+
+    def to_dict(self) -> dict[str, Any]:
+        """The JSON shape: fields set to None are left out, as undefined is."""
+        return {k: (dict(v) if isinstance(v, Mapping) else v) for k, v in self._fields.items() if v is not None}
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, JobDefinition) and self._fields == other._fields
+
+    def __hash__(self) -> int:
+        return hash(tuple(self._fields))
+
+    def __repr__(self) -> str:
+        return f"JobDefinition({self._fields!r})"
+
+
+@dataclass
+class Run:
+    id: str
+    job: str
+    status: RunStatus | str
+    #: Epoch milliseconds.
+    started_at: int
+    finished_at: int | None = None
+    duration_ms: int | None = None
+    error: str | None = None
+    #: Lines written with log(), or the string the job returned. Capped at 16 KB.
+    output: str | None = None
+    metrics: dict[str, float] = field(default_factory=dict)
+    #: What started the run: "run", "start" or a value you pass.
+    trigger: str = "run"
+
+    def __post_init__(self) -> None:
+        self.status = _enum(RunStatus, self.status)
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | Run) -> Run:
+        if isinstance(data, Run):
+            return data
+        metrics = _get(data, "metrics") or {}
+        return cls(
+            id=_get(data, "id"),
+            job=_get(data, "job"),
+            status=_get(data, "status"),
+            started_at=_get(data, "startedAt"),
+            finished_at=_get(data, "finishedAt"),
+            duration_ms=_get(data, "durationMs"),
+            error=_get(data, "error"),
+            output=_get(data, "output"),
+            metrics={str(k): v for k, v in metrics.items()},
+            trigger=_get(data, "trigger", "run"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "job": self.job,
+            "status": str(self.status),
+            "startedAt": self.started_at,
+            "finishedAt": self.finished_at,
+            "durationMs": self.duration_ms,
+            "error": self.error,
+            "output": self.output,
+            "metrics": dict(self.metrics or {}),
+            "trigger": self.trigger,
+        }
+
+    def copy(self) -> Run:
+        return Run(**{**self.__dict__, "metrics": dict(self.metrics or {})})
+
+    @property
+    def running(self) -> bool:
+        return self.status == RunStatus.RUNNING
+
+    @property
+    def ok(self) -> bool:
+        return self.status == RunStatus.OK
+
+
+@dataclass
+class StoredJob:
+    name: str
+    definition: JobDefinition
+    created_at: int
+    updated_at: int
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | StoredJob) -> StoredJob:
+        if isinstance(data, StoredJob):
+            return data
+        return cls(
+            name=_get(data, "name"),
+            definition=JobDefinition.from_dict(_get(data, "definition") or {}),
+            created_at=_get(data, "createdAt"),
+            updated_at=_get(data, "updatedAt"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"name": self.name, "definition": self.definition.to_dict(), "createdAt": self.created_at, "updatedAt": self.updated_at}
+
+
+def details_to_json(value: Any) -> Any:
+    """An alert's details, snake_case keys in Python, as their camelCase JSON."""
+    if isinstance(value, Mapping):
+        return {camel(k) if isinstance(k, str) else str(k): details_to_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [details_to_json(v) for v in value]
+    if isinstance(value, StrEnum):
+        return str(value)
+    return value
+
+
+def details_from_json(value: Any) -> dict[str, Any]:
+    """An alert's details read from JSON, with snake_case keys and conditions as Condition."""
+
+    def convert(v: Any) -> Any:
+        if isinstance(v, Mapping):
+            return {snake(k): convert(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [convert(x) for x in v]
+        return v
+
+    details = convert(value or {})
+    if isinstance(details.get("after"), list):
+        details["after"] = [_enum(Condition, c) for c in details["after"]]
+    return details
+
+
+@dataclass
+class AlertDraft:
+    """An alert before it has a title and message. See format.compose_alert()."""
+
+    type: AlertType | str
+    run: Run | None
+    details: dict[str, Any]
+
+    def __post_init__(self) -> None:
+        self.type = _enum(AlertType, self.type)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"type": str(self.type), "run": self.run.to_dict() if self.run else None, "details": details_to_json(self.details)}
+
+
+@dataclass
+class Alert:
+    """An alert as every channel receives it.
+
+    ``triage`` is the triage function's diagnosis, or None. A None triage is
+    one of two things, as in the SDK: never tried (no "triage" key in the
+    JSON), or tried and nothing came of it (``"triage": null``, and
+    ``triage_tried`` is True). A tried alert is not triaged again.
+    """
+
+    type: AlertType | str
+    run: Run | None
+    details: dict[str, Any]
+    job: str
+    definition: JobDefinition
+    #: One line, suitable as a notification title.
+    title: str
+    #: A few lines of plain text with the specifics.
+    message: str
+    at: int
+    triage: str | None = None
+    triage_tried: bool = False
+
+    def __post_init__(self) -> None:
+        self.type = _enum(AlertType, self.type)
+        if self.triage is not None:
+            self.triage_tried = True
+
+    def set_triage(self, diagnosis: str | None) -> None:
+        """Records a triage attempt: the diagnosis, or None when there was none."""
+        self.triage = diagnosis
+        self.triage_tried = True
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | Alert) -> Alert:
+        if isinstance(data, Alert):
+            return data
+        run = _get(data, "run")
+        alert = cls(
+            type=_get(data, "type"),
+            run=Run.from_dict(run) if run else None,
+            details=details_from_json(_get(data, "details") or {}),
+            job=_get(data, "job"),
+            definition=JobDefinition.from_dict(_get(data, "definition") or {}),
+            title=_get(data, "title"),
+            message=_get(data, "message"),
+            at=_get(data, "at"),
+        )
+        if _has(data, "triage"):
+            alert.set_triage(_get(data, "triage"))
+        return alert
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "type": str(self.type),
+            "run": self.run.to_dict() if self.run else None,
+            "details": details_to_json(self.details),
+            "job": self.job,
+            "definition": self.definition.to_dict() if isinstance(self.definition, JobDefinition) else self.definition,
+            "title": self.title,
+            "message": self.message,
+            "at": self.at,
+        }
+        if self.triage_tried:
+            out["triage"] = self.triage
+        return out
+
+
+@dataclass
+class JobState:
+    """A job's state. ``version`` goes up by one on every write, so a store can
+    refuse a write made from a stale read (see compare_and_set_state). None
+    counts as 0."""
+
+    job: str
+    #: Conditions currently open, with the time each one opened.
+    open: dict[str, int] = field(default_factory=dict)
+    consecutive_failures: int = 0
+    silenced_until: float | None = None
+    #: When an alert last reached at least one channel.
+    last_alert_at: int | None = None
+    #: Conditions that alerted and have since closed, waiting for the recovered message.
+    pending_recovery: list[Condition | str] | None = None
+    #: Alerts that no channel accepted. Each check retries them once.
+    undelivered: list[Alert] | None = None
+    version: int | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | JobState) -> JobState:
+        if isinstance(data, JobState):
+            return data
+        pending = _get(data, "pendingRecovery")
+        undelivered = _get(data, "undelivered")
+        return cls(
+            job=_get(data, "job"),
+            open={_enum(Condition, k): v for k, v in (_get(data, "open") or {}).items()},
+            consecutive_failures=_get(data, "consecutiveFailures", 0),
+            silenced_until=_get(data, "silencedUntil"),
+            last_alert_at=_get(data, "lastAlertAt"),
+            pending_recovery=None if pending is None else [_enum(Condition, c) for c in pending],
+            undelivered=None if undelivered is None else [Alert.from_dict(a) for a in undelivered],
+            version=_get(data, "version"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        """pendingRecovery, undelivered and version are left out when unset, as
+        in state written before they existed. The version comes last, where the
+        SDK's spread of a normalized state puts it."""
+        out: dict[str, Any] = {
+            "job": self.job,
+            "open": {str(k): v for k, v in (self.open or {}).items()},
+            "consecutiveFailures": self.consecutive_failures,
+            "silencedUntil": self.silenced_until,
+            "lastAlertAt": self.last_alert_at,
+        }
+        if self.pending_recovery is not None:
+            out["pendingRecovery"] = [str(c) for c in self.pending_recovery]
+        if self.undelivered is not None:
+            out["undelivered"] = [a.to_dict() for a in self.undelivered]
+        if self.version is not None:
+            out["version"] = self.version
+        return out
+
+    def copy(self) -> JobState:
+        return JobState(
+            job=self.job,
+            open=dict(self.open or {}),
+            consecutive_failures=self.consecutive_failures,
+            silenced_until=self.silenced_until,
+            last_alert_at=self.last_alert_at,
+            pending_recovery=None if self.pending_recovery is None else list(self.pending_recovery),
+            undelivered=None if self.undelivered is None else list(self.undelivered),
+            version=self.version,
+        )
+
+
+@dataclass
+class JobStats:
+    runs: int
+    ok_rate: float
+    p50_ms: int | None
+    p95_ms: int | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"runs": self.runs, "okRate": self.ok_rate, "p50Ms": self.p50_ms, "p95Ms": self.p95_ms}
+
+
+@dataclass
+class JobSummary:
+    name: str
+    definition: JobDefinition
+    health: JobHealth
+    open: list[Condition | str]
+    last_run: Run | None
+    #: When the schedule says the next run is due. None without a schedule.
+    next_expected_at: int | None
+    consecutive_failures: int
+    silenced_until: float | None
+    #: From the last twenty runs of any status; p50 and p95 are over the successful ones among them.
+    stats: JobStats
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "definition": self.definition.to_dict(),
+            "health": str(self.health),
+            "open": [str(c) for c in self.open],
+            "lastRun": self.last_run.to_dict() if self.last_run else None,
+            "nextExpectedAt": self.next_expected_at,
+            "consecutiveFailures": self.consecutive_failures,
+            "silencedUntil": self.silenced_until,
+            "stats": self.stats.to_dict(),
+        }
+
+
+@dataclass
+class CheckResult:
+    checked_at: int
+    jobs: list[JobSummary]
+    alerts: list[Alert]
+    pruned: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "checkedAt": self.checked_at,
+            "jobs": [j.to_dict() for j in self.jobs],
+            "alerts": [a.to_dict() for a in self.alerts],
+            "pruned": self.pruned,
+        }
+
+
+@dataclass
+class JobWithRuns:
+    """A job's summary and its newest runs, as the dashboard shows them."""
+
+    job: JobSummary
+    runs: list[Run]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"job": self.job.to_dict(), "runs": [r.to_dict() for r in self.runs]}

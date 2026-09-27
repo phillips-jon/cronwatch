@@ -2,7 +2,8 @@
 # typecheck, tests, a build, and the packed packages used from a scratch
 # project, on the two Node majors better-sqlite3 13 supports. The Ruby gem's
 # tests run on the oldest and newest Ruby it supports, against each
-# supported Rails series. One Node and one Ruby entry also run the pg_cron
+# supported Rails series. The Python package's tests run on the oldest and
+# newest Python it supports. One Node and one Ruby entry also run the pg_cron
 # tests against a Postgres with the extension, and the built site's links
 # are checked.
 # A green run on main is what lets deploy.yml ship the site.
@@ -192,3 +193,47 @@ jobs:
         env:
           CRONWATCH_TEST_RUBY: "1"
           CRONWATCH_RUBY: bundle exec ruby
+
+  # The Python package's tests replay conformance/, share a SQLite file with
+  # the built SDK and check the croner port against croner, so the SDK is
+  # built (and the fixtures checked) first.
+  python:
+    name: python (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Builds the SDK, then fails if conformance/ is stale.
+      - run: npm run check:conformance
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv run --python ${{ matrix.python }} pytest
+        working-directory: packages/python
+      # Build the wheel, install it into an empty virtualenv and use it from a
+      # directory outside the project, as an app would.
+      - name: Build, install and import the package
+        working-directory: packages/python
+        run: |
+          dir="$(mktemp -d)"
+          uv build --out-dir "$dir/dist"
+          uv venv --python ${{ matrix.python }} "$dir/venv"
+          VIRTUAL_ENV="$dir/venv" uv pip install "$dir"/dist/*.whl
+          cd "$dir"
+          "$dir/venv/bin/python" -c '
+          import cronwatch
+          from cronwatch.stores import SqliteStore
+          cw = cronwatch.Cronwatch(store=SqliteStore("smoke.db"), alerts=[], cron_secret=None)
+          job = cw.job("smoke", schedule="*/5 * * * *", timezone="UTC")
+          assert job.run(lambda ctx: ctx.log("ok") or 42) == 42
+          run = cw.runs("smoke")[0]
+          assert run.ok and run.output == "ok", run
+          print("cronwatch", cronwatch.__version__, "from", cronwatch.__file__)
+          '

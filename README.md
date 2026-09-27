@@ -44,6 +44,7 @@ export const { GET, POST, DELETE } = cw.routes();
 |---|---|
 | [`@cronwatch/sdk`](packages/sdk) | the library for Node, Cloudflare Workers, Deno and Bun: jobs, runs, checks, stores (memory, SQLite, Postgres, D1), pg_cron jobs read from Postgres, alerts (Slack, Discord, webhook, email, SMS, error trackers), dashboard and API, adapters for Node servers, optional Claude triage |
 | [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob and Sidekiq integration, schedules read from Solid Queue or sidekiq-cron, pg_cron jobs, the same alert channels, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
+| [`cronwatch-sdk` for Python](packages/python) | the Python port, under way: the core (jobs, runs, checks, the same rules and alert text), the memory and SQLite stores, sharing SQLite files with the SDK byte for byte. Postgres, the channels, the dashboard and Django, Celery and APScheduler come next ([its DESIGN.md](packages/python/DESIGN.md)) |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
 | [`site`](site) | cronwatch.dev, a static landing page and docs |
@@ -101,7 +102,7 @@ npm run check          # dash check, typecheck, tests
 npm run build          # every package and the site
 npm run dev --workspace site    # the site on http://localhost:4321, rebuilding on change
 npm run check:packages # pack both packages and use them from a scratch project (after build)
-npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem
+npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python package
 ```
 
 The gem (Ruby 3.2 or newer), after `npm run build` so its Node compatibility tests can run:
@@ -114,18 +115,27 @@ bundle exec rake test
 
 [Its README](packages/ruby/README.md#testing) has the rest: Postgres, each Rails series, the dashboard fixture and the MCP cross test.
 
+The Python package (Python 3.11 or newer), with [uv](https://docs.astral.sh/uv/), after `npm run build` so its Node compatibility and croner parity tests can run:
+
+```bash
+npm run check:python                                 # uv run pytest in packages/python
+cd packages/python && uv run --python 3.11 pytest    # a particular Python
+```
+
+It replays `conformance/` too, and is fixed the same way when the fixtures change. It is not part of `npm run check`, which does not need uv; CI runs it on Python 3.11 and 3.14.
+
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 
 ## Releasing
 
-The SDK, the MCP server, the gem and the skill share one version. From a clean `main`:
+The SDK, the MCP server, the gem, the Python package and the skill share one version. From a clean `main`:
 
 ```bash
 npm run release -- 0.4.0 --dry-run   # show every change and command, write nothing
 npm run release -- 0.4.0             # bump, regenerate, check, commit "Release 0.4.0", tag v0.4.0
 ```
 
-It bumps every file listed at the top of `scripts/release.mjs`, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, runs `npm run check`, the build, `npm run check:packages` and (with Ruby 3.2 or newer; `--skip-ruby` skips them) the gem's tests, then builds the gem and checks what it carries. It does not push or publish: it prints the `git push`, `npm publish` and `gem push` commands to run next (RubyGems spells a prerelease `0.4.0-beta.1` as `0.4.0.pre.beta.1` and refuses `+build` metadata, so the script does too), and `npm deprecate` lines for any `--deprecate <old>`. A new package under `packages/` needs a row in both of its tables (the file holding its version, and how it ships), or the script refuses to run.
+It bumps every file listed at the top of `scripts/release.mjs`, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, runs `npm run check`, the build, `npm run check:packages` and (with Ruby 3.2 or newer; `--skip-ruby` skips them) the gem's tests, then builds the gem and checks what it carries, and (with uv; `--skip-python` skips them) the Python package's tests. It does not push or publish: it prints the `git push`, `npm publish`, `gem push` and `uv publish` commands to run next (RubyGems spells a prerelease `0.4.0-beta.1` as `0.4.0.pre.beta.1` and refuses `+build` metadata, so the script does too), and `npm deprecate` lines for any `--deprecate <old>`. A new package under `packages/` needs a row in both of its tables (the file holding its version, and how it ships), or the script refuses to run.
 
 ## Deploying the site
 

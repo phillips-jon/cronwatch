@@ -1,0 +1,560 @@
+"""Replays every case in conformance/ (written by scripts/conformance.mjs from
+the TypeScript SDK) that concerns the core. Values are compared as the JSON
+the SDK would write, so key order and number formatting count too. The
+channel, triage and pg_cron fixtures belong to later phases and are skipped,
+by name, until then."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import re
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from cronwatch import _js, duration, evaluate, output, schedule, serialize
+from cronwatch.format import compose_alert
+from cronwatch.job import RunRecorder
+from cronwatch.stores import MemoryStore, SqliteStore
+from cronwatch.types import Alert, AlertDraft, JobDefinition, JobState, Run, StoredJob
+
+from helpers import T0
+
+DIR = Path(__file__).resolve().parents[3] / "conformance"
+
+
+def fixture(name: str) -> dict[str, Any]:
+    return json.loads((DIR / name).read_text("utf-8"))
+
+
+def decode(value: Any) -> Any:
+    """JSON has no NaN or Infinity; the fixtures write them as {"special": "NaN"}."""
+    if isinstance(value, dict) and "special" in value:
+        return {"NaN": math.nan, "Infinity": math.inf, "-Infinity": -math.inf}[value["special"]]
+    return value
+
+
+def as_json(value: Any) -> str:
+    if isinstance(value, list):
+        return "[" + ",".join(as_json(v) for v in value) + "]"
+    return _js.dumps(value.to_dict() if hasattr(value, "to_dict") else value)
+
+
+def each_case(cases: list[dict[str, Any]], check: Any) -> None:
+    """Runs each case, collecting mismatches, so one failure lists them all."""
+    failures = []
+    for i, case in enumerate(cases):
+        try:
+            message = check(case)
+        except Exception as error:  # noqa: BLE001
+            message = f"raised {type(error).__name__}: {error}"
+        if message:
+            failures.append(f"#{i} {json.dumps(case)[:300]}\n    {message}")
+    assert not failures, f"{len(failures)} of {len(cases)} cases differ:\n" + "\n".join(failures[:15])
+
+
+def differs(expected: Any, actual: Any) -> str | None:
+    e = expected if isinstance(expected, str) else as_json(expected)
+    a = actual if isinstance(actual, str) else as_json(actual)
+    return None if e == a else f"expected {e[:1500]}\n    got      {a[:1500]}"
+
+
+def raises(expected: str, fn: Any) -> str | None:
+    try:
+        fn()
+    except ValueError as error:
+        return None if str(error) == expected else f"expected error {expected!r}\n    got   error {str(error)!r}"
+    return f"expected an error: {expected}"
+
+
+# ---------------------------------------------------------------- duration
+
+DURATION = fixture("duration.json")
+
+
+def test_duration_parse() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        args = [decode(c["input"])] + ([c["label"]] if "label" in c else [])
+        if "error" in c:
+            return raises(c["error"], lambda: duration.parse_duration(*args))
+        return differs(c["ms"], duration.parse_duration(*args))
+
+    each_case(DURATION["parse"], check)
+
+
+def test_duration_format() -> None:
+    each_case(DURATION["format"], lambda c: differs(c["text"], duration.format_duration(decode(c["ms"]))))
+
+
+def test_duration_relative() -> None:
+    each_case(DURATION["relative"], lambda c: differs(c["text"], duration.format_relative(c["at"], c["now"])))
+
+
+# ---------------------------------------------------------------- schedule
+
+SCHEDULE = fixture("schedule.json")
+
+
+def test_schedule_parse() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        if "error" in c:
+            return raises(c["error"], lambda: schedule.parse_schedule(c["schedule"], c.get("timezone")))
+        return differs(c["parsed"], schedule.parse_schedule(c["schedule"], c.get("timezone")))
+
+    each_case(SCHEDULE["parse"], check)
+
+
+def _times(values: list[Any]) -> list[Any]:
+    return [_js.iso(v) if v is not None else None for v in values]
+
+
+def test_schedule_fires() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        parsed = schedule.parse_schedule(c["schedule"], c.get("timezone"))
+        t = c["from"]
+        fires = []
+        for _ in c["fires"]:
+            t = schedule.next_fire(parsed, t, None)
+            fires.append(t)
+            if t is None:
+                break
+        return differs(_times(c["fires"]), _times(fires))
+
+    each_case(SCHEDULE["fires"], check)
+
+
+def test_schedule_next_fire_across_the_autumn_clock_change() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        parsed = schedule.parse_schedule(c["schedule"], c.get("timezone"))
+        actual = [schedule.next_fire(parsed, c["from"] + i * c["stepMs"], None) for i in range(len(c["next"]))]
+        return differs(_times(c["next"]), _times(actual))
+
+    each_case(SCHEDULE["autumn"], check)
+
+
+def test_schedule_next_fire_for_intervals() -> None:
+    each_case(
+        SCHEDULE["nextFire"],
+        lambda c: differs(c["expected"], schedule.next_fire(schedule.parse_schedule(c["schedule"]), c["from"], c["lastRunAt"])),
+    )
+
+
+def test_schedule_expectation() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        parsed = schedule.parse_schedule(c["schedule"], c.get("timezone"))
+        return differs(c["expected"], schedule.expectation(parsed, c["lastRunAt"], c["registeredAt"], c["graceMs"]))
+
+    each_case(SCHEDULE["expectation"], check)
+
+
+def test_schedule_run_covers() -> None:
+    each_case(SCHEDULE["runCovers"], lambda c: differs(c["expected"], schedule.run_covers(c["startedAt"], c["dueAt"], c["followingAt"])))
+
+
+# ---------------------------------------------------------------- evaluate
+
+
+class Sim:
+    """The generator's Sim: a job's life through the pure functions, the way the client plays it."""
+
+    def __init__(self, definition: JobDefinition, created_at: int) -> None:
+        self.definition = definition
+        self.stored = StoredJob(name=definition.name, definition=definition, created_at=created_at, updated_at=created_at)
+        self.state = evaluate.empty_state(definition.name)
+        self.runs: list[Run] = []
+        self.order: dict[str, int] = {}
+        self.seq = 0
+
+    def define(self, definition: JobDefinition) -> None:
+        self.definition = definition
+        self.stored = StoredJob(name=self.stored.name, definition=definition, created_at=self.stored.created_at, updated_at=self.stored.updated_at)
+
+    def silence(self, until: int | None) -> dict[str, Any]:
+        self.state = self.state.copy()
+        self.state.silenced_until = until
+        return {"state": self.state}
+
+    def sorted(self) -> list[Run]:
+        return sorted(self.runs, key=lambda r: (-r.started_at, -self.order[r.id]))
+
+    def settle(self, previous: JobState, evaluation: evaluate.Evaluation, now: int) -> list[Alert]:
+        state, alerts = evaluation.state, evaluation.alerts
+        if evaluate.is_silenced(previous, now):
+            state = evaluate.mute_opens(previous, state)
+            alerts = []
+        self.state = state
+        return [compose_alert(draft, self.definition, now) for draft in alerts]
+
+    def start(self, run_id: str, now: int) -> dict[str, Any]:
+        self.runs.append(Run(id=run_id, job=self.definition.name, status="running", started_at=now))
+        self.seq += 1
+        self.order[run_id] = self.seq
+        self.state = evaluate.on_run_start(self.state)
+        return {"state": self.state}
+
+    def finish_run(self, run: Run, now: int) -> list[Alert]:
+        history = [r.copy() for r in self.sorted() if r.id != run.id]
+        previous = self.state
+        return self.settle(previous, evaluate.on_run_finish(self.definition, run.copy(), previous, history, now), now)
+
+    def finish(self, run_id: str, now: int, fields: dict[str, Any]) -> dict[str, Any]:
+        run = next(r for r in self.runs if r.id == run_id)
+        # As the client's conditional write (update_run_if): a run already
+        # finished takes no second finish, and nothing is judged.
+        if run.status in ("ok", "failed"):
+            return {"alerts": [], "state": self.state, "ignored": f"was already finished as {run.status}"}
+        marked_timed_out = run.status == "timeout"
+        run.finished_at = now
+        run.duration_ms = max(0, now - run.started_at)
+        run.status = Run.from_dict({**run.to_dict(), "status": fields["status"]}).status
+        run.metrics = fields.get("metrics", {})
+        run.output = fields.get("output")
+        run.error = fields.get("error")
+        # As the client does: a check already counted this run as stuck, so a
+        # late failure only updates the run; a late success is evaluated.
+        if marked_timed_out and run.status != "ok":
+            return {"alerts": [], "state": self.state}
+        return {"alerts": self.finish_run(run, now), "state": self.state}
+
+    def check(self, now: int) -> dict[str, Any]:
+        alerts: list[Alert] = []
+        running = sorted((r for r in self.runs if r.status == "running"), key=lambda r: (r.started_at, self.order[r.id]))
+        for run in running:
+            if not evaluate.is_stuck(self.definition, run, now):
+                continue
+            run.status = Run.from_dict({**run.to_dict(), "status": "timeout"}).status
+            run.finished_at = now
+            run.duration_ms = now - run.started_at
+            run.error = f"Still running after {duration.format_duration(evaluate.timeout_ms(self.definition))}; marked as timed out"
+            alerts.extend(self.finish_run(run, now))
+        recent = [r.copy() for r in self.sorted()[:20]]
+        previous = self.state
+        evaluation = evaluate.on_check(self.definition, self.stored, recent[0] if recent else None, previous, now)
+        alerts.extend(self.settle(previous, evaluation, now))
+        return {
+            "alerts": alerts,
+            "state": self.state,
+            "nextExpectedAt": evaluation.next_expected_at,
+            "dueAt": evaluation.due_at,
+            "summary": evaluate.summarize(self.stored, recent, self.state, evaluation.next_expected_at, now),
+        }
+
+
+EVALUATE = fixture("evaluate.json")
+
+
+@pytest.mark.parametrize("scenario", EVALUATE["scenarios"], ids=[s["name"] for s in EVALUATE["scenarios"]])
+def test_scenario(scenario: dict[str, Any]) -> None:
+    sim = Sim(JobDefinition.from_dict(scenario["definition"]), scenario["createdAt"])
+    for i, event in enumerate(scenario["events"]):
+        op = event["op"]
+        if op == "start":
+            actual = sim.start(event["id"], event["at"])
+        elif op == "finish":
+            actual = sim.finish(event["id"], event["at"], event)
+        elif op == "check":
+            actual = sim.check(event["at"])
+        elif op == "silence":
+            actual = sim.silence(event["until"])
+        elif op == "unsilence":
+            actual = sim.silence(None)
+        elif op == "define":
+            sim.define(JobDefinition.from_dict(event["definition"]))
+            continue
+        else:
+            raise AssertionError(f"unknown event {op}")
+        for key, expected in event["expect"].items():
+            assert differs(expected, actual[key]) is None, f"{scenario['name']}: event {i} ({op} at {event.get('at')}), {key}: {differs(expected, actual[key])}"
+
+
+# ---------------------------------------------------------------- format
+
+FORMAT = fixture("format.json")
+
+
+def draft_from(data: dict[str, Any]) -> AlertDraft:
+    alert = Alert.from_dict({**data, "job": None, "definition": {}, "title": None, "message": None, "at": None})
+    return AlertDraft(type=alert.type, run=alert.run, details=alert.details)
+
+
+def test_compose_alert() -> None:
+    each_case(
+        FORMAT["alerts"],
+        lambda c: differs(c["alert"], compose_alert(draft_from(c["draft"]), JobDefinition.from_dict(c["definition"]), c["now"])),
+    )
+
+
+def test_format_number() -> None:
+    each_case(FORMAT["numbers"], lambda c: differs(c["text"], evaluate.format_number(c["n"])))
+
+
+def test_cap_output() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        capped = output.cap_output(c["prefix"] + c["piece"] * c["times"])
+        return differs([c["length"], c["sha256"]], [_js.length16(capped), hashlib.sha256(capped.encode("utf-8")).hexdigest()])
+
+    each_case(FORMAT["capOutput"], check)
+
+
+def expect_from(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return value
+    if value.get("callable"):
+        return lambda text: len(text) > 3
+    flags = re.IGNORECASE if "i" in value["regex"]["flags"] else 0
+    return re.compile(value["regex"]["source"], flags)
+
+
+def test_to_stored() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        fields = {k: expect_from(v) if k == "expect" else v for k, v in c["definition"].items()}
+        return differs(c["stored"], serialize.to_stored(JobDefinition(fields)))
+
+    each_case(FORMAT["toStored"], check)
+
+
+def test_check_expectation() -> None:
+    each_case(FORMAT["checkExpectation"], lambda c: differs(c["result"], serialize.check_expectation(expect_from(c["expect"]), c["output"])))
+
+
+# ---------------------------------------------------------------- health
+
+HEALTH = fixture("health.json")
+
+
+def state_from(data: dict[str, Any] | None) -> JobState | None:
+    return JobState.from_dict(data) if data is not None else None
+
+
+def run_from(data: dict[str, Any] | None) -> Run | None:
+    return Run.from_dict(data) if data is not None else None
+
+
+def test_job_health() -> None:
+    each_case(
+        HEALTH["jobHealth"],
+        lambda c: differs(
+            c["health"],
+            str(evaluate.job_health(JobDefinition.from_dict(c["definition"]), run_from(c["lastRun"]), state_from(c["state"]), c["now"])),  # type: ignore[arg-type]
+        ),
+    )
+
+
+def test_summarize() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        stored = StoredJob.from_dict(c["stored"])
+        recent = [Run.from_dict(r) for r in c["recent"]]
+        return differs(c["summary"], evaluate.summarize(stored, recent, state_from(c["state"]), c["nextExpectedAt"], c["now"]))  # type: ignore[arg-type]
+
+    each_case(HEALTH["summarize"], check)
+
+
+def test_percentile_and_median() -> None:
+    each_case(HEALTH["percentile"], lambda c: differs(c["percentile"], evaluate.percentile(c["values"], c["p"])))
+    each_case(HEALTH["median"], lambda c: differs(c["median"], evaluate.median(c["values"])))
+
+
+def test_normalize_state() -> None:
+    each_case(HEALTH["normalizeState"], lambda c: differs(c["normalized"], evaluate.normalize_state(state_from(c["state"]), "j")))
+
+
+def test_mute_opens() -> None:
+    each_case(HEALTH["muteOpens"], lambda c: differs(c["muted"], evaluate.mute_opens(state_from(c["previous"]), state_from(c["next"]))))  # type: ignore[arg-type]
+
+
+def test_is_stuck() -> None:
+    each_case(
+        HEALTH["isStuck"],
+        lambda c: differs(c["stuck"], evaluate.is_stuck(JobDefinition.from_dict(c["definition"]), Run.from_dict(c["run"]), c["now"])),
+    )
+
+
+def test_unevaluable_summary() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        stored = StoredJob.from_dict(c["stored"])
+        recent = [Run.from_dict(r) for r in c["recent"]]
+        return differs(c["summary"], evaluate.unevaluable_summary(stored, recent, state_from(c["state"]), c["now"]))  # type: ignore[arg-type]
+
+    each_case(HEALTH["unevaluableSummary"], check)
+
+
+def test_apply_silence() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        evaluation = evaluate.Evaluation(state_from(c["evaluation"]["state"]), [draft_from(a) for a in c["evaluation"]["alerts"]])  # type: ignore[arg-type]
+        result = evaluate.apply_silence(state_from(c["previous"]), evaluation, c["now"])  # type: ignore[arg-type]
+        return differs(c["result"], {"state": result.state.to_dict(), "alerts": [a.to_dict() for a in result.alerts]})
+
+    each_case(HEALTH["applySilence"], check)
+
+
+def test_stale_alert() -> None:
+    each_case(HEALTH["staleAlert"], lambda c: differs(c["stale"], evaluate.stale_alert(Alert.from_dict(c["alert"]), state_from(c["state"]))))  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------- output
+
+OUTPUT = fixture("output.json")
+
+
+def expand(spec: Any) -> Any:
+    """Long text travels as {"parts": [[piece, times], ...]}."""
+    if isinstance(spec, dict) and "parts" in spec:
+        return "".join(piece * times for piece, times in spec["parts"])
+    return spec
+
+
+def digest(text: str | None) -> dict[str, Any] | None:
+    """A result as the fixtures hold it: the text, or when long its length in UTF-16 code units and SHA-256."""
+    if text is None:
+        return None
+    length = _js.length16(text)
+    return {"text": text} if length <= 400 else {"length": length, "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+
+
+def test_output_cap_is_the_sdks() -> None:
+    assert OUTPUT["outputCap"] == output.OUTPUT_CAP
+
+
+def test_redact_secrets() -> None:
+    each_case(OUTPUT["redact"], lambda c: differs(c["result"], digest(output.redact_secrets(expand(c["input"])))))
+
+
+def test_error_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    frames: dict[int, list[str]] = {}
+    monkeypatch.setattr(output, "_frames", lambda error: frames.get(id(error), []))
+
+    def check(c: dict[str, Any]) -> str | None:
+        if "value" in c:
+            error: Any = expand(c["value"])
+        else:
+            kind = type(c["name"], (Exception,), {})
+            error = kind(expand(c["message"]))
+            frames[id(error)] = c["frames"]
+        return differs(c["result"], digest(output.error_message(error)))
+
+    each_case(OUTPUT["errorMessage"], check)
+
+
+def expand_lines(lines: list[Any]) -> list[str]:
+    out = []
+    for line in lines:
+        if isinstance(line, dict) and "numbered" in line:
+            for i in range(line["count"]):
+                head = f"{line['numbered']}{i} "
+                out.append(head + "x" * max(0, line["width"] - _js.length16(head)))
+        else:
+            out.append(expand(line))
+    return out
+
+
+def test_expect_text() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        recorder = RunRecorder(Run(id="r", job="j", status="running", started_at=T0), 60_000)
+        for line in expand_lines(c["lines"]):
+            recorder.context.log(line)
+        text = recorder.expect_text()
+        checks = [{"expect": k["expect"], "result": serialize.check_expectation(k["expect"], text)} for k in c["checks"]]
+        return differs([c["expectText"], c["output"], c["checks"]], [digest(text), digest(recorder.output()), checks])
+
+    each_case(OUTPUT["expectText"], check)
+
+
+# ---------------------------------------------------------------- store
+
+STORE = fixture("store.json")
+
+
+def make_store(kind: str, tmp_path: Path) -> Any:
+    if kind == "memory":
+        return MemoryStore()
+    store = SqliteStore(tmp_path / f"conformance-{len(list(tmp_path.iterdir()))}.db")
+    store.init()
+    return store
+
+
+@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+def test_store_prune(kind: str, tmp_path: Path) -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        store = make_store(kind, tmp_path)
+        mismatch = None
+        for event in c["events"]:
+            if "insert" in event:
+                for run in event["insert"]:
+                    store.insert_run(Run.from_dict(run))
+            else:
+                pruned = store.prune(event["prune"])
+                remaining = {job: [r.id for r in store.list_runs(job, 100)] for job in event["remaining"]}
+                mismatch = mismatch or differs([event["pruned"], event["remaining"]], [pruned, remaining])
+        store.close()
+        return mismatch
+
+    each_case(STORE["prune"], check)
+
+
+@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+def test_store_compare_and_set_state(kind: str, tmp_path: Path) -> None:
+    store = make_store(kind, tmp_path)
+
+    def check(c: dict[str, Any]) -> str | None:
+        written = None
+        if "cas" in c:
+            written = store.compare_and_set_state(JobState.from_dict(c["cas"]), c["expected"])
+        elif "set" in c:
+            store.set_state(JobState.from_dict(c["set"]))
+        else:
+            store.delete_job(c["forget"])
+        states = {job: (s.to_dict() if (s := store.get_state(job)) else None) for job in ("a", "b")}
+        actual = {"written": written, "states": states} if "written" in c else {"states": states}
+        expected = {"written": c["written"], "states": c["states"]} if "written" in c else {"states": c["states"]}
+        return differs(expected, actual)
+
+    each_case(STORE["compareAndSetState"], check)
+    store.close()
+
+
+@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+def test_store_update_run_if(kind: str, tmp_path: Path) -> None:
+    store = make_store(kind, tmp_path)
+    store.insert_run(Run(id="u1", job="a", status="running", started_at=1000))
+
+    def check(c: dict[str, Any]) -> str | None:
+        outcome: Any = None
+        if "set" in c:
+            store.update_run(Run.from_dict(c["set"]))
+        elif "insert" in c:
+            try:
+                store.insert_run(Run.from_dict(c["insert"]))
+                outcome = "inserted"
+            except Exception:  # noqa: BLE001
+                outcome = "refused"
+        else:
+            outcome = store.update_run_if(Run.from_dict(c["run"]), c["from"])
+        stored = store.get_run("u1")
+        expected = [c.get("outcome"), c["stored"]]
+        return differs(expected, [outcome, stored.to_dict() if stored else None])
+
+    each_case(STORE["updateRunIf"], check)
+    store.close()
+
+
+# ---------------------------------------------------------------- later phases
+
+LATER = {
+    "channels.json": "phase 2 (alert channels)",
+    "triage.json": "phase 2 (Claude triage)",
+    "pgcron.json": "phase 2 (the pg_cron source)",
+}
+
+
+@pytest.mark.parametrize("name", sorted(LATER))
+def test_fixtures_for_later_phases(name: str) -> None:
+    assert (DIR / name).exists(), f"{name} is missing from conformance/"
+    pytest.skip(f"conformance/{name}: {LATER[name]}, not in the Python port yet")
+
+
+def test_every_fixture_is_replayed_or_skipped_by_name() -> None:
+    replayed = {"duration.json", "schedule.json", "evaluate.json", "format.json", "health.json", "output.json", "store.json"}
+    assert {p.name for p in DIR.glob("*.json")} == replayed | set(LATER)

@@ -9,6 +9,7 @@
  *   --dry-run          print every change and command, write nothing
  *   --branch <name>    release from this branch instead of main (for testing)
  *   --skip-ruby        skip the gem's tests
+ *   --skip-python      skip the Python package's tests
  *   --deprecate <old>  also print `npm deprecate` for these versions (a version
  *                      or range, e.g. "<0.3.0"); may be given more than once
  *
@@ -27,6 +28,8 @@ const VERSIONED = [
   { file: "packages/mcp/package.json", pattern: /^( {2}"version": ")([^"]+)(")/m },
   { file: "packages/mcp/package.json", pattern: /^( {4}"@cronwatch\/sdk": ")([^"]+)(")/m },
   { file: "packages/ruby/lib/cronwatch/version.rb", pattern: /^(\s*VERSION = ")([^"]+)(")/m },
+  { file: "packages/python/pyproject.toml", pattern: /^(version = ")([^"]+)(")/m },
+  { file: "packages/python/src/cronwatch/__init__.py", pattern: /^(__version__ = ")([^"]+)(")/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -35,6 +38,7 @@ const PUBLISH = [
   { dir: "packages/sdk", commands: () => ["npm publish --workspace packages/sdk --access public"] },
   { dir: "packages/mcp", commands: () => ["npm publish --workspace packages/mcp --access public"] },
   { dir: "packages/ruby", commands: (v, gem) => [`(cd packages/ruby && gem build cronwatch.gemspec && gem push cronwatch-${gem}.gem)`] },
+  { dir: "packages/python", commands: () => ["(cd packages/python && rm -rf dist && uv build && uv publish)"] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */
@@ -61,7 +65,7 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const options = { version: null, dryRun: false, branch: "main", skipRuby: false, deprecate: [] };
+  const options = { version: null, dryRun: false, branch: "main", skipRuby: false, skipPython: false, deprecate: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -71,16 +75,17 @@ function parseArgs(argv) {
     };
     if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--skip-ruby") options.skipRuby = true;
+    else if (arg === "--skip-python") options.skipPython = true;
     else if (arg === "--branch") options.branch = value();
     else if (arg === "--deprecate") options.deprecate.push(value());
     else if (arg === "--help" || arg === "-h") {
-      console.log("usage: node scripts/release.mjs <version> [--dry-run] [--branch <name>] [--skip-ruby] [--deprecate <old>]");
+      console.log("usage: node scripts/release.mjs <version> [--dry-run] [--branch <name>] [--skip-ruby] [--skip-python] [--deprecate <old>]");
       process.exit(0);
     } else if (arg.startsWith("--")) fail(`unknown option ${arg}`);
     else if (options.version === null) options.version = arg.replace(/^v/, "");
     else fail(`unexpected argument ${arg}`);
   }
-  if (options.version === null) fail("usage: node scripts/release.mjs <version> [--dry-run] [--branch <name>] [--skip-ruby] [--deprecate <old>]");
+  if (options.version === null) fail("usage: node scripts/release.mjs <version> [--dry-run] [--branch <name>] [--skip-ruby] [--skip-python] [--deprecate <old>]");
   return options;
 }
 
@@ -182,6 +187,11 @@ function strays(current) {
   return out.split("\n").filter((line) => line && !skip.has(line.split(":")[0]));
 }
 
+/** Whether uv, which runs the Python package's tests, is on the PATH. */
+function hasUv() {
+  return spawnSync("uv", ["--version"], { cwd: ROOT, encoding: "utf8" }).status === 0;
+}
+
 /**
  * A Ruby the gem supports (3.2 or newer) with bundler: the one on PATH, or
  * else the newest such rbenv version. Returns { version, env } or null.
@@ -235,6 +245,7 @@ if (git("tag", "--list", tag) !== "") fail(`tag ${tag} already exists`);
 
 const edits = planEdits(current, next);
 const ruby = options.skipRuby ? null : findRuby();
+const uv = !options.skipPython && hasUv();
 const gem = gemVersion(next, ruby);
 const gemDir = options.dryRun ? path.join(os.tmpdir(), "cronwatch-gem-XXXXXX") : mkdtempSync(path.join(os.tmpdir(), "cronwatch-gem-"));
 const gemFile = path.join(gemDir, `cronwatch-${gem}.gem`);
@@ -252,6 +263,7 @@ const steps = [
     ["Test the gem", "bundle", ["exec", "rake", "test"], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env }],
     ["Build the gem", "gem", ["build", "cronwatch.gemspec", "--output", gemFile], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env, after: () => checkGem(gemFile, ruby) }],
   ] : []),
+  ...(uv ? [["Test the Python package", "uv", ["run", "pytest", "-q"], { cwd: path.join(ROOT, "packages/python") }]] : []),
 ];
 const leftovers = strays(current);
 
@@ -268,6 +280,9 @@ if (leftovers.length > 0) {
 if (options.skipRuby) console.log("\nSkipping the gem's tests and build (--skip-ruby).");
 else if (!ruby) console.log("\nNo Ruby 3.2 or newer with bundler found; skipping the gem's tests and build. CI runs the tests.");
 else console.log(`\nRuby ${ruby.version}${ruby.env.RBENV_VERSION ? " (rbenv)" : ""} found; the gem's tests run and the gem is built.`);
+if (options.skipPython) console.log("Skipping the Python package's tests (--skip-python).");
+else if (!uv) console.log("No uv found; skipping the Python package's tests. CI runs them.");
+else console.log("uv found; the Python package's tests run.");
 if (gem !== next) console.log(`RubyGems spells ${next} as ${gem}.`);
 
 if (options.dryRun) {
