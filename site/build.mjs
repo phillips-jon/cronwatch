@@ -488,8 +488,8 @@ const CONTACT_FORM = `<form class="contact" method="post" action="/contact">
 </form>`;
 
 const CONTACT_INTRO = `<h1>Contact</h1>
-<p>Questions, bug reports, or a request to delete something you sent: write here and it goes to Jon Phillips, who maintains CronWatch, by email. The reply comes from a person, to the address you give.</p>
-<p>For bugs and feature requests, <a href="${GITHUB}/issues">GitHub issues</a> are public and often faster. What you send here is used only to reply to you; the <a href="/privacy/">privacy page</a> says what happens to it.</p>`;
+<p>Write here with a question, a bug report, or a request to delete something you sent. A human reads every message and replies to the address you give.</p>
+<p>Bugs and feature requests are often quicker as <a href="${GITHUB}/issues">GitHub issues</a>, which are public. What you send here is used only to reply to you; the <a href="/privacy/">privacy page</a> says what happens to it.</p>`;
 
 /** Terms and privacy from pages/*.md, and the contact page with its two answers. */
 function buildPages() {
