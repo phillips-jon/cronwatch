@@ -10,7 +10,7 @@ module Cronwatch
       attr_reader :name
 
       def initialize(api_key:, domain:, from:, to:, region: nil, subject_prefix: nil, link: nil, http: HTTP.default)
-        @api_key = Provider.require_option(api_key, "Cronwatch::Alerts::Mailgun needs an api_key")
+        @api_key = Provider.require_credential(api_key, "Cronwatch::Alerts::Mailgun needs an api_key")
         domain = Provider.require_option(domain, "Cronwatch::Alerts::Mailgun needs a domain")
         @to = Email.recipients("Mailgun", from, to)
         @from = from

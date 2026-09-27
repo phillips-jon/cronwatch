@@ -12,6 +12,12 @@ module Cronwatch
   #   run.log("sent 40 emails")
   #   run.finish                  # or run.fail(error)
   class RunHandle
+    # Raised by the client's side of finish when the store failed part way
+    # and nothing was recorded (already reported): the handle stays active.
+    #
+    # @api private
+    class Retry < StandardError; end
+
     # `started_at` is nil when a resumed run could not be read.
     attr_reader :id, :job, :started_at
 
@@ -35,6 +41,11 @@ module Cronwatch
       @recorder = fresh_recorder
       @finished = !inactive.nil?
       @finish_called = false
+      # The first Output::CAP characters of every line flushed from this
+      # handle, unredacted, or nil before the first flush. The stored output
+      # keeps only the tail, so without it an expect rule at finish would
+      # miss a line logged early, which run would have seen.
+      @head = nil
     end
 
     # False once finished, and from the start for a resumed run that already
@@ -58,10 +69,13 @@ module Cronwatch
     end
 
     # Append the lines and metrics added so far to the stored run, which must
-    # still be running. Output is redacted as it is written. A read, change
-    # and write of the run's row: two processes appending to one run at the
-    # same moment can lose one's lines. When the write fails the lines stay
-    # here for finish.
+    # still be running and belong to this job. Output is redacted as it is
+    # written. A read, change and write of the run's row, written only while
+    # it is still running: two processes appending to one run at the same
+    # moment can lose one's lines, but a flush never undoes a finish. When
+    # the write fails the lines stay here for finish. The first 16 KB of
+    # everything flushed stay in the handle, so an expect rule at finish
+    # sees an early line as run would.
     def flush
       @turn.synchronize do
         next if @flush.nil? || @state.synchronize { @finished }
@@ -76,7 +90,11 @@ module Cronwatch
         values = taken.metrics
         next if lines.nil? && values.empty?
 
-        put_back(taken) unless @flush.call(lines, values)
+        if @flush.call(lines, values)
+          keep_head(taken.expect_text)
+        else
+          put_back(taken)
+        end
       end
       nil
     end
@@ -90,8 +108,11 @@ module Cronwatch
     #   finish(result: "text")        # nothing was logged, checked by expect
     #
     # Returns the run as recorded, or nil when nothing was: the run was
-    # already finished (here or elsewhere) or was not found, which is
-    # reported to on_error.
+    # already finished (here or elsewhere), was not found, or belongs to
+    # another job, which is reported to on_error. When several processes
+    # finish one run, only the one whose write lands judges it. A store that
+    # fails is reported, nothing is recorded, and the handle stays active so
+    # finish can be called again.
     def finish(outcome = nil)
       was_inactive = nil
       again = @state.synchronize do
@@ -114,14 +135,14 @@ module Cronwatch
         end
 
         begin
-          @finish.call(@state.synchronize { @recorder }, outcome)
+          @finish.call(@state.synchronize { @recorder }, outcome, @head)
+        rescue Retry
+          reopen
+          nil
         rescue Exception # rubocop:disable Lint/RescueException
           # An Interrupt or Timeout mid-finish: the run may still be running,
           # so the handle stays open (lines kept) for finish to be called again.
-          @state.synchronize do
-            @finish_called = false
-            @finished = false
-          end
+          reopen
           raise
         end
       end
@@ -159,9 +180,24 @@ module Cronwatch
       @state.synchronize do
         later = @recorder
         @recorder = fresh_recorder
-        [taken.output, later.output].each { |text| @recorder.log(text) unless text.nil? }
+        [taken.expect_text, later.expect_text].each { |text| @recorder.log(text) unless text.nil? }
         taken.metrics.merge(later.metrics).each { |name, value| @recorder.metric(name, value) }
       end
+    end
+
+    # A finish that recorded nothing leaves the handle active, to be finished again.
+    def reopen
+      @state.synchronize do
+        @finish_called = false
+        @finished = false
+      end
+    end
+
+    # Keeps the start of what a flush wrote, up to the cap, for expect at finish.
+    def keep_head(text)
+      return if text.nil? || (!@head.nil? && JS.length16(@head) >= Output::CAP)
+
+      @head = JS.head16(@head.nil? || @head.empty? ? text : "#{@head}\n#{text}", Output::CAP)
     end
   end
 end

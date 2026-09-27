@@ -117,7 +117,73 @@ module StoreConformance
     store.delete_job("w")
   end
 
-  CAS_SCRIPT = JSON.parse(File.read(File.expand_path("../../../conformance/store.json", __dir__)))["compareAndSetState"]
+  # The SDK's store test for updateRunIf: writes only over a row whose status
+  # is one of those given, and says whether it did. insert_run refuses an id
+  # already recorded.
+  def test_update_run_if
+    store = make_store
+    store.init if store.respond_to?(:init)
+    store.upsert_job(definition("name" => "a"), 100)
+    store.insert_run(run_record("r3", "a", :running, 3000))
+    assert_raises(StandardError, "an id already recorded is refused") { store.insert_run(run_record("r3", "a", :running, 3000)) }
+    store.upsert_job(definition("name" => "q"), 300)
+    store.insert_run(run_record("rx", "q", :running, 2500))
+    once = ->(run, from) { store.update_run_if(run, from) }
+    assert_equal true, once.call(run_record("rx", "q", :failed, 2500).tap { |r| r.error = "first" }, [:running])
+    assert_equal false, once.call(run_record("rx", "q", :ok, 2500).tap { |r| r.output = "second" }, [:running]),
+                 "a second finish over the first is refused"
+    assert_equal "first", store.get_run("rx").error
+    assert_equal false, once.call(run_record("rx", "q", :ok, 2500).tap { |r| r.output = "late" }, %i[running timeout])
+    store.update_run(run_record("rx", "q", :timeout, 2500).tap { |r| r.error = "stuck" })
+    late_run = run_record("rx", "q", :ok, 2500).tap do |r|
+      r.output = "late"
+      r.metrics = { "m" => 2 }
+    end
+    assert_equal true, once.call(late_run, %i[running timeout]), "any of the statuses given"
+    late = store.get_run("rx")
+    assert_equal [:ok, "late", nil, { "m" => 2 }, "q", "run"], [late.status, late.output, late.error, late.metrics, late.job, late.trigger]
+    assert_equal false, once.call(run_record("missing", "q", :ok, 1), [:running]), "a run that is not there is not written"
+    assert_nil store.get_run("missing")
+    assert_equal false, once.call(run_record("rx", "q", :failed, 2500), []), "no statuses, no write"
+    assert_equal :ok, store.get_run("rx").status
+    store.delete_job("q")
+    store.delete_job("a")
+  end
+
+  STORE_SCRIPTS = JSON.parse(File.read(File.expand_path("../../../conformance/store.json", __dir__)))
+
+  # conformance/store.json's updateRunIf script, recorded from the SDK's
+  # memory store: which finishes are written, and the run stored after each step.
+  def test_update_run_if_replays_the_sdk_script
+    store = make_store
+    store.init if store.respond_to?(:init)
+    %w[a b].each { |name| store.upsert_job(definition("name" => name), 1) }
+    store.insert_run(Cronwatch::Run.from_h("id" => "u1", "job" => "a", "status" => "running", "startedAt" => 1000, "finishedAt" => nil,
+                                           "durationMs" => nil, "error" => nil, "output" => nil, "metrics" => {}, "trigger" => "run"))
+    failures = []
+    STORE_SCRIPTS["updateRunIf"].each_with_index do |step, i|
+      outcome = nil
+      if step["set"]
+        store.update_run(Cronwatch::Run.from_h(step["set"]))
+      elsif step["insert"]
+        outcome = begin
+          store.insert_run(Cronwatch::Run.from_h(step["insert"]))
+          "inserted"
+        rescue StandardError
+          "refused"
+        end
+      else
+        outcome = store.update_run_if(Cronwatch::Run.from_h(step["run"]), step["from"])
+      end
+      expected = Cronwatch::JS.json([step.key?("outcome") ? step["outcome"] : nil, step["stored"]])
+      actual = Cronwatch::JS.json([outcome, store.get_run("u1")&.to_h])
+      failures << "step #{i} #{JSON.generate(step)[0, 300]}\n    expected #{expected}\n    got      #{actual}" unless expected == actual
+    end
+    assert failures.empty?, failures.join("\n")
+    %w[a b].each { |name| store.delete_job(name) }
+  end
+
+  CAS_SCRIPT = STORE_SCRIPTS["compareAndSetState"]
 
   # conformance/store.json's compareAndSetState script, recorded from the
   # SDK's memory store: which writes go through, and the states stored after

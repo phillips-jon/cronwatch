@@ -16,7 +16,7 @@ module Cronwatch
 
       # endpoint: another API host, "https://eu-api.honeybadger.io" say.
       def initialize(api_key:, environment: nil, endpoint: nil, recovered: false, link: nil, http: HTTP.default)
-        @api_key = Provider.require_option(api_key, "Cronwatch::Alerts::Honeybadger needs an api_key")
+        @api_key = Provider.require_credential(api_key, "Cronwatch::Alerts::Honeybadger needs an api_key")
         @url = "#{(endpoint.nil? ? "https://api.honeybadger.io" : endpoint.to_s).sub(%r{/+\z}, "")}/v1/notices"
         @environment = environment
         @recovered = recovered

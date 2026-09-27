@@ -9,7 +9,7 @@ module Cronwatch
       attr_reader :name
 
       def initialize(api_key:, from:, to:, region: nil, subject_prefix: nil, link: nil, http: HTTP.default)
-        @api_key = Provider.require_option(api_key, "Cronwatch::Alerts::Sendgrid needs an api_key")
+        @api_key = Provider.require_credential(api_key, "Cronwatch::Alerts::Sendgrid needs an api_key")
         @to = Email.recipients("Sendgrid", from, to)
         @from = from
         @url = region.to_s == "eu" ? "https://api.eu.sendgrid.com/v3/mail/send" : "https://api.sendgrid.com/v3/mail/send"

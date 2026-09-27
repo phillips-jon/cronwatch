@@ -18,7 +18,7 @@ module Cronwatch
       attr_reader :name
 
       def initialize(dsn:, environment: nil, release: nil, recovered: true, link: nil, http: HTTP.default)
-        dsn = Provider.require_option(dsn, "Cronwatch::Alerts::Sentry needs a dsn")
+        dsn = Provider.require_credential(dsn, "Cronwatch::Alerts::Sentry needs a dsn")
         parsed = Sentry.parse_dsn(dsn)
         @endpoint = parsed.endpoint
         @public_key = parsed.public_key

@@ -15,7 +15,7 @@ module Cronwatch
       attr_reader :name
 
       def initialize(api_key:, site: nil, tags: nil, host: nil, link: nil, http: HTTP.default)
-        @api_key = Provider.require_option(api_key, "Cronwatch::Alerts::Datadog needs an api_key")
+        @api_key = Provider.require_credential(api_key, "Cronwatch::Alerts::Datadog needs an api_key")
         site = (site.nil? ? "datadoghq.com" : site.to_s).sub(%r{\Ahttps?://}, "").sub(/\A(api|app)\./, "").sub(%r{/+\z}, "")
         raise ArgumentError, "Cronwatch::Alerts::Datadog needs a site like datadoghq.com" unless /\A[a-z0-9.-]+\z/i.match?(site)
 

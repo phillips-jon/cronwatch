@@ -12,7 +12,7 @@ module Cronwatch
       attr_reader :name
 
       def initialize(access_token:, environment: nil, recovered: true, link: nil, http: HTTP.default)
-        @access_token = Provider.require_option(access_token, "Cronwatch::Alerts::Rollbar needs an access_token")
+        @access_token = Provider.require_credential(access_token, "Cronwatch::Alerts::Rollbar needs an access_token")
         @environment = environment
         @recovered = recovered
         @link = link
