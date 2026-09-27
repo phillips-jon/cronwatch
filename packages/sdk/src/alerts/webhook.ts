@@ -1,4 +1,3 @@
-import { createHmac } from "node:crypto";
 import type { AlertChannel } from "../types.js";
 
 export interface WebhookOptions {
@@ -35,11 +34,19 @@ export function webhook(options: WebhookOptions): AlertChannel {
       const body = JSON.stringify(alert);
       const headers: Record<string, string> = { "content-type": "application/json", "user-agent": "cronwatch", ...options.headers };
       if (options.secret) {
-        headers["x-cronwatch-signature"] = `sha256=${createHmac("sha256", options.secret).update(body).digest("hex")}`;
+        headers["x-cronwatch-signature"] = `sha256=${await hmacSha256Hex(options.secret, body)}`;
       }
       const response = await fetch(options.url, { method: "POST", headers, body, signal: AbortSignal.timeout(TIMEOUT_MS) });
       // Only the origin: a webhook URL's path or query often is the credential.
       if (!response.ok) throw new Error(`Webhook ${origin(options.url)} answered ${response.status}`);
     },
   };
+}
+
+/** HMAC-SHA256 as lowercase hex, with Web Crypto so it runs on Workers and Deno too. */
+export async function hmacSha256Hex(secret: string, body: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(body)));
+  return Array.from(signature, (b) => b.toString(16).padStart(2, "0")).join("");
 }

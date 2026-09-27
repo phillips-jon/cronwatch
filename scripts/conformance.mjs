@@ -1193,7 +1193,83 @@ async function channelCases() {
   } finally {
     globalThis.fetch = realFetch;
   }
-  return { alerts, sends, failures };
+  return { alerts, sends, failures, ...(await providerCases(alerts)) };
+}
+
+// The provider channels (email, SMS, error trackers). Kept apart from `sends`
+// and `failures` so a port can take them on one channel at a time. Each case
+// lists every request (twilio sends one per number; a skipped recovery sends
+// none). In `options`, `link: true` stands for the usual link function and
+// `now: <ms>` for a clock fixed at that time.
+async function providerCases(alerts) {
+  const load = async (name) => (await import(`../packages/sdk/dist/${name}.js`))[name];
+  const SECRET_KEY = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
+  const from = "CronWatch <alerts@example.com>";
+  const configs = [
+    ["resend", { apiKey: "re_secret", from, to: ["ops@example.com", "dev@example.com"], subjectPrefix: "[prod]", link: true }],
+    ["resend", { apiKey: "re_secret", from: "alerts@example.com", to: "ops@example.com" }],
+    ["postmark", { serverToken: "pm-secret", from, to: ["ops@example.com", "dev@example.com"], link: true }],
+    ["postmark", { serverToken: "pm-secret", from: "alerts@example.com", to: "ops@example.com", messageStream: "alerts", subjectPrefix: "[prod]" }],
+    ["sendgrid", { apiKey: "SG.secret", from, to: ["Ops <ops@example.com>", "dev@example.com"], link: true }],
+    ["sendgrid", { apiKey: "SG.secret", from: "alerts@example.com", to: "ops@example.com", region: "eu" }],
+    ["mailgun", { apiKey: "key-secret", domain: "mg.example.com", from, to: ["ops@example.com", "dev@example.com"], link: true }],
+    ["mailgun", { apiKey: "key-secret", domain: "mg.example.com", from: "alerts@example.com", to: "ops@example.com", region: "eu" }],
+    ["ses", { region: "us-east-1", accessKeyId: "AKIDEXAMPLE", secretAccessKey: SECRET_KEY, from, to: ["ops@example.com", "dev@example.com"], now: T0, link: true }],
+    ["ses", { region: "eu-west-1", accessKeyId: "AKIDEXAMPLE", secretAccessKey: SECRET_KEY, sessionToken: "session-token", configurationSetName: "alerts", from: "alerts@example.com", to: "ops@example.com", now: T0 + HOUR }],
+    ["twilio", { accountSid: "AC00000000000000000000000000000000", authToken: "tw-secret", from: "+15005550006", to: ["+15551110000", "+15552220000"], link: true }],
+    ["twilio", { accountSid: "AC00000000000000000000000000000000", apiKeySid: "SK00000000000000000000000000000000", apiKeySecret: "sk-secret", messagingServiceSid: "MG00000000000000000000000000000000", to: "+15551110000", recovered: true, segments: 1 }],
+    ["sentry", { dsn: "https://pubkey@o1.ingest.sentry.io/42", link: true }],
+    ["sentry", { dsn: "https://pubkey@sentry.example.com/prefix/7", environment: "staging", release: "app@1.2.3", recovered: false }],
+    ["honeybadger", { apiKey: "hb-secret", link: true }],
+    ["honeybadger", { apiKey: "hb-secret", environment: "staging", endpoint: "https://eu-api.honeybadger.io", recovered: true }],
+    ["datadog", { apiKey: "dd-secret", link: true }],
+    ["datadog", { apiKey: "dd-secret", site: "datadoghq.eu", tags: ["env:prod"], host: "worker-1" }],
+    ["rollbar", { accessToken: "rb-secret", link: true }],
+    ["rollbar", { accessToken: "rb-secret", environment: "staging", recovered: false }],
+    ["bugsnag", { apiKey: "bs-secret", now: T0, link: true }],
+    ["bugsnag", { apiKey: "bs-secret", releaseStage: "staging", endpoint: "https://notify.bugsnag.example.com/", recovered: true, now: T0 }],
+    ["newrelic", { accountId: "12345", apiKey: "nr-secret", link: true }],
+    ["newrelic", { accountId: 12345, apiKey: "nr-secret", region: "eu", eventType: "CronJobAlert" }],
+  ];
+  const link = (alert) => `https://app.example/cronwatch/jobs/${alert.job}`;
+  const materialize = (options) => {
+    const { link: withLink, now, ...rest } = options;
+    return { ...rest, ...(withLink ? { link } : {}), ...(now !== undefined ? { now: () => now } : {}) };
+  };
+  const realFetch = globalThis.fetch;
+  let response = { status: 200, body: "" };
+  let requests = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push({ url: String(url), headers: { ...init.headers }, body: digest(init.body) });
+    return new Response(response.body, { status: response.status });
+  };
+  const providerSends = [];
+  const providerFailures = [];
+  try {
+    for (const [name, options] of configs) {
+      const channel = (await load(name))(materialize(options));
+      for (const { name: alert, alert: value } of alerts) {
+        response = { status: 200, body: "" };
+        requests = [];
+        await channel.send(clone(value));
+        providerSends.push({ channel: name, options, alert, requests });
+      }
+      for (const [status, body] of [[500, "no"], [400, "x".repeat(300)], [404, ""], [401, `bad key ${options.apiKey ?? options.serverToken ?? options.authToken ?? options.apiKeySecret ?? options.secretAccessKey ?? options.accessToken ?? "pubkey"} given`]]) {
+        response = { status, body };
+        requests = [];
+        let error = null;
+        try {
+          await channel.send(clone(alerts[0].alert));
+        } catch (e) {
+          error = e.message;
+        }
+        providerFailures.push({ channel: name, options, status, body, error });
+      }
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  return { providerSends, providerFailures };
 }
 
 // ---------------------------------------------------------------- triage
