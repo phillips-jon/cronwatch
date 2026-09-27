@@ -184,11 +184,23 @@ module Cronwatch
 
         private
 
+        # A class's pool is the writing role's, as the store's is, even
+        # inside the app's connected_to(role: :reading): cron.job_run_details
+        # is read where pg_cron writes it, not on a replica that may lag or
+        # not be configured at all.
         def with_connection(&block)
-          if @source.respond_to?(:connection_pool) then @source.connection_pool.with_connection(&block)
+          if record_class?
+            ::ActiveRecord::Base.connected_to(role: ::ActiveRecord.writing_role, prevent_writes: false) do
+              @source.connection_pool.with_connection(&block)
+            end
+          elsif @source.respond_to?(:connection_pool) then @source.connection_pool.with_connection(&block)
           elsif @source.respond_to?(:with_connection) then @source.with_connection(&block)
           else yield @source
           end
+        end
+
+        def record_class?
+          defined?(::ActiveRecord::Base) && @source.is_a?(Class) && @source <= ::ActiveRecord::Base
         end
       end
 

@@ -32,6 +32,34 @@ module StartFinishAcrossPools
     refute_same connection_class.connection_pool, second_connection_class.connection_pool
     check_resume_across_clients(first, second)
   end
+
+  # A run started inside the app's transaction that then rolls back: on
+  # SQLite the store joins the transaction, so the start is lost and finish
+  # inserts the run; on Postgres the store writes through its own pool, so
+  # the start survives. Either way finish records it once.
+  def test_a_run_started_in_a_transaction_that_rolls_back_is_recorded_at_finish
+    errors = []
+    cw = Cronwatch.new(store: make_store, alerts: [], on_error: ->(e, w) { errors << "#{w}: #{e.message}" })
+    job = cw.job("sync", timeout: "5m")
+    run = nil
+    connection_class.transaction do
+      run = job.start
+      raise ActiveRecord::Rollback
+    end
+    if postgres?
+      assert_equal :running, cw.get_run(run.id).status
+    else
+      assert_nil cw.get_run(run.id)
+    end
+    run.log("done")
+    finished = run.finish
+    assert_equal :ok, finished.status
+    stored = cw.get_run(run.id)
+    assert_equal :ok, stored.status
+    assert_equal "done", stored.output
+    assert_equal 1, cw.runs("sync").size
+    assert_equal [], errors
+  end
 end
 
 class StartFinishSqliteTest < Minitest::Test

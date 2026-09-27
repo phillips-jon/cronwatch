@@ -148,6 +148,14 @@ class ProviderChannelsTest < Minitest::Test
     assert_equal "Honeybadger https://api.honeybadger.io answered 401: bad key [redacted] given", error.message
   end
 
+  # response.text() drops a leading byte order mark; bytes that are not UTF-8 read as U+FFFD.
+  def test_a_failure_body_loses_its_byte_order_mark
+    [["\xEF\xBB\xBFbom".b, "bom"], ["caf\xC3\xA9 \xFF end".b, "café \u{FFFD} end"]].each do |body, text|
+      error = assert_raises(RuntimeError) { A::Honeybadger.new(api_key: "k-secret", http: FakeHTTP.new(500, body)).call(failed) }
+      assert_equal "Honeybadger https://api.honeybadger.io answered 500: #{text}", error.message
+    end
+  end
+
   def test_a_channel_sends_through_the_client_like_any_other
     http = FakeHTTP.new
     client, clock, = make(alerts: [A::Datadog.new(api_key: "dd", http: http)])

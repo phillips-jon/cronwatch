@@ -35,9 +35,12 @@ module Cronwatch
   #            those headers or one that should not trust them. Used in place
   #            of the request's origin for the cross-site check on writes, the
   #            sign-in cookie's Secure flag, the Referer the redirect back after
-  #            a form follows, and the development sign-in line. Normalised to
+  #            a form follows, and the development sign-in line. Read as
+  #            `new URL(value).origin` reads it (Web::Origin) and normalised to
   #            scheme://host[:port]; anything that is not an absolute http or
-  #            https URL raises ArgumentError here. "" counts as unset.
+  #            https URL, or has a port outside 1 to 65535, raises
+  #            ArgumentError here. "" counts as unset. Behind more than one
+  #            proxy set it: Rack takes the last of several forwarded values.
   class Web
     # Tells "token not given" (read CRONWATCH_TOKEN) from "token: nil" (open on purpose).
     UNSET = Object.new.freeze
@@ -93,21 +96,9 @@ module Cronwatch
     # The `origin` option, normalised to scheme://host[:port], or nil when
     # unset. Raises on a value that is not an http or https origin, so a typo
     # fails at startup.
+    # Read as the SDK's `new URL(value).origin` reads it (Web::Origin).
     def self.configured_origin(value)
-      return nil if value.nil? || value == ""
-
-      uri = begin
-        value.is_a?(String) ? URI.parse(value) : nil
-      rescue URI::InvalidURIError
-        nil
-      end
-      if uri.nil? || uri.scheme.nil? || (uri.is_a?(URI::HTTP) && uri.host.to_s.empty?)
-        raise ArgumentError, "routes: origin must be an absolute URL such as \"https://app.example.com\", got #{JS.json(value)}"
-      end
-      raise ArgumentError, "routes: origin must be http or https, got #{JS.json(value)}" unless uri.is_a?(URI::HTTP)
-
-      port = uri.port == uri.default_port ? "" : ":#{uri.port}"
-      "#{uri.scheme.downcase}://#{uri.host.downcase}#{port}"
+      Origin.parse(value)
     end
 
     # The client given, or Cronwatch.client when none was.
@@ -464,9 +455,11 @@ module Cronwatch
         @env[key]
       end
 
-      # scheme://host[:port], the page's origin.
+      # scheme://host[:port], the page's origin, lowercased as a browser
+      # writes it in Origin and Referer (Rack's base_url keeps the case of
+      # the Host or X-Forwarded-Host it read).
       def origin
-        @rack.base_url
+        @rack.base_url.downcase
       end
 
       # URLSearchParams#get: the first value, or nil.
