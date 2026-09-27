@@ -323,7 +323,10 @@ function hours(span: Span, step: number, nowLabel: boolean): { lines: string; la
     const nearNow = nowLabel && Math.abs(gx - nowX) < 70;
     if (gx < 25 || gx > W - 25 || nearNow) continue;
     const minor = Math.round(t / HOUR) % 6 !== 0;
-    labels += `<span class="${minor ? "minor" : ""}" style="left:${f(gx / 10)}%">${clock(t)}</span>`;
+    // On a phone the track is too narrow for a label this close to "now"; CSS hides it there.
+    const near = nowLabel && Math.abs(gx - nowX) < 170;
+    const cls = [minor && "minor", near && "near"].filter(Boolean).join(" ");
+    labels += `<span class="${cls}" style="left:${f(gx / 10)}%">${clock(t)}</span>`;
   }
   if (nowLabel && span.now >= span.from && span.now <= span.to) labels += `<span class="nowlabel" style="left:${f(nowX / 10)}%">now ${clock(span.now)}</span>`;
   return { lines, labels };

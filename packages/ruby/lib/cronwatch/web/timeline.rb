@@ -355,7 +355,10 @@ module Cronwatch
           near_now = now_label && (gx - now_x).abs < 70
           unless gx < 25 || gx > W - 25 || near_now
             minor = (JS.round(t.fdiv(HOUR)) % 6) != 0
-            labels << %(<span class="#{minor ? "minor" : ""}" style="left:#{f(gx / 10)}%">#{clock(t)}</span>)
+            # On a phone the track is too narrow for a label this close to "now"; CSS hides it there.
+            near = now_label && (gx - now_x).abs < 170
+            cls = [("minor" if minor), ("near" if near)].compact.join(" ")
+            labels << %(<span class="#{cls}" style="left:#{f(gx / 10)}%">#{clock(t)}</span>)
           end
           t += step
         end

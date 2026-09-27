@@ -164,7 +164,7 @@ footer{padding-bottom:calc(40px + env(safe-area-inset-bottom))}
 .timeline .lane{grid-template-columns:minmax(0,1fr);padding:6px 0 8px}
 .timeline .who{padding:0 0 4px}
 .timeline .who .name{background:var(--sheet);padding-right:4px}
-.timeline .hours .minor{display:none}
+.timeline .hours .minor,.timeline .hours .near{display:none}
 .timeline .note{font-size:13px}
 td.job{min-width:0}
 table.board thead{display:none}
