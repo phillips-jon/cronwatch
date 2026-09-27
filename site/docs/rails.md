@@ -331,11 +331,12 @@ Rails.application.routes.draw do
 end
 ```
 
-`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch::Web.new(client = nil, token:, base_path:)` takes:
+`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch::Web.new(client = nil, token:, base_path:, origin:)` takes:
 
 - `client`: the client to serve. Leave it out and each request uses `Cronwatch.client` at that moment.
 - `token`: leave it out to read `CRONWATCH_TOKEN`. An empty string, passed or in the variable, counts as unset. `nil` opts out of the token entirely and serves the app to anyone who reaches it, for a mount that sits behind your own sign in.
 - `base_path`: where it is mounted, so links resolve. It defaults to the mount point Rack reports (`SCRIPT_NAME`), which is right under Rails' `mount` and Rack's `map`.
+- `origin`: the public origin, such as `"https://app.example.com"`, to use in place of each request's own (see below). An empty string counts as unset; anything that is not an absolute `http` or `https` URL raises `ArgumentError` when the routes load.
 
 Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie holding a digest of the token. Scripts and the [MCP server](/docs/mcp/) send `Authorization: Bearer <token>` instead. Without a token, while `Rails.env` is `development` or `test`, it makes a token of its own (32 random bytes, new each time the app boots) and prints a sign-in link to the server's standard output on its first request:
 
@@ -355,7 +356,13 @@ end
 
 Without Devise, a routing constraint does the same job: `constraints ->(request) { AdminSession.valid?(request) } do ... end` around the mount.
 
-A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto`. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign.
+A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` as the rest of Rails does, so there is no `trustProxy` option as in the TypeScript routes. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign. To pin it instead, pass `origin:`:
+
+```ruby
+mount Cronwatch::Web.new(Cronwatch.client, origin: ENV["APP_ORIGIN"]) => "/cronwatch"
+```
+
+With `origin:` set, a write must carry that `Origin`, the sign-in cookie is `Secure` when it is `https`, a form redirects back only to a `Referer` on it, and the development sign-in line uses it, whatever the request's headers say.
 
 `/cronwatch/api/check` runs the check. It accepts the token or, on this path only, the client's `cron_secret` (`CRON_SECRET` by default) as a bearer, so a platform cron or an outside scheduler can call it instead of `CheckJob` without holding the dashboard token. A `GET` must carry a bearer, so a page cannot set it off with the dashboard's cookie. [Dashboard and API](/docs/dashboard/) has every endpoint and JSON shape.
 
@@ -387,6 +394,46 @@ end
 ```
 
 The run is recorded however the action ends; an error is recorded and raised on to Rails, which answers 500. The action checks the bearer itself, because nothing in the gem guards your own routes. `CRON_SECRET` still guards `GET /cronwatch/api/check` on the mounted dashboard, as above.
+
+## Runs that span jobs
+
+A run is normally one `perform`. Work that one job starts and a later job, or a webhook, finishes (an export a partner builds and reports back on, a batch fanned out to other workers) can be one run too: `start` records it as running, and `finish` on a handle from `resume` ends it, in whichever process gets there. Declare the job once, after `Cronwatch.configure`:
+
+```ruby
+# config/initializers/cronwatch.rb, after Cronwatch.configure
+PARTNER_EXPORT = Cronwatch.client.job("partner-export", schedule: "0 3 * * *", timeout: "3h", expect: "imported")
+```
+
+```ruby
+class RequestPartnerExportJob < ApplicationJob
+  def perform
+    export = Partner.request_export(callback_url: Rails.application.routes.url_helpers.partner_export_url)
+    run = PARTNER_EXPORT.start(id: export.id.to_s)   # a second start with this id finds the same run
+    run.log("requested export", export.id)
+    run.flush                                        # the line is on the dashboard while the partner works
+  end
+end
+
+class PartnerExportsController < ActionController::API
+  def create
+    run = PARTNER_EXPORT.resume(params.require(:export_id))
+    if params[:status] == "failed"
+      run.fail(params[:error].to_s)
+      return head(:ok)
+    end
+
+    rows = ImportPartnerRows.call(params.require(:file_url))
+    run.metric(:rows, rows)
+    run.finish("imported #{rows} rows")
+    head :ok
+  rescue StandardError => e
+    run&.fail(e)   # recorded, then raised on to Rails
+    raise
+  end
+end
+```
+
+The id is a String of 1 to 200 characters. `start` never raises for the store: a run it could not write is reported to `on_error` and written when that handle finishes it, while a `resume` elsewhere finds nothing. `resume` of a run that already finished, or that the store does not have, gives a handle whose `finish` records nothing and reports why to `on_error`, so a webhook delivered twice is harmless. A run never finished is marked stuck by the first check after the job's `timeout`, so set `timeout` to cover the whole span, waiting included. The handle is described in [Ruby](/docs/ruby/#runs-that-span-calls).
 
 ## A worker that cannot send
 

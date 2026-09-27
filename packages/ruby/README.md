@@ -52,7 +52,19 @@ CW.start # checks for missed and stuck runs every minute, in a background thread
 
 `run` returns what the block returns and raises what it raises, after the run is recorded. A script run from crontab exits when it is done, so instead of `start`, add a second crontab line that declares the jobs and calls `CW.check` every five minutes.
 
-Client options: `store`, `alerts`, `triage`, `cron_secret`, `retention` (default `"30d"`), `defaults`, `redact` (default: blank values that look like secrets; `false` keeps output as logged, or pass a callable), `deliver` (`:now` by default; `:check` queues alerts for another process's check to send, for a worker that cannot reach Slack), `on_error` and `now`. Methods: `job`, `run`, `check`, `start`/`stop`, `silence(name, for: "2h")`/`unsilence`, `forget`, `jobs`, `jobs_with_runs`, `job_summary`, `runs`, `get_run`, `defined_jobs`, `close`. [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/#api) has each one.
+A run that starts in one call and ends in another (a job that hands work to a queue, a webhook that reports back later) is one run too:
+
+```ruby
+run = NIGHTLY.start(id: batch_id)   # records a running run; a second start with this id finds it
+# later, perhaps in another process
+run = NIGHTLY.resume(batch_id)
+run.log("Report written:", path)
+run.finish                          # or run.fail(error); finish("text") and finish(result: x) work like run's return value
+```
+
+Neither raises for the store: failures go to `on_error`, and a finish of a run already finished, or not found, records nothing and returns nil. A run never finished is marked stuck after the job's `timeout`.
+
+Client options: `store`, `alerts`, `triage`, `cron_secret`, `retention` (default `"30d"`), `defaults`, `redact` (default: blank values that look like secrets; `false` keeps output as logged, or pass a callable), `deliver` (`:now` by default; `:check` queues alerts for another process's check to send, for a worker that cannot reach Slack), `on_error` and `now`. Methods: `job`, `run`, `resume_run`, `check`, `start`/`stop`, `silence(name, for: "2h")`/`unsilence`, `forget`, `jobs`, `jobs_with_runs`, `job_summary`, `runs`, `get_run`, `defined_jobs`, `close`. [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/#api) has each one.
 
 ## Rails
 
@@ -156,7 +168,7 @@ Rails.application.routes.draw do
 end
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie. Without a token, while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, it makes a token of its own and prints a sign-in link to standard output on its first request (open it once); anywhere else it answers 503. To rely on the app's own sign in, mount it behind that (Devise's `authenticate` block, or a routing constraint) and pass `token: nil`. The URLs, JSON shapes, headers and CSRF rules are the SDK's, so the MCP server reads it unchanged. `GET /cronwatch/api/check` with a bearer (the token or `CRON_SECRET`) runs the check, for an outside cron.
+Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie. Without a token, while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, it makes a token of its own and prints a sign-in link to standard output on its first request (open it once); anywhere else it answers 503. To rely on the app's own sign in, mount it behind that (Devise's `authenticate` block, or a routing constraint) and pass `token: nil`. The URLs, JSON shapes, headers and CSRF rules are the SDK's, so the MCP server reads it unchanged. The request's origin, which the CSRF check compares against, is what Rack reports and so already follows `X-Forwarded-Host` and `X-Forwarded-Proto`; pass `origin: "https://app.example.com"` to pin it instead. `GET /cronwatch/api/check` with a bearer (the token or `CRON_SECRET`) runs the check, for an outside cron.
 
 There is no `handler()` as in the TypeScript SDK: for a job triggered over HTTP, wrap the controller action's body in `CW.job(...).run` (declared once, at boot) and check the bearer in the controller.
 

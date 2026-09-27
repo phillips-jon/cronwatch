@@ -45,12 +45,13 @@ packages/ruby/
     format.rb       alert titles and messages
     serialize.rb    stored definitions, expect rules
     abort_signal.rb AbortSignal and AbortError, like JavaScript's AbortSignal
-    job.rb          JobHandle (#run), JobContext (#log, #metric, #signal), RunRecorder
+    job.rb          JobHandle (#run, #start, #resume), JobContext (#log, #metric, #signal), RunRecorder
+    run_handle.rb   RunHandle: a run started by JobHandle#start or found by #resume, finished later
     http.rb         the channels' HTTP posts, constant time compare
     environment.rb  Environment: development?, production?
     flight.rb       Client::Flight, the check concurrent callers share
     ticker.rb       Client::Ticker, the interval thread start() runs
-    client.rb       the client: job, run, check, start/stop, silence, unsilence, forget, jobs, job_summary, runs, close
+    client.rb       the client: job, run, resume_run, check, start/stop, silence, unsilence, forget, jobs, job_summary, runs, close
     stores/memory.rb
     alerts/console.rb slack.rb discord.rb webhook.rb custom.rb
     alerts/provider.rb  what the provider channels share (alerts/shared.ts): the POST with redacted errors, alert ids, run summaries
@@ -123,6 +124,12 @@ end
 
 The job name defaults to the class name without `Job`, dasherized (`NightlyReportJob` is `nightly-report`). A job raising still raises after the run is recorded, so ActiveJob retries and error reporters see it as before.
 
+## Runs that span calls
+
+`JobHandle#start(trigger: nil, id: nil)`, `JobHandle#resume(run_id)` and `Client#resume_run(name, run_id)` are the SDK's `job.start()`, `job.resume()` and `resumeRun()`, and return a `RunHandle` (the SDK's `RunHandle`): `id`, `job`, `started_at`, `active?`, `log`, `metric`, `metrics`, `flush`, `finish(outcome = nil)` and `fail(error)`. An outcome is nil or `{ status: "ok" }` (ok), `{ error: e }` (failed, its message from `Output.error_message`), or a String or `{ result: x }`, treated like `run`'s return value. The SDK's other outcome, a `Response` of 400 or more failing the run, has no counterpart, as `run` has none.
+
+The client's side is `client.rb`'s, as `client.ts` has it: `start_run` checks the id (the SDK's messages, with `ArgumentError`) and holds a per-process `Mutex` keyed by the id while it reads the store and inserts, so two starts with one id at once record one run; `record_start` inserts the run as running and applies `on_run_start` through `update_state`; `finish_handle` reads the stored run again, joins the stored output with the handle's (capped) and merges metrics (the handle's win), then runs `conclude` and `record_finish`, the two halves of `execute`'s tail, so a finished handle and a finished block are judged by one piece of code, the marked-timed-out rule included. `flush_handle` redacts the lines it appends and writes only while the stored run is running; when it cannot, the handle keeps the lines for `finish`. The store never raises out of `start`, `resume`, `flush` or `finish`: failures go to `on_error` as `"recording <job>"`, `"starting <job>"`, `"resuming <job>"`, `"flushing <job>"` or `"finishing <job>"`, and a start that was not recorded is inserted at finish, as `execute` does. A finish that records nothing (`run <id> of <job> was already finished by this handle; ignored`, `... was already finished as ok`, `... was not found`) is reported, never raised, and returns nil.
+
 ## Delivery
 
 `deliver: :now` (the default) sends each alert from the process that produced it. `deliver: :check` sends nothing: the alert is queued in the job's state (`undelivered`, at most `Client::MAX_UNDELIVERED`, the oldest dropped first) for the next check in a process that delivers now, which adds triage and sends it, as the SDK's `deliver: "check"` does. An alert no channel accepted is queued the same way and retried once per check, oldest first. A queued alert that no longer describes the job (`Evaluate.stale_alert?`) is dropped rather than sent; one check spends at most `Client::RETRY_BUDGET_MS` (20 seconds) retrying across all jobs; past `MAX_UNDELIVERED` the oldest are dropped and `on_error` hears of it. Triage is tried once per alert: `Alert#triage` nil with `triage_tried?` true is JSON `null`, never tried again.
@@ -157,4 +164,4 @@ On Postgres the store writes through a pool of its own: an abstract class under 
 
 ## Web
 
-`Cronwatch::Web` is a Rack app with the SDK routes' URLs, JSON shapes, auth and headers: bearer or cookie token (`CRONWATCH_TOKEN`), `?token=` only on the HTML sign in, a token made per app and printed to stdout on the first request in development and test (`Cronwatch::Environment` instead of `NODE_ENV`), fail closed otherwise, the same CSRF and CSP rules, and `GET /api/check` with a bearer (the token or `CRON_SECRET`). Request bodies are read as the SDK's `request.json()` and `request.formData()` read them: forms through `Rack::Request#POST` (so a body `Rack::MethodOverride` already read still counts), JSON without a byte order mark and with bytes that are not UTF-8 as U+FFFD, every value as JavaScript's `String(value)`.
+`Cronwatch::Web` is a Rack app with the SDK routes' URLs, JSON shapes, auth and headers, and the SDK's `origin` option (normalised to scheme://host[:port], `ArgumentError` at construction for anything but an absolute http or https URL, "" as unset), which replaces the request's origin in the CSRF check, the sign-in cookie's Secure flag, the Referer the redirect back follows and the development sign-in line. Without it the request's origin is Rack's `base_url`, which already follows `X-Forwarded-Proto` and `X-Forwarded-Host` as Rails does, so the SDK's `trustProxy` (off by default there) has no counterpart. The rest: bearer or cookie token (`CRONWATCH_TOKEN`), `?token=` only on the HTML sign in, a token made per app and printed to stdout on the first request in development and test (`Cronwatch::Environment` instead of `NODE_ENV`), fail closed otherwise, the same CSRF and CSP rules, and `GET /api/check` with a bearer (the token or `CRON_SECRET`). Request bodies are read as the SDK's `request.json()` and `request.formData()` read them: forms through `Rack::Request#POST` (so a body `Rack::MethodOverride` already read still counts), JSON without a byte order mark and with bytes that are not UTF-8 as U+FFFD, every value as JavaScript's `String(value)`.

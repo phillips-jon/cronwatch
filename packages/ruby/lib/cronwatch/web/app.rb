@@ -3,6 +3,7 @@
 require "base64"
 require "digest"
 require "securerandom"
+require "uri"
 
 module Cronwatch
   # The dashboard and the small JSON API, as a Rack app: the SDK's routes
@@ -26,6 +27,17 @@ module Cronwatch
   #            client's cron_secret as a bearer, for a platform cron.
   # base_path: where the app is mounted, so links resolve. Defaults to the
   #            mount point (SCRIPT_NAME), which is right under Rails' `mount`.
+  # origin:    the public origin the dashboard is served from, such as
+  #            "https://app.example.com". By default the request's own origin
+  #            is used, as Rack reads it (Rack::Request#base_url, which follows
+  #            X-Forwarded-Proto and X-Forwarded-Host the way Rails does). Set
+  #            this to pin it, for an app behind a proxy that does not set
+  #            those headers or one that should not trust them. Used in place
+  #            of the request's origin for the cross-site check on writes, the
+  #            sign-in cookie's Secure flag, the Referer the redirect back after
+  #            a form follows, and the development sign-in line. Normalised to
+  #            scheme://host[:port]; anything that is not an absolute http or
+  #            https URL raises ArgumentError here. "" counts as unset.
   class Web
     # Tells "token not given" (read CRONWATCH_TOKEN) from "token: nil" (open on purpose).
     UNSET = Object.new.freeze
@@ -46,8 +58,9 @@ module Cronwatch
     DECIMAL = /\A[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\z/
     RADIX = { "x" => 16, "o" => 8, "b" => 2 }.freeze
 
-    def initialize(client = nil, token: UNSET, base_path: nil)
+    def initialize(client = nil, token: UNSET, base_path: nil, origin: nil)
       @client = client
+      @origin = Web.configured_origin(origin)
       @opted_out = token.nil?
       given = token.equal?(UNSET) ? nil : token
       @token = @opted_out ? nil : [given, ENV.fetch("CRONWATCH_TOKEN", nil)].map(&:to_s).find { |t| !t.empty? }
@@ -75,6 +88,26 @@ module Cronwatch
     def self.development_sign_in_line(origin, base, token)
       "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. " \
         "Sign in: #{origin}#{base}/?token=#{token}"
+    end
+
+    # The `origin` option, normalised to scheme://host[:port], or nil when
+    # unset. Raises on a value that is not an http or https origin, so a typo
+    # fails at startup.
+    def self.configured_origin(value)
+      return nil if value.nil? || value == ""
+
+      uri = begin
+        value.is_a?(String) ? URI.parse(value) : nil
+      rescue URI::InvalidURIError
+        nil
+      end
+      if uri.nil? || uri.scheme.nil? || (uri.is_a?(URI::HTTP) && uri.host.to_s.empty?)
+        raise ArgumentError, "routes: origin must be an absolute URL such as \"https://app.example.com\", got #{JS.json(value)}"
+      end
+      raise ArgumentError, "routes: origin must be http or https, got #{JS.json(value)}" unless uri.is_a?(URI::HTTP)
+
+      port = uri.port == uri.default_port ? "" : ":#{uri.port}"
+      "#{uri.scheme.downcase}://#{uri.host.downcase}#{port}"
     end
 
     # The client given, or Cronwatch.client when none was.
@@ -142,7 +175,7 @@ module Cronwatch
         end
         unless query.nil?
           # Move the token from the URL into a cookie so it is not in history or logs.
-          secure = request.https? ? "; Secure" : ""
+          secure = public_origin(request).start_with?("https:") ? "; Secure" : ""
           return redirect(request.pathname + request.search_without("token"),
                           "set-cookie" => "#{COOKIE}=#{cookie_value(@token)}; Path=#{base.empty? ? "/" : base}; HttpOnly; SameSite=Lax; Max-Age=#{COOKIE_MAX_AGE}#{secure}")
         end
@@ -255,7 +288,7 @@ module Cronwatch
       end
       return unless first
 
-      $stdout.puts(Web.development_sign_in_line(request.origin, base, @token))
+      $stdout.puts(Web.development_sign_in_line(public_origin(request), base, @token))
       $stdout.flush
     end
 
@@ -295,7 +328,7 @@ module Cronwatch
     # a page cannot forge either. Non-browser clients send neither.
     def cross_site?(request)
       origin = request.header("origin")
-      return true if !origin.nil? && origin != request.origin
+      return true if !origin.nil? && origin != public_origin(request)
 
       site = request.header("sec-fetch-site")
       !site.nil? && site != "same-origin" && site != "none"
@@ -378,7 +411,12 @@ module Cronwatch
 
     def redirect_back(request, base)
       referer = request.header("referer") || ""
-      redirect(referer.start_with?("#{request.origin}/") ? referer : "#{base}/")
+      redirect(referer.start_with?("#{public_origin(request)}/") ? referer : "#{base}/")
+    end
+
+    # The origin a browser sees: the `origin` option when set, otherwise the request's own.
+    def public_origin(request)
+      @origin || request.origin
     end
 
     def api(body, status = 200, headers = {})
@@ -429,10 +467,6 @@ module Cronwatch
       # scheme://host[:port], the page's origin.
       def origin
         @rack.base_url
-      end
-
-      def https?
-        @rack.scheme == "https"
       end
 
       # URLSearchParams#get: the first value, or nil.

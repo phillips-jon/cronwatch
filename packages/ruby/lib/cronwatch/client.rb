@@ -219,54 +219,67 @@ module Cronwatch
       returned = result.is_a?(String) ? Output.utf8(result) : nil
       run.output = recorder.output || (returned && Output.cap(returned))
 
-      if threw
-        run.status = :failed
-        run.error = Output.error_message(error)
-      elsif (problem = failure&.call(result))
-        run.status = :failed
-        run.error = Output.utf8(problem.to_s)
-      else
-        expect_text = recorder.expect_text || returned
-        unmet = Serialize.check_expectation(definition.expect, expect_text)
-        if unmet
-          run.status = :failed
-          run.error = unmet
-        else
-          run.status = :ok
-        end
-      end
-      # Redacted after the expect check, so a rule can still match what was
-      # logged. NULs go last, so not even a custom redact can store one.
-      run.output = Output.strip_nul(@redact.call(run.output)) unless run.output.nil?
-      run.error = Output.strip_nul(@redact.call(run.error)) unless run.error.nil?
-
-      stored = Serialize.to_stored(definition)
-      if recorded && marked_timed_out?(run)
-        # A check gave up on this run while it was going and already counted
-        # it as a stuck failure. A late failure must not count twice; a late
-        # success still closes stuck and recovers.
-        begin
-          @store.update_run(run)
-        rescue StandardError => e
-          report(e, "recording #{name}")
-        end
-      elsif recorded
-        finish_run(stored, run, finished_at, true)
-      else
-        # The start was never written; the store may be back by now.
-        begin
-          sync(definition)
-          @store.insert_run(run)
-          recorded = true
-        rescue StandardError => e
-          report(e, "recording #{name}")
-        end
-        finish_run(stored, run, finished_at, false) if recorded
-      end
+      conclude(definition, run, result, error, threw, recorder.expect_text || returned, failure: failure)
+      record_finish(definition, run, recorded, finished_at)
 
       raise error if threw && interrupted?(error)
 
       ExecuteResult.new(run: run, result: result, error: error, threw: threw)
+    end
+
+    # A handle on a run started elsewhere, as job(name).resume(run_id). The
+    # job must be declared in this process, or it raises ArgumentError.
+    def resume_run(name, run_id)
+      name = name.to_s if name.is_a?(Symbol)
+      definition = @registry.synchronize { @definitions[name] }
+      raise ArgumentError, "resume_run: job \"#{name}\" is not declared; call job first" unless definition
+
+      resume_handle(definition, run_id)
+    end
+
+    # JobHandle#start: records a running run and returns a RunHandle to
+    # finish it. Two starts with one id at once in this process record one
+    # run: the second waits for the first, then finds its run.
+    #
+    # @api private For JobHandle#start, not apps.
+    def start_run(definition, trigger: nil, id: nil)
+      after_fork_check
+      trigger = "start" if trigger.nil?
+      return record_start(definition, trigger, nil) if id.nil?
+
+      check_run_id(definition.name, id, "start")
+      entry = @registry.synchronize do
+        slot = (@starting[id] ||= [Mutex.new, 0])
+        slot[1] += 1
+        slot
+      end
+      begin
+        entry[0].synchronize { record_start(definition, trigger, id) }
+      ensure
+        @registry.synchronize do
+          entry[1] -= 1
+          @starting.delete(id) if entry[1].zero? && @starting[id].equal?(entry)
+        end
+      end
+    end
+
+    # JobHandle#resume and resume_run. A store that cannot be read is
+    # reported, and the handle's finish reads it again.
+    #
+    # @api private For JobHandle#resume, not apps.
+    def resume_handle(definition, run_id)
+      after_fork_check
+      check_run_id(definition.name, run_id, "resume")
+      begin
+        ensure_ready
+        stored = @store.get_run(run_id)
+      rescue StandardError => e
+        report(e, "resuming #{definition.name}")
+        return run_handle(definition, run_id, nil, true, nil)
+      end
+      return run_handle(definition, run_id, nil, true, "was not found") unless stored
+
+      existing_handle(definition, stored)
     end
 
     # Record a run that happened outside this process, for a source. Its job
@@ -509,6 +522,8 @@ module Cronwatch
       @ticker_ms = nil
       @ready_lock = Mutex.new
       @sending_lock = Mutex.new
+      # start_run calls with an id still in flight: id => [Mutex, callers].
+      @starting = {}
       # Channel (by index) and triage threads that timed out and are still going.
       @abandoned = {}
     end
@@ -697,6 +712,205 @@ module Cronwatch
       @store.get_run(run.id)&.status == :timeout
     rescue StandardError
       false
+    end
+
+    # Sets a finished run's status and error from how it ended, then redacts
+    # its output and error. Shared by execute and RunHandle#finish.
+    def conclude(definition, run, result, error, threw, expect_text, failure: nil)
+      if threw
+        run.status = :failed
+        run.error = Output.error_message(error)
+      elsif (problem = failure&.call(result))
+        run.status = :failed
+        run.error = Output.utf8(problem.to_s)
+      else
+        unmet = Serialize.check_expectation(definition.expect, expect_text)
+        if unmet
+          run.status = :failed
+          run.error = unmet
+        else
+          run.status = :ok
+        end
+      end
+      # Redacted after the expect check, so a rule can still match what was
+      # logged. NULs go last, so not even a custom redact can store one.
+      run.output = Output.strip_nul(@redact.call(run.output)) unless run.output.nil?
+      run.error = Output.strip_nul(@redact.call(run.error)) unless run.error.nil?
+    end
+
+    # Writes a finished run and evaluates it. `recorded` says whether its
+    # start was written; if not, it is inserted now when the store allows.
+    # Shared by execute and RunHandle#finish.
+    def record_finish(definition, run, recorded, finished_at)
+      name = definition.name
+      if !recorded
+        # The start was never written; the store may be back by now.
+        begin
+          sync(definition)
+          @store.insert_run(run)
+          recorded = true
+        rescue StandardError => e
+          report(e, "recording #{name}")
+        end
+        finish_run(Serialize.to_stored(definition), run, finished_at, false) if recorded
+      elsif marked_timed_out?(run)
+        # A check gave up on this run while it was going and already counted
+        # it as a stuck failure. A late failure must not count twice; a late
+        # success still closes stuck and recovers.
+        begin
+          @store.update_run(run)
+        rescue StandardError => e
+          report(e, "recording #{name}")
+        end
+      else
+        finish_run(Serialize.to_stored(definition), run, finished_at, true)
+      end
+    end
+
+    # The start of execute without the block: the run is inserted and missed
+    # and stuck close (on_run_start). A store that fails is reported and the
+    # handle inserts the finished run instead, as execute does.
+    def record_start(definition, trigger, id)
+      name = definition.name
+      unless id.nil?
+        stored = nil
+        begin
+          ensure_ready
+          stored = @store.get_run(id)
+        rescue StandardError => e
+          report(e, "recording #{name}")
+        end
+        return existing_handle(definition, stored) if stored
+      end
+      run = Run.new(id: id || SecureRandom.uuid, job: name, status: :running, started_at: now, finished_at: nil,
+                    duration_ms: nil, error: nil, output: nil, metrics: {}, trigger: trigger)
+      recorded = false
+      begin
+        sync(definition)
+        @store.insert_run(run.dup)
+        recorded = true
+      rescue StandardError => e
+        # Another process may have started a run with this id first.
+        stored = begin
+          id.nil? ? nil : @store.get_run(id)
+        rescue StandardError
+          nil
+        end
+        return existing_handle(definition, stored) if stored
+
+        report(e, "recording #{name}")
+      end
+      if recorded
+        begin
+          update_state(name) { |before| [Evaluate.on_run_start(before), nil] }
+        rescue StandardError => e
+          report(e, "starting #{name}")
+        end
+      end
+      run_handle(definition, run.id, run, recorded, nil)
+    end
+
+    # A handle on a stored run. One still running, or marked timeout by a check, can be finished.
+    def existing_handle(definition, stored)
+      if stored.job != definition.name
+        raise ArgumentError, "run \"#{stored.id}\" belongs to job \"#{stored.job}\", not \"#{definition.name}\""
+      end
+
+      finished = %i[ok failed].include?(stored.status)
+      run_handle(definition, stored.id, stored, true, finished ? "already finished as #{stored.status}" : nil)
+    end
+
+    # The handle itself. `base` is the run as last known here, `recorded`
+    # whether its start is in the store, and `inactive` why finish has
+    # nothing to do, or nil. The handle keeps its lines and metrics until
+    # flush or finish merges them onto a fresh read of the stored run.
+    def run_handle(definition, id, base, recorded, inactive)
+      name = definition.name
+      RunHandle.new(
+        id: id, job: name, started_at: base&.started_at, inactive: inactive,
+        finish: ->(recorder, outcome) { finish_handle(definition, id, base, recorded, recorder, outcome) },
+        flush: recorded ? ->(lines, metrics) { flush_handle(name, id, lines, metrics) } : nil,
+        ignored: ->(why) { ignore_finish(id, name, why) },
+      )
+    end
+
+    # A finish that records nothing, reported rather than raised.
+    def ignore_finish(id, name, why)
+      report(RuntimeError.new("run #{id} of #{name} #{why}; ignored"), "finishing #{name}")
+      nil
+    end
+
+    # RunHandle#finish, in turn with the handle's flushes: the stored run,
+    # read again, with the handle's lines and metrics added, judged like any
+    # run. Returns the run as recorded, or nil when nothing was.
+    def finish_handle(definition, id, base, recorded, recorder, outcome)
+      name = definition.name
+      from = base
+      if recorded
+        begin
+          from = @store.get_run(id) || base
+        rescue StandardError => e
+          report(e, "finishing #{name}")
+        end
+      end
+      return ignore_finish(id, name, "was not found") if from.nil?
+      return ignore_finish(id, name, "was already finished as #{from.status}") if %i[ok failed].include?(from.status)
+
+      failed, result, error = RunHandle.read_outcome(outcome)
+      finished_at = now
+      returned = result.is_a?(String) ? Output.utf8(result) : nil
+      added = recorder.output || (returned && Output.cap(returned))
+      run = from.dup
+      run.status = :running
+      run.finished_at = finished_at
+      run.duration_ms = [0, finished_at - from.started_at].max
+      run.error = nil
+      run.output = join_output(from.output, added)
+      run.metrics = (from.metrics || {}).merge(recorder.metrics)
+      expect_text = join_lines(from.output, recorder.expect_text || returned)
+      conclude(definition, run, result, error, failed, expect_text)
+      record_finish(definition, run, recorded, finished_at)
+      run
+    end
+
+    # RunHandle#flush: appends lines and metrics to the stored run while it
+    # is still running. True once written; false when the handle should keep
+    # them for finish (the run is not running, or the store failed).
+    def flush_handle(name, id, lines, metrics)
+      stored = @store.get_run(id)
+      # Not running: the lines stay in the handle for finish, which reports why it cannot record them.
+      return false if stored.nil? || stored.status != :running
+
+      updated = stored.dup
+      updated.output = join_output(stored.output, Output.strip_nul(@redact.call(lines))) unless lines.nil?
+      updated.metrics = (stored.metrics || {}).merge(metrics)
+      @store.update_run(updated)
+      true
+    rescue StandardError => e
+      report(e, "flushing #{name}")
+      false
+    end
+
+    # Raises for a run id no store could hold.
+    def check_run_id(job, id, method)
+      return if id.is_a?(String) && !id.empty? && JS.length16(id) <= 200
+
+      got = id.is_a?(String) ? "#{JS.length16(id)} characters" : id.class.to_s
+      raise ArgumentError, "job \"#{job}\": #{method}() needs a run id of 1 to 200 characters (got #{got})"
+    end
+
+    # Two stretches of text as one, a line apart; either may be nil.
+    def join_lines(before, after)
+      return after if before.nil? || before.empty?
+      return before if after.nil?
+
+      "#{before}\n#{after}"
+    end
+
+    # Output appended to stored output, capped like any run's.
+    def join_output(before, after)
+      joined = join_lines(before, after)
+      joined && Output.cap(joined)
     end
 
     # Record a finished run (ok, failed, or timed out by a check), evaluate it

@@ -75,6 +75,23 @@ module Cronwatch
 
       outcome.result
     end
+
+    # Record a running run now and finish it later, perhaps from another
+    # process (see #resume). Returns a RunHandle. `trigger` defaults to
+    # "start". `id` is your own stable id for the run, 1 to 200 characters,
+    # such as a queue's message id: a start with an id already recorded for
+    # this job records nothing and returns a handle on that run instead.
+    # Store failures go to on_error; it never raises for them. A run that is
+    # never finished is marked stuck by the first check after the job's timeout.
+    def start(trigger: nil, id: nil)
+      @client.start_run(@definition, trigger: trigger, id: id)
+    end
+
+    # A RunHandle on a run this job started elsewhere, by its id, so this
+    # process can log to it and finish it. Raises only for a run of another job.
+    def resume(run_id)
+      @client.resume_handle(@definition, run_id)
+    end
   end
 
   # Collects a run's output and metrics while its block runs.

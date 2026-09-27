@@ -130,11 +130,12 @@ end
 
 Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules, reading `Rails.env` (when Rails is loaded), `RAILS_ENV` or `RACK_ENV` where the SDK reads `NODE_ENV`. It reads forms through Rack, so it works behind `Rack::MethodOverride` and with a request body that can be read only once.
 
-`Cronwatch::Web.new(client = nil, token:, base_path:)`:
+`Cronwatch::Web.new(client = nil, token:, base_path:, origin:)`:
 
 - `client`: the client to serve. Leave it out and each request uses `Cronwatch.client`.
 - `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Without a token, while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, the app makes a token of its own and prints a sign-in link to standard output on its first request (see below); anywhere else it answers 503. `nil` opts out and serves it open, for a mount behind your own auth.
 - `base_path`: where it is mounted. It defaults to `SCRIPT_NAME`, which `map` and Rails' `mount` set, so it is only needed when something strips the prefix without setting it.
+- `origin`: the public origin the dashboard is served from, such as `"https://app.example.com"`. Leave it out and each request's own origin is used, as Rack reads it (see below). Set it to pin the origin: it then replaces the request's for the cross-site check on writes, the sign-in cookie's `Secure` flag, the `Referer` the redirect back after a form follows, and the development sign-in line. It is reduced to scheme, host and port; anything that is not an absolute `http` or `https` URL raises `ArgumentError` when the app is made, and an empty string counts as unset.
 
 The development token is 32 random bytes, base64url, made once per `Cronwatch::Web` instance (so a restart, or a reload that builds a new one, signs you out). The first request prints one line:
 
@@ -142,7 +143,7 @@ The development token is 32 random bytes, base64url, made once per `Cronwatch::W
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
 ```
 
-The link is built from that request's origin and the mount path. Open it once and the browser keeps a cookie, as with any token; scripts and the MCP server can send it as a bearer. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a Rack app cannot tell a caller on this machine from one elsewhere (proxies, tunnels and a server bound to every interface all look alike), so the log, which only you can read, is the proof. The request's origin, used to refuse cross-site writes, comes from the host and scheme Rack reports, which follow `X-Forwarded-Host` and `X-Forwarded-Proto`; behind a proxy, make sure those carry the public host and scheme. `/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
+The link is built from that request's origin and the mount path. Open it once and the browser keeps a cookie, as with any token; scripts and the MCP server can send it as a bearer. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a Rack app cannot tell a caller on this machine from one elsewhere (proxies, tunnels and a server bound to every interface all look alike), so the log, which only you can read, is the proof. The request's origin, used to refuse cross-site writes, comes from the host and scheme Rack reports (`Rack::Request#base_url`), which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` the way Rails does, so the TypeScript routes' `trustProxy` has no counterpart here. Behind a proxy, make sure those headers carry the public host and scheme, or pass `origin:` to pin it whatever a request says. `/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
 
 ## Stores
 
@@ -328,7 +329,7 @@ A triage of your own is any callable that takes the context (`alert`, `recent_ru
 | `on_error` | `Rails.logger`, or a warning on standard error | `->(error, where) { ... }` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a callable returning epoch milliseconds; for tests |
 
-`client.job(name, **options)` takes `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `expect` (a string, a Regexp or a callable), `failures_before_alert`, `description` and `tags`, with the defaults and rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ArgumentError` when the job is declared. It returns a handle whose `run(trigger: "run") { |job| ... }` runs the block.
+`client.job(name, **options)` takes `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `expect` (a string, a Regexp or a callable), `failures_before_alert`, `description` and `tags`, with the defaults and rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ArgumentError` when the job is declared. It returns a handle whose `run(trigger: "run") { |job| ... }` runs the block, and whose `start` and `resume` handle a run that spans calls (see [Runs that span calls](#runs-that-span-calls)).
 
 The block's `job` has `name`, `run_id`, `started_at`, `log(*parts)`, `metric(name, value)`, `metrics(hash)`, `signal`, and `aborted?`, true once the job's `timeout` has passed. Nothing is interrupted; a loop that can stop early checks it, or calls `job.signal.check!` to raise.
 
@@ -344,9 +345,39 @@ The client:
 | `runs(name, limit = 50)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath. Each returns the job's stored state, `version` included |
 | `forget(name)` | remove a job and its runs |
+| `resume_run(name, run_id)` | `job(name).resume(run_id)` for a job declared in this process; raises `ArgumentError` for one that is not |
 | `record_run(run, evaluate: true)` | record a run that happened elsewhere, for a source; see [pg_cron](#pg-cron). Returns the alerts it sent |
 | `defined_jobs` | the definitions declared in this process |
 | `close` | stop the thread and close the store |
+
+## Runs that span calls
+
+A run is normally one call to `run`. Work that starts in one place and ends in another (a job that hands work to a queue, a webhook that reports completion later) can be one run too: `start` records it as running and returns a run handle, and `finish` on that handle, or on one from `resume(run_id)` in another process, ends it.
+
+```ruby
+SYNC = CW.job("partner-sync", schedule: "0 * * * *", timeout: "2h")
+
+run = SYNC.start(id: batch_id)      # records a running run
+# later, perhaps in another process
+run = SYNC.resume(batch_id)         # or CW.resume_run("partner-sync", batch_id)
+run.log("imported", count, "rows")
+run.finish                           # or run.fail(error)
+```
+
+`start(trigger: nil, id: nil)` records a running run and returns a handle. `trigger` defaults to `"start"`. `id` is your own stable id, 1 to 200 characters: a start with an id already recorded for this job records nothing and returns a handle on that run, and two starts with one id at once in a process record one run. A store that fails is reported to `on_error`, never raised, and the run is written when it finishes. `resume(run_id)` reads the run from the store; one that already finished, or is not there, gives a handle whose `finish` records nothing and reports why. Both raise `ArgumentError` only for an id that is not 1 to 200 characters or a run of another job.
+
+The handle:
+
+| | |
+|---|---|
+| `id`, `job`, `started_at` | `started_at` is nil when a resumed run could not be read |
+| `active?` | false once finished, and from the start when a resumed run has already finished or was not found |
+| `log(*parts)`, `metric(name, value)`, `metrics(hash)` | as on the block's `job`; kept in the handle until `flush` or `finish` |
+| `flush` | appends the lines and metrics so far to the stored run, which must still be running. Output is redacted as it is written. It reads, changes and writes the run's row, so when two processes append to one run at the same moment the last write wins. When the write fails, the lines stay in the handle for `finish` |
+| `finish(outcome = nil)` | finishes the run and judges it like any other. `finish` or `finish(status: "ok")` is a success; `finish(error: e)` a failure, recorded like an error `run` caught; `finish("text")` or `finish(result: "text")` treats the value like the block's return (a string is the output when nothing was logged, and `expect` checks it). The handle's lines and metrics are added to those already stored (a later metric wins), then `expect`, redaction and the 16 KB cap apply. Returns the recorded run, or nil when nothing was recorded |
+| `fail(error)` | `finish(error: error)` |
+
+A second `finish` on a handle, or on a run another process has finished, records nothing: it returns nil and is reported to `on_error` (as `"finishing <job>"`), never raised. A run that is never finished is marked stuck by the first check after the job's `timeout`, so set `timeout` to cover the whole span; one finished after that follows the rule for a late `run`: a late failure is not counted again, and a late success closes stuck and recovers. For ActiveJob, see [Ruby on Rails](/docs/rails/#runs-that-span-jobs).
 
 ## Sharing a database with Node
 
