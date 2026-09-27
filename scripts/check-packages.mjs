@@ -55,6 +55,7 @@ const expected = {
   "@cronwatch/sdk/rollbar": ["rollbar"],
   "@cronwatch/sdk/bugsnag": ["bugsnag"],
   "@cronwatch/sdk/newrelic": ["newrelic"],
+  "@cronwatch/sdk/node": ["toNodeHandler", "toKoaMiddleware", "toRequest", "writeResponse"],
 };
 for (const e of entries) {
   if (!expected[e]) throw new Error(`check-packages: add ${e} to the expected exports`);

@@ -88,22 +88,19 @@ Every Strapi instance runs every cron task. With more than one instance, all the
 
 ## The dashboard
 
-Strapi's HTTP server is Koa. A global middleware hands `/cronwatch` to the routes before Strapi's body parser reads the request, using `toRequest` and `send` from the [Node adapter on the NestJS page](/docs/nestjs/#the-dashboard) (copy that file to `src/utils/node-fetch.ts`).
+Strapi's HTTP server is Koa. A global middleware made with `toKoaMiddleware` from `@cronwatch/sdk/node` hands `/cronwatch` and everything under it to the routes, before Strapi's body parser reads the request, and passes every other path on (see [Express, Koa and plain Node servers](/docs/node/#express-koa-and-plain-node-servers)).
 
 ```ts
 // src/middlewares/cronwatch.ts
-import type { Context, Next } from "koa";
+import { toKoaMiddleware } from "@cronwatch/sdk/node";
 import { cw } from "../cronwatch";
-import { send, toRequest } from "../utils/node-fetch";
 
 const routes = cw.routes({ basePath: "/cronwatch" });
 
-export default () => async (ctx: Context, next: Next) => {
-  if (ctx.path !== "/cronwatch" && !ctx.path.startsWith("/cronwatch/")) return next();
-  ctx.respond = false;   // the response is written below, not by Koa
-  await send(ctx.res, await routes.handler(await toRequest(ctx.req)));
-};
+export default () => toKoaMiddleware(routes.handler, { basePath: "/cronwatch" });
 ```
+
+It sets `ctx.respond = false` and writes the response itself, so Koa leaves it alone.
 
 Register it as `global::cronwatch` in `config/middlewares.ts`, after `strapi::errors` and before `strapi::security` and `strapi::body`:
 
@@ -124,4 +121,4 @@ export default [
 ];
 ```
 
-The dashboard sends its own security headers, which is why it sits before `strapi::security`. Set `CRONWATCH_TOKEN` and open `/cronwatch?token=<it>` once. Behind a proxy that terminates TLS, make sure it sets `X-Forwarded-Proto`, or the dashboard's forms are refused as cross-site.
+The dashboard sends its own security headers, which is why it sits before `strapi::security`. Set `CRONWATCH_TOKEN` and open `/cronwatch?token=<it>` once. Behind a proxy that terminates TLS, the dashboard's forms are refused as cross-site until the routes know the public origin: pass `origin: "https://cms.example.com"` to `cw.routes()`, or `trustProxy: true` to `toKoaMiddleware` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`. See [behind a proxy](/docs/dashboard/#behind-a-proxy).

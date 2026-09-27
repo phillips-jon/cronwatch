@@ -53,12 +53,12 @@ Import it in the root module next to `ScheduleModule.forRoot()`. `onApplicationS
 
 ```ts
 // src/main.ts
-const app = await NestFactory.create(AppModule, { rawBody: true });
+const app = await NestFactory.create(AppModule);
 app.enableShutdownHooks();
 await app.listen(3000);
 ```
 
-`rawBody: true` is for the dashboard below. SQLite (`@cronwatch/sdk/sqlite`) works as well when the app runs on one server with a persistent disk.
+SQLite (`@cronwatch/sdk/sqlite`) works as well when the app runs on one server with a persistent disk.
 
 ## Wrapping a @Cron method
 
@@ -103,68 +103,31 @@ Every instance of the app runs every `@Cron` method. All of their runs are recor
 
 ## The dashboard
 
-`routes()` is fetch-style, and Express hands a controller Node's request and response, so a small adapter converts between the two. It is framework-free and works anywhere you have Node's `IncomingMessage` and `ServerResponse`.
-
-```ts
-// src/cronwatch/node-fetch.ts
-import type { IncomingMessage, ServerResponse } from "node:http";
-
-const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)?.split(",")[0]?.trim();
-
-/** A fetch Request for a Node request. Pass rawBody when a body parser has already read the stream. */
-export async function toRequest(req: IncomingMessage, rawBody?: Buffer): Promise<Request> {
-  const proto = first(req.headers["x-forwarded-proto"]) ?? ("encrypted" in req.socket && req.socket.encrypted ? "https" : "http");
-  const host = first(req.headers["x-forwarded-host"]) ?? req.headers.host ?? "localhost";
-  const headers = new Headers();
-  for (const [name, value] of Object.entries(req.headers)) {
-    for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) headers.append(name, v);
-  }
-  const method = req.method ?? "GET";
-  let body: BodyInit | undefined;
-  if (method !== "GET" && method !== "HEAD") {
-    if (rawBody) body = new Uint8Array(rawBody);
-    else if (!req.readableEnded) body = new Uint8Array(Buffer.concat(await req.toArray()));
-  }
-  return new Request(`${proto}://${host}${req.url ?? "/"}`, { method, headers, body });
-}
-
-/** Writes a fetch Response to a Node response. */
-export async function send(res: ServerResponse, response: Response): Promise<void> {
-  const headers: Record<string, string | string[]> = {};
-  response.headers.forEach((value, name) => {
-    if (name !== "set-cookie") headers[name] = value;
-  });
-  const cookies = response.headers.getSetCookie();
-  if (cookies.length) headers["set-cookie"] = cookies;
-  res.writeHead(response.status, headers);
-  res.end(Buffer.from(await response.arrayBuffer()));
-}
-```
-
-The URL is rebuilt from `X-Forwarded-Proto` and `X-Forwarded-Host` when a proxy sets them, because the routes compare a form post's `Origin` with the request's own origin and refuse a mismatch as cross-site. Behind a TLS-terminating proxy that does not set them, dashboard forms would be refused.
-
-The controller hands every method and every path under `/cronwatch` to the routes:
+`routes()` is fetch-style, and Express hands a controller Node's request and response. `toNodeHandler` from `@cronwatch/sdk/node` converts between the two (see [Express and other Node servers](/docs/node/#express-koa-and-plain-node-servers)). The controller hands every method and every path under `/cronwatch` to it:
 
 ```ts
 // src/cronwatch/cronwatch.controller.ts
-import { All, Controller, Req, Res, type RawBodyRequest } from "@nestjs/common";
-import { CronWatch, type Routes } from "@cronwatch/sdk";
+import { All, Controller, Req, Res } from "@nestjs/common";
+import { CronWatch } from "@cronwatch/sdk";
+import { toNodeHandler, type NodeHandler } from "@cronwatch/sdk/node";
 import type { Request, Response } from "express";
-import { send, toRequest } from "./node-fetch";
 
 @Controller("cronwatch")
 export class CronwatchController {
-  private readonly routes: Routes;
+  private readonly serveRoutes: NodeHandler;
 
   constructor(cw: CronWatch) {
-    this.routes = cw.routes({ basePath: "/cronwatch" });
+    this.serveRoutes = toNodeHandler(cw.routes({ basePath: "/cronwatch" }).handler);
   }
 
   @All(["", "*path"])
-  async serve(@Req() req: RawBodyRequest<Request>, @Res() res: Response) {
-    await send(res, await this.routes.handler(await toRequest(req, req.rawBody)));
+  serve(@Req() req: Request, @Res() res: Response) {
+    return this.serveRoutes(req, res);
   }
 }
 ```
 
-Nest's body parser has read the request stream before the controller runs, which is why the app is created with `rawBody: true`: the silence form's body is passed on from `req.rawBody`. If the app sets a global prefix, include it in `basePath` (`/api/cronwatch` for `setGlobalPrefix("api")`). Set `CRONWATCH_TOKEN` and open `/cronwatch?token=<it>` once.
+Nest's body parser reads the request before the controller runs. The adapter uses `req.rawBody` when the app is created with `rawBody: true`, and otherwise encodes the parsed `req.body` again as the form or JSON it came as, so the silence form works either way. If the app sets a global prefix, include it in `basePath` (`/api/cronwatch` for `setGlobalPrefix("api")`). Set `CRONWATCH_TOKEN` and open `/cronwatch?token=<it>` once.
+
+Behind a proxy that terminates TLS, the dashboard's forms are refused as cross-site unless the routes know the public origin: pass `origin: "https://app.example.com"` to `cw.routes()`, or `trustProxy: true` to `toNodeHandler` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`. See [behind a proxy](/docs/dashboard/#behind-a-proxy).
+

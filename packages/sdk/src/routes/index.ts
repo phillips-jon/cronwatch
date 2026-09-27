@@ -23,6 +23,24 @@ export interface RoutesOptions {
   token?: string | null;
   /** Where the routes are mounted, so links resolve. Default "/cronwatch". */
   basePath?: string;
+  /**
+   * The public origin the dashboard is served from, such as
+   * "https://app.example.com", for an app behind a proxy whose request URLs
+   * carry an internal host or scheme. Used in place of the request URL's
+   * origin for the cross-site check on writes, the sign-in redirect (its
+   * cookie is Secure when this is https, and the redirect back after a form
+   * follows a Referer on this origin) and the development sign-in line.
+   * Takes precedence over trustProxy.
+   */
+  origin?: string;
+  /**
+   * Take the public origin from X-Forwarded-Proto and X-Forwarded-Host (the
+   * first value of each, falling back to the request URL's scheme or host
+   * for whichever is missing) when a request carries either. Only for an app
+   * whose proxy sets or overwrites both headers: a client can send them too.
+   * Default false, which ignores them.
+   */
+  trustProxy?: boolean;
 }
 
 export type FetchHandler = (request: Request) => Promise<Response>;
@@ -70,7 +88,9 @@ function developmentToken(): string {
  *
  *   [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: <origin><base>/?token=<token>
  *
- * <origin> is the first request's URL origin (scheme, host and any port),
+ * <origin> is the first request's public origin (scheme, host and any
+ * port): the `origin` option when set, the forwarded one under trustProxy,
+ * otherwise the request URL's,
  * <base> the base path without a trailing slash ("" when mounted at the
  * root), and <token> the token as generated (base64url, so nothing needs
  * escaping).
@@ -96,6 +116,47 @@ function readCookie(request: Request, name: string): string | null {
     if (k === name) return safeDecode(rest.join("="));
   }
   return null;
+}
+
+/** The first entry of a comma-separated header, trimmed, or null when there is none. */
+function firstValue(value: string | null): string | null {
+  const first = value?.split(",")[0]?.trim();
+  return first ? first : null;
+}
+
+/**
+ * The origin configured with `origin`, normalised, or null. Throws on a value
+ * that is not an http or https origin, so a typo fails at startup.
+ */
+function configuredOrigin(value: string | undefined): string | null {
+  if (value === undefined || value === "") return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`routes: origin must be an absolute URL such as "https://app.example.com", got ${JSON.stringify(value)}`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`routes: origin must be http or https, got ${JSON.stringify(value)}`);
+  return url.origin;
+}
+
+/**
+ * The origin a browser sees for this request, with trustProxy: the forwarded
+ * scheme and host when present and well formed, otherwise the request URL's own.
+ */
+function forwardedOrigin(request: Request, url: URL): string {
+  const proto = firstValue(request.headers.get("x-forwarded-proto"))?.toLowerCase() ?? null;
+  const host = firstValue(request.headers.get("x-forwarded-host"));
+  if (proto === null && host === null) return url.origin;
+  if (proto !== null && proto !== "http" && proto !== "https") return url.origin;
+  try {
+    const built = new URL(`${proto ?? url.protocol.slice(0, -1)}://${host ?? url.host}`);
+    // A "host" carrying a path, credentials, a query or a fragment is not a host.
+    if (built.pathname !== "/" || built.username || built.password || built.search || built.hash) return url.origin;
+    return built.origin;
+  } catch {
+    return url.origin;
+  }
 }
 
 function stripBase(pathname: string, base: string): string {
@@ -128,9 +189,9 @@ async function readBody(request: Request): Promise<Record<string, string>> {
  * A browser attaches Origin or Sec-Fetch-Site to a cross-site form post, and
  * a page cannot forge either. Non-browser clients send neither.
  */
-function crossSite(request: Request, url: URL): boolean {
+function crossSite(request: Request, publicOrigin: string): boolean {
   const origin = request.headers.get("origin");
-  if (origin !== null && origin !== url.origin) return true;
+  if (origin !== null && origin !== publicOrigin) return true;
   const site = request.headers.get("sec-fetch-site");
   return site !== null && site !== "same-origin" && site !== "none";
 }
@@ -160,6 +221,10 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
   const configured = optedOut ? null : (options.token || readEnv("CRONWATCH_TOKEN") || null);
   const base = (options.basePath ?? "/cronwatch").replace(/\/+$/, "");
   const developing = isDevelopment();
+  const fixedOrigin = configuredOrigin(options.origin);
+  const trustProxy = options.trustProxy === true;
+  const originOf = (request: Request, url: URL): string =>
+    fixedOrigin ?? (trustProxy ? forwardedOrigin(request, url) : url.origin);
   // A fetch handler cannot tell a local caller from a remote one (proxies,
   // tunnels and `next dev` listening on every interface all look alike), so
   // development gets a token too: made here, and shown only in the server log.
@@ -172,10 +237,11 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
 
   const serve = async (request: Request, url: URL, path: string, wantsHtml: boolean): Promise<Response> => {
     const method = request.method.toUpperCase();
+    const publicOrigin = originOf(request, url);
 
     if (generated && !announced) {
       announced = true;
-      console.info(developmentSignInLine(url.origin, base, token!));
+      console.info(developmentSignInLine(publicOrigin, base, token!));
     }
 
     // No token outside development: fail closed.
@@ -185,7 +251,7 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
         : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503);
     }
 
-    if (method !== "GET" && method !== "HEAD" && crossSite(request, url)) {
+    if (method !== "GET" && method !== "HEAD" && crossSite(request, publicOrigin)) {
       return wantsHtml
         ? html(messagePage("Cross-site request refused", "Changes can only be made from the dashboard itself.", base), 403)
         : api({ ok: false, error: "Cross-site request refused" }, 403);
@@ -215,7 +281,7 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
       if (query !== null) {
         // Move the token from the URL into a cookie so it is not in history or logs.
         url.searchParams.delete("token");
-        const secure = url.protocol === "https:" ? "; Secure" : "";
+        const secure = publicOrigin.startsWith("https:") ? "; Secure" : "";
         return redirect(url.pathname + (url.search || ""), {
           "set-cookie": `${COOKIE}=${await expectedCookie(token)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`,
         });
@@ -224,7 +290,7 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
 
     const redirectBack = () => {
       const referer = request.headers.get("referer") ?? "";
-      return redirect(referer.startsWith(url.origin + "/") ? referer : `${base}/`);
+      return redirect(referer.startsWith(publicOrigin + "/") ? referer : `${base}/`);
     };
     const decoded = path.split("/").filter(Boolean).map(safeDecode);
     if (decoded.some((part) => part === null)) {
