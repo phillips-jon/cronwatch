@@ -52,7 +52,7 @@ const ok = timingSafeEqual(Buffer.from(expected), Buffer.from(request.headers.ge
 
 ## Email, SMS and error trackers
 
-Each provider below is its own entry point, with nothing to install: they use only `fetch` and Web Crypto, so they run on Node, Cloudflare Workers, Deno and Bun. Every request gives up after 10 seconds. A failure names the provider and the URL's origin, with any key the channel holds cut out of the response it quotes. Every channel takes an optional `link: (alert) => string`, shown as an "Open" link.
+Each provider below is its own entry point, with nothing to install: they use only `fetch` and Web Crypto, so they run on Node, Cloudflare Workers, Deno and Bun. Every request gives up after 10 seconds. A failure names the provider and the URL's origin, with any key the channel holds cut out of the response it quotes. A redirect is treated as a failure rather than followed, here and for Slack, Discord and the webhook, so a key in a header never goes to another address. Every channel takes an optional `link: (alert) => string`, shown as an "Open" link.
 
 ### Email
 

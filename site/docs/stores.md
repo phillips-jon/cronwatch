@@ -83,8 +83,9 @@ interface Store {
   getJob(name: string): Promise<StoredJob | null>;
   listJobs(): Promise<StoredJob[]>;                                         // by name, code unit order
   deleteJob(name: string): Promise<void>;                                   // and its runs and state
-  insertRun(run: Run): Promise<void>;
+  insertRun(run: Run): Promise<void>;                                       // throws on a duplicate id
   updateRun(run: Run): Promise<void>;                                       // no-op if the run is gone
+  updateRunIf?(run: Run, fromStatuses: RunStatus[]): Promise<boolean>;      // see below
   getRun(id: string): Promise<Run | null>;
   listRuns(job: string, limit: number): Promise<Run[]>;                     // newest first
   lastRun(job: string): Promise<Run | null>;
@@ -96,6 +97,8 @@ interface Store {
   close?(): Promise<void>;
 }
 ```
+
+`updateRunIf` writes a run's status, finish time, duration, error, output and metrics only when its stored status is one of `fromStatuses`, and says whether it wrote (a missing row, or an empty list, is false). It is how a run is finished exactly once when two processes finish it at the same moment: only the one whose write lands judges it and sends alerts. Without it the client reads the run and then writes it, which is fine for one process and can count a run twice across two. The bundled stores implement it with `UPDATE ... WHERE id = ? AND status IN (...)`.
 
 `compareAndSetState` writes `state` only when the stored state's `version` equals `expectedVersion`, and says whether it wrote. A missing row, or a stored state with no `version`, counts as version 0. It is optional so that stores written for earlier versions keep working: without it the client falls back to `setState`, which is safe only when one process at a time updates a job's state (see below). Implement it if your store may be shared.
 
