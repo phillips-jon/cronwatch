@@ -64,6 +64,25 @@
     });
   });
 
+  // The docs sidebar sticks 24px from the top, but until the page has
+  // scrolled that far it starts lower, under the masthead. Its list scrolls
+  // inside it, so its height has to end above the bottom of the window from
+  // wherever it starts: tell the stylesheet how much room there is. Without
+  // script it assumes the lower start, which fits either way.
+  var side = document.querySelector(".docs-side");
+  if (side) {
+    var queued = false;
+    var room = function () {
+      queued = false;
+      var top = Math.max(side.getBoundingClientRect().top, 24);
+      side.style.setProperty("--side-room", Math.max(160, Math.floor(window.innerHeight - top - 24)) + "px");
+    };
+    var later = function () { if (!queued) { queued = true; requestAnimationFrame(room); } };
+    window.addEventListener("scroll", later, { passive: true });
+    window.addEventListener("resize", later);
+    room();
+  }
+
   document.querySelectorAll(".copy").forEach(function (button) {
     button.addEventListener("click", function () {
       var box = button.closest(".install, .out");

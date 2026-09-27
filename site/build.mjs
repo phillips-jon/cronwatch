@@ -105,7 +105,7 @@ function curlyApostrophes(html) {
 // The clock in a rounded box, as in the favicon; the box itself is CSS (.brand .mark).
 const MARK = `<span class="mark" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><circle cx="20" cy="20" r="10.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 12.5V20h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
-const assets = { css: "", js: "", theme: "" };
+const assets = { css: "", js: "", theme: "", search: "", index: "" };
 
 /* The browser chrome matches --paper; theme.js and site.js swap it to the
    dark paper when the sheet is turned over. */
@@ -137,6 +137,7 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 <script src="${assets.theme}"></script>
 <link rel="stylesheet" href="${assets.css}">
 <script src="${assets.js}" defer></script>
+<script src="${assets.search}" data-index="${assets.index}" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -527,6 +528,50 @@ ${CONTACT_FORM}`),
   return { indexed, count: indexed.length + 2 };
 }
 
+/* ---- Docs search. ---- */
+
+/**
+ * The search entry at the top of the docs sidebar and the phone's docs menu.
+ * Without script it is a link to the docs index; search.js turns it into a
+ * button that opens the search dialog, and fills in the shortcut it shows.
+ */
+const SEARCH_OPEN = `<a class="search-open" href="/docs/" data-search-open><span>Search docs</span><kbd></kbd></a>`;
+
+const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", nbsp: " " };
+/** Rendered HTML to one line of plain text, code blocks left out. */
+function plain(html) {
+  return html
+    .replace(/<div class="code">[\s\S]*?<\/div>/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(#\d+|#x[0-9a-f]+|\w+);/gi, (m, e) => ENTITIES[e] ?? (e[0] === "#" ? String.fromCodePoint(e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : m))
+    .replace(/\s+/g, " ")
+    .replace(/ ([.,;:)])/g, "$1")
+    .replace(/\( /g, "(")
+    .trim();
+}
+
+/** Cut at a word boundary near `max` characters. */
+function clip(text, max = 300) {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max - 40)).replace(/[\s,;:.]+$/, "")}…`;
+}
+
+/**
+ * The search index: for each docs page, its title, route and group, then one
+ * entry per section, [heading, anchor, excerpt], starting with the text
+ * before the first heading (with an empty heading and anchor). Taken from
+ * the rendered HTML, so every anchor is the id the page really has.
+ */
+function searchIndex(pages) {
+  return pages.map((p) => {
+    const parts = p.html.split(/<h([23]) id="([^"]*)">([\s\S]*?)<\/h\1>/);
+    const sections = [["", "", clip(plain(parts[0].replace(/<h1[\s\S]*?<\/h1>/, "")))]];
+    for (let i = 1; i < parts.length; i += 4) sections.push([plain(parts[i + 2]), parts[i + 1], clip(plain(parts[i + 3]))]);
+    return { t: p.meta.title, u: p.route, g: p.meta.group || "", s: sections };
+  });
+}
+
 function build() {
   rmSync(DIST, { recursive: true, force: true });
   mkdirSync(path.join(DIST, "assets"), { recursive: true });
@@ -542,6 +587,23 @@ function build() {
   assets.theme = `/assets/theme.${hash(theme)}.js`;
   writeFileSync(path.join(DIST, assets.theme), theme);
 
+  const pages = readdirSync(DOCS).filter((f) => f.endsWith(".md")).map((file) => {
+    const { meta, body } = frontmatter(readFileSync(path.join(DOCS, file), "utf8"));
+    const name = file.replace(/\.md$/, "");
+    const route = name === "index" ? "/docs/" : `/docs/${name}/`;
+    return { name, route, meta, html: curlyApostrophes(marked.parse(body)), order: Number(meta.order ?? 999) };
+  }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+
+  // The docs search index is a script, not JSON: the CSP's connect-src is
+  // 'none', so search.js cannot fetch it, but script-src 'self' lets it add
+  // a script tag the first time the search opens.
+  const index = `window.cronwatchSearch=${JSON.stringify(searchIndex(pages))};\n`;
+  assets.index = `/assets/search-index.${hash(index)}.js`;
+  writeFileSync(path.join(DIST, assets.index), index);
+  const search = readFileSync(path.join(SRC, "search.js"), "utf8");
+  assets.search = `/assets/search.${hash(search)}.js`;
+  writeFileSync(path.join(DIST, assets.search), search);
+
   // Replacer functions, so a $& or $1 in captured text is inserted as written.
   let landing = readFileSync(path.join(SRC, "landing.html"), "utf8").replace(/\{\{GITHUB\}\}/g, () => GITHUB);
   const promptHtml = escape(readFileSync(path.join(SRC, "prompt.txt"), "utf8"));
@@ -555,12 +617,6 @@ function build() {
     kind: "landing",
   }));
 
-  const pages = readdirSync(DOCS).filter((f) => f.endsWith(".md")).map((file) => {
-    const { meta, body } = frontmatter(readFileSync(path.join(DOCS, file), "utf8"));
-    const name = file.replace(/\.md$/, "");
-    const route = name === "index" ? "/docs/" : `/docs/${name}/`;
-    return { name, route, meta, body, order: Number(meta.order ?? 999) };
-  }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
   // Pages that share a frontmatter `group` are listed under its name. Give
   // them neighbouring `order` values, or the group is started twice.
   const docList = (here) => {
@@ -578,10 +634,10 @@ function build() {
   };
 
   for (const [i, page] of pages.entries()) {
-    const html = curlyApostrophes(marked.parse(page.body));
+    const html = page.html;
     const prev = pages[i - 1], next = pages[i + 1];
     const pager = `<nav class="pager" aria-label="Previous and next">${prev ? `<a class="prev" href="${prev.route}"><small>Previous</small>${escape(prev.meta.title)}</a>` : "<span></span>"}${next ? `<a class="next" href="${next.route}"><small>Next</small>${escape(next.meta.title)}</a>` : ""}</nav>`;
-    const body = `<div class="docs"><aside class="docs-side" aria-label="Documentation"><p>Documentation</p>${docList(page.route)}</aside><details class="docs-menu"><summary>Documentation</summary>${docList(page.route)}</details><article class="doc"><p class="label">${escape(page.meta.title)}</p>${html}${pager}</article></div>`;
+    const body = `<div class="docs"><aside class="docs-side" aria-label="Documentation">${SEARCH_OPEN}<div class="docs-scroll"><p>Documentation</p>${docList(page.route)}</div></aside><details class="docs-menu"><summary>Documentation</summary>${SEARCH_OPEN}${docList(page.route)}</details><article class="doc"><p class="label">${escape(page.meta.title)}</p>${html}${pager}</article></div>`;
     const dir = path.join(DIST, page.route);
     mkdirSync(dir, { recursive: true });
     writeFileSync(path.join(dir, "index.html"), layout({ title: page.meta.title, description: page.meta.description ?? "", body, path: page.route, kind: "docs" }));
