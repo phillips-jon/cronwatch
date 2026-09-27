@@ -265,18 +265,27 @@ test("a store failing during start does not throw; finish records the run once t
   assert.deepEqual(alerts.types(), []);
 });
 
-test("a store failing at finish is reported, not thrown", async () => {
+test("a store failing at finish is reported, not thrown, and the handle can finish again", async () => {
   const broken = new Set<string>();
   const { cw, errors } = make({ store: flaky(memory(), broken) });
   const job = cw.job("flaky");
   const run = await job.start();
   run.log("working");
-  broken.add("getRun").add("updateRun");
+  broken.add("getRun").add("updateRun").add("updateRunIf");
   await run.flush();
   assert.equal(errors.at(-1)!.where, "flushing flaky");
+  assert.equal(await run.finish(), null, "nothing recorded");
+  assert.ok(errors.some((e) => e.where === "finishing flaky"));
+  assert.equal(run.active, true, "still active, to finish again");
+  // The read works but the write fails: still retryable.
+  broken.delete("getRun");
+  assert.equal(await run.finish(), null);
+  assert.equal(run.active, true);
+  broken.clear();
+  assert.equal((await cw.getRun(run.id))!.status, "running", "nothing written yet");
   const finished = await run.finish();
   assert.equal(finished!.status, "ok");
-  assert.ok(errors.some((e) => e.where === "finishing flaky"));
-  broken.clear();
-  assert.equal((await cw.getRun(run.id))!.status, "running", "left for the stuck check");
+  assert.equal(finished!.output, "working", "the lines logged before the failures are kept");
+  assert.equal(run.active, false);
+  assert.equal(await run.finish(), null, "finished once only");
 });

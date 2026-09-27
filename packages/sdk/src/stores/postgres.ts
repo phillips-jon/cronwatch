@@ -1,6 +1,6 @@
 import pg from "pg";
 import type { Store, StoredJob } from "../types.js";
-import { params, rowToJob, rowToRun, rowToState, schema, statements, tablePrefix, type JobRow, type RunRow, type StateRow } from "./sql.js";
+import { params, rowToJob, rowToRun, rowToState, schema, statements, tablePrefix, updateRunIfSql, type JobRow, type RunRow, type StateRow } from "./sql.js";
 
 export interface PostgresOptions {
   /** postgres://... Defaults to process.env.DATABASE_URL. */
@@ -68,6 +68,11 @@ export function postgres(options: PostgresOptions = {}): Store {
     },
     async updateRun(run) {
       await pool.query(sql.updateRun, params.updateRun(run));
+    },
+    async updateRunIf(run, fromStatuses) {
+      if (fromStatuses.length === 0) return false;
+      const result = await pool.query(updateRunIfSql("postgres", p, fromStatuses.length), params.updateRunIf(run, fromStatuses));
+      return (result.rowCount ?? 0) > 0;
     },
     async getRun(id) {
       const { rows } = await pool.query<RunRow>(sql.getRun, [id]);

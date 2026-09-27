@@ -5,7 +5,7 @@
  * POST https://api.<site>/api/v1/events with DD-API-KEY. Answers 202.
  */
 import type { Alert, AlertChannel } from "../types.js";
-import { cut, plainText, post, sha256Hex } from "./shared.js";
+import { cut, plainText, post, sha256Hex, trimmed } from "./shared.js";
 
 export interface DatadogOptions {
   /** An API key (not an application key). */
@@ -30,7 +30,9 @@ const ALERT_TYPE: Record<Alert["type"], "error" | "warning" | "success"> = {
 
 /** Posts alerts to the Datadog event stream, aggregated per job and alert type. */
 export function datadog(options: DatadogOptions): AlertChannel {
-  if (!options.apiKey) throw new Error("datadog() needs an apiKey");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const apiKey = trimmed(options.apiKey);
+  if (!apiKey) throw new Error("datadog() needs an apiKey");
   const site = (options.site ?? "datadoghq.com").replace(/^https?:\/\//, "").replace(/^(api|app)\./, "").replace(/\/+$/, "");
   if (!/^[a-z0-9.-]+$/i.test(site)) throw new Error("datadog() needs a site like datadoghq.com");
   const url = `https://api.${site}/api/v1/events`;
@@ -49,9 +51,9 @@ export function datadog(options: DatadogOptions): AlertChannel {
         ...(options.host ? { host: options.host } : {}),
       };
       await post("Datadog", url, {
-        headers: { "content-type": "application/json", accept: "application/json", "dd-api-key": options.apiKey },
+        headers: { "content-type": "application/json", accept: "application/json", "dd-api-key": apiKey },
         body: JSON.stringify(event),
-      }, [options.apiKey]);
+      }, [apiKey]);
     },
   };
 }

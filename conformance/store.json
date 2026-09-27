@@ -551,5 +551,250 @@
         }
       }
     }
+  ],
+  "updateRunIf": [
+    {
+      "run": {
+        "id": "u1",
+        "job": "a",
+        "status": "failed",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": "first",
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "from": [
+        "running"
+      ],
+      "outcome": true,
+      "stored": {
+        "id": "u1",
+        "job": "a",
+        "status": "failed",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": "first",
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      }
+    },
+    {
+      "run": {
+        "id": "u1",
+        "job": "a",
+        "status": "ok",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": null,
+        "output": "second",
+        "metrics": {},
+        "trigger": "run"
+      },
+      "from": [
+        "running"
+      ],
+      "outcome": false,
+      "stored": {
+        "id": "u1",
+        "job": "a",
+        "status": "failed",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": "first",
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      }
+    },
+    {
+      "run": {
+        "id": "u1",
+        "job": "a",
+        "status": "ok",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": null,
+        "output": "late",
+        "metrics": {},
+        "trigger": "run"
+      },
+      "from": [
+        "running",
+        "timeout"
+      ],
+      "outcome": false,
+      "stored": {
+        "id": "u1",
+        "job": "a",
+        "status": "failed",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": "first",
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      }
+    },
+    {
+      "set": {
+        "id": "u1",
+        "job": "a",
+        "status": "timeout",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": "stuck",
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "stored": {
+        "id": "u1",
+        "job": "a",
+        "status": "timeout",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": "stuck",
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      }
+    },
+    {
+      "run": {
+        "id": "u1",
+        "job": "a",
+        "status": "ok",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": null,
+        "output": "late",
+        "metrics": {
+          "m": 2
+        },
+        "trigger": "run"
+      },
+      "from": [
+        "running",
+        "timeout"
+      ],
+      "outcome": true,
+      "stored": {
+        "id": "u1",
+        "job": "a",
+        "status": "ok",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": null,
+        "output": "late",
+        "metrics": {
+          "m": 2
+        },
+        "trigger": "run"
+      }
+    },
+    {
+      "run": {
+        "id": "u1",
+        "job": "a",
+        "status": "failed",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "from": [],
+      "outcome": false,
+      "stored": {
+        "id": "u1",
+        "job": "a",
+        "status": "ok",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": null,
+        "output": "late",
+        "metrics": {
+          "m": 2
+        },
+        "trigger": "run"
+      }
+    },
+    {
+      "run": {
+        "id": "missing",
+        "job": "a",
+        "status": "ok",
+        "startedAt": 5,
+        "finishedAt": 15,
+        "durationMs": 10,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "from": [
+        "running"
+      ],
+      "outcome": false,
+      "stored": {
+        "id": "u1",
+        "job": "a",
+        "status": "ok",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": null,
+        "output": "late",
+        "metrics": {
+          "m": 2
+        },
+        "trigger": "run"
+      }
+    },
+    {
+      "insert": {
+        "id": "u1",
+        "job": "b",
+        "status": "running",
+        "startedAt": 2000,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "outcome": "refused",
+      "stored": {
+        "id": "u1",
+        "job": "a",
+        "status": "ok",
+        "startedAt": 1000,
+        "finishedAt": 1010,
+        "durationMs": 10,
+        "error": null,
+        "output": "late",
+        "metrics": {
+          "m": 2
+        },
+        "trigger": "run"
+      }
+    }
   ]
 }

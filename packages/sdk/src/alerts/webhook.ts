@@ -2,7 +2,7 @@ import type { AlertChannel } from "../types.js";
 
 export interface WebhookOptions {
   url: string;
-  /** Extra request headers, for an Authorization header say. */
+  /** Extra request headers, for an Authorization header say. Values are trimmed. */
   headers?: Record<string, string>;
   /**
    * When set, each request carries `X-CronWatch-Signature: sha256=<hex>`,
@@ -25,6 +25,7 @@ function origin(url: string): string {
 /**
  * POSTs the alert as JSON to any URL. The body is the Alert object:
  * { type, job, title, message, run, details, triage, at, definition }.
+ * A redirect is an error: point the url at where the receiver really is.
  */
 export function webhook(options: WebhookOptions): AlertChannel {
   if (!options.url) throw new Error("webhook() needs a url");
@@ -32,11 +33,14 @@ export function webhook(options: WebhookOptions): AlertChannel {
     name: "webhook",
     async send(alert) {
       const body = JSON.stringify(alert);
-      const headers: Record<string, string> = { "content-type": "application/json", "user-agent": "cronwatch", ...options.headers };
+      const headers: Record<string, string> = { "content-type": "application/json", "user-agent": "cronwatch" };
+      // A pasted Authorization value often carries a stray space or newline, which fetch would refuse.
+      for (const [name, value] of Object.entries(options.headers ?? {})) headers[name] = typeof value === "string" ? value.trim() : value;
       if (options.secret) {
         headers["x-cronwatch-signature"] = `sha256=${await hmacSha256Hex(options.secret, body)}`;
       }
-      const response = await fetch(options.url, { method: "POST", headers, body, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      // A redirect is refused, not followed: the headers (and the signature) would go with it.
+      const response = await fetch(options.url, { method: "POST", headers, body, redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
       // Only the origin: a webhook URL's path or query often is the credential.
       if (!response.ok) throw new Error(`Webhook ${origin(options.url)} answered ${response.status}`);
     },

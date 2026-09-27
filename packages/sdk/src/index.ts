@@ -28,6 +28,7 @@ export type {
   AlertDraft,
   AlertType,
   BudgetBreach,
+  ChannelContext,
   CheckResult,
   Condition,
   Duration,

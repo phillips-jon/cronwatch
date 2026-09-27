@@ -20,7 +20,7 @@ import { composeAlert } from "./format.js";
 import { constantTimeEqual, json } from "./http.js";
 import { createRecorder } from "./job.js";
 import type { JobContext } from "./job.js";
-import { capOutput, errorMessage, redactSecrets, stripNul } from "./output.js";
+import { capOutput, errorMessage, OUTPUT_CAP, redactSecrets, stripNul } from "./output.js";
 import { parseSchedule } from "./schedule.js";
 import { checkExpectation, toStored } from "./serialize.js";
 import { createRoutes } from "./routes/index.js";
@@ -81,8 +81,10 @@ export interface StartOptions {
   trigger?: string;
   /**
    * Your own stable id for the run, such as an Inngest run id, 1 to 200
-   * characters. A start with an id already recorded for this job records
-   * nothing and returns a handle on that run instead.
+   * characters, not starting with "pgcron:" (the pg_cron source's). A start
+   * with an id already recorded for this job records nothing and returns a
+   * handle on that run instead; an id recorded for another job throws,
+   * whether that job's start is still in flight or long done.
    */
   id?: string;
 }
@@ -111,15 +113,21 @@ export interface RunHandle {
   metrics(values: Record<string, number>): void;
   /**
    * Append the lines and metrics added so far to the stored run, which must
-   * still be running. A read, change and write of the run's row: two
-   * processes appending to one run at the same moment can lose one's lines.
+   * still be running and belong to this job. A read, change and write of the
+   * run's row, written only while it is still running: two processes
+   * appending to one run at the same moment can lose one's lines, but a flush
+   * never undoes a finish. The first 16 KB of everything flushed stay in the
+   * handle, so an expect rule at finish() sees an early line as run() would.
    */
   flush(): Promise<void>;
   /**
    * Finish the run, judge it like any other and send what that produces.
    * Resolves to the run as recorded, or null when nothing was recorded: the
-   * run was already finished (here or elsewhere) or was not found, which is
-   * reported to onError. Never throws for the store.
+   * run was already finished (here or elsewhere), was not found, or belongs
+   * to another job, which is reported to onError. When several processes
+   * finish one run, only the one whose write lands judges it. Never throws
+   * for the store: a store that fails is reported, nothing is recorded, and
+   * the handle stays active so finish() can be called again.
    */
   finish(outcome?: RunOutcome | string): Promise<Run | null>;
   /** finish({ error }). */
@@ -571,7 +579,12 @@ export class CronWatch {
     this.conclude(definition, run, result, error, threw, recorder.expectText() ?? (typeof result === "string" ? result : null));
 
     await started;
-    await this.recordFinish(definition, run, recorded, finishedAt);
+    try {
+      const ignored = await this.recordFinish(definition, run, recorded, finishedAt);
+      if (ignored) this.report(new Error(`run ${run.id} of ${name} ${ignored}; ignored`), `finishing ${name}`);
+    } catch (e) {
+      this.onError(e, `recording ${name}`);
+    }
     return { run, result, error, threw };
   }
 
@@ -603,33 +616,54 @@ export class CronWatch {
 
   /**
    * Writes a finished run and evaluates it. `recorded` says whether its
-   * start was written; if not, it is inserted now when the store allows.
-   * Shared by execute() and RunHandle.finish().
+   * start was written; if not, it is inserted now. Returns why nothing was
+   * recorded (another process finished the run first, say), or null. Throws
+   * when the store does, so a handle can be finished again. Shared by
+   * execute() and RunHandle.finish().
    */
-  private async recordFinish(definition: JobDefinition, run: Run, recorded: boolean, finishedAt: number): Promise<void> {
-    const name = definition.name;
+  private async recordFinish(definition: JobDefinition, run: Run, recorded: boolean, finishedAt: number): Promise<string | null> {
     if (!recorded) {
       // The start was never written; the store may be back by now.
+      await this.sync(definition);
       try {
-        await this.sync(definition);
         await this.store.insertRun(run);
-        recorded = true;
+        await this.finishRun(toStored(definition), run, finishedAt);
+        return null;
       } catch (e) {
-        this.onError(e, `recording ${name}`);
+        // Another process may have recorded a run with this id meanwhile.
+        const stored = await this.store.getRun(run.id).catch(() => null);
+        if (!stored) throw e;
+        if (stored.job !== run.job) return `belongs to job "${stored.job}"`;
       }
-      if (recorded) await this.finishRun(toStored(definition), run, finishedAt, false);
-    } else if (await this.markedTimedOut(run)) {
-      // A check gave up on this run while it was going and already counted it
-      // as a stuck failure. A late failure must not count twice; a late
-      // success still closes stuck and recovers.
-      try {
-        await this.store.updateRun(run);
-      } catch (e) {
-        this.onError(e, `recording ${name}`);
-      }
-    } else {
-      await this.finishRun(toStored(definition), run, finishedAt, true);
     }
+    const claim = await this.claimFinish(run);
+    if ("ignored" in claim) return claim.ignored;
+    if (!claim.lateAfterTimeout || run.status === "ok") await this.finishRun(toStored(definition), run, finishedAt);
+    return null;
+  }
+
+  /** A conditional write (Store.updateRunIf), or for a store without one, a read then a plain write. */
+  private async writeRunIf(run: Run, fromStatuses: Run["status"][]): Promise<boolean> {
+    if (typeof this.store.updateRunIf === "function") return this.store.updateRunIf(run, fromStatuses);
+    const stored = await this.store.getRun(run.id);
+    if (!stored || !fromStatuses.includes(stored.status)) return false;
+    await this.store.updateRun(run);
+    return true;
+  }
+
+  /**
+   * Writes a finished run over its stored row, only while that row is still
+   * running, or else still marked timeout by a check. Only the process whose
+   * write lands goes on to evaluate the run; for the others it returns why
+   * nothing was written. `lateAfterTimeout` means a check already counted
+   * the run as a stuck failure: a late failure must not count twice, while
+   * a late success still closes stuck and recovers. Throws when the store does.
+   */
+  private async claimFinish(run: Run): Promise<{ lateAfterTimeout: boolean } | { ignored: string }> {
+    if (await this.writeRunIf(run, ["running"])) return { lateAfterTimeout: false };
+    if (await this.writeRunIf(run, ["timeout"])) return { lateAfterTimeout: true };
+    const stored = await this.store.getRun(run.id);
+    return { ignored: stored ? `was already finished as ${stored.status}` : "was not found" };
   }
 
   /** job.start(): records a running run and returns a handle to finish it. See JobHandle.start. */
@@ -637,12 +671,15 @@ export class CronWatch {
     const id = options.id;
     if (id === undefined) return this.recordStart(definition, options.trigger);
     checkRunId(definition.name, id, "start");
-    const inFlight = this.starting.get(id);
+    // Keyed by job as well, so another job's start with the same id is not
+    // handed this job's run: it fails as it would one call later.
+    const key = `${definition.name}\n${id}`;
+    const inFlight = this.starting.get(key);
     if (inFlight) return inFlight;
     const started = this.recordStart(definition, options.trigger, id).finally(() => {
-      if (this.starting.get(id) === started) this.starting.delete(id);
+      if (this.starting.get(key) === started) this.starting.delete(key);
     });
-    this.starting.set(id, started);
+    this.starting.set(key, started);
     return started;
   }
 
@@ -730,6 +767,13 @@ export class CronWatch {
     let recorder = fresh();
     let finished = inactive !== null;
     let finishCalled = false;
+    /**
+     * The first OUTPUT_CAP characters of every line flushed from this
+     * handle, unredacted, or null before the first flush. The stored output
+     * keeps only the tail, so without it an expect rule at finish() would
+     * miss a line logged early, which run() would have seen.
+     */
+    let head: string | null = null;
     let queue: Promise<unknown> = Promise.resolve();
     const inTurn = <T>(fn: () => Promise<T>): Promise<T> => {
       const result = queue.then(fn);
@@ -746,6 +790,13 @@ export class CronWatch {
       finishCalled = true;
       const wasInactive = finished;
       finished = true;
+      // The store failed part way and nothing was recorded, so the handle can be finished again.
+      const retryable = (error: unknown): null => {
+        finishCalled = false;
+        finished = false;
+        self.report(error, `finishing ${name}`);
+        return null;
+      };
       return inTurn(async () => {
         if (wasInactive) {
           ignored(inactive!);
@@ -756,11 +807,15 @@ export class CronWatch {
           try {
             from = (await self.store.getRun(id)) ?? base;
           } catch (e) {
-            self.report(e, `finishing ${name}`);
+            return retryable(e);
           }
         }
         if (!from) {
           ignored("was not found");
+          return null;
+        }
+        if (from.job !== name) {
+          ignored(`belongs to job "${from.job}"`);
           return null;
         }
         if (from.status === "ok" || from.status === "failed") {
@@ -781,9 +836,18 @@ export class CronWatch {
           output: joinOutput(from.output, added),
           metrics: { ...from.metrics, ...recorder.metrics() },
         };
-        const expectText = joinLines(from.output, recorder.expectText() ?? (typeof result === "string" ? result : null));
+        const expectText = joinLines(head, joinLines(from.output, recorder.expectText() ?? (typeof result === "string" ? result : null)));
         self.conclude(definition, run, result, error, failed, expectText);
-        await self.recordFinish(definition, run, recorded, finishedAt);
+        let why: string | null;
+        try {
+          why = await self.recordFinish(definition, run, recorded, finishedAt);
+        } catch (e) {
+          return retryable(e);
+        }
+        if (why) {
+          ignored(why);
+          return null;
+        }
         return run;
       });
     };
@@ -809,15 +873,23 @@ export class CronWatch {
         const putBack = () => {
           const later = recorder;
           recorder = fresh();
-          for (const text of [taken.output(), later.output()]) if (text !== null) recorder.context.log(text);
+          for (const text of [taken.expectText(), later.expectText()]) if (text !== null) recorder.context.log(text);
           recorder.context.metrics({ ...taken.metrics(), ...later.metrics() });
         };
         try {
           const stored = await self.store.getRun(id);
           // Not running: the lines stay here for finish(), which reports why it cannot record them.
           if (!stored || stored.status !== "running") return putBack();
+          if (stored.job !== name) {
+            putBack();
+            self.report(new Error(`run ${id} of ${name} belongs to job "${stored.job}"; ignored`), `flushing ${name}`);
+            return;
+          }
           const output = lines === null ? stored.output : joinOutput(stored.output, stripNul(self.redact(lines)));
-          await self.store.updateRun({ ...stored, output, metrics: { ...stored.metrics, ...metrics } });
+          // Only over a row still running, so a flush never undoes a finish written meanwhile.
+          if (!(await self.writeRunIf({ ...stored, output, metrics: { ...stored.metrics, ...metrics } }, ["running"]))) return putBack();
+          const text = taken.expectText();
+          if (text !== null && (head === null || head.length < OUTPUT_CAP)) head = (joinLines(head, text) ?? "").slice(0, OUTPUT_CAP);
         } catch (e) {
           putBack();
           self.report(e, `flushing ${name}`);
@@ -831,11 +903,17 @@ export class CronWatch {
   /**
    * Record a run that happened outside this process, for a Source. Its job
    * must be declared with job() first. Runs are keyed by id: a new one is
-   * inserted, a stored one still running is updated when this one is not,
-   * and anything else is left alone, so recording the same run twice
-   * changes nothing. A finished run is judged as if it had been wrapped
+   * inserted, a stored one still running (or marked timeout by a check) is
+   * finished when this one is not running, and anything else is left alone,
+   * so recording the same run twice changes nothing. Finishing is
+   * conditional (see Store.updateRunIf): when two processes record the same
+   * finish, only the one whose write lands evaluates it, and the other
+   * reports it as already finished. A stored run of another job is left
+   * alone and reported. A finished run is judged as if it had been wrapped
    * here (expect, failures, duration, budgets) and its output and error are
-   * redacted the same way. Returns the alerts it sent.
+   * redacted the same way; one finishing after a check marked it timeout is
+   * judged only when it succeeded, as RunHandle.finish() does. Returns the
+   * alerts it sent.
    */
   async recordRun(input: Run, options: RecordRunOptions = {}): Promise<Alert[]> {
     const declared = this.definitions.get(input.job);
@@ -855,45 +933,44 @@ export class CronWatch {
     const definition = toStored(declared);
 
     const stored = await this.store.getRun(run.id);
-    if (stored) {
-      if (stored.status !== "running" || run.status === "running") return [];
-      if (!evaluate) {
-        await this.store.updateRun(run);
-        return [];
-      }
-      return this.finishRun(definition, run, this.now(), true);
-    }
+    if (stored) return this.recordOver(definition, stored, run, evaluate);
     try {
       await this.store.insertRun(run);
     } catch (e) {
       // Another process recorded it first.
-      if (await this.store.getRun(run.id).catch(() => null)) return [];
+      const again = await this.store.getRun(run.id).catch(() => null);
+      if (again) return this.recordOver(definition, again, run, evaluate);
       throw e;
     }
     if (!evaluate) return [];
     await this.updateState(run.job, (before) => ({ state: onRunStart(before), result: undefined }));
     if (run.status === "running") return [];
-    return this.finishRun(definition, run, this.now(), false);
+    return this.finishRun(definition, run, this.now());
   }
 
-  /** Whether a check already marked this run as timed out, for a failure that finished late. */
-  private async markedTimedOut(run: Run): Promise<boolean> {
-    if (run.status === "ok") return false;
-    try {
-      return (await this.store.getRun(run.id))?.status === "timeout";
-    } catch {
-      return false;
+  /** recordRun() for a run already stored. */
+  private async recordOver(definition: StoredJobDefinition, stored: Run, run: Run, evaluate: boolean): Promise<Alert[]> {
+    if (stored.job !== run.job) {
+      this.report(new Error(`run ${run.id} of ${run.job} belongs to job "${stored.job}"; ignored`), `recording ${run.job}`);
+      return [];
     }
+    if ((stored.status !== "running" && stored.status !== "timeout") || run.status === "running") return [];
+    const claim = await this.claimFinish(run);
+    if ("ignored" in claim) {
+      this.report(new Error(`run ${run.id} of ${run.job} ${claim.ignored}; ignored`), `recording ${run.job}`);
+      return [];
+    }
+    if (!evaluate || (claim.lateAfterTimeout && run.status !== "ok")) return [];
+    return this.finishRun(definition, run, this.now());
   }
 
   /**
-   * Record a finished run (ok, failed, or timed out by a check), evaluate it
-   * against the job's state and send what that produces. Never throws.
+   * Evaluate a finished run (ok, failed, or timed out by a check), already
+   * written, against the job's state and send what that produces. Never throws.
    */
-  private async finishRun(definition: StoredJobDefinition, run: Run, now: number, write: boolean): Promise<Alert[]> {
+  private async finishRun(definition: StoredJobDefinition, run: Run, now: number): Promise<Alert[]> {
     let drafts: AlertDraft[];
     try {
-      if (write) await this.store.updateRun(run);
       let history: Run[] | null = null;
       ({ result: drafts } = await this.updateState(run.job, async (previous) => {
         history ??= await this.history(run);
@@ -960,7 +1037,9 @@ export class CronWatch {
         run.finishedAt = now;
         run.durationMs = now - run.startedAt;
         run.error = `Still running after ${formatDuration(timeout)}; marked as timed out`;
-        alerts.push(...(await this.finishRun(definition, run, now, true)));
+        // Only over a row still running: a finish that landed meanwhile wins.
+        if (!(await this.writeRunIf(run, ["running"]))) continue;
+        alerts.push(...(await this.finishRun(definition, run, now)));
       } catch (e) {
         this.onError(e, `checking ${run.job}`);
       }
@@ -1213,7 +1292,7 @@ export class CronWatch {
     const results = await Promise.all(
       this.alerts.map(async (channel) => {
         try {
-          await withTimeout(channel.send(alert), CHANNEL_TIMEOUT_MS);
+          await withTimeout(channel.send(alert, { onError: (e) => this.report(e, `alert channel ${channel.name}`) }), CHANNEL_TIMEOUT_MS);
           return true;
         } catch (e) {
           this.onError(e, `alert channel ${channel.name}`);
@@ -1239,10 +1318,16 @@ export class CronWatch {
   }
 }
 
-/** Throws for a run id no store could hold. */
+/** Run ids that start with this belong to the pg_cron source (see @cronwatch/sdk/pg-cron). */
+export const RESERVED_RUN_ID_PREFIX = "pgcron:";
+
+/** Throws for a run id no store could hold, or one reserved for the pg_cron source. */
 function checkRunId(job: string, id: unknown, method: string): void {
   if (typeof id !== "string" || id.length === 0 || id.length > 200) {
     throw new Error(`job "${job}": ${method}() needs a run id of 1 to 200 characters (got ${typeof id === "string" ? `${id.length} characters` : typeof id})`);
+  }
+  if (id.startsWith(RESERVED_RUN_ID_PREFIX)) {
+    throw new Error(`job "${job}": ${method}() cannot take a run id starting with "${RESERVED_RUN_ID_PREFIX}", which the pg_cron source uses for its runs`);
   }
 }
 

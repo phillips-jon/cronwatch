@@ -4,7 +4,7 @@
  */
 import type { AlertChannel } from "../types.js";
 import { composeEmail, recipients, type EmailOptions } from "./email.js";
-import { alertId, post } from "./shared.js";
+import { alertId, post, trimmed } from "./shared.js";
 
 export interface ResendOptions extends EmailOptions {
   /** An API key from resend.com/api-keys, "re_...". */
@@ -15,7 +15,9 @@ const ENDPOINT = "https://api.resend.com/emails";
 
 /** Sends alerts as email through Resend. */
 export function resend(options: ResendOptions): AlertChannel {
-  if (!options.apiKey) throw new Error("resend() needs an apiKey");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const apiKey = trimmed(options.apiKey);
+  if (!apiKey) throw new Error("resend() needs an apiKey");
   const to = recipients("resend", options);
   return {
     name: "resend",
@@ -24,12 +26,12 @@ export function resend(options: ResendOptions): AlertChannel {
       await post("Resend", ENDPOINT, {
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${options.apiKey}`,
+          authorization: `Bearer ${apiKey}`,
           // The same alert sent twice within 24 hours is delivered once.
           "idempotency-key": `cronwatch-${await alertId(alert)}`,
         },
         body: JSON.stringify({ from: email.from, to: email.to, subject: email.subject, text: email.text, html: email.html }),
-      }, [options.apiKey]);
+      }, [apiKey]);
     },
   };
 }

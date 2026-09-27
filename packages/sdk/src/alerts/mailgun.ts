@@ -5,7 +5,7 @@
  */
 import type { AlertChannel } from "../types.js";
 import { composeEmail, recipients, type EmailOptions } from "./email.js";
-import { basicAuth, post } from "./shared.js";
+import { basicAuth, post, trimmed } from "./shared.js";
 
 export interface MailgunOptions extends EmailOptions {
   /** A sending or account API key. */
@@ -18,7 +18,9 @@ export interface MailgunOptions extends EmailOptions {
 
 /** Sends alerts as email through Mailgun. */
 export function mailgun(options: MailgunOptions): AlertChannel {
-  if (!options.apiKey) throw new Error("mailgun() needs an apiKey");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const apiKey = trimmed(options.apiKey);
+  if (!apiKey) throw new Error("mailgun() needs an apiKey");
   if (!options.domain) throw new Error("mailgun() needs a domain");
   const to = recipients("mailgun", options);
   const host = options.region === "eu" ? "https://api.eu.mailgun.net" : "https://api.mailgun.net";
@@ -35,9 +37,9 @@ export function mailgun(options: MailgunOptions): AlertChannel {
       form.append("html", email.html);
       form.append("o:tag", "cronwatch");
       await post("Mailgun", url, {
-        headers: { "content-type": "application/x-www-form-urlencoded", authorization: basicAuth("api", options.apiKey) },
+        headers: { "content-type": "application/x-www-form-urlencoded", authorization: basicAuth("api", apiKey) },
         body: form.toString(),
-      }, [options.apiKey]);
+      }, [apiKey]);
     },
   };
 }

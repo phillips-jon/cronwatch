@@ -4,7 +4,7 @@
  * POST https://api.honeybadger.io/v1/notices with X-API-Key. Answers 201.
  */
 import type { Alert, AlertChannel } from "../types.js";
-import { cut, post, runSummary } from "./shared.js";
+import { cut, post, runSummary, trimmed } from "./shared.js";
 
 export interface HoneybadgerOptions {
   /** The project API key, from Project Settings. */
@@ -29,7 +29,9 @@ const CLASS: Record<Alert["type"], string> = {
 
 /** Reports alerts to Honeybadger as notices, one error per job and alert type. */
 export function honeybadger(options: HoneybadgerOptions): AlertChannel {
-  if (!options.apiKey) throw new Error("honeybadger() needs an apiKey");
+  // A pasted credential often carries a stray space or newline, which a header would refuse or send.
+  const apiKey = trimmed(options.apiKey);
+  if (!apiKey) throw new Error("honeybadger() needs an apiKey");
   const url = `${(options.endpoint ?? "https://api.honeybadger.io").replace(/\/+$/, "")}/v1/notices`;
   return {
     name: "honeybadger",
@@ -61,9 +63,9 @@ export function honeybadger(options: HoneybadgerOptions): AlertChannel {
         server: { environment_name: options.environment ?? "production" },
       };
       await post("Honeybadger", url, {
-        headers: { "content-type": "application/json", accept: "application/json", "x-api-key": options.apiKey },
+        headers: { "content-type": "application/json", accept: "application/json", "x-api-key": apiKey },
         body: JSON.stringify(notice),
-      }, [options.apiKey]);
+      }, [apiKey]);
     },
   };
 }
