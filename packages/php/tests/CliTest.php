@@ -25,7 +25,7 @@ final class CliTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (["{$this->dir}/config/cronwatch.php", "{$this->dir}/cronwatch.php", "{$this->dir}/other.php", "{$this->dir}/cw.db"] as $file) {
+        foreach (["{$this->dir}/config/cronwatch.php", "{$this->dir}/cronwatch.php", "{$this->dir}/other.php", "{$this->dir}/cw.db", "{$this->dir}/artisan", "{$this->dir}/craft"] as $file) {
             @unlink($file);
         }
         @rmdir("{$this->dir}/config");
@@ -69,6 +69,20 @@ final class CliTest extends TestCase
     {
         $this->bootstrap('config/cronwatch.php', 1, 0, callable: true);
         $this->assertSame([0, "cronwatch: checked 1 job, sent 0 alerts\n", ''], $this->cli(['check']));
+    }
+
+    public function testALaravelOrCraftSettingsFileIsNeverLoadedAndTheFrameworkCommandIsNamed(): void
+    {
+        // A framework settings file calls the framework's helpers, so loading it here would fail.
+        file_put_contents("{$this->dir}/config/cronwatch.php", "<?php\nreturn ['store' => env('CRONWATCH_STORE')];\n");
+        foreach (['artisan' => 'php artisan cronwatch:check', 'craft' => 'php craft cronwatch/check'] as $entry => $command) {
+            file_put_contents("{$this->dir}/{$entry}", "<?php\n");
+            $this->assertSame([1, '', "cronwatch: config/cronwatch.php here is this app's settings file, not a bootstrap: run `{$command}` instead, or pass --bootstrap <file>\n"], $this->cli(['check']));
+            unlink("{$this->dir}/{$entry}");
+        }
+        // Elsewhere, a found file that returns an array says so.
+        file_put_contents("{$this->dir}/config/cronwatch.php", "<?php\nreturn ['store' => 'sqlite'];\n");
+        $this->assertSame([1, '', "cronwatch: {$this->dir}/config/cronwatch.php returns an array, which looks like a framework's settings file: it must return a Cronwatch client (or a callable that returns one); pass --bootstrap <file> to use another\n"], $this->cli(['check']));
     }
 
     public function testTheBootstrapFileCanBeNamed(): void

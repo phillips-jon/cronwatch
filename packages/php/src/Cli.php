@@ -119,6 +119,9 @@ final class Cli
         if ($client instanceof \Closure || (is_callable($client) && !$client instanceof Cronwatch)) {
             $client = $client();
         }
+        if (is_array($client)) {
+            throw new \UnexpectedValueException("{$file} returns an array, which looks like a framework's settings file: it must return a Cronwatch client (or a callable that returns one); pass --bootstrap <file> to use another");
+        }
         if (!$client instanceof Cronwatch) {
             throw new \UnexpectedValueException("{$file} must return a Cronwatch client (or a callable that returns one), not " . get_debug_type($client));
         }
@@ -135,10 +138,19 @@ final class Cli
             }
             return $path;
         }
-        foreach (['cronwatch.php', 'config/cronwatch.php'] as $candidate) {
-            if (is_file("{$this->cwd}/{$candidate}")) {
-                return "{$this->cwd}/{$candidate}";
+        if (is_file("{$this->cwd}/cronwatch.php")) {
+            return "{$this->cwd}/cronwatch.php";
+        }
+        if (is_file("{$this->cwd}/config/cronwatch.php")) {
+            // In a Laravel or Craft app that file is the framework's settings
+            // array, which calls the framework's own helpers (env()), so it is
+            // never loaded here: the framework's command runs the check.
+            foreach (['artisan' => 'php artisan cronwatch:check', 'craft' => 'php craft cronwatch/check'] as $entry => $command) {
+                if (is_file("{$this->cwd}/{$entry}")) {
+                    throw new \UnexpectedValueException("config/cronwatch.php here is this app's settings file, not a bootstrap: run `{$command}` instead, or pass --bootstrap <file>");
+                }
             }
+            return "{$this->cwd}/config/cronwatch.php";
         }
         throw new \UnexpectedValueException("no bootstrap file: pass --bootstrap <file>, set CRONWATCH_BOOTSTRAP, or add cronwatch.php to {$this->cwd}");
     }

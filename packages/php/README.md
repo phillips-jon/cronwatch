@@ -88,7 +88,7 @@ A run that is never finished is marked stuck by the first check after the job's 
 ```php
 use Cronwatch\Alerts;
 
-$link = fn (Cronwatch\Alert $a) => "https://app.example.com/cronwatch/jobs/{$a->job}";
+$link = fn (\Cronwatch\Alert $a) => "https://app.example.com/cronwatch/jobs/{$a->job}";
 $cw = new Cronwatch(store: $store, alerts: [
     new Alerts\Slack(webhookUrl: getenv('SLACK_WEBHOOK_URL'), link: $link),
     new Alerts\Resend(apiKey: getenv('RESEND_API_KEY'), from: 'CronWatch <alerts@example.com>', to: ['ops@example.com']),
@@ -101,7 +101,7 @@ $cw = new Cronwatch(store: $store, alerts: [
 ### Claude triage
 
 ```php
-$cw = new Cronwatch(store: $store, alerts: $channels, triage: new Cronwatch\Triage\Anthropic(context: 'A Laravel app on Forge.'));
+$cw = new Cronwatch(store: $store, alerts: $channels, triage: new \Cronwatch\Triage\Anthropic(context: 'A Laravel app on Forge.'));
 ```
 
 Each alert but a recovery gets a short diagnosis from Claude: the likely cause and the first thing to check. It reads `ANTHROPIC_API_KEY`, needs no Anthropic package (it sends the Messages API request itself), and never holds an alert for long: when the answer is late or the request fails, the alert goes out without one.
@@ -109,7 +109,7 @@ Each alert but a recovery gets a short diagnosis from Claude: the likely cause a
 ### pg_cron
 
 ```php
-$cw = new Cronwatch(store: new PostgresStore($url), sources: [new Cronwatch\Sources\PgCron($url, prefix: 'db:')]);
+$cw = new Cronwatch(store: new PostgresStore($url), sources: [new \Cronwatch\Sources\PgCron($url, prefix: 'db:')]);
 ```
 
 Jobs pg_cron runs inside Postgres, where nothing can wrap them, are watched too: each check declares them from `cron.job` and copies their runs from `cron.job_run_details`.

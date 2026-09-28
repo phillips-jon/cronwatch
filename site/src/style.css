@@ -534,6 +534,8 @@ dialog.search::backdrop { background: rgba(9, 9, 11, .42); }
 .doc h2 .anchor:hover::after, .doc h3 .anchor:hover::after { content: " #"; color: var(--muted); }
 .doc p, .doc li { color: var(--ink); }
 .doc p > code, .doc li > code, .doc td > code, .doc h2 code, .doc h3 code { font-size: .8em; background: var(--sunk); border: 1px solid var(--rule); padding: 1px 4px; border-radius: 2px; color: var(--ink); }
+/* A long signature or path wraps on a phone instead of pushing the page sideways. */
+.doc p > code, .doc li > code { overflow-wrap: anywhere; }
 .doc ul, .doc ol { padding-left: 1.2em; margin: 0; }
 .doc li + li { margin-top: 5px; }
 .doc .table { overflow-x: auto; }
