@@ -6,6 +6,7 @@
     <div class="way"><p class="for">Ruby on Rails</p><div class="install"><code translate="no">bundle add cronwatch</code><button class="copy" type="button" aria-label="Copy the Bundler install command">Copy</button></div></div>
     <div class="way"><p class="for">Python</p><div class="install"><code translate="no">pip install cronwatch-sdk</code><button class="copy" type="button" aria-label="Copy the pip install command">Copy</button></div></div>
     <div class="way"><p class="for">PHP</p><div class="install"><code translate="no">composer require cronwatch/cronwatch</code><button class="copy" type="button" aria-label="Copy the Composer install command">Copy</button></div></div>
+    <div class="way"><p class="for">Go</p><div class="install"><code translate="no">go get cronwatch.dev/go</code><button class="copy" type="button" aria-label="Copy the go get command">Copy</button></div></div>
   </div>
   <div class="actions">
     <button class="prompt-btn" type="button" data-prompt aria-label="Copy the setup instructions for a coding agent">Copy setup prompt for your AI</button>
@@ -92,7 +93,7 @@
   job.log(<span class="s">"Report written:"</span>, report.path);
 });</code></pre>
     </div>
-    <p class="small">Vercel cron, Next.js, SvelteKit, Nuxt, NestJS, Cloudflare Workers, Supabase Cron, Inngest and a dozen more platforms (<a href="/docs/">see the docs</a>), or a script from crontab. Anywhere a fetch handler or an async function runs. In Rails: ActiveJob on Solid Queue or any adapter, Sidekiq and sidekiq-cron, with the schedule read from the scheduler’s own config (<a href="/docs/rails/">Rails docs</a>). In Python: Django, Celery and beat, APScheduler, or a script from crontab, with Celery’s schedules read from beat (<a href="/docs/python/">Python docs</a>). In PHP: Laravel’s scheduler and queues, the Symfony Scheduler and Messenger, Drupal cron and Craft’s commands, each with no code, WP-Cron through a WordPress plugin, or a script from crontab (<a href="/docs/php/">PHP docs</a>).</p>
+    <p class="small">Vercel cron, Next.js, SvelteKit, Nuxt, NestJS, Cloudflare Workers, Supabase Cron, Inngest and a dozen more platforms (<a href="/docs/">see the docs</a>), or a script from crontab. Anywhere a fetch handler or an async function runs. In Rails: ActiveJob on Solid Queue or any adapter, Sidekiq and sidekiq-cron, with the schedule read from the scheduler’s own config (<a href="/docs/rails/">Rails docs</a>). In Python: Django, Celery and beat, APScheduler, or a script from crontab, with Celery’s schedules read from beat (<a href="/docs/python/">Python docs</a>). In PHP: Laravel’s scheduler and queues, the Symfony Scheduler and Messenger, Drupal cron and Craft’s commands, each with no code, WP-Cron through a WordPress plugin, or a script from crontab (<a href="/docs/php/">PHP docs</a>). In Go: robfig/cron, gocron, River and Asynq, each with one line and the schedule read from the scheduler, or a program from crontab (<a href="/docs/go/">Go docs</a>).</p>
   </div>
 </section>
 
@@ -157,7 +158,7 @@
   <p class="label">Dashboard</p>
   <div class="body">
     <h2>And a board of every job, in your own app.</h2>
-    <p>Mount it with <code>cw.routes()</code>, <code>mount Cronwatch::Web</code> in Rails, include <code>cronwatch.django.urls</code> in Django, or serve <code>$cw-&gt;routes()</code> in PHP (Laravel has it at <code>/cronwatch</code>, and WordPress, Drupal and Craft in their admin), behind a token in <code>CRONWATCH_TOKEN</code> or your app’s own sign in. Open a job for its week, its runs and their output.</p>
+    <p>Mount it with <code>cw.routes()</code>, <code>mount Cronwatch::Web</code> in Rails, include <code>cronwatch.django.urls</code> in Django, or serve <code>$cw-&gt;routes()</code> in PHP (Laravel has it at <code>/cronwatch</code>, and WordPress, Drupal and Craft in their admin), or hand <code>cw.Routes()</code> to your <code>http.ServeMux</code> in Go, behind a token in <code>CRONWATCH_TOKEN</code> or your app’s own sign in. Open a job for its week, its runs and their output.</p>
   </div>
   <div class="span">
     {{BOARD_FRAME}}
