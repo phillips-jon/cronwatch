@@ -17,7 +17,7 @@ import pytest
 from cronwatch import Cronwatch, Run
 from cronwatch.stores import MemoryStore, SqliteStore
 
-from helpers import HOUR, MIN, T0, Capture, Clock, Errors, Flaky, Without, Wrapped, make
+from helpers import HOUR, MIN, NO_PG, PG, T0, Capture, Clock, Errors, Flaky, Without, Wrapped, drop_pg_tables, make, pg_prefix
 
 
 def messages(errors: Errors) -> list[str]:
@@ -314,20 +314,28 @@ class Backend:
         self.file = tmp_path / "once.db"
         self.shared = MemoryStore()
         self.opened: list[Any] = []
+        self.prefix = pg_prefix("once")
 
     def open(self) -> Any:
         if self.kind == "memory":
             return self.shared
-        store = SqliteStore(self.file)
+        if self.kind == "postgres":
+            from cronwatch.stores.postgres import PostgresStore
+
+            store: Any = PostgresStore(PG, prefix=self.prefix)
+        else:
+            store = SqliteStore(self.file)
         self.opened.append(store)
         return store
 
     def done(self) -> None:
         for store in self.opened:
             store.close()
+        if self.kind == "postgres":
+            drop_pg_tables(self.prefix)
 
 
-@pytest.fixture(params=["memory", "sqlite"])
+@pytest.fixture(params=["memory", "sqlite", pytest.param("postgres", marks=pytest.mark.skipif(not PG, reason=NO_PG))])
 def backend(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Backend]:
     b = Backend(request.param, tmp_path)
     yield b

@@ -1,8 +1,8 @@
 """Replays every case in conformance/ (written by scripts/conformance.mjs from
-the TypeScript SDK) that concerns the core. Values are compared as the JSON
-the SDK would write, so key order and number formatting count too. The
-channel, triage and pg_cron fixtures belong to later phases and are skipped,
-by name, until then."""
+the TypeScript SDK): the core, the store scripts against every store, each
+channel's requests and errors, and the pg_cron source's pure parts. Values
+are compared as the JSON the SDK would write, so key order and number
+formatting count too. triage.json is replayed by test_triage.py."""
 
 from __future__ import annotations
 
@@ -10,18 +10,24 @@ import hashlib
 import json
 import math
 import re
+import threading
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from cronwatch import _js, duration, evaluate, output, schedule, serialize
+from cronwatch import _js, alerts, duration, evaluate, output, schedule, serialize
+from cronwatch.alerts import twilio
+from cronwatch.alerts._shared import error_body
+from cronwatch.alerts.email import compose as compose_email
 from cronwatch.format import compose_alert
+from cronwatch.sources import pgcron
 from cronwatch.job import RunRecorder
 from cronwatch.stores import MemoryStore, SqliteStore
-from cronwatch.types import Alert, AlertDraft, JobDefinition, JobState, Run, StoredJob
+from cronwatch.types import Alert, AlertDraft, JobDefinition, JobState, Run, StoredJob, snake
 
-from helpers import T0
+from helpers import NO_PG, PG, T0, drop_pg_tables, pg_prefix
 
 DIR = Path(__file__).resolve().parents[3] / "conformance"
 
@@ -467,15 +473,33 @@ def test_expect_text() -> None:
 STORE = fixture("store.json")
 
 
+STORES = ["memory", "sqlite", pytest.param("postgres", marks=pytest.mark.skipif(not PG, reason=NO_PG))]
+_pg_prefixes: list[str] = []
+
+
+@pytest.fixture(autouse=True)
+def _drop_pg_tables() -> Any:
+    yield
+    while _pg_prefixes:
+        drop_pg_tables(_pg_prefixes.pop())
+
+
 def make_store(kind: str, tmp_path: Path) -> Any:
     if kind == "memory":
         return MemoryStore()
-    store = SqliteStore(tmp_path / f"conformance-{len(list(tmp_path.iterdir()))}.db")
+    if kind == "postgres":
+        from cronwatch.stores.postgres import PostgresStore
+
+        prefix = pg_prefix("c")
+        _pg_prefixes.append(prefix)
+        store: Any = PostgresStore(PG, prefix=prefix)
+    else:
+        store = SqliteStore(tmp_path / f"conformance-{len(list(tmp_path.iterdir()))}.db")
     store.init()
     return store
 
 
-@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+@pytest.mark.parametrize("kind", STORES)
 def test_store_prune(kind: str, tmp_path: Path) -> None:
     def check(c: dict[str, Any]) -> str | None:
         store = make_store(kind, tmp_path)
@@ -494,7 +518,7 @@ def test_store_prune(kind: str, tmp_path: Path) -> None:
     each_case(STORE["prune"], check)
 
 
-@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+@pytest.mark.parametrize("kind", STORES)
 def test_store_compare_and_set_state(kind: str, tmp_path: Path) -> None:
     store = make_store(kind, tmp_path)
 
@@ -515,7 +539,7 @@ def test_store_compare_and_set_state(kind: str, tmp_path: Path) -> None:
     store.close()
 
 
-@pytest.mark.parametrize("kind", ["memory", "sqlite"])
+@pytest.mark.parametrize("kind", STORES)
 def test_store_update_run_if(kind: str, tmp_path: Path) -> None:
     store = make_store(kind, tmp_path)
     store.insert_run(Run(id="u1", job="a", status="running", started_at=1000))
@@ -540,21 +564,237 @@ def test_store_update_run_if(kind: str, tmp_path: Path) -> None:
     store.close()
 
 
-# ---------------------------------------------------------------- later phases
+# ---------------------------------------------------------------- channels
 
-LATER = {
-    "channels.json": "phase 2 (alert channels)",
-    "triage.json": "phase 2 (Claude triage)",
-    "pgcron.json": "phase 2 (the pg_cron source)",
+CHANNELS = fixture("channels.json")
+CHANNEL_ALERTS = {a["name"]: a["alert"] for a in CHANNELS["alerts"]}
+
+
+class FakeHTTP:
+    """Stands in for urllib, keeping every request."""
+
+    def __init__(self, status: int = 200, body: str = "") -> None:
+        self.status = status
+        self.body = body
+        self.requests: list[dict[str, Any]] = []
+        self._lock = threading.Lock()
+
+    def post(self, url: str, body: str, headers: dict[str, str]) -> alerts.Response:
+        with self._lock:
+            self.requests.append({"url": url, "headers": dict(headers), "body": body})
+        return alerts.Response(self.status, self.body)
+
+
+PROVIDERS: dict[str, Any] = {
+    "resend": alerts.Resend,
+    "postmark": alerts.Postmark,
+    "sendgrid": alerts.Sendgrid,
+    "mailgun": alerts.Mailgun,
+    "ses": alerts.Ses,
+    "twilio": alerts.Twilio,
+    "sentry": alerts.Sentry,
+    "honeybadger": alerts.Honeybadger,
+    "datadog": alerts.Datadog,
+    "rollbar": alerts.Rollbar,
+    "bugsnag": alerts.Bugsnag,
+    "newrelic": alerts.NewRelic,
 }
 
 
-@pytest.mark.parametrize("name", sorted(LATER))
-def test_fixtures_for_later_phases(name: str) -> None:
-    assert (DIR / name).exists(), f"{name} is missing from conformance/"
-    pytest.skip(f"conformance/{name}: {LATER[name]}, not in the Python port yet")
+def link(alert: Alert) -> str:
+    return f"https://app.example/cronwatch/jobs/{alert.job}"
 
 
-def test_every_fixture_is_replayed_or_skipped_by_name() -> None:
-    replayed = {"duration.json", "schedule.json", "evaluate.json", "format.json", "health.json", "output.json", "store.json"}
-    assert {p.name for p in DIR.glob("*.json")} == replayed | set(LATER)
+def channel_for(c: dict[str, Any], http: Any) -> Any:
+    """The fixture's options, camelCase, as the Python keywords: `link: true`
+    stands for the usual link and `now: <ms>` for a clock fixed at that time."""
+    options = c["options"]
+    given = link if options.get("link") else None
+    if c["channel"] == "slack":
+        return alerts.Slack(options["webhookUrl"], link=given, http=http)
+    if c["channel"] == "discord":
+        return alerts.Discord(options["webhookUrl"], link=given, http=http)
+    if c["channel"] == "webhook":
+        return alerts.Webhook(options["url"], headers=options.get("headers"), secret=options.get("secret"), http=http)
+    keywords: dict[str, Any] = {}
+    for key, value in options.items():
+        if key == "link":
+            if value:
+                keywords["link"] = link
+        elif key == "now":
+            keywords["now"] = lambda value=value: value
+        elif key == "from":
+            keywords["from_"] = value
+        else:
+            keywords[snake(key)] = value
+    return PROVIDERS[c["channel"]](**keywords, http=http)
+
+
+def in_number_order(requests: list[dict[str, Any]], to: Any) -> list[dict[str, Any]]:
+    """Twilio texts every number at once, each from a thread of its own, so the
+    requests arrive in whatever order the threads run; the SDK's fetch calls
+    are made in the numbers' order. Compared in that order."""
+    numbers = [n.strip() for n in (to if isinstance(to, list) else [to])]
+    return sorted(requests, key=lambda r: numbers.index(urllib.parse.parse_qs(r["body"])["To"][0]))
+
+
+def test_channel_payloads() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        http = FakeHTTP()
+        channel_for(c, http).send(Alert.from_dict(CHANNEL_ALERTS[c["alert"]]))
+        request = http.requests[-1]
+        return differs([c["url"], c["headers"], c["body"]], [request["url"], request["headers"], digest(request["body"])])
+
+    each_case(CHANNELS["sends"], check)
+
+
+def test_channel_failures() -> None:
+    first = CHANNELS["alerts"][0]["alert"]
+
+    def check(c: dict[str, Any]) -> str | None:
+        try:
+            channel_for(c, FakeHTTP(c["status"], c["body"])).send(Alert.from_dict(first))
+        except RuntimeError as error:
+            return differs(c["error"], str(error))
+        return f"expected an error: {c['error']}"
+
+    each_case(CHANNELS["failures"], check)
+
+
+def test_provider_payloads() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        http = FakeHTTP()
+        channel_for(c, http).send(Alert.from_dict(CHANNEL_ALERTS[c["alert"]]))
+        sent = in_number_order(http.requests, c["options"]["to"]) if c["channel"] == "twilio" else http.requests
+        requests = [{"url": r["url"], "headers": r["headers"], "body": digest(r["body"])} for r in sent]
+        return differs(c["requests"], requests)
+
+    each_case(CHANNELS["providerSends"], check)
+
+
+def test_provider_failures() -> None:
+    first = CHANNELS["alerts"][0]["alert"]
+
+    def check(c: dict[str, Any]) -> str | None:
+        try:
+            channel_for(c, FakeHTTP(c["status"], c["body"])).send(Alert.from_dict(first))
+        except RuntimeError as error:
+            return differs(str(c["error"]), str(error))
+        return None if c["error"] is None else f"expected an error: {c['error']}"
+
+    each_case(CHANNELS["providerFailures"], check)
+
+
+def test_provider_cases_cover_every_channel() -> None:
+    assert sorted({c["channel"] for c in CHANNELS["providerSends"]}) == sorted(PROVIDERS)
+    assert len(CHANNELS["providerSends"]) >= 288
+
+
+class NumberedHTTP:
+    """Answers each Twilio number with its own status, as twilioPartialCases does."""
+
+    def __init__(self, numbers: list[str], statuses: list[int]) -> None:
+        self.answers = dict(zip(numbers, statuses, strict=True))
+        self.requests: list[dict[str, str]] = []
+        self._lock = threading.Lock()
+
+    def post(self, url: str, body: str, headers: dict[str, str]) -> alerts.Response:
+        to = urllib.parse.parse_qs(body)["To"][0]
+        with self._lock:
+            self.requests.append({"url": url, "to": to})
+        status = self.answers[to]
+        return alerts.Response(status, "{}" if status < 400 else f'{{"message":"refused {to} with tw-secret"}}')
+
+
+def test_twilio_partial_delivery() -> None:
+    """Each number refusing is reported through the channel context; the alert
+    fails only when every number refused it. The SDK also records fetch's
+    redirect: "error"; urllib is told never to follow one, so there is no
+    option to compare."""
+    partial = CHANNELS["twilioPartial"]
+    options = partial["options"]
+    alert = Alert.from_dict(CHANNELS["alerts"][0]["alert"])
+
+    def check(c: dict[str, Any]) -> str | None:
+        http = NumberedHTTP(options["to"], c["statuses"])
+        reported: list[str] = []
+        context = alerts.ChannelContext(lambda e: reported.append(str(e)))
+        channel = alerts.Twilio(account_sid=options["accountSid"], auth_token=options["authToken"], from_=options["from"], to=options["to"], http=http)
+        error = None
+        try:
+            channel.send(alert, context)
+        except RuntimeError as e:
+            error = str(e)
+        requests = sorted(http.requests, key=lambda r: options["to"].index(r["to"]))
+        expected = [[{"url": r["url"], "to": r["to"]} for r in c["requests"]], c["error"], c["reported"]]
+        return differs(expected, [requests, error, reported])
+
+    each_case(partial["cases"], check)
+
+
+TEXT_CUTS = CHANNELS["textCuts"]
+
+
+def test_error_bodies_cut_secrets_out_first() -> None:
+    each_case(TEXT_CUTS["errorBodies"], lambda c: differs(c["body"], error_body(c["text"], c["secrets"])))
+
+
+def test_email_subjects_cut_on_a_code_point() -> None:
+    first = CHANNELS["alerts"][0]["alert"]
+
+    def check(c: dict[str, Any]) -> str | None:
+        alert = Alert.from_dict({**first, "title": c["title"]})
+        return differs(c["subject"], compose_email(alert, from_="a@example.com", to=["b@example.com"], subject_prefix=c["subjectPrefix"]).subject)
+
+    each_case(TEXT_CUTS["subjects"], check)
+
+
+def test_sms_segments() -> None:
+    each_case(TEXT_CUTS["smsSegments"], lambda c: differs(c["segments"], twilio.sms_segments(c["text"])))
+
+
+def test_sms_bodies() -> None:
+    long = Alert.from_dict({**CHANNELS["alerts"][0]["alert"], "title": "nightly failed", "message": ("a" * 152 + "{\n") * 12, "triage": None})
+
+    def check(c: dict[str, Any]) -> str | None:
+        link_ = f"https://app.example/{'p' * 2000}" if c.get("link") == "long" else "https://app.example/j"
+        segments = math.nan if c["segments"] is None else c["segments"]
+        return differs(c["body"], digest(twilio.sms_body(long, link_, segments)))
+
+    each_case(TEXT_CUTS["smsBodies"], check)
+
+
+# ---------------------------------------------------------------- pg_cron
+
+PGCRON = fixture("pgcron.json")
+
+
+def test_pg_cron_hold_is_the_sdks() -> None:
+    assert PGCRON["holdMs"] == pgcron.HOLD_MS
+
+
+def test_pg_cron_schedules() -> None:
+    each_case(PGCRON["schedules"], lambda c: differs(c["result"], pgcron.schedule(c["schedule"])))
+
+
+def test_pg_cron_names() -> None:
+    each_case(PGCRON["names"], lambda c: differs(c["name"], pgcron.job_name(pgcron.Job(jobid=c["job"]["jobid"], jobname=c["job"]["jobname"]))))
+
+
+def test_pg_cron_rows_as_runs() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        run = pgcron.run(c["row"], "db:j", "pgcron:db:", c["fallbackAt"] if c["fallbackAt"] is not None else T0)
+        return differs(c["run"], run)
+
+    each_case(PGCRON["runs"], check)
+
+
+# ---------------------------------------------------------------- every fixture
+
+# triage.json is replayed by test_triage.py, which needs the anthropic package's shapes.
+ELSEWHERE = {"triage.json"}
+
+
+def test_every_fixture_is_replayed() -> None:
+    replayed = {"duration.json", "schedule.json", "evaluate.json", "format.json", "health.json", "output.json", "store.json", "channels.json", "pgcron.json"}
+    assert {p.name for p in DIR.glob("*.json")} == replayed | ELSEWHERE

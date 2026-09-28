@@ -5,9 +5,14 @@ reports a problem that did not stop the alert (one of several recipients
 refusing it). A ``send`` that takes only the alert is called with the alert
 alone, and a plain function works as a channel too.
 
-This module has the console channel (the default) and ``Custom``; the
-Slack, Discord, webhook, email, SMS and error tracker channels come in a
-later release."""
+``Console`` (the default) and ``Custom`` are here, with the SDK's channels,
+request for request: ``Slack``, ``Discord``, ``Webhook``, the email
+providers ``Resend``, ``Postmark``, ``Sendgrid``, ``Mailgun`` and ``Ses``,
+``Twilio`` for SMS, and the trackers ``Sentry``, ``Honeybadger``,
+``Datadog``, ``Rollbar``, ``Bugsnag`` and ``NewRelic``. They use the
+standard library only, and each takes ``http=`` (anything with
+``post(url, body, headers)`` returning a ``Response``) so tests can stand in
+for the network."""
 
 from __future__ import annotations
 
@@ -16,7 +21,7 @@ import sys
 from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
-from .types import Alert, AlertType
+from ..types import Alert, AlertType
 
 
 class ChannelContext:
@@ -96,3 +101,47 @@ def send_to(channel: Any, alert: Alert, context: ChannelContext) -> None:
         target(alert, context)
     else:
         target(alert)
+
+
+# The channels, imported last: each module imports the helpers above it.
+from ._http import RequestTimeout, Response, UrllibHTTP  # noqa: E402
+from .bugsnag import Bugsnag  # noqa: E402
+from .datadog import Datadog  # noqa: E402
+from .discord import Discord  # noqa: E402
+from .honeybadger import Honeybadger  # noqa: E402
+from .mailgun import Mailgun  # noqa: E402
+from .newrelic import NewRelic  # noqa: E402
+from .postmark import Postmark  # noqa: E402
+from .resend import Resend  # noqa: E402
+from .rollbar import Rollbar  # noqa: E402
+from .sendgrid import Sendgrid  # noqa: E402
+from .sentry import Sentry  # noqa: E402
+from .ses import Ses  # noqa: E402
+from .slack import Slack  # noqa: E402
+from .twilio import Twilio  # noqa: E402
+from .webhook import Webhook  # noqa: E402
+
+__all__ = [
+    "AlertChannel",
+    "Bugsnag",
+    "ChannelContext",
+    "Console",
+    "Custom",
+    "Datadog",
+    "Discord",
+    "Honeybadger",
+    "Mailgun",
+    "NewRelic",
+    "Postmark",
+    "RequestTimeout",
+    "Resend",
+    "Response",
+    "Rollbar",
+    "Sendgrid",
+    "Sentry",
+    "Ses",
+    "Slack",
+    "Twilio",
+    "UrllibHTTP",
+    "Webhook",
+]

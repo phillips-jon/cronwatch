@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import uuid
 from collections.abc import Callable, Iterable
 from typing import Any
 
@@ -108,6 +110,26 @@ class Errors:
     @property
     def messages(self) -> list[str]:
         return [str(e) for e, _ in self.items]
+
+
+#: A Postgres URL for the Postgres store's tests; they are skipped without one.
+PG = os.environ.get("CRONWATCH_TEST_PG") or None
+NO_PG = "set CRONWATCH_TEST_PG to a Postgres URL to run"
+#: A Postgres with pg_cron (in cron.database_name) for the pg_cron source's tests against the real extension.
+PGCRON = os.environ.get("CRONWATCH_TEST_PGCRON") or None
+NO_PGCRON = "set CRONWATCH_TEST_PGCRON to the URL of a Postgres with pg_cron (in cron.database_name) to run"
+
+
+def pg_prefix(label: str = "t") -> str:
+    """Tables of their own for one test, so tests never see each other's rows."""
+    return f"py{label}{os.getpid()}_{uuid.uuid4().hex[:8]}_"
+
+
+def drop_pg_tables(prefix: str) -> None:
+    import psycopg
+
+    with psycopg.connect(PG or "", autocommit=True) as connection:
+        connection.execute(f"DROP TABLE IF EXISTS {prefix}jobs, {prefix}runs, {prefix}state")
 
 
 def make(clock: Clock | None = None, **options: Any) -> tuple[Cronwatch, Clock, Capture]:
