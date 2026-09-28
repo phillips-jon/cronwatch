@@ -330,11 +330,11 @@ Before a run's output and error are stored, shown or sent anywhere, they are red
 ```go
 cronwatch.New(cronwatch.WithoutRedaction()) // keep output as logged
 cronwatch.New(cronwatch.WithRedact(func(text string) string {
-	return cardNumber.ReplaceAllString(text, "[card]")
+	return cardNumber.ReplaceAllString(cronwatch.RedactSecrets(text), "[card]")
 }))
 ```
 
-A function given to `WithRedact` replaces the default rather than adding to it. One that panics is reported to the error handler (as `redact`) and the default is used for that text.
+A function given to `WithRedact` replaces the default; call `cronwatch.RedactSecrets` inside it, as above, to keep the default patterns and add your own. One that panics is reported to the error handler (as `redact`) and the default is used for that text.
 
 ## Triage
 
