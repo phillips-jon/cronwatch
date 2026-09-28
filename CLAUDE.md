@@ -1,6 +1,6 @@
 # CronWatch
 
-Monorepo: `packages/sdk` (`@cronwatch/sdk`), `packages/mcp` (`@cronwatch/mcp`), `packages/ruby` (the `cronwatch` gem, a port of the SDK; see its `DESIGN.md`), `packages/python` (`cronwatch-sdk` on PyPI, import `cronwatch`, a port in progress; see its `DESIGN.md`), `packages/php` (`cronwatch/cronwatch` for Composer, namespace `Cronwatch\`, a port in progress; see its `DESIGN.md`), `site` (cronwatch.dev, static), `skills/cronwatch` (a Claude Code skill), `deploy` (server scripts for the site).
+Monorepo: `packages/sdk` (`@cronwatch/sdk`), `packages/mcp` (`@cronwatch/mcp`), `packages/ruby` (the `cronwatch` gem, a port of the SDK; see its `DESIGN.md`), `packages/python` (`cronwatch-sdk` on PyPI, import `cronwatch`, a port of the SDK; see its `DESIGN.md`), `packages/php` (`cronwatch/cronwatch` for Composer, namespace `Cronwatch\`, a port in progress; see its `DESIGN.md`), `site` (cronwatch.dev, static), `skills/cronwatch` (a Claude Code skill), `deploy` (server scripts for the site).
 
 - Use Node 24 (`.nvmrc`); better-sqlite3 13 needs Node 22 or newer. Run `npm run check` before committing: it runs the dash check, typecheck and tests. Postgres store tests run when `CRONWATCH_TEST_PG` is set; CI provides one.
 - No em or en dashes anywhere in the repo, including docs and commit messages. `scripts/check-dashes.mjs` gates build and test.
