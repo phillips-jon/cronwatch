@@ -76,7 +76,11 @@ jobs:
           split="$(git subtree split --prefix=packages/php/drupal HEAD)"
           git tag -f -a "$version" -m "Release $version" "$split"
           git push "$REPOSITORY" "$split:refs/heads/$branch"
-          git push "$REPOSITORY" "refs/tags/$version"
+          # A tag already there on this commit is a rerun; on another commit, a release changed after it shipped.
+          remote_tag="$(git ls-remote "$REPOSITORY" "refs/tags/$version^{}" | cut -f1)"
+          if [ -z "$remote_tag" ]; then git push "$REPOSITORY" "refs/tags/$version";
+          elif [ "$remote_tag" = "$split" ]; then echo "$version is already there on this commit";
+          else echo "$version is already there on another commit ($remote_tag)"; exit 1; fi
           rm -f "$key"
 
   craft:
@@ -111,5 +115,9 @@ jobs:
           split="$(git subtree split --prefix=packages/php/craft HEAD)"
           git tag -f -a "$TAG" -m "Release ${TAG#v}" "$split"
           git push "git@github.com:$REPOSITORY.git" "$split:refs/heads/main"
-          git push "git@github.com:$REPOSITORY.git" "refs/tags/$TAG"
+          # A tag already there on this commit is a rerun; on another commit, a release changed after it shipped.
+          remote_tag="$(git ls-remote "git@github.com:$REPOSITORY.git" "refs/tags/$TAG^{}" | cut -f1)"
+          if [ -z "$remote_tag" ]; then git push "git@github.com:$REPOSITORY.git" "refs/tags/$TAG";
+          elif [ "$remote_tag" = "$split" ]; then echo "$TAG is already there on this commit";
+          else echo "$TAG is already there on another commit ($remote_tag)"; exit 1; fi
           rm -f "$key"
