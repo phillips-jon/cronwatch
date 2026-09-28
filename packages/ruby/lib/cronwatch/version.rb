@@ -2,5 +2,5 @@
 
 module Cronwatch
   # Kept in step with @cronwatch/sdk.
-  VERSION = "0.5.0"
+  VERSION = "0.5.1"
 end

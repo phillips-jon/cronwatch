@@ -47,7 +47,7 @@ from .types import (
     StoredJob,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 _client: Cronwatch | None = None
 _lock = threading.Lock()

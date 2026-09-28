@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.5.0",
+  "sdkVersion": "0.5.1",
   "alerts": [
     {
       "draft": {
