@@ -2,8 +2,9 @@ Add CronWatch to this project so that every scheduled job is recorded and I am
 told when one is missed, fails, gets stuck, runs slow or goes over budget.
 
 CronWatch is an open source library: @cronwatch/sdk for TypeScript (Node,
-Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails, and
-cronwatch-sdk for Python (Django, Celery, APScheduler). It runs inside my app
+Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails,
+cronwatch-sdk for Python (Django, Celery, APScheduler), and cronwatch/cronwatch
+for PHP (Laravel, Symfony, WordPress, Drupal, Craft). It runs inside my app
 and writes to my own database. There is no hosted service, no account and no API key.
 
 First decide which one this project needs. A package.json with a Node server,
@@ -12,7 +13,10 @@ wrangler.toml (or wrangler.jsonc) means Cloudflare Workers, which follow the
 same steps with the Workers notes in each. A Gemfile
 means the Ruby steps (a Rails app follows them as written; plain Ruby, see
 https://cronwatch.dev/docs/ruby/). A pyproject.toml, requirements.txt or
-manage.py means the Python steps. If the scheduled jobs live in more than one,
+manage.py means the Python steps. A composer.json or wp-config.php means the
+PHP steps (artisan is Laravel, bin/console Symfony, wp-config.php WordPress,
+drupal/core-recommended in composer.json Drupal, craftcms/cms Craft). If the scheduled
+jobs live in more than one,
 set up each side where its jobs run; they can share one database.
 
 TypeScript and Node
@@ -215,6 +219,96 @@ Python (Python 3.11 or newer)
    CRON_SECRET if you added a handler, and whichever alert channel you chose.
    Do not invent other names.
 
+PHP (PHP 8.2 or newer)
+
+1. Pick the steps for the framework. Each records every run in the app's own
+   database through a connection of its own, and needs no other service.
+
+   - WordPress: install and activate the CronWatch plugin
+     (wp plugin install cronwatch --activate). Every WP-Cron event is watched
+     with no code. Set the alert channel under CronWatch, Settings. If the
+     site is not visited every few minutes, add define('DISABLE_WP_CRON',
+     true) to wp-config.php and crontab lines running
+     wp cron event run --due-now and wp cronwatch check every 5 minutes.
+     Stop there: skip steps 2 to 5.
+   - Laravel: composer require cronwatch/cronwatch, then php artisan migrate.
+     Every task in the schedule is watched, named after its command (give
+     closures a ->name()), and cronwatch:check is scheduled for you. Set
+     CRONWATCH_SLACK_WEBHOOK_URL or CRONWATCH_MAIL_TO in .env.
+   - Symfony: composer require cronwatch/cronwatch, add
+     Cronwatch\Symfony\CronwatchBundle::class => ['all' => true] to
+     config/bundles.php, and config/packages/cronwatch.yaml with
+     cronwatch: { alerts: { slack: '%env(CRONWATCH_SLACK_WEBHOOK_URL)%' } }.
+     Every Scheduler message is watched, and the check is added to the
+     default schedule, so the worker consuming scheduler_default runs it.
+   - Drupal: composer require drupal/cronwatch, drush pm:install cronwatch.
+     Every cron run and each module's hook_cron is watched. Set the alert
+     channel and the cron schedule under Configuration, System, CronWatch.
+   - Craft: composer require cronwatch/craft,
+     php craft plugin/install cronwatch. List the console commands the
+     crontab runs, with their schedules, and the queue job classes to watch,
+     in config/cronwatch.php ('commands' => ['resave/entries' =>
+     ['schedule' => '0 3 * * *']], 'queueJobs' => [...]).
+   - Anything else (crontab scripts, Slim, a plain PHP app):
+     composer require cronwatch/cronwatch.
+
+2. Outside the frameworks, make one client in cronwatch.php at the project's
+   root that requires vendor/autoload.php, declares every job and returns
+   the client:
+
+   $cw = new Cronwatch\Cronwatch(
+       store: new Cronwatch\Store\MysqlStore(getenv('DATABASE_URL')),   // or SqliteStore('/var/lib/app/cronwatch.db'), PostgresStore(...)
+       alerts: [new Cronwatch\Alerts\Slack(getenv('SLACK_WEBHOOK_URL'))],
+   );
+   $cw->job('nightly-report', ['schedule' => '0 2 * * *', 'timezone' => 'UTC', 'grace' => '15m']);
+   return $cw;
+
+   Other channels under Cronwatch\Alerts: Discord, Webhook, Resend,
+   Postmark, Sendgrid, Mailgun, Ses, Twilio, Sentry, Honeybadger, Datadog,
+   Rollbar, Bugsnag, NewRelic, with named arguments. Their options:
+   https://cronwatch.dev/docs/php/
+
+3. Watch each scheduled job:
+
+   - Laravel: nothing to do for scheduled tasks; options per task with
+     ->cronwatch(['name' => 'nightly-report', 'grace' => '15m']), or
+     ->cronwatch(false) to leave one out. Queued jobs opt in with
+     #[Cronwatch\Watch(grace: '15m')] on the class.
+   - Symfony: nothing to do for scheduled messages; options with
+     #[Cronwatch\Watch(...)] on the message class. Messenger messages that
+     workers handle opt in with the same attribute.
+   - Drupal: queue workers opt in under the settings or with
+     #[Cronwatch\Watch] on the worker class.
+   - Craft: the commands and queueJobs lists above.
+   - A crontab script: $cw = require 'cronwatch.php'; then
+     $cw->job('nightly-report', [...])->run(function ($job) { ...
+     $job->log('Report written'); }).
+   - A platform that calls a URL: $cw->job(...)->handler($fn), then
+     ->serve() in a bare script, ->laravel() as a Laravel route action, or
+     called with the request in a Symfony controller. It needs
+     Authorization: Bearer $CRON_SECRET.
+
+4. Run the check every 5 minutes so missed and stuck runs are noticed:
+   Laravel schedules php artisan cronwatch:check itself, Symfony adds it to
+   the default schedule, Drupal runs it after each cron run (add
+   drush cronwatch:check to the crontab too), Craft needs a crontab line
+   running php craft cronwatch/check, and a plain app a crontab line running
+   vendor/bin/cronwatch check (which loads cronwatch.php). One checker per
+   store.
+
+5. The dashboard: Laravel serves it at /cronwatch behind the viewCronwatch
+   gate (define it for your admins); Symfony imports
+   '@CronwatchBundle/config/routes.php' under /cronwatch in
+   config/routes/cronwatch.yaml behind access_control; Drupal and Craft put
+   it in their admin. In a plain app, a public/cronwatch.php requiring
+   cronwatch.php and calling $cw->routes()->serve(). Outside development it
+   needs CRONWATCH_TOKEN; behind the app's own admin auth, pass
+   routes(token: false) instead.
+
+6. Set the environment variables you referenced: CRONWATCH_TOKEN,
+   CRON_SECRET if you added a handler, and whichever alert channel you chose.
+   Do not invent other names.
+
 Rules for you:
 - Declare every existing scheduled job in this project, not just one. Find them
   in cron config, workflow files, queue schedulers and any crontab.
@@ -225,19 +319,23 @@ Rules for you:
   does not re-run work.
 - If this project already has a dashboard route or auth, mount cw.routes()
   or Cronwatch::Web behind that auth with its token set to null (nil in Ruby,
-  None in Python) rather than exposing it.
+  None in Python, false in PHP) rather than exposing it.
 - Make sure the process that runs the check knows every job it should expect,
   or a job that never starts at all goes unnoticed. If installs differ, declare
   a job there only where that install runs it.
 - Work that starts in one call and finishes in another (a webhook, a queue
   step, a workflow) uses await job.start({ id }) where it begins and
-  (await job.resume(id)).finish() where it ends, with the same id both times.
+  (await job.resume(id)).finish() where it ends, with the same id both times
+  ($job->start(id: $id) and $job->resume($id)->finish() in PHP).
 - A job that runs where the network or the app's secrets are unavailable gets
   its own client with deliver: "check" (deliver = :check in Ruby,
-  deliver="check" in Python) and the same
+  deliver="check" in Python, deliver: 'check' in PHP) and the same
   store; the next check sends its alerts.
 
 Docs: https://cronwatch.dev/docs/
 Rails docs: https://cronwatch.dev/docs/rails/
 Python docs: https://cronwatch.dev/docs/python/ and https://cronwatch.dev/docs/django/
+PHP docs: https://cronwatch.dev/docs/php/, https://cronwatch.dev/docs/laravel/,
+https://cronwatch.dev/docs/symfony/, https://cronwatch.dev/docs/wordpress/,
+https://cronwatch.dev/docs/drupal/ and https://cronwatch.dev/docs/craft/
 MCP server for agents: npx -y @cronwatch/mcp
