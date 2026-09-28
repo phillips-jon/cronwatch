@@ -16,7 +16,7 @@ import { formatDuration } from "../duration.js";
 import { graceMs, isStuck, timeoutMs } from "../evaluate.js";
 import { expectation, firesBetween, parseSchedule, type ParsedSchedule } from "../schedule.js";
 import type { JobSummary, Run } from "../types.js";
-import { escapeHtml as h } from "./escape.js";
+import { escapeHtml as h, escapeName } from "./escape.js";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -364,7 +364,7 @@ export function dayTimeline(lanes: LaneInput[], span: Span, base: string, total:
     const { job } = input;
     const parts = lane(input, span, { nowInLane: false, label: job.name });
     return {
-      html: `<li class="lane"><div class="who"><i class="sq ${stateClass(job)}" aria-hidden="true"></i><a class="name" href="${h(base)}/jobs/${encodeURIComponent(job.name)}">${h(job.name)}</a><span class="sched">${h(job.definition.schedule ?? "no schedule")}</span></div><div class="track">${parts.svg}${parts.note}</div></li>`,
+      html: `<li class="lane"><div class="who"><i class="sq ${stateClass(job)}" aria-hidden="true"></i><a class="name" href="${h(base)}/jobs/${encodeURIComponent(job.name)}">${escapeName(job.name)}</a><span class="sched">${h(job.definition.schedule ?? "no schedule")}</span></div><div class="track">${parts.svg}${parts.note}</div></li>`,
       words: `<li>${h(`${job.name} (${job.definition.schedule ?? "no schedule"}): ${parts.words}.`)}</li>`,
     };
   });

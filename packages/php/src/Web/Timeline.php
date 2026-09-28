@@ -508,7 +508,7 @@ final class Timeline
             $parts = self::lane($input, $span, false, $job->name);
             $schedule = $job->definition->get('schedule') ?? 'no schedule';
             $html .= '<li class="lane"><div class="who"><i class="sq ' . self::STATE_CLASS[$job->health] . '" aria-hidden="true"></i><a class="name" href="' . Text::h($base) . '/jobs/'
-                . Text::encodeUriComponent($job->name) . '">' . Text::h($job->name) . '</a><span class="sched">' . Text::h($schedule) . '</span></div><div class="track">'
+                . Text::encodeUriComponent($job->name) . '">' . Text::name($job->name) . '</a><span class="sched">' . Text::h($schedule) . '</span></div><div class="track">'
                 . $parts['svg'] . $parts['note'] . '</div></li>';
             $words .= '<li>' . Text::h("{$job->name} (" . Text::text($schedule) . "): {$parts['words']}.") . '</li>';
         }

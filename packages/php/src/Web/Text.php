@@ -29,6 +29,12 @@ final class Text
         return strtr(self::text($value), self::ESCAPES);
     }
 
+    /** escapeName: a job name shown as text, with a break allowed after each run of _ : . / - so it wraps at its separators. Never in an attribute. */
+    public static function name(mixed $value): string
+    {
+        return (string) preg_replace('~([_:./-]+)(?=[^_:./-])~', '$1<wbr>', self::h($value));
+    }
+
     /** JavaScript truthiness, for the templates' `x ? a : b`: an empty array is true there, as an empty object is. */
     public static function truthy(mixed $value): bool
     {

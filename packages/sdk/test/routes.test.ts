@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { cronwatch } from "../src/index.js";
+import { escapeName } from "../src/routes/escape.js";
 import { capture, clock } from "./helpers.js";
 
 function app(token: string | null = "tok") {
@@ -82,6 +83,31 @@ test("dashboard and job pages render, JSON API answers", async () => {
   assert.equal((await get("/cronwatch/api/jobs/missing", { headers: auth })).status, 404);
   assert.equal((await get("/cronwatch/jobs/missing", { headers: auth })).status, 404);
   assert.equal((await get("/cronwatch/nope", { headers: auth })).status, 404);
+});
+
+test("escapeName escapes, then allows a break after each run of separators but not at the end", () => {
+  assert.equal(escapeName("a/b::c<d>-"), "a/<wbr>b::<wbr>c&lt;d&gt;-");
+  assert.equal(escapeName("plain"), "plain");
+});
+
+test("a long name may break after its separators wherever it is text, and nowhere else", async () => {
+  const { cw, get, auth } = app();
+  const name = "wp:store_sync.inventory--eu";
+  await cw.run(name, async () => {});
+  const shown = "wp:<wbr>store_<wbr>sync.<wbr>inventory--<wbr>eu";
+  const href = `/cronwatch/jobs/${encodeURIComponent(name)}`;
+
+  const dash = await (await get("/cronwatch", { headers: auth })).text();
+  assert.ok(dash.includes(`<a class="name" href="${href}">${shown}</a><span class="sched">`), "the lane");
+  assert.ok(dash.includes(`<td class="job"><a class="name" href="${href}">${shown}</a></td>`), "the board");
+  assert.ok(dash.includes(`<li>wp:store_sync.inventory--eu (`), "the lane in words, unbroken");
+
+  const page = await (await get(href, { headers: auth })).text();
+  assert.ok(page.includes(`<span class="crumb">${shown}</span>`), "the breadcrumb");
+  assert.ok(page.includes(`<h1 class="jobname">${shown}</h1>`), "the heading");
+  assert.ok(page.includes(`<title>wp:store_sync.inventory--eu: CronWatch</title>`), "the title, unbroken");
+  assert.ok(page.includes(`<title>wp:store_sync.inventory--eu, `), "the marks' titles, unbroken");
+  assert.equal(page.match(/<wbr>/g)?.length, 8, "only in the crumb and the heading");
 });
 
 test("check, silence, unsilence and forget over the API", async () => {

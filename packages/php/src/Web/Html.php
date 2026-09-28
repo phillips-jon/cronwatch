@@ -243,7 +243,7 @@ CSS;
         $home = '<a href="' . Text::h($base) . '/">' . self::MARK . '<span>CronWatch</span></a>';
         return $crumb === null
             ? "<p class=\"brand\">{$home}</p>"
-            : "<p class=\"brand\">{$home}<span class=\"slash\" aria-hidden=\"true\">/</span><span class=\"crumb\">" . Text::h($crumb) . '</span></p>';
+            : "<p class=\"brand\">{$home}<span class=\"slash\" aria-hidden=\"true\">/</span><span class=\"crumb\">" . Text::name($crumb) . '</span></p>';
     }
 
     /** The job's health, with any open condition it does not already say (over budget, slow) after it. */
@@ -359,7 +359,7 @@ CSS;
                 ? ($next < $now ? '<span class="state warn">overdue</span> ' : '') . self::stamp($next, $now) . '<span class="sub">' . Text::h(Timeline::when($next, $now)) . ' UTC</span>'
                 : '<span class="muted">not scheduled</span>';
             $rows[] = "<tr>\n"
-                . '<td class="job"><a class="name" href="' . Text::h($base) . '/jobs/' . Text::encodeUriComponent($job->name) . '">' . Text::h($job->name) . "</a>{$description}</td>\n"
+                . '<td class="job"><a class="name" href="' . Text::h($base) . '/jobs/' . Text::encodeUriComponent($job->name) . '">' . Text::name($job->name) . "</a>{$description}</td>\n"
                 . '<td class="health">' . self::healthState($job) . "</td>\n"
                 . "<td class=\"nowrap hide-sm\">{$schedule}</td>\n"
                 . "<td class=\"nowrap last\">{$lastCell}</td>\n"
@@ -490,7 +490,7 @@ CSS;
             . "<section class=\"sec intro\" aria-label=\"Job\">\n"
             . "  <h2>Job</h2>\n"
             . "  <div>\n"
-            . '    <h1 class="jobname">' . Text::h($job->name) . "</h1>\n"
+            . '    <h1 class="jobname">' . Text::name($job->name) . "</h1>\n"
             . "    {$description}\n"
             . '    <p class="stateline">' . self::healthState($job) . "{$whyNote}</p>\n"
             . "    <div class=\"actions\">\n"

@@ -399,7 +399,7 @@ module Cronwatch
           parts = lane(input, span, now_in_lane: false, label: job.name)
           schedule = job.definition.schedule.nil? ? "no schedule" : job.definition.schedule
           [
-            %(<li class="lane"><div class="who"><i class="sq #{state_class(job)}" aria-hidden="true"></i><a class="name" href="#{h(base)}/jobs/#{HTML.encode_uri_component(job.name)}">#{h(job.name)}</a><span class="sched">#{h(schedule)}</span></div><div class="track">#{parts.svg}#{parts.note}</div></li>),
+            %(<li class="lane"><div class="who"><i class="sq #{state_class(job)}" aria-hidden="true"></i><a class="name" href="#{h(base)}/jobs/#{HTML.encode_uri_component(job.name)}">#{HTML.name_html(job.name)}</a><span class="sched">#{h(schedule)}</span></div><div class="track">#{parts.svg}#{parts.note}</div></li>),
             "<li>#{h("#{job.name} (#{schedule}): #{parts.words}.")}</li>",
           ]
         end

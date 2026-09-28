@@ -26,7 +26,7 @@ from .. import _js
 from ..duration import format_duration, format_relative
 from ..types import JobSummary, Run
 from . import _timeline as timeline
-from ._escape import encode_uri_component, entries, h, text, to_fixed, truthy
+from ._escape import encode_uri_component, entries, h, name_html, text, to_fixed, truthy
 from ._pwa import THEME_COLOR, THEME_COLOR_DARK
 
 CSS = r"""
@@ -237,7 +237,7 @@ def _brand(base: str, crumb: str | None = None) -> str:
     home = f'<a href="{h(base)}/">{MARK}<span>CronWatch</span></a>'
     if crumb is None:
         return f'<p class="brand">{home}</p>'
-    return f'<p class="brand">{home}<span class="slash" aria-hidden="true">/</span><span class="crumb">{h(crumb)}</span></p>'
+    return f'<p class="brand">{home}<span class="slash" aria-hidden="true">/</span><span class="crumb">{name_html(crumb)}</span></p>'
 
 
 def _health_state(job: JobSummary) -> str:
@@ -332,7 +332,7 @@ def dashboard_page(
             next_cell = f'{overdue}{_stamp(next_at, now)}<span class="sub">{h(timeline.when(next_at, now))} UTC</span>'
         rows.append(
             f"""<tr>
-<td class="job"><a class="name" href="{h(base)}/jobs/{encode_uri_component(job.name)}">{h(job.name)}</a>{description}</td>
+<td class="job"><a class="name" href="{h(base)}/jobs/{encode_uri_component(job.name)}">{name_html(job.name)}</a>{description}</td>
 <td class="health">{_health_state(job)}</td>
 <td class="nowrap hide-sm">{schedule}</td>
 <td class="nowrap last">{last_cell}</td>
@@ -479,7 +479,7 @@ def job_page(job: JobSummary, runs: Sequence[Run], now: int, base: str, complete
 <section class="sec intro" aria-label="Job">
   <h2>Job</h2>
   <div>
-    <h1 class="jobname">{h(job.name)}</h1>
+    <h1 class="jobname">{name_html(job.name)}</h1>
     {description}
     <p class="stateline">{_health_state(job)}{why_note}</p>
     <div class="actions">

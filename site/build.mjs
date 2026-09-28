@@ -211,7 +211,7 @@ function readDashboard() {
     const note = /<span class="note( before)?" style="(?:left|right):([\d.]+)%;max-width:([\d.]+)%">([^<]*)<\/span>/.exec(lane);
     return {
       tone: need(/<i class="sq (\w+)"/, lane, "lane state")[1],
-      name: need(/class="name"[^>]*>([^<]*)</, lane, "lane name")[1],
+      name: need(/class="name"[^>]*>([\s\S]*?)<\/a>/, lane, "lane name")[1].replace(/<wbr>/g, ""),
       sched: need(/<span class="sched">([^<]*)</, lane, "lane schedule")[1],
       marks: need(/<svg class="marks"[^>]*>([\s\S]*?)<\/svg>/, lane, "lane marks")[1],
       note: note ? { before: Boolean(note[1]), at: note[1] ? 100 - Number(note[2]) : Number(note[2]), room: Number(note[3]), text: note[4] } : null,
@@ -225,7 +225,7 @@ function readDashboard() {
     words: need(/<ul class="vh">[\s\S]*?<\/ul>/, figure, "lane words")[0],
     boardHead: need(/<table class="board">\s*<thead>([\s\S]*?)<\/thead>/, html, "board header")[1],
     // Job names link to job pages that exist only inside an app.
-    boardRows: need(/<tbody>([\s\S]*?)<\/tbody>/, html, "board rows")[1].replace(/<a class="name" href="[^"]*">([^<]*)<\/a>/g, '<span class="name">$1</span>'),
+    boardRows: need(/<tbody>([\s\S]*?)<\/tbody>/, html, "board rows")[1].replace(/<a class="name" href="[^"]*">([\s\S]*?)<\/a>/g, '<span class="name">$1</span>'),
   };
 }
 

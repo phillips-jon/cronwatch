@@ -1,5 +1,5 @@
 {
-  "capturedAt": 1790462539000,
+  "capturedAt": 1790548939000,
   "jobs": [
     {
       "name": "backup-to-s3",
@@ -12,10 +12,10 @@
       "health": "healthy",
       "open": [],
       "lastRun": {
-        "id": "cfee5697-6594-4ca7-bc13-c06dfcc0bd77",
+        "id": "a9473cf0-6b4d-435b-8a6d-c4971753f35a",
         "job": "backup-to-s3",
         "status": "running",
-        "startedAt": 1790462419000,
+        "startedAt": 1790548819000,
         "finishedAt": null,
         "durationMs": null,
         "error": null,
@@ -23,7 +23,7 @@
         "metrics": {},
         "trigger": "run"
       },
-      "nextExpectedAt": 1790485200000,
+      "nextExpectedAt": 1790571600000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
@@ -51,11 +51,11 @@
         "over_budget"
       ],
       "lastRun": {
-        "id": "4889ef00-7c6c-45f9-8e6d-a67af53acee3",
+        "id": "dc5b28a5-d2a1-47ea-b321-64b163f26307",
         "job": "daily-digest",
         "status": "ok",
-        "startedAt": 1790395200000,
-        "finishedAt": 1790395244000,
+        "startedAt": 1790481600000,
+        "finishedAt": 1790481644000,
         "durationMs": 44000,
         "error": null,
         "output": "Digest sent to 412 subscribers",
@@ -65,7 +65,7 @@
         },
         "trigger": "run"
       },
-      "nextExpectedAt": 1790481600000,
+      "nextExpectedAt": 1790568000000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
@@ -85,11 +85,11 @@
       "health": "healthy",
       "open": [],
       "lastRun": {
-        "id": "37f853bd-71b5-4a5e-b4ad-71c7ffc5f08c",
+        "id": "9bdf7f43-450c-4b43-8c12-079b8a4f741e",
         "job": "embeddings-refresh",
         "status": "ok",
-        "startedAt": 1790462239000,
-        "finishedAt": 1790462470000,
+        "startedAt": 1790548639000,
+        "finishedAt": 1790548870000,
         "durationMs": 231000,
         "error": null,
         "output": null,
@@ -98,7 +98,7 @@
         },
         "trigger": "run"
       },
-      "nextExpectedAt": 1790463139000,
+      "nextExpectedAt": 1790549539000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
@@ -122,18 +122,18 @@
         "failed"
       ],
       "lastRun": {
-        "id": "b646531a-d6de-4f9c-9bfd-682e8618c54a",
+        "id": "090f5147-ab0a-4414-ba9c-3974a901ddb9",
         "job": "invoice-run",
         "status": "failed",
-        "startedAt": 1790391600000,
-        "finishedAt": 1790391600412,
+        "startedAt": 1790478000000,
+        "finishedAt": 1790478000412,
         "durationMs": 412,
         "error": "Error: connect ECONNREFUSED 10.0.0.12:5432\n    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1615:16)",
         "output": "Loading 1,204 open invoices\nConnecting to billing database",
         "metrics": {},
         "trigger": "run"
       },
-      "nextExpectedAt": 1790478000000,
+      "nextExpectedAt": 1790564400000,
       "consecutiveFailures": 1,
       "silencedUntil": null,
       "stats": {
@@ -155,11 +155,11 @@
       "health": "healthy",
       "open": [],
       "lastRun": {
-        "id": "5ddb05de-3f8b-4a26-82b1-aee05417dcfa",
+        "id": "7ebdaafb-adb8-4d6c-be03-47c7c9d171b7",
         "job": "nightly-report",
         "status": "ok",
-        "startedAt": 1790388000000,
-        "finishedAt": 1790388072000,
+        "startedAt": 1790474400000,
+        "finishedAt": 1790474472000,
         "durationMs": 72000,
         "error": null,
         "output": "Rendering 14 pages\nReport written: /reports/today.pdf",
@@ -168,7 +168,7 @@
         },
         "trigger": "run"
       },
-      "nextExpectedAt": 1790474400000,
+      "nextExpectedAt": 1790560800000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {
@@ -190,11 +190,11 @@
         "missed"
       ],
       "lastRun": {
-        "id": "f8941995-a1ff-4e50-9017-92f4ac73d04c",
+        "id": "537ad884-3e46-4bab-a813-c77ab1629902",
         "job": "sync-crm",
         "status": "ok",
-        "startedAt": 1790460409000,
-        "finishedAt": 1790460417000,
+        "startedAt": 1790546809000,
+        "finishedAt": 1790546817000,
         "durationMs": 8000,
         "error": null,
         "output": null,
@@ -203,7 +203,7 @@
         },
         "trigger": "run"
       },
-      "nextExpectedAt": 1790462209000,
+      "nextExpectedAt": 1790548609000,
       "consecutiveFailures": 0,
       "silencedUntil": null,
       "stats": {

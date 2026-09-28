@@ -195,6 +195,12 @@ module Cronwatch
         text(value).gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;").gsub('"', "&quot;").gsub("'", "&#39;")
       end
 
+      # escapeName: a job name shown as text, with a break allowed after each
+      # run of _ : . / - so it wraps at its separators. Never in an attribute.
+      def name_html(value)
+        h(value).gsub(%r{([_:./-]+)(?=[^_:./-])}, '\1<wbr>')
+      end
+
       # String(value), the way a template literal writes it.
       def text(value)
         case value
@@ -278,7 +284,7 @@ module Cronwatch
         home = %(<a href="#{h(base)}/">#{MARK}<span>CronWatch</span></a>)
         return %(<p class="brand">#{home}</p>) if crumb.nil?
 
-        %(<p class="brand">#{home}<span class="slash" aria-hidden="true">/</span><span class="crumb">#{h(crumb)}</span></p>)
+        %(<p class="brand">#{home}<span class="slash" aria-hidden="true">/</span><span class="crumb">#{name_html(crumb)}</span></p>)
       end
 
       # The job's health, with any open condition it does not already say (over budget, slow) after it.
@@ -375,7 +381,7 @@ module Cronwatch
             end
           <<~ROW.chomp
             <tr>
-            <td class="job"><a class="name" href="#{h(base)}/jobs/#{encode_uri_component(job.name)}">#{h(job.name)}</a>#{description}</td>
+            <td class="job"><a class="name" href="#{h(base)}/jobs/#{encode_uri_component(job.name)}">#{name_html(job.name)}</a>#{description}</td>
             <td class="health">#{health_state(job)}</td>
             <td class="nowrap hide-sm">#{schedule}</td>
             <td class="nowrap last">#{last_cell}</td>
@@ -510,7 +516,7 @@ module Cronwatch
           <section class="sec intro" aria-label="Job">
             <h2>Job</h2>
             <div>
-              <h1 class="jobname">#{h(job.name)}</h1>
+              <h1 class="jobname">#{name_html(job.name)}</h1>
               #{truthy?(d.description) ? %(<p class="desc">#{h(d.description)}</p>) : ""}
               <p class="stateline">#{health_state(job)}#{why ? %(<span class="why">#{h(why)}</span>) : ""}</p>
               <div class="actions">

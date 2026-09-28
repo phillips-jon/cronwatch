@@ -5,6 +5,7 @@ toFixed and Object.entries."""
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Mapping
 from fractions import Fraction
 from typing import Any
@@ -35,6 +36,15 @@ def text(value: Any) -> str:
 def h(value: Any) -> str:
     """escapeHtml: String(value ?? "") with & < > " ' escaped. Every string a page shows goes through this."""
     return text(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
+
+
+_SEPARATORS = re.compile(r"([_:./-]+)(?=[^_:./-])")
+
+
+def name_html(value: Any) -> str:
+    """escapeName: a job name shown as text, with a break allowed after each run
+    of _ : . / - so it wraps at its separators. Never in an attribute."""
+    return _SEPARATORS.sub(r"\1<wbr>", h(value))
 
 
 def truthy(value: Any) -> bool:

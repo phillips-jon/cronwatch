@@ -1,8 +1,9 @@
 // A local CronWatch dashboard full of dummy jobs, for working on the pages.
-// Fifteen jobs with a week of history in a memory store: healthy ones at
+// Seventeen jobs with a week of history in a memory store: healthy ones at
 // several cadences, a failing job, a missed interval, a stuck run, a slow
 // run, an over-budget job, a silenced job, one that never ran, and one with
-// a long description and tags. Nothing is saved; restart for a fresh week.
+// a long description and tags, and two with long framework-style names
+// (a WordPress hook, a Laravel class). Nothing is saved; restart for a fresh week.
 //
 //   npm run dev:dashboard           serve on http://localhost:3717/cronwatch/
 //   PORT=4000 npm run dev:dashboard
@@ -54,6 +55,8 @@ const jobs = {
   "backup-to-s3": job("backup-to-s3", { schedule: "0 5 * * *", timezone: "UTC", timeout: "2h" }),
   "exchange-rates": job("exchange-rates", { schedule: "0 */4 * * *", timezone: "UTC", grace: "10m" }),
   "webhook-retry": job("webhook-retry", { schedule: "every 10m", grace: "3m" }),
+  "wp:store_sync_inventory": job("wp:store_sync_inventory", { schedule: "0 * * * *", timezone: "UTC", grace: "5m" }),
+  "App.Jobs.SendNewsletterDigest": job("App.Jobs.SendNewsletterDigest", { schedule: "0 7 * * *", timezone: "UTC" }),
 };
 
 async function at(when, name, ms, fn) {
@@ -98,10 +101,12 @@ for (let d = 7; d >= 0; d--) {
   }
   if (past(day + 5 * HOUR)) seeded.push([day + 5 * HOUR, "backup-to-s3", 9 * MIN * wobble(0.1), (j) => { j.log("Uploaded 2.1 GB"); j.metric("gb", 2.1); }]);
   if (past(day + 9 * HOUR)) seeded.push([day + 9 * HOUR, "newsletter-send", 3 * MIN * wobble(0.2), (j) => { j.log("Queued 18,204 emails"); }]);
+  if (past(day + 7 * HOUR)) seeded.push([day + 7 * HOUR, "App.Jobs.SendNewsletterDigest", 50_000 * wobble(0.2)]);
   if (past(day + 90 * MIN)) seeded.push([day + 90 * MIN, "cleanup-sessions", 4 * MIN * wobble(0.3), (j) => { j.log("Deleted 48,112 sessions in 10 batches"); j.metric("deleted", 48_112); }]);
 }
 // Hourly, four-hourly and six-hourly jobs over three days.
 for (const t of slots(HOUR, now - 3 * DAY, now - MIN)) seeded.push([t, "cache-warm", 40_000 * wobble(0.2), (j) => j.metric("keys", 3_200)]);
+for (const t of slots(HOUR, now - 3 * DAY, now - MIN)) seeded.push([t, "wp:store_sync_inventory", 12_000 * wobble(0.3), (j) => j.metric("products", 840)]);
 for (const t of slots(4 * HOUR, now - 7 * DAY, now - MIN)) seeded.push([t, "exchange-rates", 2_500 * wobble(0.3), (j) => { j.metrics({ currencies: 32 }); j.log("Fetched 32 rates from ECB"); }]);
 const reindex = slots(6 * HOUR, now - 7 * DAY, now - MIN);
 reindex.forEach((t, i) => seeded.push([t, "search-reindex", i === reindex.length - 1 ? 26 * MIN : 6 * MIN * wobble(0.15), (j) => j.metric("documents", 412_000)]));

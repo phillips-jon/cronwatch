@@ -26,7 +26,7 @@ from ..duration import format_duration
 from ..evaluate import grace_ms, is_stuck, timeout_ms
 from ..schedule import ParsedSchedule, expectation, fires_between, parse_schedule
 from ..types import JobSummary, Run
-from ._escape import encode_uri_component, entries, h, text, to_fixed, truthy
+from ._escape import encode_uri_component, entries, h, name_html, text, to_fixed, truthy
 
 HOUR = 3_600_000
 DAY = 24 * HOUR
@@ -458,7 +458,7 @@ def day_timeline(lanes: Sequence[LaneInput], span: Span, base: str, total: int) 
         schedule = _schedule_or(job, "no schedule")
         html_rows.append(
             f'<li class="lane"><div class="who"><i class="sq {STATE_CLASS[str(job.health)]}" aria-hidden="true"></i>'
-            f'<a class="name" href="{h(base)}/jobs/{encode_uri_component(job.name)}">{h(job.name)}</a>'
+            f'<a class="name" href="{h(base)}/jobs/{encode_uri_component(job.name)}">{name_html(job.name)}</a>'
             f'<span class="sched">{h(schedule)}</span></div><div class="track">{parts.svg}{parts.note}</div></li>'
         )
         word_rows.append(f"<li>{h(f'{job.name} ({text(schedule)}): {parts.words}.')}</li>")

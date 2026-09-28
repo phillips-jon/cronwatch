@@ -1,6 +1,6 @@
 import { formatDuration, formatRelative } from "../duration.js";
 import type { JobSummary, Run } from "../types.js";
-import { escapeHtml } from "./escape.js";
+import { escapeHtml, escapeName } from "./escape.js";
 import { THEME_COLOR, THEME_COLOR_DARK } from "./pwa.js";
 import { BOARD_LANES, BOARD_AHEAD_MS, BOARD_BEHIND_MS, clock, dayTimeline, laneNote, missedAt, parsedSchedule, weekTimeline, when, type LaneInput } from "./timeline.js";
 
@@ -218,7 +218,7 @@ function brand(base: string, crumb?: string): string {
   const home = `<a href="${h(base)}/">${MARK}<span>CronWatch</span></a>`;
   return crumb === undefined
     ? `<p class="brand">${home}</p>`
-    : `<p class="brand">${home}<span class="slash" aria-hidden="true">/</span><span class="crumb">${h(crumb)}</span></p>`;
+    : `<p class="brand">${home}<span class="slash" aria-hidden="true">/</span><span class="crumb">${escapeName(crumb)}</span></p>`;
 }
 
 const HEALTH: Record<JobSummary["health"], [string, string]> = {
@@ -293,7 +293,7 @@ export function dashboardPage(
     const last = job.lastRun;
     const d = job.definition;
     return `<tr>
-<td class="job"><a class="name" href="${h(base)}/jobs/${encodeURIComponent(job.name)}">${h(job.name)}</a>${d.description ? `<span class="desc">${h(d.description)}</span>` : ""}</td>
+<td class="job"><a class="name" href="${h(base)}/jobs/${encodeURIComponent(job.name)}">${escapeName(job.name)}</a>${d.description ? `<span class="desc">${h(d.description)}</span>` : ""}</td>
 <td class="health">${healthState(job)}</td>
 <td class="nowrap hide-sm">${d.schedule ? `${h(d.schedule)}${d.timezone ? `<span class="tz">${h(d.timezone)}</span>` : ""}` : `<span class="muted">no schedule</span>`}</td>
 <td class="nowrap last">${last ? `${runState(last)} ${stamp(last.startedAt, now)}${last.durationMs !== null ? `<span class="sub">took ${h(formatDuration(last.durationMs))}</span>` : ""}` : `<span class="muted">never</span>`}</td>
@@ -373,7 +373,7 @@ export function jobPage(job: JobSummary, runs: Run[], now: number, base: string,
 <section class="sec intro" aria-label="Job">
   <h2>Job</h2>
   <div>
-    <h1 class="jobname">${h(job.name)}</h1>
+    <h1 class="jobname">${escapeName(job.name)}</h1>
     ${d.description ? `<p class="desc">${h(d.description)}</p>` : ""}
     <p class="stateline">${healthState(job)}${why ? `<span class="why">${h(why)}</span>` : ""}</p>
     <div class="actions">
