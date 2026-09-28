@@ -64,6 +64,28 @@ func TestUTF16(t *testing.T) {
 	}
 }
 
+func TestLoneSurrogates(t *testing.T) {
+	s := "a\U0001F600b"
+	// JavaScript: "a😀b".slice(0, 2) is "a\ud83d", .slice(2) is "\ude00b", and JSON.stringify escapes each half.
+	if got := StringifyLone(Slice16Lone(s, 0, 2)); got != `"a\ud83d"` {
+		t.Error(got)
+	}
+	if got := StringifyLone(Tail16Lone(s, 2)); got != `"\ude00b"` {
+		t.Error(got)
+	}
+	if got := StringifyLone(Head16Lone(s, 4)); got != `"`+s+`"` {
+		t.Error(got)
+	}
+	// Anywhere else the three bytes are not UTF-8, and Stringify writes U+FFFD for each.
+	if got := Stringify(Slice16Lone(s, 0, 2)); got != `"a`+"���"+`"` {
+		t.Error(got)
+	}
+	// Bytes that are not UTF-8 and not a lone surrogate are U+FFFD either way.
+	if got := StringifyLone("x\xffy"); got != `"x`+"�"+`y"` {
+		t.Error(got)
+	}
+}
+
 func TestDates(t *testing.T) {
 	if got := ISOString(DateUTC(2026, 0, 5, 9, 30, 0, 0)); got != "2026-01-05T09:30:00.000Z" {
 		t.Error(got)

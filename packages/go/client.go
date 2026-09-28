@@ -223,6 +223,24 @@ func (c *Client) Job(name string, options ...JobOption) (*Job, error) {
 	return &Job{c: c, def: def}, nil
 }
 
+// DescribeJob is the definition these options give a job, before any
+// client's defaults and without checking them: what a source compares to
+// tell whether a job it declares has changed (the SDK compares the options
+// object's JSON).
+func DescribeJob(name string, options ...JobOption) Definition {
+	var cfg jobConfig
+	for _, o := range options {
+		o(&cfg)
+	}
+	fields := &js.Object{}
+	for _, k := range cfg.fields.Keys() {
+		v, _ := cfg.fields.Get(k)
+		fields.Set(k, js.CloneValue(v))
+	}
+	fields.Set("name", name)
+	return toStored(fields, cfg.expect)
+}
+
 // MustJob is Job for package-level declarations: it panics when an option
 // is invalid.
 func (c *Client) MustJob(name string, options ...JobOption) *Job {

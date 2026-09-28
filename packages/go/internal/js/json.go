@@ -155,11 +155,22 @@ func CloneValue(v any) any {
 // that is not finite is null, as JavaScript writes it.
 func Stringify(v any) string {
 	var b strings.Builder
-	write(&b, v)
+	write(&b, v, false)
 	return b.String()
 }
 
-func write(b *strings.Builder, v any) {
+// StringifyLone is Stringify for a value whose strings may hold a lone
+// surrogate kept by Slice16Lone: each is written as JSON.stringify writes
+// one (\ud83d), so a body cut through a surrogate pair is the SDK's bytes.
+// Its strings must otherwise be UTF-8 (WellFormed), since the three bytes
+// that hold a lone surrogate are not.
+func StringifyLone(v any) string {
+	var b strings.Builder
+	write(&b, v, true)
+	return b.String()
+}
+
+func write(b *strings.Builder, v any, lone bool) {
 	switch t := v.(type) {
 	case nil:
 		b.WriteString("null")
@@ -182,14 +193,14 @@ func write(b *strings.Builder, v any) {
 	case int32:
 		b.WriteString(FormatNumber(float64(t)))
 	case string:
-		quote(b, t)
+		quote(b, t, lone)
 	case []any:
 		b.WriteByte('[')
 		for i, e := range t {
 			if i > 0 {
 				b.WriteByte(',')
 			}
-			write(b, e)
+			write(b, e, lone)
 		}
 		b.WriteByte(']')
 	case []string:
@@ -198,7 +209,7 @@ func write(b *strings.Builder, v any) {
 			if i > 0 {
 				b.WriteByte(',')
 			}
-			quote(b, e)
+			quote(b, e, lone)
 		}
 		b.WriteByte(']')
 	case *Object:
@@ -211,13 +222,13 @@ func write(b *strings.Builder, v any) {
 			if i > 0 {
 				b.WriteByte(',')
 			}
-			quote(b, k)
+			quote(b, k, lone)
 			b.WriteByte(':')
-			write(b, t.vals[k])
+			write(b, t.vals[k], lone)
 		}
 		b.WriteByte('}')
 	case Valuer:
-		write(b, t.JSValue())
+		write(b, t.JSValue(), lone)
 	default:
 		panic(fmt.Sprintf("js.Stringify: %T is not a JSON value", v))
 	}
@@ -226,13 +237,13 @@ func write(b *strings.Builder, v any) {
 // Quote is JSON.stringify of a string.
 func Quote(s string) string {
 	var b strings.Builder
-	quote(&b, s)
+	quote(&b, s, false)
 	return b.String()
 }
 
 const hex = "0123456789abcdef"
 
-func quote(b *strings.Builder, s string) {
+func quote(b *strings.Builder, s string, lone bool) {
 	b.WriteByte('"')
 	start := 0
 	for i := 0; i < len(s); {
@@ -243,6 +254,18 @@ func quote(b *strings.Builder, s string) {
 		}
 		if c >= utf8.RuneSelf {
 			r, size := utf8.DecodeRuneInString(s[i:])
+			if r == utf8.RuneError && size == 1 && lone {
+				if u, ok := loneAt(s, i); ok {
+					b.WriteString(s[start:i])
+					b.WriteString(`\u`)
+					for shift := 12; shift >= 0; shift -= 4 {
+						b.WriteByte(hex[u>>shift&0xf])
+					}
+					i += 3
+					start = i
+					continue
+				}
+			}
 			if r == utf8.RuneError && size == 1 {
 				b.WriteString(s[start:i])
 				b.WriteString("�")

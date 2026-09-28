@@ -26,13 +26,22 @@ type ChannelContext struct {
 	report func(error)
 }
 
+// NewChannelContext is a channel context that reports to report, for
+// sending to a channel outside a client (a test, say).
+func NewChannelContext(report func(error)) ChannelContext {
+	return ChannelContext{report: report}
+}
+
 // ReportError reports a problem that did not stop the alert going out,
 // such as one of several recipients refusing it. It goes to the client's
-// error handler.
+// error handler; the zero ChannelContext writes it to standard error, as
+// the SDK does for a channel called without one.
 func (cc ChannelContext) ReportError(err error) {
 	if cc.report != nil {
 		cc.report(err)
+		return
 	}
+	fmt.Fprintln(Stderr, "[cronwatch] alert channel:", err)
 }
 
 type funcChannel struct {

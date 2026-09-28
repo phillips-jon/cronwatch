@@ -5,8 +5,10 @@ package cronwatch
 // test files here (conformance_<name>_test.go), store.json is replayed
 // against every store (storetest.ReplayFixture), and duration, schedule and
 // output are replayed by the internal packages that port them
-// (internal/schedule, internal/output). This file holds what the tests here
-// share, and fails when the SDK writes a fixture this port does not replay.
+// (internal/schedule, internal/output), and channels, triage and pgcron by
+// the packages that port them (alerts, triage, pgcron). This file holds
+// what the tests here share, and fails when the SDK writes a fixture this
+// port does not replay.
 
 import (
 	"os"
@@ -21,11 +23,11 @@ import (
 // conformanceDir is the repository's conformance/ directory.
 var conformanceDir = filepath.Join("..", "..", "conformance")
 
-// replayed are the fixtures this package replays; pending are those a later
-// phase of the port replays (DESIGN.md, Phases).
+// replayed are the fixtures this package and the internal ones replay;
+// elsewhere are those the alerts, triage and pgcron packages replay.
 var (
-	replayed = []string{"duration", "evaluate", "format", "health", "output", "schedule", "store"}
-	pending  = []string{"channels", "pgcron", "triage"}
+	replayed  = []string{"duration", "evaluate", "format", "health", "output", "schedule", "store"}
+	elsewhere = []string{"channels", "pgcron", "triage"}
 )
 
 func TestConformanceFixturesAreReplayed(t *testing.T) {
@@ -34,7 +36,7 @@ func TestConformanceFixturesAreReplayed(t *testing.T) {
 		t.Fatal(err)
 	}
 	known := map[string]bool{}
-	for _, name := range append(append([]string{}, replayed...), pending...) {
+	for _, name := range append(append([]string{}, replayed...), elsewhere...) {
 		known[name] = true
 	}
 	var unknown []string
