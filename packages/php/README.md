@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your PHP app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
 
-This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process and a Node process can share one SQLite file, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, and a WordPress plugin; the Laravel, Symfony, Drupal and Craft integrations follow ([DESIGN.md](DESIGN.md) has the plan). It is not on Packagist yet.
+This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process and a Node process can share one SQLite file, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, a job handler for crons that call a URL, the Laravel and Symfony integrations, and a WordPress plugin; the Drupal and Craft integrations follow ([DESIGN.md](DESIGN.md) has the plan). It is not on Packagist yet.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -140,6 +140,83 @@ $app->add(new Cronwatch\Web\PsrMiddleware($cw->routes(), $factory, $factory));  
 
 Changes (silence, forget, the check) are refused from another site, the pages carry a strict CSP and load nothing but their own app shell, and the dashboard installs as an app (a manifest, icons and a service worker that caches only the shell).
 
+### A job behind a URL
+
+For a cron that calls a URL (a platform's cron, Cloud Scheduler, a crontab line running curl), `handler()` makes a request handler that runs the job, the SDK's `handler()`:
+
+```php
+$cron = $cw->job('nightly-report', ['schedule' => '0 2 * * *'])
+    ->handler(fn (JobContext $job, $request) => build_report($job));
+
+$cron->serve();                                              // public/cron/nightly.php, from the superglobals
+Route::post('/cron/nightly', $cron->laravel());              // Laravel (routes/api.php, which has no CSRF check)
+return $cron($request);                                      // a Symfony (or Laravel) controller
+$psr = new Cronwatch\Web\PsrJobHandler($cron, $f, $f);       // PSR-15, with a PSR-17 factory
+```
+
+The caller must send `Authorization: Bearer <secret>`: the handler's `secret:`, else the client's `cronSecret` (`CRON_SECRET` by default). With no secret at all it answers 503 outside development; `secret: false` lets anyone run the job. Each request is a recorded run, answered with `{"ok","job","run","status","durationMs"}` and 200 or 500. A function that returns a response is answered with it, and a status of 400 or more fails the run, from any job: a PSR-7 response, Symfony's or Laravel's, Laravel's HTTP client response, a `Cronwatch\Web\Response`, or an array such as `['status' => 503, 'body' => 'down']`.
+
+### Laravel
+
+`composer require cronwatch/cronwatch`, and package discovery does the rest (Laravel 12 and 13). Every task in the app's schedule is watched with no code changes: its runs are recorded as `schedule:run` runs it, its cron expression and timezone are its job's schedule, and `cronwatch:check` is scheduled every five minutes in the same scheduler, so a task that never ran is reported missed. Runs are kept in the app's database through a connection of CronWatch's own, so a run recorded inside a transaction survives its rollback; `php artisan migrate` makes the tables.
+
+```
+CRONWATCH_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+CRONWATCH_MAIL_TO=ops@example.com
+```
+
+A job is named after its command (`emails:send`; one with arguments gets a short hash, `emails:send-force-1a2b3c4d`), its `->name()` or description, its queued job's class (`App.Jobs.SendReport`), or, for an unnamed closure, `closure:<file>:<line>`, which moves when the line does, so name those. Options per task, or leave one out:
+
+```php
+Schedule::command('reports:build')->dailyAt('02:00')->cronwatch(['name' => 'nightly-report', 'grace' => '15m', 'expect' => 'Report written']);
+Schedule::command('cache:prune-stale-tags')->hourly()->cronwatch(false);
+```
+
+A task with `->when()`, `->skip()` or `->between()` has no schedule to miss, so its job has none unless given one. Queued jobs opt in, and then every attempt is a run (failing retries open one alert, the attempt that works closes it):
+
+```php
+#[Cronwatch\Watch(grace: '15m', failuresBeforeAlert: 3)]
+final class SendNightlyReport implements ShouldQueue { /* Cronwatch::current()?->log(...) inside handle() */ }
+```
+
+The dashboard is at `/cronwatch`, for whoever the `viewCronwatch` gate lets in (anyone in the `local` environment, until you define it: `Gate::define('viewCronwatch', fn (User $user) => $user->is_admin)`); `@cronwatch/mcp` reaches its API with `CRONWATCH_TOKEN` as a bearer token. `php artisan vendor:publish --tag=cronwatch-config` gives `config/cronwatch.php`, where everything else is.
+
+### Symfony
+
+Register the bundle (`Cronwatch\Symfony\CronwatchBundle::class => ['all' => true]` in `config/bundles.php`; Symfony 6.4, 7.4 and 8.1) and configure it:
+
+```yaml
+# config/packages/cronwatch.yaml
+cronwatch:
+    # store: '%env(DATABASE_URL)%'    # the default; or sqlite:///%kernel.project_dir%/var/cronwatch.db
+    alerts:
+        slack: '%env(CRONWATCH_SLACK_WEBHOOK_URL)%'
+        mailer: { to: ops@example.com, from: cronwatch@example.com }
+```
+
+Every message of every schedule (`#[AsSchedule]` providers, `#[AsCronTask]`, `#[AsPeriodicTask]`) is watched through the Scheduler's events as the worker runs it, its trigger as its job's schedule. Messenger messages marked `#[Cronwatch\Watch]` are recorded where a worker handles them, each attempt a run. The check runs from the bundle's own schedule, `cronwatch`, every five minutes:
+
+```
+bin/console messenger:consume scheduler_default scheduler_cronwatch
+```
+
+(or `bin/console cronwatch:check` from a crontab). The dashboard is a route import behind your security:
+
+```yaml
+# config/routes/cronwatch.yaml
+cronwatch:
+    resource: '@CronwatchBundle/config/routes.php'
+    prefix: /cronwatch
+
+# config/packages/security.yaml
+security:
+    access_control:
+        - { path: ^/cronwatch/api, roles: PUBLIC_ACCESS }   # @cronwatch/mcp brings CRONWATCH_TOKEN instead
+        - { path: ^/cronwatch, roles: ROLE_ADMIN }
+```
+
+A signed-in user with `ROLE_ADMIN` (`dashboard.role`) is let in; anyone else needs the dashboard's token.
+
 ### WordPress
 
 The CronWatch plugin (`wordpress/`, built into the plugin directory's zip with `php wordpress/build.php`) watches every WP-Cron event with no code changes: each event's runs are recorded in the site's own database, and missed, failed, stuck and slow runs are alerted by email, Slack or webhook. It adds a CronWatch menu to wp-admin, for administrators: the dashboard above, and its settings. The JSON API, for `@cronwatch/mcp`, is off until turned on there with a token. It works network wide on a multisite. WP-Cron only fires when someone visits the site, so a quiet site's events run late or not at all; the plugin's readme recommends `DISABLE_WP_CRON` and a real crontab, with `wp cronwatch check` running the check from it. See DESIGN.md for how events become jobs.
@@ -168,6 +245,17 @@ CRONWATCH_TEST_MYSQL=mysql://root:pw@127.0.0.1:33061/cw CRONWATCH_TEST_MARIADB=m
 `tests/ChannelsTest.php` runs the default HTTP client (curl, and PHP's streams) against a local `php -S` server. The WordPress plugin's tests install WordPress with WP-CLI and run the built plugin in it, when `CRONWATCH_TEST_WORDPRESS` is a `mysql://` URL and `CRONWATCH_TEST_WPCLI` the path to `wp-cli.phar` (`CRONWATCH_TEST_WP_VERSION` picks the WordPress version).
 
 `tests/FinishOnceTest.php` starts PHP worker processes that finish the same runs at the same moment, on SQLite and on each server. `tests/NodeCompatTest.php` shares a SQLite file with the built SDK, and `tests/ScheduleFuzzTest.php` checks thousands of generated cron expressions against croner itself; both need Node and the SDK built first (`npm ci && npm run build` at the repository root), and skip with the reason otherwise. `npm run check:php` at the root runs the suite.
+
+`tests/Laravel/` runs the Laravel integration on Orchestra Testbench and `tests/Symfony/` the bundle on FrameworkBundle's test kernel; the dev dependencies bring the newest of each that the PHP allows (Laravel 12 and Symfony 7.4 on PHP 8.2, Laravel 13 and Symfony 8.1 on 8.4 and newer), and without them those tests are skipped. To test another series, pin it and take the other framework out, as CI's php-frameworks job does:
+
+```bash
+composer remove --dev --no-update orchestra/testbench
+composer require --dev --no-update "symfony/framework-bundle:6.4.*" "symfony/scheduler:6.4.*" "symfony/messenger:6.4.*" \
+  "symfony/security-bundle:6.4.*" "symfony/browser-kit:6.4.*" "symfony/console:6.4.*"
+composer update && vendor/bin/phpunit tests/Symfony
+```
+
+The Laravel store tests use `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PG` too.
 
 ## License
 

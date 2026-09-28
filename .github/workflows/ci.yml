@@ -5,7 +5,8 @@
 # supported Rails series. The Python package's tests run on the oldest and
 # newest Python it supports, against each supported Django series, and the
 # PHP package's on the oldest and newest PHP, against MySQL, MariaDB,
-# Postgres and WordPress. The MCP server is driven against each port's
+# Postgres and WordPress, and against each supported Laravel and Symfony
+# series. The MCP server is driven against each port's
 # dashboard. One Node, one Ruby and one Python entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
@@ -317,7 +318,8 @@ jobs:
   # croner, so the SDK is built (and the fixtures checked) first. The MySQL, MariaDB and Postgres store
   # tests, and the finish-once tests with several processes, run against the
   # services; the pg_cron tests against a Postgres with the extension, as the
-  # Node, Ruby and Python jobs start it.
+  # Node, Ruby and Python jobs start it. The Laravel and Symfony tests run on
+  # the newest of each that the PHP allows (php-frameworks pins each series).
   php:
     name: php (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
@@ -443,3 +445,73 @@ jobs:
           '
           # The Composer bin finds cronwatch.php in the working directory.
           test "$(vendor/bin/cronwatch check)" = "cronwatch: checked 1 job, sent 0 alerts"
+
+  # The Laravel and Symfony integrations against each supported release,
+  # one framework at a time: the php job above already runs them on the
+  # newest each PHP allows (Laravel 12 and Symfony 7.4 on 8.2, Laravel 13
+  # and Symfony 8.1 on 8.5); here each series is pinned on its own, the
+  # other framework taken out, and its tests run (Orchestra Testbench for
+  # Laravel, FrameworkBundle's test kernel for Symfony). Laravel 11 and
+  # Symfony 7.3 and 8.0 are out of support and not tested.
+  php-frameworks:
+    name: php (PHP ${{ matrix.php }}, ${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { php: "8.2", name: "Laravel 12", tests: tests/Laravel, remove: "symfony/browser-kit symfony/framework-bundle symfony/messenger symfony/scheduler symfony/security-bundle", require: "orchestra/testbench:^10.0" }
+          - { php: "8.5", name: "Laravel 13", tests: tests/Laravel, remove: "symfony/browser-kit symfony/framework-bundle symfony/messenger symfony/scheduler symfony/security-bundle", require: "orchestra/testbench:^11.0" }
+          - { php: "8.2", name: "Symfony 6.4", tests: tests/Symfony, remove: "orchestra/testbench", require: "symfony/browser-kit:6.4.* symfony/console:6.4.* symfony/framework-bundle:6.4.* symfony/messenger:6.4.* symfony/scheduler:6.4.* symfony/security-bundle:6.4.*" }
+          - { php: "8.2", name: "Symfony 7.4", tests: tests/Symfony, remove: "orchestra/testbench", require: "symfony/browser-kit:7.4.* symfony/console:7.4.* symfony/framework-bundle:7.4.* symfony/messenger:7.4.* symfony/scheduler:7.4.* symfony/security-bundle:7.4.*" }
+          - { php: "8.5", name: "Symfony 8.1", tests: tests/Symfony, remove: "orchestra/testbench", require: "symfony/browser-kit:8.1.* symfony/console:8.1.* symfony/framework-bundle:8.1.* symfony/messenger:8.1.* symfony/scheduler:8.1.* symfony/security-bundle:8.1.*" }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+          MARIADB_DATABASE: cw
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, pdo_mysql, pdo_pgsql, curl
+          coverage: none
+          tools: composer:v2
+      - name: Pin ${{ matrix.name }}
+        working-directory: packages/php
+        env:
+          REMOVE: ${{ matrix.remove }}
+          REQUIRE: ${{ matrix.require }}
+        run: |
+          # shellcheck disable=SC2086
+          composer remove --dev --no-update --no-interaction $REMOVE
+          # shellcheck disable=SC2086
+          composer require --dev --no-update --no-interaction $REQUIRE
+          composer update --no-interaction --no-progress
+          composer show | grep -E '^(laravel/framework|orchestra/testbench|symfony/framework-bundle|symfony/scheduler|phpunit/phpunit) '
+      - run: vendor/bin/phpunit ${{ matrix.tests }}
+        working-directory: packages/php
+        env:
+          CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
+          CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw

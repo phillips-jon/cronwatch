@@ -54,6 +54,22 @@ final class JobHandle
     }
 
     /**
+     * A request handler that runs the job, for a cron that calls a URL: the
+     * function is called as fn(JobContext $job, $request) for each request
+     * carrying `Authorization: Bearer <secret>`, as a recorded run with the
+     * trigger "handler", and the request is answered with how it went. The
+     * secret defaults to the client's cronSecret (CRON_SECRET); false lets
+     * anyone run the job. See Handler for its answers and its adapters
+     * (serve() for a bare script, laravel(), a Symfony controller, PSR-15).
+     *
+     * @param callable(JobContext, mixed): mixed $fn
+     */
+    public function handler(callable $fn, string|false|null $secret = null): Handler
+    {
+        return new Handler($this->client, $this->definition, $fn, $secret);
+    }
+
+    /**
      * Record a running run now and finish it later, perhaps from another
      * process (see resume()). `id` is your own stable id for the run, 1 to 200
      * characters, not starting with "pgcron:" (the pg_cron source's): a start
