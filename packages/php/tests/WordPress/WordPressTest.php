@@ -685,7 +685,7 @@ final class WordPressTest extends TestCase
         // A job's page, through the link the board gives it.
         [$status, , $job] = self::http('GET', '/wp-admin/admin.php?page=cronwatch&cw=%2Fjobs%2Fwp%253Acwt_ok', $admin);
         $this->assertSame(200, $status);
-        $this->assertStringContainsString('<h1 class="jobname">wp:cwt_ok</h1>', $job);
+        $this->assertStringContainsString('<h1 class="jobname">wp:<wbr>cwt_<wbr>ok</h1>', $job);
 
         // Changes carry a WordPress nonce, which the forms' actions hold.
         $this->assertSame(1, preg_match('#<form class="inline" method="post" action="([^"]*cw=%2Fcheck[^"]*)"#', $page, $m));
