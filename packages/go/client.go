@@ -92,6 +92,7 @@ type Client struct {
 
 	warnMu              sync.Mutex
 	warnedDeferredStart bool
+	warnedNoSecret      bool
 
 	busyMu      sync.Mutex
 	channelBusy map[int]bool

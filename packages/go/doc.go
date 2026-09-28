@@ -23,6 +23,13 @@
 // SMS and error trackers), the triage package Claude triage, and the pgcron
 // package a source that watches pg_cron's jobs.
 //
+// The dashboard and its JSON API are an http.Handler, Client.Routes, and a
+// job run by a platform cron that calls a URL is one too, Job.Handler:
+//
+//	routes, err := cw.Routes(cronwatch.WithToken(os.Getenv("CRONWATCH_TOKEN")))
+//	mux.Handle("/cronwatch/", routes)
+//	mux.Handle("POST /api/cron/nightly", nightly.Handler(buildReport))
+//
 // Every value a store holds is the SDK's JSON: each type's MarshalJSON
 // writes it byte for byte, with keys in JavaScript's order.
 package cronwatch

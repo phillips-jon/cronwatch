@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Go app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
 
-This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text and the same stored rows, so a Go process and a Node process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, a `database/sql` store for SQLite, Postgres and MySQL, the SDK's alert channels, Claude triage and the pg_cron source; the dashboard and the scheduler integrations follow ([DESIGN.md](DESIGN.md) has the plan and how each part works). It is not released yet.
+This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text and the same stored rows, so a Go process and a Node process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, a `database/sql` store for SQLite, Postgres and MySQL, the SDK's alert channels, Claude triage, the pg_cron source, the dashboard with its JSON API, and job handlers for platform crons; the scheduler integrations follow ([DESIGN.md](DESIGN.md) has the plan and how each part works). It is not released yet.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -95,6 +95,30 @@ cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(pgcro
 cw.Start(time.Minute)
 ```
 
+## Dashboard
+
+`cw.Routes(...)` is the dashboard and its small JSON API as an `http.Handler`: every job's health, its last day and week drawn as timelines, its runs with their output, and buttons to check, silence and forget. It is the SDK's, page for page and byte for byte, so the `@cronwatch/mcp` server works against it as it does against a Node app. It installs as an app on a phone (a manifest, icons and a service worker, served without the token).
+
+```go
+routes, err := cw.Routes(cronwatch.WithToken(os.Getenv("CRONWATCH_TOKEN")))
+mux.Handle("/cronwatch/", routes)                               // mounted at /cronwatch
+mux.Handle("/ops/cron/", http.StripPrefix("/ops/cron", routes)) // or anywhere, stripped
+```
+
+Everything needs the token: send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. `/api/check` also takes the client's cron secret, so a platform cron can run checks. With no token, the routes answer 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `GO_ENV` set to `development`, `dev`, `local`, `test` or `testing`), where they make one and print a sign-in link on the first request; `cronwatch.WithoutToken()` serves them open, behind your own auth. The base path is found from the request: what `http.StripPrefix` took off, else the part of the `ServeMux` pattern before its wildcard or trailing slash, else `/cronwatch`; `cronwatch.WithBasePath` sets it. Behind a proxy, `cronwatch.WithOrigin("https://app.example.com")` or `cronwatch.WithTrustProxy()` gives the public origin the cross-site check and the cookie use.
+
+## Platform crons
+
+`job.Handler(fn)` is a job as an `http.Handler`, for a cron that calls a URL (Cloud Scheduler, Vercel, a crontab line running curl). A request must carry `Authorization: Bearer <CRON_SECRET>`; each one runs the function as a recorded run and is answered with how it went.
+
+```go
+mux.Handle("POST /api/cron/nightly", nightly.Handler(func(ctx context.Context, job *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) error {
+	return buildReport(ctx)
+}))
+```
+
+The answer is `{"ok","job","run","status","durationMs"}`, 200 or 500, unless the function wrote its own, in which case a status of 400 or more fails the run. `cronwatch.HandlerValue` takes a function returning a value, such as the `*http.Response` of a call it made, which becomes the answer. Without a secret the handler answers 503 outside development; `cronwatch.WithoutSecret()` lets anyone in. `cronwatch.Lambda(handler)` is any handler (a job's, or the dashboard) as an AWS Lambda function behind API Gateway or a function URL, for `lambda.Start`, with no AWS module in this one.
+
 ## Checks
 
 Missed and stuck runs are found by a check. A long-running service calls `cw.Start(time.Minute)`; a program run from a crontab checks from a second crontab line, or calls `cw.Check(ctx)` itself.
@@ -112,11 +136,11 @@ h.Finish(ctx) // or h.Fail(ctx, err); a run is judged once, however many process
 ## Testing
 
 ```bash
-cd packages/go && go test -race ./...           # the core, the channels, triage and pg_cron (against fakes), standard library only
+cd packages/go && go test -race ./...           # the core, the dashboard, the channels, triage and pg_cron (against fakes), standard library only
 cd packages/go/sqltest && go test -race ./...   # the SQL store with real drivers
 ```
 
-Run `npm ci && npm run build` at the repository root first: the croner parity test (`internal/schedule`) and the SQLite file shared with Node (`sqltest`) use the built SDK, and skip, with the reason, without it. The tests set the process zone to UTC, as the conformance fixtures are made in UTC.
+Run `npm ci && npm run build` at the repository root first: the croner parity test (`internal/schedule`) and the SQLite file shared with Node (`sqltest`) use the built SDK, and skip, with the reason, without it. The dashboard is checked against `packages/ruby/test/web/golden.json`, the SDK's answers to a fixed seed, and `CRONWATCH_TEST_GO=1 npm test --workspace packages/mcp` drives the MCP server against it. The tests set the process zone to UTC, as the conformance fixtures are made in UTC.
 
 `sqltest` is a module of its own so that the drivers it uses (`modernc.org/sqlite`, `github.com/jackc/pgx/v5`, `github.com/lib/pq`, `github.com/go-sql-driver/mysql`) never appear in the `cronwatch.dev/go` module. SQLite always runs; Postgres, MySQL and MariaDB run when these are set, and the pg_cron source against a real pg_cron (through pgx and lib/pq) when `CRONWATCH_TEST_PGCRON` names a Postgres with the extension preloaded:
 

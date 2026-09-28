@@ -2,8 +2,11 @@ package cronwatch_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"time"
 
 	cronwatch "cronwatch.dev/go"
@@ -49,4 +52,47 @@ func ExampleClient_Job() {
 	fmt.Println(string(out))
 	// Output:
 	// {"schedule":"every 5m","timeout":90000,"budget":{"tokens":5000},"name":"sync","expect":"contains \"synced\""}
+}
+
+// The dashboard and its JSON API, mounted under a prefix: the base path
+// its links use is found from the mount.
+func ExampleClient_Routes() {
+	cw := cronwatch.MustNew(cronwatch.WithoutCronSecret())
+	routes, err := cw.Routes(cronwatch.WithToken("a-long-random-token"))
+	if err != nil {
+		panic(err)
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/ops/cron/", http.StripPrefix("/ops/cron", routes))
+
+	req := httptest.NewRequest("GET", "/ops/cron/api/jobs", nil)
+	req.Header.Set("Authorization", "Bearer a-long-random-token")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	fmt.Println(rec.Code, rec.Body.String())
+	// Output:
+	// 200 {"ok":true,"jobs":[]}
+}
+
+// A job run by a platform cron that calls a URL with the cron secret.
+func ExampleJob_Handler() {
+	cw := cronwatch.MustNew(cronwatch.WithCronSecret("the-cron-secret"))
+	nightly := cw.MustJob("nightly-report")
+	handler := nightly.Handler(func(ctx context.Context, job *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) error {
+		job.Log("Report written")
+		return nil
+	})
+
+	req := httptest.NewRequest("POST", "/api/cron/nightly", nil)
+	req.Header.Set("Authorization", "Bearer the-cron-secret")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	var answer struct {
+		OK     bool   `json:"ok"`
+		Status string `json:"status"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &answer)
+	fmt.Println(rec.Code, answer.OK, answer.Status)
+	// Output:
+	// 200 true ok
 }

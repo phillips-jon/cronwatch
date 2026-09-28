@@ -723,3 +723,9 @@ jobs:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
           CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
           CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
+      # @cronwatch/mcp's tools against the Go dashboard, served by
+      # packages/go/internal/webserver through `go run` on this entry's Go.
+      - name: MCP server against the Go dashboard
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_GO: "1"
