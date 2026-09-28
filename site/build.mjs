@@ -111,7 +111,7 @@ const assets = { css: "", js: "", theme: "", search: "", index: "" };
    dark paper when the sheet is turned over. */
 const THEME_COLOR = "#f4f4f5";
 
-function layout({ title, description, body, path: pagePath, kind = "page", index = true }) {
+function layout({ title, description, body, path: pagePath, kind = "page", index = true, head = "" }) {
   const canonical = `${SITE}${pagePath}`;
   const fullTitle = pagePath === "/" ? "CronWatch | Cron fails silently. This doesn’t." : `${title} | CronWatch`;
   const here = (href) => (href === pagePath || (href === "/docs/" && pagePath.startsWith("/docs/")) ? "here" : "");
@@ -127,7 +127,7 @@ function layout({ title, description, body, path: pagePath, kind = "page", index
 <title>${escape(fullTitle)}</title>
 <meta name="description" content="${escape(description)}">
 ${index ? `<link rel="canonical" href="${canonical}">` : `<meta name="robots" content="noindex">`}
-<meta property="og:title" content="${escape(fullTitle)}">
+${head ? `${head}\n` : ""}<meta property="og:title" content="${escape(fullTitle)}">
 <meta property="og:description" content="${escape(description)}">
 ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta property="og:type" content="website">
 <meta name="theme-color" content="${THEME_COLOR}">
@@ -151,7 +151,7 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 ${body}
   </main>
   <footer>
-    <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><a href="https://pypi.org/project/cronwatch-sdk/">PyPI</a><a href="https://packagist.org/packages/cronwatch/cronwatch">Packagist</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
+    <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><a href="https://pypi.org/project/cronwatch-sdk/">PyPI</a><a href="https://packagist.org/packages/cronwatch/cronwatch">Packagist</a><a href="https://pkg.go.dev/cronwatch.dev/go">pkg.go.dev</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
     <nav class="legal" aria-label="Site policies"><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/contact/">Contact</a></nav>
     <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>.</p>
   </footer>
@@ -528,6 +528,86 @@ ${CONTACT_FORM}`),
   return { indexed, count: indexed.length + 2 };
 }
 
+/* ---- The Go module's import paths. ---- */
+
+/**
+ * The Go port's import path is cronwatch.dev/go (packages/go/DESIGN.md), so
+ * the go command, and the module proxy for it, asks this site where the code
+ * is: for `go get cronwatch.dev/go/river` it fetches /go/river?go-get=1 and
+ * reads the go-import tag there. Every module and every package a user
+ * imports has a page, each carrying its module's tag and a line or two for a
+ * person who follows the path in a browser. nginx serves them as directories
+ * whatever the query (deploy/nginx.conf).
+ *
+ * A tag's last field is Go 1.25's subdirectory. The go command puts the part
+ * of a module path past the tag's prefix in front of that subdirectory
+ * (modfetch.newCodeRepo), so a nested module under the core's tag would be
+ * looked for in river/packages/go. Each nested module's pages therefore
+ * name the module's own path and directory, and its tags are
+ * packages/go/<name>/vX.Y.Z, the go command's rule for a module below a
+ * repository's root.
+ */
+const GO_SRC = `${GITHUB}/tree/main`;
+const GO_MODULES = [
+  {
+    path: "cronwatch.dev/go", dir: "packages/go", docs: "/docs/go/",
+    what: "The Go port of CronWatch, package <code>cronwatch</code>: jobs, runs and checks, the memory store, the dashboard and job handlers as <code>http.Handler</code>s, with no requirements of its own.",
+    packages: [
+      { name: "sqlstore", docs: "/docs/go/#stores", what: "The <code>database/sql</code> store: SQLite, Postgres and MySQL over the app's own <code>*sql.DB</code> and driver." },
+      { name: "alerts", docs: "/docs/go/#alerts", what: "The alert channels: Slack, Discord, a signed webhook, email, SMS and error trackers, on <code>net/http</code> alone." },
+      { name: "triage", docs: "/docs/go/#triage", what: "Claude triage of each alert, over plain HTTP." },
+      { name: "pgcron", docs: "/docs/go/#pg-cron", what: "The pg_cron source: pg_cron's jobs and runs read through the app's <code>*sql.DB</code>." },
+      { name: "storetest", docs: "/docs/go/#stores", what: "The store contract test, for a store of your own." },
+      { name: "bridge", docs: "/docs/go-schedulers/", what: "What the scheduler integrations share. Most apps never import it." },
+    ],
+  },
+  { path: "cronwatch.dev/go/robfigcron", dir: "packages/go/robfigcron", docs: "/docs/go-schedulers/#robfig-cron", what: "Watches a robfig/cron v3 scheduler: one option to <code>cron.New</code>." },
+  { path: "cronwatch.dev/go/gocron", dir: "packages/go/gocron", docs: "/docs/go-schedulers/#gocron", what: "Watches a go-co-op/gocron v2 scheduler: one option to <code>gocron.NewScheduler</code>." },
+  { path: "cronwatch.dev/go/river", dir: "packages/go/river", docs: "/docs/go-schedulers/#river", what: "Watches River's periodic jobs and workers: a periodic job constructor and a worker middleware." },
+  { path: "cronwatch.dev/go/asynq", dir: "packages/go/asynq", docs: "/docs/go-schedulers/#asynq", what: "Watches Asynq's scheduler and server: a scheduler that declares its entries and a server middleware." },
+];
+
+/** A description as the second half of a list item: "sqlstore: the database/sql store". */
+const lowerFirst = (t) => (/^Claude\b/.test(t) ? t : t[0].toLowerCase() + t.slice(1));
+
+/** The go-import and go-source tags for a module. */
+function goMeta(mod) {
+  const src = `${GO_SRC}/${mod.dir}`;
+  return `<meta name="go-import" content="${mod.path} git ${GITHUB} ${mod.dir}">
+<meta name="go-source" content="${mod.path} ${src} ${src}{/dir} ${GITHUB}/blob/main/${mod.dir}{/dir}/{file}#L{line}">`;
+}
+
+/** One page per module and per package in it, under /go/. */
+function buildGoPages() {
+  let count = 0;
+  const write = (mod, importPath, heading, intro, extra = "") => {
+    const route = `/${importPath.replace(/^cronwatch\.dev\//, "")}/`;
+    const dir = path.join(DIST, route);
+    mkdirSync(dir, { recursive: true });
+    const parent = importPath === mod.path ? "" : `<p>A package of the module <a href="/${mod.path.replace(/^cronwatch\.dev\//, "")}/"><code>${mod.path}</code></a>, released with it.</p>`;
+    // A break after each slash, so a long path wraps on a phone.
+    const inner = `<h1><code translate="no">${importPath.replace(/\//g, "/<wbr>")}</code></h1>
+<p>${intro}</p>${parent}
+<div class="code"><pre><code translate="no">go get ${importPath}</code></pre></div>
+<p><a href="${heading.docs}">Read the docs</a>, the <a href="https://pkg.go.dev/${importPath}">reference on pkg.go.dev</a>, or <a href="${GO_SRC}/${mod.dir}${importPath === mod.path ? "" : `/${importPath.slice(mod.path.length + 1)}`}">the source</a>.</p>${extra}`;
+    writeFileSync(path.join(dir, "index.html"), layout({
+      title: importPath, description: `The Go import path ${importPath}, for go get.`,
+      path: route, kind: "page", index: false, head: goMeta(mod),
+      body: solo("Go", inner),
+    }));
+    count++;
+  };
+  for (const mod of GO_MODULES) {
+    const list = mod.packages
+      ? `<h2>Packages</h2><ul>${mod.packages.map((p) => `<li><a href="/go/${p.name}/"><code>${mod.path}/${p.name}</code></a>: ${lowerFirst(p.what)}</li>`).join("")}</ul>
+<h2>Scheduler integrations</h2><p>Modules of their own, so an app pulls only the scheduler it uses.</p><ul>${GO_MODULES.filter((m) => !m.packages).map((m) => `<li><a href="/${m.path.replace(/^cronwatch\.dev\//, "")}/"><code>${m.path}</code></a>: ${lowerFirst(m.what)}</li>`).join("")}</ul>`
+      : "";
+    write(mod, mod.path, mod, mod.what, list);
+    for (const p of mod.packages ?? []) write(mod, `${mod.path}/${p.name}`, p, p.what);
+  }
+  return count;
+}
+
 /* ---- Docs search. ---- */
 
 /**
@@ -611,7 +691,7 @@ function build() {
   for (const [key, value] of Object.entries(demoContent())) landing = landing.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), () => value);
   writeFileSync(path.join(DIST, "index.html"), layout({
     title: "CronWatch",
-    description: "Open source cron and scheduled-job monitoring that lives inside your app: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby on Rails, cronwatch-sdk for Python (Django, Celery, APScheduler), or cronwatch/cronwatch for PHP (Laravel, Symfony, WordPress, Drupal, Craft). Every run recorded in your own database; alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. MCP server included. No server to run.",
+    description: "Open source cron and scheduled-job monitoring that lives inside your app: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby on Rails, cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch for PHP (Laravel, Symfony, WordPress, Drupal, Craft), or cronwatch.dev/go for Go (robfig/cron, gocron, River, Asynq). Every run recorded in your own database; alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. MCP server included. No server to run.",
     body: landing,
     path: "/",
     kind: "landing",
@@ -661,16 +741,17 @@ ${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${headi
   }));
 
   const extra = buildPages();
+  const goPages = buildGoPages();
 
   const prompt = readFileSync(path.join(SRC, "prompt.txt"), "utf8");
   writeFileSync(path.join(DIST, "prompt.txt"), prompt);
-  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails, cronwatch-sdk for Python (Django, Celery, APScheduler), and cronwatch/cronwatch for PHP (Laravel, Symfony, WordPress, Drupal, Craft). Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nPlatforms: Vercel cron, Next.js, SvelteKit, Nuxt, React Router, NestJS, Strapi, Netlify, Firebase, Convex, Trigger.dev, Inngest, Cloudflare Workers with D1, pg_cron and Supabase Cron, node-cron, BullMQ, GitHub Actions, Rails with ActiveJob, Solid Queue or Sidekiq, Django, Celery and beat, APScheduler, AWS Lambda, Laravel's scheduler and queues, the Symfony Scheduler and Messenger, WordPress's WP-Cron, Drupal cron and queues, Craft console commands and queue jobs.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nPython docs: ${SITE}/docs/python/, ${SITE}/docs/django/, ${SITE}/docs/celery/\nPHP docs: ${SITE}/docs/php/, ${SITE}/docs/laravel/, ${SITE}/docs/symfony/, ${SITE}/docs/wordpress/, ${SITE}/docs/drupal/, ${SITE}/docs/craft/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nPyPI: pip install cronwatch-sdk\nPackagist: composer require cronwatch/cronwatch\nWordPress: https://wordpress.org/plugins/cronwatch/\nMCP server: npx -y @cronwatch/mcp\n`);
+  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails, cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch for PHP (Laravel, Symfony, WordPress, Drupal, Craft), and cronwatch.dev/go for Go (robfig/cron, gocron, River, Asynq). Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nPlatforms: Vercel cron, Next.js, SvelteKit, Nuxt, React Router, NestJS, Strapi, Netlify, Firebase, Convex, Trigger.dev, Inngest, Cloudflare Workers with D1, pg_cron and Supabase Cron, node-cron, BullMQ, GitHub Actions, Rails with ActiveJob, Solid Queue or Sidekiq, Django, Celery and beat, APScheduler, AWS Lambda, Laravel's scheduler and queues, the Symfony Scheduler and Messenger, WordPress's WP-Cron, Drupal cron and queues, Craft console commands and queue jobs, Go's robfig/cron, gocron, River and Asynq.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nPython docs: ${SITE}/docs/python/, ${SITE}/docs/django/, ${SITE}/docs/celery/\nPHP docs: ${SITE}/docs/php/, ${SITE}/docs/laravel/, ${SITE}/docs/symfony/, ${SITE}/docs/wordpress/, ${SITE}/docs/drupal/, ${SITE}/docs/craft/\nGo docs: ${SITE}/docs/go/, ${SITE}/docs/go-schedulers/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nPyPI: pip install cronwatch-sdk\nPackagist: composer require cronwatch/cronwatch\nGo: go get cronwatch.dev/go\nWordPress: https://wordpress.org/plugins/cronwatch/\nMCP server: npx -y @cronwatch/mcp\n`);
 
   const urls = ["/", ...pages.map((p) => p.route), ...extra.indexed];
   writeFileSync(path.join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${SITE}${u}</loc></url>`).join("\n")}\n</urlset>\n`);
   writeFileSync(path.join(DIST, "robots.txt"), `User-agent: *\nAllow: /\nSitemap: ${SITE}/sitemap.xml\n`);
 
-  console.log(`built ${pages.length + 2 + extra.count} pages -> ${path.relative(process.cwd(), DIST) || "."}`);
+  console.log(`built ${pages.length + 2 + extra.count + goPages} pages -> ${path.relative(process.cwd(), DIST) || "."}`);
 }
 
 build();

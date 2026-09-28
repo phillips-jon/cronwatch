@@ -69,7 +69,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 code, pre, kbd, .mono { font-family: var(--mono); }
 h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.006em; }
 p { margin: 0; }
-pre { margin: 0; font: 400 13.5px/1.62 var(--mono); color: var(--body); overflow-x: auto; }
+pre { margin: 0; font: 400 13.5px/1.62 var(--mono); color: var(--body); overflow-x: auto; tab-size: 4; }
 pre .k { color: var(--ink); font-weight: 500; } pre .s { color: var(--ok); } pre .c { color: var(--muted); } pre .n { color: var(--ink); }
 pre b { font-weight: 600; color: var(--ink); }
 pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { color: var(--ok); }

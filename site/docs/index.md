@@ -8,7 +8,7 @@ order: 1
 
 CronWatch is a library. You install it in the app that runs your scheduled jobs, it records every run in a database you already have, and it alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. There is nothing to sign up for and no server to run.
 
-This page sets up the TypeScript library. For Ruby and Rails there is the `cronwatch` gem, a port with the same rules, alerts and stored rows: see [Ruby on Rails](/docs/rails/) and [Ruby](/docs/ruby/). For Python there is `cronwatch-sdk`, the same again: see [Django](/docs/django/), [Celery](/docs/celery/) and [Python](/docs/python/). For PHP there is `cronwatch/cronwatch`, and a plugin for WordPress: see [PHP](/docs/php/), [WordPress](/docs/wordpress/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/).
+This page sets up the TypeScript library. For Ruby and Rails there is the `cronwatch` gem, a port with the same rules, alerts and stored rows: see [Ruby on Rails](/docs/rails/) and [Ruby](/docs/ruby/). For Python there is `cronwatch-sdk`, the same again: see [Django](/docs/django/), [Celery](/docs/celery/) and [Python](/docs/python/). For PHP there is `cronwatch/cronwatch`, and a plugin for WordPress: see [PHP](/docs/php/), [WordPress](/docs/wordpress/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/). For Go there is `cronwatch.dev/go`, with modules for robfig/cron, gocron, River and Asynq: see [Go](/docs/go/) and [Go schedulers](/docs/go-schedulers/).
 
 ## Install
 
