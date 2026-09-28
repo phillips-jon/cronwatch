@@ -218,6 +218,33 @@ func Run(t *testing.T, newStore func(t *testing.T) cronwatch.Store) {
 	rx, err = store.GetRun(ctx, "rx")
 	must(err)
 	eq("still ok", rx.Status, cronwatch.StatusOK)
+
+	// DeleteRunIf, for a store that has it, takes back only a run still of
+	// the job and in the status given.
+	if deleter, ok := store.(cronwatch.RunDeleter); ok {
+		must(store.InsertRun(ctx, NewRun("rd", "q", cronwatch.StatusRunning, 2600)))
+		deleted, err := deleter.DeleteRunIf(ctx, "rd", "a", cronwatch.StatusRunning)
+		must(err)
+		eq("not another job's", deleted, false)
+		deleted, err = deleter.DeleteRunIf(ctx, "rd", "q", cronwatch.StatusOK)
+		must(err)
+		eq("not in another status", deleted, false)
+		deleted, err = deleter.DeleteRunIf(ctx, "rx", "q", cronwatch.StatusRunning)
+		must(err)
+		eq("not a finished run", deleted, false)
+		deleted, err = deleter.DeleteRunIf(ctx, "rd", "q", cronwatch.StatusRunning)
+		must(err)
+		eq("taken back", deleted, true)
+		gone, err := store.GetRun(ctx, "rd")
+		must(err)
+		eq("gone", gone == nil, true)
+		deleted, err = deleter.DeleteRunIf(ctx, "rd", "q", cronwatch.StatusRunning)
+		must(err)
+		eq("only once", deleted, false)
+		kept, err := store.GetRun(ctx, "rx")
+		must(err)
+		eq("the finished run kept", kept != nil, true)
+	}
 	must(store.DeleteJob(ctx, "q"))
 
 	// Forgetting a job while one of its runs is in flight: the run

@@ -55,7 +55,11 @@ func WithoutSecret() HandlerOption { return func(c *handlerConfig) { c.secret, c
 // {"ok","job","run","status","durationMs"}, 200 when the run was ok and
 // 500 when it failed, with the error's first line as "error" for a caller
 // who sent the secret. A function that wrote its own answer is answered
-// with that, and a status of 400 or more it wrote fails the run.
+// with that, and a status of 400 or more it wrote fails the run. A panic in
+// fn is a failed run like an error (`panic: <value>`), answered 500 as the
+// SDK answers a throw; a panic with http.ErrAbortHandler, or one after fn
+// began its own answer, is recorded the same way and then aborts the
+// response, as net/http does.
 //
 //	mux.Handle("POST /api/cron/nightly", nightly.Handler(func(ctx context.Context, job *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) error {
 //		return buildReport(ctx)
@@ -95,7 +99,7 @@ func HandlerValue[T any](job *Job, fn func(ctx context.Context, job *JobContext,
 				return &http.Response{StatusCode: w.status, Status: strconv.Itoa(w.status) + " " + http.StatusText(w.status)}, err
 			}
 			return v, err
-		}, "handler")
+		}, "handler", nil)
 	}
 	return h
 }
@@ -134,12 +138,17 @@ func (h *jobHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	aw := &answerWriter{ResponseWriter: w}
 	out := h.run(aw, r)
 	if out.panicked {
-		panic(out.panicValue)
-	}
-	if aw.wrote {
+		// The run is recorded as failed. http.ErrAbortHandler is net/http's
+		// own way to abort a response, and one the function had begun to
+		// write cannot become the JSON answer: both abort the response, as
+		// net/http does, without the stack it logs for any other panic.
+		if err, ok := out.panicValue.(error); (ok && errors.Is(err, http.ErrAbortHandler)) || aw.wrote {
+			panic(http.ErrAbortHandler)
+		}
+	} else if aw.wrote {
 		return
 	}
-	if res, ok := out.result.(*http.Response); ok && res != nil {
+	if res, ok := out.result.(*http.Response); ok && res != nil && !out.panicked {
 		copyResponse(w, res)
 		return
 	}

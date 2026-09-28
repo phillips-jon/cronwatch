@@ -6,6 +6,7 @@ package cronwatch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -42,6 +43,7 @@ type runConfig struct {
 	trigger string
 	id      string
 	hasID   bool
+	discard func(error) bool
 }
 
 // WithTrigger names what started the run. The default is "run" for Run
@@ -54,6 +56,20 @@ func WithTrigger(trigger string) RunOption { return func(r *runConfig) { r.trigg
 // nothing and returns a handle on that run instead; an id recorded for
 // another job is an error. Start only.
 func WithRunID(id string) RunOption { return func(r *runConfig) { r.id, r.hasID = id, true } }
+
+// DiscardWhen takes a run back rather than judging it when the function
+// returns an error discard answers true for: an attempt a queue gives back
+// without failing, such as a River job that snoozes itself. The run's row
+// is deleted while it is still running (through the store's RunDeleter),
+// no alert is sent, the job's failures in a row are left as they were, and
+// the error is still returned. A row a check already marked stuck is left
+// as it is, and a store that is not a RunDeleter records the run as it
+// ended; both are reported to the error handler as "discarding <job>". The
+// SDK has no counterpart; the PHP port takes back a released Laravel job's
+// attempt the same way. Run and RunValue only.
+func DiscardWhen(discard func(err error) bool) RunOption {
+	return func(r *runConfig) { r.discard = discard }
+}
 
 func runOptions(options []RunOption, trigger string) runConfig {
 	cfg := runConfig{trigger: trigger}
@@ -93,7 +109,7 @@ func RunValue[T any](ctx context.Context, job *Job, fn func(ctx context.Context,
 		v, err := fn(ctx, jc)
 		result = v
 		return v, err
-	}, cfg.trigger)
+	}, cfg.trigger, cfg.discard)
 	if out.panicked {
 		panic(out.panicValue)
 	}
@@ -156,6 +172,8 @@ type executed struct {
 	err        error
 	panicked   bool
 	panicValue any
+	// discarded is a run taken back (DiscardWhen): nothing was judged.
+	discarded bool
 }
 
 func recorderMetrics(rec *output.Recorder) Metrics {
@@ -165,8 +183,9 @@ func recorderMetrics(rec *output.Recorder) Metrics {
 
 // execute runs fn as a recorded run. The function always runs, whatever the
 // store is doing: store errors go to the error handler, and the result is
-// the function's own outcome.
-func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Context, *JobContext) (any, error), trigger string) executed {
+// the function's own outcome. discard, when not nil, says which returned
+// errors take the run back rather than finish it (DiscardWhen).
+func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Context, *JobContext) (any, error), trigger string, discard func(error) bool) executed {
 	name := def.name
 	sctx := storeCtx(ctx)
 	startedAt := c.now()
@@ -209,6 +228,15 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	}()
 	cancel()
 
+	if discard != nil && !out.panicked && out.err != nil && discard(out.err) {
+		started.Wait()
+		if !recorded || c.discardRun(sctx, run) {
+			out.discarded = true
+			out.run = run
+			return out
+		}
+	}
+
 	finishedAt := c.now()
 	run.FinishedAt = ptr(finishedAt)
 	run.DurationMs = ptr(max(0, finishedAt-startedAt))
@@ -241,6 +269,28 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	}
 	out.run = run
 	return out
+}
+
+// discardRun takes back a run still running (DiscardWhen) and says whether
+// the caller is done with it. A store that is not a RunDeleter, or that
+// fails, is reported and the run is finished as it ended, so it is not left
+// running to be reported stuck; a row no longer running (a check marked it
+// stuck meanwhile) is reported and left as it is.
+func (c *Client) discardRun(ctx context.Context, run Run) bool {
+	deleter, ok := c.store.(RunDeleter)
+	if !ok {
+		c.report(errors.New("the store cannot take back a run (it is not a cronwatch.RunDeleter); recorded as it ended"), "discarding "+run.Job)
+		return false
+	}
+	deleted, err := deleter.DeleteRunIf(ctx, run.ID, run.Job, StatusRunning)
+	if err != nil {
+		c.report(err, "discarding "+run.Job)
+		return false
+	}
+	if !deleted {
+		c.report(fmt.Errorf("run %s of %s is no longer running; left as it is", run.ID, run.Job), "discarding "+run.Job)
+	}
+	return true
 }
 
 // httpFailure is the error an HTTP response of 400 or more fails a run with.

@@ -43,6 +43,17 @@ const VERSIONED = [
   // A Go module's version is its tag (see PUBLISH); the constant is what the
   // library reports about itself, kept in step with the tag.
   { file: "packages/go/version.go", pattern: /^(const Version = ")([^"]+)(")/m },
+  // The scheduler integrations are modules of their own, released with the
+  // core under tags of their own (see PUBLISH); each requires the core, and
+  // those that convert robfig/cron schedules robfigcron, at the same
+  // release. A replace directive points them at the source for development;
+  // an app that requires one ignores it and gets these versions.
+  // (A requirement is on a require line of its own or in a require block.)
+  { file: "packages/go/robfigcron/go.mod", pattern: /^((?:require |\t)cronwatch\.dev\/go v)(\S+)()$/m },
+  ...["gocron", "river", "asynq"].flatMap((name) => [
+    { file: `packages/go/${name}/go.mod`, pattern: /^((?:require |\t)cronwatch\.dev\/go v)(\S+)()$/m },
+    { file: `packages/go/${name}/go.mod`, pattern: /^((?:require |\t)cronwatch\.dev\/go\/robfigcron v)(\S+)()$/m },
+  ]),
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -84,10 +95,14 @@ const PUBLISH = [
   // Go modules publish by tag: a module in a subdirectory is versioned by a
   // tag with that prefix, so the release commit also gets packages/go/vX.Y.Z,
   // and the Go proxy serves it once anyone asks (packages/go/DESIGN.md,
-  // Releasing). packages/go/sqltest holds tests only and is never tagged.
+  // Releasing). The scheduler integrations nested in it are modules of
+  // their own, each tagged with its directory at the same version.
+  // packages/go/sqltest and packages/go/examples hold tests and examples
+  // only and are never tagged.
   { dir: "packages/go", commands: (v) => [
-    `git tag -a packages/go/v${v} -m "Release ${v} (Go)" v${v}^{} && git push origin packages/go/v${v}`,
-    `# packages/go: then GOPROXY=https://proxy.golang.org go list -m cronwatch.dev/go@v${v} makes the proxy fetch it (once cronwatch.dev serves the go-import tag)`,
+    ...["", "robfigcron/", "gocron/", "river/", "asynq/"].map((sub) =>
+      `git tag -a packages/go/${sub}v${v} -m "Release ${v} (Go${sub ? `, ${sub.slice(0, -1)}` : ""})" v${v}^{} && git push origin packages/go/${sub}v${v}`),
+    `# packages/go: then GOPROXY=https://proxy.golang.org go list -m cronwatch.dev/go@v${v} cronwatch.dev/go/robfigcron@v${v} cronwatch.dev/go/gocron@v${v} cronwatch.dev/go/river@v${v} cronwatch.dev/go/asynq@v${v} makes the proxy fetch them (once cronwatch.dev serves the go-import tags)`,
   ] },
 ];
 

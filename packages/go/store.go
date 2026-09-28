@@ -59,3 +59,16 @@ type StateComparer interface {
 	// a refused write reads again.
 	CompareAndSetState(ctx context.Context, state JobState, expected int64) (bool, error)
 }
+
+// RunDeleter is a store that can take back a run it recorded, only while
+// the run is still of one job and in one status. The SDK has no
+// counterpart: it is how an attempt a queue gave back without failing (a
+// River job that snoozed or cancelled itself, an Asynq task revoked)
+// leaves no run behind, neither a failure nor a success (see DiscardWhen),
+// as the PHP port's stores take back a released Laravel job's attempt.
+type RunDeleter interface {
+	// DeleteRunIf deletes the run id only when its stored job is job and its
+	// status is status (SQL: DELETE ... WHERE id = ? AND job = ? AND status
+	// = ?), and says whether it deleted.
+	DeleteRunIf(ctx context.Context, id, job string, status RunStatus) (bool, error)
+}

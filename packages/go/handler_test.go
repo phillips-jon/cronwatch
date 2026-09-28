@@ -137,22 +137,73 @@ func TestHandlerFailsClosedWithoutASecretOutsideDevelopment(t *testing.T) {
 	status(t, "WithoutCronSecret", serve(must[*cronwatch.Job](t)(anyone.cw.Job("any")).Handler(func(context.Context, *cronwatch.JobContext, http.ResponseWriter, *http.Request) error { return nil }), "GET", "http://x/", nil, ""), 200)
 }
 
-func TestHandlerPanicsAreRecordedThenCarryOn(t *testing.T) {
-	k := newKit(t)
+func TestHandlerAPanicIsAFailedRunAnswered500(t *testing.T) {
+	secret := "s3" + "cret"
+	k := newKit(t, cronwatch.WithCronSecret(secret))
 	h := must[*cronwatch.Job](t)(k.cw.Job("p")).Handler(func(context.Context, *cronwatch.JobContext, http.ResponseWriter, *http.Request) error {
 		panic("boom")
 	})
-	func() {
-		defer func() {
-			if recover() == nil {
-				t.Error("the panic did not carry on")
-			}
-		}()
-		serve(h, "GET", "http://x/", nil, "")
-	}()
+	res := serve(h, "GET", "http://x/", hdr{"authorization": "Bearer " + secret}, "")
+	status(t, "answered", res, 500)
+	eq(t, "type", res.Header().Get("Content-Type"), "application/json; charset=utf-8")
 	list := runs(t, k.cw, "p")
 	eq(t, "failed", list[0].Status, cronwatch.StatusFailed)
-	contains(t, "error", *list[0].Error, "panic: boom")
+	contains(t, "error", *list[0].Error, "panic: boom\n    at ")
+	eq(t, "body", res.Body.String(), `{"ok":false,"job":"p","run":"`+list[0].ID+`","status":"failed","durationMs":0,"error":"panic: boom"}`)
+	sameList(t, "alerts", k.alerts.Types(), []string{"failed"})
+
+	// A caller without the secret gets no error text, as for any failure.
+	open := must[*cronwatch.Job](t)(k.cw.Job("q")).Handler(func(context.Context, *cronwatch.JobContext, http.ResponseWriter, *http.Request) error {
+		panic(errors.New("private detail"))
+	}, cronwatch.WithoutSecret())
+	res = serve(open, "GET", "http://x/", nil, "")
+	status(t, "open", res, 500)
+	if _, has := decode(t, res)["error"]; has {
+		t.Error("the panic went to a caller who sent no secret")
+	}
+}
+
+func TestHandlerAbortStillPropagates(t *testing.T) {
+	k := newKit(t)
+	abort := func(fn cronwatch.HandlerFunc) any {
+		var got any
+		func() {
+			defer func() { got = recover() }()
+			serve(must[*cronwatch.Job](t)(k.cw.Job("a")).Handler(fn), "GET", "http://x/", nil, "")
+		}()
+		return got
+	}
+	got := abort(func(context.Context, *cronwatch.JobContext, http.ResponseWriter, *http.Request) error {
+		panic(http.ErrAbortHandler)
+	})
+	eq(t, "ErrAbortHandler carries on", got, any(http.ErrAbortHandler))
+	list := runs(t, k.cw, "a")
+	eq(t, "recorded", list[0].Status, cronwatch.StatusFailed)
+	contains(t, "error", *list[0].Error, "panic: net/http: abort Handler")
+
+	// A panic once the function has begun its own answer cannot become the
+	// JSON answer, so the response is aborted too.
+	k.c.Advance(1000)
+	got = abort(func(ctx context.Context, j *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) error {
+		_, _ = io.WriteString(w, "half")
+		panic("late")
+	})
+	eq(t, "aborted", got, any(http.ErrAbortHandler))
+	list = runs(t, k.cw, "a")
+	eq(t, "runs", len(list), 2)
+	contains(t, "late panic", *list[0].Error, "panic: late")
+
+	// Through a server, a panic is the 500 and the server carries on.
+	mux := http.NewServeMux()
+	mux.Handle("/boom", must[*cronwatch.Job](t)(k.cw.Job("b")).Handler(func(context.Context, *cronwatch.JobContext, http.ResponseWriter, *http.Request) error {
+		panic("boom")
+	}))
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	answer, err := http.Get(server.URL + "/boom")
+	check(t, err)
+	answer.Body.Close()
+	eq(t, "through a server", answer.StatusCode, 500)
 }
 
 func TestHandlerThroughAServer(t *testing.T) {

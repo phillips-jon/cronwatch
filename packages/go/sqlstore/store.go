@@ -81,6 +81,7 @@ var (
 	_ cronwatch.Store         = (*Store)(nil)
 	_ cronwatch.RunUpdater    = (*Store)(nil)
 	_ cronwatch.StateComparer = (*Store)(nil)
+	_ cronwatch.RunDeleter    = (*Store)(nil)
 )
 
 // New is a store over db in the dialect given.
@@ -510,6 +511,14 @@ func (s *Store) UpdateRunIf(ctx context.Context, r cronwatch.Run, from []cronwat
 		matched = matched || stored.Status == st
 	}
 	return matched && canonical(updateRunArgs(*stored)) == canonical(updateRunArgs(r)), nil
+}
+
+// DeleteRunIf deletes a run only while it is of job and in status, in one
+// statement, and says whether it did. A DELETE counts the rows it matched on
+// every dialect, MySQL included.
+func (s *Store) DeleteRunIf(ctx context.Context, id, job string, status cronwatch.RunStatus) (bool, error) {
+	n, err := s.run(ctx, deleteRunIfSQL(s.dialect, s.prefix), id, job, string(status))
+	return n > 0, err
 }
 
 // canonical is statement arguments compared whatever order a JSON column
