@@ -3,8 +3,9 @@
 # project, on the two Node majors better-sqlite3 13 supports. The Ruby gem's
 # tests run on the oldest and newest Ruby it supports, against each
 # supported Rails series. The Python package's tests run on the oldest and
-# newest Python it supports, against each supported Django series. One Node,
-# one Ruby and one Python entry also
+# newest Python it supports, against each supported Django series, and the
+# PHP package's on the oldest and newest PHP, against MySQL and MariaDB. One
+# Node, one Ruby and one Python entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
 # A green run on main is what lets deploy.yml ship the site.
@@ -290,4 +291,74 @@ jobs:
           body = web({"REQUEST_METHOD": "GET", "PATH_INFO": "/api/jobs", "HTTP_AUTHORIZATION": "Bearer smoke"}, lambda status, headers: seen.update(status=status))
           assert seen["status"] == "200 OK" and b"\"name\":\"smoke\"" in b"".join(body), seen
           print("cronwatch", cronwatch.__version__, "from", cronwatch.__file__)
+          '
+
+  # The PHP package's tests replay conformance/, share a SQLite file with the
+  # built SDK and check the croner port against croner, so the SDK is built
+  # (and the fixtures checked) first. The MySQL and MariaDB store tests, and
+  # the finish-once tests with several processes, run against the services.
+  php:
+    name: php (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ["8.2", "8.5"]
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+          MARIADB_DATABASE: cw
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Builds the SDK, then fails if conformance/ is stale.
+      - run: npm run check:conformance
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, pdo_mysql
+          coverage: none
+          tools: composer:v2
+      # No composer.lock is committed (a library's is ignored by the apps that
+      # install it), so each PHP gets the newest dev dependencies it allows.
+      - run: composer install --no-interaction --no-progress
+        working-directory: packages/php
+      - run: vendor/bin/phpunit
+        working-directory: packages/php
+        env:
+          CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
+          CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
+      # Install the package from its directory into an empty project and use
+      # it from there, as an app would.
+      - name: Install and use the package
+        run: |
+          dir="$(mktemp -d)"
+          cd "$dir"
+          composer init --no-interaction --name smoke/smoke --stability dev
+          composer config repositories.cronwatch "{\"type\": \"path\", \"url\": \"$GITHUB_WORKSPACE/packages/php\", \"options\": {\"symlink\": false}}"
+          composer require --no-interaction --no-progress "cronwatch/cronwatch:*"
+          php -r '
+          require "vendor/autoload.php";
+          $cw = new Cronwatch\Cronwatch(store: new Cronwatch\Store\SqliteStore(getcwd() . "/smoke.db"), alerts: [], cronSecret: false);
+          $job = $cw->job("smoke", ["schedule" => "*/5 * * * *", "timezone" => "UTC"]);
+          if ($job->run(function ($j) { $j->log("ok"); return 42; }) !== 42) { fwrite(STDERR, "run returned the wrong value\n"); exit(1); }
+          $run = $cw->runs("smoke")[0];
+          if (!$run->isOk() || $run->output !== "ok") { fwrite(STDERR, "no run recorded\n"); exit(1); }
+          echo "cronwatch ", Cronwatch\Cronwatch::VERSION, " from ", (new ReflectionClass(Cronwatch\Cronwatch::class))->getFileName(), "\n";
           '

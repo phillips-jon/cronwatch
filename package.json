@@ -25,6 +25,7 @@
     "check:conformance": "npm run build --workspace packages/sdk && TZ=UTC node --import tsx scripts/conformance.mjs --check && TZ=UTC node packages/ruby/test/web/golden.mjs --check && node scripts/make-dashboard-icons.mjs --check",
     "check:packages": "node scripts/check-packages.mjs",
     "check:python": "cd packages/python && uv run pytest",
+    "check:php": "cd packages/php && composer install --no-interaction --quiet && vendor/bin/phpunit",
     "release": "node scripts/release.mjs"
   },
   "devDependencies": {
