@@ -1,0 +1,57 @@
+# A release tag -> packages/python built and published to PyPI as
+# cronwatch-sdk, with PyPI's trusted publishing: PyPI trusts this workflow's
+# OIDC token, so no API token is stored anywhere. Can also be started by hand
+# for a tag.
+#
+# Stays off until the repository variable PYPI_ENABLED is "true". Before
+# that, on pypi.org: add a pending trusted publisher for the project
+# cronwatch-sdk with owner phillips-jon, repository cronwatch, workflow
+# pypi.yml and environment pypi; and here, create the environment "pypi"
+# (Settings, Environments), optionally with required reviewers so each
+# upload waits for a click.
+name: PyPI
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to publish (v0.6.0, say)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pypi
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: vars.PYPI_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Build and publish packages/python
+        working-directory: packages/python
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          # The package's version must be the tag's, or PyPI would list a
+          # release whose __version__ says otherwise.
+          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/cronwatch/__init__.py)"
+          if [ "v$version" != "$TAG" ]; then echo "packages/python is $version, the tag is $TAG"; exit 1; fi
+          rm -rf dist
+          uv build
+          uv publish --trusted-publishing always

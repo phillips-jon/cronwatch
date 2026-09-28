@@ -64,7 +64,7 @@ const PUBLISH = [
   { dir: "packages/sdk", commands: () => ["npm publish --workspace packages/sdk --access public"] },
   { dir: "packages/mcp", commands: () => ["npm publish --workspace packages/mcp --access public"] },
   { dir: "packages/ruby", commands: (v, gem) => [`(cd packages/ruby && gem build cronwatch.gemspec && gem push cronwatch-${gem}.gem)`] },
-  { dir: "packages/python", commands: () => ["(cd packages/python && rm -rf dist && uv build && uv publish)"] },
+  { dir: "packages/python", commands: (v) => [`# packages/python: the pushed tag v${v} is published to PyPI by .github/workflows/pypi.yml (trusted publishing, once PYPI_ENABLED is true)`] },
   // Packagist publishes from git tags, and reads composer.json from a
   // repository's root: pushing the tag starts .github/workflows/php-split.yml,
   // which pushes packages/php and the tag to the split repository Packagist
