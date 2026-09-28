@@ -118,7 +118,7 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
-= 0.5.0 =
+= 0.5.1 =
 
 * First release: WP-Cron events recorded as jobs, missed, failed, stuck and slow alerts by email, Slack and webhook, `wp cronwatch check`.
 * The dashboard in wp-admin: health, the last 24 hours, each event's week and runs.
