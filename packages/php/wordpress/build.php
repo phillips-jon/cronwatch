@@ -11,7 +11,8 @@
  * LICENSE as lib/LICENSE), less the library's files the plugin never runs
  * (LEFT_OUT: the curl and stream transport, since every request goes through
  * wp_remote_post; the PDO stores, since the plugin stores through $wpdb; the
- * pg_cron source; the command-line check; the PSR-15 adapters). Nothing else
+ * pg_cron source; the command-line check; the PSR-15 adapters; the Laravel
+ * and Symfony integrations and what only they use). Nothing else
  * goes in: no tests, no Composer files, no build script, no dotfiles. The
  * version is the library's
  * (Cronwatch::VERSION); the plugin header's Version and the readme's Stable
@@ -22,19 +23,36 @@
 
 declare(strict_types=1);
 
-/** The library's files (under src/) the plugin never loads, so its zip leaves them out. */
+/** The library's files (under src/) the plugin never loads, so its zip leaves them out. A path ending in "/" is a directory. */
 const CRONWATCH_LEFT_OUT = [
     'Alerts/NativeHttp.php',
+    'Bridge/',
     'Cli.php',
+    'Laravel/',
     'Sources/PgCron.php',
     'Sources/PgCronPdo.php',
+    'Store/Migrated.php',
     'Store/MysqlStore.php',
     'Store/PdoStore.php',
     'Store/PostgresStore.php',
     'Store/SqliteStore.php',
+    'Symfony/',
+    'Watch.php',
     'Web/PsrHandler.php',
+    'Web/PsrJobHandler.php',
     'Web/PsrMiddleware.php',
 ];
+
+/** Whether a file under src/ is left out. */
+function cronwatch_left_out(string $file): bool
+{
+    foreach (CRONWATCH_LEFT_OUT as $out) {
+        if ($file === $out || (str_ends_with($out, '/') && str_starts_with($file, $out))) {
+            return true;
+        }
+    }
+    return false;
+}
 
 $plugin = __DIR__;
 $library = dirname(__DIR__);
@@ -81,12 +99,12 @@ foreach (cronwatch_build_files("{$plugin}/includes") as $file) {
     $entries["cronwatch/includes/{$file}"] = "{$plugin}/includes/{$file}";
 }
 foreach (cronwatch_build_files("{$library}/src") as $file) {
-    if (!in_array($file, CRONWATCH_LEFT_OUT, true)) {
+    if (!cronwatch_left_out($file)) {
         $entries["cronwatch/lib/src/{$file}"] = "{$library}/src/{$file}";
     }
 }
 foreach (CRONWATCH_LEFT_OUT as $file) {
-    if (!is_file("{$library}/src/{$file}")) {
+    if (str_ends_with($file, '/') ? !is_dir("{$library}/src/{$file}") : !is_file("{$library}/src/{$file}")) {
         fwrite(STDERR, "build: {$file} is left out but is not in src/; update CRONWATCH_LEFT_OUT\n");
         exit(1);
     }

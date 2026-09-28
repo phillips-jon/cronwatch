@@ -1,0 +1,192 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Cronwatch\Laravel;
+
+use Cronwatch\Bridge\JobName;
+use Cronwatch\Cronwatch;
+use Cronwatch\Job\JobHandle;
+use Cronwatch\Watch;
+use Illuminate\Contracts\Container\Container;
+
+/**
+ * Queued jobs that opt in (#[Cronwatch\Watch] on the class, or
+ * ShouldBeWatched), watched through the queue's events, so each attempt
+ * is a run with the trigger "queue", recorded in the worker that ran it:
+ *
+ * - JobProcessing starts the run; Cronwatch::current() is its context
+ *   while the job runs, for log() and metric().
+ * - JobProcessed ends it ok, or failed when the job released itself back
+ *   onto the queue without an exception (a retry, as the gem's Sidekiq and
+ *   the Python package's Celery count one) or marked itself failed.
+ * - JobExceptionOccurred and JobFailed end it failed with the exception,
+ *   whichever comes first; JobTimedOut ends it failed before the worker
+ *   kills itself.
+ *
+ * Every attempt is a run of its own (its id is the queued job's uuid and
+ * a random suffix), so failing attempts open one failed alert, the attempt
+ * that succeeds closes it, and failuresBeforeAlert rides through retries.
+ * A worker killed outright records nothing, and its run is marked stuck
+ * after the job's timeout; one that exits or dies of a fatal error records
+ * the run as interrupted. A queued listener, mailable or notification is
+ * watched by its own class, as the worker names it.
+ *
+ * @internal
+ */
+final class QueueWatcher
+{
+    public const TRIGGER = 'queue';
+    public const TAG = 'laravel-queue';
+
+    /** @var array<int, int> spl_object_id(queue job) => the run's execution key */
+    private array $open = [];
+    /** @var array<string, array{Cronwatch, JobHandle}> */
+    private array $handles = [];
+    /** @var array<string, bool> */
+    private array $watched = [];
+
+    public function __construct(private readonly Container $app)
+    {
+    }
+
+    private function cw(): Cronwatch
+    {
+        return $this->app->make(Cronwatch::class);
+    }
+
+    /** Whether a job class opted in. */
+    public function watches(string $class): bool
+    {
+        if (isset($this->watched[$class])) {
+            return $this->watched[$class];
+        }
+        $watch = class_exists($class) ? Watch::of($class) : null;
+        $watched = $watch !== null ? $watch->enabled : is_subclass_of($class, ShouldBeWatched::class);
+        return $this->watched[$class] = $watched;
+    }
+
+    /**
+     * A watched class's options: the attribute's, then a static cronwatch()
+     * method's, with "name" taken out.
+     *
+     * @return array{string, array<string, mixed>}
+     */
+    public function definition(string $class): array
+    {
+        $options = Watch::of($class)?->options() ?? [];
+        $name = Watch::of($class)?->name;
+        if (method_exists($class, 'cronwatch') && (new \ReflectionMethod($class, 'cronwatch'))->isStatic()) {
+            $more = $class::cronwatch();
+            if (is_array($more)) {
+                $name = is_string($more['name'] ?? null) && $more['name'] !== '' ? $more['name'] : $name;
+                unset($more['name']);
+                $options = array_replace($options, $more);
+            }
+        }
+        $options = ['description' => "Queued job {$class}"] + $options;
+        $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG]));
+        return [$name !== null && $name !== '' ? $name : JobName::ofClass($class), $options];
+    }
+
+    private function handle(string $class): ?JobHandle
+    {
+        $cw = $this->cw();
+        [$client, $handle] = $this->handles[$class] ?? [null, null];
+        if ($client === $cw && $handle !== null) {
+            return $handle;
+        }
+        try {
+            // A job the schedule dispatches (Schedule::job()) is declared with its schedule, as the check declares it.
+            $scheduled = $this->app->make('config')->get('cronwatch.schedule.watch', true)
+                ? $this->app->make(ScheduledTasks::class)->queuedJob($class)
+                : null;
+            [$name, $options] = $scheduled ?? $this->definition($class);
+            $handle = $cw->job($name, $options);
+        } catch (\Throwable $error) {
+            $cw->onError($error, "declaring {$class}");
+            return null;
+        }
+        $this->handles[$class] = [$cw, $handle];
+        return $handle;
+    }
+
+    /** The watched class a queue job runs, or null. */
+    private function classOf(object $job): ?string
+    {
+        $candidates = [];
+        try {
+            $payload = method_exists($job, 'payload') ? $job->payload() : [];
+            if (is_string($payload['data']['commandName'] ?? null)) {
+                $candidates[] = $payload['data']['commandName'];
+            }
+        } catch (\Throwable) {
+        }
+        if (method_exists($job, 'resolveName')) {
+            $candidates[] = (string) $job->resolveName();
+        }
+        foreach ($candidates as $class) {
+            if (class_exists($class) && $this->watches($class)) {
+                return $class;
+            }
+        }
+        return null;
+    }
+
+    public function processing(object $event): void
+    {
+        $job = $event->job;
+        $class = $this->classOf($job);
+        if ($class === null || isset($this->open[spl_object_id($job)])) {
+            return;
+        }
+        $handle = $this->handle($class);
+        if ($handle === null) {
+            return;
+        }
+        $base = method_exists($job, 'uuid') ? $job->uuid() : null;
+        $base = is_string($base) && $base !== '' ? $base : (method_exists($job, 'getJobId') ? $job->getJobId() : null);
+        $id = is_scalar($base) && (string) $base !== '' && strlen((string) $base) <= 150 ? $base . ':' . bin2hex(random_bytes(6)) : null;
+        $this->open[spl_object_id($job)] = $this->cw()->startExecution($handle->definition, self::TRIGGER, $id);
+    }
+
+    public function processed(object $event): void
+    {
+        $job = $event->job;
+        if (!isset($this->open[spl_object_id($job)])) {
+            return;
+        }
+        if (method_exists($job, 'hasFailed') && $job->hasFailed()) {
+            $this->end($job, 'The job was marked as failed');
+        } elseif (method_exists($job, 'isReleased') && $job->isReleased() && !(method_exists($job, 'isDeleted') && $job->isDeleted())) {
+            $this->end($job, 'Released back onto the queue');
+        } else {
+            $this->end($job, null);
+        }
+    }
+
+    /** JobExceptionOccurred and JobFailed: the attempt failed with this exception. */
+    public function failed(object $event): void
+    {
+        $this->end($event->job, $event->exception ?? 'The job failed');
+    }
+
+    public function timedOut(object $event): void
+    {
+        $job = $event->job;
+        $name = method_exists($job, 'resolveName') ? (string) $job->resolveName() : 'The job';
+        $this->end($job, "{$name} has timed out.");
+    }
+
+    /** Ends the attempt's run: ok when `error` is null, else failed with it. */
+    private function end(object $job, mixed $error): void
+    {
+        $id = spl_object_id($job);
+        $key = $this->open[$id] ?? null;
+        if ($key === null) {
+            return;
+        }
+        unset($this->open[$id]);
+        $this->cw()->finishExecution($key, null, $error, $error !== null);
+    }
+}

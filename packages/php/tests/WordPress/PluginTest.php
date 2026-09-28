@@ -132,9 +132,22 @@ final class PluginTest extends TestCase
             $this->assertCount(count(array_unique($names)), $names);
             $this->assertContains('cronwatch/includes/AdminDashboard.php', $names);
             $this->assertContains('cronwatch/lib/src/Web/Dashboard.php', $names);
-            // The library's files the plugin never runs are left out: no curl, no PDO stores, no pg_cron, no PSR adapters.
+            // The library's files the plugin never runs are left out: no curl, no PDO stores, no pg_cron, no PSR adapters,
+            // no Laravel or Symfony.
             $leftOut = ['Alerts/NativeHttp.php', 'Cli.php', 'Sources/PgCron.php', 'Sources/PgCronPdo.php', 'Store/MysqlStore.php', 'Store/PdoStore.php',
-                'Store/PostgresStore.php', 'Store/SqliteStore.php', 'Web/PsrHandler.php', 'Web/PsrMiddleware.php'];
+                'Store/PostgresStore.php', 'Store/SqliteStore.php', 'Web/PsrHandler.php', 'Web/PsrMiddleware.php', 'Web/PsrJobHandler.php',
+                'Store/Migrated.php', 'Watch.php'];
+            $src = dirname(__DIR__, 2) . '/src';
+            foreach (['Bridge', 'Laravel', 'Symfony'] as $dir) {
+                $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator("{$src}/{$dir}", \FilesystemIterator::SKIP_DOTS));
+                foreach ($files as $file) {
+                    $relative = substr($file->getPathname(), strlen($src) + 1);
+                    $this->assertNotContains("cronwatch/lib/src/{$relative}", $names);
+                    if (preg_match('#(^|/)[A-Z][A-Za-z]*\.php$#', $relative) === 1) {
+                        $leftOut[] = $relative;
+                    }
+                }
+            }
             foreach ($leftOut as $file) {
                 $this->assertNotContains("cronwatch/lib/src/{$file}", $names);
             }

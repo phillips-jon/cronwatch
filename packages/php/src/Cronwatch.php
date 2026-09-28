@@ -12,6 +12,7 @@ use Cronwatch\Cron\Zone;
 use Cronwatch\Job\AbortSignal;
 use Cronwatch\Job\JobContext;
 use Cronwatch\Job\JobHandle;
+use Cronwatch\Job\Outcome;
 use Cronwatch\Job\RetryFinish;
 use Cronwatch\Job\RunHandle;
 use Cronwatch\Job\RunRecorder;
@@ -64,8 +65,10 @@ final class Cronwatch
     public readonly array $alerts;
     /** @var list<Source> */
     public readonly array $sources;
-    /** The secret an outside cron may present to the dashboard's check endpoint (routes()) instead of its token, or null. */
+    /** The secret an outside cron may present to the dashboard's check endpoint (routes()) and to a job's handler(), or null. */
     public readonly ?string $cronSecret;
+    /** cronSecret was passed as false: handlers may run without a secret. */
+    public readonly bool $secretOptOut;
     public readonly int|float $retentionMs;
     /** @var array<string, mixed> */
     public readonly array $defaults;
@@ -90,6 +93,7 @@ final class Cronwatch
     private array $inProgress = [];
     private int $nextExecution = 0;
     private bool $shutdownHooked = false;
+    private bool $warnedNoSecret = false;
 
     /** @var list<JobContext> The runs of execute() in progress in this process, innermost last. */
     private static array $current = [];
@@ -101,8 +105,8 @@ final class Cronwatch
      * @param list<AlertChannel|callable>|null $alerts where alerts go; default the console. A callable is a Custom channel named "custom".
      * @param callable(TriageContext): ?string|null $triage adds a short diagnosis to every alert but recoveries
      * @param list<Source> $sources where runs this process does not wrap come from; each is synced at the start of every check
-     * @param string|false|null $cronSecret the secret the dashboard's check endpoint (routes()) also accepts; null reads
-     *        CRON_SECRET, "" counts as unset, and false lets the endpoint run without one
+     * @param string|false|null $cronSecret the secret the dashboard's check endpoint (routes()) also accepts, and a job's
+     *        handler() requires; null reads CRON_SECRET, "" counts as unset, and false lets both run without one
      * @param mixed $retention how long finished runs are kept; default "30d"
      * @param array<string, mixed> $defaults grace, timeout, timezone and failuresBeforeAlert for every job that does not set its own
      * @param callable(string): string|false|null $redact applied to every run's output and error before it is stored, shown or
@@ -147,6 +151,7 @@ final class Cronwatch
         $this->sources = array_values($sources);
         $secret = $cronSecret === null ? Env::read('CRON_SECRET') : $cronSecret;
         $this->cronSecret = is_string($secret) && $secret !== '' ? $secret : null;
+        $this->secretOptOut = $cronSecret === false;
         $this->retentionMs = Duration::parse($retention ?? '30d', 'retention');
         foreach (array_keys($defaults) as $key) {
             if (!in_array($key, self::DEFAULT_OPTIONS, true)) {
@@ -296,6 +301,21 @@ final class Cronwatch
         return $this->finishRun($definition, $run, $this->now());
     }
 
+    /**
+     * Reports, once per client, that a handler() refused a request for want
+     * of a secret.
+     *
+     * @internal Called by Job\Handler.
+     */
+    public function warnNoSecret(): void
+    {
+        if ($this->warnedNoSecret) {
+            return;
+        }
+        $this->warnedNoSecret = true;
+        $this->report(new \RuntimeException('handler() refused a request because no CRON_SECRET is set; pass secret: false to allow unauthenticated requests'), 'handler');
+    }
+
     /** Hands an error to onError, as a source reports what went wrong. */
     public function onError(\Throwable $error, string $where): void
     {
@@ -336,6 +356,13 @@ final class Cronwatch
         $at = $this->now();
         $count = self::clampLimit($limit, 20, 0);
         return array_map(fn (StoredJob $stored) => $this->snapshot($stored, $at, $count), $this->store->listJobs());
+    }
+
+    /** @return list<StoredJob> every job the store knows about, as stored, by name. Reads nothing else. */
+    public function storedJobs(): array
+    {
+        $this->ensureReady();
+        return $this->store->listJobs();
     }
 
     public function jobSummary(string $name): ?JobSummary
@@ -608,9 +635,45 @@ final class Cronwatch
      */
     public function execute(JobDefinition $definition, string $trigger, callable $fn): mixed
     {
+        $outcome = $this->executeOutcome($definition, $trigger, $fn);
+        if ($outcome->threw) {
+            throw $outcome->error;
+        }
+        return $outcome->result;
+    }
+
+    /**
+     * execute() without throwing: the run as recorded and how the function
+     * ended, for a caller that answers with the run (a job's handler()).
+     *
+     * @internal
+     */
+    public function executeOutcome(JobDefinition $definition, string $trigger, callable $fn): Outcome
+    {
+        $key = $this->startExecution($definition, $trigger);
+        $context = self::$current[count(self::$current) - 1];
+        try {
+            $result = $fn($context);
+        } catch (\Throwable $error) {
+            return new Outcome($this->endExecution($key, null, $error, true), null, $error, true);
+        }
+        return new Outcome($this->endExecution($key, $result, null, false), $result, null, false);
+    }
+
+    /**
+     * The first half of execute(), for an integration that sees a run begin
+     * and end in two calls (a scheduler's or a queue's events): the run is
+     * recorded as running, and Cronwatch::current() is its context until
+     * finishExecution() is called with the key returned. A process that ends
+     * in between records the run as interrupted, as execute() does.
+     *
+     * @internal For the framework integrations.
+     */
+    public function startExecution(JobDefinition $definition, string $trigger, ?string $id = null): int
+    {
         $name = (string) $definition->get('name');
         $startedAt = $this->now();
-        $run = new Run(self::uuid(), $name, RunStatus::RUNNING, $startedAt, trigger: $trigger);
+        $run = new Run($id ?? self::uuid(), $name, RunStatus::RUNNING, $startedAt, trigger: $trigger);
         $recorded = false;
         try {
             $this->sync($definition);
@@ -633,18 +696,32 @@ final class Cronwatch
         $this->inProgress[$key] = [$definition, $run, $recorder, $recorded];
         $this->hookShutdown();
         self::$current[] = $recorder->context;
-        try {
-            $result = $fn($recorder->context);
-        } catch (\Throwable $error) {
-            $this->endExecution($key, null, $error, true);
-            throw $error;
+        return $key;
+    }
+
+    /**
+     * The second half: the run finished, judged and recorded, as execute()
+     * records one that returned `result` or, with `threw`, threw `error` (a
+     * Throwable, or a string written as it is). `output` is text the run
+     * wrote elsewhere (a command's output file), added to what it logged.
+     * Returns the run as judged, or null for a key already finished (or
+     * never started).
+     *
+     * @internal For the framework integrations.
+     */
+    public function finishExecution(int $key, mixed $result = null, mixed $error = null, bool $threw = false, ?string $output = null): ?Run
+    {
+        if (!isset($this->inProgress[$key])) {
+            return null;
         }
-        $this->endExecution($key, $result, null, false);
-        return $result;
+        if ($output !== null && $output !== '') {
+            $this->inProgress[$key][2]->log(Js::wellFormed($output));
+        }
+        return $this->endExecution($key, $result, $error, $threw);
     }
 
     /** The end of one execute(): the run finished, judged and recorded. */
-    private function endExecution(int $key, mixed $result, mixed $error, bool $threw): void
+    private function endExecution(int $key, mixed $result, mixed $error, bool $threw): Run
     {
         [$definition, $run, $recorder, $recorded] = $this->inProgress[$key];
         unset($this->inProgress[$key]);
@@ -660,7 +737,7 @@ final class Cronwatch
         $run->metrics = $recorder->metrics();
         $run->output = $recorder->output() ?? (is_string($result) ? Output::capOutput(Js::wellFormed($result)) : null);
         $expectText = $recorder->expectText() ?? (is_string($result) ? Js::wellFormed($result) : null);
-        $this->conclude($definition, $run, $error, $threw, $expectText);
+        $this->conclude($definition, $run, $result, $error, $threw, $expectText);
         try {
             $ignored = $this->recordFinish($definition, $run, $recorded, $finishedAt);
             if ($ignored !== null) {
@@ -669,6 +746,7 @@ final class Cronwatch
         } catch (\Throwable $problem) {
             $this->report($problem, "recording {$name}");
         }
+        return $run;
     }
 
     /**
@@ -708,12 +786,21 @@ final class Cronwatch
         });
     }
 
-    /** Sets a finished run's status and error from how it ended, then redacts its output and error. */
-    private function conclude(JobDefinition $definition, Run $run, mixed $error, bool $threw, ?string $expectText): void
+    /**
+     * Sets a finished run's status and error from how it ended, then redacts
+     * its output and error. An HTTP response of 400 or more that the function
+     * returned fails the run, as a fetch Response does in the SDK (see
+     * Web\ResponseStatus for the kinds it reads).
+     */
+    private function conclude(JobDefinition $definition, Run $run, mixed $result, mixed $error, bool $threw, ?string $expectText): void
     {
+        $http = $threw ? null : Web\ResponseStatus::of($result);
         if ($threw) {
             $run->status = RunStatus::FAILED;
             $run->error = Output::errorMessage($error);
+        } elseif ($http !== null && $http[0] >= 400) {
+            $run->status = RunStatus::FAILED;
+            $run->error = "HTTP {$http[0]}" . ($http[1] !== '' ? " {$http[1]}" : '');
         } else {
             $unmet = Serialize::checkExpectation($definition->get('expect'), $expectText);
             if ($unmet !== null) {
@@ -978,7 +1065,7 @@ final class Cronwatch
         $run->metrics = array_replace($source->metrics, $recorder->metrics());
         $seen = $recorder->expectText() ?? (is_string($result) ? Js::wellFormed($result) : null);
         $expectText = self::joinLines($head, self::joinLines($source->output, $seen));
-        $this->conclude($definition, $run, $error, $failed, $expectText);
+        $this->conclude($definition, $run, $result, $error, $failed, $expectText);
         try {
             $why = $this->recordFinish($definition, $run, $handle->recorded, $finishedAt);
         } catch (\Throwable $problem) {
