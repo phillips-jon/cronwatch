@@ -1,0 +1,8 @@
+email_to: ''
+slack_webhook_url: ''
+webhook_url: ''
+webhook_secret: ''
+grace: 10m
+schedule: ''
+check_on_cron: true
+queues: []

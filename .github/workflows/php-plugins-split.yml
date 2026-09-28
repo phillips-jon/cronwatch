@@ -1,0 +1,110 @@
+# A release tag -> the Drupal module (packages/php/drupal) pushed to its
+# drupal.org repository, and the Craft plugin (packages/php/craft) to its own
+# read-only GitHub repository, each with the tag (see "Distribution" in
+# packages/php/DESIGN.md). drupal.org builds a module's releases from tags in
+# its own GitLab, and the Craft Plugin Store and Packagist read a plugin's
+# composer.json from a repository's root, so neither can be published from
+# this monorepo directly. The split is `git subtree split`, as for the
+# library (php-split.yml), so each push fast-forwards. Can also be started by
+# hand for a tag.
+#
+# Each half stays off until its repository variable is "true". Needs:
+#   DRUPAL_SPLIT_ENABLED     "true" to push the module
+#   DRUPAL_SPLIT_REPOSITORY  the drupal.org repository's SSH URL
+#                            (git@git.drupal.org:project/cronwatch.git)
+#   DRUPAL_SPLIT_SSH_KEY     secret, the private half of an SSH key with push
+#                            access to it
+#   CRAFT_SPLIT_ENABLED      "true" to push the plugin
+#   CRAFT_SPLIT_REPOSITORY   the plugin's GitHub repository as owner/name
+#                            (phillips-jon/cronwatch-craft)
+#   CRAFT_SPLIT_DEPLOY_KEY   secret, the private half of a deploy key with
+#                            write access to it
+name: PHP plugins split
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to push (v0.6.0, say)
+        required: true
+
+# The jobs read the monorepo and push elsewhere with their own keys.
+permissions:
+  contents: read
+
+concurrency:
+  group: php-plugins-split
+  cancel-in-progress: false
+
+jobs:
+  drupal:
+    if: vars.DRUPAL_SPLIT_ENABLED == 'true' && vars.DRUPAL_SPLIT_REPOSITORY != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          persist-credentials: false
+      - name: Split packages/php/drupal and push it with the tag
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          REPOSITORY: ${{ vars.DRUPAL_SPLIT_REPOSITORY }}
+          SSH_KEY: ${{ secrets.DRUPAL_SPLIT_SSH_KEY }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          if [ -z "$SSH_KEY" ]; then echo "DRUPAL_SPLIT_SSH_KEY is not set"; exit 1; fi
+          version="${TAG#v}"
+          # The module requires the library of its own release.
+          required="$(sed -n 's/^        "cronwatch\/cronwatch": "\^\(.*\)"$/\1/p' packages/php/drupal/composer.json)"
+          if [ "$required" != "$version" ]; then echo "packages/php/drupal requires cronwatch/cronwatch ^$required, the tag is $TAG"; exit 1; fi
+          # drupal.org names releases X.Y.Z (no "v") and their branches X.Y.x.
+          branch="$(echo "$version" | cut -d. -f1-2).x"
+          key="$RUNNER_TEMP/split_key"
+          printf '%s\n' "$SSH_KEY" > "$key"
+          chmod 600 "$key"
+          ssh-keyscan -t ed25519,rsa git.drupal.org > "$RUNNER_TEMP/known_hosts" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts"
+          git config user.name "CronWatch release"
+          git config user.email "noreply@cronwatch.dev"
+          split="$(git subtree split --prefix=packages/php/drupal HEAD)"
+          git tag -f -a "$version" -m "Release $version" "$split"
+          git push "$REPOSITORY" "$split:refs/heads/$branch"
+          git push "$REPOSITORY" "refs/tags/$version"
+          rm -f "$key"
+
+  craft:
+    if: vars.CRAFT_SPLIT_ENABLED == 'true' && vars.CRAFT_SPLIT_REPOSITORY != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          persist-credentials: false
+      - name: Split packages/php/craft and push it with the tag
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          REPOSITORY: ${{ vars.CRAFT_SPLIT_REPOSITORY }}
+          DEPLOY_KEY: ${{ secrets.CRAFT_SPLIT_DEPLOY_KEY }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          if [ -z "$DEPLOY_KEY" ]; then echo "CRAFT_SPLIT_DEPLOY_KEY is not set"; exit 1; fi
+          required="$(sed -n 's/^        "cronwatch\/cronwatch": "\^\(.*\)"$/\1/p' packages/php/craft/composer.json)"
+          if [ "v$required" != "$TAG" ]; then echo "packages/php/craft requires cronwatch/cronwatch ^$required, the tag is $TAG"; exit 1; fi
+          key="$RUNNER_TEMP/split_key"
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          ssh-keyscan -t ed25519,rsa github.com > "$RUNNER_TEMP/known_hosts" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts"
+          git config user.name "CronWatch release"
+          git config user.email "noreply@cronwatch.dev"
+          split="$(git subtree split --prefix=packages/php/craft HEAD)"
+          git tag -f -a "$TAG" -m "Release ${TAG#v}" "$split"
+          git push "git@github.com:$REPOSITORY.git" "$split:refs/heads/main"
+          git push "git@github.com:$REPOSITORY.git" "refs/tags/$TAG"
+          rm -f "$key"

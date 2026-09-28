@@ -1,0 +1,54 @@
+{% import '_includes/forms.twig' as forms %}
+
+<p>{{ 'Nothing leaves the site until a channel is set; with none, alerts go to Craft’s log. Each field takes an environment variable ($SLACK_WEBHOOK_URL), so a credential need not be in project config.'|t('cronwatch') }}</p>
+
+{{ forms.autosuggestField({
+  label: 'Email alerts to'|t('cronwatch'),
+  instructions: 'One or more addresses, separated by commas. Sent through Craft’s mailer.'|t('cronwatch'),
+  name: 'emailTo',
+  value: settings.emailTo,
+  suggestEnvVars: true,
+  errors: settings.getErrors('emailTo'),
+  disabled: 'emailTo' in overrides,
+}) }}
+
+{{ forms.autosuggestField({
+  label: 'Slack incoming webhook URL'|t('cronwatch'),
+  name: 'slackWebhookUrl',
+  value: settings.slackWebhookUrl,
+  suggestEnvVars: true,
+  errors: settings.getErrors('slackWebhookUrl'),
+  disabled: 'slackWebhookUrl' in overrides,
+}) }}
+
+{{ forms.autosuggestField({
+  label: 'Webhook URL'|t('cronwatch'),
+  instructions: 'Each alert is POSTed here as JSON.'|t('cronwatch'),
+  name: 'webhookUrl',
+  value: settings.webhookUrl,
+  suggestEnvVars: true,
+  errors: settings.getErrors('webhookUrl'),
+  disabled: 'webhookUrl' in overrides,
+}) }}
+
+{{ forms.autosuggestField({
+  label: 'Webhook signing secret'|t('cronwatch'),
+  instructions: 'When set, each request is signed with HMAC-SHA256 in the X-CronWatch-Signature header.'|t('cronwatch'),
+  name: 'webhookSecret',
+  value: settings.webhookSecret,
+  suggestEnvVars: true,
+  errors: settings.getErrors('webhookSecret'),
+  disabled: 'webhookSecret' in overrides,
+}) }}
+
+{{ forms.textField({
+  label: 'Grace'|t('cronwatch'),
+  instructions: 'How late a run may be before it is reported missed, such as 10m or 1h.'|t('cronwatch'),
+  name: 'grace',
+  value: settings.grace,
+  errors: settings.getErrors('grace'),
+  required: true,
+  disabled: 'grace' in overrides,
+}) }}
+
+<p>{{ 'The console commands and queue jobs to watch, with their schedules, are set in config/cronwatch.php (see the plugin’s README). Run `php craft cronwatch/check` from the server’s crontab every five minutes.'|t('cronwatch') }}</p>

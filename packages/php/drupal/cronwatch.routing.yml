@@ -1,0 +1,42 @@
+cronwatch.settings:
+  path: '/admin/config/system/cronwatch'
+  defaults:
+    _form: '\Drupal\cronwatch\Form\SettingsForm'
+    _title: 'CronWatch'
+  requirements:
+    _permission: 'administer cronwatch'
+
+# The admin page: the dashboard in a frame, under Reports.
+cronwatch.dashboard:
+  path: '/admin/reports/cronwatch'
+  defaults:
+    _controller: '\Drupal\cronwatch\Controller\DashboardController::page'
+    _title: 'CronWatch'
+  requirements:
+    _permission: 'view cronwatch dashboard'
+
+# The dashboard's own pages, its path in ?cw= (see DashboardController).
+cronwatch.dashboard_view:
+  path: '/admin/reports/cronwatch/view'
+  defaults:
+    _controller: '\Drupal\cronwatch\Controller\DashboardController::view'
+  requirements:
+    _permission: 'view cronwatch dashboard'
+  options:
+    _admin_route: TRUE
+    no_cache: 'TRUE'
+
+# The JSON API for @cronwatch/mcp, with the dashboard's token: 404 until a
+# token is set ($settings['cronwatch_token'] or CRONWATCH_TOKEN).
+cronwatch.api:
+  path: '/cronwatch/api/{a}/{b}/{c}/{d}'
+  defaults:
+    _controller: '\Drupal\cronwatch\Controller\DashboardController::api'
+    a: ''
+    b: ''
+    c: ''
+    d: ''
+  requirements:
+    _access: 'TRUE'
+  options:
+    no_cache: 'TRUE'

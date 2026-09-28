@@ -1,0 +1,8 @@
+administer cronwatch:
+  title: 'Administer CronWatch'
+  description: 'Choose where alerts go and which queues are watched, and silence, forget or check jobs from the dashboard.'
+  restrict access: true
+view cronwatch dashboard:
+  title: 'View the CronWatch dashboard'
+  description: 'See the watched jobs, their runs and their output, which holds what each job logged.'
+  restrict access: true

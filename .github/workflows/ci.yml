@@ -5,8 +5,8 @@
 # supported Rails series. The Python package's tests run on the oldest and
 # newest Python it supports, against each supported Django series, and the
 # PHP package's on the oldest and newest PHP, against MySQL, MariaDB,
-# Postgres and WordPress, and against each supported Laravel and Symfony
-# series. The MCP server is driven against each port's
+# Postgres and WordPress, against each supported Laravel and Symfony
+# series, and in a real Drupal and a real Craft. The MCP server is driven against each port's
 # dashboard. One Node, one Ruby and one Python entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
@@ -515,3 +515,111 @@ jobs:
           CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
           CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+
+  # The Drupal module in a real Drupal: tests/Drupal/DrupalTest.php makes a
+  # Drupal project with Composer (drupal/core-recommended, Drush, and the
+  # library and the module from this checkout as path repositories),
+  # installs a site with Drush, and drives it with Drush (cron, queue:run,
+  # cronwatch:check, uninstalling) and PHP's built-in server (/cron/<key>,
+  # Automated Cron, the dashboard and settings behind the permissions, the
+  # JSON API). Drupal 10.6 on PHP 8.2, the module's floor; 11 on 8.3, its
+  # floor, and on 8.5; one entry per database driver the store reads.
+  php-drupal:
+    name: php (PHP ${{ matrix.php }}, Drupal ${{ matrix.drupal }}, ${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { php: "8.2", drupal: "10.6", constraint: "~10.6.0", db: mysql, url: "mysql://root:pw@127.0.0.1:3306/cw" }
+          - { php: "8.3", drupal: "11", constraint: "^11.4", db: sqlite, url: "sqlite" }
+          - { php: "8.5", drupal: "11", constraint: "^11.4", db: postgres, url: "postgres://postgres:pw@127.0.0.1:5432/cw" }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, pdo_mysql, pdo_pgsql, gd, curl, mbstring, xml, zip
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --no-progress
+        working-directory: packages/php
+      - run: vendor/bin/phpunit tests/Drupal
+        working-directory: packages/php
+        env:
+          CRONWATCH_TEST_DRUPAL: ${{ matrix.constraint }}
+          CRONWATCH_TEST_DRUPAL_DB: ${{ matrix.url }}
+
+  # The Craft plugin in a real Craft: tests/Craft/CraftTest.php makes a Craft
+  # project with Composer (craftcms/cms, and the library and the plugin from
+  # this checkout), runs `craft install`, installs the plugin, and drives it
+  # with console commands (the watched commands, queue/run, cronwatch/check,
+  # uninstalling) and PHP's built-in server (the Control Panel's dashboard
+  # behind its sign-in, CSRF and permissions, the JSON API). Craft 5.3, the
+  # plugin's floor, and the newest 5.x, on PHP 8.2 and 8.5, on each database
+  # Craft runs on.
+  php-craft:
+    name: php (PHP ${{ matrix.php }}, Craft ${{ matrix.craft }}, ${{ matrix.db }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { php: "8.2", craft: "5.3", constraint: "~5.3.0", db: mariadb, url: "mysql://root:pw@127.0.0.1:3307/cw" }
+          - { php: "8.2", craft: "5", constraint: "^5.3", db: mysql, url: "mysql://root:pw@127.0.0.1:3306/cw" }
+          - { php: "8.5", craft: "5", constraint: "^5.3", db: postgres, url: "postgres://postgres:pw@127.0.0.1:5432/cw" }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+          MARIADB_DATABASE: cw
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_mysql, pdo_pgsql, bcmath, curl, gd, intl, mbstring, xml, zip
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --no-progress
+        working-directory: packages/php
+      - run: vendor/bin/phpunit tests/Craft
+        working-directory: packages/php
+        env:
+          CRONWATCH_TEST_CRAFT: ${{ matrix.constraint }}
+          CRONWATCH_TEST_CRAFT_DB: ${{ matrix.url }}

@@ -1,0 +1,10 @@
+{% extends '_layouts/cp.twig' %}
+{% set title = 'CronWatch' %}
+
+{% block actionButton %}
+  <a class="btn" href="{{ src }}" target="_blank" rel="noopener">{{ 'Open on its own'|t('cronwatch') }}</a>
+{% endblock %}
+
+{% block content %}
+  <iframe class="cronwatch-dashboard-frame" title="{{ 'CronWatch dashboard'|t('cronwatch') }}" src="{{ src }}" style="display:block;width:100%;height:calc(100vh - 220px);min-height:560px;border:0"></iframe>
+{% endblock %}

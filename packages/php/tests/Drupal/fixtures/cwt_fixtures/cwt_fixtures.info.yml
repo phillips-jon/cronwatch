@@ -1,0 +1,5 @@
+name: CronWatch test fixtures
+type: module
+description: 'hook_cron implementations, queue workers and an alert channel for the CronWatch module tests.'
+package: Testing
+core_version_requirement: ^10.3 || ^11
