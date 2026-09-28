@@ -295,8 +295,10 @@ jobs:
 
   # The PHP package's tests replay conformance/, share a SQLite file with the
   # built SDK and check the croner port against croner, so the SDK is built
-  # (and the fixtures checked) first. The MySQL and MariaDB store tests, and
-  # the finish-once tests with several processes, run against the services.
+  # (and the fixtures checked) first. The MySQL, MariaDB and Postgres store
+  # tests, and the finish-once tests with several processes, run against the
+  # services; the pg_cron tests against a Postgres with the extension, as the
+  # Node, Ruby and Python jobs start it.
   php:
     name: php (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
@@ -304,6 +306,14 @@ jobs:
       matrix:
         php: ["8.2", "8.5"]
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
       mysql:
         image: mysql:8.4
         env:
@@ -332,18 +342,51 @@ jobs:
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
           php-version: ${{ matrix.php }}
-          extensions: pdo_sqlite, pdo_mysql
+          extensions: pdo_sqlite, pdo_mysql, pdo_pgsql, curl, mysqli, zip
           coverage: none
           tools: composer:v2
       # No composer.lock is committed (a library's is ignored by the apps that
       # install it), so each PHP gets the newest dev dependencies it allows.
       - run: composer install --no-interaction --no-progress
         working-directory: packages/php
+      # A second Postgres with pg_cron, for the pg_cron source's tests against
+      # the real extension, as the Node, Ruby and Python jobs start it.
+      - name: Start Postgres with pg_cron
+        if: matrix.php == '8.5'
+        run: |
+          docker run -d --name pgcron -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 5433:5432 postgres:16 \
+            bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-cron > /dev/null && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw'
+          for _ in $(seq 1 90); do
+            if [ "$(docker exec pgcron psql postgres://postgres:pw@127.0.0.1:5432/cw -tAc 'show shared_preload_libraries' 2>/dev/null)" = "pg_cron" ]; then
+              echo "CRONWATCH_TEST_PGCRON=postgres://postgres:pw@127.0.0.1:5433/cw" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs pgcron
+          exit 1
+      # WP-CLI, pinned and checked, for the WordPress plugin's tests: they
+      # install WordPress into a temporary directory (WP-CLI checks the
+      # download's checksum against api.wordpress.org), install the built
+      # plugin zip, and drive it through wp-cli and wp-cron.php. PHP 8.2 runs
+      # them on WordPress 6.1, the plugin's floor; 8.5 on the default, current one.
+      - name: Download WP-CLI
+        run: |
+          curl -sSLo "$RUNNER_TEMP/wp-cli.phar" https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar
+          echo "be928f6b8ca1e8dfb9d2f4b75a13aa4aee0896f8a9a0a1c45cd5d2c98605e6172e6d014dda2e27f88c98befc16c040cbb2bd1bfa121510ea5cdf5f6a30fe8832  $RUNNER_TEMP/wp-cli.phar" | sha512sum -c -
       - run: vendor/bin/phpunit
         working-directory: packages/php
         env:
           CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
           CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+          CRONWATCH_TEST_WORDPRESS: mysql://root:pw@127.0.0.1:3306/cw
+          CRONWATCH_TEST_WPCLI: ${{ runner.temp }}/wp-cli.phar
+          CRONWATCH_TEST_WP_VERSION: ${{ matrix.php == '8.2' && '6.1.14' || '' }}
+      # The plugin directory's zip: the plugin and the library, no dev files.
+      - name: Build the WordPress plugin zip
+        working-directory: packages/php
+        run: php wordpress/build.php "$RUNNER_TEMP/plugin" && unzip -l "$RUNNER_TEMP"/plugin/cronwatch-*.zip | tail -1
       # Install the package from its directory into an empty project and use
       # it from there, as an app would.
       - name: Install and use the package
@@ -353,12 +396,22 @@ jobs:
           composer init --no-interaction --name smoke/smoke --stability dev
           composer config repositories.cronwatch "{\"type\": \"path\", \"url\": \"$GITHUB_WORKSPACE/packages/php\", \"options\": {\"symlink\": false}}"
           composer require --no-interaction --no-progress "cronwatch/cronwatch:*"
+          cat > cronwatch.php <<'PHP'
+          <?php
+          require __DIR__ . "/vendor/autoload.php";
+          $resend = new Cronwatch\Alerts\Resend(apiKey: "re_smoke", from: "alerts@example.com", to: "ops@example.com");
+          $source = new Cronwatch\Sources\PgCron(new class { public function query(string $sql, array $params): array { return []; } });
+          $cw = new Cronwatch\Cronwatch(store: new Cronwatch\Store\SqliteStore(__DIR__ . "/smoke.db"), alerts: [$resend], sources: [$source], cronSecret: false);
+          $cw->job("smoke", ["schedule" => "*/5 * * * *", "timezone" => "UTC"]);
+          return $cw;
+          PHP
           php -r '
-          require "vendor/autoload.php";
-          $cw = new Cronwatch\Cronwatch(store: new Cronwatch\Store\SqliteStore(getcwd() . "/smoke.db"), alerts: [], cronSecret: false);
+          $cw = require "cronwatch.php";
           $job = $cw->job("smoke", ["schedule" => "*/5 * * * *", "timezone" => "UTC"]);
           if ($job->run(function ($j) { $j->log("ok"); return 42; }) !== 42) { fwrite(STDERR, "run returned the wrong value\n"); exit(1); }
           $run = $cw->runs("smoke")[0];
           if (!$run->isOk() || $run->output !== "ok") { fwrite(STDERR, "no run recorded\n"); exit(1); }
           echo "cronwatch ", Cronwatch\Cronwatch::VERSION, " from ", (new ReflectionClass(Cronwatch\Cronwatch::class))->getFileName(), "\n";
           '
+          # The Composer bin finds cronwatch.php in the working directory.
+          test "$(vendor/bin/cronwatch check)" = "cronwatch: checked 1 job, sent 0 alerts"

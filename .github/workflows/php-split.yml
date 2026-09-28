@@ -1,0 +1,67 @@
+# A release tag -> packages/php pushed, with the tag, to its own read-only
+# repository, which Packagist watches (see "Releasing" in
+# packages/php/DESIGN.md). Packagist reads composer.json from a
+# repository's root and versions from its tags, so the package cannot be
+# published from this monorepo directly. The split is `git subtree split`,
+# which gives the same commits for the same history every time, so each push
+# fast-forwards the split repository. Can also be started by hand for a tag.
+#
+# Stays off until the repository variable PHP_SPLIT_ENABLED is "true". Needs:
+#   PHP_SPLIT_REPOSITORY  repository variable, the split repository as owner/name
+#                         (phillips-jon/cronwatch-php, say)
+#   PHP_SPLIT_DEPLOY_KEY  repository secret, the private half of an SSH deploy key
+#                         added to the split repository with write access
+name: PHP split
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to push (v0.6.0, say)
+        required: true
+
+# The job reads the monorepo and pushes elsewhere with its own key.
+permissions:
+  contents: read
+
+concurrency:
+  group: php-split
+  cancel-in-progress: false
+
+jobs:
+  split:
+    if: vars.PHP_SPLIT_ENABLED == 'true' && vars.PHP_SPLIT_REPOSITORY != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          persist-credentials: false
+      - name: Split packages/php and push it with the tag
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          REPOSITORY: ${{ vars.PHP_SPLIT_REPOSITORY }}
+          DEPLOY_KEY: ${{ secrets.PHP_SPLIT_DEPLOY_KEY }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          if [ -z "$DEPLOY_KEY" ]; then echo "PHP_SPLIT_DEPLOY_KEY is not set"; exit 1; fi
+          # The package's version must be the tag's, or Packagist would list a
+          # release whose Cronwatch::VERSION says otherwise.
+          version="$(sed -n "s/^    public const VERSION = '\(.*\)';$/\1/p" packages/php/src/Cronwatch.php)"
+          if [ "v$version" != "$TAG" ]; then echo "packages/php is $version, the tag is $TAG"; exit 1; fi
+          key="$RUNNER_TEMP/split_key"
+          printf '%s\n' "$DEPLOY_KEY" > "$key"
+          chmod 600 "$key"
+          ssh-keyscan -t ed25519,rsa github.com > "$RUNNER_TEMP/known_hosts" 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts"
+          git config user.name "CronWatch release"
+          git config user.email "noreply@cronwatch.dev"
+          split="$(git subtree split --prefix=packages/php HEAD)"
+          git tag -f -a "$TAG" -m "Release ${TAG#v}" "$split"
+          git push "git@github.com:$REPOSITORY.git" "$split:refs/heads/main"
+          git push "git@github.com:$REPOSITORY.git" "refs/tags/$TAG"
+          rm -f "$key"

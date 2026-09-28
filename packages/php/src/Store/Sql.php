@@ -75,6 +75,38 @@ final class Sql
   ";
     }
 
+    /** The SDK's Postgres schema, text for text: JSONB for the JSON columns, BIGINT times, `seq` for ties. */
+    public static function postgresSchema(string $p): string
+    {
+        return "
+    CREATE TABLE IF NOT EXISTS {$p}jobs (
+      name TEXT PRIMARY KEY,
+      definition JSONB NOT NULL,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS {$p}runs (
+      seq BIGSERIAL,
+      id TEXT PRIMARY KEY,
+      job TEXT NOT NULL,
+      status TEXT NOT NULL,
+      started_at BIGINT NOT NULL,
+      finished_at BIGINT,
+      duration_ms BIGINT,
+      error TEXT,
+      output TEXT,
+      metrics JSONB NOT NULL DEFAULT '{}',
+      trigger TEXT NOT NULL DEFAULT 'run'
+    );
+    CREATE INDEX IF NOT EXISTS {$p}runs_job_started ON {$p}runs (job, started_at DESC);
+    CREATE INDEX IF NOT EXISTS {$p}runs_running ON {$p}runs (status) WHERE status = 'running';
+    CREATE TABLE IF NOT EXISTS {$p}state (
+      job TEXT PRIMARY KEY,
+      state JSONB NOT NULL
+    );
+  ";
+    }
+
     /**
      * The same tables for MySQL 8.0.13 and MariaDB 10.6 or newer, one statement
      * each. Names and ids are byte-compared (utf8mb4_bin), as SQLite and
@@ -127,14 +159,22 @@ final class Sql
      */
     public static function statements(string $dialect, string $p): array
     {
-        if ($dialect === 'sqlite') {
-            // Text for text as stores/sql.ts writes them for SQLite.
-            $version = fn (string $column) => "COALESCE(json_extract({$column}, '\$.version'), 0)";
+        if ($dialect === 'sqlite' || $dialect === 'postgres') {
+            // Text for text as stores/sql.ts writes them. For Postgres the ?
+            // placeholders are numbered $1, $2, ... by PDO's native prepare, so
+            // the server sees the SDK's text.
+            $pg = $dialect === 'postgres';
+            $version = $pg
+                ? fn (string $column) => "COALESCE(({$column}->>'version')::bigint, 0)"
+                : fn (string $column) => "COALESCE(json_extract({$column}, '\$.version'), 0)";
+            // Insertion order breaks ties; byte order for names whatever the database's collation.
+            $seq = $pg ? 'seq' : 'rowid';
+            $byName = $pg ? 'name COLLATE "C"' : 'name';
             return [
                 'upsertJob' => "INSERT INTO {$p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
       ON CONFLICT (name) DO UPDATE SET definition = excluded.definition, updated_at = excluded.updated_at",
                 'getJob' => "SELECT * FROM {$p}jobs WHERE name = ?",
-                'listJobs' => "SELECT * FROM {$p}jobs ORDER BY name",
+                'listJobs' => "SELECT * FROM {$p}jobs ORDER BY {$byName}",
                 'deleteRuns' => "DELETE FROM {$p}runs WHERE job = ?",
                 'deleteState' => "DELETE FROM {$p}state WHERE job = ?",
                 'deleteJob' => "DELETE FROM {$p}jobs WHERE name = ?",
@@ -142,8 +182,8 @@ final class Sql
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 'updateRun' => "UPDATE {$p}runs SET status = ?, finished_at = ?, duration_ms = ?, error = ?, output = ?, metrics = ? WHERE id = ?",
                 'getRun' => "SELECT * FROM {$p}runs WHERE id = ?",
-                'listRuns' => "SELECT * FROM {$p}runs WHERE job = ? ORDER BY started_at DESC, rowid DESC LIMIT ?",
-                'runningRuns' => "SELECT * FROM {$p}runs WHERE status = 'running' ORDER BY started_at, rowid",
+                'listRuns' => "SELECT * FROM {$p}runs WHERE job = ? ORDER BY started_at DESC, {$seq} DESC LIMIT ?",
+                'runningRuns' => "SELECT * FROM {$p}runs WHERE status = 'running' ORDER BY started_at, {$seq}",
                 'getState' => "SELECT state FROM {$p}state WHERE job = ?",
                 'setState' => "INSERT INTO {$p}state (job, state) VALUES (?, ?) ON CONFLICT (job) DO UPDATE SET state = excluded.state",
                 // compareAndSetState. Expecting version 0 also matches a missing

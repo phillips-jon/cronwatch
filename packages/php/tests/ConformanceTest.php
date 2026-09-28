@@ -34,9 +34,9 @@ use PHPUnit\Framework\TestCase;
  * rules, titles and messages, health and stats, output and redaction, and
  * the store scripts against every store. Values are compared as the JSON the
  * SDK would write, so key order and number formatting count too. The
- * channel, pg_cron and triage fixtures belong to later phases (see
- * DESIGN.md) and are listed as such, so a new fixture fails until it is
- * replayed or placed.
+ * channel, pg_cron and triage fixtures are replayed by tests of their own
+ * (ChannelConformanceTest, PgCronTest, TriageTest), listed here so a new
+ * fixture fails until something replays it.
  */
 final class ConformanceTest extends TestCase
 {
@@ -428,7 +428,7 @@ final class ConformanceTest extends TestCase
 
     public static function stores(): iterable
     {
-        foreach (['memory', 'sqlite', 'mysql', 'mariadb'] as $kind) {
+        foreach (['memory', 'sqlite', 'mysql', 'mariadb', 'postgres'] as $kind) {
             yield $kind => [$kind];
         }
     }
@@ -533,15 +533,22 @@ final class ConformanceTest extends TestCase
 
     // ------------------------------------------------------------ every fixture
 
-    /** The fixtures of later phases: the alert channels, triage and the pg_cron source (see DESIGN.md, "Phases"). */
-    private const LATER = ['channels.json', 'pgcron.json', 'triage.json'];
+    /** The fixtures replayed by a test of their own. */
+    private const ELSEWHERE = [
+        'channels.json' => ChannelConformanceTest::class,
+        'pgcron.json' => PgCronTest::class,
+        'triage.json' => TriageTest::class,
+    ];
 
-    public function testEveryFixtureIsReplayedOrPlaced(): void
+    public function testEveryFixtureIsReplayed(): void
     {
         $replayed = ['duration.json', 'schedule.json', 'evaluate.json', 'format.json', 'health.json', 'output.json', 'store.json'];
+        foreach (self::ELSEWHERE as $test) {
+            $this->assertTrue(class_exists($test), "{$test} replays a fixture");
+        }
         $all = array_map('basename', glob(self::DIR . '/*.json') ?: []);
         sort($all);
-        $known = [...$replayed, ...self::LATER];
+        $known = [...$replayed, ...array_keys(self::ELSEWHERE)];
         sort($known);
         $this->assertSame($known, $all);
     }

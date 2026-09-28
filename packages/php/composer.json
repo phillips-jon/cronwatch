@@ -23,8 +23,11 @@
     },
     "suggest": {
         "ext-pdo_sqlite": "For Cronwatch\\Store\\SqliteStore",
-        "ext-pdo_mysql": "For Cronwatch\\Store\\MysqlStore (MySQL 8.0.13 or MariaDB 10.6 and newer)"
+        "ext-pdo_mysql": "For Cronwatch\\Store\\MysqlStore (MySQL 8.0.13 or MariaDB 10.6 and newer)",
+        "ext-pdo_pgsql": "For Cronwatch\\Store\\PostgresStore and the pg_cron source (Cronwatch\\Sources\\PgCron)",
+        "ext-curl": "The alert channels and Claude triage use it when loaded, and PHP's own streams otherwise"
     },
+    "bin": ["bin/cronwatch"],
     "autoload": {
         "psr-4": {
             "Cronwatch\\": "src/"

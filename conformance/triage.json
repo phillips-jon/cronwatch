@@ -524,5 +524,73 @@
       },
       "result": null
     }
+  ],
+  "wire": [
+    {
+      "options": {},
+      "context": "a failure with earlier runs",
+      "request": {
+        "url": "https://api.anthropic.com/v1/messages?beta=true",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json",
+          "anthropic-beta": "server-side-fallback-2026-07-01",
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          "x-api-key": "test-key"
+        },
+        "body": {
+          "length": 16040,
+          "sha256": "dcc622e6aee340ba9bca3e8edf95d00f404d7aef42c6117d328f75c1c5be7eb7"
+        }
+      }
+    },
+    {
+      "options": {
+        "context": "A Rails app on Heroku.",
+        "model": "claude-sonnet-5",
+        "effort": "low",
+        "maxTokens": 300,
+        "fallbacks": false
+      },
+      "context": "a failure with earlier runs",
+      "request": {
+        "url": "https://api.anthropic.com/v1/messages?beta=true",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json",
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          "x-api-key": "test-key"
+        },
+        "body": {
+          "length": 16059,
+          "sha256": "04d6bfee8bcd842bfcf4dc976aa600234283ee6dde2e4e5fbb849c89ac0c94bb"
+        }
+      }
+    },
+    {
+      "options": {
+        "context": "",
+        "effort": "high",
+        "fallbacks": true
+      },
+      "context": "a failure with earlier runs",
+      "request": {
+        "url": "https://api.anthropic.com/v1/messages?beta=true",
+        "method": "POST",
+        "headers": {
+          "accept": "application/json",
+          "anthropic-beta": "server-side-fallback-2026-07-01",
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+          "x-api-key": "test-key"
+        },
+        "body": {
+          "length": 16038,
+          "sha256": "7e6220414bc386fdbe824d6723ee20e813007f8323dbb01f960322b7999de745"
+        }
+      }
+    }
   ]
 }

@@ -1,0 +1,26 @@
+#!/usr/bin/env php
+<?php
+
+// `vendor/bin/cronwatch check`: see src/Cli.php.
+
+declare(strict_types=1);
+
+if (PHP_SAPI !== 'cli') {
+    exit(1);
+}
+
+// Composer 2.2 and newer tell a bin script where the app's autoloader is;
+// older ones, and a checkout of this package, are found by path.
+$autoload = $GLOBALS['_composer_autoload_path'] ?? null;
+foreach ([__DIR__ . '/../../../autoload.php', __DIR__ . '/../vendor/autoload.php'] as $candidate) {
+    if ($autoload === null && is_file($candidate)) {
+        $autoload = $candidate;
+    }
+}
+if ($autoload === null) {
+    fwrite(STDERR, "cronwatch: no Composer autoloader found; run composer install\n");
+    exit(1);
+}
+require $autoload;
+
+exit((new Cronwatch\Cli((string) getcwd()))->run(array_slice($argv, 1)));

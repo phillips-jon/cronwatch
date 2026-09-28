@@ -15,6 +15,7 @@ use Cronwatch\Alert;
 use Cronwatch\Cronwatch;
 use Cronwatch\Run;
 use Cronwatch\Store\MysqlStore;
+use Cronwatch\Store\PostgresStore;
 use Cronwatch\Store\SqliteStore;
 use Cronwatch\Tests\Support\Capture;
 use Cronwatch\Tests\Support\FlakyStore;
@@ -23,7 +24,11 @@ require __DIR__ . '/../bootstrap.php';
 
 $config = json_decode($argv[1], true, 512, JSON_THROW_ON_ERROR);
 $spec = $config['store'];
-$store = $spec['kind'] === 'sqlite' ? new SqliteStore($spec['path']) : new MysqlStore($spec['url'], prefix: $spec['prefix']);
+$store = match ($spec['kind']) {
+    'sqlite' => new SqliteStore($spec['path']),
+    'postgres' => new PostgresStore($spec['url'], prefix: $spec['prefix']),
+    default => new MysqlStore($spec['url'], prefix: $spec['prefix']),
+};
 if ($config['slowReads'] ?? false) {
     // State reads that take a while, as over a network: processes reading at
     // about the same time all get the old state before any of them writes.

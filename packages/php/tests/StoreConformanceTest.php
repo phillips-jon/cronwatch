@@ -11,6 +11,7 @@ use Cronwatch\Js;
 use Cronwatch\Run;
 use Cronwatch\Store\ComparesAndSetsState;
 use Cronwatch\Store\MemoryStore;
+use Cronwatch\Store\PostgresStore;
 use Cronwatch\Store\SqliteStore;
 use Cronwatch\Store\Store;
 use Cronwatch\Store\UpdatesRunIf;
@@ -46,6 +47,7 @@ final class StoreConformanceTest extends TestCase
         yield 'sqlite on disk' => ['sqlite'];
         yield 'mysql' => ['mysql'];
         yield 'mariadb' => ['mariadb'];
+        yield 'postgres' => ['postgres'];
     }
 
     /** @return array{Store, \Closure(): void} */
@@ -81,6 +83,28 @@ final class StoreConformanceTest extends TestCase
         return array_map(fn ($item) => $item instanceof Run ? $item->id : $item->name, $items);
     }
 
+    /**
+     * JSON text to compare. Postgres keeps JSON as JSONB, which orders an
+     * object's keys by length and then bytes, so a definition read back has
+     * its keys in that order (the SDK's reads it the same way); key order is
+     * set aside there, and only there.
+     */
+    private static function json(Store $store, string $text): string
+    {
+        if (!$store instanceof PostgresStore) {
+            return $text;
+        }
+        $sort = function (mixed $value) use (&$sort): mixed {
+            if ($value instanceof \stdClass) {
+                $fields = get_object_vars($value);
+                ksort($fields, SORT_STRING);
+                return (object) array_map($sort, $fields);
+            }
+            return is_array($value) ? array_map($sort, $value) : $value;
+        };
+        return Js::stringify($sort(Js::parse($text)));
+    }
+
     private function conformance(Store $store): void
     {
         $this->assertInstanceOf(UpdatesRunIf::class, $store);
@@ -95,7 +119,7 @@ final class StoreConformanceTest extends TestCase
         $a = $store->getJob('a');
         $this->assertSame(100, $a->createdAt, 'createdAt survives upsert');
         $this->assertSame(200, $a->updatedAt);
-        $this->assertSame('{"name":"a","schedule":"every 10m","tags":["x"]}', Js::stringify($a->definition));
+        $this->assertSame(self::json($store, '{"name":"a","schedule":"every 10m","tags":["x"]}'), self::json($store, Js::stringify($a->definition)));
         $this->assertSame(['B', '_c', 'a', 'b'], self::names($store->listJobs()), 'code unit order, not locale');
 
         $store->insertRun(self::makeRun('r1', 'a', 'ok', 1000));
@@ -158,7 +182,7 @@ final class StoreConformanceTest extends TestCase
         $undelivered = new Alert('failed', null, ['consecutiveFailures' => 1], 'a', new JobDefinition(['name' => 'a']), 'a failed', 'boom', 7);
         $full = new JobState('a', ['stuck' => 7], 1, null, 6, ['missed'], [$undelivered]);
         $store->setState($full);
-        $this->assertSame(Js::stringify($full), Js::stringify($store->getState('a')), 'pendingRecovery and undelivered round-trip');
+        $this->assertSame(self::json($store, Js::stringify($full)), self::json($store, Js::stringify($store->getState('a'))), 'pendingRecovery and undelivered round-trip');
         $store->setState(new JobState('a', [], 0, 99, 6));
 
         // compareAndSetState: writes only over the version it was told to expect.

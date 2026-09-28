@@ -24,7 +24,7 @@ final class FinishOnceTest extends TestCase
 
     public static function backends(): iterable
     {
-        foreach (['sqlite', 'mysql', 'mariadb'] as $kind) {
+        foreach (['sqlite', 'mysql', 'mariadb', 'postgres'] as $kind) {
             yield $kind => [$kind];
         }
     }

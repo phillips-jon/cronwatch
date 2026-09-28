@@ -32,6 +32,9 @@ const VERSIONED = [
   { file: "packages/python/pyproject.toml", pattern: /^(version = ")([^"]+)(")/m },
   { file: "packages/python/src/cronwatch/__init__.py", pattern: /^(__version__ = ")([^"]+)(")/m },
   { file: "packages/php/src/Cronwatch.php", pattern: /^( {4}public const VERSION = ')([^']+)(')/m },
+  // The WordPress plugin ships the library's version; wordpress/build.php refuses a zip whose header or readme differ.
+  { file: "packages/php/wordpress/cronwatch.php", pattern: /^( \* Version: +)(\S+)()$/m },
+  { file: "packages/php/wordpress/readme.txt", pattern: /^(Stable tag: )(\S+)()$/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -42,9 +45,10 @@ const PUBLISH = [
   { dir: "packages/ruby", commands: (v, gem) => [`(cd packages/ruby && gem build cronwatch.gemspec && gem push cronwatch-${gem}.gem)`] },
   { dir: "packages/python", commands: () => ["(cd packages/python && rm -rf dist && uv build && uv publish)"] },
   // Packagist publishes from git tags, and reads composer.json from a
-  // repository's root, so there is nothing to run here yet: see "Releasing"
-  // in packages/php/DESIGN.md (a split repository is the plan).
-  { dir: "packages/php", commands: (v) => [`# packages/php: nothing to publish until its Packagist repository exists; the pushed tag v${v} carries it (packages/php/DESIGN.md, Releasing)`] },
+  // repository's root: pushing the tag starts .github/workflows/php-split.yml,
+  // which pushes packages/php and the tag to the split repository Packagist
+  // watches, once PHP_SPLIT_ENABLED is on (packages/php/DESIGN.md, Releasing).
+  { dir: "packages/php", commands: (v) => [`# packages/php: the pushed tag v${v} is split to its own repository by .github/workflows/php-split.yml (packages/php/DESIGN.md, Releasing)`] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */

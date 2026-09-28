@@ -295,7 +295,43 @@ final class Js
         return substr($text, $i);
     }
 
-    /** A string as JSON.stringify writes it. */
+    /**
+     * text.slice(0, units) as JavaScript takes it, in UTF-16 code units, for
+     * text that goes on into JSON. A cut through a surrogate pair keeps the
+     * lone high surrogate, as JavaScript does, in its three byte (WTF-8)
+     * form, which quote() escapes as JSON.stringify does ("\ud83d"), so a
+     * JSON body carries the SDK's bytes. Text going anywhere else is cut with
+     * head16(), whose U+FFFD is what a lone surrogate becomes as UTF-8.
+     */
+    public static function slice16(string $text, int $units): string
+    {
+        $head = self::head16($text, $units);
+        $cutAt = strlen($head) - 3;
+        if ($cutAt < 0 || !str_ends_with($head, "\u{FFFD}") || substr($text, $cutAt, 3) === "\u{FFFD}") {
+            return $head;
+        }
+        // The cut went through the four byte character at $cutAt: keep its high surrogate.
+        $b = array_map('ord', str_split(substr($text, $cutAt, 4)));
+        $code = (($b[0] & 0x07) << 18) | (($b[1] & 0x3F) << 12) | (($b[2] & 0x3F) << 6) | ($b[3] & 0x3F);
+        $high = 0xD800 + (($code - 0x10000) >> 10);
+        return substr($head, 0, $cutAt) . chr(0xE0 | ($high >> 12)) . chr(0x80 | (($high >> 6) & 0x3F)) . chr(0x80 | ($high & 0x3F));
+    }
+
+    /** text.slice(-units), for text that goes on into JSON: a cut pair keeps its lone low surrogate, as slice16() keeps a high one. */
+    public static function sliceEnd16(string $text, int $units): string
+    {
+        $tail = self::tail16($text, $units);
+        $kept = strlen($tail) - 3;
+        if ($kept < 0 || !str_starts_with($tail, "\u{FFFD}") || substr($text, strlen($text) - strlen($tail), 3) === "\u{FFFD}") {
+            return $tail;
+        }
+        $b = array_map('ord', str_split(substr($text, strlen($text) - $kept - 4, 4)));
+        $code = (($b[0] & 0x07) << 18) | (($b[1] & 0x3F) << 12) | (($b[2] & 0x3F) << 6) | ($b[3] & 0x3F);
+        $low = 0xDC00 + (($code - 0x10000) & 0x3FF);
+        return chr(0xE0 | ($low >> 12)) . chr(0x80 | (($low >> 6) & 0x3F)) . chr(0x80 | ($low & 0x3F)) . substr($tail, 3);
+    }
+
+    /** A string as JSON.stringify writes it, a lone surrogate (see slice16()) escaped. */
     public static function quote(string $text): string
     {
         if (self::$escapes === null) {
@@ -305,7 +341,15 @@ final class Js
             }
             self::$escapes = $map;
         }
-        return '"' . strtr($text, self::$escapes) . '"';
+        $quoted = '"' . strtr($text, self::$escapes) . '"';
+        if (str_contains($quoted, "\xED") && preg_match('/\xED[\xA0-\xBF]/', $quoted) === 1) {
+            $quoted = (string) preg_replace_callback(
+                '/\xED[\xA0-\xBF][\x80-\xBF]/',
+                fn (array $m) => sprintf('\\u%04x', 0xD000 | ((ord($m[0][1]) & 0x3F) << 6) | (ord($m[0][2]) & 0x3F)),
+                $quoted,
+            );
+        }
+        return $quoted;
     }
 
     /** A JSON object from a PHP array, even an empty one or one whose keys look like a list. */

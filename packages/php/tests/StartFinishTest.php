@@ -117,7 +117,7 @@ final class StartFinishTest extends TestCase
 
     public static function pairs(): iterable
     {
-        foreach (['memory', 'sqlite', 'mysql', 'mariadb'] as $kind) {
+        foreach (['memory', 'sqlite', 'mysql', 'mariadb', 'postgres'] as $kind) {
             yield $kind => [$kind];
         }
     }
@@ -162,7 +162,8 @@ final class StartFinishTest extends TestCase
             $stored = $first->getRun('evt-1');
             $this->assertSame('ok', $stored->status);
             $this->assertSame("loaded 40 recipients\ntoken=[redacted]\nsent 40 emails", $stored->output);
-            $this->assertSame(['recipients' => 40, 'emails' => 40], $stored->metrics);
+            // Postgres keeps metrics as JSONB, which orders keys by length: the SDK reads them back so too.
+            $this->assertSame($kind === 'postgres' ? ['emails' => 40, 'recipients' => 40] : ['recipients' => 40, 'emails' => 40], $stored->metrics);
             $this->assertSame([], $alerts->types());
             $this->assertSame([], $errors);
         } finally {

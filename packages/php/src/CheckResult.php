@@ -19,6 +19,14 @@ final class CheckResult
     ) {
     }
 
+    /** The line every port's check command prints: "cronwatch: checked 3 jobs, sent 1 alert". */
+    public function summary(): string
+    {
+        $jobs = count($this->jobs);
+        $alerts = count($this->alerts);
+        return "cronwatch: checked {$jobs} job" . ($jobs === 1 ? '' : 's') . ", sent {$alerts} alert" . ($alerts === 1 ? '' : 's');
+    }
+
     public function toJson(): array
     {
         return [

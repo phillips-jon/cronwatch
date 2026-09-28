@@ -1504,7 +1504,32 @@ async function triageCases() {
     const client = { beta: { messages: { create: async () => response } } };
     answers.push({ response, result: await anthropic({ client })({ alert: missedAlert, recentRuns: [], signal: new AbortController().signal }) });
   }
-  return { contexts, requests, responses: answers };
+  return { contexts, requests, responses: answers, wire: await triageWire(contexts, optionSets) };
+}
+
+// The HTTP request the official Anthropic client makes for a triage, for a
+// port that speaks to the Messages API without that client: its URL, method,
+// the headers that carry meaning (the client's own user-agent and
+// x-stainless-* telemetry are left out) and the body, byte for byte.
+async function triageWire(contexts, optionSets) {
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+  const kept = ["accept", "anthropic-beta", "anthropic-version", "content-type", "x-api-key"];
+  const wire = [];
+  for (const options of optionSets) {
+    const context = contexts[0];
+    let request = null;
+    const client = new Anthropic({
+      apiKey: "test-key",
+      fetch: async (url, init) => {
+        const headers = Object.fromEntries(new Headers(init.headers));
+        request = { url: String(url), method: init.method, headers: Object.fromEntries(kept.filter((h) => h in headers).map((h) => [h, headers[h]])), body: digest(init.body) };
+        return new Response(JSON.stringify({ id: "msg_1", type: "message", role: "assistant", model: "m", stop_reason: "end_turn", content: [{ type: "text", text: "ok" }], usage: {} }), { status: 200, headers: { "content-type": "application/json" } });
+      },
+    });
+    await anthropic({ ...options, client })({ alert: clone(context.alert), recentRuns: clone(context.recentRuns), signal: new AbortController().signal });
+    wire.push({ options, context: context.name, request });
+  }
+  return wire;
 }
 
 // ---------------------------------------------------------------- write or check

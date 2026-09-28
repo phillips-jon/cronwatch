@@ -6,6 +6,7 @@ namespace Cronwatch\Tests\Support;
 
 use Cronwatch\Store\MemoryStore;
 use Cronwatch\Store\MysqlStore;
+use Cronwatch\Store\PostgresStore;
 use Cronwatch\Store\SqliteStore;
 use Cronwatch\Store\Store;
 
@@ -13,7 +14,8 @@ use Cronwatch\Store\Store;
  * One database for a test, and as many stores over it as the test wants,
  * as several processes would have. SQLite is a file in a temporary
  * directory; MySQL and MariaDB are servers named by CRONWATCH_TEST_MYSQL and
- * CRONWATCH_TEST_MARIADB (mysql:// URLs), with tables under a prefix of
+ * CRONWATCH_TEST_MARIADB (mysql:// URLs), and Postgres one named by
+ * CRONWATCH_TEST_PG (a postgres:// URL), with tables under a prefix of
  * their own that done() drops.
  */
 final class Backend
@@ -36,7 +38,7 @@ final class Backend
     /** The environment variable naming a server for this kind, or null for one that needs none. */
     public static function variable(string $kind): ?string
     {
-        return ['mysql' => 'CRONWATCH_TEST_MYSQL', 'mariadb' => 'CRONWATCH_TEST_MARIADB'][$kind] ?? null;
+        return ['mysql' => 'CRONWATCH_TEST_MYSQL', 'mariadb' => 'CRONWATCH_TEST_MARIADB', 'postgres' => 'CRONWATCH_TEST_PG'][$kind] ?? null;
     }
 
     /** Why this kind cannot run here, or null when it can. */
@@ -44,7 +46,10 @@ final class Backend
     {
         $variable = self::variable($kind);
         if ($variable !== null && (getenv($variable) === false || getenv($variable) === '')) {
-            return "set {$variable} to a mysql:// URL to run";
+            return "set {$variable} to a " . ($kind === 'postgres' ? 'postgres' : 'mysql') . ':// URL to run';
+        }
+        if ($kind === 'postgres') {
+            return extension_loaded('pdo_pgsql') ? null : 'needs pdo_pgsql';
         }
         if ($kind === 'sqlite' && !extension_loaded('pdo_sqlite')) {
             return 'needs pdo_sqlite';
@@ -67,6 +72,7 @@ final class Backend
         $store = match ($this->kind) {
             'memory' => $this->memory ??= new MemoryStore(),
             'sqlite' => new SqliteStore("{$this->dir}/cw.db"),
+            'postgres' => new PostgresStore($this->url, prefix: $this->prefix),
             default => new MysqlStore($this->url, prefix: $this->prefix),
         };
         $this->opened[] = $store;
@@ -78,6 +84,7 @@ final class Backend
     {
         return match ($this->kind) {
             'sqlite' => ['kind' => 'sqlite', 'path' => "{$this->dir}/cw.db"],
+            'postgres' => ['kind' => 'postgres', 'url' => $this->url, 'prefix' => $this->prefix],
             default => ['kind' => 'mysql', 'url' => $this->url, 'prefix' => $this->prefix],
         };
     }
@@ -99,8 +106,15 @@ final class Backend
             @rmdir($this->dir);
         }
         if ($this->url !== null) {
-            self::dropTables($this->url, $this->prefix);
+            $this->kind === 'postgres' ? self::dropPgTables($this->url, $this->prefix) : self::dropTables($this->url, $this->prefix);
         }
+    }
+
+    public static function dropPgTables(string $url, string $prefix): void
+    {
+        [$dsn, $user, $password] = PostgresStore::connection($url);
+        $pdo = new \PDO($dsn, $user, $password, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
+        $pdo->exec("DROP TABLE IF EXISTS {$prefix}jobs, {$prefix}runs, {$prefix}state");
     }
 
     public static function dropTables(string $url, string $prefix): void
