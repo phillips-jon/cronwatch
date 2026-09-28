@@ -43,6 +43,11 @@ func (p *Parsed) JSValue() any {
 	return o
 }
 
+// MaxIntervalMs is the longest interval kept, 2^53 ms: added to any time
+// the SDK meets it stays well inside an int64. A longer "every" is read as
+// this long, which fires no sooner in any run's lifetime.
+const MaxIntervalMs = 1 << 53
+
 var (
 	cacheMu sync.Mutex
 	cache   = map[string]*Parsed{}
@@ -92,7 +97,11 @@ func parse(schedule, timezone string) (*Parsed, error) {
 		if ms < 1000 {
 			return nil, fmt.Errorf("schedule \"%s\" is shorter than one second", schedule)
 		}
-		return &Parsed{Kind: "interval", Source: text, EveryMs: int64(ms)}, nil
+		// JavaScript adds an interval of any size to a time; an int64 would
+		// wrap past about 292 million years (and float64 to int64 is not
+		// defined past it), so a longer one is held at 2^53 ms, still some
+		// 285,000 years, which no run outlives.
+		return &Parsed{Kind: "interval", Source: text, EveryMs: int64(min(ms, MaxIntervalMs))}, nil
 	}
 	c, err := cron.New(text, nil)
 	if err != nil {

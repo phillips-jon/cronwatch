@@ -303,6 +303,12 @@ func (p *provider) GetConfigs() ([]*asynq.PeriodicTaskConfig, error) {
 	return configs, nil
 }
 
+// Wait waits until the entries and configs declared have been written to
+// the store (which happens in the background, so a scheduler whose server
+// runs in another process still puts its jobs where the server and the
+// check read them), for tests and for a clean exit.
+func (w *Watcher) Wait() { w.watch.Settle() }
+
 // Sync declares again without its schedule each job of this app's that no
 // scheduler or provider here runs any more (taken out since a process
 // declared it). CheckHandler runs it before each check.

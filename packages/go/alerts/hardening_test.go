@@ -129,6 +129,10 @@ func TestOneDeadlineForTheWholeRequest(t *testing.T) {
 	if !errors.Is(err, post.ErrTimeout) || err.Error() != "The operation was aborted due to timeout" {
 		t.Fatalf("got %v", err)
 	}
+	// And Go's own: a deadline passed (the audit).
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("not a context.DeadlineExceeded: %v", err)
+	}
 	if took := time.Since(started); took > 3*time.Second {
 		t.Fatalf("took %v", took)
 	}
@@ -249,6 +253,45 @@ func TestAnErrorNamesOnlyTheOrigin(t *testing.T) {
 	defer refuse.Close()
 	ch, _ = Webhook(WebhookOptions{URL: refuse.URL + "/services/" + secret + "?key=" + secret})
 	if err := ch.Send(bg, sample(t), cronwatch.ChannelContext{}); err == nil || err.Error() != "Webhook "+refuse.URL+" answered 403" {
+		t.Fatalf("got %v", err)
+	}
+}
+
+// quoting is an app's transport that fails the way a wrapper around a
+// client of its own does: a *url.Error inside, or its own text with the URL.
+type quoting struct{ nested bool }
+
+func (q quoting) RoundTrip(r *http.Request) (*http.Response, error) {
+	if q.nested {
+		return nil, &url.Error{Op: "Post", URL: r.URL.String(), Err: errors.New("inner")}
+	}
+	return nil, errors.New("giving up on " + r.URL.String() + " after 3 tries")
+}
+
+// The audit: only the outer *url.Error was taken apart, so a transport
+// that quoted the URL itself put the webhook's path and query in the error.
+func TestAnErrorNamesOnlyTheOriginWhateverTheTransportQuotes(t *testing.T) {
+	secret := "not" + "areal" + "secret"
+	for _, nested := range []bool{true, false} {
+		ch, _ := Webhook(WebhookOptions{URL: "https://hooks.example.com/services/" + secret + "?token=" + secret, HTTPClient: &http.Client{Transport: quoting{nested}}})
+		err := ch.Send(bg, sample(t), cronwatch.ChannelContext{})
+		if err == nil || strings.Contains(err.Error(), secret) || strings.Contains(err.Error(), "/services") || !strings.HasPrefix(err.Error(), "https://hooks.example.com: ") {
+			t.Fatalf("nested %v: %v", nested, err)
+		}
+	}
+}
+
+// panicking is an app's transport that panics.
+type panicking struct{}
+
+func (panicking) RoundTrip(*http.Request) (*http.Response, error) { panic("transport broke") }
+
+// The audit: Twilio sends each number in a goroutine of its own, where a
+// panic ended the process; it is that number's failure instead.
+func TestAPanicWhileTextingIsAFailureNotACrash(t *testing.T) {
+	sms, _ := Twilio(TwilioOptions{AccountSID: "AC1", AuthToken: "tok", From: "+15551112222", To: []string{"+15553334444", "+15553335555"}, HTTPClient: &http.Client{Transport: panicking{}}})
+	err := sms.Send(bg, sample(t), cronwatch.ChannelContext{})
+	if err == nil || !strings.Contains(err.Error(), "panicked: transport broke") {
 		t.Fatalf("got %v", err)
 	}
 }

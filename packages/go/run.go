@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -198,22 +199,30 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	} else {
 		recorded = true
 	}
-	// Closing missed and stuck happens beside the job, which never waits on it.
+	// Closing missed and stuck happens beside the job, which never waits on
+	// it. A run that may be given back (DiscardWhen) closes them only once
+	// it is known not to be, as the PHP port's released job does: one
+	// taken back must leave the state as it was, or a job overdue would
+	// have missed closed by each attempt given back and opened again by the
+	// next check, an alert each time.
 	var started sync.WaitGroup
-	if recorded {
+	closeOnStart := func() {
+		if _, _, err := updateState(sctx, c, name, func(s JobState) (JobState, struct{}, error) { return onRunStart(s), struct{}{}, nil }); err != nil {
+			c.report(err, "starting "+name)
+		}
+	}
+	if recorded && discard == nil {
 		started.Add(1)
 		go func() {
 			defer started.Done()
-			if _, _, err := updateState(sctx, c, name, func(s JobState) (JobState, struct{}, error) { return onRunStart(s), struct{}{}, nil }); err != nil {
-				c.report(err, "starting "+name)
-			}
+			closeOnStart()
 		}()
 	}
 
 	rec := output.NewRecorder()
 	jc := &JobContext{name: name, runID: run.ID, startedAt: startedAt, rec: rec}
 	timeout, _ := timeoutMs(def.stored)
-	jobCtx, cancel := context.WithTimeoutCause(context.WithValue(ctx, contextKey{}, jc), time.Duration(timeout*float64(time.Millisecond)),
+	jobCtx, cancel := context.WithTimeoutCause(context.WithValue(ctx, contextKey{}, jc), msDuration(timeout),
 		fmt.Errorf("job %s passed its timeout of %s", js.Quote(name), schedule.FormatDuration(timeout)))
 	out := executed{}
 	var panicText string
@@ -229,12 +238,14 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	cancel()
 
 	if discard != nil && !out.panicked && out.err != nil && discard(out.err) {
-		started.Wait()
 		if !recorded || c.discardRun(sctx, run) {
 			out.discarded = true
 			out.run = run
 			return out
 		}
+	}
+	if recorded && discard != nil {
+		closeOnStart()
 	}
 
 	finishedAt := c.now()
@@ -270,6 +281,21 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	out.run = run
 	return out
 }
+
+// msDuration is ms milliseconds as a time.Duration, held at the longest
+// one (some 292 years) past it: the conversion would otherwise wrap (on
+// amd64), and a timeout of "20000w" would end the job's context at once.
+func msDuration(ms float64) time.Duration {
+	if ns := ms * float64(time.Millisecond); ns < math.MaxInt64 {
+		return time.Duration(ns)
+	}
+	return math.MaxInt64
+}
+
+// laterBy is t plus ms milliseconds, with ms held at schedule.MaxIntervalMs
+// so the sum cannot wrap: a silence "for" any length ends in some 285,000
+// years at most.
+func laterBy(t int64, ms float64) int64 { return t + int64(min(ms, schedule.MaxIntervalMs)) }
 
 // discardRun takes back a run still running (DiscardWhen) and says whether
 // the caller is done with it. A store that is not a RunDeleter, or that

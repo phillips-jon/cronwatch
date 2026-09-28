@@ -409,10 +409,18 @@ func (p *parser) escape(set *charSet, inClass bool) error {
 		set.add('\v')
 	case '0':
 		set.add(0)
+	case '1', '2', '3', '4', '5', '6', '7', '8', '9', 'c', 'k', 'p', 'P':
+		// JavaScript reads these as a backreference, a control character,
+		// a named backreference or a property; read as the plain letter they
+		// would match something else, so they are refused.
+		return fmt.Errorf("jsre: \\%c is not supported", c)
 	case 'x', 'u':
 		width := 2
 		if c == 'u' {
 			width = 4
+			if p.i < len(p.src) && p.src[p.i] == '{' {
+				return fmt.Errorf("jsre: \\u{...} is not supported")
+			}
 		}
 		if p.i+width <= len(p.src) {
 			if n, err := strconv.ParseUint(string(p.src[p.i:p.i+width]), 16, 32); err == nil {

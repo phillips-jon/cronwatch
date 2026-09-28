@@ -316,7 +316,13 @@ func (r row) job() (cronwatch.StoredJob, error) {
 	def, _ := text(r["definition"])
 	var d cronwatch.Definition
 	if err := json.Unmarshal([]byte(def), &d); err != nil {
-		return cronwatch.StoredJob{}, fmt.Errorf("job %s: %w", name, err)
+		// JSON of another shape (another writer's, or a hand edit) is a
+		// definition with nothing in it, as the SDK reads it: one such row
+		// must not fail every read of the jobs, and with it every check.
+		if !json.Valid([]byte(def)) {
+			return cronwatch.StoredJob{}, fmt.Errorf("job %s: %w", name, err)
+		}
+		_ = json.Unmarshal([]byte("{}"), &d)
 	}
 	created, _ := integer(r["created_at"])
 	updated, _ := integer(r["updated_at"])
@@ -337,11 +343,33 @@ func (r row) run() (cronwatch.Run, error) {
 	out.Metrics = cronwatch.Metrics{}
 	if m, ok := text(r["metrics"]); ok {
 		if err := json.Unmarshal([]byte(m), &out.Metrics); err != nil {
-			return cronwatch.Run{}, fmt.Errorf("run %s: %w", out.ID, err)
+			// Metrics another writer stored that are not all numbers keep
+			// the ones that are, so one such row (a running one especially,
+			// which every check reads) cannot fail the reads it is part of.
+			v, perr := js.Parse(m)
+			if perr != nil {
+				return cronwatch.Run{}, fmt.Errorf("run %s: %w", out.ID, err)
+			}
+			out.Metrics = numbersOf(v)
 		}
 	}
 	out.Trigger, _ = text(r["trigger"])
 	return out, nil
+}
+
+// numbersOf is the numeric entries of a parsed JSON object, in order.
+func numbersOf(v any) cronwatch.Metrics {
+	out := cronwatch.Metrics{}
+	if o, ok := v.(*js.Object); ok {
+		for _, k := range o.Keys() {
+			if x, _ := o.Get(k); x != nil {
+				if f, ok := x.(float64); ok {
+					out.Set(k, f)
+				}
+			}
+		}
+	}
+	return out
 }
 
 func (r row) state() (cronwatch.JobState, error) {
@@ -479,6 +507,14 @@ func (s *Store) DeleteJob(ctx context.Context, name string) error {
 }
 
 func (s *Store) InsertRun(ctx context.Context, r cronwatch.Run) error {
+	if s.dialect == MySQL {
+		// MySQL's trigger column is VARCHAR(255), which refuses anything
+		// longer (the others are TEXT): a long trigger is cut to fit rather
+		// than lose the whole run.
+		if runes := []rune(r.Trigger); len(runes) > 255 {
+			r.Trigger = string(runes[:255])
+		}
+	}
 	_, err := s.run(ctx, s.sql.insertRun, insertRunArgs(r)...)
 	return err
 }
@@ -621,14 +657,14 @@ func (s *Store) CompareAndSetState(ctx context.Context, st cronwatch.JobState, e
 		return n > 0, err
 	}
 	if _, err := s.run(ctx, s.sql.casInsert, st.Job, body); err != nil {
-		// A row is there, at another version: another process wrote first.
-		// (Or it is at version 0 and already holds this very state, which
-		// MySQL's changed-rows count answered 0 for.)
+		// A row is there: another process wrote first, unless it holds
+		// exactly what this write sent, when the insert landed and only its
+		// answer was lost (a connection dropped after the commit), as the
+		// PHP port's stateLanded() reads it. Counting that as refused would
+		// have the client work the change out again over its own write, and
+		// the alert the first attempt opened would never go out.
 		if stored, gerr := s.GetState(ctx, st.Job); gerr == nil && stored != nil {
-			if stored.Version == nil || *stored.Version == 0 {
-				return jsonText(*stored) == body, nil
-			}
-			return false, nil
+			return jsonText(*stored) == body, nil
 		}
 		return false, err
 	}

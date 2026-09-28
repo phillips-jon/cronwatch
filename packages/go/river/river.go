@@ -230,6 +230,12 @@ func constant(schedule river.PeriodicSchedule) (time.Duration, bool) {
 	return every, true
 }
 
+// Wait waits until the periodic jobs declared have been written to the
+// store (which happens in the background, so a process that only inserts
+// them still puts them where the workers and the check read them), for
+// tests and for a clean exit.
+func (w *Watcher) Wait() { w.watch.Settle() }
+
 // Sync declares the periodic jobs made in this process again, and again
 // without its schedule each job of this app's that no periodic job holds
 // any more (taken out of the config since a process declared it). The

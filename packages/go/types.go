@@ -605,6 +605,20 @@ func (a Alert) clone() Alert {
 	}
 	c.Definition = a.Definition.clone()
 	c.Triage = copyStr(a.Triage)
+	// The details' slices and pointers too, so a channel that changes what
+	// it was given changes nothing another channel or a store holds.
+	switch d := a.Details.(type) {
+	case MissedDetails:
+		d.LastRunAt = copyInt(d.LastRunAt)
+		c.Details = d
+	case OverBudgetDetails:
+		d.Breaches = append([]BudgetBreach(nil), d.Breaches...)
+		c.Details = d
+	case RecoveredDetails:
+		d.After = append([]Condition(nil), d.After...)
+		d.Since = copyInt(d.Since)
+		c.Details = d
+	}
 	return c
 }
 

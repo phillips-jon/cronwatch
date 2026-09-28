@@ -280,7 +280,7 @@ func (c *Client) deliver(ctx context.Context, alert Alert) bool {
 func (c *Client) sendOne(ctx context.Context, i int, ch Channel, alert Alert) bool {
 	where := "alert channel " + ch.Name()
 	c.busyMu.Lock()
-	stalled := c.channelBusy[i]
+	stalled := c.channelBusy[i] > 0
 	c.busyMu.Unlock()
 	if stalled {
 		c.report(errors.New("still sending an earlier alert, past its timeout"), where)
@@ -289,7 +289,10 @@ func (c *Client) sendOne(ctx context.Context, i int, ch Channel, alert Alert) bo
 	sendCtx, cancel := context.WithTimeout(storeCtx(ctx), channelTimeout)
 	defer cancel()
 	done := make(chan error, 1)
-	finished := false
+	// finished and counted are this send's own, under busyMu: only a send
+	// counted as stalled uncounts itself, so another send to the channel
+	// that returns in time never clears a hung one's mark.
+	finished, counted := false, false
 	go func() {
 		defer func() {
 			if p := recover(); p != nil {
@@ -297,7 +300,11 @@ func (c *Client) sendOne(ctx context.Context, i int, ch Channel, alert Alert) bo
 			}
 			c.busyMu.Lock()
 			finished = true
-			delete(c.channelBusy, i)
+			if counted {
+				if c.channelBusy[i]--; c.channelBusy[i] <= 0 {
+					delete(c.channelBusy, i)
+				}
+			}
 			c.busyMu.Unlock()
 		}()
 		done <- ch.Send(sendCtx, alert.clone(), ChannelContext{report: func(err error) { c.report(err, where) }})
@@ -314,7 +321,8 @@ func (c *Client) sendOne(ctx context.Context, i int, ch Channel, alert Alert) bo
 	case <-timer.C:
 		c.busyMu.Lock()
 		if !finished {
-			c.channelBusy[i] = true
+			counted = true
+			c.channelBusy[i]++
 		}
 		c.busyMu.Unlock()
 		c.report(fmt.Errorf("timed out after %dms", channelTimeout.Milliseconds()), where)
@@ -330,7 +338,7 @@ func (c *Client) addTriage(ctx context.Context, alert *Alert, timeout time.Durat
 	alert.TriageTried = true
 	alert.Triage = nil
 	c.busyMu.Lock()
-	stalled := c.triageBusy
+	stalled := c.triageBusy > 0
 	c.busyMu.Unlock()
 	if stalled {
 		c.report(errors.New("an earlier triage is still running past its timeout"), where)
@@ -348,7 +356,8 @@ func (c *Client) addTriage(ctx context.Context, alert *Alert, timeout time.Durat
 		err  error
 	}
 	done := make(chan answer, 1)
-	finished := false
+	// As for a channel: only a triage counted as stalled uncounts itself.
+	finished, counted := false, false
 	tc := TriageContext{Alert: alert.clone(), RecentRuns: recent}
 	go func() {
 		defer func() {
@@ -357,7 +366,9 @@ func (c *Client) addTriage(ctx context.Context, alert *Alert, timeout time.Durat
 			}
 			c.busyMu.Lock()
 			finished = true
-			c.triageBusy = false
+			if counted {
+				c.triageBusy--
+			}
 			c.busyMu.Unlock()
 		}()
 		text, err := c.triage(tctx, tc)
@@ -378,7 +389,8 @@ func (c *Client) addTriage(ctx context.Context, alert *Alert, timeout time.Durat
 		cancel()
 		c.busyMu.Lock()
 		if !finished {
-			c.triageBusy = true
+			counted = true
+			c.triageBusy++
 		}
 		c.busyMu.Unlock()
 		c.report(fmt.Errorf("timed out after %dms", timeout.Milliseconds()), where)

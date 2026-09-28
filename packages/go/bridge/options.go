@@ -94,16 +94,32 @@ func expectOf(value any) cronwatch.JobOption {
 // definition the store holds, when that is this app's (tagged with its app
 // tag), so the schedule another process stored is kept, else with options
 // and this watch's tags. Declared once per name in this process; nil, with
-// the reason reported, when the client refuses it.
+// the reason reported, when the client refuses it or the store cannot be
+// read (the run then goes unrecorded, and the next one asks again), since
+// a declaration made without the stored one would overwrite its schedule.
+// A job Declare has declared meanwhile is Declare's.
 func (w *Watch) Fallback(ctx context.Context, name string, options []cronwatch.JobOption) *cronwatch.Job {
+	// In turn with Declare, so the two never declare one name at once and
+	// leave the client holding the one without the schedule.
+	w.declaring.Lock()
+	defer w.declaring.Unlock()
 	w.mu.Lock()
+	if d, ok := w.jobs[name]; ok {
+		w.mu.Unlock()
+		return d.job
+	}
 	if job, ok := w.fallback[name]; ok {
 		w.mu.Unlock()
 		return job
 	}
 	w.mu.Unlock()
 	made := w.tagged(name, options)
-	if summary, err := w.cw.JobSummary(ctx, name); err == nil && summary != nil && slices.Contains(summary.Definition.Tags(), w.appTag) {
+	summary, err := w.cw.JobSummary(ctx, name)
+	if err != nil {
+		w.cw.ReportError(err, "declaring "+name)
+		return nil
+	}
+	if summary != nil && slices.Contains(summary.Definition.Tags(), w.appTag) {
 		made = OptionsOf(summary.Definition)
 	}
 	job, err := w.cw.Job(name, made...)

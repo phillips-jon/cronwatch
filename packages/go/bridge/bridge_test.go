@@ -184,6 +184,88 @@ func TestFallbackKeepsTheStoredDefinition(t *testing.T) {
 	eq(t, "its own options", string(must(made.Definition().MarshalJSON())), `{"grace":"1m","tags":["river","river:search"],"name":"report"}`)
 }
 
+// The audit: a process that only schedules (an Asynq scheduler whose server
+// runs elsewhere) neither runs nor checks, and kept its declarations in
+// memory, so the store never held its jobs and nothing was watched.
+func TestDeclaringWritesTheJobsToTheStore(t *testing.T) {
+	store := cronwatch.NewMemoryStore()
+	cw, errs := newClient(t, store)
+	w := bridge.NewWatch(cw, "asynq", "billing", "Asynq")
+	w.Declare([]bridge.Entry{{Name: "invoices", Where: "x", Schedule: "0 1 * * *"}})
+	w.Settle()
+	eq(t, "stored with no run or check", stored(t, store, "invoices"), `{"schedule":"0 1 * * *","tags":["asynq","asynq:billing"],"name":"invoices"}`)
+	eq(t, "nothing reported", len(errs.List()), 0)
+}
+
+// The audit: a definition was written once per declaration, so a job
+// another process of the app took the schedule out of (an older release
+// still up during a deploy, which does not run the new entry) stayed
+// unscheduled until this process restarted. The check puts it back.
+func TestAJobAnotherProcessUnscheduledIsPutBack(t *testing.T) {
+	store := cronwatch.NewMemoryStore()
+	ctx := context.Background()
+	newer, _ := newClient(t, store)
+	wn := bridge.NewWatch(newer, "gocron", "billing", "gocron")
+	wn.Declare([]bridge.Entry{{Name: "old", Where: "a", Schedule: "0 1 * * *"}, {Name: "added", Where: "b", Schedule: "0 2 * * *"}})
+	wn.Settle()
+	check(t, newer)
+
+	older, _ := newClient(t, store)
+	wo := bridge.NewWatch(older, "gocron", "billing", "gocron")
+	wo.Declare([]bridge.Entry{{Name: "old", Where: "a", Schedule: "0 1 * * *"}})
+	if _, err := wo.Unschedule(ctx); err != nil {
+		t.Fatal(err)
+	}
+	check(t, older)
+	eq(t, "the older release took it out", strings.Contains(stored(t, store, "added"), `"schedule"`), false)
+
+	if _, err := wn.Unschedule(ctx); err != nil {
+		t.Fatal(err)
+	}
+	eq(t, "the newer one puts it back", stored(t, store, "added"), `{"schedule":"0 2 * * *","tags":["gocron","gocron:billing"],"name":"added"}`)
+}
+
+// flakyStore fails GetJob while failing is set.
+type flakyStore struct {
+	*cronwatch.MemoryStore
+	failing bool
+}
+
+func (s *flakyStore) GetJob(ctx context.Context, name string) (*cronwatch.StoredJob, error) {
+	if s.failing {
+		return nil, errors.New("the store blinked")
+	}
+	return s.MemoryStore.GetJob(ctx, name)
+}
+
+// The audit: a lookup that failed once had Fallback declare the job
+// without its schedule, keep that for good, and write it over the
+// scheduler's definition at the next run.
+func TestFallbackDoesNotDeclareOverAStoreItCouldNotRead(t *testing.T) {
+	store := &flakyStore{MemoryStore: cronwatch.NewMemoryStore()}
+	scheduler, _ := newClient(t, store)
+	if _, err := scheduler.Job("report", cronwatch.Schedule("0 2 * * *"), cronwatch.Tags("river", "river:billing")); err != nil {
+		t.Fatal(err)
+	}
+	check(t, scheduler)
+	before := stored(t, store.MemoryStore, "report")
+
+	worker, errs := newClient(t, store)
+	w := bridge.NewWatch(worker, "river", "billing", "River")
+	store.failing = true
+	if job := w.Fallback(context.Background(), "report", nil); job != nil {
+		t.Fatal("a job was declared without reading the store")
+	}
+	eq(t, "reported", len(errs.List()), 1)
+	store.failing = false
+	job := w.Fallback(context.Background(), "report", nil)
+	if job == nil {
+		t.Fatal("no job once the store answers")
+	}
+	check2(t, job.Run(context.Background(), func(context.Context, *cronwatch.JobContext) error { return nil }))
+	eq(t, "the schedule is kept", stored(t, store.MemoryStore, "report"), before)
+}
+
 func TestOptionsOfRebuildsAnExpectPattern(t *testing.T) {
 	def := cronwatch.DescribeJob("x", cronwatch.ExpectMatch(regexp.MustCompile(`(?i)done \d+`)))
 	rebuilt := cronwatch.DescribeJob("x", bridge.OptionsOf(def)...)

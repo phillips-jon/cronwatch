@@ -7,9 +7,11 @@ package cronwatch
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"regexp"
 	"sync"
 	"time"
@@ -94,9 +96,11 @@ type Client struct {
 	warnedDeferredStart bool
 	warnedNoSecret      bool
 
+	// Sends (by channel index) and triages still running past their
+	// timeout; while any is, nothing more goes to that channel or triage.
 	busyMu      sync.Mutex
-	channelBusy map[int]bool
-	triageBusy  bool
+	channelBusy map[int]int
+	triageBusy  int
 }
 
 // jobDef is a declared job: its stored definition, and the live expect rule
@@ -118,7 +122,7 @@ func New(options ...Option) (*Client, error) {
 		synced:      map[string]bool{},
 		jobLocks:    map[string]*sync.Mutex{},
 		starting:    map[string]*startCall{},
-		channelBusy: map[int]bool{},
+		channelBusy: map[int]int{},
 	}
 	c.onError = func(err error, where string) { fmt.Fprintf(Stderr, "[cronwatch] %s: %v\n", where, err) }
 	c.cronSecret = os.Getenv("CRON_SECRET")
@@ -335,6 +339,56 @@ func (c *Client) sync(ctx context.Context, def *jobDef) error {
 	}
 	c.mu.Unlock()
 	return nil
+}
+
+// SyncJob writes the definition declared in this process under name to
+// the store now, unless the store already holds that definition (whatever
+// order its keys come back in), and says whether it wrote. A run or a
+// check writes a declaration anyway, once; a scheduler integration calls
+// SyncJob so a process that only schedules (and never runs or checks)
+// still puts its jobs where the processes that run and check them read
+// them, and so a definition another process changed since (took the
+// schedule out of, say) is written back. A name not declared here is an
+// error.
+func (c *Client) SyncJob(ctx context.Context, name string) (bool, error) {
+	def, ok := c.declared(name)
+	if !ok {
+		return false, fmt.Errorf("job %s is not declared in this process", js.Quote(name))
+	}
+	if err := c.ensureReady(ctx); err != nil {
+		return false, err
+	}
+	stored, err := c.store.GetJob(ctx, name)
+	if err != nil {
+		return false, err
+	}
+	write := stored == nil || !equalJSON(stored.Definition, def.stored)
+	if write {
+		if err := c.store.UpsertJob(ctx, def.stored.clone(), c.now()); err != nil {
+			return false, err
+		}
+	}
+	c.mu.Lock()
+	if c.definitions[name] == def {
+		c.synced[name] = true
+	}
+	c.mu.Unlock()
+	return write, nil
+}
+
+// equalJSON is whether two values write the same JSON, keys in any order
+// (Postgres's JSONB gives them back in an order of its own).
+func equalJSON(a, b json.Marshaler) bool {
+	ja, errA := a.MarshalJSON()
+	jb, errB := b.MarshalJSON()
+	if errA != nil || errB != nil {
+		return false
+	}
+	var va, vb any
+	if json.Unmarshal(ja, &va) != nil || json.Unmarshal(jb, &vb) != nil {
+		return false
+	}
+	return reflect.DeepEqual(va, vb)
 }
 
 // jobLock is the lock every state update of a job in this process takes in

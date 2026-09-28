@@ -17,6 +17,29 @@ var errSnoozed = errors.New("snoozed")
 
 func snoozed(err error) bool { return errors.Is(err, errSnoozed) }
 
+// The audit: a run given back used to close missed at its start all the
+// same, so an overdue job that snoozed had missed opened again by the next
+// check, one alert per snooze. It now leaves the state as it was, as the
+// PHP port's released job does.
+func TestAGivenBackRunLeavesMissedOpen(t *testing.T) {
+	k := newKit(t)
+	job := must[*cronwatch.Job](t)(k.cw.Job("q", cronwatch.Schedule("every 1h"), cronwatch.Grace("5m")))
+	ctx := context.Background()
+	check(t, job.Run(ctx, ok))
+	k.c.Advance(HOUR + 10*MIN)
+	checkNow(t, k.cw)
+	sameList(t, "missed", k.alerts.Types(), []string{"missed"})
+	for i := 0; i < 3; i++ {
+		k.c.Advance(MIN)
+		_ = job.Run(ctx, func(context.Context, *cronwatch.JobContext) error { return errSnoozed }, cronwatch.DiscardWhen(snoozed))
+		k.c.Advance(MIN)
+		checkNow(t, k.cw)
+	}
+	sameList(t, "one missed alert, still open", k.alerts.Types(), []string{"missed"})
+	check(t, job.Run(ctx, ok))
+	sameList(t, "the run that was not given back recovers it", k.alerts.Types(), []string{"missed", "recovered"})
+}
+
 func TestDiscardWhenTakesTheRunBack(t *testing.T) {
 	k := newKit(t)
 	job := must[*cronwatch.Job](t)(k.cw.Job("q", cronwatch.FailuresBeforeAlert(2)))

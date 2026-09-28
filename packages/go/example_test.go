@@ -74,6 +74,28 @@ func ExampleClient_Routes() {
 	// 200 {"ok":true,"jobs":[]}
 }
 
+// A run that starts in one call and ends in another, as the README shows:
+// work handed to a queue, a webhook that reports back later.
+func ExampleJob_Start() {
+	ctx := context.Background()
+	cw := cronwatch.MustNew(cronwatch.WithoutCronSecret())
+	nightly := cw.MustJob("nightly-report")
+	h, err := nightly.Start(ctx, cronwatch.WithRunID("delivery-42"))
+	if err != nil {
+		panic(err)
+	}
+	// ... later, perhaps in another process:
+	h, err = nightly.Resume(ctx, "delivery-42")
+	if err != nil {
+		panic(err)
+	}
+	h.Log("done")
+	run := h.Finish(ctx)
+	fmt.Println(run.ID, run.Status, *run.Output)
+	// Output:
+	// delivery-42 ok done
+}
+
 // A job run by a platform cron that calls a URL with the cron secret.
 func ExampleJob_Handler() {
 	cw := cronwatch.MustNew(cronwatch.WithCronSecret("the-cron-secret"))

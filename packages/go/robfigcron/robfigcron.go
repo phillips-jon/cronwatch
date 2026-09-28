@@ -188,14 +188,16 @@ func (w *Watcher) later() {
 	}()
 }
 
-// Wait waits for the syncs the cron's events started to finish, for tests
-// and for a clean exit.
+// Wait waits for the syncs the cron's events started to finish, and for
+// what they declared to be written to the store, for tests and for a clean
+// exit.
 func (w *Watcher) Wait() {
 	w.mu.Lock()
 	for w.pending {
 		w.idle.Wait()
 	}
 	w.mu.Unlock()
+	w.watch.Settle()
 }
 
 // Sync declares the cron's entries now: each entry's job with its schedule,

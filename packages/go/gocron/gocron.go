@@ -204,14 +204,16 @@ func (w *Watcher) later() {
 	}()
 }
 
-// Wait waits for the syncs the scheduler's events started to finish, for
-// tests and for a clean exit.
+// Wait waits for the syncs the scheduler's events started to finish, and
+// for what they declared to be written to the store, for tests and for a
+// clean exit.
 func (w *Watcher) Wait() {
 	w.mu.Lock()
 	for w.pending {
 		w.idle.Wait()
 	}
 	w.mu.Unlock()
+	w.watch.Settle()
 }
 
 // Sync declares the scheduler's jobs now: each with its schedule, and again
@@ -225,6 +227,12 @@ func (w *Watcher) Sync(ctx context.Context) error {
 		return errors.New("the watcher was not given to gocron.NewScheduler; pass cwgocron.Watch(cw, options) or watcher.Option() to it")
 	}
 	jobs := s.Jobs()
+	if jobs == nil {
+		// A scheduler shut down answers nil (a running one with no jobs, an
+		// empty list): its jobs are not gone, and taking them for gone would
+		// take every schedule out of the store (the audit).
+		return nil
+	}
 	loc := w.location(jobs)
 	var found []bridge.Entry
 	for _, job := range jobs {
@@ -334,11 +342,11 @@ func (w *Watcher) after(id uuid.UUID, _ string) {
 }
 
 func (w *Watcher) failed(id uuid.UUID, _ string, err error) {
-	// gocron reports a panic to its panic listener and then as an error;
-	// the panic listener has recorded it.
-	if errors.Is(err, gocron.ErrPanicRecovered) {
-		return
-	}
+	// gocron reports a panic to its panic listener and then as an error.
+	// CronWatch's panic listener panics again, which ends the program, so a
+	// panic seen here went to a listener of the job's own that replaced
+	// CronWatch's: the run is failed with it here, rather than left
+	// running (the audit).
 	if handle := w.take(id); handle != nil {
 		handle.Fail(context.Background(), err)
 	}

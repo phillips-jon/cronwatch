@@ -105,6 +105,14 @@ func Twilio(o TwilioOptions) (cronwatch.Channel, error) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				// A panic here (in an app's transport, say) would end the
+				// process: it is this number's failure instead, as the
+				// client makes a channel's.
+				defer func() {
+					if p := recover(); p != nil {
+						errs[i] = fmt.Errorf("panicked: %v", p)
+					}
+				}()
 				pairs := [][2]string{{"To", number}}
 				if o.MessagingServiceSID != "" {
 					pairs = append(pairs, [2]string{"MessagingServiceSid", o.MessagingServiceSID})

@@ -33,10 +33,19 @@ const MaxBody = 1 << 20
 // ErrorBodyMax is how much of an answer's body goes into an error.
 const ErrorBodyMax = 200
 
-// ErrTimeout is fetch's error for a request past its deadline.
-//
-//lint:ignore ST1005 the SDK's message, word for word
-var ErrTimeout = errors.New("The operation was aborted due to timeout")
+// ErrTimeout is fetch's error for a request past its deadline. It is a
+// context.DeadlineExceeded, so an app telling a channel's timeout from its
+// refusal can ask errors.Is(err, context.DeadlineExceeded).
+var ErrTimeout error = timeoutError{}
+
+type timeoutError struct{}
+
+func (timeoutError) Error() string { return "The operation was aborted due to timeout" }
+
+func (timeoutError) Unwrap() error { return context.DeadlineExceeded }
+
+// Timeout is true, as net.Error's is for a timeout.
+func (timeoutError) Timeout() bool { return true }
 
 // Header is one request header. The channels keep them in the SDK's order.
 type Header struct{ Name, Value string }
@@ -236,6 +245,8 @@ func DoWithin(ctx context.Context, timeout time.Duration, client *http.Client, r
 	}
 	c := *client
 	c.CheckRedirect = refuse
+	// A cookie an endpoint sets has no business in the app's own jar.
+	c.Jar = nil
 	resp, err := c.Do(req)
 	if err != nil {
 		if ctx.Err() == nil && errors.Is(context.Cause(rctx), ErrTimeout) {
@@ -244,12 +255,22 @@ func DoWithin(ctx context.Context, timeout time.Duration, client *http.Client, r
 		if ctx.Err() != nil {
 			return Response{}, context.Cause(ctx)
 		}
-		// *url.Error quotes the whole URL: only what went wrong is kept.
-		var ue *url.Error
-		if errors.As(err, &ue) {
+		// *url.Error quotes the whole URL: only what went wrong is kept,
+		// however deep (an app's transport may wrap a client of its own).
+		for {
+			var ue *url.Error
+			if !errors.As(err, &ue) {
+				break
+			}
 			err = ue.Err
 		}
-		return Response{}, fmt.Errorf("%s: %w", Origin(target), err)
+		// And a transport's own text that still quotes the URL has its path
+		// and query, a webhook's credential, cut out.
+		origin := Origin(target)
+		if text, cut := withoutURL(err.Error(), origin, target, req.URL); cut {
+			return Response{}, fmt.Errorf("%s: %s", origin, text)
+		}
+		return Response{}, fmt.Errorf("%s: %w", origin, err)
 	}
 	defer resp.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, MaxBody))
@@ -258,6 +279,23 @@ func DoWithin(ctx context.Context, timeout time.Duration, client *http.Client, r
 		return Response{Status: resp.StatusCode}, nil
 	}
 	return Response{Status: resp.StatusCode, Body: Text(data)}, nil
+}
+
+// withoutURL is text with every spelling of the URL posted to written as
+// its origin, and its path and query cut out, or false when it held none.
+func withoutURL(text, origin, target string, u *url.URL) (string, bool) {
+	out := text
+	for _, s := range []string{target, u.String()} {
+		if s != origin && s != origin+"/" {
+			out = strings.ReplaceAll(out, s, origin)
+		}
+	}
+	for _, s := range []string{u.RequestURI(), u.EscapedPath(), u.Path, u.RawQuery} {
+		if len(s) > 1 {
+			out = strings.ReplaceAll(out, s, "")
+		}
+	}
+	return out, out != text
 }
 
 // Text is bytes as response.text() reads them: UTF-8, U+FFFD for bytes

@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	cronwatch "cronwatch.dev/go"
 	"cronwatch.dev/go/storetest"
@@ -774,4 +775,35 @@ func TestRoutesPathsAreReadAsTheURLParserLeavesThem(t *testing.T) {
 		contains(t, path, res.Body.String(), `<h1 class="jobname">x</h1>`)
 	}
 	status(t, "a slash inside a name", w.get("/cronwatch/api/jobs/a%2Fb", auth), 404)
+}
+
+// The audit: an interval past what an int64 of milliseconds holds wrapped
+// round, and drawing the board's timeline never ended; a silence for longer
+// than that ended at once.
+func TestHugeDurationsNeitherHangNorWrap(t *testing.T) {
+	w := newWeb(t, nil)
+	job := must[*cronwatch.Job](t)(w.cw.Job("rare", cronwatch.Schedule("every 20000000000w")))
+	check(t, job.Run(bg, ok))
+	w.c.Advance(10 * 24 * HOUR)
+	done := make(chan []int)
+	go func() {
+		var codes []int
+		if _, err := w.cw.Check(bg); err == nil {
+			for _, path := range []string{"/cronwatch/", "/cronwatch/jobs/rare", "/cronwatch/api/jobs/rare"} {
+				codes = append(codes, w.get(path, auth).Code)
+			}
+		}
+		done <- codes
+	}()
+	select {
+	case codes := <-done:
+		sameList(t, "answered", codes, []int{200, 200, 200})
+	case <-time.After(10 * time.Second):
+		t.Fatal("the dashboard never answered")
+	}
+	silenced := decode(t, w.send("POST", "/cronwatch/api/jobs/rare/silence", join(auth, hdr{"content-type": "application/json"}), `{"for":"99999999999999999999999"}`))
+	until := silenced["state"].(map[string]any)["silencedUntil"].(float64)
+	if until <= float64(w.c.Now()) {
+		t.Fatalf("a long silence ended at once: %v", until)
+	}
 }

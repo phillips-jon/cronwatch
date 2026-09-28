@@ -24,22 +24,42 @@ type checkCall struct {
 // Concurrent calls share one check. A job that cannot be evaluated is
 // reported to the error handler and shown as failing; the error returned is
 // for the store failing as the check starts.
+//
+// The shared check runs to the end without the first caller's cancellation
+// (its values still reach the store), so a caller that gives up (a request
+// that ended) neither fails the check for the others nor leaves a job half
+// checked; each caller stops waiting when its own ctx ends, with its cause.
 func (c *Client) Check(ctx context.Context) (*CheckResult, error) {
 	c.checkMu.Lock()
-	if call := c.checking; call != nil {
-		c.checkMu.Unlock()
-		<-call.done
-		return call.result, call.err
+	call := c.checking
+	if call == nil {
+		call = &checkCall{done: make(chan struct{})}
+		c.checking = call
+		go c.runShared(context.WithoutCancel(ctx), call)
 	}
-	call := &checkCall{done: make(chan struct{})}
-	c.checking = call
 	c.checkMu.Unlock()
+	select {
+	case <-call.done:
+		return call.result, call.err
+	case <-ctx.Done():
+		return nil, context.Cause(ctx)
+	}
+}
+
+// runShared runs the check callers share, and always ends it: a panic (in
+// a store, say) is the check's error rather than a check that never
+// finishes, which every later Check would wait on.
+func (c *Client) runShared(ctx context.Context, call *checkCall) {
+	defer func() {
+		if p := recover(); p != nil {
+			call.result, call.err = nil, fmt.Errorf("the check panicked: %v", p)
+		}
+		c.checkMu.Lock()
+		c.checking = nil
+		c.checkMu.Unlock()
+		close(call.done)
+	}()
 	call.result, call.err = c.runCheck(ctx)
-	c.checkMu.Lock()
-	c.checking = nil
-	c.checkMu.Unlock()
-	close(call.done)
-	return call.result, call.err
 }
 
 func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
@@ -302,7 +322,7 @@ func (c *Client) Silence(ctx context.Context, name string, d time.Duration) (Job
 	if err != nil {
 		return JobState{}, err
 	}
-	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(c.now() + int64(ms)) })
+	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(laterBy(c.now(), ms)) })
 }
 
 // Unsilence ends a silence.

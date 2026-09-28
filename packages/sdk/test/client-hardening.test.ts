@@ -455,3 +455,27 @@ test('start() with deliver: "check" says once that another process must send', (
     console.warn = warn;
   }
 });
+
+test("a timeout longer than setTimeout can hold does not abort the job at once", async () => {
+  const { cw } = make();
+  const job = cw.job("monthly", { timeout: "30d" });
+  let aborted: boolean | undefined;
+  await job.run(async (ctx) => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    aborted = ctx.signal.aborted;
+  });
+  assert.equal(aborted, false, "Node fires a timer past 2^31 - 1 ms after 1 ms");
+});
+
+test("start() with an interval longer than setInterval can hold does not check every millisecond", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const cw = cronwatch({ cronSecret: null });
+  let checks = 0;
+  cw.check = async () => { checks++; return { checkedAt: 0, jobs: [], alerts: [], pruned: 0 }; };
+  cw.start("30d");
+  t.mock.timers.tick(1_000);
+  assert.equal(checks, 1, "the first check, a second in");
+  t.mock.timers.tick(60_000);
+  assert.equal(checks, 1, "no more within the minute");
+  cw.stop();
+});

@@ -113,7 +113,7 @@ func TestHungChannelIsSkippedUntilItReturns(t *testing.T) {
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		cw.busyMu.Lock()
-		busy := cw.channelBusy[0]
+		busy := cw.channelBusy[0] > 0
 		cw.busyMu.Unlock()
 		if !busy {
 			break
@@ -249,4 +249,147 @@ func TestStartChecksOnItsInterval(t *testing.T) {
 	if n := store.checks.Load(); n != 1 {
 		t.Errorf("%d checks in the first 50ms, want 1 (the interval is at least five seconds)", n)
 	}
+}
+
+// The audit: a send to a channel that returns in time used to clear the
+// mark a hung send to the same channel had set, so the next alert started a
+// second goroutine that hung too.
+func TestAHungChannelStaysMarkedWhenAnotherSendToItReturns(t *testing.T) {
+	shorten(t, &channelTimeout, 40*time.Millisecond)
+	release := make(chan struct{})
+	defer close(release)
+	var hung atomic.Int32
+	ch := ChannelFunc("flaky", func(_ context.Context, a Alert) error {
+		if a.Job == "slow" {
+			time.Sleep(80 * time.Millisecond) // past the timeout, but returns
+			return nil
+		}
+		hung.Add(1)
+		<-release // ignores its context
+		return nil
+	})
+	cw := MustNew(WithAlerts(ch), WithErrorHandler(func(error, string) {}), WithoutCronSecret())
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	for _, name := range []string{"hangs", "slow"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = cw.Run(ctx, name, failing)
+		}()
+	}
+	wg.Wait()
+	time.Sleep(100 * time.Millisecond) // the slow send has returned by now
+	_ = cw.Run(ctx, "next", failing)
+	if n := hung.Load(); n != 1 {
+		t.Fatalf("the hung channel holds %d goroutines, want 1", n)
+	}
+}
+
+func TestAHungTriageStaysMarkedWhenAnotherTriageReturns(t *testing.T) {
+	shorten(t, &triageTimeout, 40*time.Millisecond)
+	release := make(chan struct{})
+	defer close(release)
+	var hung atomic.Int32
+	cw := MustNew(WithAlerts(&alertsOf{}), WithErrorHandler(func(error, string) {}), WithoutCronSecret(),
+		WithTriage(func(_ context.Context, tc TriageContext) (string, error) {
+			if tc.Alert.Job == "slow" {
+				time.Sleep(80 * time.Millisecond)
+				return "", nil
+			}
+			hung.Add(1)
+			<-release
+			return "", nil
+		}))
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	for _, name := range []string{"hangs", "slow"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = cw.Run(ctx, name, failing)
+		}()
+	}
+	wg.Wait()
+	time.Sleep(100 * time.Millisecond)
+	_ = cw.Run(ctx, "next", failing)
+	if n := hung.Load(); n != 1 {
+		t.Fatalf("the hung triage holds %d goroutines, want 1", n)
+	}
+}
+
+// The audit: a store that panics during a check used to leave the check
+// marked as in flight, so every later Check waited on it for ever.
+func TestACheckThatPanicsEndsAndTheNextOneRuns(t *testing.T) {
+	store := &panickyStore{MemoryStore: NewMemoryStore()}
+	store.panics.Store(true)
+	cw := MustNew(WithStore(store), WithoutCronSecret())
+	if _, err := cw.Check(context.Background()); err == nil || !strings.Contains(err.Error(), "panicked") {
+		t.Fatalf("the panicking check: %v", err)
+	}
+	store.panics.Store(false)
+	done := make(chan error, 1)
+	go func() {
+		_, err := cw.Check(context.Background())
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the next check waited on the one that panicked")
+	}
+}
+
+// The audit: a caller that gave up used to fail the check it shared with
+// the others (and a waiter could not give up at all).
+func TestACallerGivingUpDoesNotFailTheCheckOthersShare(t *testing.T) {
+	store := &panickyStore{MemoryStore: NewMemoryStore(), gate: make(chan struct{}), entered: make(chan struct{})}
+	cw := MustNew(WithStore(store), WithoutCronSecret())
+	first, cancel := context.WithCancel(context.Background())
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := cw.Check(first)
+		firstDone <- err
+	}()
+	<-store.entered
+	second := make(chan error, 1)
+	go func() {
+		_, err := cw.Check(context.Background())
+		second <- err
+	}()
+	cancel()
+	if err := <-firstDone; !errors.Is(err, context.Canceled) {
+		t.Fatalf("the caller that gave up: %v", err)
+	}
+	close(store.gate)
+	if err := <-second; err != nil {
+		t.Fatalf("the caller still waiting: %v", err)
+	}
+}
+
+// panickyStore panics in RunningRuns while panics is set, and waits there
+// on gate when it has one.
+type panickyStore struct {
+	*MemoryStore
+	panics  atomic.Bool
+	gate    chan struct{}
+	entered chan struct{}
+	once    sync.Once
+}
+
+func (s *panickyStore) RunningRuns(ctx context.Context) ([]Run, error) {
+	if s.panics.Load() {
+		panic("the store broke")
+	}
+	if s.gate != nil {
+		s.once.Do(func() { close(s.entered) })
+		<-s.gate
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return s.MemoryStore.RunningRuns(ctx)
 }

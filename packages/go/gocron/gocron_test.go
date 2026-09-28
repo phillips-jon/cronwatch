@@ -14,6 +14,7 @@ import (
 	cwgocron "cronwatch.dev/go/gocron"
 	"cronwatch.dev/go/storetest"
 	"github.com/go-co-op/gocron/v2"
+	"github.com/google/uuid"
 )
 
 type kit struct {
@@ -262,6 +263,47 @@ func TestAPanicFailsTheRunAndCarriesOn(t *testing.T) {
 	}
 	contains(t, "recorded and alerted", string(out), "ALERT failed Panic: boom")
 	contains(t, "then panicked", string(out), "panic: boom")
+}
+
+// The audit: a scheduler shut down answers Jobs() with nil, which a sync
+// took for every job gone, taking each schedule out of the store.
+func TestASyncAfterShutdownUnschedulesNothing(t *testing.T) {
+	k := newKit(t)
+	w := cwgocron.New(k.cw, cwgocron.Options{})
+	s, err := gocron.NewScheduler(w.Option(), gocron.WithLocation(time.UTC))
+	check(t, err)
+	_, err = s.NewJob(gocron.CronJob("0 4 * * *", false), gocron.NewTask(func() {}), gocron.WithName("early"))
+	check(t, err)
+	s.Start()
+	w.Wait()
+	check(t, w.Sync(context.Background()))
+	eq(t, "scheduled", k.stored(t, "early").Schedule(), "0 4 * * *")
+	check(t, s.Shutdown())
+	check(t, w.Sync(context.Background()))
+	eq(t, "still scheduled", k.stored(t, "early").Schedule(), "0 4 * * *")
+}
+
+// The audit: a job with a panic listener of its own (which replaces
+// CronWatch's) left its run running, to be reported stuck, and the next
+// end of that job was paired with it.
+func TestAPanicAJobsOwnListenerTookFailsTheRun(t *testing.T) {
+	k := newKit(t)
+	w := cwgocron.New(k.cw, cwgocron.Options{})
+	s, err := gocron.NewScheduler(w.Option(), gocron.WithLocation(time.UTC))
+	check(t, err)
+	defer func() { _ = s.Shutdown() }()
+	_, err = s.NewJob(gocron.DurationJob(time.Hour), gocron.NewTask(func() { panic("boom") }), gocron.WithName("panics"),
+		gocron.WithStartAt(gocron.WithStartImmediately()),
+		gocron.WithEventListeners(gocron.AfterJobRunsWithPanic(func(uuid.UUID, string, any) {})))
+	check(t, err)
+	s.Start()
+	waitFor(t, "the run to end", func() bool {
+		runs := k.runs(t, "panics")
+		return len(runs) > 0 && runs[0].Status != cronwatch.StatusRunning
+	})
+	run := k.runs(t, "panics")[0]
+	eq(t, "failed", run.Status, cronwatch.StatusFailed)
+	contains(t, "with the panic", *run.Error, "boom")
 }
 
 func waitFor(t *testing.T, what string, cond func() bool) {

@@ -556,8 +556,7 @@ export class CronWatch {
       : Promise.resolve();
 
     const recorder = createRecorder(run);
-    const timer = setTimeout(() => recorder.abort(), timeoutMs(definition));
-    if (typeof timer === "object" && "unref" in timer) timer.unref();
+    const clearTimer = after(timeoutMs(definition), () => recorder.abort());
 
     let result: T | undefined;
     let error: unknown;
@@ -568,7 +567,7 @@ export class CronWatch {
       error = e;
       threw = true;
     } finally {
-      clearTimeout(timer);
+      clearTimer();
     }
 
     const finishedAt = this.now();
@@ -1178,7 +1177,8 @@ export class CronWatch {
    */
   start(every: Duration = "1m"): void {
     if (this.timer) return;
-    const ms = Math.max(5_000, parseDuration(every, "check interval"));
+    // At most setInterval's longest delay: a longer one would check every millisecond.
+    const ms = Math.min(TIMER_MAX_MS, Math.max(5_000, parseDuration(every, "check interval")));
     if (this.deferDelivery && !this.warnedDeferredStart) {
       this.warnedDeferredStart = true;
       console.warn('[cronwatch] start() was called with deliver: "check", so these checks send no alerts. Another process must run checks with deliver: "now" (the default) to send them.');
@@ -1348,6 +1348,24 @@ function joinOutput(before: string | null, after: string | null): string | null 
 function clampLimit(limit: number, fallback: number, min: number): number {
   const n = typeof limit === "number" && Number.isFinite(limit) ? Math.trunc(limit) : fallback;
   return Math.min(500, Math.max(min, n));
+}
+
+/** The longest delay setTimeout keeps: Node runs a longer one after 1 ms. */
+const TIMER_MAX_MS = 2 ** 31 - 1;
+
+/**
+ * Calls fn after ms, however long (a job's timeout of "30d" included, which
+ * setTimeout alone would fire at once), without keeping the process alive.
+ * Returns what cancels it.
+ */
+function after(ms: number, fn: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout>;
+  const arm = (left: number): void => {
+    timer = left > TIMER_MAX_MS ? setTimeout(() => arm(left - TIMER_MAX_MS), TIMER_MAX_MS) : setTimeout(fn, left);
+    if (typeof timer === "object" && "unref" in timer) timer.unref();
+  };
+  arm(ms);
+  return () => clearTimeout(timer);
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

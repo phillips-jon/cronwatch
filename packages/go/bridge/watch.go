@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	cronwatch "cronwatch.dev/go"
 	"cronwatch.dev/go/internal/js"
@@ -54,6 +55,13 @@ type Watch struct {
 	// takes no job for one the scheduler dropped (a process that runs a
 	// check and no scheduler must not unschedule the app's jobs).
 	seen bool
+
+	// pending are names declared and not yet written to the store, which
+	// one goroutine at a time (saving) writes; settled is signalled when it
+	// has none left.
+	pending map[string]bool
+	saving  bool
+	settled *sync.Cond
 }
 
 type declared struct {
@@ -71,7 +79,71 @@ func NewWatch(cw *cronwatch.Client, tag, app, scheduler string) *Watch {
 	if app == "" {
 		app = AppName()
 	}
-	return &Watch{cw: cw, tag: tag, appTag: AppTag(tag, app), scheduler: scheduler, jobs: map[string]*declared{}, fallback: map[string]*cronwatch.Job{}, reported: map[string]bool{}}
+	w := &Watch{cw: cw, tag: tag, appTag: AppTag(tag, app), scheduler: scheduler, jobs: map[string]*declared{}, fallback: map[string]*cronwatch.Job{}, reported: map[string]bool{}, pending: map[string]bool{}}
+	w.settled = sync.NewCond(&w.mu)
+	return w
+}
+
+// saveTimeout bounds one write of a declaration to the store.
+const saveTimeout = 30 * time.Second
+
+// save writes name's declaration to the store in the background: a process
+// that only schedules (an Asynq scheduler, say, whose server runs in
+// another process) neither runs nor checks, and a declaration kept only in
+// memory would never reach the processes that do. Writes run in turn, one
+// goroutine at a time, each the client's declaration as it is then.
+func (w *Watch) save(name string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.pending[name] = true
+	if w.saving {
+		return
+	}
+	w.saving = true
+	go w.saveAll()
+}
+
+func (w *Watch) saveAll() {
+	for {
+		w.mu.Lock()
+		if len(w.pending) == 0 {
+			w.saving = false
+			w.settled.Broadcast()
+			w.mu.Unlock()
+			return
+		}
+		names := make([]string, 0, len(w.pending))
+		for name := range w.pending {
+			names = append(names, name)
+		}
+		clear(w.pending)
+		w.mu.Unlock()
+		slices.Sort(names)
+		defined := map[string]bool{}
+		for _, def := range w.cw.DefinedJobs() {
+			defined[def.Name()] = true
+		}
+		for _, name := range names {
+			if !defined[name] {
+				continue // forgotten since
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
+			if _, err := w.cw.SyncJob(ctx, name); err != nil {
+				w.cw.ReportError(err, "declaring "+name)
+			}
+			cancel()
+		}
+	}
+}
+
+// Settle waits until what Declare declared has been written to the store,
+// for tests and a clean exit.
+func (w *Watch) Settle() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for w.saving {
+		w.settled.Wait()
+	}
 }
 
 // Client is the client the watch declares jobs on.
@@ -221,6 +293,7 @@ func (w *Watch) declare(name, where string, options []cronwatch.JobOption, curre
 		w.jobs[name] = &declared{job: job, key: key, current: current}
 	}
 	w.mu.Unlock()
+	w.save(name)
 }
 
 // kept are the options a job keeps when it is declared again without its
@@ -296,20 +369,38 @@ func appendDuration(options []cronwatch.JobOption, text func(string) cronwatch.J
 func (w *Watch) Unschedule(ctx context.Context) ([]string, error) {
 	w.mu.Lock()
 	seen := w.seen
+	mine := make([]string, 0, len(w.jobs))
+	for name := range w.jobs {
+		mine = append(mine, name)
+	}
 	w.mu.Unlock()
 	if !seen {
 		return nil, nil
 	}
+	// This process's own declarations are written back where the store
+	// holds something else: another process of the app (an older release
+	// still up during a deploy) may have taken the schedule out of a job it
+	// does not run, and a long-running process would otherwise never put
+	// it back.
 	defined := map[string]bool{}
 	for _, def := range w.cw.DefinedJobs() {
 		defined[def.Name()] = true
 	}
+	slices.Sort(mine)
+	var failed []error
+	for _, name := range mine {
+		if !defined[name] {
+			continue // forgotten (the dashboard's forget) since
+		}
+		if _, err := w.cw.SyncJob(ctx, name); err != nil {
+			failed = append(failed, fmt.Errorf("declaring %s: %w", name, err))
+		}
+	}
 	stored, err := w.cw.Jobs(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(append(failed, err)...)
 	}
 	var names []string
-	var failed []error
 	for _, job := range stored {
 		def := job.Definition
 		if defined[job.Name] || def.Schedule() == "" || !slices.Contains(def.Tags(), w.appTag) {

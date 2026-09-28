@@ -507,6 +507,47 @@ func (c *clockOf) Now() int64 { c.mu.Lock(); defer c.mu.Unlock(); return c.at }
 
 func (c *clockOf) Advance(ms int64) { c.mu.Lock(); defer c.mu.Unlock(); c.at += ms }
 
+// The audit: a timeout past what a time.Duration holds (some 292 years)
+// wrapped round where the float's conversion is not saturating (amd64),
+// and the job's context ended as it started.
+func TestAVeryLongTimeoutDoesNotEndTheJobAtOnce(t *testing.T) {
+	k := newKit(t)
+	job := k.cw.MustJob("forever", cronwatch.Timeout("20000w"))
+	check(t, job.Run(bg, func(ctx context.Context, _ *cronwatch.JobContext) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		deadline, ok := ctx.Deadline()
+		if !ok || time.Until(deadline) < 100*365*24*time.Hour {
+			return errors.New("the deadline is not centuries away")
+		}
+		return nil
+	}))
+}
+
+// The audit: each channel gets a copy of the alert, but its details' slices
+// were shared, so a channel that changed them changed every other's.
+func TestAChannelChangingAnAlertsDetailsChangesNoOtherChannels(t *testing.T) {
+	changer := cronwatch.ChannelFunc("changer", func(_ context.Context, a cronwatch.Alert) error {
+		if d, ok := a.Details.(cronwatch.OverBudgetDetails); ok {
+			for i := range d.Breaches {
+				d.Breaches[i].Metric = "changed"
+			}
+		}
+		return nil
+	})
+	seen := &captureOf{}
+	k := newKit(t, cronwatch.WithAlerts(changer, seen))
+	job := k.cw.MustJob("spend", cronwatch.Budget("cost", 1))
+	check(t, job.Run(bg, func(_ context.Context, j *cronwatch.JobContext) error { return j.Metric("cost", 2) }))
+	if seen.n() != 1 {
+		t.Fatalf("alerts: %v", seen.types())
+	}
+	if d := seen.get(0).Details.(cronwatch.OverBudgetDetails); d.Breaches[0].Metric != "cost" {
+		t.Fatalf("the other channel's copy was changed: %+v", d)
+	}
+}
+
 // captureOf keeps the alerts sent to it.
 type captureOf struct {
 	mu     sync.Mutex

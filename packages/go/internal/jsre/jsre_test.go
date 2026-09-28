@@ -99,7 +99,9 @@ func TestLongBoundedRuns(t *testing.T) {
 }
 
 func TestCompileErrors(t *testing.T) {
-	for _, source := range []string{`(a`, `a)`, `*a`, `[a`, `a{3,1}`, `a+?`, `(?<!a+)b`, `[z-a]`} {
+	for _, source := range []string{`(a`, `a)`, `*a`, `[a`, `a{3,1}`, `a+?`, `(?<!a+)b`, `[z-a]`,
+		// JavaScript reads these as something other than the letter (the audit).
+		`(a)\1`, `\cJ`, `\k<x>`, `\p{L}`, `\u{41}`, `[\2]`} {
 		if _, err := Compile(source, "g"); err == nil {
 			t.Errorf("/%s/ compiled", source)
 		}
