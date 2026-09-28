@@ -289,23 +289,6 @@ final class Sql
         return $value === null ? null : Js::wellFormed($value);
     }
 
-    /** Binds each value with the type it has: an int (or a float with no fraction) as an integer, null as NULL. */
-    public static function bind(\PDOStatement $statement, array $params): void
-    {
-        foreach (array_values($params) as $i => $value) {
-            if (is_float($value) && Js::isInteger($value) && abs($value) <= Js::MAX_SAFE_INTEGER) {
-                $value = (int) $value;
-            }
-            $type = match (true) {
-                $value === null => \PDO::PARAM_NULL,
-                is_int($value) => \PDO::PARAM_INT,
-                is_bool($value) => \PDO::PARAM_BOOL,
-                default => \PDO::PARAM_STR,
-            };
-            $statement->bindValue($i + 1, is_float($value) ? Js::number($value) : $value, $type);
-        }
-    }
-
     /** JSON text as the SDK wrote it. */
     private static function json(mixed $value): mixed
     {

@@ -60,7 +60,7 @@ final class Ses implements AlertChannel
             throw new \InvalidArgumentException('Ses needs an accessKeyId and secretAccessKey');
         }
         $this->to = Email::recipients('Ses', $from, $to);
-        $this->url = "https://email.{$region}.amazonaws.com/v2/email/outbound-emails";
+        $this->url = "https://email.{$region}.amazonaws.com/v2/email/outbound-emails"; // phpcs:ignore PluginCheck.CodeAnalysis.Offloading.OffloadedContent -- the SES API alerts are posted to, not a file a page loads.
         $this->link = $link === null ? null : \Closure::fromCallable($link);
         $this->now = $now === null ? Js::nowMs(...) : \Closure::fromCallable($now);
         $this->http = $http ?? Transport::default();

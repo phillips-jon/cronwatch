@@ -44,7 +44,7 @@ final class WpdbStore implements Store, UpdatesRunIf, ComparesAndSetsState
         // would fold them, so here any prefix WordPress takes is kept as it is.
         $prefix = $wpdb->prefix . 'cronwatch_';
         if (preg_match('/^[A-Za-z0-9_]+$/D', $prefix) !== 1 || strlen($prefix) > 64 - strlen('runs_job_started')) {
-            throw new \InvalidArgumentException("CronWatch cannot name tables with the prefix \"{$prefix}\"");
+            throw new \InvalidArgumentException(esc_html("CronWatch cannot name tables with the prefix {$prefix}"));
         }
         $this->prefix = $prefix;
         $this->sql = Sql::statements('mysql', $prefix);
@@ -64,7 +64,7 @@ final class WpdbStore implements Store, UpdatesRunIf, ComparesAndSetsState
     {
         $why = self::unsupported($this->wpdb->db_server_info());
         if ($why !== null) {
-            throw new \RuntimeException($why);
+            throw new \RuntimeException(esc_html($why));
         }
         foreach (self::schema($this->prefix, $this->wpdb->db_server_info()) as $statement) {
             $this->query($statement);
@@ -149,20 +149,32 @@ final class WpdbStore implements Store, UpdatesRunIf, ComparesAndSetsState
         }, $text);
     }
 
-    /** Runs a statement; returns the rows it read, or the rows it changed. Throws with $wpdb's error, which it keeps off the page. */
+    /**
+     * Runs a statement; returns the rows it read, or the rows it changed.
+     * Throws with $wpdb's error, which it keeps off the page.
+     *
+     * The statements are the library's own (Sql::statements, fixed text on
+     * this site's cronwatch_ tables, whose prefix the constructor checked),
+     * and render() writes every value in: each string through
+     * $wpdb->prepare('%s'), each number as its digits, null as NULL. They
+     * are on the plugin's own tables, so there is no WordPress API to use
+     * instead, and nothing to cache: a run or a state is read to be changed.
+     */
     private function query(string $text, array $params = [], bool $select = false): array|int
     {
         $sql = $this->render($text, $params);
         $suppressed = $this->wpdb->suppress_errors(true);
         try {
+            // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery, PluginCheck.Security.DirectDB.UnescapedDBParameter -- see above: every value is escaped by render(), through $wpdb->prepare().
             if ($select) {
                 $rows = $this->wpdb->get_results($sql, ARRAY_A);
                 $result = is_array($rows) ? $rows : [];
             } else {
                 $result = $this->wpdb->query($sql);
             }
+            // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery, PluginCheck.Security.DirectDB.UnescapedDBParameter
             if ($this->wpdb->last_error !== '') {
-                throw new \RuntimeException('WordPress database error: ' . $this->wpdb->last_error);
+                throw new \RuntimeException(esc_html('WordPress database error: ' . $this->wpdb->last_error));
             }
             return $select ? $result : (int) $result;
         } finally {

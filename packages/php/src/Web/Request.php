@@ -126,10 +126,12 @@ final class Request
         $type = strtolower($headers['content-type'] ?? '');
         $form = null;
         if (str_contains($type, 'multipart/form-data') && $server === $_SERVER) {
+            // phpcs:disable WordPress.Security.NonceVerification.Missing -- the host checks a change's nonce first (the WordPress plugin: AdminDashboard::serve()); the dashboard checks the origin.
             $form = $_POST;
             foreach (array_keys($_FILES) as $name) {
                 $form[$name] = new \SplFileInfo((string) $name);
             }
+            // phpcs:enable WordPress.Security.NonceVerification.Missing
         }
         return new self(
             (string) ($server['REQUEST_METHOD'] ?? 'GET'),

@@ -120,6 +120,7 @@ final class Shared
     {
         $clean = self::cleanUrl($url);
         $message = str_replace([$clean, $url], self::origin($url), $message);
+        // phpcs:disable WordPress.WP.AlternativeFunctions.parse_url_parse_url -- a library that runs outside WordPress too, on PHP 8.2 or newer, where parse_url is consistent.
         $pieces = [
             (string) preg_replace('#^[A-Za-z][A-Za-z0-9+.-]*://[^/?\#]*#', '', $clean),
             (string) parse_url($clean, PHP_URL_PATH),
@@ -127,6 +128,7 @@ final class Shared
             (string) parse_url($clean, PHP_URL_USER),
             (string) parse_url($clean, PHP_URL_PASS),
         ];
+        // phpcs:enable WordPress.WP.AlternativeFunctions.parse_url_parse_url
         foreach ($pieces as $piece) {
             if (strlen($piece) > 1) {
                 $message = str_replace($piece, '', $message);

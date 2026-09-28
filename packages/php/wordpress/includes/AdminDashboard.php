@@ -128,6 +128,7 @@ final class AdminDashboard
         $body = $response->body;
         if (str_starts_with((string) ($headers['content-type'] ?? ''), 'text/html')) {
             $marker = preg_quote(self::MARKER, '#');
+            // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- this pattern takes the dashboard's script tag out of its page; it adds none.
             $body = (string) preg_replace("#\n<link rel=\"manifest\" href=\"{$marker}/manifest\\.webmanifest\">|\n<script src=\"{$marker}/app\\.js\" defer></script>#", '', $body);
             $body = (string) preg_replace_callback("#(\\s(?:href|action|src)=)\"{$marker}(/[^\"]*)\"#", function (array $m): string {
                 $url = self::url(html_entity_decode($m[2], ENT_QUOTES));

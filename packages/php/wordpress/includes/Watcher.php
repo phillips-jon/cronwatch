@@ -234,6 +234,7 @@ final class Watcher
             $fatal = null;
         }
         if ($fatal !== null && str_starts_with($fatal['message'], 'Allowed memory size')) {
+            // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- the request is ending on a memory fatal; room to record the failed run. wp_raise_memory_limit() only reaches WP_MAX_MEMORY_LIMIT, which may be the limit just hit.
             @ini_set('memory_limit', (string) (memory_get_usage(true) + 32 * 1024 * 1024));
         }
         $this->failAll($fatal !== null
