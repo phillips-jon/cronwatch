@@ -288,6 +288,6 @@ jobs:
           web = cw.routes(token="smoke")
           seen = {}
           body = web({"REQUEST_METHOD": "GET", "PATH_INFO": "/api/jobs", "HTTP_AUTHORIZATION": "Bearer smoke"}, lambda status, headers: seen.update(status=status))
-          assert seen["status"] == "200 OK" and b'"name":"smoke"' in b"".join(body), seen
+          assert seen["status"] == "200 OK" and b"\"name\":\"smoke\"" in b"".join(body), seen
           print("cronwatch", cronwatch.__version__, "from", cronwatch.__file__)
           '
