@@ -1,4 +1,5 @@
 import type { Alert, AlertChannel } from "../types.js";
+import { postable } from "./shared.js";
 
 export interface SlackOptions {
   /** An incoming webhook URL from api.slack.com/messaging/webhooks. */
@@ -27,7 +28,7 @@ export function slack(options: SlackOptions): AlertChannel {
       const url = options.link?.(alert);
       const title = `${EMOJI[alert.type]} *${escape(alert.title)}*${url ? ` (<${url}|open>)` : ""}`;
       const body = codeBlockSafe(escape(alert.message)).slice(0, 2900);
-      const response = await fetch(options.webhookUrl, {
+      const response = await fetch(postable(options.webhookUrl), {
         method: "POST",
         headers: { "content-type": "application/json" },
         // Refused, not followed: a webhook URL is its own credential.

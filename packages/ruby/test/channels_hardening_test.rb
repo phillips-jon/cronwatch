@@ -228,4 +228,21 @@ class ChannelsHardeningTest < Minitest::Test
     assert_equal [:failed], plain.got
     assert_equal ["alert channel two: one recipient refused it"], errors
   end
+
+  def test_a_webhook_url_that_cannot_be_posted_to_is_refused_without_quoting_it
+    secret_path = ["services", "T0", "B0", "not" + "areal" + "secret"].join("/")
+    { "hooks.example.com/#{secret_path}" => "this URL", "ftp://hooks.example.com/#{secret_path}" => "ftp:",
+      "https://hooks.example.com/#{secret_path} x" => "this URL" }.each do |url, shown|
+      [Cronwatch::Alerts::Slack.new(webhook_url: url), Cronwatch::Alerts::Discord.new(webhook_url: url),
+       Cronwatch::Alerts::Webhook.new(url: url)].each do |channel|
+        error = assert_raises(ArgumentError) { channel.call(failed) }
+        assert_equal "only http and https URLs can be posted to, not #{shown}", error.message, channel.name
+        refute_includes error.message, secret_path
+      end
+    end
+    # A stray newline or space around a pasted URL is dropped, as fetch drops it.
+    uri = Cronwatch::HTTP.postable("  https://hooks.example.com/#{secret_path}\n")
+    assert_equal "/#{secret_path}", uri.path
+    assert_equal "https://hooks.example.com", Cronwatch::Alerts::Webhook.origin("https://hooks.example.com/#{secret_path}\n")
+  end
 end

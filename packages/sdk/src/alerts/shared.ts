@@ -25,6 +25,22 @@ export function origin(url: string): string {
   }
 }
 
+/**
+ * The URL, once it is one fetch can post to. Refused without quoting it:
+ * fetch's own error for a URL it cannot parse ("Failed to parse URL from ...")
+ * quotes the whole URL, and a webhook URL's path is its credential.
+ */
+export function postable(url: string): string {
+  let protocol: string;
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    throw new Error("only http and https URLs can be posted to, not this URL");
+  }
+  if (protocol !== "http:" && protocol !== "https:") throw new Error(`only http and https URLs can be posted to, not ${protocol}`);
+  return url;
+}
+
 /** How much of a provider's error body goes into the error message. */
 export const ERROR_BODY_MAX = 200;
 
@@ -38,7 +54,7 @@ export const ERROR_BODY_MAX = 200;
  * followed: the credential headers would go with it to wherever it points.
  */
 export async function post(provider: string, url: string, init: { headers: Record<string, string>; body: string }, secrets: (string | undefined)[] = []): Promise<Response> {
-  const response = await fetch(url, { method: "POST", headers: init.headers, body: init.body, redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const response = await fetch(postable(url), { method: "POST", headers: init.headers, body: init.body, redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!response.ok) {
     let text = "";
     try {

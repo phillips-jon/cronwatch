@@ -38,7 +38,7 @@ module Cronwatch
       end
 
       def self.origin(url)
-        uri = URI(url)
+        uri = URI(HTTP.clean_url(url))
         raise URI::InvalidURIError unless uri.scheme && uri.host
 
         port = uri.port && uri.port != uri.default_port ? ":#{uri.port}" : ""

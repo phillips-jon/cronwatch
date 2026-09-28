@@ -12,7 +12,7 @@ Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 pip install cronwatch-sdk        # or: uv add cronwatch-sdk
 ```
 
-The import name is `cronwatch`. Python 3.11 or newer, and no dependencies: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses), zones come from the standard library's `zoneinfo`, and the SQLite store uses the standard library's `sqlite3`. On Windows, which has no zone database of its own, install `cronwatch-sdk[tzdata]`.
+The import name is `cronwatch`. Python 3.11 or newer, and no dependencies: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses), zones come from the standard library's `zoneinfo`, and the SQLite store uses the standard library's `sqlite3`. On Windows, which has no zone database of its own, install `cronwatch-sdk[tzdata]`. An older, unrelated PyPI project named `cronwatch` installs a module of the same name; if `pip show cronwatch` finds it, uninstall it, or `import cronwatch` may load the wrong one.
 
 ## Use
 

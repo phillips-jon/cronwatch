@@ -1,4 +1,5 @@
 import type { Alert, AlertChannel } from "../types.js";
+import { postable } from "./shared.js";
 
 export interface DiscordOptions {
   /** A channel webhook URL from Server Settings, Integrations, Webhooks. */
@@ -24,7 +25,7 @@ export function discord(options: DiscordOptions): AlertChannel {
     name: "discord",
     async send(alert) {
       const url = options.link?.(alert);
-      const response = await fetch(options.webhookUrl, {
+      const response = await fetch(postable(options.webhookUrl), {
         method: "POST",
         headers: { "content-type": "application/json" },
         // Refused, not followed: a webhook URL is its own credential.

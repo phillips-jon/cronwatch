@@ -34,7 +34,7 @@ module Cronwatch
       # past it while the body is still arriving, returns the answer with an
       # empty body, as the SDK's channels treat a body they could not read.
       def post(url, body, headers)
-        uri = URI(url)
+        uri = HTTP.postable(url)
         deadline = HTTP.monotonic + @timeout
         request = Net::HTTP::Post.new(uri.request_uri)
         headers.each { |k, v| request[k] = HTTP.trim_header(v) }
@@ -94,6 +94,30 @@ module Cronwatch
     # Seconds left before `deadline`, never quite zero (Net::HTTP reads 0 as no wait).
     def remaining(deadline)
       [deadline - monotonic, 0.001].max
+    end
+
+    # A URL as fetch reads it: the spaces and control characters around it,
+    # and any tab or line break inside it, dropped (a pasted webhook URL often
+    # ends in a newline).
+    def clean_url(url)
+      url.to_s.gsub(/\A[\u0000-\u0020]+|[\u0000-\u0020]+\z/, "").delete("\t\n\r")
+    end
+
+    # The URL parsed, once it is one a channel can post to. Refused without
+    # quoting it: URI's own errors quote the whole URL, and a webhook URL's
+    # path is its credential.
+    def postable(url)
+      uri = begin
+        URI(clean_url(url))
+      rescue URI::Error, ArgumentError
+        nil
+      end
+      scheme = uri&.scheme&.downcase
+      unless %w[http https].include?(scheme) && uri.host && !uri.host.empty?
+        shown = uri&.scheme && uri.host ? "#{scheme}:" : "this URL"
+        raise ArgumentError, "only http and https URLs can be posted to, not #{shown}"
+      end
+      uri
     end
 
     # A header value without the spaces, tabs and line breaks around it, as fetch sends it.

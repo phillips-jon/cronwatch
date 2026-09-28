@@ -1,4 +1,5 @@
 import type { AlertChannel } from "../types.js";
+import { postable } from "./shared.js";
 
 export interface WebhookOptions {
   url: string;
@@ -40,7 +41,7 @@ export function webhook(options: WebhookOptions): AlertChannel {
         headers["x-cronwatch-signature"] = `sha256=${await hmacSha256Hex(options.secret, body)}`;
       }
       // A redirect is refused, not followed: the headers (and the signature) would go with it.
-      const response = await fetch(options.url, { method: "POST", headers, body, redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
+      const response = await fetch(postable(options.url), { method: "POST", headers, body, redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
       // Only the origin: a webhook URL's path or query often is the credential.
       if (!response.ok) throw new Error(`Webhook ${origin(options.url)} answered ${response.status}`);
     },

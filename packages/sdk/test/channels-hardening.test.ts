@@ -172,3 +172,24 @@ test("credentials are trimmed before they go in a header", async (t) => {
   assert.equal(headers[12]!.authorization, "Bearer wh-secret");
   assert.throws(() => resend({ apiKey: "  ", ...email }), /needs an apiKey/);
 });
+
+test("a webhook URL fetch cannot post to is refused without quoting it, since its path is the credential", async (t) => {
+  const realFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => { calls++; return new Response(null, { status: 200 }); }) as typeof fetch;
+  t.after(() => { globalThis.fetch = realFetch; });
+  const secretPath = ["services", "T0", "B0", "not" + "areal" + "secret"].join("/");
+  for (const [url, shown] of [[`hooks.example.com/${secretPath}`, "this URL"], [`ftp://hooks.example.com/${secretPath}`, "ftp:"]] as const) {
+    for (const channel of [slack({ webhookUrl: url }), discord({ webhookUrl: url }), webhook({ url })]) {
+      await assert.rejects(channel.send(failed()), (error: Error) => {
+        assert.equal(error.message, `only http and https URLs can be posted to, not ${shown}`, channel.name);
+        assert.ok(!error.message.includes(secretPath), `${channel.name} quoted the URL`);
+        return true;
+      });
+    }
+  }
+  assert.equal(calls, 0, "nothing was sent");
+  // A pasted URL's stray newline is dropped by the URL parser, as fetch drops it, so it still posts.
+  await slack({ webhookUrl: `https://hooks.example.com/${secretPath}\n` }).send(failed());
+  assert.equal(calls, 1);
+});
