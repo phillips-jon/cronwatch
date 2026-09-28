@@ -690,7 +690,10 @@ jobs:
         working-directory: packages/go
       - run: go vet ./...
         working-directory: packages/go/sqltest
+      # staticcheck 0.8 needs Go 1.26 to build, so it lints on the newest entry;
+      # the tests still run on both.
       - name: staticcheck
+        if: matrix.go == '1.26'
         run: |
           go install honnef.co/go/tools/cmd/staticcheck@v0.8.1
           (cd packages/go && "$(go env GOPATH)/bin/staticcheck" ./...)
