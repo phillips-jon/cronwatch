@@ -99,6 +99,7 @@ final class Js
      */
     public static function decimal(float $value): array
     {
+        // phpcs:disable Squiz.PHP.DiscouragedFunctions.Discouraged, WordPress.PHP.DevelopmentFunctions.error_log_var_export -- var_export writes a float's shortest digits, the setting is put back at once; not debug output.
         $saved = ini_get('serialize_precision');
         if ($saved !== '-1') {
             ini_set('serialize_precision', '-1');
@@ -107,6 +108,7 @@ final class Js
         if ($saved !== '-1' && $saved !== false) {
             ini_set('serialize_precision', $saved);
         }
+        // phpcs:enable Squiz.PHP.DiscouragedFunctions.Discouraged, WordPress.PHP.DevelopmentFunctions.error_log_var_export
         $exponent = 0;
         if (preg_match('/^([0-9.]+)[eE]([+-]?[0-9]+)$/', $text, $m) === 1) {
             $text = $m[1];
@@ -406,7 +408,7 @@ final class Js
         if (is_float($value)) {
             return is_finite($value) ? self::number($value) : 'null';
         }
-        if (is_array($value) && array_is_list($value)) {
+        if (is_array($value) && \array_is_list($value)) {
             return '[' . implode(',', array_map(self::stringify(...), $value)) . ']';
         }
         if (is_array($value) || $value instanceof \stdClass) {

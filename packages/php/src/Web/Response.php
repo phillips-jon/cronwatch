@@ -32,13 +32,13 @@ final class Response
      */
     public function send(?string $method = null): void
     {
-        $method ??= (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $method ??= (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- only compared with HEAD.
         if (!headers_sent()) {
             http_response_code($this->status);
             header_remove('X-Powered-By');
             if (!isset($this->headers['content-type'])) {
                 // Otherwise PHP adds "Content-type: text/html" to a redirect.
-                ini_set('default_mimetype', '');
+                ini_set('default_mimetype', ''); // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- for this response only, which sets its own Content-Type.
             }
             foreach ($this->headers as $name => $value) {
                 header(self::title($name) . ': ' . $value, true);
@@ -46,7 +46,7 @@ final class Response
             header('Content-Length: ' . strlen($this->body), true);
         }
         if (strtoupper($method) !== 'HEAD') {
-            echo $this->body;
+            echo $this->body; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the page or JSON the dashboard built, every value escaped as it was written.
         }
     }
 

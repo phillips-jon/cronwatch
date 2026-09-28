@@ -12,8 +12,16 @@
  * (LEFT_OUT: the curl and stream transport, since every request goes through
  * wp_remote_post; the PDO stores, since the plugin stores through $wpdb; the
  * pg_cron source; the command-line check; the PSR-15 adapters). Nothing else
- * goes in: no tests, no Composer files, no build script, no dotfiles. The
- * version is the library's
+ * goes in: no tests, no Composer files, no build script, no dotfiles.
+ *
+ * Each of the library's PHP files gets one line after its declare():
+ * CRONWATCH_LIB_ANNOTATION, which tells the directory's Plugin Check (PHPCS
+ * with the WordPress rules) that the library's exception messages are not
+ * output. They are plain text for the error log, WP-CLI and the dashboard,
+ * and everywhere the plugin shows one it escapes it (esc_html in wp-admin,
+ * the dashboard's own escaping on its pages); the library runs outside
+ * WordPress too, so it cannot call esc_html itself. Nothing else in a file
+ * changes. The version is the library's
  * (Cronwatch::VERSION); the plugin header's Version and the readme's Stable
  * tag must match it, and the readme's changelog must have its section, and
  * the build stops when they do not. Entries carry a
@@ -35,6 +43,9 @@ const CRONWATCH_LEFT_OUT = [
     'Web/PsrHandler.php',
     'Web/PsrMiddleware.php',
 ];
+
+/** The line each library PHP file gets in the zip, after declare(strict_types=1); (see above). */
+const CRONWATCH_LIB_ANNOTATION = '// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- the library\'s exception messages are plain text for logs, WP-CLI and the dashboard, and are escaped wherever the plugin shows one.';
 
 $plugin = __DIR__;
 $library = dirname(__DIR__);
@@ -107,7 +118,17 @@ if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::EXCL) !== true) {
 // 2026-01-01 00:00:00 UTC, so the zip does not change with the checkout's file times.
 $time = 1767225600;
 foreach ($entries as $name => $source) {
-    $zip->addFile($source, $name);
+    if (str_starts_with($name, 'cronwatch/lib/src/') && str_ends_with($name, '.php')) {
+        $code = (string) file_get_contents($source);
+        $declare = "\ndeclare(strict_types=1);\n";
+        if (substr_count($code, $declare) !== 1) {
+            fwrite(STDERR, "build: {$source} needs exactly one declare(strict_types=1); line\n");
+            exit(1);
+        }
+        $zip->addFromString($name, str_replace($declare, $declare . CRONWATCH_LIB_ANNOTATION . "\n", $code));
+    } else {
+        $zip->addFile($source, $name);
+    }
     $zip->setMtimeName($name, $time);
     $zip->setExternalAttributesName($name, ZipArchive::OPSYS_UNIX, 0644 << 16);
 }

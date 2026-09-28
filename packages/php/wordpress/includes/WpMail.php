@@ -56,7 +56,7 @@ final class WpMail implements AlertChannel
             remove_action('wp_mail_failed', $listen);
         }
         if (!$sent) {
-            throw new \RuntimeException('wp_mail could not send the alert' . ($failure !== null && $failure !== '' ? ": {$failure}" : ''));
+            throw new \RuntimeException(esc_html('wp_mail could not send the alert' . ($failure !== null && $failure !== '' ? ": {$failure}" : '')));
         }
     }
 }

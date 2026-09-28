@@ -62,9 +62,13 @@ final class Admin
     /** admin-post.php?action=cronwatch_save */
     public static function save(): void
     {
-        self::authorize('cronwatch_save');
-        // Each field is sanitized in saveSettings().
-        $posted = isset($_POST['cronwatch']) && is_array($_POST['cronwatch']) ? wp_unslash($_POST['cronwatch']) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+        // authorize(), written out, so the nonce check sits where the form is read.
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__('Sorry, you are not allowed to change CronWatch settings.', 'cronwatch'), 403);
+        }
+        check_admin_referer('cronwatch_save');
+        // Each field is sanitized by saveSettings(), by its kind: an email list, a URL, a duration, a token.
+        $posted = isset($_POST['cronwatch']) && is_array($_POST['cronwatch']) ? wp_unslash($_POST['cronwatch']) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized field by field in saveSettings().
         $notice = self::saveSettings($posted);
         wp_safe_redirect(self::pageUrl(['cronwatch_notice' => $notice]));
         exit;
@@ -177,6 +181,7 @@ final class Admin
         } elseif ($notice === 'grace') {
             echo '<div class="notice notice-error"><p>' . esc_html__('The grace was not a duration such as 10m or 1h30m, so it was left as it was. The rest was saved.', 'cronwatch') . '</p></div>';
         } elseif ($notice === 'token') {
+            /* translators: %d: the least number of characters an API token may have. */
             echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was shorter than %d characters, so it was not saved. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
         } elseif ($notice === 'tested') {
             $results = get_transient('cronwatch_test_' . get_current_user_id());
@@ -186,7 +191,11 @@ final class Admin
             } else {
                 foreach ($results as $r) {
                     $class = $r['ok'] ? 'notice-success' : 'notice-error';
-                    $line = $r['ok'] ? sprintf(__('Sent through %s.', 'cronwatch'), $r['channel']) : sprintf(__('%1$s failed: %2$s', 'cronwatch'), $r['channel'], $r['message']);
+                    $line = $r['ok']
+                        /* translators: %s: an alert channel's name, such as email or slack. */
+                        ? sprintf(__('Sent through %s.', 'cronwatch'), $r['channel'])
+                        /* translators: 1: an alert channel's name, such as email or slack; 2: why sending failed. */
+                        : sprintf(__('%1$s failed: %2$s', 'cronwatch'), $r['channel'], $r['message']);
                     echo '<div class="notice ' . esc_attr($class) . '"><p>' . esc_html($line) . '</p></div>';
                 }
             }
@@ -223,10 +232,13 @@ final class Admin
         echo '<h2>' . esc_html__('JSON API', 'cronwatch') . '</h2>';
         echo '<p>' . esc_html__('Off unless you turn it on. When on, CronWatch\'s JSON API (the jobs, their runs, silencing and the check) answers at the address below to anyone who sends the token, so an MCP server (@cronwatch/mcp) or a script can reach this site. The dashboard itself stays in wp-admin.', 'cronwatch') . '</p>';
         echo '<table class="form-table" role="presentation"><tbody>';
+        /* translators: %s: the JSON API's base URL. */
+        $base = sprintf(__('Base URL: %s', 'cronwatch'), Api::baseUrl());
         self::row('api_enabled', __('Allow the JSON API', 'cronwatch'), '<label><input type="checkbox" id="cronwatch-api_enabled" name="cronwatch[api_enabled]" value="1"' . checked($settings['api_enabled'], '1', false) . '> '
-            . esc_html__('Answer API requests that carry the token', 'cronwatch') . '</label>', sprintf(__('Base URL: %s', 'cronwatch'), Api::baseUrl()));
+            . esc_html__('Answer API requests that carry the token', 'cronwatch') . '</label>', $base);
         $tokenHelp = $settings['api_token'] !== ''
             ? __('A token is saved. Leave blank to keep it, or type a new one.', 'cronwatch')
+            /* translators: %d: the least number of characters an API token may have. */
             : sprintf(__('Leave blank and one is made when you turn the API on, or type one of at least %d characters.', 'cronwatch'), self::TOKEN_MIN);
         self::row('api_token', __('API token', 'cronwatch'), '<input type="password" class="regular-text" id="cronwatch-api_token" name="cronwatch[api_token]" value="" autocomplete="new-password">'
             . ($settings['api_token'] !== '' ? ' <label><input type="checkbox" name="cronwatch[api_token_new]" value="1"> ' . esc_html__('Make a new one', 'cronwatch') . '</label>' : ''), $tokenHelp);
@@ -261,6 +273,7 @@ final class Admin
         try {
             $jobs = Plugin::client()->jobs();
         } catch (\Throwable $error) {
+            /* translators: %s: the error the database gave. */
             echo '<p>' . esc_html(sprintf(__('The jobs could not be read: %s', 'cronwatch'), $error->getMessage())) . '</p>';
             return;
         }
@@ -272,7 +285,9 @@ final class Admin
         echo '<table class="widefat striped"><thead><tr><th>' . esc_html__('Job', 'cronwatch') . '</th><th>' . esc_html__('Health', 'cronwatch') . '</th><th>'
             . esc_html__('Last run', 'cronwatch') . '</th><th>' . esc_html__('Next due', 'cronwatch') . '</th></tr></thead><tbody>';
         foreach ($jobs as $job) {
-            $last = $job->lastRun === null ? '' : $job->lastRun->status . ', ' . sprintf(__('%s ago', 'cronwatch'), human_time_diff((int) ($job->lastRun->startedAt / 1000), $now));
+            /* translators: %s: a length of time, such as 5 mins. */
+            $ago = $job->lastRun === null ? '' : sprintf(__('%s ago', 'cronwatch'), human_time_diff((int) ($job->lastRun->startedAt / 1000), $now));
+            $last = $job->lastRun === null ? '' : $job->lastRun->status . ', ' . $ago;
             $next = $job->nextExpectedAt === null ? '' : wp_date('Y-m-d H:i', (int) ($job->nextExpectedAt / 1000));
             echo '<tr><td><code>' . esc_html($job->name) . '</code><br><span class="description">' . esc_html((string) ($job->definition->get('description') ?? '')) . '</span></td><td>'
                 . esc_html($job->health) . '</td><td>' . esc_html($last) . '</td><td>' . esc_html((string) $next) . '</td></tr>';

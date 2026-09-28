@@ -697,7 +697,7 @@ final class Cronwatch
             }
             if ($fatal !== null && str_starts_with($fatal['message'], 'Allowed memory size')) {
                 // Room to record the run in, past the limit the job ran into.
-                @ini_set('memory_limit', (string) (memory_get_usage(true) + 32 * 1024 * 1024));
+                @ini_set('memory_limit', (string) (memory_get_usage(true) + 32 * 1024 * 1024)); // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- the process is ending; room to record the failed run.
             }
             $describe = $fatal !== null
                 ? Output::describe('Interrupted', 'Fatal error: ' . $fatal['message'], ["{$fatal['file']}:{$fatal['line']}"])

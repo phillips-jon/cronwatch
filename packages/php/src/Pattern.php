@@ -22,7 +22,7 @@ final class Pattern implements \Stringable
     /** @param string $pattern a PCRE pattern with its delimiters, as preg_match takes it */
     public function __construct(public readonly string $pattern)
     {
-        set_error_handler(static fn () => true);
+        set_error_handler(static fn () => true); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler -- keeps an invalid pattern's warning quiet while it is tested; restored below.
         try {
             $valid = preg_match($pattern, '') !== false;
         } finally {

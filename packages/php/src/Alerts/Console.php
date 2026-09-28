@@ -28,9 +28,9 @@ final class Console implements AlertChannel
     public static function write(string $line, bool $good = false): void
     {
         if (PHP_SAPI === 'cli' && defined('STDERR')) {
-            fwrite($good ? STDOUT : STDERR, $line . "\n");
+            fwrite($good ? STDOUT : STDERR, $line . "\n"); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite -- standard error on the command line, not a file.
             return;
         }
-        error_log($line);
+        error_log($line); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- the default channel: an alert with nowhere else to go is logged, not debug output.
     }
 }

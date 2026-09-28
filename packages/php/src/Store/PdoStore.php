@@ -40,7 +40,7 @@ abstract class PdoStore implements Store, UpdatesRunIf, ComparesAndSetsState
         $db = $this->open();
         $statement = $this->prepared[$text] ??= $db->prepare($text);
         try {
-            Sql::bind($statement, $params);
+            self::bind($statement, $params);
             $statement->execute();
         } catch (\Throwable $error) {
             // A statement that failed part way (SQLite's busy answer leaves it
@@ -53,6 +53,27 @@ abstract class PdoStore implements Store, UpdatesRunIf, ComparesAndSetsState
             throw $error;
         }
         return $statement;
+    }
+
+    /**
+     * Binds each value with the type it has: an int (or a float with no
+     * fraction) as an integer, null as NULL. It lives here, not in Sql, so
+     * Sql (which the WordPress plugin's $wpdb store shares) names no PDO.
+     */
+    public static function bind(\PDOStatement $statement, array $params): void
+    {
+        foreach (array_values($params) as $i => $value) {
+            if (is_float($value) && Js::isInteger($value) && abs($value) <= Js::MAX_SAFE_INTEGER) {
+                $value = (int) $value;
+            }
+            $type = match (true) {
+                $value === null => \PDO::PARAM_NULL,
+                is_int($value) => \PDO::PARAM_INT,
+                is_bool($value) => \PDO::PARAM_BOOL,
+                default => \PDO::PARAM_STR,
+            };
+            $statement->bindValue($i + 1, is_float($value) ? Js::number($value) : $value, $type);
+        }
     }
 
     /** @return list<array<string, mixed>> */

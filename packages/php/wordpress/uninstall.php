@@ -15,12 +15,13 @@ function cronwatch_uninstall_site(): void {
 	global $wpdb;
 	$prefix = $wpdb->prefix . 'cronwatch_';
 	if ( preg_match( '/^[A-Za-z0-9_]+$/D', $prefix ) === 1 ) {
-		// The table names are built from the site's own prefix, checked above.
-		$wpdb->query( "DROP TABLE IF EXISTS {$prefix}jobs, {$prefix}runs, {$prefix}state" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// The plugin's own tables, named from the site's prefix, checked above; a table name cannot be a placeholder before WordPress 6.2 (%i).
+		$wpdb->query( "DROP TABLE IF EXISTS {$prefix}jobs, {$prefix}runs, {$prefix}state" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange, PluginCheck.Security.DirectDB.UnescapedDBParameter -- see above.
 	}
 	delete_option( 'cronwatch_settings' );
 	delete_option( 'cronwatch_db_version' );
-	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_cronwatch_' ) . '%', $wpdb->esc_like( '_transient_timeout_cronwatch_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	// WordPress has no API that deletes transients by prefix; the plugin's are short lived (a test result, a new token), so this removes any left.
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s", $wpdb->esc_like( '_transient_cronwatch_' ) . '%', $wpdb->esc_like( '_transient_timeout_cronwatch_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- see above.
 	wp_clear_scheduled_hook( 'cronwatch_check' );
 }
 

@@ -172,7 +172,7 @@ final class Dashboard
         if ($proto !== null && $proto !== 'http' && $proto !== 'https') {
             return $request->origin;
         }
-        $own = (string) parse_url($request->origin, PHP_URL_SCHEME);
+        $own = (string) parse_url($request->origin, PHP_URL_SCHEME); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url -- runs outside WordPress too; PHP 8.2's parse_url is consistent.
         $ownHost = substr($request->origin, strlen($own) + 3);
         return Origin::bare(($proto ?? $own) . '://' . ($host ?? $ownHost)) ?? $request->origin;
     }
@@ -215,6 +215,8 @@ final class Dashboard
             return [$existing, false];
         }
         $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+        // Never reached in the WordPress plugin, which always gives a token (false in wp-admin, the owner's for the API).
+        // phpcs:disable WordPress.WP.AlternativeFunctions -- a development server's token file in the system's temporary directory, outside WordPress.
         $handle = @fopen($file, 'x');
         if ($handle === false) {
             // Another request made it first, or the directory is not writable: use its token, or this one.
@@ -224,6 +226,7 @@ final class Dashboard
         @chmod($file, 0600);
         fwrite($handle, $token);
         fclose($handle);
+        // phpcs:enable WordPress.WP.AlternativeFunctions
         return [$token, true];
     }
 
@@ -246,7 +249,7 @@ final class Dashboard
             [$this->token, $made] = $this->developmentToken($base);
             if ($made) {
                 $line = self::developmentSignInLine($publicOrigin, $base, $this->token);
-                $this->log !== null ? ($this->log)($line) : error_log($line);
+                $this->log !== null ? ($this->log)($line) : error_log($line); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- a development server's sign-in line; never reached in the WordPress plugin, which gives a token.
             }
         }
 

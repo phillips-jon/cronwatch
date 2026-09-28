@@ -141,7 +141,14 @@ final class PluginTest extends TestCase
             $zip->open($path);
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $name = (string) $zip->getNameIndex($i);
-                $code = str_ends_with($name, '.php') ? self::codeOnly((string) $zip->getFromIndex($i)) : '';
+                $source = (string) $zip->getFromIndex($i);
+                $code = str_ends_with($name, '.php') ? self::codeOnly($source) : '';
+                if (str_starts_with($name, 'cronwatch/lib/src/') && str_ends_with($name, '.php')) {
+                    // build.php's one added line, after the declare, and nothing else changed.
+                    $this->assertStringContainsString("\ndeclare(strict_types=1);\n// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- ", $source, "{$name} carries the exception annotation");
+                    $original = (string) file_get_contents(dirname(__DIR__, 2) . '/src/' . substr($name, strlen('cronwatch/lib/src/')));
+                    $this->assertSame($original, (string) preg_replace('#\n// phpcs:disable WordPress\.Security\.EscapeOutput\.ExceptionNotEscaped -- [^\n]*#', '', $source, 1), "{$name} is the library's file");
+                }
                 $this->assertDoesNotMatchRegularExpression('/\bcurl_[a-z_]+\s*\(/', $code, "{$name} calls curl directly");
                 $this->assertDoesNotMatchRegularExpression('/\bnew\s+\\\\?PDO\b|\bfsockopen\s*\(/', $code, "{$name} opens its own connection");
                 foreach ($leftOut as $file) {

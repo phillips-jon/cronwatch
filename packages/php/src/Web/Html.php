@@ -231,7 +231,7 @@ CSS;
             . "<link rel=\"manifest\" href=\"{$b}/manifest.webmanifest\">\n"
             . "<link rel=\"icon\" href=\"{$b}/icons/icon.svg\" type=\"image/svg+xml\">\n"
             . "<link rel=\"apple-touch-icon\" href=\"{$b}/icons/apple-touch-icon.png\">\n"
-            . "<script src=\"{$b}/app.js\" defer></script>\n"
+            . "<script src=\"{$b}/app.js\" defer></script>\n" // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- the dashboard's own page, not a WordPress page (the plugin leaves this line out).
             . '<style>' . self::CSS . "</style>\n"
             . "</head>\n"
             . "<body><div class=\"sheet\">{$body}</div></body>\n"
