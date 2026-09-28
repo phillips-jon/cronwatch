@@ -56,7 +56,9 @@ jobs:
           key="$RUNNER_TEMP/split_key"
           printf '%s\n' "$DEPLOY_KEY" > "$key"
           chmod 600 "$key"
-          ssh-keyscan -t ed25519,rsa github.com > "$RUNNER_TEMP/known_hosts" 2>/dev/null
+          # GitHub's published ED25519 host key (SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU,
+          # from https://api.github.com/meta), pinned rather than trusted on first use.
+          printf '%s\n' 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' > "$RUNNER_TEMP/known_hosts"
           export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts"
           git config user.name "CronWatch release"
           git config user.email "noreply@cronwatch.dev"
