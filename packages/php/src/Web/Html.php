@@ -33,7 +33,8 @@ use Cronwatch\Run;
  */
 final class Html
 {
-    private const CSS = <<<'CSS'
+    /** The pages' stylesheet: inline in a standalone page (StandaloneHead), a file of its own where a host loads it. */
+    public const CSS = <<<'CSS'
 
 :root{color-scheme:light dark;--paper:#f4f4f5;--sheet:#fff;--sunk:#fafafa;--rule:#e4e4e7;--rule-2:#d4d4d8;--tick:#909098;--ink:#000;--body:#18181b;--muted:#71717a;--ok:#15803d;--warn:#a16207;--bad:#b91c1c;--serif:"Newsreader",ui-serif,Georgia,Cambria,"Times New Roman",serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--who:200px}
 @media(prefers-color-scheme:dark){:root{--paper:#09090b;--sheet:#111113;--sunk:#18181b;--rule:#27272a;--rule-2:#3f3f46;--tick:#66666f;--ink:#fff;--body:#e4e4e7;--muted:#a1a1aa;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171}}
@@ -208,11 +209,15 @@ CSS;
     public const DECLARE_ONE = "\$cw->job('name', ['schedule' => '0 2 * * *'])";
 
     /**
-     * A page. `base` is where the dashboard is mounted ("" at the root): the
-     * head links the web app manifest, the icons and app.js, the one script,
-     * which only registers the service worker (Pwa). Everything works without it.
+     * A page. `base` is where the dashboard is mounted ("" at the root).
+     * The head's assets are StandaloneHead's (the manifest, the icons,
+     * app.js and the stylesheet inline) unless `head` is given: then they
+     * are what it returns for the base, for a host that shows the dashboard
+     * inside its own pages and loads their assets its own way.
+     *
+     * @param (\Closure(string): string)|null $head
      */
-    public static function layout(string $title, string $body, string $base, ?int $refresh = null): string
+    public static function layout(string $title, string $body, string $base, ?int $refresh = null, ?\Closure $head = null): string
     {
         $b = Text::h($base);
         $meta = $refresh ? '<meta http-equiv="refresh" content="' . $refresh . '">' : '';
@@ -228,11 +233,7 @@ CSS;
             . "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n"
             . "<meta name=\"apple-mobile-web-app-title\" content=\"CronWatch\">\n"
             . "<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"default\">\n"
-            . "<link rel=\"manifest\" href=\"{$b}/manifest.webmanifest\">\n"
-            . "<link rel=\"icon\" href=\"{$b}/icons/icon.svg\" type=\"image/svg+xml\">\n"
-            . "<link rel=\"apple-touch-icon\" href=\"{$b}/icons/apple-touch-icon.png\">\n"
-            . "<script src=\"{$b}/app.js\" defer></script>\n" // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- the dashboard's own page, not a WordPress page (the plugin leaves this line out).
-            . '<style>' . self::CSS . "</style>\n"
+            . ($head === null ? StandaloneHead::html($b) : $head($base))
             . "</head>\n"
             . "<body><div class=\"sheet\">{$body}</div></body>\n"
             . '</html>';
@@ -332,7 +333,7 @@ CSS;
      * @param array<string, list<Run>> $runsByJob
      * @param list<array{job: JobSummary, runs: list<Run>, complete: bool}>|null $lanes
      */
-    public static function dashboardPage(array $jobs, array $runsByJob, int|float $now, string $base, int|float|null $checkedAt = null, ?array $lanes = null): string
+    public static function dashboardPage(array $jobs, array $runsByJob, int|float $now, string $base, int|float|null $checkedAt = null, ?array $lanes = null, ?\Closure $head = null): string
     {
         $lanes ??= array_map(fn (JobSummary $job) => ['job' => $job, 'runs' => $runsByJob[$job->name] ?? [], 'complete' => true], array_slice($jobs, 0, Timeline::BOARD_LANES));
         $total = count($jobs);
@@ -406,7 +407,7 @@ CSS;
             . "{$sections}\n"
             . "</main>\n"
             . "<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"{$b}/api/jobs\">JSON</a></footer>";
-        return self::layout('CronWatch', $body, $base, 60);
+        return self::layout('CronWatch', $body, $base, 60, $head);
     }
 
     /**
@@ -416,7 +417,7 @@ CSS;
      *
      * @param list<Run> $runs
      */
-    public static function jobPage(JobSummary $job, array $runs, int|float $now, string $base, bool $complete = true): string
+    public static function jobPage(JobSummary $job, array $runs, int|float $now, string $base, bool $complete = true, ?\Closure $head = null): string
     {
         $d = $job->definition;
         $stats = $job->stats;
@@ -531,7 +532,7 @@ CSS;
             . "</section>\n"
             . "</main>\n"
             . "<footer><span>Refreshes every minute. Times are UTC.</span><a href=\"{$b}/api/jobs/" . Text::encodeUriComponent($job->name) . '">JSON</a></footer>';
-        return self::layout("{$job->name}: CronWatch", $body, $base, 60);
+        return self::layout("{$job->name}: CronWatch", $body, $base, 60, $head);
     }
 
     /**
@@ -541,11 +542,11 @@ CSS;
      * an app on an iPhone's home screen, which keeps its cookies apart from
      * Safari's.
      */
-    public static function messagePage(string $title, string $message, string $base, bool $signIn = false): string
+    public static function messagePage(string $title, string $message, string $base, bool $signIn = false, ?\Closure $head = null): string
     {
         $form = $signIn
             ? '<form class="signin" method="get" action="' . Text::h($base) . '/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>'
             : '';
-        return self::layout($title, '<header class="top">' . self::brand($base) . '</header><main class="message"><h1>' . Text::h($title) . '</h1><p>' . Text::h($message) . "</p>{$form}</main>", $base);
+        return self::layout($title, '<header class="top">' . self::brand($base) . '</header><main class="message"><h1>' . Text::h($title) . '</h1><p>' . Text::h($message) . "</p>{$form}</main>", $base, null, $head);
     }
 }

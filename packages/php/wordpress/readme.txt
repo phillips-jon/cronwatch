@@ -63,12 +63,14 @@ CronWatch finds missed runs with a check every five minutes, which it schedules 
 
 = For developers =
 
-* `cronwatch_alerts` (filter): the list of alert channels. Add any object implementing `Cronwatch\Alerts\AlertChannel`, or a callable taking the `Cronwatch\Alert`. The library's channels (Discord, Resend, Twilio, Sentry and the rest) send through `wp_remote_post()` here.
+* `cronwatch_alerts` (filter): the list of alert channels (the email, Slack and webhook ones the settings made). Add any object implementing `Cronwatch\Alerts\AlertChannel`, or a callable taking the `Cronwatch\Alert`.
 * `cronwatch_watch_event` (filter): return false to leave an event unwatched. Given `true`, the hook, its arguments and its recurrence name (null for a single event).
 * `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence.
-* `cronwatch_client_args` (filter): the arguments the library's client is made with.
+* `cronwatch_client_args` (filter): the arguments the library's client is made with (its store, alert channels, default grace and error handler).
 * `cronwatch_reject_unsafe_urls` (filter): whether an alert URL may not reach a private address or an unusual port (WordPress's `reject_unsafe_urls`). True on a multisite network, where a site's administrators may not be the network's, and false otherwise; given the URL's origin.
 * `cronwatch_log( ...$parts )`, or `do_action( 'cronwatch_log', ...$parts )`: a line for the output of the event running now.
+
+The plugin carries only the alert channels its settings offer. Developers who need other channels or AI triage of alerts can install [the cronwatch/cronwatch Composer package](https://packagist.org/packages/cronwatch/cronwatch), which has them, and add them with these filters.
 
 = Privacy =
 
@@ -82,29 +84,13 @@ The plugin is GPLv2 or later. It includes the cronwatch/cronwatch PHP library (i
 
 == External services ==
 
-CronWatch connects to an outside service only to deliver an alert, and only to a service the site's owner has set up: nothing is sent while no alert channel is set. An alert is sent when a watched event is missed, fails, gets stuck or runs slow, when it recovers, and when you press "Send a test alert". It holds the job's name and description, what went wrong and when, and the run that raised it with the end of its output and its error (with values that look like secrets blanked); email and Slack alerts also carry a link to the event's page in your wp-admin.
+CronWatch contacts an outside service only to deliver an alert, and only one the site's owner has set up under CronWatch, Settings: nothing is sent while no alert channel is set. An alert is sent when a watched event is missed, fails, gets stuck or runs slow, when it recovers, and when you press "Send a test alert". It holds the job's name and description, what went wrong and when, and the run that raised it with the end of its output and its error (with values that look like secrets blanked).
 
-Set under CronWatch, Settings:
+* Email: sent with `wp_mail()`, the way your site sends its other mail (your host, or an SMTP or mail service plugin you chose), to the addresses you enter, with a link to the event's page in your wp-admin. The plugin itself contacts no mail service.
+* Slack: when you enter a Slack incoming webhook URL, each alert is posted to it as a message, with the alert described above and a link to the event's page in your wp-admin. Slack is a service of Slack Technologies: [terms of service](https://slack.com/main-services-agreement), [privacy policy](https://slack.com/trust/privacy/privacy-policy).
+* Webhook: when you enter a webhook URL, each alert is posted to it as JSON (the alert described above, and the job's definition), signed with the secret you give, if any. The URL is your own endpoint, or a service you chose, whose terms then apply; the plugin sends nothing to it until you enter it.
 
-* Email: sent with `wp_mail()`, however your site sends its mail (your host, or an SMTP or mail service plugin you chose), to the addresses you enter.
-* Slack: the alert is posted to the Slack incoming webhook URL you enter. Slack is run by Slack Technologies: [terms of service](https://slack.com/main-services-agreement), [privacy policy](https://slack.com/trust/privacy/privacy-policy).
-* Webhook: the alert, as JSON, is posted to the URL you enter, which is your own or a service you chose; that service's terms apply.
-
-Only a developer can turn on the following, in code, with the `cronwatch_alerts` filter (the alert channels) or the `cronwatch_client_args` filter (triage); the settings page never does. Each is sent the alert described above, with the account key or address the developer gives it:
-
-* Discord (a channel's webhook URL): [terms](https://discord.com/terms), [privacy policy](https://discord.com/privacy).
-* Resend (email, api.resend.com): [terms](https://resend.com/legal/terms-of-service), [privacy policy](https://resend.com/legal/privacy-policy).
-* Postmark (email, api.postmarkapp.com): [terms](https://postmarkapp.com/terms-of-service), [privacy policy](https://www.activecampaign.com/legal/privacy-policy).
-* SendGrid (email, api.sendgrid.com) and Twilio (text messages, api.twilio.com), both run by Twilio: [terms](https://www.twilio.com/en-us/legal/tos), [privacy policy](https://www.twilio.com/en-us/legal/privacy).
-* Mailgun (email, api.mailgun.net): [terms](https://www.mailgun.com/legal/terms/), [privacy policy](https://www.mailgun.com/legal/privacy-policy/).
-* Amazon SES (email, email.<region>.amazonaws.com): [terms](https://aws.amazon.com/service-terms/), [privacy policy](https://aws.amazon.com/privacy/).
-* Sentry (the DSN's host, sentry.io by default): [terms](https://sentry.io/terms/), [privacy policy](https://sentry.io/privacy/).
-* Datadog (api.datadoghq.com or the site given): [terms](https://www.datadoghq.com/legal/terms/), [privacy policy](https://www.datadoghq.com/legal/privacy/).
-* Honeybadger (api.honeybadger.io): [terms](https://www.honeybadger.io/terms/), [privacy policy](https://www.honeybadger.io/privacy/).
-* Bugsnag (notify.bugsnag.com), run by SmartBear: [terms](https://smartbear.com/terms-of-use/), [privacy policy](https://smartbear.com/privacy/).
-* Rollbar (api.rollbar.com): [terms](https://docs.rollbar.com/docs/terms-of-service), [privacy policy](https://docs.rollbar.com/docs/privacy-policy).
-* New Relic (insights-collector.newrelic.com): [terms](https://newrelic.com/termsandconditions/terms), [privacy policy](https://newrelic.com/termsandconditions/privacy).
-* Anthropic's Claude API (api.anthropic.com), for triage: when a developer turns it on with an Anthropic API key, each alert but a recovery is sent to it before it goes out, with the job's definition and up to five earlier runs' output and errors, and the short diagnosis it returns is added to the alert. [Commercial terms](https://www.anthropic.com/legal/commercial-terms), [privacy policy](https://www.anthropic.com/legal/privacy).
+The plugin contacts no other service.
 
 == Installation ==
 

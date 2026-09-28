@@ -7,13 +7,19 @@
  *
  * writes cronwatch-<version>.zip (default into wordpress/dist/) holding one
  * folder, cronwatch/: the plugin's own files (cronwatch.php, uninstall.php,
- * readme.txt, includes/) and the library it runs on (lib/src, with its MIT
- * LICENSE as lib/LICENSE), less the library's files the plugin never runs
- * (LEFT_OUT: the curl and stream transport, since every request goes through
- * wp_remote_post; the PDO stores, since the plugin stores through $wpdb; the
- * pg_cron source; the command-line check; the PSR-15 adapters; the Laravel
- * and Symfony integrations and what only they use). Nothing else
- * goes in: no tests, no Composer files, no build script, no dotfiles.
+ * readme.txt, includes/), the dashboard's stylesheet (css/dashboard.css,
+ * written here from the library's Html::CSS, which the plugin enqueues) and
+ * the library it runs on (lib/src, with its MIT LICENSE as lib/LICENSE),
+ * less the library's files the plugin never runs (LEFT_OUT: the curl and
+ * stream transport, since every request goes through wp_remote_post; every
+ * alert channel but Slack and the webhook, the two the settings offer (email
+ * goes through wp_mail), and the AWS signing only SES used; Claude triage;
+ * the standalone dashboard's head, with its inline stylesheet and app.js,
+ * since the plugin gives the dashboard its own; the PDO stores, since the
+ * plugin stores through $wpdb; the pg_cron source; the command-line check;
+ * the PSR-15 adapters; the Laravel and Symfony integrations and what only
+ * they use). Nothing else goes in: no tests, no Composer files, no build
+ * script, no dotfiles.
  *
  * Each of the library's PHP files gets one line after its declare():
  * CRONWATCH_LIB_ANNOTATION, which tells the directory's Plugin Check (PHPCS
@@ -33,7 +39,21 @@ declare(strict_types=1);
 
 /** The library's files (under src/) the plugin never loads, so its zip leaves them out. A path ending in "/" is a directory. */
 const CRONWATCH_LEFT_OUT = [
+    'Alerts/Bugsnag.php',
+    'Alerts/Datadog.php',
+    'Alerts/Discord.php',
+    'Alerts/Honeybadger.php',
+    'Alerts/Mailgun.php',
     'Alerts/NativeHttp.php',
+    'Alerts/NewRelic.php',
+    'Alerts/Postmark.php',
+    'Alerts/Resend.php',
+    'Alerts/Rollbar.php',
+    'Alerts/Sendgrid.php',
+    'Alerts/Sentry.php',
+    'Alerts/Ses.php',
+    'Alerts/SigV4.php',
+    'Alerts/Twilio.php',
     'Bridge/',
     'Cli.php',
     'Laravel/',
@@ -45,11 +65,16 @@ const CRONWATCH_LEFT_OUT = [
     'Store/PostgresStore.php',
     'Store/SqliteStore.php',
     'Symfony/',
+    'Triage/',
     'Watch.php',
     'Web/PsrHandler.php',
     'Web/PsrJobHandler.php',
     'Web/PsrMiddleware.php',
+    'Web/StandaloneHead.php',
 ];
+
+/** Where the dashboard's stylesheet goes in the plugin (AdminDashboard::STYLESHEET). */
+const CRONWATCH_STYLESHEET = 'css/dashboard.css';
 
 /** The line each library PHP file gets in the zip, after declare(strict_types=1); (see above). */
 const CRONWATCH_LIB_ANNOTATION = '// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped -- the library\'s exception messages are plain text for logs, WP-CLI and the dashboard, and are escaped wherever the plugin shows one.';
@@ -102,10 +127,16 @@ function cronwatch_build_files(string $dir): array
     return $files;
 }
 
+// The dashboard's stylesheet, from the library's pages. Html only declares
+// constants, so loading it runs nothing and needs no other class.
+require_once "{$library}/src/Web/Html.php";
+$generated = ['cronwatch/' . CRONWATCH_STYLESHEET => ltrim(\Cronwatch\Web\Html::CSS, "\n")];
+
 $entries = [];
 foreach (['cronwatch.php', 'uninstall.php', 'readme.txt'] as $file) {
     $entries["cronwatch/{$file}"] = "{$plugin}/{$file}";
 }
+$entries += array_fill_keys(array_keys($generated), null);
 foreach (cronwatch_build_files("{$plugin}/includes") as $file) {
     $entries["cronwatch/includes/{$file}"] = "{$plugin}/includes/{$file}";
 }
@@ -136,7 +167,9 @@ if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::EXCL) !== true) {
 // 2026-01-01 00:00:00 UTC, so the zip does not change with the checkout's file times.
 $time = 1767225600;
 foreach ($entries as $name => $source) {
-    if (str_starts_with($name, 'cronwatch/lib/src/') && str_ends_with($name, '.php')) {
+    if ($source === null) {
+        $zip->addFromString($name, $generated[$name]);
+    } elseif (str_starts_with($name, 'cronwatch/lib/src/') && str_ends_with($name, '.php')) {
         $code = (string) file_get_contents($source);
         $declare = "\ndeclare(strict_types=1);\n";
         if (substr_count($code, $declare) !== 1) {
