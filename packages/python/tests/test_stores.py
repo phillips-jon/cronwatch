@@ -16,6 +16,8 @@ from cronwatch.stores import MemoryStore, SqliteStore
 from cronwatch.stores import _sql
 from cronwatch.stores.sqlite import retry_busy
 
+from helpers import NO_PG, PG, drop_pg_tables, pg_prefix
+
 
 def run(run_id: str, job: str, status: str, started_at: int, **extra: Any) -> Run:
     done = status != "running"
@@ -36,9 +38,18 @@ def definition(**fields: Any) -> JobDefinition:
     return JobDefinition(fields)
 
 
-@pytest.fixture(params=["memory", "sqlite"])
+@pytest.fixture(params=["memory", "sqlite", pytest.param("postgres", marks=pytest.mark.skipif(not PG, reason=NO_PG))])
 def store(request: pytest.FixtureRequest, tmp_path: Path) -> Any:
-    made: Any = MemoryStore() if request.param == "memory" else SqliteStore(tmp_path / "data" / "cw.db")
+    if request.param == "postgres":
+        from cronwatch.stores.postgres import PostgresStore
+
+        prefix = pg_prefix("s")
+        made: Any = PostgresStore(PG, prefix=prefix)
+        yield made
+        made.close()
+        drop_pg_tables(prefix)
+        return
+    made = MemoryStore() if request.param == "memory" else SqliteStore(tmp_path / "data" / "cw.db")
     yield made
     made.close()
 
