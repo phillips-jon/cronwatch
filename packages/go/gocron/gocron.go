@@ -24,8 +24,9 @@
 // replaces CronWatch's for that job. A run gocron skips (singleton mode, a
 // distributed lock held elsewhere) records nothing and may be reported
 // missed. gocron gives a task no CronWatch context, so cronwatch.Current is
-// nil inside it and a run's output is empty; wrap the work in job.Run
-// yourself when it should log.
+// nil inside it and a run's output is empty. To log from a task, leave it
+// out with Options.Exclude and wrap its work in job.Run yourself; wrapping
+// a watched task would record each run twice.
 //
 // # Names
 //

@@ -9,6 +9,7 @@
 //	)
 //
 //	w := cwriver.New(cw, cwriver.Options{})
+//	nightly, _ := cron.ParseStandard("0 2 * * *") // github.com/robfig/cron/v3
 //	workers := river.NewWorkers()
 //	river.AddWorker(workers, &NightlyReportWorker{})
 //	river.AddWorker(workers, w.CheckWorker())
@@ -16,7 +17,7 @@
 //		Workers:    workers,
 //		Middleware: []rivertype.Middleware{w.Middleware()},
 //		PeriodicJobs: []*river.PeriodicJob{
-//			w.PeriodicJob(cron.ParseStandard("0 2 * * *"), func() (river.JobArgs, *river.InsertOpts) {
+//			w.PeriodicJob(nightly, func() (river.JobArgs, *river.InsertOpts) {
 //				return NightlyReportArgs{}, nil
 //			}, &river.PeriodicJobOpts{ID: "nightly-report"}, cronwatch.Grace("15m")),
 //			w.CheckPeriodicJob(5 * time.Minute),

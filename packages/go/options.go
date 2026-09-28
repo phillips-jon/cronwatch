@@ -317,7 +317,7 @@ func WithDefaults(options ...JobOption) Option {
 	}
 }
 
-// WithRedact replaces the default redaction (RedactSecrets) of every run's
+// WithRedact replaces the default redaction (see RedactSecrets) of every run's
 // output and error before it is stored, shown or sent anywhere. A redact
 // function that panics is reported to the error handler and the default is
 // used.
