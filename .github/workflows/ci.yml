@@ -6,7 +6,9 @@
 # newest Python it supports, against each supported Django series, and the
 # PHP package's on the oldest and newest PHP, against MySQL, MariaDB,
 # Postgres and WordPress, against each supported Laravel and Symfony
-# series, and in a real Drupal and a real Craft. The MCP server is driven against each port's
+# series, and in a real Drupal and a real Craft. The Go module's tests run
+# on the two Go releases Go supports, with the race detector, against
+# SQLite, Postgres, MySQL and MariaDB. The MCP server is driven against each port's
 # dashboard. One Node, one Ruby and one Python entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
@@ -623,3 +625,81 @@ jobs:
         env:
           CRONWATCH_TEST_CRAFT: ${{ matrix.constraint }}
           CRONWATCH_TEST_CRAFT_DB: ${{ matrix.url }}
+
+  # The Go module on the two Go releases Go supports, with the race
+  # detector. The core (packages/go, standard library only) replays
+  # conformance/ and checks its croner port against croner through the built
+  # SDK; packages/go/sqltest, a module of its own and the only place database
+  # drivers appear, runs the SQL store's contract, conformance and
+  # finish-once tests on SQLite, Postgres, MySQL and MariaDB, and shares a
+  # SQLite file with the SDK.
+  go:
+    name: go (Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.25", "1.26"]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+          MARIADB_DATABASE: cw
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Builds the SDK (for the croner parity and Node compatibility tests),
+      # then fails if conformance/ or the dashboard fixture is stale.
+      - run: npm run check:conformance
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.go }}
+          # The core module has no go.sum: it requires nothing.
+          cache-dependency-path: packages/go/sqltest/go.sum
+      - name: The core module requires nothing
+        working-directory: packages/go
+        run: |
+          go mod tidy -diff
+          test -z "$(go list -m -f '{{if not .Main}}{{.Path}}{{end}}' all)"
+      - name: gofmt
+        run: test -z "$(gofmt -l packages/go)" || { gofmt -l packages/go; exit 1; }
+      - run: go vet ./...
+        working-directory: packages/go
+      - run: go vet ./...
+        working-directory: packages/go/sqltest
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@v0.8.1
+          (cd packages/go && "$(go env GOPATH)/bin/staticcheck" ./...)
+          (cd packages/go/sqltest && "$(go env GOPATH)/bin/staticcheck" ./...)
+      - run: go test -race -count=1 ./...
+        working-directory: packages/go
+      - run: go test -race -count=1 ./...
+        working-directory: packages/go/sqltest
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+          CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
+          CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw

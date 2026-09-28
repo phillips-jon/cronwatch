@@ -46,6 +46,7 @@ export const { GET, POST, DELETE } = cw.routes();
 | [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob and Sidekiq integration, schedules read from Solid Queue or sidekiq-cron, pg_cron jobs, the same alert channels, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
 | [`cronwatch-sdk` for Python](packages/python) | the Python port for Python apps: the memory, SQLite and Postgres stores, the same alert channels and Claude triage, pg_cron jobs, the dashboard as a WSGI and ASGI app, Django, Celery and beat, APScheduler, async jobs, and `handler()` for platform crons and AWS Lambda. |
 | [`cronwatch/cronwatch` for PHP](packages/php) | the PHP port: the core (jobs, runs, checks, the same rules and alert text), the memory, SQLite, MySQL (and MariaDB) and Postgres stores, sharing tables with the SDK byte for byte, every channel, the dashboard, and Laravel, Symfony, WordPress, Drupal and Craft ([its DESIGN.md](packages/php/DESIGN.md)) |
+| [`cronwatch.dev/go`](packages/go) | the Go port, under way: the core (jobs, runs, checks, the same rules and alert text, context-first and safe across goroutines), the memory store and a `database/sql` store for SQLite, Postgres and MySQL over the app's own driver, sharing tables with the SDK byte for byte. Channels, the dashboard and scheduler integrations come in later phases ([its DESIGN.md](packages/go/DESIGN.md)) |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
 | [`site`](site) | cronwatch.dev, a static landing page and docs |
@@ -103,7 +104,7 @@ npm run check          # dash check, typecheck, tests
 npm run build          # every package and the site
 npm run dev --workspace site    # the site on http://localhost:4321, rebuilding on change
 npm run check:packages # pack both packages and use them from a scratch project (after build)
-npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python and PHP packages
+npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python, PHP and Go packages
 ```
 
 The gem (Ruby 3.2 or newer), after `npm run build` so its Node compatibility tests can run:
@@ -132,6 +133,15 @@ npm run check:php                              # composer install and phpunit in
 ```
 
 It replays `conformance/` as well. Its MySQL and MariaDB tests run when `CRONWATCH_TEST_MYSQL` and `CRONWATCH_TEST_MARIADB` are `mysql://` URLs ([its README](packages/php/README.md#testing) shows two throwaway servers); CI runs it on PHP 8.2 and 8.5, against both.
+
+The Go module (Go 1.25 or newer), after `npm run build` for the same reason:
+
+```bash
+cd packages/go && go test -race ./...           # the core: standard library only
+cd packages/go/sqltest && go test -race ./...   # the SQL store, in a module of its own that holds the drivers
+```
+
+It replays `conformance/` too. The SQL store's Postgres, MySQL and MariaDB tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL` and `CRONWATCH_TEST_MARIADB` are set ([its README](packages/go/README.md#testing) has the formats); CI runs both modules on Go 1.25 and 1.26 with the race detector, against all three.
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 

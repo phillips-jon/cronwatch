@@ -1,0 +1,645 @@
+// Package sqlstore keeps CronWatch's jobs, runs and state in the app's own
+// database through database/sql: SQLite, Postgres or MySQL (and MariaDB).
+// The app brings its driver and its *sql.DB; this package imports none, so
+// the cronwatch module needs no driver at all.
+//
+//	db, _ := sql.Open("sqlite", "file:data/app.db")    // modernc.org/sqlite
+//	db, _ := sql.Open("pgx", os.Getenv("DATABASE_URL")) // github.com/jackc/pgx/v5/stdlib
+//	db, _ := sql.Open("mysql", "app:pw@tcp(db:3306)/app") // github.com/go-sql-driver/mysql
+//
+//	store, err := sqlstore.New(db, sqlstore.Postgres)
+//	cw, err := cronwatch.New(cronwatch.WithStore(store))
+//
+// The tables are the SDK's (stores/sql.ts): the same names, columns and
+// statements, and the SDK's JSON in the JSON columns byte for byte, so a
+// Go process shares a database with a Node, Ruby, Python or PHP one.
+package sqlstore
+
+import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	cronwatch "cronwatch.dev/go"
+	"cronwatch.dev/go/internal/js"
+)
+
+// Dialect is the database's SQL.
+type Dialect string
+
+// The dialects.
+const (
+	SQLite   Dialect = "sqlite"
+	Postgres Dialect = "postgres"
+	// MySQL 8.0.13 or newer, or MariaDB 10.6 or newer.
+	MySQL Dialect = "mysql"
+)
+
+// Option configures a store.
+type Option func(*Store)
+
+// Prefix starts every table name: lowercase letters, digits and
+// underscores. Default "cronwatch_".
+func Prefix(prefix string) Option { return func(s *Store) { s.prefix = prefix } }
+
+// Store is a cronwatch.Store over a *sql.DB. Safe for use by many
+// goroutines at once.
+//
+// On SQLite it holds one connection of the pool (the SDK's store has one
+// connection too): an in-memory database is one per connection, and one
+// writer at a time is what SQLite allows anyway. That connection is put in
+// WAL mode (with the SDK's retry of a busy database while switching), with
+// busy_timeout 5000 and synchronous NORMAL. On Postgres and MySQL it uses
+// the pool, each statement on its own (autocommit), so its writes never
+// join a transaction the app has open. So a pool limited to one connection
+// (db.SetMaxOpenConns(1)) leaves the app none on SQLite, and waits on an
+// app's open transaction on the others: give it room for the store too.
+//
+// The tests are in the sqltest module beside this package (SQLite,
+// Postgres, MySQL and MariaDB, and a file shared with the SDK in Node),
+// kept apart so the drivers never become the cronwatch module's
+// requirements.
+type Store struct {
+	db      *sql.DB
+	dialect Dialect
+	prefix  string
+	sql     statements
+
+	// SQLite's one connection, in turn.
+	mu   sync.Mutex
+	conn *sql.Conn
+}
+
+var (
+	_ cronwatch.Store         = (*Store)(nil)
+	_ cronwatch.RunUpdater    = (*Store)(nil)
+	_ cronwatch.StateComparer = (*Store)(nil)
+)
+
+// New is a store over db in the dialect given.
+func New(db *sql.DB, dialect Dialect, options ...Option) (*Store, error) {
+	if db == nil {
+		return nil, errors.New("sqlstore: New needs a *sql.DB")
+	}
+	if dialect != SQLite && dialect != Postgres && dialect != MySQL {
+		return nil, fmt.Errorf("sqlstore: unknown dialect %s; use sqlstore.SQLite, sqlstore.Postgres or sqlstore.MySQL", js.Quote(string(dialect)))
+	}
+	s := &Store{db: db, dialect: dialect, prefix: DefaultPrefix}
+	for _, o := range options {
+		o(s)
+	}
+	p, err := tablePrefix(s.prefix)
+	if err != nil {
+		return nil, err
+	}
+	s.prefix = p
+	s.sql = newStatements(dialect, p)
+	return s, nil
+}
+
+// Dialect is the store's dialect.
+func (s *Store) Dialect() Dialect { return s.dialect }
+
+// TablePrefix is the prefix of the store's tables.
+func (s *Store) TablePrefix() string { return s.prefix }
+
+// querier is what a statement runs on: the pool, SQLite's connection, or a
+// transaction.
+type querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// busyRetry is how long opening SQLite keeps retrying a busy database
+// before it gives up (busy.ts).
+const busyRetry = 2 * time.Second
+
+func isBusy(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := err.Error()
+	return strings.Contains(text, "SQLITE_BUSY") || strings.Contains(text, "SQLITE_LOCKED") || strings.Contains(text, "database is locked") || strings.Contains(text, "database table is locked")
+}
+
+// retryBusy runs fn, retrying while SQLite answers busy, with a short
+// growing pause, for up to busyRetry in all (busy.ts retryBusy).
+func retryBusy(ctx context.Context, fn func() error) error {
+	waited := time.Duration(0)
+	for attempt := 0; ; attempt++ {
+		err := fn()
+		if !isBusy(err) || waited >= busyRetry {
+			return err
+		}
+		pause := min(10*time.Millisecond<<attempt, 200*time.Millisecond, busyRetry-waited)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(pause):
+		}
+		waited += pause
+	}
+}
+
+// with runs fn with what statements go through: SQLite's one connection,
+// held for the call, or the pool.
+func (s *Store) with(ctx context.Context, fn func(q querier) error) error {
+	if s.dialect != SQLite {
+		return fn(s.db)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.conn == nil {
+		conn, err := s.db.Conn(ctx)
+		if err != nil {
+			return err
+		}
+		// No busy handler until WAL is on: switching journal mode can answer
+		// busy at once while another process is doing the same on a new
+		// file, so that is retried. The connection is kept only once every
+		// pragma has gone through; a failed open is tried afresh next time.
+		err = retryBusy(ctx, func() error { return exec(ctx, conn, "PRAGMA journal_mode = WAL") })
+		if err == nil {
+			err = exec(ctx, conn, "PRAGMA busy_timeout = 5000")
+		}
+		if err == nil {
+			err = exec(ctx, conn, "PRAGMA synchronous = NORMAL")
+		}
+		if err != nil {
+			conn.Close()
+			return err
+		}
+		s.conn = conn
+	}
+	err := fn(s.conn)
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, sql.ErrConnDone) {
+		s.conn.Close()
+		s.conn = nil
+	}
+	return err
+}
+
+// exec runs a statement whose rows, if any, are not wanted (PRAGMA
+// journal_mode answers one).
+func exec(ctx context.Context, q querier, text string, args ...any) error {
+	rows, err := q.QueryContext(ctx, text, args...)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	return rows.Close()
+}
+
+// run executes a statement and answers how many rows it changed.
+func (s *Store) run(ctx context.Context, text string, args ...any) (int64, error) {
+	var n int64
+	err := s.with(ctx, func(q querier) error {
+		res, err := q.ExecContext(ctx, text, args...)
+		if err != nil {
+			return err
+		}
+		n, err = res.RowsAffected()
+		return err
+	})
+	return n, err
+}
+
+// row is one row by column name, each value as the driver gave it.
+type row map[string]any
+
+func (s *Store) query(ctx context.Context, text string, args ...any) ([]row, error) {
+	var out []row
+	err := s.with(ctx, func(q querier) error {
+		rows, err := q.QueryContext(ctx, text, args...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		cols, err := rows.Columns()
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			values := make([]any, len(cols))
+			ptrs := make([]any, len(cols))
+			for i := range values {
+				ptrs[i] = &values[i]
+			}
+			if err := rows.Scan(ptrs...); err != nil {
+				return err
+			}
+			r := row{}
+			for i, c := range cols {
+				r[strings.ToLower(c)] = values[i]
+			}
+			out = append(out, r)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
+// text is a column as text: drivers hand back strings or bytes.
+func text(v any) (string, bool) {
+	switch t := v.(type) {
+	case string:
+		return t, true
+	case []byte:
+		return string(t), true
+	case nil:
+		return "", false
+	}
+	// A driver that decoded a JSON column itself: written back as JSON,
+	// though a map loses the order of its keys on the way. pgx's stdlib,
+	// go-sql-driver/mysql and modernc.org/sqlite all hand JSON back as
+	// text (the sqltest module checks it), so this is for other drivers.
+	b, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Sprint(v), true
+	}
+	return string(b), true
+}
+
+// integer is a number column: drivers hand back int64, or text for BIGINT.
+func integer(v any) (int64, bool) {
+	switch t := v.(type) {
+	case int64:
+		return t, true
+	case int32:
+		return int64(t), true
+	case int:
+		return int64(t), true
+	case float64:
+		return int64(t), true
+	case nil:
+		return 0, false
+	}
+	s, _ := text(v)
+	if n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64); err == nil {
+		return n, true
+	}
+	f, _ := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	return int64(f), true
+}
+
+func nullableInt(v any) *int64 {
+	n, ok := integer(v)
+	if !ok {
+		return nil
+	}
+	return &n
+}
+
+func nullableText(v any) *string {
+	t, ok := text(v)
+	if !ok {
+		return nil
+	}
+	return &t
+}
+
+func (r row) job() (cronwatch.StoredJob, error) {
+	name, _ := text(r["name"])
+	def, _ := text(r["definition"])
+	var d cronwatch.Definition
+	if err := json.Unmarshal([]byte(def), &d); err != nil {
+		return cronwatch.StoredJob{}, fmt.Errorf("job %s: %w", name, err)
+	}
+	created, _ := integer(r["created_at"])
+	updated, _ := integer(r["updated_at"])
+	return cronwatch.StoredJob{Name: name, Definition: d, CreatedAt: created, UpdatedAt: updated}, nil
+}
+
+func (r row) run() (cronwatch.Run, error) {
+	var out cronwatch.Run
+	out.ID, _ = text(r["id"])
+	out.Job, _ = text(r["job"])
+	status, _ := text(r["status"])
+	out.Status = cronwatch.RunStatus(status)
+	out.StartedAt, _ = integer(r["started_at"])
+	out.FinishedAt = nullableInt(r["finished_at"])
+	out.DurationMs = nullableInt(r["duration_ms"])
+	out.Error = nullableText(r["error"])
+	out.Output = nullableText(r["output"])
+	out.Metrics = cronwatch.Metrics{}
+	if m, ok := text(r["metrics"]); ok {
+		if err := json.Unmarshal([]byte(m), &out.Metrics); err != nil {
+			return cronwatch.Run{}, fmt.Errorf("run %s: %w", out.ID, err)
+		}
+	}
+	out.Trigger, _ = text(r["trigger"])
+	return out, nil
+}
+
+func (r row) state() (cronwatch.JobState, error) {
+	t, _ := text(r["state"])
+	var s cronwatch.JobState
+	err := json.Unmarshal([]byte(t), &s)
+	return s, err
+}
+
+// jsonText is the SDK's JSON of a value.
+func jsonText(v json.Marshaler) string {
+	b, _ := v.MarshalJSON()
+	return string(b)
+}
+
+// textValue is a TEXT value as a JavaScript driver writes it: valid UTF-8.
+func textValue(p *string) any {
+	if p == nil {
+		return nil
+	}
+	return js.WellFormed(*p)
+}
+
+func intValue(p *int64) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+// Parameters in statement order, so every driver binds the same values.
+
+func insertRunArgs(r cronwatch.Run) []any {
+	return []any{r.ID, r.Job, string(r.Status), r.StartedAt, intValue(r.FinishedAt), intValue(r.DurationMs), textValue(r.Error), textValue(r.Output), jsonText(r.Metrics), r.Trigger}
+}
+
+func updateRunArgs(r cronwatch.Run) []any {
+	return []any{string(r.Status), intValue(r.FinishedAt), intValue(r.DurationMs), textValue(r.Error), textValue(r.Output), jsonText(r.Metrics), r.ID}
+}
+
+// Init makes the tables. On Postgres many processes starting at once would
+// race CREATE TABLE IF NOT EXISTS, which Postgres can reject with a unique
+// violation on pg_type, so they take turns under an advisory lock per
+// prefix. MySQL commits CREATE TABLE at once, so call Init when nothing is
+// open (it runs at the client's first use).
+func (s *Store) Init(ctx context.Context) error {
+	statements := schema(s.dialect, s.prefix)
+	if s.dialect != Postgres {
+		return s.with(ctx, func(q querier) error {
+			for _, st := range statements {
+				if _, err := q.ExecContext(ctx, st); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+	return s.transaction(ctx, func(q querier) error {
+		if err := exec(ctx, q, "SELECT pg_advisory_xact_lock(hashtext($1))", "cronwatch:"+s.prefix); err != nil {
+			return err
+		}
+		for _, st := range statements {
+			if _, err := q.ExecContext(ctx, st); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// transaction runs fn in a transaction of the store's own.
+func (s *Store) transaction(ctx context.Context, fn func(q querier) error) error {
+	begin := func(q interface {
+		BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+	}) error {
+		tx, err := q.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		if err := fn(tx); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		return tx.Commit()
+	}
+	if s.dialect != SQLite {
+		return begin(s.db)
+	}
+	return s.with(ctx, func(q querier) error { return begin(q.(*sql.Conn)) })
+}
+
+func (s *Store) UpsertJob(ctx context.Context, def cronwatch.Definition, now int64) error {
+	_, err := s.run(ctx, s.sql.upsertJob, def.Name(), jsonText(def), now, now)
+	return err
+}
+
+func (s *Store) GetJob(ctx context.Context, name string) (*cronwatch.StoredJob, error) {
+	rows, err := s.query(ctx, s.sql.getJob, name)
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	j, err := rows[0].job()
+	if err != nil {
+		return nil, err
+	}
+	return &j, nil
+}
+
+func (s *Store) ListJobs(ctx context.Context) ([]cronwatch.StoredJob, error) {
+	rows, err := s.query(ctx, s.sql.listJobs)
+	if err != nil {
+		return nil, err
+	}
+	out := []cronwatch.StoredJob{}
+	for _, r := range rows {
+		j, err := r.job()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, j)
+	}
+	return out, nil
+}
+
+// DeleteJob removes the job, its runs and its state in one transaction.
+func (s *Store) DeleteJob(ctx context.Context, name string) error {
+	return s.transaction(ctx, func(q querier) error {
+		for _, st := range []string{s.sql.deleteRuns, s.sql.deleteState, s.sql.deleteJob} {
+			if _, err := q.ExecContext(ctx, st, name); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (s *Store) InsertRun(ctx context.Context, r cronwatch.Run) error {
+	_, err := s.run(ctx, s.sql.insertRun, insertRunArgs(r)...)
+	return err
+}
+
+func (s *Store) UpdateRun(ctx context.Context, r cronwatch.Run) error {
+	_, err := s.run(ctx, s.sql.updateRun, updateRunArgs(r)...)
+	return err
+}
+
+func (s *Store) UpdateRunIf(ctx context.Context, r cronwatch.Run, from []cronwatch.RunStatus) (bool, error) {
+	if len(from) == 0 {
+		return false, nil
+	}
+	args := updateRunArgs(r)
+	for _, st := range from {
+		args = append(args, string(st))
+	}
+	n, err := s.run(ctx, updateRunIfSQL(s.dialect, s.prefix, len(from)), args...)
+	if err != nil || n > 0 || s.dialect != MySQL {
+		return n > 0, err
+	}
+	// MySQL counts only the rows an UPDATE changed, so a row that already
+	// held these values (and matched) answers 0: it was written all the same.
+	stored, err := s.GetRun(ctx, r.ID)
+	if err != nil || stored == nil {
+		return false, err
+	}
+	matched := false
+	for _, st := range from {
+		matched = matched || stored.Status == st
+	}
+	return matched && canonical(updateRunArgs(*stored)) == canonical(updateRunArgs(r)), nil
+}
+
+// canonical is statement arguments compared whatever order a JSON column
+// gave an object's keys back in.
+func canonical(args []any) string {
+	var b strings.Builder
+	for _, a := range args {
+		if t, ok := a.(string); ok && (strings.HasPrefix(t, "{") || strings.HasPrefix(t, "[")) {
+			var v any
+			if json.Unmarshal([]byte(t), &v) == nil {
+				out, _ := json.Marshal(v)
+				a = string(out)
+			}
+		}
+		fmt.Fprintf(&b, "%#v\x00", a)
+	}
+	return b.String()
+}
+
+func (s *Store) GetRun(ctx context.Context, id string) (*cronwatch.Run, error) {
+	rows, err := s.query(ctx, s.sql.getRun, id)
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	r, err := rows[0].run()
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (s *Store) runs(ctx context.Context, text string, args ...any) ([]cronwatch.Run, error) {
+	rows, err := s.query(ctx, text, args...)
+	if err != nil {
+		return nil, err
+	}
+	out := []cronwatch.Run{}
+	for _, r := range rows {
+		run, err := r.run()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, run)
+	}
+	return out, nil
+}
+
+func (s *Store) ListRuns(ctx context.Context, job string, limit int) ([]cronwatch.Run, error) {
+	return s.runs(ctx, s.sql.listRuns, job, max(0, limit))
+}
+
+func (s *Store) LastRun(ctx context.Context, job string) (*cronwatch.Run, error) {
+	list, err := s.runs(ctx, s.sql.listRuns, job, 1)
+	if err != nil || len(list) == 0 {
+		return nil, err
+	}
+	return &list[0], nil
+}
+
+func (s *Store) RunningRuns(ctx context.Context) ([]cronwatch.Run, error) {
+	return s.runs(ctx, s.sql.runningRuns)
+}
+
+func (s *Store) GetState(ctx context.Context, job string) (*cronwatch.JobState, error) {
+	rows, err := s.query(ctx, s.sql.getState, job)
+	if err != nil || len(rows) == 0 {
+		return nil, err
+	}
+	st, err := rows[0].state()
+	if err != nil {
+		return nil, err
+	}
+	return &st, nil
+}
+
+func (s *Store) SetState(ctx context.Context, st cronwatch.JobState) error {
+	_, err := s.run(ctx, s.sql.setState, st.Job, jsonText(st))
+	return err
+}
+
+func (s *Store) CompareAndSetState(ctx context.Context, st cronwatch.JobState, expected int64) (bool, error) {
+	body := jsonText(st)
+	if s.dialect != MySQL {
+		var n int64
+		var err error
+		if expected == 0 {
+			n, err = s.run(ctx, s.sql.casInsert, st.Job, body)
+		} else {
+			n, err = s.run(ctx, s.sql.casUpdate, body, st.Job, expected)
+		}
+		return n > 0, err
+	}
+	if expected != 0 {
+		n, err := s.run(ctx, s.sql.casUpdate, body, st.Job, expected)
+		return n > 0, err
+	}
+	// Version 0 is a row at version 0 (or with none), or no row at all.
+	n, err := s.run(ctx, s.sql.casFromZero, body, st.Job)
+	if err != nil || n > 0 {
+		return n > 0, err
+	}
+	if _, err := s.run(ctx, s.sql.casInsert, st.Job, body); err != nil {
+		// A row is there, at another version: another process wrote first.
+		// (Or it is at version 0 and already holds this very state, which
+		// MySQL's changed-rows count answered 0 for.)
+		if stored, gerr := s.GetState(ctx, st.Job); gerr == nil && stored != nil {
+			if stored.Version == nil || *stored.Version == 0 {
+				return jsonText(*stored) == body, nil
+			}
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *Store) Prune(ctx context.Context, before int64) (int, error) {
+	n, err := s.run(ctx, s.sql.prune, before)
+	return int(n), err
+}
+
+// Close gives SQLite's connection back to the pool. The *sql.DB is the
+// app's, and stays open.
+func (s *Store) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.conn != nil {
+		err := s.conn.Close()
+		s.conn = nil
+		return err
+	}
+	return nil
+}

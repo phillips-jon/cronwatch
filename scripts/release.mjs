@@ -40,6 +40,9 @@ const VERSIONED = [
   // is what moves.
   { file: "packages/php/drupal/composer.json", pattern: /^( {8}"cronwatch\/cronwatch": "\^)([^"]+)(")/m },
   { file: "packages/php/craft/composer.json", pattern: /^( {8}"cronwatch\/cronwatch": "\^)([^"]+)(")/m },
+  // A Go module's version is its tag (see PUBLISH); the constant is what the
+  // library reports about itself, kept in step with the tag.
+  { file: "packages/go/version.go", pattern: /^(const Version = ")([^"]+)(")/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -77,6 +80,14 @@ const PUBLISH = [
   { dir: "packages/php", commands: (v) => [
     `# packages/php: the pushed tag v${v} is split to its own repository by .github/workflows/php-split.yml (packages/php/DESIGN.md, Releasing)`,
     `# packages/php/drupal and packages/php/craft: the same tag is split to drupal.org's repository (as ${v}) and the Craft plugin's by .github/workflows/php-plugins-split.yml; then make the drupal.org release from the ${v} tag`,
+  ] },
+  // Go modules publish by tag: a module in a subdirectory is versioned by a
+  // tag with that prefix, so the release commit also gets packages/go/vX.Y.Z,
+  // and the Go proxy serves it once anyone asks (packages/go/DESIGN.md,
+  // Releasing). packages/go/sqltest holds tests only and is never tagged.
+  { dir: "packages/go", commands: (v) => [
+    `git tag -a packages/go/v${v} -m "Release ${v} (Go)" v${v}^{} && git push origin packages/go/v${v}`,
+    `# packages/go: then GOPROXY=https://proxy.golang.org go list -m cronwatch.dev/go@v${v} makes the proxy fetch it (once cronwatch.dev serves the go-import tag)`,
   ] },
 ];
 
