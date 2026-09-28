@@ -322,3 +322,15 @@ def test_a_plain_function_handing_back_a_coroutine_is_a_failed_run_not_a_quick_s
     assert run.error.startswith("TypeError: job a: the function returned a coroutine")
     assert ran == [], "never started, and closed rather than left to warn"
     assert alerts.types() == ["failed"]
+
+
+def test_run_and_monitor_are_typed_for_a_type_checker() -> None:
+    """py.typed is shipped, so a decorated function must keep its signature
+    rather than become Any (mypy and pyright read these overloads)."""
+    import typing
+
+    from cronwatch.client import JobHandle
+
+    assert len(typing.get_overloads(JobHandle.monitor)) == 2
+    assert len(typing.get_overloads(JobHandle.run)) == 3
+    assert JobHandle.handler.__annotations__["return"] == "Handler"

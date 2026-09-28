@@ -508,13 +508,13 @@ class PgCron:
         for jobid, name in names.items():
             if jobid in self._cursors:
                 continue
-            ours = [r for r in host.store.list_runs(name, BACKFILL) if self._run_id_of(r.id) is not None]
+            ours = [(runid, r) for r in host.store.list_runs(name, BACKFILL) if (runid := self._run_id_of(r.id)) is not None]
             if ours:
-                self._cursors[jobid] = max(self._run_id_of(r.id) for r in ours)  # type: ignore[type-var]
-                self._last_at[jobid] = max(r.started_at for r in ours)
-                for r in ours:
+                self._cursors[jobid] = max(runid for runid, _ in ours)
+                self._last_at[jobid] = max(r.started_at for _, r in ours)
+                for runid, r in ours:
                     if r.status in (RunStatus.RUNNING, RunStatus.TIMEOUT):
-                        self._pending[self._run_id_of(r.id)] = r.job  # type: ignore[index]
+                        self._pending[runid] = r.job
                 continue
             # First sight: copy recent history quietly, and judge only from the newest finished run on.
             # The cursor goes to the newest row read, whatever is held, so history is never judged later.

@@ -19,9 +19,9 @@ import re
 import threading
 import time
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
 
 from . import _js, _zone
 from ._env import is_production
@@ -65,7 +65,11 @@ from .types import (
     StoredJob,
 )
 
+if TYPE_CHECKING:
+    from .handler import Handler
+
 T = TypeVar("T")
+P = ParamSpec("P")
 _log = logging.getLogger("cronwatch")
 
 NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,119}")
@@ -232,7 +236,7 @@ class _Ticker:
 
 def is_async_callable(fn: Any) -> bool:
     """An async def, or something whose call is one (a partial of one, an object with async __call__)."""
-    return inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(getattr(fn, "__call__", None))
+    return inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(getattr(fn, "__call__", None))  # noqa: B004, whether __call__ is a coroutine function
 
 
 class JobHandle:
@@ -258,7 +262,14 @@ class JobHandle:
         #: The job's name.
         self.name: str = definition.name
 
-    def run(self, fn: Callable[[JobContext], T] | None = None, *, trigger: str = "run") -> Any:
+    @overload
+    def run(self, fn: None = None, *, trigger: str = "run") -> _RunBlock: ...
+    @overload
+    def run(self, fn: Callable[[JobContext], Awaitable[T]], *, trigger: str = "run") -> Awaitable[T]: ...
+    @overload
+    def run(self, fn: Callable[[JobContext], T], *, trigger: str = "run") -> T: ...
+
+    def run(self, fn: Callable[[JobContext], Any] | None = None, *, trigger: str = "run") -> Any:
         """With a function: run it now as a recorded run, passing the context.
         Returns what it returns and raises what it raises, after the run is
         recorded. A string it returns is the run's output when nothing was
@@ -270,7 +281,12 @@ class JobHandle:
             return self._client._aexecute(self.definition, trigger, fn)
         return self._client._execute(self.definition, trigger, fn)
 
-    def monitor(self, fn: Callable[..., T] | None = None, *, trigger: str = "run") -> Any:
+    @overload
+    def monitor(self, fn: Callable[P, T], *, trigger: str = "run") -> Callable[P, T]: ...
+    @overload
+    def monitor(self, fn: None = None, *, trigger: str = "run") -> Callable[[Callable[P, T]], Callable[P, T]]: ...
+
+    def monitor(self, fn: Callable[..., Any] | None = None, *, trigger: str = "run") -> Any:
         """A decorator: every call of the function is a recorded run. Inside it,
         ``cronwatch.current()`` is the run's context, for log() and metric().
         An async function stays async: each await of it is a run."""
@@ -294,7 +310,7 @@ class JobHandle:
 
         return decorate(fn) if fn is not None else decorate
 
-    def handler(self, fn: Callable[..., Any], *, secret: str | None = _UNSET) -> Any:
+    def handler(self, fn: Callable[..., Any], *, secret: str | None = _UNSET) -> Handler:
         """A request handler that runs the function for each request carrying
         the cron secret and records the run: the SDK's handler(), for a
         platform cron (Vercel, a scheduler calling a URL). ``fn(ctx, request)``

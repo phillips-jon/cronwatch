@@ -111,7 +111,7 @@ class AnthropicTriage:
         fallbacks: bool | None = None,
         context: str | None = None,
     ) -> None:
-        self.client = client if client is not None else _anthropic.Anthropic(**({"api_key": api_key} if api_key else {}))
+        self.client = client if client is not None else (_anthropic.Anthropic(api_key=api_key) if api_key else _anthropic.Anthropic())
         self.model = model or DEFAULT_MODEL
         self.effort = effort or DEFAULT_EFFORT
         self.max_tokens = DEFAULT_MAX_TOKENS if max_tokens is None else max_tokens

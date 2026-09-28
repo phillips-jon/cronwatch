@@ -585,6 +585,43 @@ def test_the_default_http_trims_header_values() -> None:
         server.close()
 
 
+def test_the_default_http_posts_only_to_http_and_https_and_never_quotes_the_url(tmp_path: Any) -> None:
+    """urllib would open file: and ftp: URLs, and its errors for a URL it
+    cannot read quote it whole, path and all: a webhook's credential."""
+    secret_path = "/services/T0/B0/" + "hook" + "path" + "secret"
+    target = tmp_path / "private.txt"
+    target.write_text("not for a channel")
+    for url in (f"file://{target}", "ftp://example.com/x", "hooks.slack.com" + secret_path, "javascript:alert(1)"):
+        with pytest.raises(ValueError) as refused:
+            UrllibHTTP(timeout=1).post(url, "{}", {})
+        assert "only http and https" in str(refused.value)
+        assert "hookpathsecret" not in str(refused.value) and "private" not in str(refused.value)
+    with pytest.raises(ValueError) as invalid:
+        UrllibHTTP(timeout=1).post("https://hooks.example.com" + secret_path + " x", "{}", {})
+    assert str(invalid.value) == "cannot post to https://hooks.example.com: the URL is not valid"
+    with pytest.raises(ValueError) as failed:
+        A.Slack("https://hooks.example.com" + secret_path + " x").send(alert_j())
+    assert "hookpathsecret" not in str(failed.value)
+
+
+def test_the_default_http_reads_a_pasted_url_as_fetch_does() -> None:
+    server = LocalServer(204)
+    try:
+        response = UrllibHTTP().post(f"  {server.url}/hook\n?key=abc\r\n", "{}", {})
+        assert response.status == 204
+        assert server.seen[0][0].startswith("POST /hook?key=abc HTTP/1.1\r\n")
+    finally:
+        server.close()
+
+
+def test_a_header_value_with_a_line_break_is_refused_without_quoting_it() -> None:
+    key = "key-" + "line" + "break" + "credential"
+    with pytest.raises(ValueError) as refused:
+        UrllibHTTP(timeout=1).post("https://127.0.0.1:9/", "{}", {"authorization": f"Bearer {key}\r\nx-injected: 1"})
+    assert "authorization" in str(refused.value)
+    assert "credential" not in str(refused.value)
+
+
 def test_the_default_http_gives_up_after_ten_seconds() -> None:
     assert UrllibHTTP().timeout == 10
     assert A.Slack("https://hooks.slack.example/x")._http.timeout == 10  # type: ignore[attr-defined]

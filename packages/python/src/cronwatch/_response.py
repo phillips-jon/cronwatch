@@ -3,7 +3,9 @@ returns a fetch Response with a status of 400 or more; Python has no one
 Response type, so any of the common ones counts, read by duck typing:
 cronwatch.web.Response, anything with an integer status_code (Django,
 Flask and Werkzeug, Starlette and FastAPI, requests, httpx), and the standard
-library's http.client.HTTPResponse (what urllib.request.urlopen returns)."""
+library's http.client.HTTPResponse (what urllib.request.urlopen returns),
+and the dict an AWS Lambda function answers API Gateway or a function URL
+with (an integer "statusCode" and only the proxy result's keys)."""
 
 from __future__ import annotations
 
@@ -12,6 +14,17 @@ import sys
 from typing import Any
 
 _PLAIN = (str, bytes, bytearray, int, float, bool, list, tuple, dict, set, type(None))
+#: The keys of a Lambda proxy result (API Gateway REST and HTTP APIs, function URLs).
+LAMBDA_KEYS = frozenset({"statusCode", "headers", "multiValueHeaders", "body", "isBase64Encoded", "cookies"})
+
+
+def is_lambda_result(value: Any) -> bool:
+    """A Lambda proxy result: a dict with a whole-number statusCode from 100 to
+    599 and no key a proxy result does not have."""
+    if not isinstance(value, dict) or not value.keys() <= LAMBDA_KEYS:
+        return False
+    code = value.get("statusCode")
+    return isinstance(code, int) and not isinstance(code, bool) and 100 <= code <= 599
 
 
 def response_status(value: Any) -> tuple[int, str] | None:
@@ -19,6 +32,8 @@ def response_status(value: Any) -> tuple[int, str] | None:
     reason is the response's own reason phrase when it carries one (Django's
     reason_phrase, requests' reason, Werkzeug's status line), else "", as a
     fetch Response made without a statusText has none."""
+    if is_lambda_result(value):
+        return value["statusCode"], ""
     if isinstance(value, _PLAIN):
         return None
     web = sys.modules.get("cronwatch.web")

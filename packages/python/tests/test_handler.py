@@ -341,3 +341,132 @@ def test_a_werkzeug_request_gets_a_werkzeug_response() -> None:
     assert isinstance(answer, WerkzeugResponse)
     assert answer.status_code == 200
     assert json.loads(answer.get_data())["ok"] is True
+
+
+# ---------------------------------------------------------------- AWS Lambda
+
+SECRET = "lambda-" + "s3cret"
+
+
+def rest_event(authorization: str | None = None, multi_only: bool = False) -> dict[str, Any]:
+    """An API Gateway REST API (payload 1.0) event: headers as sent, and multiValueHeaders."""
+    headers = {} if authorization is None else {"Authorization": authorization}
+    return {
+        "resource": "/cron/nightly",
+        "path": "/cron/nightly",
+        "httpMethod": "GET",
+        "headers": None if multi_only else {"Host": "abc.execute-api.us-east-1.amazonaws.com", **headers},
+        "multiValueHeaders": {"Host": ["abc.execute-api.us-east-1.amazonaws.com"], **{k: [v] for k, v in headers.items()}},
+        "queryStringParameters": None,
+        "requestContext": {"resourcePath": "/cron/nightly", "httpMethod": "GET", "stage": "prod"},
+        "body": None,
+        "isBase64Encoded": False,
+    }
+
+
+def http_api_event(authorization: str | None = None, route_key: str = "GET /cron/nightly") -> dict[str, Any]:
+    """An HTTP API (payload 2.0) event, or with route_key "$default" a function URL's: headers lowercased."""
+    headers = {"host": "abc.lambda-url.us-east-1.on.aws", **({} if authorization is None else {"authorization": authorization})}
+    return {
+        "version": "2.0",
+        "routeKey": route_key,
+        "rawPath": "/cron/nightly",
+        "rawQueryString": "",
+        "headers": headers,
+        "requestContext": {"http": {"method": "GET", "path": "/cron/nightly", "sourceIp": "203.0.113.1"}},
+        "isBase64Encoded": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        pytest.param(rest_event, id="REST API"),
+        pytest.param(lambda auth=None: rest_event(auth, multi_only=True), id="REST API, multiValueHeaders only"),
+        pytest.param(http_api_event, id="HTTP API"),
+        pytest.param(lambda auth=None: http_api_event(auth, "$default"), id="function URL"),
+    ],
+)
+def test_the_lambda_adapter_answers_api_gateway_and_function_urls_with_a_proxy_result(event: Any) -> None:
+    cw, _, _ = make(cron_secret=SECRET)
+    seen: list[Any] = []
+
+    def work(ctx: cronwatch.JobContext, request: Any) -> None:
+        seen.append(request)
+        ctx.log("ran")
+
+    lambda_handler = cw.job("nightly").handler(work).aws_lambda
+    refused = lambda_handler(event(), None)
+    assert refused == {
+        "statusCode": 401,
+        "headers": {"content-type": "application/json; charset=utf-8", "cache-control": "no-store"},
+        "body": '{"ok":false,"error":"Unauthorized"}',
+        "isBase64Encoded": False,
+    }
+    assert lambda_handler(event("Bearer wrong"), None)["statusCode"] == 401
+    assert seen == [] and cw.runs("nightly") == []
+    ok = lambda_handler(event(f"Bearer {SECRET}"), None)
+    assert ok["statusCode"] == 200 and ok["isBase64Encoded"] is False
+    run = cw.runs("nightly")[0]
+    assert json.loads(ok["body"]) == {"ok": True, "job": "nightly", "run": run.id, "status": "ok", "durationMs": 0}
+    assert run.output == "ran" and run.trigger == "handler"
+    assert seen[0]["requestContext"], "the function gets the event"
+
+
+def test_the_lambda_adapter_fails_closed_without_a_secret_outside_development() -> None:
+    errors = Errors()
+    cw, _, _ = make(cron_secret="", on_error=errors)
+    ran: list[int] = []
+    lambda_handler = cw.job("closed").handler(lambda ctx, event: ran.append(1)).aws_lambda
+    answer = lambda_handler(http_api_event("Bearer anything"), None)
+    assert answer["statusCode"] == 503
+    assert "CRON_SECRET is not set" in json.loads(answer["body"])["error"]
+    assert ran == []
+    assert errors.wheres == ["handler"]
+
+
+def test_the_lambda_adapter_runs_an_async_function_and_passes_a_proxy_result_through() -> None:
+    cw, _, _ = make(cron_secret=SECRET)
+
+    async def work(ctx: cronwatch.JobContext, event: Any) -> dict[str, Any]:
+        await asyncio.sleep(0)
+        return {"statusCode": 502, "headers": {"content-type": "text/plain"}, "body": "upstream down"}
+
+    lambda_handler = cw.job("proxy").handler(work).aws_lambda
+    answer = lambda_handler(rest_event(f"Bearer {SECRET}"), None)
+    assert answer == {"statusCode": 502, "headers": {"content-type": "text/plain"}, "body": "upstream down"}
+    run = cw.runs("proxy")[0]
+    assert (run.status, run.error) == ("failed", "HTTP 502"), "a proxy result of 400 or more fails the run"
+    cw.job("fine").run(lambda ctx: {"statusCode": 200, "body": "ok"})
+    assert cw.runs("fine")[0].status == "ok"
+    cw.job("plain").run(lambda ctx: {"statusCode": 500, "detail": "not a proxy result"})
+    assert cw.runs("plain")[0].status == "ok", "a dict with other keys is not a response"
+
+
+def test_a_binary_answer_goes_to_lambda_as_base64() -> None:
+    cw, _, _ = make(cron_secret=None)
+    lambda_handler = cw.job("bin").handler(lambda ctx, event: Response(200, {"content-type": "image/png"}, b"\x89PNG\xff")).aws_lambda
+    answer = lambda_handler(http_api_event(), None)
+    assert answer == {"statusCode": 200, "headers": {"content-type": "image/png"}, "body": "iVBOR/8=", "isBase64Encoded": True}
+
+
+def test_an_asgi_handler_refuses_a_body_over_the_limit() -> None:
+    from cronwatch.web import MAX_BODY
+
+    cw, _, _ = make(cron_secret=SECRET)
+    ran: list[int] = []
+    app = cw.job("big").handler(lambda ctx, request: ran.append(1)).asgi
+    sent: list[dict[str, Any]] = []
+    calls = [0]
+
+    async def receive() -> dict[str, Any]:
+        calls[0] += 1
+        return {"type": "http.request", "body": b"x" * (MAX_BODY // 2 + 1), "more_body": True}
+
+    async def emit(message: dict[str, Any]) -> None:
+        sent.append(message)
+
+    scope = {"type": "http", "method": "POST", "path": "/c", "raw_path": b"/c", "query_string": b"", "root_path": "", "headers": [(b"authorization", f"Bearer {SECRET}".encode())]}
+    asyncio.run(app(scope, receive, emit))
+    assert sent[0]["status"] == 413
+    assert calls[0] == 2 and ran == []

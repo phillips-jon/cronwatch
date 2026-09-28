@@ -185,7 +185,7 @@ Every job is declared, named after its id, with its trigger as the schedule (cro
 
 ### A job run by a URL
 
-For a platform cron that calls a URL (Vercel's crons, Cloud Scheduler), `job.handler(fn)` runs `fn(ctx, request)` for each request carrying `Authorization: Bearer $CRON_SECRET` and answers with how it went, as the SDK's `handler()` does:
+For a platform cron that calls a URL (Vercel's crons, Cloud Scheduler, a Lambda function URL), `job.handler(fn)` runs `fn(ctx, request)` for each request carrying `Authorization: Bearer $CRON_SECRET` and answers with how it went, as the SDK's `handler()` does:
 
 ```python
 cron = nightly.handler(lambda ctx, request: build_report(ctx))
@@ -194,9 +194,10 @@ path("api/cron/nightly", cron.django)                                  # Django 
 app.add_url_rule("/api/cron/nightly", view_func=cron.flask)            # Flask
 app.add_route("/api/cron/nightly", cron.starlette)                     # Starlette, FastAPI
 app = cron.wsgi   # or cron.asgi: the handler as the whole app
+lambda_handler = cron.aws_lambda                                       # AWS Lambda: API Gateway or a function URL
 ```
 
-It answers `{"ok", "job", "run", "status", "durationMs"}` with 200 or 500, 401 without the secret, and 503 when no secret is set outside development (`secret=None` lets anyone run it). A function that returns a response is answered with it, and, as for any run, a response of 400 or more fails the run. An `async def` makes an async handler.
+It answers `{"ok", "job", "run", "status", "durationMs"}` with 200 or 500, 401 without the secret, and 503 when no secret is set outside development (`secret=None` lets anyone run it). A function that returns a response is answered with it, and, as for any run, a response of 400 or more fails the run. An `async def` makes an async handler. On Lambda, `cron.aws_lambda(event, context)` reads the bearer from a REST API's, an HTTP API's or a function URL's event, hands `fn` the event, and answers with the proxy result (`{"statusCode", "headers", "body", "isBase64Encoded"}`); a function may return a proxy result of its own. A function invoked directly (EventBridge Scheduler) gets an event with no headers, and IAM already decides who may invoke it, so give that handler `secret=None`.
 
 ## Testing
 

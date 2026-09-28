@@ -61,7 +61,7 @@ def format_duration(ms: float) -> str:
     return " ".join(parts) or "0s"
 
 
-def format_relative(at: int, now: int) -> str:
+def format_relative(at: float, now: float) -> str:
     """ "5m ago", "in 2h". Relative to `now`."""
     diff = at - now
     if abs(diff) < 5_000:

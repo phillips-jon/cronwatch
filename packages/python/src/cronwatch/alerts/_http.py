@@ -9,10 +9,12 @@ where it points), and the whole request has one ten second deadline."""
 
 from __future__ import annotations
 
+import http.client
 import re
 import socket
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -23,6 +25,11 @@ from .._js import well_formed
 TIMEOUT = 10.0
 
 _AROUND = re.compile(r"^[ \t\r\n]+|[ \t\r\n]+\Z")
+# What the URL parser drops before it reads a URL: C0 controls and spaces around it, tabs and line breaks anywhere.
+_C0_AROUND = re.compile(r"^[\x00-\x20]+|[\x00-\x20]+\Z")
+_TAB_OR_NEWLINE = re.compile(r"[\t\n\r]")
+# What a header name or value may not hold (http.client refuses them, quoting the value).
+_BAD_HEADER = re.compile(r"[\x00\r\n]")
 
 
 @dataclass
@@ -45,6 +52,28 @@ class RequestTimeout(TimeoutError):
 
     def __init__(self, message: str = "The operation was aborted due to timeout") -> None:
         super().__init__(message)
+
+
+def web_url(url: str) -> str:
+    """The URL as fetch reads it: the spaces and control characters around it
+    and any tab or line break inside it dropped (a URL pasted with a newline
+    works), and only http or https, where urllib would also open file: and
+    ftp: URLs. Raises ValueError naming no more than the scheme or the origin,
+    since a webhook URL's path or query is often its credential."""
+    text = _TAB_OR_NEWLINE.sub("", _C0_AROUND.sub("", str(url)))
+    scheme = text.split(":", 1)[0].lower() if ":" in text else ""
+    if scheme not in ("http", "https"):
+        shown = f"{scheme}:" if scheme and re.fullmatch(r"[a-z][a-z0-9+.-]*", scheme) else "this URL"
+        raise ValueError(f"only http and https URLs can be posted to, not {shown}")
+    return text
+
+
+def _origin_of(url: str) -> str:
+    try:
+        parts = urllib.parse.urlsplit(url)
+        return f"{parts.scheme.lower()}://{parts.hostname or ''}"
+    except ValueError:
+        return "(invalid URL)"
 
 
 def trim_header(value: Any) -> str:
@@ -78,9 +107,14 @@ class UrllibHTTP:
 
     def post(self, url: str, body: str, headers: dict[str, str]) -> Response:
         deadline = time.monotonic() + self.timeout
-        request = urllib.request.Request(url, data=well_formed(body).encode("utf-8"), method="POST")
+        target = web_url(url)
+        request = urllib.request.Request(target, data=well_formed(body).encode("utf-8"), method="POST")
         for name, value in headers.items():
-            request.add_header(name, trim_header(value))
+            text = trim_header(value)
+            if _BAD_HEADER.search(text) or _BAD_HEADER.search(str(name)):
+                # http.client's own error would quote the value, which may be a credential.
+                raise ValueError(f"the {name!r} header has a line break or control character in it")
+            request.add_header(name, text)
         try:
             response = self._opener.open(request, timeout=_remaining(deadline))
         except urllib.error.HTTPError as error:
@@ -91,6 +125,9 @@ class UrllibHTTP:
             if isinstance(error.reason, (TimeoutError, socket.timeout)):
                 raise RequestTimeout() from error
             raise
+        except (http.client.InvalidURL, ValueError):
+            # Their messages quote the URL, whose path or query may be the credential.
+            raise ValueError(f"cannot post to {_origin_of(target)}: the URL is not valid") from None
         with response:
             return Response(response.status, _read(response, deadline))
 

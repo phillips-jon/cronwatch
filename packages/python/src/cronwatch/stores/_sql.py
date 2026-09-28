@@ -6,7 +6,7 @@ Postgres store (a later release) numbers them."""
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from .. import _js

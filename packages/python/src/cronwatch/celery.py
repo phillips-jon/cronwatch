@@ -418,9 +418,9 @@ class CeleryWatch:
             except Exception as error:
                 report(error, "reading @cronwatch_task")
         for name, task in list(self.app.tasks.items()):
-            options = _task_options(task)
-            if options is not None:
-                found[name] = options
+            own_options = _task_options(task)
+            if own_options is not None:
+                found[name] = own_options
         return found
 
     def _read(self, report: Callable[[BaseException, str], None]) -> dict[str, _Declaration]:

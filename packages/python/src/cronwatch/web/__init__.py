@@ -64,7 +64,7 @@ from ..duration import parse_duration
 from . import _html, _origin, _pwa
 from . import _timeline as timeline
 
-__all__ = ["Request", "Response", "Web"]
+__all__ = ["BodyTooLarge", "Request", "Response", "Web"]
 
 
 class _Unset:
@@ -81,6 +81,10 @@ MAX_RUNS = 500
 #: Runs per job the board reads in one go: the table's sparkline, and most jobs' lanes.
 BOARD_PAGE_RUNS = 20
 COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+#: The most of a request body read into memory. The routes' forms and JSON are
+#: a few bytes, and an ASGI server hands the body over before the routes can
+#: ask for a token, so without a limit anyone could make the process hold any size.
+MAX_BODY = 1024 * 1024
 
 # 'self' only for what the app shell needs: app.js (which registers the
 # service worker and nothing else), the manifest, the worker and the icons.
@@ -108,6 +112,13 @@ _DECIMAL = re.compile(r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z"
 _RADIX = re.compile(r"0([xXoObB])([0-9a-fA-F]+)\Z")
 # What a browser leaves as it is in a path; everything else is percent-encoded.
 _PATH_SAFE = "/!$&'()*+,;=:@-._~[]|^{}`"
+
+
+class BodyTooLarge(Exception):
+    """A request body over MAX_BODY bytes: answered 413, never read into memory."""
+
+    def __init__(self) -> None:
+        super().__init__(f"the request body is larger than {MAX_BODY} bytes")
 
 
 @dataclass
@@ -175,10 +186,16 @@ class Request:
                 return b""
             length = environ.get("CONTENT_LENGTH")
             if length:
-                data: bytes = stream.read(int(length))
+                size = int(length)
+                if size > MAX_BODY:
+                    raise BodyTooLarge()
+                # read(-1) would read everything.
+                data: bytes = stream.read(size) if size > 0 else b""
                 return data
             if environ.get("wsgi.input_terminated"):
-                data = stream.read()
+                data = stream.read(MAX_BODY + 1)
+                if len(data) > MAX_BODY:
+                    raise BodyTooLarge()
                 return data
             return b""
 
@@ -522,19 +539,17 @@ class Web:
             if kind == "websocket":
                 await send({"type": "websocket.close", "code": 1000})
             return
-        chunks = []
-        while True:
-            message = await receive()
-            if message["type"] == "http.disconnect":
-                return
-            chunks.append(message.get("body", b""))
-            if not message.get("more_body", False):
-                break
-        request = Request.from_asgi(scope, b"".join(chunks))
-        response = await asyncio.to_thread(self.handle, request)
+        body = await read_asgi_body(receive)
+        if body is None:
+            return
+        head = str(scope.get("method", "")).upper() == "HEAD"
+        if isinstance(body, BodyTooLarge):
+            response = too_large()
+        else:
+            response = await asyncio.to_thread(self.handle, Request.from_asgi(scope, body))
         headers = [(k.encode("latin-1"), v.encode("latin-1")) for k, v in response.wsgi_headers()]
         await send({"type": "http.response.start", "status": response.status, "headers": headers})
-        await send({"type": "http.response.body", "body": b"" if request.method.upper() == "HEAD" else response.body})
+        await send({"type": "http.response.body", "body": b"" if head else response.body})
 
     # ------------------------------------------------------------ the routes
 
@@ -546,6 +561,8 @@ class Web:
             path = _strip_base(request.path, base)
             wants_html = not path.startswith("/api")
             return self._serve(request, path, wants_html, base)
+        except BodyTooLarge:
+            return too_large()
         except Exception as error:
             try:
                 self.client.on_error(error, "routes")
@@ -808,9 +825,34 @@ class Web:
                 for key, value in parse_query(data.decode("latin-1")):
                     out[key] = value
                 return out
+        except BodyTooLarge:
+            raise
         except Exception:
             return {}
         return {}
+
+
+def too_large() -> Response:
+    """The answer to a body over MAX_BODY bytes."""
+    return _api({"ok": False, "error": "Request body too large"}, 413)
+
+
+async def read_asgi_body(receive: Callable[..., Any]) -> bytes | BodyTooLarge | None:
+    """An ASGI request's body; BodyTooLarge once it passes MAX_BODY bytes (the
+    rest is not read); None when the client went away."""
+    chunks: list[bytes] = []
+    size = 0
+    while True:
+        message = await receive()
+        if message["type"] == "http.disconnect":
+            return None
+        chunk = message.get("body", b"")
+        size += len(chunk)
+        if size > MAX_BODY:
+            return BodyTooLarge()
+        chunks.append(chunk)
+        if not message.get("more_body", False):
+            return b"".join(chunks)
 
 
 def _js_loads(text: str) -> Any:

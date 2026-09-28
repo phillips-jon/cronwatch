@@ -1000,3 +1000,66 @@ def test_a_web_without_a_client_uses_the_process_client(monkeypatch: pytest.Monk
         assert [j["name"] for j in send(web, "GET", "/api/jobs", BEARER).json()["jobs"]] == ["proc"]
     finally:
         cw.stop()
+
+
+# ------------------------------------------------------------ request bodies
+
+
+def test_an_asgi_body_over_the_limit_is_refused_before_anything_reads_it_whole() -> None:
+    """An ASGI server hands the body over before the routes can ask for a
+    token, so a body past MAX_BODY is answered 413 and the rest never read."""
+    from cronwatch.web import MAX_BODY
+
+    _, _, web = app()
+    chunk = b"x" * (64 * 1024)
+    chunks = MAX_BODY // len(chunk) + 50
+    received = [0]
+    sent: list[dict[str, Any]] = []
+
+    async def receive() -> dict[str, Any]:
+        received[0] += 1
+        return {"type": "http.request", "body": chunk, "more_body": received[0] < chunks}
+
+    async def emit(message: dict[str, Any]) -> None:
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/cronwatch/check",
+        "raw_path": b"/cronwatch/check",
+        "root_path": "",
+        "query_string": b"",
+        "headers": [(b"host", b"app.test")],
+    }
+    asyncio.run(web.asgi(scope, receive, emit))
+    assert sent[0]["status"] == 413
+    assert json.loads(sent[1]["body"]) == {"ok": False, "error": "Request body too large"}
+    assert received[0] == MAX_BODY // len(chunk) + 1, "reading stops once the limit is passed"
+
+
+def test_a_wsgi_body_over_the_limit_is_413_and_never_silences_the_job() -> None:
+    from cronwatch.web import MAX_BODY
+
+    cw, _, web = app()
+    cw.run("big", lambda ctx: None)
+    res = send(web, "POST", "/cronwatch/api/jobs/big/silence", {**JSON_BODY, "content-length": str(MAX_BODY + 1)}, b'{"for":"2h"}')
+    assert res.status == 413
+    assert cw.job_summary("big").silenced_until is None
+    form = send(web, "POST", "/cronwatch/jobs/big/silence", {**BEARER, **FORM, "content-length": str(MAX_BODY + 1)}, b"for=2h")
+    assert form.status == 413
+    assert cw.job_summary("big").silenced_until is None
+
+
+def test_a_negative_content_length_reads_no_body() -> None:
+    import io
+
+    class Endless(io.RawIOBase):
+        def read(self, size: int | None = -1) -> bytes:
+            if size is None or size < 0:
+                raise AssertionError("read the whole stream")
+            return b"x" * size
+
+    request = Request.from_wsgi({"REQUEST_METHOD": "POST", "PATH_INFO": "/", "CONTENT_LENGTH": "-1", "wsgi.input": Endless()})
+    assert request.read() == b""

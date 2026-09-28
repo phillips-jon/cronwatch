@@ -10,6 +10,7 @@ answered with how it went:
     # Flask: app.add_url_rule("/api/cron/nightly", view_func=cron.flask)
     # Starlette or FastAPI: app.add_route("/api/cron/nightly", cron.starlette)
     # a WSGI or ASGI server (Vercel's Python runtime): app = cron.wsgi, or app = cron.asgi
+    # AWS Lambda behind API Gateway or a function URL: lambda_handler = cron.aws_lambda
     # anything else: response = cron(request), for any request with headers
 
 The caller must send ``Authorization: Bearer <secret>``. The secret is the
@@ -38,13 +39,14 @@ given: the framework's own, or a cronwatch.web.Request for .wsgi and .asgi.
 from __future__ import annotations
 
 import asyncio
+import base64
 import http
 import re
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
 from . import _env, _js
-from ._response import response_status
+from ._response import is_lambda_result, response_status
 
 if TYPE_CHECKING:
     from .client import Cronwatch, _Outcome
@@ -99,7 +101,10 @@ def authorization(request: Any) -> str:
         if "REQUEST_METHOD" in request or "wsgi.version" in request:
             return _text(request.get("HTTP_AUTHORIZATION"))
         inner = request.get("headers")
-        return _lookup(inner if isinstance(inner, Mapping) else request)
+        found = _lookup(inner if isinstance(inner, Mapping) else request)
+        # API Gateway's REST API event also lists every header's values in multiValueHeaders.
+        multi = request.get("multiValueHeaders")
+        return found or (_lookup(multi) if isinstance(multi, Mapping) else "")
     if isinstance(headers, Mapping):
         return _lookup(headers)
     get = getattr(headers, "get", None)
@@ -152,7 +157,7 @@ class Handler:
 
     @property
     def job(self) -> str:
-        return self._definition.name
+        return str(self._definition.name)
 
     # ------------------------------------------------------------ the core
 
@@ -222,9 +227,9 @@ class Handler:
         """A Flask view function (reads flask.request)."""
 
         def view(*args: Any, **kwargs: Any) -> Any:
-            from flask import request
+            from flask import request as proxy
 
-            return _convert(self.respond(request._get_current_object()), "werkzeug")
+            return _convert(self.respond(_flask_request(proxy)), "werkzeug")
 
         return _named(view, self)
 
@@ -254,6 +259,15 @@ class Handler:
         answer = await asyncio.to_thread(self.respond, request)
         await _asgi_answer(answer, scope, receive, send)
 
+    def aws_lambda(self, event: Any, context: Any = None) -> dict[str, Any]:
+        """The handler as an AWS Lambda function (``lambda_handler = cron.aws_lambda``)
+        behind API Gateway (a REST or an HTTP API) or a function URL: the bearer
+        is read from the event's headers (or a REST API's multiValueHeaders),
+        and the answer is the proxy result, ``{"statusCode", "headers", "body",
+        "isBase64Encoded"}``. The function gets the event; one that returns a
+        proxy result dict of its own is answered with it."""
+        return _lambda_answer(self.respond(event))
+
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self._definition.name!r})"
 
@@ -262,7 +276,7 @@ class AsyncHandler(Handler):
     """The handler of an async function: awaited, and its adapters are async.
     The store is used from a worker thread, so the event loop is not held up."""
 
-    async def respond(self, request: Any) -> Any:  # type: ignore[override]
+    async def respond(self, request: Any) -> Any:
         refused = self._refusal(request)
         if refused is not None:
             return refused
@@ -270,7 +284,7 @@ class AsyncHandler(Handler):
         outcome = await self._client._aexecute_outcome(self._definition, "handler", lambda ctx: fn(ctx, request))
         return self._answer(outcome)
 
-    async def __call__(self, request: Any) -> Any:  # type: ignore[override]
+    async def __call__(self, request: Any) -> Any:
         return _convert(await self.respond(request), _family(request))
 
     @property
@@ -286,9 +300,9 @@ class AsyncHandler(Handler):
         """An async Flask view (Flask runs it with its async extra, flask[async])."""
 
         async def view(*args: Any, **kwargs: Any) -> Any:
-            from flask import request
+            from flask import request as proxy
 
-            return _convert(await self.respond(request._get_current_object()), "werkzeug")
+            return _convert(await self.respond(_flask_request(proxy)), "werkzeug")
 
         return _named(view, self)
 
@@ -312,6 +326,15 @@ class AsyncHandler(Handler):
             return
         await _asgi_answer(await self.respond(request), scope, receive, send)
 
+    def aws_lambda(self, event: Any, context: Any = None) -> dict[str, Any]:
+        """The handler as an AWS Lambda function: the async function runs to completion on an event loop of its own."""
+        return _lambda_answer(asyncio.run(self.respond(event)))
+
+
+def _flask_request(proxy: Any) -> Any:
+    """The request behind flask.request (a proxy that only means something in this thread)."""
+    return proxy._get_current_object()
+
 
 def _named(view: Callable[..., Any], handler: Handler) -> Callable[..., Any]:
     """A view named after the job, so a framework that names routes by their function (Flask) tells two apart."""
@@ -330,6 +353,11 @@ def _parts(response: Any) -> tuple[int, list[tuple[str, str]], bytes]:
 
     if isinstance(response, Response):
         return response.status, response.wsgi_headers(), response.body
+    if is_lambda_result(response):
+        text = response.get("body") or ""
+        data = base64.b64decode(text) if response.get("isBase64Encoded") else str(text).encode("utf-8")
+        headers = [(str(k), str(v)) for k, v in (response.get("headers") or {}).items()]
+        return int(response["statusCode"]), [*headers, ("content-length", str(len(data)))], data
     status = int(response.status_code)
     if hasattr(response, "items") and hasattr(response, "content"):  # Django
         return status, [(str(k), str(v)) for k, v in response.items()], bytes(response.content)
@@ -363,6 +391,22 @@ def _convert(answer: Any, family: str) -> Any:
     return StarletteResponse(answer.body, status_code=answer.status, headers=dict(answer.headers))
 
 
+def _lambda_answer(answer: Any) -> dict[str, Any]:
+    """An answer as a Lambda proxy result. The body is text when it is UTF-8, else base64."""
+    if is_lambda_result(answer):
+        return dict(answer)
+    status, headers, data = _parts(answer)
+    out: dict[str, str] = {}
+    for name, value in headers:
+        if name.lower() == "content-length":
+            continue  # API Gateway and function URLs set their own.
+        out[name] = f"{out[name]}, {value}" if name in out else value
+    try:
+        return {"statusCode": status, "headers": out, "body": data.decode("utf-8"), "isBase64Encoded": False}
+    except UnicodeDecodeError:
+        return {"statusCode": status, "headers": out, "body": base64.b64encode(data).decode("ascii"), "isBase64Encoded": True}
+
+
 def _status_line(status: int) -> str:
     try:
         return f"{status} {http.HTTPStatus(status).phrase}"
@@ -380,8 +424,9 @@ def _wsgi_answer(answer: Any, environ: Mapping[str, Any], start_response: Callab
 
 
 async def _asgi_request(scope: Mapping[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> WebRequest | None:
-    """The request of an HTTP scope, or None once the scope is dealt with (lifespan, websocket, a client gone)."""
-    from .web import Request
+    """The request of an HTTP scope, or None once the scope is dealt with
+    (lifespan, websocket, a client gone, a body over web.MAX_BODY answered 413)."""
+    from .web import BodyTooLarge, Request, read_asgi_body, too_large
 
     kind = scope.get("type")
     if kind == "lifespan":
@@ -396,15 +441,13 @@ async def _asgi_request(scope: Mapping[str, Any], receive: Callable[..., Any], s
         if kind == "websocket":
             await send({"type": "websocket.close", "code": 1000})
         return None
-    chunks = []
-    while True:
-        message = await receive()
-        if message["type"] == "http.disconnect":
-            return None
-        chunks.append(message.get("body", b""))
-        if not message.get("more_body", False):
-            break
-    return Request.from_asgi(scope, b"".join(chunks))
+    body = await read_asgi_body(receive)
+    if body is None:
+        return None
+    if isinstance(body, BodyTooLarge):
+        await _asgi_answer(too_large(), scope, receive, send)
+        return None
+    return Request.from_asgi(scope, body)
 
 
 async def _asgi_answer(answer: Any, scope: Mapping[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> None:
