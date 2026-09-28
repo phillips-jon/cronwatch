@@ -1,0 +1,182 @@
+# The Go port
+
+`packages/go` is the Go module `cronwatch.dev/go` (package `cronwatch`): the same library as `@cronwatch/sdk`, for Go apps, from a `main` a crontab runs to a service with robfig/cron, gocron, River or Asynq inside it. It is a port, not a new design, made the way the Ruby gem and the Python and PHP packages were (see their `DESIGN.md`), and like the Python and PHP ports it is made in phases. The TypeScript SDK is the source of truth for every behaviour, message and stored byte; when the two disagree, the Go side is wrong.
+
+## Rules
+
+- Go 1.25 or newer (`go 1.25` in `go.mod`), tested on 1.25 and 1.26 in CI: the two newest major releases, which is exactly what Go's own release policy supports, so an app on a Go that still gets security fixes can use the module and nobody is asked to support one that does not. The code uses 1.21's `context.WithoutCancel`, `context.WithTimeoutCause` and the `min`/`max` builtins and 1.22's per-iteration loop variables; the floor is set by support and by the module path (the `go-import` tag's subdirectory field, below, is read only by the 1.25 go command), not by syntax.
+- The core module has no requirements at all: its `go.mod` names no other module, and `go mod tidy` keeps it so. Cron parsing and fire times are a port of croner 10 (`internal/schedule/cron`, as the Python port's `_cron.py` and the PHP port's `src/Cron`), zones come from Go's own `time` package (an app without a zone database imports `time/tzdata`), JSON is written by `internal/js` (not `encoding/json`, whose escaping and key order differ), and secret redaction runs on `internal/jsre`, a small backtracking engine with JavaScript's semantics (Go's `regexp` has no lookaround and refuses a bounded repeat past 1000, and the SDK's patterns need both). Database drivers appear only in `sqltest`, a module of its own that holds the SQL store's tests (see Storage).
+- Times are `int64` epoch milliseconds everywhere, as in the SDK and the other ports, so `evaluate` ports line for line and stored rows are identical. Durations are `float64` milliseconds inside (a definition may hold `1.5`, which the SDK keeps), and the public API takes `time.Duration` where Go code would pass one.
+- Anything that leaves the process (store rows, JSON columns, alert JSON) uses the SDK's exact field names, key order and values, so a Node, Ruby, Python, PHP and Go process can share one database and `@cronwatch/mcp` works against any of them. Each public type's `MarshalJSON` is `JSON.stringify` byte for byte (`internal/js`): numbers as JavaScript prints them (`2` not `2.0`, `1e-7`, `1e+21`), keys in JavaScript's order (array-index keys first in ascending order, then the rest as inserted; `js.Object` keeps that order and `Metrics` keeps it for a run's numbers), only control characters, quotes and backslashes escaped (never `<`, `>` or `&`), and a byte that is not UTF-8 written as U+FFFD, as a JavaScript string decoded from those bytes has it. Call `MarshalJSON` (or `json.Encoder` with `SetEscapeHTML(false)`) for those bytes: `json.Marshal` passes a type's own JSON through its HTML escaping, which rewrites `<`, `>`, `&`, U+2028 and U+2029. The stores call `MarshalJSON` directly.
+- A definition keeps its fields in the order they were given. The SDK writes `{ ...defaults, ...options, name }` with `expect` moved last, so the stored JSON follows the object literal an app wrote; Go has no literal to follow, so job options are functional options, applied in the order given, and a Go process declaring a job writes the same bytes a Node process declaring it with its options in that order does. Fields a newer writer added are kept.
+- Alert titles and messages are the SDK's text, character for character, with numbers as `toLocaleString("en-US")` writes them: ICU's rounding, which starts from the shortest decimal digits of the double (1234.56785 rounds up, though its binary value is just below) and rounds half away from zero.
+- Lengths and cuts are in UTF-16 code units, as JavaScript counts them (`js.Length16`, `Slice16`, `Tail16`). A cut through a surrogate pair leaves U+FFFD where JavaScript would keep a lone surrogate, which is the character that surrogate becomes once written out as UTF-8 (to a store, a hash, a network), so the stored bytes are the same.
+- Secret redaction uses the SDK's patterns, copied verbatim as JavaScript source into `internal/output` and run by `internal/jsre` over UTF-16 code units, so a quantifier counts an emoji as two, `\s` is JavaScript's set, `\b` and `/i` are ASCII-only as they are in JavaScript without the `u` flag, and every one of `conformance/output.json`'s 204 redaction cases gives the SDK's bytes.
+- Every condition opens once and closes with a recovery. No repeat alerts. A job whose schedule is removed while missed is open has missed closed by the next check with a recovery of its own (`reason: "unscheduled"`).
+- Errors are returned, never panicked, except by the `Must` helpers for package-level declarations (`MustNew`, `MustJob`). A job's function returns an error, which fails the run and is returned from `Run`. A panic in a job's function is recorded as a failed run (`panic: <value>` and up to five frames of the panicking goroutine, innermost first, `    at function (file:line)`, as a JavaScript stack reads) and then carries on up the stack, so no run is left `running` to be reported stuck later. The store failing never stops a job: store errors go to the error handler, and the job's own outcome is returned.
+- An error is written `Name: message`: the error's type name when it is an exported type (`PathError: open x: no such file or directory`), `Error` for the standard library's unnamed ones (`errors.New`, `fmt.Errorf`, joined errors) and unexported types. Go errors carry no stack, so a returned error has no frames; a panic does.
+- The environment is read in one place, `env.go`: the first of `CRONWATCH_ENV`, `APP_ENV` and `GO_ENV` that is set (the SDK reads `NODE_ENV`); `development`, `dev`, `local`, `test` and `testing` are development and `prod` is production, as in the PHP port. It decides whether the in-memory store warns that it forgets on restart, and (phase 3) whether the dashboard makes a development token when none is configured.
+- Safe for use by many goroutines at once: the client, a job, a run handle, a job context and every store.
+- No em or en dashes anywhere, as in the rest of the repo.
+
+## Module path and releases
+
+The module path is `cronwatch.dev/go`, a vanity path served by a `go-import` tag from cronwatch.dev that points into this repository, with Go 1.25's subdirectory field:
+
+```html
+<meta name="go-import" content="cronwatch.dev/go git https://github.com/phillips-jon/cronwatch packages/go">
+```
+
+The go command then fetches `packages/go` from the monorepo, and versions are tags prefixed with that directory: `packages/go/v0.6.0` for release 0.6.0 (the go command's rule for a module below a repository's root, `modfetch.newCodeRepo`, which the subdirectory field feeds). The three options weighed:
+
+- *`github.com/phillips-jon/cronwatch/packages/go`, tags `packages/go/vX.Y.Z`.* Works today with no infrastructure. But the import path names a personal GitHub account and a directory layout forever: moving the repository to an organisation, or `packages/go` anywhere else, is a new module path and a breaking change for every importer, and `packages/go` reads badly in an import block.
+- *`cronwatch.dev/go`, tags `packages/go/vX.Y.Z`* (recommended). The path is the product's own domain, like the docs, and says nothing about where the code lives: the repository can move, be renamed or be split later by changing one meta tag, and importers change nothing. The tags are the same as the first option's, so nothing about releasing differs, and no second repository or split workflow is needed. The cost is that cronwatch.dev must answer `?go-get=1` for the module path (a static page is enough), and that the subdirectory field needs the Go 1.25 go command, which is also the oldest Go this module supports; the module proxy, which runs a current Go, caches every version it has served, so a release keeps resolving through the proxy even if the site is down.
+- *A split repository* (`github.com/phillips-jon/cronwatch-go`, tags `vX.Y.Z`), as the PHP package reaches Packagist. It gives the shortest tags and works on any Go, but it is a second repository, a deploy key and a split workflow to keep working, for nothing a Go importer can see, since Go, unlike Packagist, reads modules from subdirectories.
+
+The last element of the path is `go`, not the package name `cronwatch`; the package clause says `cronwatch`, so code refers to `cronwatch.New` and goimports writes the import as `cronwatch "cronwatch.dev/go"`, as it does for `gopkg.in/yaml.v3`. Other packages of the module are `cronwatch.dev/go/sqlstore` and `cronwatch.dev/go/storetest` (phase 2 and 3 add `alerts`, `triage`, `pgcron` and `web`), all under the same tag.
+
+The site change is for a later phase and the owner's approval. It is a page at `/go` (and one per nested module, such as `/go/river`, each naming its own path and subdirectory, since for a module below the tag's prefix the go command puts the subdirectory field after the module's own directory, `river/packages/go`, not before it) holding the meta tag above and a link to the docs, served for `?go-get=1` requests; with the site's nginx, one `location ~ ^/go(/|$)` answering the right tag for the path does it. Until then nothing can `go get` the module, which is fine before its first release. If the owner prefers not to serve it, the fallback is the first option: change the path in `go.mod`, the imports and this file, and nothing else.
+
+`version.go` holds `const Version`, the release version, bumped by `scripts/release.mjs` with the others (the VERSIONED table); a Go module's real version is its tag, so the PUBLISH table prints the tag to add to the release commit and push (`git tag -a packages/go/vX.Y.Z ... vX.Y.Z^{}`). `packages/go/sqltest` holds tests only and is never tagged or imported. Integration modules (phase 4) are tagged `packages/go/<name>/vX.Y.Z` at the same version.
+
+## Layout
+
+```
+packages/go/
+  go.mod  README.md  LICENSE  DESIGN.md
+  doc.go           the package documentation and an example
+  version.go       Version
+  types.go         Run, Metrics, Definition, StoredJob, JobState, Alert and its details, JobSummary, CheckResult: the SDK's JSON both ways
+  options.go       job options (Schedule, Grace, Expect, Budget ...), client options (WithStore, WithAlerts ...), the definition's checks
+  client.go        Client, New, Job, Run, updateState (the compare-and-set loop), the job locks
+  run.go           Job.Run, RunValue, JobContext, execute, conclude, recordFinish and claimFinish, RecordRun
+  handle.go        Job.Start, Job.Resume, ResumeRun, RunHandle (Flush, Finish, FinishWith, Fail)
+  check.go         Check, the reads (Jobs, JobsWithRuns, JobSummary, Runs, GetRun), Silence, Forget, Start/Stop
+  deliver.go       Channel, Console, ChannelFunc, TriageFunc, Source, dispatch, retries, the delivery record
+  evaluate.go      the alert rules, pure functions (evaluate.ts)
+  format.go        alert titles and messages, toLocaleString's numbers (format.ts)
+  serialize.go     expect rules and stored definitions (serialize.ts)
+  stats.go         percentile and median (stats.ts)
+  store.go         Store, RunUpdater, StateComparer
+  memory.go        MemoryStore (stores/memory.ts)
+  env.go           the environment
+  internal/js/        JavaScript's numbers, JSON.stringify and JSON.parse (key order), UTF-16, \s and trim, Date.UTC and toISOString
+  internal/jsre/      the JavaScript regular expression engine the redaction patterns run on
+  internal/output/    the output cap, error messages, redaction, the run recorder (output.ts, job.ts)
+  internal/schedule/  durations and schedules (duration.ts, schedule.ts)
+    cron/             croner 10: CronPattern, CronDate, fromTZ, zones matched without regard to case
+  sqlstore/        the database/sql store: SQLite, Postgres and MySQL dialects (stores/sql.ts)
+  storetest/       the store contract test (store-conformance.ts), the store.json replay, the finish-once scenarios; exported for stores of your own
+  sqltest/         a module of its own: the SQL store's tests with real drivers, and the SQLite file shared with Node
+```
+
+## The Go API
+
+```go
+import (
+	cronwatch "cronwatch.dev/go"
+	"cronwatch.dev/go/sqlstore"
+)
+
+store, err := sqlstore.New(db, sqlstore.Postgres) // the app's *sql.DB and driver
+cw, err := cronwatch.New(
+	cronwatch.WithStore(store),                           // default: a MemoryStore
+	cronwatch.WithAlerts(cronwatch.ChannelFunc("pager", page)), // default: Console()
+	cronwatch.WithRetention("30d"),
+)
+
+nightly, err := cw.Job("nightly-report",
+	cronwatch.Schedule("0 2 * * *"), cronwatch.Timezone("UTC"),
+	cronwatch.Grace("15m"), cronwatch.Timeout(30*time.Minute),
+	cronwatch.Expect("Report written"), cronwatch.Budget("cost", 2),
+	cronwatch.FailuresBeforeAlert(1))
+
+err = nightly.Run(ctx, func(ctx context.Context, job *cronwatch.JobContext) error {
+	path, err := buildReport(ctx) // ctx is cancelled at the job's timeout
+	job.Log("Report written:", path)
+	job.Metric("cost", 1.2)
+	return err
+})
+
+report, err := cronwatch.RunValue(ctx, nightly, func(ctx context.Context, job *cronwatch.JobContext) (string, error) {
+	return "Report written", nil // a string is the output when nothing was logged
+})
+
+result, err := cw.Check(ctx) // missed and stuck runs, retries, pruning; a *CheckResult
+cw.Start(time.Minute)        // a goroutine that checks every minute (long-running services)
+cw.Silence(ctx, "nightly-report", 2*time.Hour)
+```
+
+The shape follows Go's conventions while keeping the SDK's names recognisable: `cronwatch({...})` is `cronwatch.New(options...)`, `cw.job(name, options)` is `cw.Job(name, options...)`, `job.run(fn)` is `job.Run(ctx, fn)`, `recordRun`, `resumeRun`, `jobsWithRuns` and `jobSummary` are `RecordRun`, `ResumeRun`, `JobsWithRuns` and `JobSummary`. Every call that can reach the store takes a `context.Context` first and returns an `error`; nothing panics for a bad option or a store failure.
+
+- *Functional options, not an Options struct*, for both the client and jobs. For jobs it is the only way to keep a definition's fields in the order given (see Rules). For the client it keeps the SDK's three-way options readable: `WithCronSecret(s)` and `WithoutCronSecret()` where the SDK has a string, `null` and absent; `WithRedact(fn)` and `WithoutRedaction()` where it has a function and `false`; `WithDeliver(cronwatch.DeliverAtCheck)`. `WithDefaults` takes the job options `Grace`, `Timeout`, `Timezone` and `FailuresBeforeAlert`, and refuses others with an error.
+- *Durations* take the SDK's text or a Go duration: `Grace`, `Timeout`, `MaxDuration` and `WithRetention` are generic over `~string | ~int | ~int64 | ~float64`, so `Grace("15m")`, `Grace(15*time.Minute)` and `Grace(900000)` all compile; text is stored as written and a `time.Duration` as its milliseconds (as the Python port stores a `timedelta`). Methods cannot be generic in Go, so `Silence` and `Start` take a `time.Duration`.
+- *Expect* is three options: `Expect(text)` (contains), `ExpectMatch(*regexp.Regexp)` (Go's syntax, stored as `matches /source/`, flags being inline in Go) and `ExpectFunc(func(string) bool)` (stored as `custom function`; a panic in it fails the run with `Output check threw: ...`).
+- *Job functions* are `func(ctx context.Context, job *JobContext) error`. The context is the caller's with the job's timeout added (the SDK's `signal`), cancelled with a cause naming the job and its timeout, and carries the `JobContext`, so code deep in a call chain can find it with `cronwatch.Current(ctx)`. `RunValue[T]` is `run()` for a function that returns a value, generic because methods cannot be: a `string` is the output when nothing was logged (and what `expect` checks), and an `*http.Response` of 400 or more fails the run with `HTTP <status> <reason>`, as the SDK does for a fetch `Response`.
+- *Recording never depends on the caller's context.* Store calls made while recording a run use `context.WithoutCancel(ctx)`, so a run whose caller gave up (a request that ended, a deadline) is still recorded as it ended, rather than left `running` to be reported stuck; the values the context carries (trace ids) still reach the store.
+- *Channels, triage and sources are interfaces*: `Channel` (`Name`, `Send(ctx, Alert, ChannelContext) error`; `ChannelFunc` wraps a function, `Console` is the default), `TriageFunc` (`func(ctx, TriageContext) (string, error)`) and `Source` (`Name`, `Sync(ctx, SourceHost)`), where `SourceHost` is what a source may use of the client and `*Client` is one.
+- *Stores* are the `Store` interface, with the SDK's two optional methods as the optional interfaces `RunUpdater` (`UpdateRunIf`) and `StateComparer` (`CompareAndSetState`), checked by type assertion as `io.WriterTo` is; without them the client falls back to a read then a write, as the SDK does.
+- *Nullable values are pointers* (`*int64`, `*string`) in `Run`, `JobState` and `JobSummary`, so `null` and absent survive a round trip. In `JobState`, a nil `PendingRecovery` or `Undelivered` is a state written before the field existed (absent from the JSON), and a nil `Version` is a state written before versions.
+
+## Runs that span calls
+
+`job.Start(ctx, WithTrigger(t), WithRunID(id))`, `job.Resume(ctx, runID)` and `cw.ResumeRun(ctx, name, runID)` are the SDK's `start()`, `resume()` and `resumeRun()`, and return a `*RunHandle`: `ID`, `Job`, `StartedAt`, `Active`, `Log`, `Metric`, `Flush(ctx)`, `Finish(ctx)`, `FinishWith(ctx, result)` and `Fail(ctx, err)`. They return an error only for a run id no store could hold or one in the pg_cron source's `pgcron:` namespace (the SDK's messages), and for a stored run that belongs to another job. `Run` refuses `WithRunID`, which is for `Start` only.
+
+The client's side follows `client.ts`: a start with an id holds a per-process entry keyed by the job and the id while it reads the store and inserts, so two starts with one id at once in one process record one run and get the same handle, and another job's start with that id fails as it would one call later. `Finish` reads the stored run again, joins the stored output with the handle's (capped) and merges metrics (the handle's win), then judges it with the same code as `Run`. `Flush` redacts the lines it appends and writes only over a row still running and of this job (`UpdateRunIf`); when it cannot, the handle keeps the lines for `Finish`, and it keeps the first 16 KB of what it flushed so `expect` at finish sees an early line. The store never fails out of `Start`, `Resume`, `Flush` or `Finish`: failures go to the error handler as `recording <job>`, `starting <job>`, `resuming <job>`, `flushing <job>` or `finishing <job>`. A store that fails during `Finish` records nothing and leaves the handle active, lines kept, so it can be called again. A finish that records nothing is reported, never returned as an error, and returns nil.
+
+A run is judged once, however many processes finish it: the finish is written only over a stored row still `running`, else over one still `timeout` (a check already counted it as stuck: a late failure is written but not judged, a late success is judged and recovers), through `UpdateRunIf`, one conditional `UPDATE`. Only the process whose write lands evaluates. The stuck check marks a run timed out the same way, so a finish that landed meanwhile wins. `InsertRun` refuses an id already stored, the memory store included. `storetest.FinishOnce` holds the SDK's multi-process tests (two processes finishing one run, two recording one finished run from a source, six starting and finishing one id five times), run against the memory store here and against SQLite, Postgres, MySQL and MariaDB in `sqltest`, each process a store of its own over one database.
+
+## Goroutines and state
+
+The client never blocks a job on anything but its own store writes. Every read-modify-write of a job's state goes through `updateState`: holding the job's mutex (the SDK's `serial()` queue), it reads the state, works out the next one, and writes it only when it changed, with `version` one higher, through `CompareAndSetState` against the version read; a refused write is worked out again from a fresh read, up to 10 times. Only store reads and writes happen under the lock; alerts are sent after it is released. Closing missed and stuck at a run's start happens in a goroutine beside the job, joined before the finish is written, as the SDK's promise is. Concurrent `Check` calls share one check (the first caller runs it, the others wait for its result). `Start(every)` runs checks in a goroutine, the first after a second and then on the interval (a minute by default, five seconds at least); a second `Start` does nothing, and `Stop` ends it (a check in flight finishes).
+
+## Delivery
+
+`WithDeliver(DeliverNow)` (the default) sends each alert from the process that produced it. `DeliverAtCheck` sends nothing: the alert is queued in the job's state (`undelivered`, at most 20, the oldest dropped first and reported) for the next check in a process that delivers now, which triages and sends it. An alert no channel accepted is queued the same way and retried once per check, oldest first; one that no longer describes the job (`staleAlert`) is dropped; one check spends at most 20 seconds of wall clock retrying across all jobs. Triage is tried once per alert: `Triage` nil with `TriageTried` set is JSON `null`, never tried again.
+
+Each channel sends in a goroutine of its own with a 15 second context, and triage gets 25 seconds. Go cannot stop a goroutine, so a channel (or triage) that has not returned when its time is up is left to finish; until it has, nothing more is sent to it (the alert counts as not delivered there, and is retried) and no second triage starts, so a channel that ignores its context holds one goroutine rather than one per alert. The Python port does the same with threads. The channels themselves (Slack, Discord, the webhook, the email providers, Twilio and the error trackers) and Claude triage are phase 2.
+
+## Storage
+
+`MemoryStore` is `stores/memory.ts`: a mutex, deep copies in and out, names sorted by byte order (as the SQL stores sort), the same prune rule (each job's newest run is kept whatever its age).
+
+`sqlstore.New(db, dialect, sqlstore.Prefix(p))` keeps the same three tables in the app's database through `database/sql`, with the app's driver and `*sql.DB`: this package imports no driver, so the core module requires none. The SQLite and Postgres dialects are `stores/sql.ts` text for text (the same `CREATE` statements, so `sqlite_master` reads the same whoever created the tables; the same statements, `$n` placeholders for Postgres; `BIGINT` times, `JSONB`, `BIGSERIAL seq` breaking ties, names sorted `COLLATE "C"`; `init` under `pg_advisory_xact_lock(hashtext('cronwatch:<prefix>'))` so many processes can start at once), and the MySQL dialect is the PHP port's (MySQL 8.0.13 or MariaDB 10.6 or newer: `utf8mb4_bin` so names are byte-compared, JSON as `LONGTEXT` holding the SDK's JSON byte for byte, never MySQL's `JSON` type, which would rewrite it, `ON DUPLICATE KEY`, the prune's newest start per job as a derived table, and compare-and-set from version 0 in two steps). MySQL answers the rows an `UPDATE` changed, not the rows it matched, so an `UpdateRunIf` or a compare-and-set that wrote the values already there reads the row back to tell a landed write from a refused one, as the PHP port does.
+
+On SQLite the store holds one connection of the pool for its statements, in turn: an in-memory database is one per connection, a pool's connections would each need the pragmas, and SQLite allows one writer at a time anyway (the SDK's store has one connection too). That connection is put in WAL mode, with the SDK's retry of a busy database while switching (`busy.ts`), then `busy_timeout` 5000 and `synchronous` NORMAL. On Postgres and MySQL each statement runs on the pool on its own, in autocommit, so the store's writes never join a transaction the app has open (a run recorded inside one survives a rollback), and `DeleteJob` is one transaction of the store's own. Rows are read by column name whatever types the driver hands back (`int64` or text for `BIGINT`, text or bytes for `JSONB` and `LONGTEXT`), and JSON columns are parsed in the order the database gives the keys, as the SDK reads them (Postgres's `JSONB` reorders keys; everything written is the SDK's order).
+
+*Why a module of its own for the tests.* A Go module's `go.mod` lists what its tests import too, and the go command reads that list when an app requires the module, so drivers imported by `sqlstore`'s own tests would reach every app's module graph. The SQL tests therefore live in `packages/go/sqltest`, a module that requires `cronwatch.dev/go` through a `replace` to `../` and the drivers (`modernc.org/sqlite`, pure Go, so the tests need no C toolchain; `github.com/jackc/pgx/v5`'s `stdlib`; `github.com/go-sql-driver/mysql`). Build tags were the other way, and were left out: a tagged test file's imports still go into `go.mod`, so they keep the drivers out of the build but not out of the module graph. The core module's own tests use the memory store and the standard library only.
+
+`sqltest` runs, per dialect, the contract test (`storetest.Run`, the SDK's `store-conformance.ts`), the replay of `conformance/store.json` (`storetest.ReplayFixture`), the finish-once scenarios over several stores on one database, and a client end to end; SQLite always, Postgres, MySQL and MariaDB when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL` and `CRONWATCH_TEST_MARIADB` are set. Its node-compat test has the built SDK and `sqlstore` replay the same store calls into two SQLite files and compares what each reads of the other's and every column's bytes and SQLite type, and has a Node client and a Go client take turns on one file and on one job's state version.
+
+## Keeping in step
+
+`conformance/` at the repo root holds JSON cases generated from the TypeScript build by `scripts/conformance.mjs`. The Go tests replay every case this phase covers, comparing values as the JSON the SDK writes, byte for byte: `duration.json` and `schedule.json` in `internal/schedule`, `output.json` in `internal/output`, `evaluate.json` (every scenario's events played through the pure functions, as the script's `Sim` plays them), `format.json` and `health.json` in the core package, and `store.json` against every store. `TestConformanceFixturesAreReplayed` fails when the SDK writes a fixture this port does not know; `channels.json`, `triage.json` and `pgcron.json` are listed as pending until phase 2 replays them. A behaviour change lands in TypeScript first, `npm run conformance` regenerates the fixtures, and this package is fixed until they pass. The tests set `time.Local` to UTC, as the fixtures are made with `TZ=UTC`.
+
+Croner parity is also checked against croner itself: `internal/schedule/fuzz_test.go` generates 3,000 expressions from three fixed seeds (valid and malformed, nicknames, names, ranges, steps, lists, `L`, `W`, `LW`, `#`, `?`, `+`, six and seven fields) in zones with and without daylight saving, from times around the clock changes, and the SDK in Node (`testdata/schedule_fuzz.mjs`, reading `packages/sdk/dist`) must give the same error message or the same fire times. It skips, with the reason, when `node` or the built SDK is missing, and under `-short`.
+
+## Phases
+
+1. Done: this design; the core with no requirements (durations, schedules on the croner port, evaluation, stats, the output cap and redaction, alert text, stored definitions, the client with runs, handles, `RecordRun`, `Check`, `Start`/`Stop`, `Silence`, sources, deferred delivery and the triage hook; the job's context cancelled at its timeout; goroutine safety); `MemoryStore`; `sqlstore` for SQLite, Postgres and MySQL with byte-identical stored data; conformance, the croner fuzz check and the SQLite file shared with Node; the SDK's client, store and finish-once tests ported to Go and run with the race detector on Go 1.25 and 1.26.
+2. The alert channels in `cronwatch.dev/go/alerts`, `net/http` only, request for request as `conformance/channels.json` records them (the same URL, header names and order, body bytes, stable alert ids, redacted error text, no redirect followed, one ten second deadline); Claude triage over plain HTTP to the Messages API in `cronwatch.dev/go/triage` (`triage.json`: the same model, prompts, `<job_data>` fencing and fallbacks, no SDK); the pg_cron source in `cronwatch.dev/go/pgcron`, over a `*sql.DB` the app opened with any Postgres driver (`pgcron.json`).
+3. The dashboard and JSON API in `cronwatch.dev/go/web` as an `http.Handler` (`cw.Routes(...)`), matching `packages/ruby/test/web/golden.json` byte for byte (every page, header and JSON body); `job.Handler(fn)` as an `http.Handler` for platform crons, with the SDK's bearer and answers; the MCP server's end-to-end test against the Go dashboard, as it runs against the other ports'.
+4. Integrations, each decided on what it pulls in. Anything that needs only the standard library stays in the core module; anything that imports a third-party module is a module of its own, nested under `packages/go` and tagged with its directory, so the core stays requirement-free and an app pulls only the scheduler it uses:
+   - robfig/cron v3: `cronwatch.dev/go/robfigcron`, a module (it requires `github.com/robfig/cron/v3`): a `cron.JobWrapper` recording each run and declaring each entry with its spec as the schedule, checked against robfig's own `Next` as the other ports check a converted schedule.
+   - go-co-op/gocron v2: `cronwatch.dev/go/gocron`, a module: an event listener (`BeforeJobRuns`, `AfterJobRuns`, `AfterJobRunsWithError`) and its job definitions read as schedules.
+   - River: `cronwatch.dev/go/river`, a module (River and its pgx driver): periodic jobs declared as jobs with their schedules, and a worker middleware recording each run, retries as the gem's Sidekiq rules have them (each attempt a run, a snoozed or retried attempt a failed one with its cause).
+   - Asynq: `cronwatch.dev/go/asynq`, a module: the scheduler's entries as schedules, and a server middleware recording each task run.
+   - A plain crontab `main`: in the core, as a documented pattern and an example (`cw.Run` then `cw.Close` in `main`, and `Check` from a second crontab line or the interval), since it needs nothing; a `cronwatch` command-line tool that wraps a shell command (`cronwatch run nightly -- ./backup.sh`) would need a driver, so if the owner wants one it is a module of its own under `cmd/`.
+
+Then an audit of the whole port against the SDK (as the other ports had), the site pass (the Go docs pages, the go-import page, the landing page's languages), and the first release.
+
+## Where it cannot match the SDK
+
+- A cron expression that names a date no month has (`0 0 30 2 *`) makes croner, which walks by recursion a year at a time, run out of stack before the year 3000, so the SDK reports the job as unevaluable. The port walks in a loop and answers that the schedule never fires: no next expected time, never missed.
+- Croner reads a string with a colon after its first character as a one-time date, through JavaScript's lenient `Date.parse`. The port refuses every such string: one that looks like an ISO date with `CronPattern: a one-time date is not supported by the Go port`, anything else with the message croner gives for text `Date.parse` cannot read (`Invalid ISO8601 passed to timezone parser.`).
+- In the process's own zone (no `timezone`), a wall-clock time in a gap is found by croner's `fromTZ` rule, as it is for a named zone, where JavaScript's local `Date` uses the offset before the transition. The two agree for one-hour gaps; the conformance fixtures run in UTC. The process zone is `time.Local`.
+- Croner accepts any zone when it reads an expression and fails on a bad one only when asked for a fire time; the port's parser checks the zone at once. Declaring a job with a bad zone gives the SDK's message either way (`job "x": timezone "Mars/Base" is not an IANA timezone`); a stored definition another writer gave a bad zone is unevaluable in both.
+- Zone names are matched without regard to case, as `Intl` does, through the zone database Go reads (`$ZONEINFO`, the system's, or `time/tzdata` when the app imports it). Fixed offsets (`+05:30`) are zones too, as Node 24's `Intl` and croner accept them.
+- Go errors carry no stack, so a failed run's error has frames only when it was a panic. Error names follow Go's types (see Rules), not JavaScript's classes.
+- A value logged or panicked that is not a string, a number or an error is written as JSON through `encoding/json` (with HTML escaping off): Go's field names and sorted map keys, where a JavaScript object would have its own.
+- Two goroutines recording the same finished run from a source at once judge it once, as two SDK promises do, but the SDK's second promise always reports the run as already finished, while a goroutine that reads it after the first finish landed leaves it alone without a word.
+- A channel or triage that has not returned past its timeout gets nothing more until it does (see Delivery); the SDK calls it again for the next alert.
+- The finish and the rest of a run are recorded even when the caller's context is cancelled (see The Go API); the SDK has no such context.
