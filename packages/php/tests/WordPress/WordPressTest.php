@@ -733,8 +733,16 @@ final class WordPressTest extends TestCase
         $this->assertStringNotContainsString('\/', $body, 'the library\'s JSON, not the REST server\'s (which escapes slashes)');
         [$status, , $body] = self::http('GET', $api);
         $this->assertSame([401, '{"ok":false,"error":"Unauthorized"}'], [$status, $body]);
-        [$status] = self::http('GET', $api, ['Authorization' => 'Bearer wrong']);
-        $this->assertSame(401, $status);
+        [$status, $headers, $body] = self::http('GET', $api, ['Authorization' => 'Bearer wrong']);
+        $this->assertSame([401, '{"ok":false,"error":"Unauthorized"}', 'application/json; charset=utf-8'], [$status, $body, $headers['content-type']], 'the permission callback refuses it, with the dashboard\'s own body');
+        [$status, , $body] = self::http('POST', '/?rest_route=/cronwatch/v1/api/check', ['Authorization' => 'Bearer ' . substr($secret, 0, -1)]);
+        $this->assertSame([401, '{"ok":false,"error":"Unauthorized"}'], [$status, $body]);
+        [$status, , $body] = self::http('GET', $api, ['Authorization' => "Basic {$secret}"]);
+        $this->assertSame([401, '{"ok":false,"error":"Unauthorized"}'], [$status, $body], 'only a bearer');
+        [$status, , $body] = self::http('GET', '/?rest_route=/cronwatch/v1/api/%2E%2E/jobs', ['Authorization' => "Bearer {$secret}"]);
+        $this->assertSame([404, '{"ok":false,"error":"Not found"}'], [$status, $body], 'dot segments do not leave /api');
+        [$status] = self::http('GET', '/?rest_route=/cronwatch/v1/api/%252E%252E/jobs', ['Authorization' => "Bearer {$secret}"]);
+        $this->assertSame(404, $status, 'nor encoded ones, which are decoded once');
         [$status, , $body] = self::http('POST', '/?rest_route=/cronwatch/v1/api/check', ['Authorization' => "Bearer {$secret}"]);
         $this->assertSame(200, $status);
         $this->assertStringStartsWith('{"ok":true,"checkedAt":', $body);
@@ -746,6 +754,9 @@ final class WordPressTest extends TestCase
 
         $short = self::inWp('wp_set_current_user(1); echo json_encode(Cronwatch\WordPress\Admin::saveSettings(["api_enabled" => "1", "api_token" => "too-short"]));');
         $this->assertSame('token', $short);
+        // Sanitizing would change this one (it drops every %xx), so it is refused as typed rather than saved shorter.
+        $mangled = self::inWp('wp_set_current_user(1); echo json_encode([Cronwatch\WordPress\Admin::saveSettings(["api_enabled" => "1", "api_token" => "ab%aa%bb%cc%dd%ee%ff%00%11"]), get_option("cronwatch_settings")["api_token"]]);');
+        $this->assertSame(['token', $secret], $mangled);
         self::inWp('update_option("cronwatch_settings", Cronwatch\WordPress\Plugin::DEFAULTS); echo json_encode(true);');
         [$status] = self::http('GET', $api, ['Authorization' => "Bearer {$secret}"]);
         $this->assertSame(404, $status, 'off again');

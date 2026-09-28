@@ -99,6 +99,22 @@ final class HttpTest extends TestCase
         $this->assertStringContainsString('href="/ops/cron/jobs/nightly"', (string) $page->getContent());
     }
 
+    protected function withoutTheGatesMiddleware($app): void
+    {
+        $app['config']->set('cronwatch.dashboard.middleware', ['web']);
+    }
+
+    #[DefineEnvironment('withoutTheGatesMiddleware')]
+    public function testTheControllerAsksTheGateItselfWhenTheMiddlewareIsTakenOut(): void
+    {
+        $this->seeded();
+        $this->get('/cronwatch/api/jobs')->assertUnauthorized();
+        Gate::define(Authorize::GATE, fn (?User $user = null) => $user?->getAttribute('email') === 'ops@example.com');
+        $this->actingAs((new User())->forceFill(['email' => 'someone@example.com']))->get('/cronwatch/api/jobs')->assertUnauthorized();
+        $this->actingAs((new User())->forceFill(['email' => 'ops@example.com']))->get('/cronwatch/api/jobs')->assertOk();
+        $this->getJson('/cronwatch/api/jobs', ['Authorization' => 'Bearer ' . self::TOKEN])->assertOk();
+    }
+
     protected function noDashboard($app): void
     {
         $this->local($app);

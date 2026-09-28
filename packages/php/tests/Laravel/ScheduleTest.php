@@ -57,14 +57,14 @@ final class ScheduleTest extends TestCase
             'prune-tokens', $closure, 'Cronwatch.Tests.Laravel.Fixtures.InvokableTask.handle', 'Cronwatch.Tests.Laravel.Fixtures.InvokableTask',
             'Cronwatch.Tests.Laravel.Fixtures.PlainQueuedJob', 'nightly-report',
         ], array_keys($jobs));
-        $this->assertSame(['schedule' => '0 2 * * *', 'timezone' => 'UTC', 'description' => 'emails:send', 'tags' => ['laravel-scheduler'], 'name' => 'emails:send'], $jobs['emails:send']);
+        $this->assertSame(['schedule' => '0 2 * * *', 'timezone' => 'UTC', 'description' => 'emails:send', 'tags' => ['laravel-scheduler', 'laravel-scheduler:laravel'], 'name' => 'emails:send'], $jobs['emails:send']);
         $this->assertSame('America/New_York', $jobs['emails:send-force-' . substr(md5('emails:send --force'), 0, 8)]['timezone']);
         $this->assertSame('*/5 * * * *', $jobs['node-home-forge-script.js-' . substr(md5('node /home/forge/script.js'), 0, 8)]['schedule']);
         $this->assertStringStartsWith('A closure in ScheduleTest.php at line', $jobs[$closure]['description']);
         // The watched queued job's schedule is declared under its own name, with its own options too.
         $this->assertSame('*/30 * * * *', $jobs['nightly-report']['schedule']);
         $this->assertSame('15m', $jobs['nightly-report']['grace']);
-        $this->assertSame(['nightly', 'laravel-queue', 'laravel-scheduler'], $jobs['nightly-report']['tags']);
+        $this->assertSame(['nightly', 'laravel-queue', 'laravel-scheduler', 'laravel-scheduler:laravel'], $jobs['nightly-report']['tags']);
         $this->assertSame([], $this->errors);
     }
 
@@ -85,7 +85,7 @@ final class ScheduleTest extends TestCase
 
         $jobs = $this->declared($cw);
         $this->assertArrayHasKey('reports', $jobs);
-        $this->assertSame(['schedule' => '0 * * * *', 'timezone' => 'UTC', 'description' => 'reports:build', 'grace' => '5m', 'tags' => ['team-a', 'laravel-scheduler'], 'name' => 'reports'], $jobs['reports']);
+        $this->assertSame(['schedule' => '0 * * * *', 'timezone' => 'UTC', 'description' => 'reports:build', 'grace' => '5m', 'tags' => ['team-a', 'laravel-scheduler', 'laravel-scheduler:laravel'], 'name' => 'reports'], $jobs['reports']);
         $this->assertArrayNotHasKey('left:out', $jobs);
         $this->assertArrayNotHasKey('schedule', $jobs['office:hours'], 'a filtered task has no schedule to miss');
         $this->assertSame('0 9-17 * * *', $jobs['office:given']['schedule']);
@@ -168,6 +168,31 @@ final class ScheduleTest extends TestCase
         $this->assertSame([], $cw->runs('locked'));
         $this->artisan('schedule:run')->assertExitCode(0);
         $this->assertCount(1, $cw->runs('locked'), 'once the lock is gone it runs');
+        $this->assertSame('* * * * *', $cw->store->getJob('locked')->definition->get('schedule'), 'withoutOverlapping() is not a filter: the task keeps its schedule');
+    }
+
+    public function testATaskLaravelSkipsForOverlappingAfterItStartedLeavesNoRun(): void
+    {
+        // The lock taken between the watcher's look and Laravel's (Laravel 13 says so).
+        $cw = $this->client();
+        $event = $this->schedule()->call(fn () => null)->hourly()->name('raced')->withoutOverlapping();
+        if (!property_exists($event, 'skippedBecauseOverlapping')) {
+            $this->markTestSkipped('this Laravel does not say when it skipped a task for overlapping');
+        }
+        $watcher = $this->app->make(\Cronwatch\Laravel\ScheduleWatcher::class);
+        $this->artisan('cronwatch:check')->assertExitCode(0);
+        $this->clock->advance(3 * 3600_000);
+        $this->artisan('cronwatch:check')->assertExitCode(0);
+        $this->assertSame(['missed'], $this->capture->types());
+        $watcher->starting(new \Illuminate\Console\Events\ScheduledTaskStarting($event));
+        $this->assertSame(['running'], array_map(fn ($r) => $r->status, $cw->runs('raced')));
+        $event->skippedBecauseOverlapping = true;
+        $watcher->finished(new \Illuminate\Console\Events\ScheduledTaskFinished($event, 0.1));
+        $this->assertSame([], $cw->runs('raced'));
+        $this->clock->advance(60_000);
+        $this->artisan('cronwatch:check')->assertExitCode(0);
+        $this->assertSame(['missed'], $this->capture->types(), 'missed stays open, alerted once');
+        $this->assertSame([], $this->errors);
     }
 
     public function testABackgroundTaskIsFinishedByScheduleFinish(): void
@@ -220,6 +245,42 @@ final class ScheduleTest extends TestCase
         $definition = $cw->store->getJob('reports:build')->definition;
         $this->assertFalse($definition->has('schedule'));
         $this->assertSame('reports:build (no longer scheduled)', $definition->get('description'));
+    }
+
+    public function testTwoAppsSharingAStoreNeverUnscheduleEachOthersJobs(): void
+    {
+        $store = new \Cronwatch\Store\MemoryStore();
+        $check = function (string $app, ?string $command) use ($store): void {
+            $this->refreshApplication();
+            $this->app['config']->set('app.name', $app);
+            $this->client(['store' => $store]);
+            if ($command !== null) {
+                $this->schedule()->command($command)->hourly();
+            }
+            $this->artisan('cronwatch:check')->assertExitCode(0);
+        };
+        $check('Shop', 'shop:sync');
+        $this->assertSame(['laravel-scheduler', 'laravel-scheduler:shop'], $store->getJob('shop:sync')->definition->get('tags'));
+        $check('Blog', 'blog:publish');
+        $this->assertTrue($store->getJob('shop:sync')->definition->has('schedule'), 'the blog leaves the shop\'s job alone');
+        $this->assertSame(['laravel-scheduler', 'laravel-scheduler:blog'], $store->getJob('blog:publish')->definition->get('tags'));
+        $check('Shop', 'shop:sync');
+        $this->assertTrue($store->getJob('blog:publish')->definition->has('schedule'), 'and the shop the blog\'s');
+        $check('Blog', null);
+        $this->assertFalse($store->getJob('blog:publish')->definition->has('schedule'), 'the blog\'s own task taken out');
+        $this->assertTrue($store->getJob('shop:sync')->definition->has('schedule'));
+        $check('Shop', null);
+        $this->assertFalse($store->getJob('shop:sync')->definition->has('schedule'));
+        $this->assertSame([], $this->errors);
+    }
+
+    public function testTheAppIdNamesTheAppOverItsName(): void
+    {
+        $this->app['config']->set('cronwatch.app_id', 'Billing API');
+        $cw = $this->client();
+        $this->schedule()->command('invoices:send')->daily();
+        $this->artisan('cronwatch:check')->assertExitCode(0);
+        $this->assertSame(['laravel-scheduler', 'laravel-scheduler:billing-api'], $cw->store->getJob('invoices:send')->definition->get('tags'));
     }
 
     public function testACheckThatFailsExitsOne(): void

@@ -36,9 +36,9 @@ final class PostgresStore extends PdoStore
 
     /** @param array<int, mixed> $options more PDO attributes for a connection of its own */
     public function __construct(
-        ?string $url = null,
+        #[\SensitiveParameter] ?string $url = null,
         ?string $username = null,
-        ?string $password = null,
+        #[\SensitiveParameter] ?string $password = null,
         ?\PDO $pdo = null,
         string $prefix = Sql::DEFAULT_PREFIX,
         private readonly array $options = [],
@@ -72,7 +72,7 @@ final class PostgresStore extends PdoStore
      *
      * @return array{string, ?string, ?string}
      */
-    public static function connection(string $url, ?string $username = null, ?string $password = null): array
+    public static function connection(#[\SensitiveParameter] string $url, ?string $username = null, #[\SensitiveParameter] ?string $password = null): array
     {
         if (preg_match('/^pgsql:/i', $url) === 1) {
             return [$url, $username, $password];
@@ -107,12 +107,31 @@ final class PostgresStore extends PdoStore
                 $fields[(string) $key] = $value;
             }
         }
-        $dsn = 'pgsql:' . implode(';', array_map(fn (string $k, string $v) => "{$k}={$v}", array_keys($fields), $fields));
         return [
-            $dsn,
+            self::dsn($fields),
             $username ?? (isset($parts['user']) ? rawurldecode($parts['user']) : null),
             $password ?? (isset($parts['pass']) ? rawurldecode($parts['pass']) : null),
         ];
+    }
+
+    /**
+     * A pgsql: DSN from libpq's keywords, each value quoted as libpq reads
+     * one (key='value', with \ and ' escaped), so a space in a value never
+     * starts another keyword. A value holding ";" is refused: PDO turns every
+     * ";" into a space before libpq reads the string, quotes or not.
+     *
+     * @param array<string, string> $fields
+     */
+    public static function dsn(array $fields): string
+    {
+        $pairs = [];
+        foreach ($fields as $key => $value) {
+            if (str_contains($value, ';')) {
+                throw new \InvalidArgumentException("PostgresStore cannot put a {$key} holding \";\" in a DSN");
+            }
+            $pairs[] = "{$key}='" . str_replace(['\\', "'"], ['\\\\', "\\'"], $value) . "'";
+        }
+        return 'pgsql:' . implode(';', $pairs);
     }
 
     protected function open(): \PDO
@@ -155,6 +174,7 @@ final class PostgresStore extends PdoStore
                 throw $error;
             }
             $this->db = null;
+            $this->resent = true;
             return parent::run($text, $params);
         }
     }
@@ -209,9 +229,10 @@ final class PostgresStore extends PdoStore
 
     public function compareAndSetState(JobState $state, int|float $expectedVersion): bool
     {
+        $this->resent = false;
         $statement = $expectedVersion == 0
             ? $this->run($this->sql['casInsert'], Sql::stateParams($state))
             : $this->run($this->sql['casUpdate'], Sql::casUpdateParams($state, $expectedVersion));
-        return $statement->rowCount() > 0;
+        return $statement->rowCount() > 0 || $this->stateLanded($state);
     }
 }

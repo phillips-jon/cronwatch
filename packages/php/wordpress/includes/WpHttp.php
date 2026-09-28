@@ -29,9 +29,14 @@ final class WpHttp implements Http
         $url = Shared::postable($url);
         $response = wp_remote_post($url, [
             'body' => $body,
-            'headers' => array_map(fn ($value) => trim((string) $value, " \t\r\n"), $headers),
+            'headers' => Shared::headers($headers),
             'timeout' => max(1, $timeoutMs / 1000),
             'redirection' => 0,
+            'limit_response_size' => Http::MAX_BODY,
+            // On a network, where a site's administrators may not be the
+            // network's, an alert URL may not reach a private address or an
+            // unusual port (wp_safe_remote_post's rule); a filter can say otherwise.
+            'reject_unsafe_urls' => (bool) apply_filters('cronwatch_reject_unsafe_urls', is_multisite(), Shared::origin($url)),
         ]);
         if (is_wp_error($response)) {
             $message = Shared::scrub($response->get_error_message(), $url);

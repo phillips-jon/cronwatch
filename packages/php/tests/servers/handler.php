@@ -17,6 +17,19 @@ use Cronwatch\Job\JobContext;
 use Cronwatch\Store\SqliteStore;
 use Cronwatch\Web\Request;
 
+if (($_GET['slow'] ?? '') === '1') {
+    // A failure whose alert takes longer than the request's time limit (CPU
+    // time, which is what max_execution_time counts): the alert still goes out.
+    ini_set('max_execution_time', '1');
+    $slow = new Cronwatch(store: new SqliteStore((string) getenv('CW_HANDLER_DB')), onError: fn () => null, alerts: [function (): void {
+        for ($until = hrtime(true) + 1_500_000_000; hrtime(true) < $until;) {
+        }
+        file_put_contents(getenv('CW_HANDLER_DB') . '.alerted', 'yes');
+    }]);
+    $slow->job('slow')->handler(fn () => throw new RuntimeException('down'))->serve();
+    return;
+}
+
 $cw = new Cronwatch(store: new SqliteStore((string) getenv('CW_HANDLER_DB')), alerts: [], onError: fn () => null);
 $cw->job('hook')->handler(function (JobContext $job, Request $request) {
     $job->log("{$request->method} {$request->path}");

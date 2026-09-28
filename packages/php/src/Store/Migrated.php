@@ -15,7 +15,7 @@ use Cronwatch\StoredJob;
  * nothing. For an app whose database user may not create tables at run
  * time (the framework integrations use it when told the migration ran).
  */
-final class Migrated implements Store, UpdatesRunIf, ComparesAndSetsState
+final class Migrated implements Store, UpdatesRunIf, ComparesAndSetsState, DeletesRunIf
 {
     public function __construct(public readonly Store&UpdatesRunIf&ComparesAndSetsState $inner)
     {
@@ -58,6 +58,12 @@ final class Migrated implements Store, UpdatesRunIf, ComparesAndSetsState
     public function updateRunIf(Run $run, array $fromStatuses): bool
     {
         return $this->inner->updateRunIf($run, $fromStatuses);
+    }
+
+    /** False when the store given cannot delete a run. */
+    public function deleteRunIf(string $id, string $job, string $status): bool
+    {
+        return $this->inner instanceof DeletesRunIf && $this->inner->deleteRunIf($id, $job, $status);
     }
 
     public function getRun(string $id): ?Run

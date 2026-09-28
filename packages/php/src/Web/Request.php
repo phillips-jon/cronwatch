@@ -138,7 +138,7 @@ final class Request
             $path,
             $query,
             $headers,
-            $input ?? static fn (): string => (string) file_get_contents('php://input'),
+            $input ?? static fn (): string => self::readAtMost('php://input'),
             self::originOf($scheme, $host),
             $mount,
             $form,
@@ -186,7 +186,15 @@ final class Request
             if ($stream->isSeekable()) {
                 $stream->rewind();
             }
-            return $stream->getContents();
+            $text = '';
+            while (!$stream->eof() && strlen($text) <= self::MAX_BODY) {
+                $chunk = $stream->read(65536);
+                if ($chunk === '') {
+                    break;
+                }
+                $text .= $chunk;
+            }
+            return substr($text, 0, self::MAX_BODY + 1);
         };
         return new self((string) $request->getMethod(), $path, (string) $uri->getQuery(), $headers, $body, self::originOf($scheme, $host), $mount, $form);
     }
@@ -214,7 +222,39 @@ final class Request
         return $this->headers[strtolower($name)] ?? null;
     }
 
-    /** The body's bytes, read once. */
+    /**
+     * The most of a body the dashboard reads (1 MiB; its forms and JSON are
+     * a few bytes). A body is read only once a route wants it, after the
+     * token; one past this is answered 413 (Dashboard), and at most one byte
+     * more than this is read to tell.
+     */
+    public const MAX_BODY = 1_048_576;
+
+    /** Whether the body is more than MAX_BODY bytes, by its Content-Length or by reading it. */
+    public function bodyTooLarge(): bool
+    {
+        $length = $this->header('content-length');
+        if ($length !== null && preg_match('/^[0-9]+$/D', $length) === 1 && (strlen(ltrim($length, '0')) > 7 || (int) $length > self::MAX_BODY)) {
+            return true;
+        }
+        return strlen($this->body()) > self::MAX_BODY;
+    }
+
+    /** Up to MAX_BODY bytes of a stream and one more, to tell a body that is too large. */
+    public static function readAtMost(string $uri): string
+    {
+        $stream = @fopen($uri, 'rb'); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- the request body, read in PHP's own way.
+        if ($stream === false) {
+            return '';
+        }
+        try {
+            return (string) stream_get_contents($stream, self::MAX_BODY + 1);
+        } finally {
+            fclose($stream); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- as above.
+        }
+    }
+
+    /** The body's bytes, read once (at most MAX_BODY and one more from a stream). */
     public function body(): string
     {
         if ($this->body instanceof \Closure) {

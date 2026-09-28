@@ -22,7 +22,11 @@ final class Duration
     {
         if ($value instanceof \DateInterval) {
             $start = new \DateTimeImmutable('@0');
-            return Js::round(((float) $start->add($value)->format('U.u')) * 1000);
+            $ms = Js::round(((float) $start->add($value)->format('U.u')) * 1000);
+            if ($ms < 0) {
+                throw new \InvalidArgumentException("{$label} must be a non-negative number of milliseconds");
+            }
+            return $ms;
         }
         if (is_int($value) || is_float($value)) {
             if (!Js::isFinite($value) || $value < 0) {

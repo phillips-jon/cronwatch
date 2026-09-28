@@ -6,6 +6,7 @@ namespace Cronwatch\Laravel\Http;
 
 use Cronwatch\Cronwatch;
 use Cronwatch\Web\HttpFoundation;
+use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Http\Request;
 
@@ -22,7 +23,7 @@ use Illuminate\Http\Request;
  */
 final class DashboardController
 {
-    public function __construct(private readonly Cronwatch $cw, private readonly Repository $config)
+    public function __construct(private readonly Cronwatch $cw, private readonly Repository $config, private readonly Gate $gate)
     {
     }
 
@@ -31,8 +32,11 @@ final class DashboardController
         $path = trim((string) $this->config->get('cronwatch.dashboard.path', 'cronwatch'), '/');
         $base = rtrim($request->getBaseUrl(), '/') . ($path === '' ? '' : "/{$path}");
         $token = $this->config->get('cronwatch.dashboard.token');
+        // Served open only to a request the gate lets in, asked again here rather
+        // than trusted to the route's middleware, which the config may change.
+        $open = !Authorize::hasBearer($request) && $this->gate->check(Authorize::GATE, [$request->user()]);
         $dashboard = $this->cw->routes(
-            token: Authorize::hasBearer($request) ? (is_string($token) && $token !== '' ? $token : null) : false,
+            token: $open ? false : (is_string($token) && $token !== '' ? $token : null),
             basePath: $base,
             origin: $request->getSchemeAndHttpHost(),
         );

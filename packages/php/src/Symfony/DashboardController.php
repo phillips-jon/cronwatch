@@ -42,7 +42,7 @@ final class DashboardController
     {
         $info = $request->getPathInfo();
         $rest = $path === '' ? '' : '/' . ltrim($path, '/');
-        $mount = $rest !== '' && str_ends_with($info, $rest) ? substr($info, 0, -strlen($rest)) : rtrim($info, '/');
+        $mount = self::mount($info, $rest);
         $base = rtrim($request->getBaseUrl(), '/') . rtrim($mount, '/');
         $bearer = preg_match('/^Bearer\s/i', (string) $request->headers->get('authorization', '')) === 1;
         $open = !$bearer && $this->granted();
@@ -54,6 +54,25 @@ final class DashboardController
         $response = HttpFoundation::toResponse($dashboard->handle(HttpFoundation::toRequest($request)));
         \assert($response instanceof Response);
         return $response;
+    }
+
+    /**
+     * Where the routes are mounted: the path before the route's {path}. The
+     * router hands {path} decoded (billing:sync) while the path info is as
+     * sent (billing%3Async), so the mount ends at the "/" after which the
+     * path info decodes to it.
+     */
+    private static function mount(string $info, string $rest): string
+    {
+        if ($rest === '') {
+            return rtrim($info, '/');
+        }
+        for ($at = strpos($info, '/'); $at !== false; $at = strpos($info, '/', $at + 1)) {
+            if (rawurldecode(substr($info, $at)) === $rest || rawurldecode(rtrim(substr($info, $at), '/')) === rtrim($rest, '/')) {
+                return substr($info, 0, $at);
+            }
+        }
+        return rtrim($info, '/');
     }
 
     private function granted(): bool

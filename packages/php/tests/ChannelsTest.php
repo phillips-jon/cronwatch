@@ -559,6 +559,42 @@ final class ChannelsTest extends TestCase
         }
     }
 
+    #[DataProvider('transports')]
+    public function testTheDefaultHttpKeepsAtMostAMebibyteOfAnAnswer(bool $curl): void
+    {
+        $server = new LocalServer();
+        try {
+            $answer = $this->http($curl)->post("{$server->url}/big", '{}', []);
+            $this->assertSame(500, $answer->status);
+            $this->assertSame(str_repeat("y", Alerts\Http::MAX_BODY), $answer->body, 'three decoded mebibytes, one kept');
+        } finally {
+            $server->stop();
+        }
+    }
+
+    public function testAWebhookSignsTheBytesItSendsWhenTheAlertHoldsBytesThatAreNotUtf8(): void
+    {
+        $http = new FakeHttp();
+        (new Alerts\Webhook('https://hooks.example.com/x', secret: 'k', http: $http))->send(self::failed("Error: bad \xC3 byte"), self::context());
+        $body = $http->requests[0]['body'];
+        $this->assertSame(1, preg_match('//u', $body), 'sent as fetch sends a string');
+        $this->assertStringContainsString("bad \u{FFFD} byte", $body);
+        $this->assertSame('sha256=' . hash_hmac('sha256', $body, 'k'), $http->requests[0]['headers']['x-cronwatch-signature']);
+    }
+
+    public function testAHeaderNameThatIsNotATokenIsRefused(): void
+    {
+        foreach (["x-a\r\nx-injected", 'x a', '', "x:\0"] as $name) {
+            try {
+                (new NativeHttp(false))->post('http://127.0.0.1:1/', '{}', [$name => 'v']);
+                $this->fail('refused: ' . json_encode($name));
+            } catch (\InvalidArgumentException $error) {
+                $this->assertStringContainsString('header name', $error->getMessage());
+            }
+        }
+        $this->assertSame(['x-a' => 'v', 'X_B.c~' => 'w'], Shared::headers(['x-a' => ' v ', 'X_B.c~' => 'w']));
+    }
+
     public function testTheDefaultHttpGivesUpAfterTenSeconds(): void
     {
         $this->assertSame(10_000, NativeHttp::TIMEOUT_MS);

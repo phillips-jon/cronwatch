@@ -49,7 +49,12 @@ final class SqliteStore extends PdoStore
             // Create the file private before SQLite opens it. SQLite gives the
             // -wal and -shm files the main file's mode, so the whole set stays
             // 0600; the chmods cover files left by an earlier open.
-            $handle = @fopen($file, 'a');
+            $mask = umask(0077);
+            try {
+                $handle = @fopen($file, 'a');
+            } finally {
+                umask($mask);
+            }
             if ($handle !== false) {
                 fclose($handle);
                 foreach ([$file, "{$file}-wal", "{$file}-shm"] as $f) {
@@ -97,10 +102,14 @@ final class SqliteStore extends PdoStore
     {
         $sleep ??= fn (int $ms) => usleep($ms * 1000);
         $waited = 0;
+        $start = hrtime(true);
         for ($attempt = 0; ; $attempt++) {
             try {
                 return $fn();
             } catch (\Throwable $error) {
+                // The budget is wall clock (an attempt can itself wait out the busy
+                // timeout), or the pauses slept, whichever is more.
+                $waited = (int) max($waited, (hrtime(true) - $start) / 1e6);
                 if (!self::isBusy($error) || $waited >= $budgetMs) {
                     throw $error;
                 }
@@ -133,9 +142,10 @@ final class SqliteStore extends PdoStore
 
     public function compareAndSetState(JobState $state, int|float $expectedVersion): bool
     {
+        $this->resent = false;
         $statement = $expectedVersion == 0
             ? $this->run($this->sql['casInsert'], Sql::stateParams($state))
             : $this->run($this->sql['casUpdate'], Sql::casUpdateParams($state, $expectedVersion));
-        return $statement->rowCount() > 0;
+        return $statement->rowCount() > 0 || $this->stateLanded($state);
     }
 }

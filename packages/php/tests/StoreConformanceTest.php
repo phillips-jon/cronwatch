@@ -165,6 +165,20 @@ final class StoreConformanceTest extends TestCase
         $this->assertNull($store->getRun('missing'));
         $this->assertFalse($store->updateRunIf(self::makeRun('rx', 'q', 'failed', 2500), []), 'no statuses, no write');
         $this->assertSame('ok', $store->getRun('rx')->status);
+
+        // deleteRunIf (the PHP port's own): takes back a run only while it is of the job and in the status given.
+        if ($store instanceof \Cronwatch\Store\DeletesRunIf) {
+            $store->insertRun(self::makeRun('rd', 'q', 'running', 2600));
+            $this->assertFalse($store->deleteRunIf('rd', 'other', 'running'), 'another job\'s run is not deleted');
+            $this->assertFalse($store->deleteRunIf('rd', 'q', 'timeout'), 'nor one in another status');
+            $this->assertFalse($store->deleteRunIf('rx', 'q', 'running'), 'nor a finished run');
+            $this->assertFalse($store->deleteRunIf('missing', 'q', 'running'));
+            $this->assertTrue($store->deleteRunIf('rd', 'q', 'running'));
+            $this->assertNull($store->getRun('rd'));
+            $this->assertFalse($store->deleteRunIf('rd', 'q', 'running'), 'once');
+            $this->assertSame('ok', $store->getRun('rx')->status);
+            $this->assertSame(['rx'], self::names($store->listRuns('q', 10)));
+        }
         $store->deleteJob('q');
 
         // Forgetting a job while one of its runs is in flight: the run finishing later changes nothing.

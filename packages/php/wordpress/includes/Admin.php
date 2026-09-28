@@ -25,6 +25,8 @@ final class Admin
     public const PAGE = 'cronwatch-settings';
     /** The least a token the owner types in may be; one the plugin makes is 40. */
     public const TOKEN_MIN = 24;
+    /** What an API token typed in may hold. */
+    public const TOKEN_PATTERN = '/^[A-Za-z0-9._~+\/=-]{24,200}$/D';
 
     public static function register(): void
     {
@@ -101,8 +103,10 @@ final class Admin
         // The API's token: one typed in (never shown again), a new one made on request, or one made when the API is first turned on.
         $token = preg_replace('/\s+/', '', $text('api_token')) ?? '';
         if ($token !== '') {
-            if (strlen($token) >= self::TOKEN_MIN) {
-                $new['api_token'] = sanitize_text_field($token);
+            // Checked as typed, and saved as typed: letters, digits and . _ ~ + / = -, which
+            // no sanitizing changes, so the token saved is the one the owner gives the client.
+            if (preg_match(self::TOKEN_PATTERN, $token) === 1) {
+                $new['api_token'] = $token;
             } else {
                 $notice = 'token';
             }
@@ -182,7 +186,7 @@ final class Admin
             echo '<div class="notice notice-error"><p>' . esc_html__('The grace was not a duration such as 10m or 1h30m, so it was left as it was. The rest was saved.', 'cronwatch') . '</p></div>';
         } elseif ($notice === 'token') {
             /* translators: %d: the least number of characters an API token may have. */
-            echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was shorter than %d characters, so it was not saved. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
+            echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was not saved: it needs at least %d characters, each a letter, a digit or one of . _ ~ + / = -. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
         } elseif ($notice === 'tested') {
             $results = get_transient('cronwatch_test_' . get_current_user_id());
             delete_transient('cronwatch_test_' . get_current_user_id());
@@ -239,7 +243,7 @@ final class Admin
         $tokenHelp = $settings['api_token'] !== ''
             ? __('A token is saved. Leave blank to keep it, or type a new one.', 'cronwatch')
             /* translators: %d: the least number of characters an API token may have. */
-            : sprintf(__('Leave blank and one is made when you turn the API on, or type one of at least %d characters.', 'cronwatch'), self::TOKEN_MIN);
+            : sprintf(__('Leave blank and one is made when you turn the API on, or type one of at least %d letters, digits and . _ ~ + / = -.', 'cronwatch'), self::TOKEN_MIN);
         self::row('api_token', __('API token', 'cronwatch'), '<input type="password" class="regular-text" id="cronwatch-api_token" name="cronwatch[api_token]" value="" autocomplete="new-password">'
             . ($settings['api_token'] !== '' ? ' <label><input type="checkbox" name="cronwatch[api_token_new]" value="1"> ' . esc_html__('Make a new one', 'cronwatch') . '</label>' : ''), $tokenHelp);
         echo '</tbody></table>';

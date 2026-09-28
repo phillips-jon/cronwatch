@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Cronwatch\Tests\Laravel;
 
+use Cronwatch\Cronwatch;
 use Cronwatch\Tests\Laravel\Fixtures\FlakyJob;
 use Cronwatch\Tests\Laravel\Fixtures\InterfaceJob;
+use Cronwatch\Tests\Laravel\Fixtures\LimitedJob;
 use Cronwatch\Tests\Laravel\Fixtures\OptedOutJob;
 use Cronwatch\Tests\Laravel\Fixtures\PlainQueuedJob;
 use Cronwatch\Tests\Laravel\Fixtures\ReleasingJob;
@@ -72,12 +74,87 @@ final class QueueTest extends TestCase
         $this->assertSame([], $this->errors);
     }
 
-    public function testAJobThatReleasesItselfFailsTheAttempt(): void
+    public function testAJobReleasedWithoutAnExceptionLeavesNoRun(): void
     {
         $cw = $this->client();
+        ReleasingJob::$failOn = [];
+        ReleasingJob::$releaseOn = [1];
         ReleasingJob::dispatch();
         $this->work();
-        $this->assertSame([['failed', 'Released back onto the queue']], array_map(fn ($r) => [$r->status, $r->error], $cw->runs('releases')));
+        $this->assertSame([], $cw->runs('releases'), 'the released attempt is taken back');
+        $this->assertNotNull($cw->store->getJob('releases'), 'the job is still declared');
+        $this->work();
+        $this->assertSame([['ok', 'attempt 2 worked']], array_map(fn ($r) => [$r->status, $r->output], $cw->runs('releases')));
+        $this->assertSame([], $this->capture->types());
+        $this->assertSame([], $this->errors);
+    }
+
+    public function testAReleaseNeitherFailsNorRecovers(): void
+    {
+        // failuresBeforeAlert: 2. Failures on either side of a release are
+        // two in a row, and the release closes nothing.
+        $cw = $this->client();
+        ReleasingJob::$failOn = [1, 3];
+        ReleasingJob::$releaseOn = [2, 4];
+        ReleasingJob::dispatch();
+        $this->work(2);
+        $this->assertSame(['failed'], array_map(fn ($r) => $r->status, $cw->runs('releases')));
+        $this->assertSame([], $this->capture->types(), 'one failure is not yet two');
+        $this->work();
+        $this->assertSame(['failed', 'failed'], array_map(fn ($r) => $r->status, $cw->runs('releases')));
+        $this->assertSame(['failed'], $this->capture->types(), 'the release did not reset the count');
+        $this->work();
+        $this->assertSame(['failed'], $this->capture->types(), 'a release does not recover');
+        $this->assertSame('failing', $cw->jobSummary('releases')->health);
+        $this->work();
+        $this->assertSame(['ok', 'failed', 'failed'], array_map(fn ($r) => $r->status, $cw->runs('releases')));
+        $this->assertSame(['failed', 'recovered'], $this->capture->types());
+        $this->assertSame([], $this->errors);
+    }
+
+    public function testAJobReleasedByItsMiddlewareLeavesNoRun(): void
+    {
+        $cw = $this->client();
+        LimitedJob::$limited = 2;
+        LimitedJob::dispatch();
+        $this->work(2);
+        $this->assertSame([], $cw->runs('rate-limited'));
+        $this->work();
+        $this->assertSame([['ok', 'done']], array_map(fn ($r) => [$r->status, $r->output], $cw->runs('rate-limited')));
+        $this->assertSame([], $this->capture->types());
+        $this->assertSame([], $this->errors);
+    }
+
+    public function testATakenBackRunLeavesMissedOpenAndAlertedOnce(): void
+    {
+        $cw = $this->client();
+        $handle = $cw->job('hourly-queue', ['schedule' => '0 * * * *', 'timezone' => 'UTC']);
+        $cw->check();
+        $this->clock->advance(2 * 3600_000);
+        $cw->check();
+        $this->assertSame(['missed'], $this->capture->types());
+        $key = $cw->startExecution($handle->definition, 'queue', mayDiscard: true);
+        $this->assertTrue($cw->discardExecution($key));
+        $this->clock->advance(60_000);
+        $cw->check();
+        $this->assertSame(['missed'], $this->capture->types(), 'not missed again: it never closed');
+        $key = $cw->startExecution($handle->definition, 'queue', mayDiscard: true);
+        $this->assertSame('ok', $cw->finishExecution($key)->status);
+        $this->assertSame(['missed', 'recovered'], $this->capture->types(), 'the start closes missed when the run is judged');
+        $this->assertSame([], $this->errors);
+    }
+
+    public function testATakenBackRunThatACheckAlreadyMarkedStuckIsLeftAndReported(): void
+    {
+        $cw = $this->client(['store' => new \Cronwatch\Store\MemoryStore()]);
+        $handle = $cw->job('released', ['timeout' => '1m']);
+        $key = $cw->startExecution($handle->definition, 'queue', 'x:1');
+        $this->clock->advance(120_000);
+        $cw->check();
+        $this->assertFalse($cw->discardExecution($key));
+        $this->assertSame('timeout', $cw->getRun('x:1')->status);
+        $this->assertSame(['discarding released'], $this->wheres());
+        $this->assertNull(Cronwatch::current());
     }
 
     public function testOnlyJobsThatOptInAreWatched(): void

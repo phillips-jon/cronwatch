@@ -100,12 +100,25 @@ final class ScheduledTasks
         return array_keys($this->handles);
     }
 
+    /**
+     * This app's tag under the scheduler's ("laravel-scheduler:<app>"): the
+     * app's name from cronwatch.app_id (CRONWATCH_APP_ID), else app.name, so
+     * two apps sharing a store never take each other's jobs for their own.
+     */
+    public function appTag(): string
+    {
+        $config = $this->app->make('config');
+        $app = $config->get('cronwatch.app_id');
+        $app = is_string($app) && trim($app) !== '' ? $app : $config->get('app.name');
+        return Unscheduled::appTag(self::TAG, is_string($app) && trim($app) !== '' ? $app : 'laravel');
+    }
+
     /** What a check starts with: every task declared, and jobs of tasks no longer scheduled declared without their schedule. */
     public function prepare(): Cronwatch
     {
         $this->declare();
         $cw = $this->cw();
-        Unscheduled::declare($cw, self::TAG, $this->report(...));
+        Unscheduled::declare($cw, self::TAG, $this->appTag(), $this->report(...));
         return $cw;
     }
 
@@ -226,7 +239,7 @@ final class ScheduledTasks
         foreach ([...$base, ...$given] as $key => $value) {
             $options[(string) $key] = $value;
         }
-        $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG]));
+        $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG, $this->appTag()]));
         $options = array_filter($options, fn ($value) => $value !== null);
         $this->names[spl_object_id($event)] = $name;
         if (!isset($this->jobs[$name])) {
@@ -338,7 +351,29 @@ final class ScheduledTasks
     public static function isFiltered(Event $event): bool
     {
         [$filters, $rejects] = (fn () => [$this->filters ?? [], $this->rejects ?? []])->call($event);
+        // ->withoutOverlapping() adds a skip of its own (the lock is held),
+        // which does not move when the task is due: it is not a filter here.
+        $rejects = array_filter($rejects, fn ($reject) => !self::isOverlapSkip($reject));
         return $filters !== [] || $rejects !== [];
+    }
+
+    /** Whether a reject callback is the one Event::withoutOverlapping() adds. */
+    private static function isOverlapSkip(mixed $reject): bool
+    {
+        static $where = null;
+        if (!$reject instanceof \Closure) {
+            return false;
+        }
+        try {
+            if ($where === null) {
+                $method = new \ReflectionMethod(Event::class, 'withoutOverlapping');
+                $where = [$method->getFileName(), $method->getStartLine(), $method->getEndLine()];
+            }
+            $closure = new \ReflectionFunction($reject);
+            return $closure->getFileName() === $where[0] && $closure->getStartLine() >= $where[1] && $closure->getEndLine() <= $where[2];
+        } catch (\ReflectionException) {
+            return false;
+        }
     }
 
     private function timezone(Event $event): string

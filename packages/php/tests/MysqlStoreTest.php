@@ -37,8 +37,51 @@ final class MysqlStoreTest extends TestCase
         $this->assertSame(['mysql:unix_socket=/tmp/mysql.sock;dbname=cw;charset=utf8mb4', 'u', null], MysqlStore::connection('mysql://u@localhost/cw?unix_socket=/tmp/mysql.sock'));
         $this->assertSame(['mysql:host=h;dbname=d;charset=utf8mb4', 'u', 'x'], MysqlStore::connection('mysql:host=h;dbname=d', 'u', 'x'), 'a DSN passes through');
         $this->assertSame(['mysql:host=h;charset=latin1', null, null], MysqlStore::connection('mysql:host=h;charset=latin1'));
+        foreach (['mysql://u@db/app%3Bunix_socket%3D%2Ftmp%2Fx', 'mysql://u@db/app?unix_socket=/tmp/s;host=x', 'mysql://u@db/app?charset=utf8;x=y'] as $url) {
+            try {
+                MysqlStore::connection($url);
+                $this->fail("{$url} is refused");
+            } catch (\InvalidArgumentException $error) {
+                $this->assertStringContainsString('holding ";"', $error->getMessage());
+            }
+        }
         $this->expectExceptionMessage('mysql:// or mariadb://');
         MysqlStore::connection('postgres://h/d');
+    }
+
+    public function testAUrlsTlsParametersBecomePdoAttributesAndAnUnknownOneIsRefused(): void
+    {
+        if (!extension_loaded('pdo_mysql')) {
+            $this->markTestSkipped('needs pdo_mysql');
+        }
+        $attribute = fn (string $name) => (int) constant(\PHP_VERSION_ID >= 80400 ? "Pdo\\Mysql::ATTR_{$name}" : "PDO::MYSQL_ATTR_{$name}");
+        $this->assertSame([], MysqlStore::urlOptions('mysql://u@db/app?charset=latin1&serverVersion=8.0'));
+        $this->assertSame([], MysqlStore::urlOptions('mysql:host=db;dbname=app'), 'a DSN has none');
+        $this->assertSame([], MysqlStore::urlOptions('mysql://u@db/app?ssl-mode=DISABLED&ssl-ca=/ca.pem'));
+        $this->assertSame(
+            [$attribute('SSL_CA') => '/etc/ca.pem', $attribute('SSL_VERIFY_SERVER_CERT') => true],
+            MysqlStore::urlOptions('mysql://u@db/app?ssl-mode=VERIFY_IDENTITY&ssl-ca=/etc/ca.pem'),
+        );
+        $this->assertSame(
+            [$attribute('SSL_CERT') => '/c.pem', $attribute('SSL_KEY') => '/k.pem', $attribute('SSL_VERIFY_SERVER_CERT') => false],
+            MysqlStore::urlOptions('mysql://u@db/app?sslcert=/c.pem&sslkey=/k.pem'),
+        );
+        $default = openssl_get_cert_locations()['default_cert_file'] ?? '';
+        if (is_string($default) && is_readable($default)) {
+            $this->assertSame(
+                [$attribute('SSL_CA') => $default, $attribute('SSL_VERIFY_SERVER_CERT') => false],
+                MysqlStore::urlOptions('mysql://u@db/app?sslmode=require'),
+                'TLS asked for without a CA uses OpenSSL\'s own',
+            );
+        }
+        try {
+            MysqlStore::urlOptions('mysql://u@db/app?ssl-mode=SOMETIMES');
+            $this->fail('an unknown mode is refused');
+        } catch (\InvalidArgumentException $error) {
+            $this->assertStringContainsString('ssl-mode SOMETIMES', $error->getMessage());
+        }
+        $this->expectExceptionMessage('does not know the URL parameter sslaccept');
+        MysqlStore::urlOptions('mysql://u@db/app?sslaccept=strict');
     }
 
     public function testWithoutAUrlItReadsDatabaseUrl(): void

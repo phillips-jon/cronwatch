@@ -216,6 +216,25 @@ final class WebTest extends TestCase
         $this->assertNull($cw->jobSummary('s'));
     }
 
+    public function testABodyOverAMebibyteIsRefusedWith413(): void
+    {
+        [$cw, $web] = $this->app();
+        $cw->run('s', self::nothing());
+        $big = json_encode(['for' => '2h', 'pad' => str_repeat('x', Request::MAX_BODY)]);
+        $answer = self::send($web, 'POST', '/cronwatch/api/jobs/s/silence', self::JSON, $big);
+        $this->assertSame([413, ['ok' => false, 'error' => 'Request body too large']], [$answer->status, self::json($answer)]);
+        $this->assertNull($cw->store->getState('s')?->silencedUntil, 'not silenced');
+        // Told by its Content-Length alone, before anything is read.
+        $unread = new Request('POST', '/cronwatch/api/jobs/s/silence', '', self::BEARER + self::JSON + ['content-length' => '99999999999999999999'], fn () => throw new \LogicException('read'), 'http://app.test');
+        $this->assertSame(413, $web->handle($unread)->status);
+        $form = self::send($web, 'POST', '/cronwatch/jobs/s/silence', self::BEARER + self::FORM, 'for=4h&pad=' . str_repeat('x', Request::MAX_BODY));
+        $this->assertSame(413, $form->status);
+        // Nothing is read for a caller without the token.
+        $stranger = new Request('POST', '/cronwatch/api/jobs/s/silence', '', ['content-type' => 'application/json'], fn () => throw new \LogicException('read'), 'http://app.test');
+        $this->assertSame(401, $web->handle($stranger)->status);
+        $this->assertSame(200, self::send($web, 'POST', '/cronwatch/api/jobs/s/silence', self::JSON, json_encode(['for' => '2h']))->status, 'a body of a few bytes is fine');
+    }
+
     public function testDashboardFormsPostAndRedirectBack(): void
     {
         [$cw, $web] = $this->app();
@@ -306,6 +325,56 @@ final class WebTest extends TestCase
         self::send($other, 'GET', 'https://dev.example:8443/api/jobs');
         $this->assertMatchesRegularExpression('#Sign in: https://dev\.example:8443/\?token=[A-Za-z0-9_-]{43}$#', $this->logged[1], 'the origin as requested, and a root mount');
         $this->assertNotSame($token, substr($this->logged[1], -43), 'another dashboard makes its own');
+    }
+
+    public function testADevelopmentTokenFileSomeoneElseCouldWriteIsNotTrusted(): void
+    {
+        putenv('CRONWATCH_ENV=development');
+        $planted = str_repeat('A', 43);
+        // A token planted by another user of the temporary directory: readable by others, so not this server's.
+        $web = $this->routes($this->client());
+        $file = end($this->tokenFiles);
+        file_put_contents($file, $planted);
+        chmod($file, 0644);
+        $this->assertSame(401, self::send($web, 'GET', '/cronwatch/api/jobs', ['authorization' => "Bearer {$planted}"])->status);
+        $this->assertCount(1, $this->logged, 'a token of its own made and announced');
+        // A link in its place is not followed either.
+        $link = sys_get_temp_dir() . '/cronwatch-test-link-' . getmypid() . '-' . bin2hex(random_bytes(4));
+        $target = "{$link}-target";
+        file_put_contents($target, $planted);
+        chmod($target, 0600);
+        symlink($target, $link);
+        try {
+            $linked = new Dashboard($this->client(), null, '/cronwatch', null, false, function (string $line): void {
+                $this->logged[] = $line;
+            }, $link);
+            $this->assertSame(401, self::send($linked, 'GET', '/cronwatch/api/jobs', ['authorization' => "Bearer {$planted}"])->status);
+        } finally {
+            @unlink($link);
+            @unlink($target);
+        }
+    }
+
+    public function testTheDefaultDevelopmentTokenFileIsInADirectoryOfTheUsersOwn(): void
+    {
+        putenv('CRONWATCH_ENV=development');
+        $base = '/cronwatch-default-' . bin2hex(random_bytes(4));
+        $web = new Dashboard($this->client(), null, $base, null, false, function (string $line): void {
+            $this->logged[] = $line;
+        });
+        $this->assertSame(401, self::send($web, 'GET', "http://localhost{$base}/api/jobs")->status);
+        $uid = function_exists('posix_geteuid') ? posix_geteuid() : getmyuid();
+        $dir = sys_get_temp_dir() . "/cronwatch-{$uid}";
+        $this->assertDirectoryExists($dir);
+        $this->assertSame(0, fileperms($dir) & 0077, 'nobody else may list or write it');
+        $token = substr($this->logged[0], -43);
+        $again = new Dashboard($this->client(), null, $base, null, false, fn () => null);
+        $this->assertSame(200, self::send($again, 'GET', "http://localhost{$base}/api/jobs", ['authorization' => "Bearer {$token}"])->status, 'kept for the next request');
+        foreach (glob("{$dir}/dev-token-*") ?: [] as $file) {
+            if (trim((string) file_get_contents($file)) === $token) {
+                unlink($file);
+            }
+        }
     }
 
     public function testAFrameworksEnvironmentCountsWhenNoVariableNamesOne(): void

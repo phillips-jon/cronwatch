@@ -63,6 +63,9 @@ final class HttpFoundation
             Request::normalizePath($path),
             $query,
             $headers,
+            // As a string, as the framework reads it for any controller (a resource
+            // read would stop anything later asking for the string); a body
+            // past Request::MAX_BODY is told by its Content-Length before this.
             static fn (): string => (string) $request->getContent(),
             Request::originOf((string) $request->getScheme(), (string) $request->getHttpHost()),
             null,

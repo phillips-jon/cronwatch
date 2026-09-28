@@ -310,6 +310,9 @@ final class HandlerTest extends TestCase
             $this->assertSame([503, 'psr', 'down'], [$status, $headers['x-kind'], $body]);
             [$status, $headers, $body] = self::http($port, 'HEAD', '/cron/hook', "Bearer {$secret}");
             $this->assertSame([200, ''], [$status, $body], 'HEAD runs the job and sends the headers only');
+            [$status] = self::http($port, 'GET', '/cron/hook?slow=1', "Bearer {$secret}");
+            $this->assertSame(500, $status);
+            $this->assertFileExists("{$dir}/cw.db.alerted", 'an alert outlasting the request\'s time limit still goes out');
 
             $cw = new Cronwatch(store: new \Cronwatch\Store\SqliteStore("{$dir}/cw.db"), alerts: []);
             $runs = $cw->runs('hook');

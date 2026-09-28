@@ -31,6 +31,12 @@ use Symfony\Component\Scheduler\Trigger\CallbackTrigger;
  */
 final class SchedulerTest extends TestCase
 {
+    /** The test kernel's app tag: a hash of its secret, when no app_id is set. */
+    private static function appTag(): string
+    {
+        return 'symfony-scheduler:app-' . substr(hash('sha256', 'cronwatch:secret:test-' . 'secret'), 0, 12);
+    }
+
     protected function tearDown(): void
     {
         TestSchedule::$messages = [];
@@ -80,8 +86,8 @@ final class SchedulerTest extends TestCase
             'nightly-report', $plain, 'app:prune-days-30-' . substr(md5('app:prune --days=30'), 0, 8), 'app.cleaner.purge', 'App.Service.Nightly',
             'queued-report', 'Cronwatch.Tests.Symfony.Fixtures.Failing', 'Cronwatch.Tests.Symfony.Fixtures.AsyncReport', "reports:{$plain}",
         ], array_keys($jobs));
-        $this->assertSame(['schedule' => '0 2 * * *', 'timezone' => 'Europe/Paris', 'description' => Report::class, 'grace' => '15m', 'expect' => 'Report written', 'tags' => ['symfony-scheduler'], 'name' => 'nightly-report'], $jobs['nightly-report']);
-        $this->assertSame(['schedule' => 'every 3600s', 'description' => Plain::class, 'tags' => ['symfony-scheduler'], 'name' => $plain], $jobs[$plain]);
+        $this->assertSame(['schedule' => '0 2 * * *', 'timezone' => 'Europe/Paris', 'description' => Report::class, 'grace' => '15m', 'expect' => 'Report written', 'tags' => ['symfony-scheduler', self::appTag()], 'name' => 'nightly-report'], $jobs['nightly-report']);
+        $this->assertSame(['schedule' => 'every 3600s', 'description' => Plain::class, 'tags' => ['symfony-scheduler', self::appTag()], 'name' => $plain], $jobs[$plain]);
         $this->assertSame('app:prune --days=30', $jobs['app:prune-days-30-' . substr(md5('app:prune --days=30'), 0, 8)]['description']);
         $this->assertSame(['*/5 * * * *', 'UTC'], [$jobs['app.cleaner.purge']['schedule'], $jobs['app.cleaner.purge']['timezone']]);
         $this->assertSame('0 0 * * *', $jobs['App.Service.Nightly']['schedule']);
@@ -190,18 +196,90 @@ final class SchedulerTest extends TestCase
         $this->assertFalse($cw->store->getJob('Cronwatch.Tests.Symfony.Fixtures.Plain')->definition->has('schedule'));
     }
 
-    public function testTheBundlesOwnScheduleRunsTheCheck(): void
+    public function testTwoAppsSharingAStoreNeverUnscheduleEachOthersJobs(): void
+    {
+        $check = function (string $app, array $messages, ?\Cronwatch\Store\Store $store): Cronwatch {
+            TestSchedule::$messages = $messages;
+            self::ensureKernelShutdown();
+            self::bootKernel(['cronwatch' => ['store' => 'memory', 'app_id' => $app]]);
+            $cw = $this->client($store === null ? [] : ['store' => $store]);
+            $tester = new CommandTester((new Application(static::$kernel))->find('cronwatch:check'));
+            $tester->execute([]);
+            $this->assertSame(0, $tester->getStatusCode());
+            return $cw;
+        };
+        $plain = 'Cronwatch.Tests.Symfony.Fixtures.Plain';
+        $shop = $check('Shop', [RecurringMessage::cron('0 * * * *', new Plain())], null);
+        $store = $shop->store;
+        $this->assertSame(['symfony-scheduler', 'symfony-scheduler:shop'], $store->getJob($plain)->definition->get('tags'));
+        $check('Blog', [RecurringMessage::cron('0 2 * * *', new Report())], $store);
+        $this->assertTrue($store->getJob($plain)->definition->has('schedule'), 'the blog leaves the shop\'s job alone');
+        $this->assertSame(['symfony-scheduler', 'symfony-scheduler:blog'], $store->getJob('nightly-report')->definition->get('tags'));
+        $check('Shop', [RecurringMessage::cron('0 * * * *', new Plain())], $store);
+        $this->assertTrue($store->getJob('nightly-report')->definition->has('schedule'), 'and the shop the blog\'s');
+        $check('Blog', [], $store);
+        $this->assertFalse($store->getJob('nightly-report')->definition->has('schedule'), 'the blog\'s own job taken out');
+        $this->assertTrue($store->getJob($plain)->definition->has('schedule'));
+        $check('Shop', [], $store);
+        $this->assertFalse($store->getJob($plain)->definition->has('schedule'));
+    }
+
+    public function testWithoutAnAppIdOrASecretTheProjectDirectoryNamesTheApp(): void
+    {
+        $messages = new ScheduledMessages(fn () => $this->client(), [], [], true, null, null, '/srv/app');
+        $this->assertSame('symfony-scheduler:app-' . substr(hash('sha256', 'cronwatch:dir:/srv/app'), 0, 12), $messages->appTag());
+        $named = new ScheduledMessages(fn () => $this->client(), [], [], true, 'Shop', null, '/srv/app');
+        $this->assertSame('symfony-scheduler:shop', $named->appTag());
+    }
+
+    public function testTheCheckIsInTheAppsDefaultSchedule(): void
     {
         self::bootKernel();
         $cw = $this->client();
         $cw->job('seen', ['schedule' => '@hourly']);
-        $provider = static::getContainer()->get('Cronwatch\Symfony\CheckSchedule');
+        // The check is in the app's default schedule, beside its own messages, so
+        // the worker that consumes scheduler_default runs it.
+        TestSchedule::$messages = [RecurringMessage::cron('0 * * * *', new Plain())];
+        $provider = static::getContainer()->get(TestSchedule::class);
+        $this->assertInstanceOf(\Cronwatch\Symfony\CheckSchedule::class, $provider, 'the app\'s provider, decorated');
         $messages = $provider->getSchedule()->getRecurringMessages();
-        $this->assertCount(1, $messages);
-        $this->assertSame('every 5 minutes', (string) $messages[0]->getTrigger());
+        $this->assertSame(['0 * * * *', 'every 5 minutes'], array_map(fn (RecurringMessage $m) => (string) $m->getTrigger(), $messages));
+        $this->assertCount(2, $provider->getSchedule()->getRecurringMessages(), 'added once');
+        $this->assertSame(['schedules' => ['default' => 1, 'reports' => 0], 'check' => ['default']], static::getContainer()->get(ScheduledMessages::class)->status());
+        $tester = new CommandTester((new Application(static::$kernel))->find('cronwatch:check'));
+        $tester->execute(['--status' => true]);
+        $this->assertSame(
+            "cronwatch: the check runs every 5 minutes in the \"default\" schedule, only while a worker consumes it: bin/console messenger:consume scheduler_default\n"
+            . "cronwatch: schedule \"default\" (scheduler_default): 1 message watched, and the check\n"
+            . "cronwatch: schedule \"reports\" (scheduler_reports): 0 messages watched\n",
+            $tester->getDisplay(),
+        );
+        $this->assertSame([], $cw->store->listJobs(), '--status checks nothing');
         $handled = static::getContainer()->get(MessageBusInterface::class)->dispatch(new CheckMessage());
         $result = $handled->last(\Symfony\Component\Messenger\Stamp\HandledStamp::class)->getResult();
-        $this->assertSame('cronwatch: checked 1 job, sent 0 alerts', $result->summary());
+        $this->assertSame('cronwatch: checked 2 jobs, sent 0 alerts', $result->summary());
+    }
+
+    public function testTheCheckCanGoInAScheduleOfItsOwnOrNone(): void
+    {
+        self::bootKernel(['cronwatch' => ['store' => 'memory', 'check' => ['schedule' => 'cronwatch', 'frequency' => '*/10 * * * *']]]);
+        $container = static::getContainer();
+        $this->assertTrue($container->has('messenger.transport.scheduler_cronwatch'), 'a schedule of its own gets its transport');
+        $this->assertSame(['cronwatch' => 0, 'default' => 0, 'reports' => 0], array_intersect_key($container->get(ScheduledMessages::class)->status()['schedules'], ['default' => 1, 'reports' => 1, 'cronwatch' => 1]));
+        $tester = new CommandTester((new Application(static::$kernel))->find('cronwatch:check'));
+        $tester->execute(['--status' => true]);
+        $this->assertStringStartsWith("cronwatch: the check runs every */10 * * * * in the \"cronwatch\" schedule, only while a worker consumes it: bin/console messenger:consume scheduler_cronwatch\n", $tester->getDisplay());
+        self::ensureKernelShutdown();
+
+        self::bootKernel(['cronwatch' => ['store' => 'memory', 'check' => ['schedule' => false]]]);
+        $tester = new CommandTester((new Application(static::$kernel))->find('cronwatch:check'));
+        $tester->execute(['--status' => true]);
+        $this->assertStringStartsWith('cronwatch: the check is not scheduled (check.schedule: false): run bin/console cronwatch:check every five minutes from a crontab', $tester->getDisplay());
+        $this->assertSame([], static::getContainer()->get(ScheduledMessages::class)->status()['check']);
+        self::ensureKernelShutdown();
+
+        $this->expectException(\Symfony\Component\Config\Definition\Exception\InvalidConfigurationException::class);
+        self::bootKernel(['cronwatch' => ['store' => 'memory', 'check' => ['schedule' => 'not a name']]]);
     }
 
     public function testWatchingCanBeTurnedOff(): void

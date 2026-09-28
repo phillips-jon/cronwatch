@@ -18,6 +18,14 @@ interface Http
     public const TIMEOUT_MS = 10_000;
 
     /**
+     * The most of an answer's body an Http keeps (1 MiB): a channel reads 200
+     * characters of a refusal and triage a few kilobytes, and a compressed
+     * answer from a hostile or broken endpoint could otherwise decode to more
+     * than PHP's memory limit, a fatal error no catch sees.
+     */
+    public const MAX_BODY = 1_048_576;
+
+    /**
      * POSTs `body` with `headers` (lowercase names, values sent trimmed).
      * Returns the answer, whatever its status; throws RequestTimeout when no
      * answer came within `timeoutMs`, and anything else for a request that

@@ -88,7 +88,8 @@ final class Ses implements AlertChannel
             $request['ConfigurationSetName'] = $this->configurationSetName;
         }
         $request['EmailTags'] = [['Name' => 'source', 'Value' => 'cronwatch']];
-        $body = Js::stringify($request);
+        // Signed as sent: UTF-8, U+FFFD for bytes that are not (Shared::post sends it so).
+        $body = Js::wellFormed(Js::stringify($request));
         $headers = SigV4::sign(
             'POST', $this->url, ['content-type' => 'application/json'], $body, $this->region, 'ses', ($this->now)(),
             $this->accessKeyId, $this->secretAccessKey, $this->sessionToken,

@@ -6,12 +6,12 @@
     "keywords": ["cron", "monitoring", "scheduled jobs", "alerts", "heartbeat", "laravel", "symfony", "wordpress"],
     "homepage": "https://cronwatch.dev",
     "authors": [
-        {"name": "Jon C. Phillips"}
+        {"name": "Jon C. Phillips", "homepage": "https://cronwatch.dev"}
     ],
     "support": {
         "docs": "https://cronwatch.dev/docs/",
         "issues": "https://github.com/phillips-jon/cronwatch/issues",
-        "source": "https://github.com/phillips-jon/cronwatch/tree/main/packages/php"
+        "source": "https://github.com/phillips-jon/cronwatch"
     },
     "require": {
         "php": ">=8.2",
@@ -38,7 +38,15 @@
         "ext-pdo_sqlite": "For Cronwatch\\Store\\SqliteStore",
         "ext-pdo_mysql": "For Cronwatch\\Store\\MysqlStore (MySQL 8.0.13 or MariaDB 10.6 and newer)",
         "ext-pdo_pgsql": "For Cronwatch\\Store\\PostgresStore and the pg_cron source (Cronwatch\\Sources\\PgCron)",
-        "ext-curl": "The alert channels and Claude triage use it when loaded, and PHP's own streams otherwise"
+        "ext-curl": "The alert channels and Claude triage use it when loaded, and PHP's own streams otherwise",
+        "ext-openssl": "For https alert channels and triage over PHP's streams, and a mysql:// URL's ssl-mode without an ssl-ca",
+        "ext-posix": "The dashboard's development token directory is checked against the process's own user",
+        "laravel/framework": "Laravel 12 or 13: the service provider is found by package discovery",
+        "symfony/framework-bundle": "Symfony 6.4, 7.4 or 8.1: register Cronwatch\\Symfony\\CronwatchBundle",
+        "symfony/scheduler": "Symfony: every scheduled message is watched, and the check is added to the default schedule",
+        "symfony/messenger": "Symfony: messages marked #[Cronwatch\\Watch] are watched where a worker handles them",
+        "psr/http-server-handler": "Cronwatch\\Web\\PsrHandler and Cronwatch\\Web\\PsrJobHandler (PSR-15)",
+        "psr/http-server-middleware": "Cronwatch\\Web\\PsrMiddleware (PSR-15)"
     },
     "bin": ["bin/cronwatch"],
     "autoload": {

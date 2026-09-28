@@ -73,7 +73,7 @@ final class ScheduleWatcher
             $handle->start(trigger: self::TRIGGER);
             return;
         }
-        $this->open[spl_object_id($task)] = ['key' => $this->cw()->startExecution($handle->definition, self::TRIGGER)] + $capture;
+        $this->open[spl_object_id($task)] = ['key' => $this->cw()->startExecution($handle->definition, self::TRIGGER, mayDiscard: !empty($task->withoutOverlapping))] + $capture;
     }
 
     public function finished(object $event): void
@@ -87,7 +87,9 @@ final class ScheduleWatcher
         $output = $this->readOutput($task, $run);
         $cw = $this->cw();
         if (!empty($task->skippedBecauseOverlapping)) {
-            $cw->finishExecution($run['key'], 'Skipped: the last run still held the overlapping lock');
+            // Laravel 13 skipped it after all (the lock was taken between the
+            // two looks): no run happened, so none is left.
+            $cw->discardExecution($run['key']);
             return;
         }
         $code = (int) ($task->exitCode ?? 0);

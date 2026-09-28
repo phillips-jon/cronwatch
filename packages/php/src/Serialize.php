@@ -45,7 +45,12 @@ final class Serialize
             return str_contains($text, $expect) ? null : 'Output did not contain ' . Js::quote($expect);
         }
         if ($expect instanceof Pattern) {
-            return $expect->matches($text) ? null : "Output did not match {$expect}";
+            if ($expect->matches($text)) {
+                return null;
+            }
+            // PCRE gave up (its backtrack limit, say) rather than finding no match: say so.
+            $why = preg_last_error() !== PREG_NO_ERROR ? ' (' . preg_last_error_msg() . ')' : '';
+            return "Output did not match {$expect}{$why}";
         }
         try {
             $ok = $expect($text);

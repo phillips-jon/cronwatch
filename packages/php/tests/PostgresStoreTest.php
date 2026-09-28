@@ -31,11 +31,18 @@ final class PostgresStoreTest extends TestCase
     {
         $password = 'p' . '%40ss';
         $this->assertSame(
-            ['pgsql:host=db.internal;port=5433;dbname=app;sslmode=require', 'app user', 'p@ss'],
+            ["pgsql:host='db.internal';port='5433';dbname='app';sslmode='require'", 'app user', 'p@ss'],
             PostgresStore::connection("postgres://app%20user:{$password}@db.internal:5433/app?sslmode=require"),
         );
-        $this->assertSame(['pgsql:host=/var/run/postgresql;dbname=cw', null, null], PostgresStore::connection('postgresql:///cw?host=/var/run/postgresql'));
+        $this->assertSame(["pgsql:host='/var/run/postgresql';dbname='cw'", null, null], PostgresStore::connection('postgresql:///cw?host=/var/run/postgresql'));
         $this->assertSame(['pgsql:host=h;dbname=d', 'u', 'x'], PostgresStore::connection('pgsql:host=h;dbname=d', 'u', 'x'), 'a DSN passes through');
+        $this->assertSame("pgsql:host='db';dbname='app';application_name='x sslmode=disable';options='-c search_path=it\\'s'", PostgresStore::connection('postgres://db/app?application_name=x%20sslmode%3Ddisable&options=-c%20search_path%3Dit%27s')[0], 'each value quoted, so a space starts no keyword');
+        try {
+            PostgresStore::connection('postgres://db/app%3Bsslmode%3Ddisable');
+            $this->fail('a ; is refused');
+        } catch (\InvalidArgumentException $error) {
+            $this->assertStringContainsString('holding ";"', $error->getMessage());
+        }
         $this->expectExceptionMessage('postgres:// or postgresql://');
         PostgresStore::connection('mysql://h/d');
     }

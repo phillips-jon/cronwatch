@@ -550,4 +550,37 @@ final class ClientHardeningTest extends TestCase
         $this->assertSame(['alert channel loop'], $this->wheres());
         $this->assertStringContainsString('from inside a check', $this->messages()[0]);
     }
+
+    public function testAWriteWhoseAnswerWasLostWithTheConnectionIsNotAppliedTwice(): void
+    {
+        // The state write and the finish land, then the connection breaks and the
+        // store sends each again, which now matches nothing: the store reads what
+        // is there and counts its own first send, so the failure is judged once
+        // and alerted.
+        $store = new \Cronwatch\Tests\Support\ResendingStore();
+        $cw = $this->make(['store' => $store]);
+        $job = $cw->job('flaky', ['failuresBeforeAlert' => 1]);
+        $job->run(fn () => 'warm up');
+        $store->breakAfter = ['casInsert'];
+        try {
+            $job->run(function (): void {
+                throw new \RuntimeException('down');
+            });
+        } catch (\RuntimeException) {
+        }
+        $this->assertSame(1, $store->resends);
+        $this->assertSame(['failed'], $this->capture->types(), 'alerted once');
+        $this->assertSame(1, $store->getState('flaky')->consecutiveFailures, 'counted once');
+
+        $store->breakAfter = ['updateRunIf'];
+        $handle = $job->start(id: 'batch-1');
+        $this->assertSame('ok', $handle->finish()->status);
+        $this->assertSame(2, $store->resends);
+        $this->assertSame(['failed', 'recovered'], $this->capture->types(), 'the finish was judged, not taken for another process\'s');
+
+        $store->breakAfter = ['deleteRunIf'];
+        $store->insertRun(new Run('gone', 'flaky', 'running', 1));
+        $this->assertTrue($store->deleteRunIf('gone', 'flaky', 'running'));
+        $this->assertSame([], $this->errors);
+    }
 }

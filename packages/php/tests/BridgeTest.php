@@ -56,20 +56,56 @@ final class BridgeTest extends TestCase
     public function testJobsNoLongerScheduledAreDeclaredAgainWithoutTheirSchedule(): void
     {
         $cw = $this->make();
-        $cw->job('gone', ['schedule' => '@hourly', 'grace' => '5m', 'description' => 'nightly', 'tags' => ['fw']]);
-        $cw->job('kept', ['schedule' => '@hourly', 'tags' => ['fw']]);
+        $cw->job('gone', ['schedule' => '@hourly', 'grace' => '5m', 'description' => 'nightly', 'tags' => ['fw', 'fw:app']]);
+        $cw->job('kept', ['schedule' => '@hourly', 'tags' => ['fw', 'fw:app']]);
         $cw->job('other', ['schedule' => '@hourly', 'tags' => ['not-ours']]);
+        $cw->job('theirs', ['schedule' => '@hourly', 'tags' => ['fw', 'fw:another-app']]);
         $cw->check();
 
         $again = $this->make(['store' => $cw->store]);
-        $again->job('kept', ['schedule' => '@hourly', 'tags' => ['fw']]);
-        $this->assertSame(['gone'], Unscheduled::declare($again, 'fw', fn () => null));
+        $again->job('kept', ['schedule' => '@hourly', 'tags' => ['fw', 'fw:app']]);
+        $this->assertSame(['gone'], Unscheduled::declare($again, 'fw', 'fw:app', fn () => null));
         $again->check();
         $gone = $again->store->getJob('gone')->definition;
-        $this->assertSame(['description' => 'nightly (no longer scheduled)', 'tags' => ['fw'], 'grace' => '5m', 'name' => 'gone'], $gone->fields);
+        $this->assertSame(['description' => 'nightly (no longer scheduled)', 'tags' => ['fw', 'fw:app'], 'grace' => '5m', 'name' => 'gone'], $gone->fields);
         $this->assertTrue($again->store->getJob('kept')->definition->has('schedule'));
         $this->assertTrue($again->store->getJob('other')->definition->has('schedule'), 'another integration\'s job is left alone');
-        $this->assertSame([], Unscheduled::declare($again, 'fw', fn () => null), 'once');
+        $this->assertTrue($again->store->getJob('theirs')->definition->has('schedule'), 'and another app\'s');
+        $this->assertSame([], Unscheduled::declare($again, 'fw', 'fw:app', fn () => null), 'once');
+    }
+
+    public function testAJobTaggedBeforeAppTagsIsTakenOnlyWhileNoOtherAppIsInTheStore(): void
+    {
+        $cw = $this->make();
+        $cw->job('old', ['schedule' => '@hourly', 'tags' => ['team', 'fw']]);
+        $cw->check();
+
+        // One app in the store: the old job is its own, declared again with the app's tag.
+        $alone = $this->make(['store' => $cw->store]);
+        $this->assertSame(['old'], Unscheduled::declare($alone, 'fw', 'fw:app', fn () => null));
+        $alone->check();
+        $this->assertSame(['team', 'fw', 'fw:app'], $alone->store->getJob('old')->definition->get('tags'));
+        $this->assertFalse($alone->store->getJob('old')->definition->has('schedule'));
+
+        // Another app has tagged its jobs: an old job could be either's, and is left alone.
+        $shared = $this->make();
+        $shared->job('old', ['schedule' => '@hourly', 'tags' => ['fw']]);
+        $shared->job('blog', ['schedule' => '@daily', 'tags' => ['fw', 'fw:blog']]);
+        $shared->check();
+        $shop = $this->make(['store' => $shared->store]);
+        $this->assertSame([], Unscheduled::declare($shop, 'fw', 'fw:shop', fn () => null));
+        $this->assertTrue($shop->store->getJob('old')->definition->has('schedule'));
+        $this->assertTrue($shop->store->getJob('blog')->definition->has('schedule'));
+    }
+
+    public function testAppTags(): void
+    {
+        $this->assertSame('fw:laravel', Unscheduled::appTag('fw', 'Laravel'));
+        $this->assertSame('fw:billing-api', Unscheduled::appTag('fw', '  Billing API! '));
+        $this->assertSame('fw:app-1d4ce23f0a88', Unscheduled::appTag('fw', 'app-1d4ce23f0a88'));
+        $this->assertSame('fw:' . substr(md5('ÉÉ'), 0, 8), Unscheduled::appTag('fw', 'ÉÉ'), 'nothing left once cleaned');
+        $long = str_repeat('x', 60);
+        $this->assertSame('fw:' . str_repeat('x', 39) . '-' . substr(md5($long), 0, 8), Unscheduled::appTag('fw', $long));
     }
 
     public function testTheWatchAttribute(): void

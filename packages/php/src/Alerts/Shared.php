@@ -159,7 +159,8 @@ final class Shared
      */
     public static function post(Http $http, string $provider, string $url, array $headers, string $body, array $secrets = []): HttpResponse
     {
-        $response = $http->post(self::postable($url), $body, $headers);
+        // UTF-8 as fetch sends a string, U+FFFD for bytes that are not.
+        $response = $http->post(self::postable($url), Js::wellFormed($body), $headers);
         if ($response->ok()) {
             return $response;
         }
@@ -184,6 +185,39 @@ final class Shared
             $head = str_replace($secret, '[redacted]', $head);
         }
         return self::cut($head, self::ERROR_BODY_MAX);
+    }
+
+    /**
+     * Headers as an Http sends them: each name an HTTP token (RFC 9110:
+     * letters, digits and !#$%&'*+.^_`|~-), each value trimmed of the spaces,
+     * tabs and line breaks around it, as fetch sends it. A name that is not a
+     * token, or a value with a line break or NUL inside, is refused, as fetch
+     * refuses them, so no header can add another.
+     *
+     * @param array<array-key, mixed> $headers
+     * @return array<string, string>
+     */
+    public static function headers(array $headers): array
+    {
+        $out = [];
+        foreach ($headers as $name => $value) {
+            $name = (string) $name;
+            if (preg_match('/^[!#$%&\'*+.^_`|~0-9A-Za-z-]+$/D', $name) !== 1) {
+                throw new \InvalidArgumentException('a header name must be a token (letters, digits and !#$%&\'*+.^_`|~-)');
+            }
+            $out[$name] = self::headerValue(is_scalar($value) ? (string) $value : '');
+        }
+        return $out;
+    }
+
+    /** A header value without the spaces, tabs and line breaks around it, as fetch sends it; one with a line break or NUL inside is refused, as fetch refuses it. */
+    public static function headerValue(string $value): string
+    {
+        $value = trim($value, " \t\r\n");
+        if (strpbrk($value, "\r\n\0") !== false) {
+            throw new \InvalidArgumentException('a header value may not contain a line break');
+        }
+        return $value;
     }
 
     /** A credential with the spaces and newlines a paste leaves around it taken off. Anything not a string is "". */

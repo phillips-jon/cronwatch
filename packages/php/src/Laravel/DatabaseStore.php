@@ -76,11 +76,20 @@ final class DatabaseStore
     /** @param array<string, mixed> $config */
     public static function mysqlDsn(array $config): string
     {
-        $socket = self::text($config['unix_socket'] ?? null);
+        // A value holding ";" would end its DSN field and start another.
+        $field = function (mixed $value): ?string {
+            $text = self::text($value);
+            if ($text !== null && str_contains($text, ';')) {
+                throw new \InvalidArgumentException('CronWatch cannot put a host, port, socket or database name holding ";" in a DSN');
+            }
+            return $text;
+        };
+        $socket = $field($config['unix_socket'] ?? null);
+        $port = $field($config['port'] ?? null);
         $dsn = 'mysql:' . ($socket !== null && $socket !== ''
             ? "unix_socket={$socket}"
-            : 'host=' . (self::text($config['host'] ?? null) ?? '127.0.0.1') . (isset($config['port']) && $config['port'] !== '' ? ';port=' . $config['port'] : ''));
-        $database = self::text($config['database'] ?? null);
+            : 'host=' . ($field($config['host'] ?? null) ?? '127.0.0.1') . ($port !== null && $port !== '' ? ";port={$port}" : ''));
+        $database = $field($config['database'] ?? null);
         if ($database !== null && $database !== '') {
             $dsn .= ";dbname={$database}";
         }
@@ -114,9 +123,9 @@ final class DatabaseStore
         $schemas = is_array($path) ? $path : (is_string($path) ? preg_split('/\s*,\s*/', trim($path)) : []);
         $schemas = array_values(array_filter(array_map(fn ($s) => (string) preg_replace('/[^A-Za-z0-9_$]/', '', (string) $s), (array) $schemas), fn (string $s) => $s !== ''));
         if ($schemas !== [] && $schemas !== ['public']) {
-            $fields['options'] = "'--search_path=" . implode(',', $schemas) . "'";
+            $fields['options'] = '--search_path=' . implode(',', $schemas);
         }
-        return 'pgsql:' . implode(';', array_map(fn (string $k, string $v) => "{$k}={$v}", array_keys($fields), $fields));
+        return PostgresStore::dsn($fields);
     }
 
     /**

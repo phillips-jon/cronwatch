@@ -67,6 +67,7 @@ CronWatch finds missed runs with a check every five minutes, which it schedules 
 * `cronwatch_watch_event` (filter): return false to leave an event unwatched. Given `true`, the hook, its arguments and its recurrence name (null for a single event).
 * `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence.
 * `cronwatch_client_args` (filter): the arguments the library's client is made with.
+* `cronwatch_reject_unsafe_urls` (filter): whether an alert URL may not reach a private address or an unusual port (WordPress's `reject_unsafe_urls`). True on a multisite network, where a site's administrators may not be the network's, and false otherwise; given the URL's origin.
 * `cronwatch_log( ...$parts )`, or `do_action( 'cronwatch_log', ...$parts )`: a line for the output of the event running now.
 
 = Privacy =

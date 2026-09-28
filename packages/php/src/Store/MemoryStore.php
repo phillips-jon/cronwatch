@@ -17,7 +17,7 @@ use Cronwatch\StoredJob;
  * gone when the process ends, and a PHP process usually ends with its
  * request or its cron script, so anything real wants SqliteStore or MysqlStore.
  */
-final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState
+final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState, DeletesRunIf
 {
     /** @var array<string, StoredJob> */
     private array $jobs = [];
@@ -101,6 +101,16 @@ final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState
             return false;
         }
         $this->runs[$run->id] = self::finishedFields($existing, $run);
+        return true;
+    }
+
+    public function deleteRunIf(string $id, string $job, string $status): bool
+    {
+        $existing = $this->runs[$id] ?? null;
+        if ($existing === null || $existing->job !== $job || $existing->status !== $status) {
+            return false;
+        }
+        unset($this->runs[$id], $this->order[$id]);
         return true;
     }
 

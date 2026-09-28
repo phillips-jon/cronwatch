@@ -135,10 +135,10 @@ final class ProviderTest extends TestCase
         $this->assertSame('mysql:host=db.internal;port=3307;dbname=app;charset=utf8mb4', DatabaseStore::mysqlDsn(['host' => 'db.internal', 'port' => '3307', 'database' => 'app', 'charset' => 'utf8']));
         $this->assertSame('mysql:unix_socket=/tmp/mysql.sock;dbname=app;charset=utf8mb4', DatabaseStore::mysqlDsn(['host' => 'x', 'unix_socket' => '/tmp/mysql.sock', 'database' => 'app']));
         $this->assertSame(
-            "pgsql:host=pg.internal;port=5432;dbname=app;sslmode=require;options='--search_path=tenant,public'",
+            "pgsql:host='pg.internal';port='5432';dbname='app';sslmode='require';options='--search_path=tenant,public'",
             DatabaseStore::pgsqlDsn(['host' => 'pg.internal', 'port' => 5432, 'database' => 'app', 'sslmode' => 'require', 'search_path' => 'tenant, public']),
         );
-        $this->assertSame('pgsql:host=pg;dbname=app', DatabaseStore::pgsqlDsn(['host' => 'pg', 'database' => 'app', 'search_path' => 'public']));
+        $this->assertSame("pgsql:host='pg';dbname='app'", DatabaseStore::pgsqlDsn(['host' => 'pg', 'database' => 'app', 'search_path' => 'public']));
         $this->assertSame(
             ['driver' => 'mysql', 'database' => 'app', 'host' => 'primary', 'username' => 'writer'],
             DatabaseStore::writeConfig(['driver' => 'mysql', 'database' => 'app', 'read' => ['host' => ['replica']], 'write' => ['host' => ['primary', 'other'], 'username' => 'writer']]),

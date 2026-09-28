@@ -40,7 +40,9 @@ final class Webhook implements AlertChannel
 
     public function send(Alert $alert, ChannelContext $context): void
     {
-        $body = Js::stringify($alert);
+        // Sent as fetch sends a string: UTF-8, U+FFFD for bytes that are not,
+        // so the signature is over exactly the bytes sent.
+        $body = Js::wellFormed(Js::stringify($alert));
         $headers = ['content-type' => 'application/json', 'user-agent' => 'cronwatch'];
         // A pasted Authorization value often carries a stray space or newline, which fetch would refuse.
         foreach ($this->headers as $name => $value) {

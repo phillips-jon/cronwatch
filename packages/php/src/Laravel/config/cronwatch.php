@@ -10,6 +10,12 @@ return [
     // not mounted. The client (app(Cronwatch\Cronwatch::class)) still works.
     'enabled' => env('CRONWATCH_ENABLED', true),
 
+    // This app's name in its scheduled jobs' tags (laravel-scheduler:<name>),
+    // default app.name. Two apps sharing one store and table prefix need
+    // different names, or each would take the other's jobs for its own tasks
+    // taken out of the schedule.
+    'app_id' => env('CRONWATCH_APP_ID'),
+
     // Where jobs, runs and state are kept.
     //   database  the app's database (MySQL, MariaDB, Postgres or SQLite), through
     //             a connection of CronWatch's own made from that connection's

@@ -30,20 +30,16 @@ final class NativeHttp implements Http
         // Refused before curl or a stream sees it, and never quoted: a webhook URL's path is its credential.
         $url = Shared::postable($url);
         $lines = [];
-        foreach ($headers as $name => $value) {
-            $lines[] = $name . ': ' . self::headerValue((string) $value);
+        foreach (Shared::headers($headers) as $name => $value) {
+            $lines[] = "{$name}: {$value}";
         }
         return $this->curl ? $this->viaCurl($url, $body, $lines, $timeoutMs) : $this->viaStreams($url, $body, $lines, $timeoutMs);
     }
 
-    /** A header value without the spaces, tabs and line breaks around it, as fetch sends it; one with a line break inside is refused, as fetch refuses it. */
+    /** A header value as fetch sends it (see Shared::headerValue()). */
     public static function headerValue(string $value): string
     {
-        $value = trim($value, " \t\r\n");
-        if (strpbrk($value, "\r\n\0") !== false) {
-            throw new \InvalidArgumentException('a header value may not contain a line break');
-        }
-        return $value;
+        return Shared::headerValue($value);
     }
 
     /** @param list<string> $lines */
@@ -71,15 +67,21 @@ final class NativeHttp implements Http
                 }
                 return strlen($line);
             },
-            CURLOPT_WRITEFUNCTION => function ($handle, string $chunk) use (&$received): int {
-                $received .= $chunk;
+            CURLOPT_WRITEFUNCTION => function ($handle, string $chunk) use (&$received, &$full): int {
+                $received .= substr($chunk, 0, max(0, self::MAX_BODY - strlen($received)));
+                if (strlen($received) >= self::MAX_BODY) {
+                    // Enough: stop reading (curl answers CURLE_WRITE_ERROR).
+                    $full = true;
+                    return 0;
+                }
                 return strlen($chunk);
             },
         ]);
+        $full = false;
         $done = curl_exec($handle);
         $errno = curl_errno($handle);
         $error = curl_error($handle);
-        if ($done === true && $errno === 0) {
+        if (($done === true && $errno === 0) || ($full && $errno === CURLE_WRITE_ERROR)) {
             return new HttpResponse($status, $received);
         }
         if ($errno === CURLE_OPERATION_TIMEDOUT) {
@@ -128,7 +130,7 @@ final class NativeHttp implements Http
                 }
             }
             $received = '';
-            while (!feof($stream)) {
+            while (!feof($stream) && strlen($received) < self::MAX_BODY) {
                 $left = $deadline - hrtime(true) / 1e9;
                 if ($left <= 0) {
                     return new HttpResponse($status, '');
@@ -138,7 +140,7 @@ final class NativeHttp implements Http
                 if ($chunk === false || stream_get_meta_data($stream)['timed_out']) {
                     return new HttpResponse($status, '');
                 }
-                $received .= $chunk;
+                $received .= substr($chunk, 0, self::MAX_BODY - strlen($received));
             }
             return new HttpResponse($status, $received);
         } finally {

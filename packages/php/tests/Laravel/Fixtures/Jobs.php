@@ -92,13 +92,56 @@ final class OptedOutJob implements ShouldQueue, ShouldBeWatched
     }
 }
 
-#[Watch(name: 'releases')]
+/** Throws on the attempts in $failOn, releases itself without an exception on those in $releaseOn, else works. */
+#[Watch(name: 'releases', failuresBeforeAlert: 2)]
 final class ReleasingJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
+    public int $tries = 6;
+    public int $backoff = 0;
+    /** @var list<int> */
+    public static array $failOn = [];
+    /** @var list<int> */
+    public static array $releaseOn = [1];
+
     public function handle(): void
     {
-        $this->release(0);
+        $attempt = $this->attempts();
+        if (in_array($attempt, self::$failOn, true)) {
+            throw new \RuntimeException("attempt {$attempt} failed");
+        }
+        if (in_array($attempt, self::$releaseOn, true)) {
+            Cronwatch::current()?->log('not now');
+            $this->release(0);
+            return;
+        }
+        Cronwatch::current()?->log("attempt {$attempt} worked");
+    }
+}
+
+/** Released by its middleware before handle() runs, as RateLimited and WithoutOverlapping release a job, for its first $limited attempts. */
+#[Watch(name: 'rate-limited')]
+final class LimitedJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable;
+
+    public int $tries = 5;
+    public static int $limited = 1;
+
+    public function middleware(): array
+    {
+        return [function (self $job, callable $next) {
+            if ($job->attempts() <= self::$limited) {
+                $job->release(0);
+                return null;
+            }
+            return $next($job);
+        }];
+    }
+
+    public function handle(): void
+    {
+        Cronwatch::current()?->log('done');
     }
 }

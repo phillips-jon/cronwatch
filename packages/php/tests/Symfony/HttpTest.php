@@ -38,6 +38,24 @@ final class HttpTest extends TestCase
         $this->assertSame(200, $browser->getResponse()->getStatusCode());
     }
 
+    public function testAJobNameWithAnEscapeInItsPathIsItsOwnPage(): void
+    {
+        // The router decodes {path} (billing:sync); the path info keeps billing%3Async.
+        $browser = static::createClient(['cronwatch' => ['store' => 'memory', 'dashboard' => ['token' => self::TOKEN]]]);
+        $browser->disableReboot();
+        $cw = $this->seeded();
+        $cw->job('billing:sync')->run(fn () => 'synced');
+        $admin = ['PHP_AUTH_USER' => 'admin', 'PHP_AUTH_PW' => 'pw'];
+        $browser->request('GET', '/cronwatch/jobs/billing%3Async', server: $admin);
+        $this->assertSame(200, $browser->getResponse()->getStatusCode());
+        $this->assertStringContainsString('synced', (string) $browser->getResponse()->getContent());
+        $browser->request('GET', '/cronwatch/api/jobs/billing%3Async', server: ['HTTP_AUTHORIZATION' => 'Bearer ' . self::TOKEN]);
+        $this->assertSame('billing:sync', json_decode((string) $browser->getResponse()->getContent(), true)['job']['name']);
+        $browser->request('POST', '/cronwatch/jobs/billing%3Async/forget', [], server: $admin + ['HTTP_ORIGIN' => 'http://localhost']);
+        $this->assertSame(303, $browser->getResponse()->getStatusCode());
+        $this->assertNull($cw->store->getJob('billing:sync'));
+    }
+
     public function testAnyoneElseNeedsTheDashboardsToken(): void
     {
         $browser = static::createClient(['cronwatch' => ['store' => 'memory', 'dashboard' => ['token' => self::TOKEN]]]);

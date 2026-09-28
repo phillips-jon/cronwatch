@@ -7,6 +7,7 @@ namespace Cronwatch\Symfony;
 use Cronwatch\Cronwatch;
 use Cronwatch\Env;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
+use Symfony\Component\DependencyInjection\Compiler\PassConfig;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
@@ -34,10 +35,18 @@ final class CronwatchBundle extends AbstractBundle
         return __DIR__;
     }
 
+    public function build(ContainerBuilder $container): void
+    {
+        parent::build($container);
+        // Before the Scheduler's own pass (priority 0), which makes each schedule's transport.
+        $container->addCompilerPass(new CheckSchedulePass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 10);
+    }
+
     public function configure(DefinitionConfigurator $definition): void
     {
         $definition->rootNode()
             ->children()
+                ->scalarNode('app_id')->defaultNull()->info('This app\'s name in its scheduled jobs\' tags (symfony-scheduler:<app_id>), so apps sharing a store and table prefix never take each other\'s jobs for their own; default a hash of the kernel secret, else of the project directory')->end()
                 ->scalarNode('store')->defaultNull()->info('A store URL (mysql://, postgresql://, sqlite:///path, memory); default DATABASE_URL, else var/cronwatch.db')->end()
                 ->scalarNode('store_service')->defaultNull()->info('The id of a Cronwatch\Store\Store service to use instead')->end()
                 ->scalarNode('table_prefix')->defaultValue('cronwatch_')->end()
@@ -79,7 +88,12 @@ final class CronwatchBundle extends AbstractBundle
                     ->booleanNode('watch')->defaultTrue()->end()
                 ->end()->end()
                 ->arrayNode('check')->addDefaultsIfNotSet()->children()
-                    ->booleanNode('schedule')->defaultTrue()->info('The "cronwatch" schedule: consume scheduler_cronwatch')->end()
+                    ->scalarNode('schedule')->defaultValue('default')
+                        ->info('The schedule the check is added to: "default" (run by the worker that consumes scheduler_default), another schedule\'s name, or false for none (run bin/console cronwatch:check from a crontab instead)')
+                        ->beforeNormalization()->ifTrue(fn (mixed $v) => $v === true)->then(fn () => 'default')->end()
+                        ->validate()->ifTrue(fn (mixed $v) => $v !== false && !(is_string($v) && preg_match('/^[A-Za-z0-9_.-]+$/D', $v) === 1))
+                            ->thenInvalid('check.schedule must be a schedule name or false, not %s')->end()
+                    ->end()
                     ->scalarNode('frequency')->defaultValue('5 minutes')->end()
                 ->end()->end()
                 ->arrayNode('dashboard')->addDefaultsIfNotSet()->children()
@@ -117,6 +131,9 @@ final class CronwatchBundle extends AbstractBundle
                     tagged_iterator('scheduler.schedule_provider', 'name'),
                     $config['scheduler'],
                     $messenger && $config['messenger']['watch'],
+                    is_string($config['app_id']) && trim($config['app_id']) !== '' ? $config['app_id'] : null,
+                    service('parameter_bag')->nullOnInvalid(),
+                    param('kernel.project_dir'),
                 ]);
             if ($config['scheduler']['watch']) {
                 $services->set(SchedulerSubscriber::class)
@@ -135,13 +152,19 @@ final class CronwatchBundle extends AbstractBundle
                     ->tag('kernel.event_subscriber');
             }
         }
-        if ($scheduler && $messenger && $config['check']['schedule']) {
+        if ($scheduler && $messenger && $config['check']['schedule'] !== false) {
+            // CheckSchedulePass decorates the app's provider for that schedule, or makes this its provider.
             $services->set(CheckSchedule::class)
-                ->args([(string) $config['check']['frequency']])
-                ->tag('scheduler.schedule_provider', ['name' => 'cronwatch']);
+                ->args([(string) $config['check']['frequency'], null])
+                ->tag(CheckSchedulePass::TAG, ['schedule' => (string) $config['check']['schedule']]);
         }
         $services->set(CheckCommand::class)
-            ->args([service(CheckMessageHandler::class)])
+            ->args([
+                service(CheckMessageHandler::class),
+                $scheduler && $messenger ? $config['check']['schedule'] : null,
+                (string) $config['check']['frequency'],
+                $scheduler ? service(ScheduledMessages::class) : null,
+            ])
             ->tag('console.command', ['command' => 'cronwatch:check']);
         $services->set(DashboardController::class)
             ->args([

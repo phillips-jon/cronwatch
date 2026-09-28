@@ -162,4 +162,31 @@ final class CorrectnessTest extends TestCase
         $this->assertMatchesRegularExpression('/^Error: Output did not contain "wrote"/m', $message('Output did not contain "wrote"'));
         $this->assertMatchesRegularExpression('/^Error: HTTP 503/m', $message('HTTP 503 Service Unavailable'));
     }
+
+    public function testAPatternPcreGaveUpOnSaysSo(): void
+    {
+        $jit = ini_get('pcre.jit');
+        $limit = ini_get('pcre.backtrack_limit');
+        ini_set('pcre.jit', '0');
+        ini_set('pcre.backtrack_limit', '1000');
+        try {
+            $this->assertSame(
+                'Output did not match /(a|aa)+c/ (Backtrack limit exhausted)',
+                \Cronwatch\Serialize::checkExpectation(new Pattern('/(a|aa)+c/'), str_repeat('a', 40) . 'b c'),
+            );
+            $this->assertSame('Output did not match /x/', \Cronwatch\Serialize::checkExpectation(new Pattern('/x/'), 'y'));
+        } finally {
+            ini_set('pcre.jit', (string) $jit);
+            ini_set('pcre.backtrack_limit', (string) $limit);
+        }
+    }
+
+    public function testADateIntervalIsItsMillisecondsAndANegativeOneIsRefused(): void
+    {
+        $this->assertSame(5_400_000, \Cronwatch\Duration::parse(new \DateInterval('PT1H30M')));
+        $back = new \DateInterval('PT15M');
+        $back->invert = 1;
+        $this->expectExceptionMessage('retention must be a non-negative number of milliseconds');
+        new Cronwatch(retention: $back);
+    }
 }

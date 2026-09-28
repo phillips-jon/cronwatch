@@ -7,6 +7,7 @@
 //   /redirect?to=<url>      307 to that URL
 //   /drip                   500 with a 30 byte body sent one byte every 200 ms
 //   /hang                   nothing for 5 seconds, then 200
+//   /big                    500 with a 3 MiB body of "y", gzipped when the client takes gzip
 
 declare(strict_types=1);
 
@@ -41,6 +42,17 @@ if ($path === '/drip') {
         flush();
         usleep(200_000);
     }
+    return true;
+}
+if ($path === '/big') {
+    http_response_code(500);
+    $body = str_repeat('y', 3 << 20);
+    if (str_contains($headers['accept-encoding'] ?? '', 'gzip')) {
+        header('Content-Encoding: gzip');
+        $body = (string) gzencode($body);
+    }
+    header('Content-Length: ' . strlen($body));
+    echo $body;
     return true;
 }
 if ($path === '/hang') {

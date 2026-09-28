@@ -64,6 +64,10 @@ final class ScheduledMessages
     /** @var array<string, true> the recurring messages that are a RedispatchMessage */
     private array $sentOn = [];
     private bool $planned = false;
+    /** @var array<string, true> every schedule, by name */
+    private array $schedules = [];
+    /** @var array<string, true> the schedules that send the check (CheckMessage) */
+    private array $checkIn = [];
     /** @var array<string, true> */
     private array $reported = [];
 
@@ -71,13 +75,42 @@ final class ScheduledMessages
      * @param \Closure(): Cronwatch $client
      * @param iterable<string, ScheduleProviderInterface> $providers every schedule, by name
      * @param array<string, mixed> $config the bundle's scheduler settings
+     * @param string|null $app this app's name in its jobs' tags (the bundle's app_id), or null (see appTag())
+     * @param object|null $parameters the container's parameter bag, to read kernel.secret from
      */
     public function __construct(
         private readonly \Closure $client,
         private readonly iterable $providers,
         private readonly array $config = [],
         private readonly bool $messenger = true,
+        private ?string $app = null,
+        private readonly ?object $parameters = null,
+        private readonly string $projectDir = '',
     ) {
+    }
+
+    /**
+     * This app's tag under the scheduler's ("symfony-scheduler:<app>"), so
+     * two apps sharing a store never take each other's jobs for their own.
+     * The bundle's `app_id` names the app; without one it is "app-" and 12
+     * hex characters of a hash of the kernel's secret (APP_SECRET), which
+     * stays the same across deploys and differs between apps, else of the
+     * project directory (see DESIGN.md).
+     */
+    public function appTag(): string
+    {
+        if ($this->app === null) {
+            $secret = null;
+            try {
+                if ($this->parameters !== null && method_exists($this->parameters, 'has') && $this->parameters->has('kernel.secret')) {
+                    $secret = $this->parameters->get('kernel.secret');
+                }
+            } catch (\Throwable) {
+                // An APP_SECRET that is not set: the project directory instead.
+            }
+            $this->app = 'app-' . substr(hash('sha256', is_string($secret) && $secret !== '' ? "cronwatch:secret:{$secret}" : "cronwatch:dir:{$this->projectDir}"), 0, 12);
+        }
+        return Unscheduled::appTag(self::TAG, $this->app);
     }
 
     private function cw(): Cronwatch
@@ -98,12 +131,34 @@ final class ScheduledMessages
         return array_keys($this->handles);
     }
 
+    /**
+     * For `cronwatch:check --status`: every schedule with the number of its
+     * messages watched as jobs, and the schedules that send the check.
+     *
+     * @return array{schedules: array<string, int>, check: list<string>}
+     */
+    public function status(): array
+    {
+        if (!$this->planned) {
+            $this->plan();
+        }
+        $schedules = array_map(fn () => 0, $this->schedules);
+        foreach (array_keys($this->names) as $key) {
+            $schedule = explode("\0", (string) $key, 2)[0];
+            $schedules[$schedule] = ($schedules[$schedule] ?? 0) + 1;
+        }
+        ksort($schedules);
+        $check = array_map('strval', array_keys($this->checkIn));
+        sort($check);
+        return ['schedules' => $schedules, 'check' => $check];
+    }
+
     /** What a check starts with: every message declared, and jobs of messages no longer scheduled declared without their schedule. */
     public function prepare(): Cronwatch
     {
         $this->declare();
         $cw = $this->cw();
-        Unscheduled::declare($cw, self::TAG, fn (\Throwable $e, string $where) => $cw->onError($e, $where));
+        Unscheduled::declare($cw, self::TAG, $this->appTag(), fn (\Throwable $e, string $where) => $cw->onError($e, $where));
         return $cw;
     }
 
@@ -185,8 +240,17 @@ final class ScheduledMessages
     private function plan(): void
     {
         $this->planned = true;
-        $this->names = $this->jobs = $this->handles = $this->redispatched = $this->sentOn = [];
+        $this->names = $this->jobs = $this->handles = $this->redispatched = $this->sentOn = $this->checkIn = $this->schedules = [];
+        // The default schedule first, then the rest as the container lists them.
+        $providers = [];
         foreach ($this->providers as $schedule => $provider) {
+            $providers[(string) $schedule] = $provider;
+        }
+        if (isset($providers['default'])) {
+            $providers = ['default' => $providers['default']] + $providers;
+        }
+        foreach ($providers as $schedule => $provider) {
+            $this->schedules[(string) $schedule] = true;
             try {
                 foreach ($provider->getSchedule()->getRecurringMessages() as $recurring) {
                     $this->addRecurring((string) $schedule, $recurring);
@@ -212,6 +276,7 @@ final class ScheduledMessages
     private function add(string $schedule, string $id, TriggerInterface $trigger, object $message): void
     {
         if ($message instanceof CheckMessage) {
+            $this->checkIn[$schedule] = true;
             return;
         }
         $carried = self::carried($message);
@@ -242,7 +307,7 @@ final class ScheduledMessages
         foreach ([...($watch?->options() ?? []), ...$given] as $key => $value) {
             $options[(string) $key] = $value;
         }
-        $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG]));
+        $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG, $this->appTag()]));
         $options = array_filter($options, fn ($value) => $value !== null);
         $this->names[$schedule . "\0" . $id] = $name;
         if ($carried !== $message) {

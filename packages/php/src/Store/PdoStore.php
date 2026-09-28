@@ -17,13 +17,15 @@ use Cronwatch\StoredJob;
  *
  * @internal
  */
-abstract class PdoStore implements Store, UpdatesRunIf, ComparesAndSetsState
+abstract class PdoStore implements Store, UpdatesRunIf, ComparesAndSetsState, DeletesRunIf
 {
     public readonly string $prefix;
     /** @var array<string, string> */
     protected array $sql;
     /** @var array<string, \PDOStatement> Each statement is prepared once per open connection. */
     private array $prepared = [];
+    /** Set by a store that sent a statement again on a new connection after the old one broke: its first send may have landed. */
+    protected bool $resent = false;
 
     protected function __construct(string $prefix, string $dialect, protected ?\PDO $db, protected readonly bool $own)
     {
@@ -154,15 +156,60 @@ abstract class PdoStore implements Store, UpdatesRunIf, ComparesAndSetsState
         if ($fromStatuses === []) {
             return false;
         }
+        $this->resent = false;
         $statement = $this->run(Sql::updateRunIfSql($this->prefix, count($fromStatuses)), Sql::updateRunIfParams($run, $fromStatuses));
         if ($statement->rowCount() > 0) {
             return true;
         }
         // MySQL counts only the rows an UPDATE changed, so a row that already
         // held these values (and matched) answers 0: it was written all the same.
+        // And a statement sent again after the connection broke finds its own
+        // first send's write, which landed before the break.
         $stored = $this->getRun($run->id);
-        return $stored !== null && in_array($stored->status, $fromStatuses, true)
-            && Js::stringify(Sql::updateRunParams($stored)) === Js::stringify(Sql::updateRunParams($run));
+        return $stored !== null && (in_array($stored->status, $fromStatuses, true) || $this->resent)
+            && self::canonical(Sql::updateRunParams($stored)) === self::canonical(Sql::updateRunParams($run));
+    }
+
+    public function deleteRunIf(string $id, string $job, string $status): bool
+    {
+        $this->resent = false;
+        return $this->run(Sql::deleteRunIfSql($this->prefix), [$id, $job, $status])->rowCount() > 0
+            || ($this->resent && $this->getRun($id) === null);
+    }
+
+    /**
+     * After a conditional state write that answered "not written": whether it
+     * was sent again after the connection broke and its first send had in fact
+     * landed (the stored state is the one written). Without this a lost answer
+     * would read as another process having written first, and the job's
+     * update would be worked out and applied twice.
+     */
+    protected function stateLanded(JobState $state): bool
+    {
+        if (!$this->resent) {
+            return false;
+        }
+        $stored = $this->getState($state->job);
+        return $stored !== null && self::canonical(Js::stringify($stored)) === self::canonical(Js::stringify($state));
+    }
+
+    /** Values compared whatever order a JSON column (Postgres's JSONB) gave an object's keys back in. */
+    private static function canonical(mixed $value): string
+    {
+        $sort = function (mixed $v) use (&$sort): mixed {
+            if (is_string($v) && ($v === '' || $v[0] === '{' || $v[0] === '[')) {
+                $decoded = json_decode($v, true);
+                $v = json_last_error() === JSON_ERROR_NONE && is_array($decoded) ? ['json' => $decoded] : $v;
+            }
+            if (is_array($v)) {
+                if (!array_is_list($v)) {
+                    ksort($v, SORT_STRING);
+                }
+                return array_map($sort, $v);
+            }
+            return $v;
+        };
+        return (string) json_encode($sort($value), JSON_PARTIAL_OUTPUT_ON_ERROR);
     }
 
     public function getRun(string $id): ?Run

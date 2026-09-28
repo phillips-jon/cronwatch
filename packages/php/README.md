@@ -172,7 +172,7 @@ Schedule::command('reports:build')->dailyAt('02:00')->cronwatch(['name' => 'nigh
 Schedule::command('cache:prune-stale-tags')->hourly()->cronwatch(false);
 ```
 
-A task with `->when()`, `->skip()` or `->between()` has no schedule to miss, so its job has none unless given one. Queued jobs opt in, and then every attempt is a run (failing retries open one alert, the attempt that works closes it):
+A task with `->when()`, `->skip()` or `->between()` has no schedule to miss, so its job has none unless given one. Queued jobs opt in, and then every attempt is a run (failing retries open one alert, the attempt that works closes it; an attempt released back onto the queue without an exception, by a rate limit, `WithoutOverlapping` or `$this->release()`, is not a run, neither a failure nor a success):
 
 ```php
 #[Cronwatch\Watch(grace: '15m', failuresBeforeAlert: 3)]
@@ -194,13 +194,15 @@ cronwatch:
         mailer: { to: ops@example.com, from: cronwatch@example.com }
 ```
 
-Every message of every schedule (`#[AsSchedule]` providers, `#[AsCronTask]`, `#[AsPeriodicTask]`) is watched through the Scheduler's events as the worker runs it, its trigger as its job's schedule. Messenger messages marked `#[Cronwatch\Watch]` are recorded where a worker handles them, each attempt a run. The check runs from the bundle's own schedule, `cronwatch`, every five minutes:
+Every message of every schedule (`#[AsSchedule]` providers, `#[AsCronTask]`, `#[AsPeriodicTask]`) is watched through the Scheduler's events as the worker runs it, its trigger as its job's schedule. Messenger messages marked `#[Cronwatch\Watch]` are recorded where a worker handles them, each attempt a run.
+
+The check (which finds missed and stuck runs) is added to your `default` schedule, every five minutes, so it runs only while a worker consumes that schedule, the same worker your scheduled messages need:
 
 ```
-bin/console messenger:consume scheduler_default scheduler_cronwatch
+bin/console messenger:consume scheduler_default
 ```
 
-(or `bin/console cronwatch:check` from a crontab). The dashboard is a route import behind your security:
+`bin/console cronwatch:check --status` says where the check is and which transport must be consumed; `debug:scheduler` lists it too. `check.schedule` puts it in another schedule (`check: { schedule: cronwatch }`, then consume `scheduler_cronwatch` as well), and `check.schedule: false` leaves it out, for a crontab line running `bin/console cronwatch:check` every five minutes. If nothing runs the check, a job that never runs is never reported. Two apps sharing one store and table prefix need different `app_id`s (see DESIGN.md). The dashboard is a route import behind your security:
 
 ```yaml
 # config/routes/cronwatch.yaml

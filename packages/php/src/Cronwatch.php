@@ -17,6 +17,7 @@ use Cronwatch\Job\RetryFinish;
 use Cronwatch\Job\RunHandle;
 use Cronwatch\Job\RunRecorder;
 use Cronwatch\Store\ComparesAndSetsState;
+use Cronwatch\Store\DeletesRunIf;
 use Cronwatch\Store\MemoryStore;
 use Cronwatch\Store\Store;
 use Cronwatch\Store\UpdatesRunIf;
@@ -43,8 +44,6 @@ final class Cronwatch
 
     public const NAME_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/D';
     public const TRIAGE_TIMEOUT_MS = 25_000;
-    /** How long one channel may take to send one alert (see DESIGN.md: PHP cannot cut one short). */
-    public const CHANNEL_TIMEOUT_MS = 15_000;
     public const PRUNE_INTERVAL_MS = 60 * 60_000;
     /** Undelivered alerts kept per job for retry; the oldest go first. */
     public const MAX_UNDELIVERED = 20;
@@ -89,7 +88,7 @@ final class Cronwatch
     private bool $ready = false;
     private bool $checking = false;
     private int|float $lastPruneAt = 0;
-    /** @var array<int, array{JobDefinition, Run, RunRecorder, bool}> Runs of execute() in progress, for the shutdown hook. */
+    /** @var array<int, array{JobDefinition, Run, RunRecorder, bool, bool}> Runs of execute() in progress (recorded, and whether the start's state change waits for the finish), for the shutdown hook. */
     private array $inProgress = [];
     private int $nextExecution = 0;
     private bool $shutdownHooked = false;
@@ -667,9 +666,16 @@ final class Cronwatch
      * finishExecution() is called with the key returned. A process that ends
      * in between records the run as interrupted, as execute() does.
      *
+     * `mayDiscard` is for a run that may turn out not to have happened (a
+     * queued job released back onto the queue, a scheduled task skipped for
+     * overlapping): the start's effect on the job's state (missed and stuck
+     * closed) waits for the finish, which applies it just before judging the
+     * run, so discardExecution() leaves the state as it was. A check while
+     * the run is going sees its running row either way.
+     *
      * @internal For the framework integrations.
      */
-    public function startExecution(JobDefinition $definition, string $trigger, ?string $id = null): int
+    public function startExecution(JobDefinition $definition, string $trigger, ?string $id = null, bool $mayDiscard = false): int
     {
         $name = (string) $definition->get('name');
         $startedAt = $this->now();
@@ -684,7 +690,7 @@ final class Cronwatch
         }
         // The SDK closes missed and stuck beside the running job; here it is
         // done just before the job runs. The result is the same.
-        if ($recorded) {
+        if ($recorded && !$mayDiscard) {
             try {
                 $this->updateState($name, fn (JobState $before) => [Evaluate::onRunStart($before), null]);
             } catch (\Throwable $error) {
@@ -693,7 +699,7 @@ final class Cronwatch
         }
         $recorder = new RunRecorder($run, Evaluate::timeoutMs($definition));
         $key = $this->nextExecution++;
-        $this->inProgress[$key] = [$definition, $run, $recorder, $recorded];
+        $this->inProgress[$key] = [$definition, $run, $recorder, $recorded, $recorded && $mayDiscard];
         $this->hookShutdown();
         self::$current[] = $recorder->context;
         return $key;
@@ -720,10 +726,54 @@ final class Cronwatch
         return $this->endExecution($key, $result, $error, $threw);
     }
 
+    /**
+     * The other end of startExecution(): the attempt neither failed nor
+     * succeeded (a queued job released back onto the queue without an
+     * exception, a scheduled task skipped for overlapping), so its run is
+     * taken back rather than judged. The running row is deleted while it is
+     * still running and of this job (a store that implements DeletesRunIf;
+     * every store here does), and nothing is alerted. The job's state is
+     * left as it was when the run was started with `mayDiscard` (without it,
+     * the start already closed missed and stuck). A store that cannot delete
+     * a run, or a row a check already marked stuck, is reported to onError
+     * and left as it is. Returns whether the run was taken back.
+     *
+     * @internal For the framework integrations.
+     */
+    public function discardExecution(int $key): bool
+    {
+        if (!isset($this->inProgress[$key])) {
+            return false;
+        }
+        [$definition, $run, $recorder, $recorded, $startPending] = $this->inProgress[$key];
+        unset($this->inProgress[$key]);
+        $at = array_search($recorder->context, self::$current, true);
+        if ($at !== false) {
+            array_splice(self::$current, $at, 1);
+        }
+        $recorder->signal->settle();
+        if (!$recorded) {
+            return true;
+        }
+        $name = (string) $definition->get('name');
+        try {
+            if (!$this->store instanceof DeletesRunIf) {
+                throw new \LogicException('the store cannot take back a run (implement Cronwatch\\Store\\DeletesRunIf); it is left running');
+            }
+            if (!$this->store->deleteRunIf($run->id, $name, RunStatus::RUNNING)) {
+                throw new \RuntimeException("run {$run->id} of {$name} is no longer running; left as it is");
+            }
+            return true;
+        } catch (\Throwable $error) {
+            $this->report($error, "discarding {$name}");
+            return false;
+        }
+    }
+
     /** The end of one execute(): the run finished, judged and recorded. */
     private function endExecution(int $key, mixed $result, mixed $error, bool $threw): Run
     {
-        [$definition, $run, $recorder, $recorded] = $this->inProgress[$key];
+        [$definition, $run, $recorder, $recorded, $startPending] = $this->inProgress[$key];
         unset($this->inProgress[$key]);
         $at = array_search($recorder->context, self::$current, true);
         if ($at !== false) {
@@ -739,7 +789,7 @@ final class Cronwatch
         $expectText = $recorder->expectText() ?? (is_string($result) ? Js::wellFormed($result) : null);
         $this->conclude($definition, $run, $result, $error, $threw, $expectText);
         try {
-            $ignored = $this->recordFinish($definition, $run, $recorded, $finishedAt);
+            $ignored = $this->recordFinish($definition, $run, $recorded, $finishedAt, $startPending);
             if ($ignored !== null) {
                 $this->report(new \RuntimeException("run {$run->id} of {$name} {$ignored}; ignored"), "finishing {$name}");
             }
@@ -826,14 +876,14 @@ final class Cronwatch
      * recorded (another process finished the run first, say), or null.
      * Throws when the store does, so a handle can be finished again.
      */
-    private function recordFinish(JobDefinition $definition, Run $run, bool $recorded, int|float $finishedAt): ?string
+    private function recordFinish(JobDefinition $definition, Run $run, bool $recorded, int|float $finishedAt, bool $startPending = false): ?string
     {
         if (!$recorded) {
             // The start was never written; the store may be back by now.
             $this->sync($definition);
             try {
                 $this->store->insertRun($run);
-                $this->finishRun(Serialize::toStored($definition), $run, $finishedAt);
+                $this->finishRun(Serialize::toStored($definition), $run, $finishedAt, $startPending);
                 return null;
             } catch (\Throwable $error) {
                 // Another process may have recorded a run with this id meanwhile.
@@ -851,7 +901,7 @@ final class Cronwatch
             return $ignored;
         }
         if (!$late || $run->status === RunStatus::OK) {
-            $this->finishRun(Serialize::toStored($definition), $run, $finishedAt);
+            $this->finishRun(Serialize::toStored($definition), $run, $finishedAt, $startPending);
         }
         return null;
     }
@@ -1144,13 +1194,14 @@ final class Cronwatch
      *
      * @return list<Alert>
      */
-    private function finishRun(JobDefinition $definition, Run $run, int|float $at): array
+    private function finishRun(JobDefinition $definition, Run $run, int|float $at, bool $startPending = false): array
     {
         $history = null;
         try {
-            [, $drafts] = $this->updateState($run->job, function (JobState $previous) use ($definition, $run, $at, &$history): array {
+            [, $drafts] = $this->updateState($run->job, function (JobState $previous) use ($definition, $run, $at, $startPending, &$history): array {
                 $history ??= $this->history($run);
-                $settled = Evaluate::applySilence($previous, Evaluate::onRunFinish($definition, $run, $previous, $history, $at), $at);
+                $started = $startPending ? Evaluate::onRunStart($previous) : $previous;
+                $settled = Evaluate::applySilence($previous, Evaluate::onRunFinish($definition, $run, $started, $history, $at), $at);
                 return [$settled->state, $settled->alerts];
             });
         } catch (\Throwable $error) {
@@ -1297,6 +1348,9 @@ final class Cronwatch
         if ($drafts === []) {
             return [];
         }
+        if (!$this->deferDelivery) {
+            self::holdOn();
+        }
         $composed = [];
         $delivered = [];
         $failed = [];
@@ -1321,6 +1375,27 @@ final class Cronwatch
     }
 
     /**
+     * Alerts are about to go out, one channel after another (triage up to 25
+     * seconds, each channel up to 10), perhaps from a web request (a handler,
+     * the dashboard's check, WordPress's wp-cron.php). The condition is saved
+     * open already, so a request cut short now (max_execution_time, the
+     * caller hanging up) would lose the alert for good. Outside the command
+     * line the request is kept going: a caller that hangs up no longer stops
+     * it, and a time limit is moved on to leave two minutes for delivery.
+     */
+    private static function holdOn(): void
+    {
+        if (\PHP_SAPI === 'cli') {
+            return;
+        }
+        ignore_user_abort(true);
+        $limit = (int) ini_get('max_execution_time');
+        if ($limit > 0 && function_exists('set_time_limit')) {
+            set_time_limit(max($limit, 120)); // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- alerts must not be lost to the request's time limit.
+        }
+    }
+
+    /**
      * Send the alerts that no channel accepted last time, once each, oldest
      * first. An alert that no longer describes the job (Evaluate::staleAlert)
      * is dropped instead. Retries across a check share RETRY_BUDGET_MS of
@@ -1334,6 +1409,7 @@ final class Cronwatch
         if ($pending === [] || Evaluate::isSilenced($state, $at) || $this->deferDelivery) {
             return [];
         }
+        self::holdOn();
         $delivered = [];
         $failed = [];
         $dropped = array_values(array_filter($pending, fn (Alert $alert) => Evaluate::staleAlert($alert, $state)));

@@ -232,6 +232,12 @@ final class Sql
         ];
     }
 
+    /** deleteRunIf: one run, only while it is of the job and in the status given. */
+    public static function deleteRunIfSql(string $p): string
+    {
+        return "DELETE FROM {$p}runs WHERE id = ? AND job = ? AND status = ?";
+    }
+
     /** updateRunIf: the update above, only while the stored status is one of `count` statuses. */
     public static function updateRunIfSql(string $p, int $count): string
     {

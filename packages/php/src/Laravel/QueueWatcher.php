@@ -17,9 +17,13 @@ use Illuminate\Contracts\Container\Container;
  *
  * - JobProcessing starts the run; Cronwatch::current() is its context
  *   while the job runs, for log() and metric().
- * - JobProcessed ends it ok, or failed when the job released itself back
- *   onto the queue without an exception (a retry, as the gem's Sidekiq and
- *   the Python package's Celery count one) or marked itself failed.
+ * - JobProcessed ends it ok, or failed when the job marked itself failed.
+ *   A job released back onto the queue without an exception (a RateLimited
+ *   or WithoutOverlapping middleware, or a deliberate $this->release())
+ *   did not run, so its run is taken back (Cronwatch::discardExecution):
+ *   no row is left, nothing is judged or alerted, and failuresBeforeAlert
+ *   counts on across it. A release after an exception is the exception's
+ *   failed attempt, as Celery's retry is.
  * - JobExceptionOccurred and JobFailed end it failed with the exception,
  *   whichever comes first; JobTimedOut ends it failed before the worker
  *   kills itself.
@@ -147,7 +151,7 @@ final class QueueWatcher
         $base = method_exists($job, 'uuid') ? $job->uuid() : null;
         $base = is_string($base) && $base !== '' ? $base : (method_exists($job, 'getJobId') ? $job->getJobId() : null);
         $id = is_scalar($base) && (string) $base !== '' && strlen((string) $base) <= 150 ? $base . ':' . bin2hex(random_bytes(6)) : null;
-        $this->open[spl_object_id($job)] = $this->cw()->startExecution($handle->definition, self::TRIGGER, $id);
+        $this->open[spl_object_id($job)] = $this->cw()->startExecution($handle->definition, self::TRIGGER, $id, mayDiscard: true);
     }
 
     public function processed(object $event): void
@@ -159,10 +163,24 @@ final class QueueWatcher
         if (method_exists($job, 'hasFailed') && $job->hasFailed()) {
             $this->end($job, 'The job was marked as failed');
         } elseif (method_exists($job, 'isReleased') && $job->isReleased() && !(method_exists($job, 'isDeleted') && $job->isDeleted())) {
-            $this->end($job, 'Released back onto the queue');
+            // Released without an exception (rate limited, WithoutOverlapping,
+            // a deliberate release): the attempt did not happen, so its run is
+            // taken back, neither a failure nor a success.
+            $this->discard($job);
         } else {
             $this->end($job, null);
         }
+    }
+
+    private function discard(object $job): void
+    {
+        $id = spl_object_id($job);
+        $key = $this->open[$id] ?? null;
+        if ($key === null) {
+            return;
+        }
+        unset($this->open[$id]);
+        $this->cw()->discardExecution($key);
     }
 
     /** JobExceptionOccurred and JobFailed: the attempt failed with this exception. */
