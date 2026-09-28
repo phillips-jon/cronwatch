@@ -66,9 +66,10 @@ jobs:
           key="$RUNNER_TEMP/split_key"
           printf '%s\n' "$SSH_KEY" > "$key"
           chmod 600 "$key"
-          # Trusted on first use: pin git.drupal.org's key here once its fingerprint is checked
-          # against the one drupal.org publishes.
-          ssh-keyscan -t ed25519,rsa git.drupal.org > "$RUNNER_TEMP/known_hosts" 2>/dev/null
+          # git.drupal.org's ED25519 host key, checked against the fingerprint drupal.org
+          # publishes (SHA256:dPC6RYiFfvVB/epk5s/lisF4jCbOFJnitbYPy6Dsog8, at
+          # https://git.drupalcode.org/help/instance_configuration), pinned rather than trusted on first use.
+          printf '%s\n' 'git.drupal.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKCkFTXM7BUQUHlDkVmQV6qNkIeSIRBTNzlLn+T/APHa' > "$RUNNER_TEMP/known_hosts"
           export GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts"
           git config user.name "CronWatch release"
           git config user.email "noreply@cronwatch.dev"
