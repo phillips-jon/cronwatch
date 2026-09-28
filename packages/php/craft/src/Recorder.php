@@ -154,6 +154,18 @@ final class Recorder
     }
 
     /**
+     * This install's tag under an integration's tag, from Craft's application
+     * id (CRAFT_APP_ID, made at install), so two installs sharing one store
+     * and prefix never declare each other's jobs without a schedule (see
+     * Unscheduled).
+     */
+    public static function appTag(string $tag): string
+    {
+        $id = (string) (Craft::$app->id ?? '');
+        return Unscheduled::appTag($tag, $id !== '' ? $id : 'craft');
+    }
+
+    /**
      * Declares a job: the name from the options' "name" when there is one,
      * the tags added to, and the definition the client keeps.
      *
@@ -164,6 +176,9 @@ final class Recorder
     {
         $given = $options['name'] ?? null;
         unset($options['name']);
+        if (in_array(self::TAG_CONFIG, $tags, true)) {
+            $tags[] = self::appTag(self::TAG_CONFIG);
+        }
         $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), ...$tags]));
         return $this->client()->job(is_string($given) && $given !== '' ? $given : $name, $options);
     }
@@ -242,7 +257,7 @@ final class Recorder
                 $this->safely(fn () => $this->declare(JobName::ofClass((string) $class), ['description' => "Queue job {$class}"] + $options, [self::TAG_QUEUE, self::TAG_CONFIG]), "declaring {$class}");
             }
         }
-        Unscheduled::declare($cw, self::TAG_CONFIG, $this->report(...));
+        Unscheduled::declare($cw, self::TAG_CONFIG, self::appTag(self::TAG_CONFIG), $this->report(...));
         return $cw;
     }
 

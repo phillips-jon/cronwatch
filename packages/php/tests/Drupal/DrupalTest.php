@@ -509,7 +509,10 @@ final class DrupalTest extends TestCase
 
         $definition = self::definition('drupal:cwt_fixtures');
         $this->assertSame('The fixture module', $definition['description']);
-        $this->assertSame(['drupal-cron'], $definition['tags']);
+        // The integration's tag, and this site's under it (from its UUID).
+        $this->assertCount(2, $definition['tags']);
+        $this->assertSame('drupal-cron', $definition['tags'][0]);
+        $this->assertMatchesRegularExpression('/^drupal-cron:[0-9a-f-]{36}$/', $definition['tags'][1]);
         $this->assertArrayNotHasKey('schedule', $definition, 'a hook_cron has no schedule of its own');
         // Automated Cron is on, at its default interval.
         $this->assertSame('every 10800s', self::definition('drupal:cron')['schedule']);
@@ -617,7 +620,10 @@ final class DrupalTest extends TestCase
         $types = array_map(fn ($x) => [$x['type'], $x['job']], self::alerts());
         $this->assertSame(['failed', 'drupal:queue:cwt_flaky'], $types[0]);
         $this->assertContains(['recovered', 'drupal:queue:cwt_flaky'], $types);
-        $this->assertSame(['drupal-queue'], self::definition('drupal:queue:cwt_flaky')['tags']);
+        $tags = self::definition('drupal:queue:cwt_flaky')['tags'];
+        $this->assertCount(2, $tags);
+        $this->assertSame('drupal-queue', $tags[0]);
+        $this->assertMatchesRegularExpression('/^drupal-queue:[0-9a-f-]{36}$/', $tags[1]);
 
         $marked = self::runs('cwt-marked');
         $this->assertSame(['ok'], array_column($marked, 'status'), 'a worker with #[Watch] is watched unlisted');

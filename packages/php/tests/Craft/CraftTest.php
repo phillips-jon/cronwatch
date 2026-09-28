@@ -523,7 +523,11 @@ final class CraftTest extends TestCase
         $this->assertSame('hello from cwt', $run['output']);
         $definition = self::definition('craft:cwt:task:hello');
         $this->assertSame('0 3 * * *', $definition['schedule']);
-        $this->assertSame(['craft-command', 'craft-config'], $definition['tags']);
+        // The integration's tags, and this install's under craft-config (from CRAFT_APP_ID).
+        $tags = $definition['tags'];
+        $this->assertSame(['craft-command', 'craft-config'], array_slice($tags, 0, 2));
+        $this->assertCount(3, $tags);
+        $this->assertStringStartsWith('craft-config:', $tags[2]);
 
         [$code] = self::craft(['cwt/task/fail']);
         $this->assertSame(3, $code);
@@ -568,7 +572,11 @@ final class CraftTest extends TestCase
         $this->assertSame(['queue'], array_values(array_unique(array_column($runs, 'trigger'))));
         $this->assertStringStartsWith('RuntimeException: job a failed attempt 1', (string) $runs[0]['error']);
         $this->assertSame('job a attempt 3', $runs[2]['output']);
-        $this->assertSame(['craft-queue', 'craft-config'], self::definition($name)['tags']);
+        // The integration's tags, and this install's under craft-config (from CRAFT_APP_ID).
+        $tags = self::definition($name)['tags'];
+        $this->assertSame(['craft-queue', 'craft-config'], array_slice($tags, 0, 2));
+        $this->assertCount(3, $tags);
+        $this->assertStringStartsWith('craft-config:', $tags[2]);
         $this->assertSame([['failed', $name], ['recovered', $name]], array_map(fn ($a) => [$a['type'], $a['job']], self::alerts()));
 
         $marked = self::runs('cwt-marked');

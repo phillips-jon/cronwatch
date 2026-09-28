@@ -247,8 +247,18 @@ final class Recorder {
     if ($schedule !== NULL) {
       $options['schedule'] = $schedule;
     }
-    $options['tags'] = [self::TAG_CRON];
+    $options['tags'] = [self::TAG_CRON, $this->appTag(self::TAG_CRON)];
     return $this->declare(self::CRON_JOB, $options, ['kind' => 'cron']);
+  }
+
+  /**
+   * This site's tag under an integration's tag, from the site's UUID, so two
+   * sites sharing one store and prefix never declare each other's jobs
+   * without a schedule (see Unscheduled).
+   */
+  public function appTag(string $tag): string {
+    $uuid = (string) ($this->configFactory->get('system.site')->get('uuid') ?? '');
+    return Unscheduled::appTag($tag, $uuid !== '' ? $uuid : 'drupal');
   }
 
   /**
@@ -258,7 +268,7 @@ final class Recorder {
     $name = 'drupal:' . $module;
     return $this->handles[$name] ?? $this->declare($name, [
       'description' => "hook_cron of the {$module} module",
-      'tags' => [self::TAG_CRON],
+      'tags' => [self::TAG_CRON, $this->appTag(self::TAG_CRON)],
     ], ['kind' => 'module', 'module' => $module]);
   }
 
@@ -273,7 +283,7 @@ final class Recorder {
       return $this->handles[$name];
     }
     $options = ['description' => "Items of the {$id} queue"] + $options;
-    $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG_QUEUE]));
+    $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG_QUEUE, $this->appTag(self::TAG_QUEUE)]));
     return $this->declare($name, $options, ['kind' => 'queue', 'queue' => $id]);
   }
 
@@ -333,7 +343,7 @@ final class Recorder {
       }
     }
     foreach ([self::TAG_CRON, self::TAG_QUEUE] as $tag) {
-      Unscheduled::declare($cw, $tag, $this->report(...));
+      Unscheduled::declare($cw, $tag, $this->appTag($tag), $this->report(...));
     }
     return $cw;
   }
