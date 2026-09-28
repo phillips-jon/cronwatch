@@ -107,6 +107,7 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .installs { display: flex; flex-wrap: wrap; gap: 14px 18px; margin-top: 26px; }
 .installs .for { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 7px; }
 .installs .install { margin-top: 0; }
+@media (min-width: 701px) { .installs { display: grid; grid-template-columns: repeat(2, max-content); } .installs .install { display: flex; justify-content: space-between; } }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 22px; }
 .prompt-btn { display: inline-flex; align-items: center; gap: 9px; font: 500 14px/1 var(--mono); color: var(--sheet); background: var(--ink); border: 1px solid var(--ink); border-radius: 3px; padding: 11px 14px; }
 .prompt-btn:hover { opacity: .85; }
