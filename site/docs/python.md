@@ -21,6 +21,10 @@ The import name is `cronwatch` (the name `cronwatch` on PyPI belongs to an older
 | `cronwatch.stores.postgres` | the Postgres store | `cronwatch-sdk[postgres]` (psycopg 3.2 or newer) |
 | `cronwatch.triage.anthropic` | Claude triage | `cronwatch-sdk[anthropic]` |
 | `cronwatch.sources.pgcron` | watching pg_cron's jobs | `cronwatch-sdk` (psycopg for a connection string) |
+| `cronwatch.django` | settings, the dashboard's URLs, `cronwatch_check`; see [Django](/docs/django/) | `cronwatch-sdk[django]` (Django 5.2 or newer) |
+| `cronwatch.celery` | Celery tasks and beat schedules; see [Celery](/docs/celery/) | `cronwatch-sdk[celery]` (Celery 5.5 or newer) |
+| `cronwatch.apscheduler` | APScheduler 3 jobs | `cronwatch-sdk[apscheduler]` |
+| `cronwatch.aio` | the async client | `cronwatch-sdk` |
 
 On Windows, which has no zone database of its own, install `cronwatch-sdk[tzdata]`.
 
@@ -80,6 +84,23 @@ Option names are snake_case (`max_duration`, `failures_before_alert`). Durations
 
 The context has `name`, `run_id`, `started_at`, `log(*parts)`, `metric(name, value)`, `metrics(dict)` and `signal`, which aborts once the job's `timeout` has passed. Nothing is interrupted: a loop that can stop early checks `ctx.aborted()`, or calls `ctx.signal.throw_if_aborted()` to raise.
 
+## Async jobs
+
+An `async def` job is wrapped the same way, with `async with`, an async decorator, or `await`:
+
+```python
+async with nightly.run() as ctx:
+    await build_report_async()
+    ctx.log("Report written")
+
+@nightly.monitor
+async def refresh_cache() -> None: ...
+
+await nightly.run(refresh_cache_async)
+```
+
+`cronwatch.aio.AsyncCronwatch(client)` (or `AsyncCronwatch(store=..., alerts=...)`) has the client's methods as coroutines: `await acw.check()`, `await acw.runs("nightly-report")`, `await acw.silence("nightly-report", "2h")`, and start and resume handles whose `finish` is awaited. The store, the alert channels and triage run in a worker thread, so a slow database or a hung webhook never blocks the event loop. It needs asyncio (uvicorn, FastAPI, aiohttp); trio is not supported.
+
 ## Run the check
 
 A long-running process (a web server, a worker) checks in a daemon thread:
@@ -135,6 +156,48 @@ application = cw.routes()
 - `trust_proxy`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`, as the SDK's option does. Off by default.
 
 The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's `cron_secret` as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). The ASGI app runs each request in a worker thread, so it needs an asyncio server (uvicorn, Hypercorn, Daphne).
+
+## Jobs a URL starts
+
+Some platforms run scheduled work by calling a URL: a hosting provider's cron, a serverless function on a schedule, an outside cron service. `job.handler(fn)` is that endpoint. It runs `fn(ctx, request)` as a recorded run for each request carrying `Authorization: Bearer <secret>`, and answers with JSON saying how the run went:
+
+```python
+nightly = cw.job("nightly-report", schedule="0 2 * * *", timezone="UTC")
+hook = nightly.handler(lambda ctx, request: build_report())
+
+# Flask
+app.add_url_rule("/cron/nightly-report", view_func=hook.flask, methods=["GET", "POST"])
+
+# FastAPI or Starlette
+app.add_route("/cron/nightly-report", hook.starlette, methods=["GET", "POST"])
+
+# AWS Lambda behind API Gateway or a function URL, on a schedule
+lambda_handler = hook.aws_lambda
+```
+
+`.django` is a Django view (see [Django](/docs/django/#jobs-a-platform-cron-calls)), `.aws_lambda` takes Lambda's `(event, context)` and returns the response dict API Gateway and function URLs expect, and `.wsgi` and `.asgi` are apps of their own. Called directly with a request, the handler answers in that request's own kind. An `async def` function gives an async handler.
+
+The secret is `handler(fn, secret=...)`, else the client's `cron_secret`, which reads `CRON_SECRET` by default; it is compared in constant time. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 and reports it once to `on_error`, rather than let anyone on the internet run the job; `secret=None` opts out on purpose, for an endpoint your platform already protects. A run is answered 200 or 500 with `{"ok", "job", "run", "status", "durationMs"}`, and a function that returns a response of its own is answered with it.
+
+A response with a status of 400 or more fails the run, recorded as `HTTP <status>` and its reason, whether a handler, `run()` or `finish(result=...)` got it. Django, Flask, Starlette and FastAPI, requests, httpx and `http.client` responses are all recognised, so a job that calls an API and returns its answer fails when the API does.
+
+## APScheduler
+
+```python
+from apscheduler.schedulers.background import BackgroundScheduler
+from cronwatch.apscheduler import watch
+
+scheduler = BackgroundScheduler(timezone="UTC")
+scheduler.add_job(nightly_report, "cron", hour=2, id="nightly-report")
+watch(scheduler, client=cw)
+scheduler.start()
+```
+
+`pip install "cronwatch-sdk[apscheduler]"`. `watch` adds a listener to an APScheduler 3 scheduler (background, blocking, asyncio or any other) and needs no change to your jobs. Every job becomes a CronWatch job named after its id, with its trigger as the schedule: a cron trigger becomes the same cron expression, checked against APScheduler's own fire times; an interval trigger is `every <interval>`; a date trigger runs once. A job added or rescheduled later is followed, and a removed one stops being expected.
+
+Each run is recorded from APScheduler's own events: the return value is the output when it is a string (and checked by `expect`), an exception fails it, and a run APScheduler skipped because it could not start within `misfire_grace_time` is failed with that reason. The events are recorded in a thread of the listener's own, so neither the scheduler nor an asyncio loop waits on the store. `jobs=` and `exclude=` pick the jobs, and other options (`grace`, `timeout`, `failures_before_alert`) apply to each one it declares. `cronwatch.current()` is not available inside an APScheduler job, since the listener only sees events; log from the job with Python's `logging` instead, or wrap its body in `job.run()` yourself.
+
+APScheduler 4 is still a pre-release that replaced the events and triggers this is built on, so it is not supported yet.
 
 ## Stores
 

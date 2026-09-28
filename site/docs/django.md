@@ -39,10 +39,10 @@ The client is made from these settings the first time something asks for it, thr
 
 ## Declare and run jobs
 
-Declare each job once, in a module your app imports, and wrap the work. A job that cron runs is usually a management command:
+Declare jobs in a `cronwatch_jobs.py` module in any installed app. At startup `cronwatch.django` imports that module from every app that has one, the way the admin finds `admin.py`, so each job is known before it first runs and a job that never runs at all is reported missed:
 
 ```python
-# reports/jobs.py
+# reports/cronwatch_jobs.py
 from cronwatch.django import client
 
 nightly_report = client().job(
@@ -52,10 +52,12 @@ nightly_report = client().job(
 )
 ```
 
+Then wrap the work. A job that cron runs is usually a management command:
+
 ```python
 # reports/management/commands/nightly_report.py
 from django.core.management.base import BaseCommand
-from reports.jobs import nightly_report
+from reports.cronwatch_jobs import nightly_report
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
@@ -68,7 +70,25 @@ class Command(BaseCommand):
 0 2 * * *    cd /srv/app && .venv/bin/python manage.py nightly_report
 ```
 
-The run is recorded when the block ends; an exception inside it is recorded as the failure and raised again, so the command still exits non-zero. `@nightly_report.monitor` on a function, and `nightly_report.run(fn)`, work the same way; see [Python](/docs/python/#declare-and-run-a-job) for every option.
+The run is recorded when the block ends; an exception inside it is recorded as the failure and raised again, so the command still exits non-zero. `@nightly_report.monitor` on a function, and `nightly_report.run(fn)`, work the same way, async functions included; see [Python](/docs/python/#declare-and-run-a-job) for every option. A `cronwatch_jobs` module that fails to import stops Django's startup, so a bad declaration is found at deploy rather than at 2 a.m.
+
+Jobs that Celery runs need no declarations at all: see [Celery](/docs/celery/).
+
+## Jobs a platform cron calls
+
+A platform that runs jobs by calling a URL (a hosting provider's scheduler, a cron service) can call a view: `job.handler(fn).django` is a view, exempt from CSRF, that runs the job for each request carrying `Authorization: Bearer <CRON_SECRET>` and answers 401 to anything else.
+
+```python
+# urls.py
+from reports.cronwatch_jobs import nightly_report
+from reports.tasks import build_report
+
+urlpatterns = [
+    path("cron/nightly-report", nightly_report.handler(lambda ctx, request: build_report()).django),
+]
+```
+
+The secret is the client's `CRON_SECRET` (from `CRONWATCH`, else the environment); outside development, a handler with no secret answers 503 rather than let anyone run the job. See [handler](/docs/python/#jobs-a-url-starts) for the rules.
 
 ## Look for missed runs
 
@@ -78,7 +98,7 @@ A job that never started records nothing, so something has to look. Add one cron
 */5 * * * *  cd /srv/app && .venv/bin/python manage.py cronwatch_check
 ```
 
-`cronwatch_check` runs the check and prints `cronwatch: checked N jobs, sent M alerts` (nothing at `--verbosity 0`). It checks every job in the store from its stored definition, so a job whose module the command never imports is still checked once it has run or been declared somewhere. Run one checker per store.
+`cronwatch_check` runs the check and prints `cronwatch: checked N jobs, sent M alerts` (nothing at `--verbosity 0`). Every job in a `cronwatch_jobs` module is declared when Django starts, and every job in the store is checked from its stored definition. Run one checker per store.
 
 A long-running process can check on its own instead: call `client().start()` once in each worker process (with Gunicorn, in its `post_fork` hook), and drop the crontab line.
 
