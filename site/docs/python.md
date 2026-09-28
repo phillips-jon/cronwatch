@@ -110,6 +110,32 @@ cw.close()
 
 `check()` returns a result with `checked_at`, `jobs`, `alerts` and `pruned`. Calls at the same time share one check.
 
+## The dashboard
+
+`cw.routes()` is the dashboard and JSON API, the same pages and endpoints as the TypeScript routes: the board's counts by health, a timeline of the last day with a lane per job, the table of every job, and for each job its last seven days, runs and definition, all drawn on the server with no script. It is a WSGI app, and `.asgi` is the same routes as an ASGI app, so it mounts in any Python web server. For Django, see [Django](/docs/django/).
+
+```python
+# Flask
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {"/cronwatch": cw.routes()})
+
+# FastAPI or Starlette
+from starlette.routing import Mount
+app.router.routes.append(Mount("/cronwatch", app=cw.routes().asgi))
+
+# Its own WSGI server (gunicorn, uWSGI), at the root
+application = cw.routes()
+```
+
+`cw.routes(token=..., base_path=..., origin=..., trust_proxy=False)`:
+
+- `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Without a token, while the environment is development or test, the routes make a token of their own and print a sign-in link to standard output on the first request; anywhere else they answer 503. `None` opts out and serves them open, for a mount behind your own auth. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that is set (where the SDK reads `NODE_ENV`).
+- `base_path`: where it is mounted. It defaults to the mount point the server reports (`SCRIPT_NAME`, or ASGI's `root_path`), so the mounts above need nothing more.
+- `origin`: the public origin, such as `"https://app.example.com"`, to pin it whatever a request says. It then replaces the request's own for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line.
+- `trust_proxy`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`, as the SDK's option does. Off by default.
+
+The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's `cron_secret` as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). The ASGI app runs each request in a worker thread, so it needs an asyncio server (uvicorn, Hypercorn, Daphne).
+
 ## Stores
 
 `cronwatch.stores.MemoryStore()` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each process has its own.
