@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your PHP app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
 
-This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process and a Node process can share one SQLite file, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, a job handler for crons that call a URL, the Laravel and Symfony integrations, and a WordPress plugin; the Drupal and Craft integrations follow ([DESIGN.md](DESIGN.md) has the plan). It is not on Packagist yet.
+This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process and a Node process can share one SQLite file, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, a job handler for crons that call a URL, the Laravel and Symfony integrations, a WordPress plugin, a Drupal module and a Craft plugin ([DESIGN.md](DESIGN.md) has how each works). It is not on Packagist yet.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -223,6 +223,14 @@ A signed-in user with `ROLE_ADMIN` (`dashboard.role`) is let in; anyone else nee
 
 The CronWatch plugin (`wordpress/`, built into the plugin directory's zip with `php wordpress/build.php`) watches every WP-Cron event with no code changes: each event's runs are recorded in the site's own database, and missed, failed, stuck and slow runs are alerted by email, Slack or webhook. It adds a CronWatch menu to wp-admin, for administrators: the dashboard above, and its settings. The JSON API, for `@cronwatch/mcp`, is off until turned on there with a token. It works network wide on a multisite. WP-Cron only fires when someone visits the site, so a quiet site's events run late or not at all; the plugin's readme recommends `DISABLE_WP_CRON` and a real crontab, with `wp cronwatch check` running the check from it. See DESIGN.md for how events become jobs.
 
+### Drupal
+
+The Drupal module (`drupal/`, `drupal/cronwatch` once it is on drupal.org; Drupal 10.3 and newer and 11) watches cron with no code changes: every cron run (Automated Cron, `drush cron`, `/cron/<key>`) is a run of `drupal:cron`, and each module's `hook_cron` in it a run of `drupal:<module>`. Only `drupal:cron` has a schedule, since every hook runs on every cron run: the one set under Configuration, System, CronWatch, else Automated Cron's interval. Queue workers chosen there, or marked `#[Cronwatch\Watch]`, have each item recorded as a run. The check runs after each cron run and from `drush cronwatch:check`; the tables are in the site's database through a connection of CronWatch's own; the dashboard is under Reports, behind the module's permissions. See [drupal/README.md](drupal/README.md).
+
+### Craft CMS
+
+The Craft plugin (`craft/`, `cronwatch/craft`; Craft 5.3 and newer) watches the console commands a crontab runs and the queue jobs `config/cronwatch.php` lists (or `#[Cronwatch\Watch]` marks), each attempt a run, with `craft cronwatch/check` for the crontab. The tables are in Craft's database through a connection of CronWatch's own; the dashboard is a Control Panel section behind the plugin's permissions. See [craft/README.md](craft/README.md).
+
 ## Testing
 
 From this directory:
@@ -247,6 +255,13 @@ CRONWATCH_TEST_MYSQL=mysql://root:pw@127.0.0.1:33061/cw CRONWATCH_TEST_MARIADB=m
 `tests/ChannelsTest.php` runs the default HTTP client (curl, and PHP's streams) against a local `php -S` server. The WordPress plugin's tests install WordPress with WP-CLI and run the built plugin in it, when `CRONWATCH_TEST_WORDPRESS` is a `mysql://` URL and `CRONWATCH_TEST_WPCLI` the path to `wp-cli.phar` (`CRONWATCH_TEST_WP_VERSION` picks the WordPress version).
 
 `tests/FinishOnceTest.php` starts PHP worker processes that finish the same runs at the same moment, on SQLite and on each server. `tests/NodeCompatTest.php` shares a SQLite file with the built SDK, and `tests/ScheduleFuzzTest.php` checks thousands of generated cron expressions against croner itself; both need Node and the SDK built first (`npm ci && npm run build` at the repository root), and skip with the reason otherwise. `npm run check:php` at the root runs the suite.
+
+`tests/Drupal/DrupalTest.php` makes a Drupal project with Composer, installs a site with Drush and drives the module in it, when `CRONWATCH_TEST_DRUPAL` is a `drupal/core` constraint (`^11.4`, `~10.6.0`); `CRONWATCH_TEST_DRUPAL_DB` is a `mysql://` or `postgres://` URL for the site's database (default a SQLite file). `tests/Craft/CraftTest.php` does the same for Craft when `CRONWATCH_TEST_CRAFT` is a `craftcms/cms` constraint (`^5.3`) and `CRONWATCH_TEST_CRAFT_DB` a `mysql://` or `postgres://` URL. Each needs Composer on the PATH (or `CRONWATCH_TEST_COMPOSER`), and keeps its project in the system's temporary directory between runs:
+
+```bash
+CRONWATCH_TEST_DRUPAL='^11.4' vendor/bin/phpunit tests/Drupal
+CRONWATCH_TEST_CRAFT='^5.3' CRONWATCH_TEST_CRAFT_DB=mysql://root:pw@127.0.0.1:33061/cw vendor/bin/phpunit tests/Craft
+```
 
 `tests/Laravel/` runs the Laravel integration on Orchestra Testbench and `tests/Symfony/` the bundle on FrameworkBundle's test kernel; the dev dependencies bring the newest of each that the PHP allows (Laravel 12 and Symfony 7.4 on PHP 8.2, Laravel 13 and Symfony 8.1 on 8.4 and newer), and without them those tests are skipped. To test another series, pin it and take the other framework out, as CI's php-frameworks job does:
 

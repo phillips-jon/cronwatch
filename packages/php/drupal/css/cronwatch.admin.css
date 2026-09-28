@@ -1,0 +1,11 @@
+.cronwatch-dashboard-links {
+  margin: 0 0 8px;
+  text-align: right;
+}
+.cronwatch-dashboard-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 220px);
+  min-height: 560px;
+  border: 1px solid #d3d4d9;
+}

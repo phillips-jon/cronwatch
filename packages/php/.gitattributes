@@ -1,9 +1,12 @@
 # What Composer's download of the package leaves out: the tests and their
-# configuration, and the WordPress plugin's source, which ships as a zip of its
-# own (a git archive of this directory, as a split repository or Packagist
+# configuration, the WordPress plugin's source, which ships as a zip of its
+# own, and the Drupal module and Craft plugin, each a package of its own
+# (a git archive of this directory, as a split repository or Packagist
 # serves it).
 /tests export-ignore
 /phpunit.xml.dist export-ignore
 /wordpress export-ignore
+/drupal export-ignore
+/craft export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore

@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * @file
+ * Install and uninstall: the library's three tables.
+ */
+
+declare(strict_types=1);
+
+use Drupal\cronwatch\Storage;
+
+/**
+ * Implements hook_install().
+ *
+ * The tables are made by the library's store, with the CREATE text every
+ * port uses, through its own connection to the site's database; IF NOT
+ * EXISTS, so tables another port already made are kept.
+ */
+function cronwatch_install(): void {
+  Storage::store()->init();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function cronwatch_uninstall(): void {
+  Storage::drop();
+}

@@ -1,0 +1,58 @@
+<?php
+
+/**
+ * @file
+ * CronWatch: every cron run, each hook_cron and chosen queue workers watched.
+ *
+ * The cron runs are recorded by the cron service itself (WatchedCron, set by
+ * CronwatchServiceProvider); these hooks watch queue workers, build the
+ * alert email, and describe the module.
+ */
+
+declare(strict_types=1);
+
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\cronwatch\Recorder;
+use Drupal\cronwatch\WatchedQueueWorker;
+
+/**
+ * Implements hook_queue_info_alter().
+ *
+ * A watched worker (listed in the settings, or with #[Cronwatch\Watch] on
+ * its class) is made through WatchedQueueWorker, which records each item.
+ */
+function cronwatch_queue_info_alter(array &$queues): void {
+  $listed = \Drupal::config('cronwatch.settings')->get('queues');
+  $listed = is_array($listed) ? array_values(array_map('strval', $listed)) : [];
+  foreach ($queues as $id => &$definition) {
+    $class = is_array($definition) ? (string) ($definition['class'] ?? '') : '';
+    if ($class === '' || $class === WatchedQueueWorker::class || !Recorder::watchesQueue((string) $id, $class, $listed)) {
+      continue;
+    }
+    $definition['cronwatch_class'] = $class;
+    $definition['class'] = WatchedQueueWorker::class;
+  }
+}
+
+/**
+ * Implements hook_mail().
+ *
+ * The alert email: the library's subject and plain text body.
+ */
+function cronwatch_mail(string $key, array &$message, array $params): void {
+  if ($key === 'alert') {
+    $message['subject'] = (string) ($params['subject'] ?? '');
+    $message['body'][] = (string) ($params['text'] ?? '');
+  }
+}
+
+/**
+ * Implements hook_help().
+ */
+function cronwatch_help(string $route_name, RouteMatchInterface $route_match): ?string {
+  if ($route_name !== 'help.page.cronwatch') {
+    return NULL;
+  }
+  return '<p>' . t('CronWatch records every cron run as a run of the job <em>drupal:cron</em>, and each module\'s hook_cron in it as a run of <em>drupal:&lt;module&gt;</em>, in the site\'s own database. It alerts you when cron is missed, when a hook_cron fails, gets stuck or runs much slower than usual, and again when it recovers. Queue workers you choose are watched too, each item a run.') . '</p>'
+    . '<p>' . t('A check every few minutes finds missed and stuck runs. It runs at the end of each cron run, and from <code>drush cronwatch:check</code>; a check that runs with cron cannot notice cron not running, so run it from the server\'s crontab as well.') . '</p>';
+}

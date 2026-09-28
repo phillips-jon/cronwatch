@@ -35,6 +35,11 @@ const VERSIONED = [
   // The WordPress plugin ships the library's version; wordpress/build.php refuses a zip whose header or readme differ.
   { file: "packages/php/wordpress/cronwatch.php", pattern: /^( \* Version: +)(\S+)()$/m },
   { file: "packages/php/wordpress/readme.txt", pattern: /^(Stable tag: )(\S+)()$/m },
+  // The Drupal module and the Craft plugin are released with the library they
+  // require; their versions come from their tags, so the library constraint
+  // is what moves.
+  { file: "packages/php/drupal/composer.json", pattern: /^( {8}"cronwatch\/cronwatch": "\^)([^"]+)(")/m },
+  { file: "packages/php/craft/composer.json", pattern: /^( {8}"cronwatch\/cronwatch": "\^)([^"]+)(")/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -69,7 +74,10 @@ const PUBLISH = [
   // repository's root: pushing the tag starts .github/workflows/php-split.yml,
   // which pushes packages/php and the tag to the split repository Packagist
   // watches, once PHP_SPLIT_ENABLED is on (packages/php/DESIGN.md, Releasing).
-  { dir: "packages/php", commands: (v) => [`# packages/php: the pushed tag v${v} is split to its own repository by .github/workflows/php-split.yml (packages/php/DESIGN.md, Releasing)`] },
+  { dir: "packages/php", commands: (v) => [
+    `# packages/php: the pushed tag v${v} is split to its own repository by .github/workflows/php-split.yml (packages/php/DESIGN.md, Releasing)`,
+    `# packages/php/drupal and packages/php/craft: the same tag is split to drupal.org's repository (as ${v}) and the Craft plugin's by .github/workflows/php-plugins-split.yml; then make the drupal.org release from the ${v} tag`,
+  ] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */

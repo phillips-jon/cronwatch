@@ -1,0 +1,51 @@
+<?php
+
+/**
+ * @file
+ * Fixtures for the CronWatch module's tests.
+ *
+ * State keys steer them: cwt.cron_mode ("ok", "throw" or "error") picks what
+ * this module's hook_cron does, and every alert CronWatch sends is appended
+ * to cwt.alerts.
+ */
+
+declare(strict_types=1);
+
+use Cronwatch\Alert;
+use Cronwatch\Cronwatch;
+
+/**
+ * Implements hook_cron().
+ */
+function cwt_fixtures_cron(): void {
+  Cronwatch::current()?->log('cwt cron ran');
+  $mode = \Drupal::state()->get('cwt.cron_mode', 'ok');
+  if ($mode === 'throw') {
+    throw new \RuntimeException('cwt cron broke');
+  }
+  if ($mode === 'error') {
+    // An \Error, which core's cron does not catch.
+    throw new \TypeError('cwt cron hit a type error');
+  }
+}
+
+/**
+ * Implements hook_cronwatch_alerts_alter().
+ */
+function cwt_fixtures_cronwatch_alerts_alter(array &$channels): void {
+  $channels[] = function (Alert $alert): void {
+    $state = \Drupal::state();
+    $alerts = $state->get('cwt.alerts', []);
+    $alerts[] = ['type' => $alert->type, 'job' => $alert->job, 'title' => $alert->title];
+    $state->set('cwt.alerts', $alerts);
+  };
+}
+
+/**
+ * Implements hook_cronwatch_job_options_alter().
+ */
+function cwt_fixtures_cronwatch_job_options_alter(array &$options, string $name, array $context): void {
+  if ($name === 'drupal:cwt_fixtures') {
+    $options['description'] = 'The fixture module';
+  }
+}

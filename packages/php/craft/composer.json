@@ -1,0 +1,33 @@
+{
+    "name": "cronwatch/craft",
+    "description": "Watches Craft CMS's queue jobs and console commands, and alerts you when a run is missed, fails, gets stuck or runs slow.",
+    "type": "craft-plugin",
+    "license": "MIT",
+    "keywords": ["craft", "craftcms", "craft-plugin", "cron", "queue", "monitoring", "alerts"],
+    "homepage": "https://cronwatch.dev",
+    "authors": [
+        {"name": "Jon C. Phillips"}
+    ],
+    "support": {
+        "docs": "https://cronwatch.dev/docs/",
+        "issues": "https://github.com/phillips-jon/cronwatch/issues",
+        "source": "https://github.com/phillips-jon/cronwatch/tree/main/packages/php/craft"
+    },
+    "require": {
+        "php": ">=8.2",
+        "craftcms/cms": "^5.3",
+        "cronwatch/cronwatch": "^0.5.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Cronwatch\\Craft\\": "src/"
+        }
+    },
+    "extra": {
+        "handle": "cronwatch",
+        "name": "CronWatch",
+        "developer": "Jon C. Phillips",
+        "documentationUrl": "https://cronwatch.dev/docs/",
+        "class": "Cronwatch\\Craft\\Plugin"
+    }
+}

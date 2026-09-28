@@ -1,0 +1,10 @@
+cronwatch.dashboard:
+  title: CronWatch
+  description: 'Cron runs, queue items and alerts.'
+  route_name: cronwatch.dashboard
+  parent: system.admin_reports
+cronwatch.settings:
+  title: CronWatch
+  description: 'Where CronWatch alerts go, the grace a run is given, and which queues are watched.'
+  route_name: cronwatch.settings
+  parent: system.admin_config_system

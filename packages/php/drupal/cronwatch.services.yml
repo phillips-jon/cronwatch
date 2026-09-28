@@ -1,0 +1,8 @@
+services:
+  logger.channel.cronwatch:
+    parent: logger.channel_base
+    arguments: ['cronwatch']
+  cronwatch.recorder:
+    class: Drupal\cronwatch\Recorder
+    arguments: ['@config.factory', '@module_handler', '@logger.channel.cronwatch', '@plugin.manager.mail', '@language_manager', '@plugin.manager.queue_worker']
+  Drupal\cronwatch\Recorder: '@cronwatch.recorder'
