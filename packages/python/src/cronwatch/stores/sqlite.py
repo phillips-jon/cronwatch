@@ -60,7 +60,20 @@ class SqliteStore:
         self._sql = _sql.statements("sqlite", self.prefix)
         self._own = connection is None
         self._db: sqlite3.Connection | None = connection
-        self._lock = threading.RLock()
+        self._mutex = threading.RLock()
+        self._pid = os.getpid()
+
+    @property
+    def _lock(self) -> threading.RLock:
+        """The store's lock. A forked child (gunicorn, Celery's prefork pool)
+        gets a fresh one, and opens a connection of its own: SQLite's must not
+        be used across a fork, so the parent's is left to it, not closed."""
+        if self._pid != os.getpid():
+            self._pid = os.getpid()
+            self._mutex = threading.RLock()
+            if self._own:
+                self._db = None
+        return self._mutex
 
     def _open(self) -> sqlite3.Connection:
         if self._db is not None:

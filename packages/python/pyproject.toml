@@ -11,13 +11,15 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [{ name = "Jon C. Phillips" }]
-keywords = ["cron", "monitoring", "scheduled jobs", "alerts", "heartbeat", "celery", "django"]
+keywords = ["cron", "monitoring", "scheduled jobs", "alerts", "heartbeat", "celery", "django", "apscheduler", "asyncio"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Framework :: Django",
   "Framework :: Django :: 5.2",
   "Framework :: Django :: 6.0",
   "Framework :: Django :: 6.1",
+  "Framework :: Celery",
+  "Framework :: AsyncIO",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
@@ -41,6 +43,11 @@ postgres = ["psycopg>=3.2"]
 anthropic = ["anthropic>=0.40"]
 # cronwatch.django: the settings, the dashboard's URLs and the cronwatch_check command.
 django = ["django>=5.2"]
+# cronwatch.celery: tasks watched through Celery's signals, beat's schedules, the check task.
+celery = ["celery>=5.5"]
+# cronwatch.apscheduler: a listener recording each job's runs, its trigger as the schedule.
+# APScheduler 4 is a pre-release with other events and triggers.
+apscheduler = ["apscheduler>=3.10,<4"]
 
 [project.urls]
 Homepage = "https://cronwatch.dev"
@@ -52,8 +59,11 @@ Issues = "https://github.com/phillips-jon/cronwatch/issues"
 # psycopg for the Postgres and pg_cron tests (run when CRONWATCH_TEST_PG or
 # CRONWATCH_TEST_PGCRON is set), anthropic to check triage requests against the
 # real SDK, Django for the Django integration (CI runs each supported series
-# with `uv run --with "django~=X.Y.0"`).
-dev = ["pytest>=8", "psycopg[binary]>=3.2", "anthropic>=0.40", "django>=5.2"]
+# with `uv run --with "django~=X.Y.0"`), Celery, django-celery-beat and redis
+# for cronwatch.celery (a prefork worker on Redis runs when
+# CRONWATCH_TEST_REDIS is set), APScheduler 3, and Flask and Starlette for
+# handler()'s adapters.
+dev = ["pytest>=8", "psycopg[binary]>=3.2", "anthropic>=0.40", "django>=5.2", "celery>=5.5", "django-celery-beat>=2.7", "apscheduler>=3.10,<4", "redis>=5", "flask>=3", "starlette>=0.40"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cronwatch"]

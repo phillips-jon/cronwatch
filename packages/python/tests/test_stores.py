@@ -246,3 +246,25 @@ def test_busy_retries_with_a_growing_pause_then_gives_up() -> None:
 
     with pytest.raises(sqlite3.OperationalError, match="no such table"):
         retry_busy(other, sleep=pauses.append)
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="needs fork")
+@pytest.mark.filterwarnings("ignore:This process .* is multi-threaded, use of fork:DeprecationWarning")
+def test_a_forked_child_opens_a_sqlite_connection_of_its_own(tmp_path: Path) -> None:
+    """As a prefork worker's children do: the parent's connection is left to it."""
+    store = SqliteStore(str(tmp_path / "fork.db"))
+    store.init()
+    parent_connection = store._db
+    pid = os.fork()
+    if pid == 0:  # pragma: no cover, the child
+        code = 0
+        try:
+            store.insert_run(Run(id="from-child", job="j", status="ok", started_at=1, finished_at=2, duration_ms=1))
+            code = 0 if store._db is not parent_connection else 3
+        except BaseException:
+            code = 2
+        os._exit(code)
+    _, status = os.waitpid(pid, 0)
+    assert os.waitstatus_to_exitcode(status) == 0
+    assert store._db is parent_connection
+    assert store.get_run("from-child") is not None

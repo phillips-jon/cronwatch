@@ -131,7 +131,72 @@ urlpatterns = [..., path("cronwatch/", include("cronwatch.django.urls"))]
 
 `CRONWATCH` takes the client's options in upper case (`STORE`, `ALERTS`, `TRIAGE`, `SOURCES`, `CRON_SECRET`, `RETENTION`, `DEFAULTS`, `REDACT`, `DELIVER`, `ON_ERROR`), or `CLIENT` for a client you made yourself, and the dashboard's (`TOKEN`, `BASE_PATH`, `ORIGIN`, `TRUST_PROXY`). `cronwatch.django.client()` is the client made from them, and `cronwatch.client()` hands out the same one. `python manage.py cronwatch_check` runs one check, for cron to call every few minutes. `DEBUG` is the environment unless `CRONWATCH_ENV` says otherwise: with it on and no token set, the dashboard makes one and prints its sign-in link to the runserver log.
 
-The Celery and APScheduler integrations and an async client follow in a later release; [DESIGN.md](DESIGN.md) has the plan.
+Declare jobs in a `cronwatch_jobs.py` module in any installed app: it is imported at startup, so `cronwatch_check` knows every job before it first runs and reports one that never does.
+
+```python
+# reports/cronwatch_jobs.py
+from cronwatch.django import client
+
+nightly = client().job("nightly-report", schedule="0 2 * * *", grace="15m")
+```
+
+### Async
+
+A job runs an `async def` the same ways: `async with job.run() as ctx`, `@job.monitor` on an async function (each await is a run), or `await job.run(fn)`. The store is used from a worker thread, so the event loop never waits on it. For an app that is async throughout, `cronwatch.aio.AsyncCronwatch` takes the same options and has the client's methods as coroutines (`await cw.check()`, `await cw.runs("nightly-report")`), with `job.start()`, `flush()` and `finish()` awaited too; `AsyncCronwatch(cronwatch.client())` shares a synchronous client.
+
+### Celery
+
+`pip install "cronwatch-sdk[celery]"` (Celery 5.5 or newer), then, where the app is made:
+
+```python
+import cronwatch.celery
+from celery.schedules import crontab
+
+app.conf.beat_schedule = {
+    "nightly-report": {"task": "proj.tasks.nightly_report", "schedule": crontab(hour=2, minute=0)},
+    "cronwatch-check": {"task": "cronwatch.celery.check", "schedule": 300},
+}
+cronwatch.celery.install(app, grace="15m")
+```
+
+Every task beat schedules becomes a job named after the task, with beat's schedule (crontabs in Celery's `timezone`, intervals as `every <n>`), read from `beat_schedule` and, when installed, django-celery-beat's table. No task changes: each run by a worker is recorded through Celery's signals, and `cronwatch.current()` is its context inside the task. A task that raises is recorded as failed and raises on to Celery as before. Every attempt is a run, so a task that retries opens one failed alert and the attempt that succeeds recovers it (`failures_before_alert=3` waits for three in a row). A worker process lost under a task (a hard time limit, a revoke with terminate) has its run failed by the worker. Per-task options go below `@app.task`:
+
+```python
+@app.task
+@cronwatch.celery.cronwatch_task(timeout="2h", expect="Report written")
+def nightly_report(): ...
+```
+
+A schedule CronWatch cannot read exactly (a solar schedule, a task scheduled by two entries, a time daylight saving skips) is reported to `on_error` and the task is watched without one. `cronwatch.celery.check`, scheduled with beat once for the deployment, declares every watched job and runs a check. With the prefork pool use a store the processes share (SQLite or Postgres). The client is `install(client=...)`, else the Django integration's, else `cronwatch.client()`.
+
+### APScheduler
+
+`pip install "cronwatch-sdk[apscheduler]"` (APScheduler 3.10 or newer; 4 is a pre-release and not supported yet):
+
+```python
+import cronwatch.apscheduler
+
+scheduler.add_job(nightly_report, "cron", hour=2, id="nightly-report")
+cronwatch.apscheduler.watch(scheduler, grace="15m", jobs={"nightly-report": {"timeout": "2h"}})
+cw.start()   # checks every minute, in a thread
+```
+
+Every job is declared, named after its id, with its trigger as the schedule (cron triggers in their zone, intervals as `every <n>`), and each run is recorded from APScheduler's events: a string it returns is the output, an exception fails it. A job added, rescheduled or removed later follows. APScheduler tells a listener nothing while a job runs, so return the text to record (inside the job `cronwatch.current()` is None).
+
+### A job run by a URL
+
+For a platform cron that calls a URL (Vercel's crons, Cloud Scheduler), `job.handler(fn)` runs `fn(ctx, request)` for each request carrying `Authorization: Bearer $CRON_SECRET` and answers with how it went, as the SDK's `handler()` does:
+
+```python
+cron = nightly.handler(lambda ctx, request: build_report(ctx))
+
+path("api/cron/nightly", cron.django)                                  # Django (exempt from CSRF)
+app.add_url_rule("/api/cron/nightly", view_func=cron.flask)            # Flask
+app.add_route("/api/cron/nightly", cron.starlette)                     # Starlette, FastAPI
+app = cron.wsgi   # or cron.asgi: the handler as the whole app
+```
+
+It answers `{"ok", "job", "run", "status", "durationMs"}` with 200 or 500, 401 without the secret, and 503 when no secret is set outside development (`secret=None` lets anyone run it). A function that returns a response is answered with it, and, as for any run, a response of 400 or more fails the run. An `async def` makes an async handler.
 
 ## Testing
 
@@ -142,7 +207,7 @@ uv run pytest                    # the Python uv picks
 uv run --python 3.11 pytest      # any of 3.11 to 3.14
 ```
 
-`tests/test_conformance.py` replays the cases in the repository's `conformance/` directory, generated from the TypeScript SDK. `tests/test_node_compat.py` shares a SQLite file with the built SDK, and `tests/test_schedule_fuzz.py` checks thousands of generated cron expressions against croner itself; both need Node and the SDK built first (`npm ci && npm run build` at the repository root), and skip with the reason otherwise. The Postgres store's tests run when `CRONWATCH_TEST_PG` is a Postgres URL, and the pg_cron source's tests against the real extension when `CRONWATCH_TEST_PGCRON` is the URL of a Postgres with pg_cron in `cron.database_name` (CI starts both). `tests/test_web_golden.py` replays the SDK routes' answers to a fixed seed (`packages/ruby/test/web/golden.json`, which the gem replays too) and compares every page and header byte for byte. `tests/test_django.py` runs on the dev group's Django; CI runs it on each supported series with `uv run --with "django~=5.2.0" pytest` (and 6.0, 6.1). `npm run check:python` at the root runs the suite.
+`tests/test_conformance.py` replays the cases in the repository's `conformance/` directory, generated from the TypeScript SDK. `tests/test_node_compat.py` shares a SQLite file with the built SDK, and `tests/test_schedule_fuzz.py` checks thousands of generated cron expressions against croner itself; both need Node and the SDK built first (`npm ci && npm run build` at the repository root), and skip with the reason otherwise. The Postgres store's tests run when `CRONWATCH_TEST_PG` is a Postgres URL, and the pg_cron source's tests against the real extension when `CRONWATCH_TEST_PGCRON` is the URL of a Postgres with pg_cron in `cron.database_name` (CI starts both). `tests/test_web_golden.py` replays the SDK routes' answers to a fixed seed (`packages/ruby/test/web/golden.json`, which the gem replays too) and compares every page and header byte for byte. `tests/test_django.py` runs on the dev group's Django; CI runs it on each supported series with `uv run --with "django~=5.2.0" pytest` (and 6.0, 6.1). `tests/test_celery.py` runs tasks eagerly and on a real worker in the test process; with `CRONWATCH_TEST_REDIS` set to a Redis URL (CI starts one) it also runs a prefork worker whose children record to one SQLite file. `npm run check:python` at the root runs the suite.
 
 ## License
 

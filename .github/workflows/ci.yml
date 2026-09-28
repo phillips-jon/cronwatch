@@ -221,6 +221,12 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      # The broker for cronwatch.celery's prefork worker test.
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -254,6 +260,7 @@ jobs:
         working-directory: packages/python
         env:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+          CRONWATCH_TEST_REDIS: redis://127.0.0.1:6379/0
       # @cronwatch/mcp's tools against cronwatch.web, served by
       # packages/python/tests/web_server.py through uv on this entry's Python.
       - name: MCP server against cronwatch.web
@@ -269,10 +276,14 @@ jobs:
           dir="$(mktemp -d)"
           uv build --out-dir "$dir/dist"
           uv venv --python ${{ matrix.python }} "$dir/venv"
-          VIRTUAL_ENV="$dir/venv" uv pip install "$dir"/dist/*.whl "django~=${{ matrix.django }}.0"
+          VIRTUAL_ENV="$dir/venv" uv pip install "$dir"/dist/*.whl "django~=${{ matrix.django }}.0" "celery>=5.5" "apscheduler>=3.10,<4"
           cd "$dir"
           "$dir/venv/bin/python" -c '
+          import asyncio
           import cronwatch
+          import cronwatch.apscheduler, cronwatch.celery
+          from cronwatch.aio import AsyncCronwatch
+          from cronwatch.web import Request
           from cronwatch.alerts import Resend
           from cronwatch.sources.pgcron import PgCron
           from cronwatch.stores import SqliteStore
@@ -290,6 +301,13 @@ jobs:
           seen = {}
           body = web({"REQUEST_METHOD": "GET", "PATH_INFO": "/api/jobs", "HTTP_AUTHORIZATION": "Bearer smoke"}, lambda status, headers: seen.update(status=status))
           assert seen["status"] == "200 OK" and b"\"name\":\"smoke\"" in b"".join(body), seen
+          async def later(ctx):
+              return "async ok"
+          assert asyncio.run(job.run(later)) == "async ok"
+          assert asyncio.run(AsyncCronwatch(cw).runs("smoke"))[0].output == "async ok"
+          hook = job.handler(lambda ctx, request: "hooked", secret="smoke")
+          answer = hook(Request("GET", "/cron", headers={"authorization": "Bearer smoke"}))
+          assert answer.status == 200 and cw.runs("smoke")[0].output == "hooked", answer
           print("cronwatch", cronwatch.__version__, "from", cronwatch.__file__)
           '
 

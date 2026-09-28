@@ -44,7 +44,7 @@ from cronwatch import _env  # noqa: E402
 from cronwatch.stores import MemoryStore  # noqa: E402
 from cronwatch.web import Request  # noqa: E402
 
-from helpers import boom, make  # noqa: E402
+from helpers import boom, make, run_python  # noqa: E402
 
 DIGEST = hashlib.sha256(b"cronwatch-cookie:tok").hexdigest()
 BEARER = {"HTTP_AUTHORIZATION": "Bearer tok"}
@@ -223,3 +223,47 @@ def test_the_dashboard_answers_under_django_asgi_too() -> None:
         page = asyncio.run(signed_in.get(f"{BASE}/jobs/broken"))
         assert page.status_code == 200
         assert f'<link rel="manifest" href="{BASE}/manifest.webmanifest">'.encode() in page.content
+
+
+def test_a_job_handler_is_a_django_view_exempt_from_csrf_plain_or_async() -> None:
+    from django_urls import handler_client
+
+    client = Client(enforce_csrf_checks=True)
+    ok = client.post("/cron/nightly", HTTP_AUTHORIZATION="Bearer s3cret")
+    assert ok.status_code == 200, "the bearer secret, not a CSRF token"
+    assert ok["content-type"] == "application/json; charset=utf-8"
+    assert ok.json()["job"] == "django-nightly"
+    assert handler_client.runs("django-nightly")[0].output == "via django /cron/nightly"
+    assert client.get("/cron/nightly").status_code == 401
+    res = asyncio.run(AsyncClient().get("/cron/async", headers={"authorization": "Bearer s3cret"}))
+    assert res.status_code == 200
+    assert handler_client.runs("django-async")[0].output == "async via django"
+    assert Client().get("/cron/async", HTTP_AUTHORIZATION="Bearer s3cret").status_code == 200, "an async view under WSGI too"
+
+
+def test_each_apps_cronwatch_jobs_module_is_imported_at_startup(tmp_path: Any) -> None:
+    """A project of its own, in a process of its own: a job declared in an
+    app's cronwatch_jobs.py is known to cronwatch_check before it ever runs."""
+    app = tmp_path / "reports"
+    app.mkdir()
+    (app / "__init__.py").write_text("")
+    (app / "cronwatch_jobs.py").write_text(
+        "from cronwatch.django import client\n\n"
+        'nightly = client().job("nightly-report", schedule="0 2 * * *", timezone="UTC")\n'
+    )
+    (tmp_path / "settings.py").write_text(
+        'SECRET_KEY = "cronwatch-tests-only"\n'
+        'INSTALLED_APPS = ["cronwatch.django", "reports"]\n'
+        'CRONWATCH = {"STORE": "cronwatch.stores.SqliteStore", "ALERTS": [], "CRON_SECRET": None}\n'
+    )
+    script = (
+        "import os, django\n"
+        'os.chdir(os.environ["WORK"])\n'
+        "django.setup()\n"
+        "from django.core.management import call_command\n"
+        "import cronwatch.django\n"
+        'call_command("cronwatch_check")\n'
+        'print([job.name + ":" + str(job.health) for job in cronwatch.django.client().jobs()])\n'
+    )
+    done = run_python(script, tmp_path, DJANGO_SETTINGS_MODULE="settings")
+    assert done.stdout.splitlines() == ["cronwatch: checked 1 job, sent 0 alerts", "['nightly-report:never_ran']"]

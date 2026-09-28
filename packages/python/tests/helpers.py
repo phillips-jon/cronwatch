@@ -210,6 +210,20 @@ def make(clock: Clock | None = None, **options: Any) -> tuple[Cronwatch, Clock, 
     return cronwatch.Cronwatch(**settings), c, alerts
 
 
+def run_python(script: str, work: Any, timeout: float = 120, **env: str) -> Any:
+    """Runs a script in a Python process of its own, in `work` (which is on
+    its path, beside the tests), and returns the finished process; it must succeed."""
+    import subprocess
+    import sys
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.pathsep.join(p for p in (str(work), here, os.environ.get("PYTHONPATH", "")) if p)
+    environ = {**os.environ, "PYTHONPATH": path, "WORK": str(work), **env}
+    done = subprocess.run([sys.executable, "-c", script], cwd=str(work), env=environ, capture_output=True, text=True, timeout=timeout)
+    assert done.returncode == 0, f"exit {done.returncode}\n{done.stdout}\n{done.stderr}"
+    return done
+
+
 def boom(message: str = "x") -> Callable[[Any], Any]:
     def fail(_ctx: Any = None) -> Any:
         raise RuntimeError(message)
