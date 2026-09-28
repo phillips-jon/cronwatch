@@ -41,7 +41,7 @@ final class Resend implements AlertChannel
         $this->apiKey = Shared::required($apiKey, 'Resend needs an apiKey');
         $this->to = Email::recipients('Resend', $from, $to);
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

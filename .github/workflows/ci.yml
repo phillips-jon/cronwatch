@@ -4,8 +4,9 @@
 # tests run on the oldest and newest Ruby it supports, against each
 # supported Rails series. The Python package's tests run on the oldest and
 # newest Python it supports, against each supported Django series, and the
-# PHP package's on the oldest and newest PHP, against MySQL and MariaDB. One
-# Node, one Ruby and one Python entry also
+# PHP package's on the oldest and newest PHP, against MySQL, MariaDB,
+# Postgres and WordPress. The MCP server is driven against each port's
+# dashboard. One Node, one Ruby and one Python entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
 # A green run on main is what lets deploy.yml ship the site.
@@ -311,9 +312,9 @@ jobs:
           print("cronwatch", cronwatch.__version__, "from", cronwatch.__file__)
           '
 
-  # The PHP package's tests replay conformance/, share a SQLite file with the
-  # built SDK and check the croner port against croner, so the SDK is built
-  # (and the fixtures checked) first. The MySQL, MariaDB and Postgres store
+  # The PHP package's tests replay conformance/ and the dashboard fixture,
+  # share a SQLite file with the built SDK and check the croner port against
+  # croner, so the SDK is built (and the fixtures checked) first. The MySQL, MariaDB and Postgres store
   # tests, and the finish-once tests with several processes, run against the
   # services; the pg_cron tests against a Postgres with the extension, as the
   # Node, Ruby and Python jobs start it.
@@ -355,7 +356,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
-      # Builds the SDK, then fails if conformance/ is stale.
+      # Builds the SDK, then fails if conformance/, the dashboard fixture
+      # (packages/ruby/test/web/golden.json) or the icons are stale.
       - run: npm run check:conformance
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
@@ -401,6 +403,12 @@ jobs:
           CRONWATCH_TEST_WORDPRESS: mysql://root:pw@127.0.0.1:3306/cw
           CRONWATCH_TEST_WPCLI: ${{ runner.temp }}/wp-cli.phar
           CRONWATCH_TEST_WP_VERSION: ${{ matrix.php == '8.2' && '6.1.14' || '' }}
+      # @cronwatch/mcp's tools against the PHP dashboard's serve(), under
+      # PHP's built-in server with packages/php/tests/servers/web.php.
+      - name: MCP server against Cronwatch\Web\Dashboard
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_PHP: "1"
       # The plugin directory's zip: the plugin and the library, no dev files.
       - name: Build the WordPress plugin zip
         working-directory: packages/php
@@ -429,6 +437,8 @@ jobs:
           if ($job->run(function ($j) { $j->log("ok"); return 42; }) !== 42) { fwrite(STDERR, "run returned the wrong value\n"); exit(1); }
           $run = $cw->runs("smoke")[0];
           if (!$run->isOk() || $run->output !== "ok") { fwrite(STDERR, "no run recorded\n"); exit(1); }
+          $answer = $cw->routes(token: "smoke")->handle(Cronwatch\Web\Request::create("GET", "/cronwatch/api/jobs", ["authorization" => "Bearer smoke"]));
+          if ($answer->status !== 200 || !str_contains($answer->body, "\"name\":\"smoke\"")) { fwrite(STDERR, "the dashboard did not answer\n"); exit(1); }
           echo "cronwatch ", Cronwatch\Cronwatch::VERSION, " from ", (new ReflectionClass(Cronwatch\Cronwatch::class))->getFileName(), "\n";
           '
           # The Composer bin finds cronwatch.php in the working directory.

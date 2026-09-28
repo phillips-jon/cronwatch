@@ -29,6 +29,7 @@ final class WordPressTest extends TestCase
     private static string $phar = '';
     private static string $url = '';
     private static string $prefix = '';
+    private static string $version = '';
     private static int $port = 0;
     /** @var resource|null */
     private static $server = null;
@@ -53,7 +54,7 @@ final class WordPressTest extends TestCase
         self::$port = self::freePort();
         $parts = parse_url($url);
         $host = ($parts['host'] ?? '127.0.0.1') . (isset($parts['port']) ? ':' . $parts['port'] : '');
-        $version = (string) (getenv('CRONWATCH_TEST_WP_VERSION') ?: self::WORDPRESS);
+        $version = self::$version = (string) (getenv('CRONWATCH_TEST_WP_VERSION') ?: self::WORDPRESS);
 
         mkdir(self::$dir, 0777, true);
         self::must(['core', 'download', "--version={$version}", '--skip-content', '--force']);
@@ -85,7 +86,10 @@ final class WordPressTest extends TestCase
         self::stopServer();
         try {
             $pdo = self::pdo();
-            $tables = $pdo->query('SHOW TABLES LIKE ' . $pdo->quote(self::$prefix . '%'))->fetchAll(\PDO::FETCH_COLUMN);
+            $tables = [
+                ...$pdo->query('SHOW TABLES LIKE ' . $pdo->quote(self::$prefix . '%'))->fetchAll(\PDO::FETCH_COLUMN),
+                ...$pdo->query('SHOW TABLES LIKE ' . $pdo->quote(self::networkPrefix() . '%'))->fetchAll(\PDO::FETCH_COLUMN),
+            ];
             foreach ($tables as $table) {
                 $pdo->exec("DROP TABLE IF EXISTS `{$table}`");
             }
@@ -140,18 +144,18 @@ final class WordPressTest extends TestCase
      * @param list<string> $args
      * @return array{int, string, string}
      */
-    private static function wp(array $args, string $stdin = ''): array
+    private static function wp(array $args, string $stdin = '', ?string $dir = null): array
     {
         // WP-CLI 2.12 is older than PHP 8.5; its deprecation notices are not the plugin's.
         // In a container the tests may run as root, which WP-CLI refuses unless told.
         $root = function_exists('posix_geteuid') && posix_geteuid() === 0 ? ['--allow-root'] : [];
-        return self::exec([PHP_BINARY, '-d', 'error_reporting=' . (E_ALL & ~E_DEPRECATED), '-d', 'display_errors=stderr', self::$phar, '--path=' . self::$dir, ...$root, ...$args], $stdin);
+        return self::exec([PHP_BINARY, '-d', 'error_reporting=' . (E_ALL & ~E_DEPRECATED), '-d', 'display_errors=stderr', self::$phar, '--path=' . ($dir ?? self::$dir), ...$root, ...$args], $stdin);
     }
 
     /** @param list<string> $args */
-    private static function must(array $args, string $stdin = ''): string
+    private static function must(array $args, string $stdin = '', ?string $dir = null): string
     {
-        [$code, $out, $err] = self::wp($args, $stdin);
+        [$code, $out, $err] = self::wp($args, $stdin, $dir);
         if ($code !== 0) {
             throw new \RuntimeException('wp ' . implode(' ', $args) . " exited {$code}:\n{$out}\n{$err}");
         }
@@ -231,7 +235,10 @@ final class WordPressTest extends TestCase
     /**
      * PHP's built-in server on the site, set as php.ini-production sets a
      * host: errors logged rather than shown, and output buffered, so nothing
-     * is sent before WordPress's fatal error handler shows its page.
+     * is sent before WordPress's fatal error handler shows its page. It
+     * answers one request at a time, so the fixtures keep WordPress from
+     * requesting anything over HTTP (Site Health's weekly event requests the
+     * site itself, which would wait on the request making it).
      */
     private static function startServer(): void
     {
@@ -545,7 +552,7 @@ final class WordPressTest extends TestCase
             $page = ob_get_clean();
             $out['pageHasSecret'] = str_contains($page, 'shh-its-a-secret');
             $out['pageHasNonce'] = str_contains($page, 'name="_wpnonce"');
-            $out['pageSaysLater'] = str_contains($page, 'The full dashboard comes to wp-admin in a later release.');
+            $out['pageLinksTheDashboard'] = str_contains($page, 'href="' . esc_url(admin_url('admin.php?page=cronwatch')) . '">Open the dashboard</a>');
             update_option('cronwatch_settings', Cronwatch\WordPress\Plugin::DEFAULTS);
             echo json_encode($out);
             PHP);
@@ -561,13 +568,15 @@ final class WordPressTest extends TestCase
             'webhook_url' => 'https://hooks.example.com/in?team=a&b=1',
             'webhook_secret' => 'shh-its-a-secret',
             'grace' => '1h30m',
-        ], $result['after']);
+            'api_enabled' => '',
+            'api_token' => '',
+        ], $result['after'], 'the JSON API stays off unless asked for');
         $this->assertStringContainsString('cronwatch_notice=grace', $result['keep']);
         $this->assertSame('shh-its-a-secret', $result['kept']['webhook_secret'], 'a blank secret keeps the saved one');
         $this->assertSame('1h30m', $result['kept']['grace'], 'a grace that does not parse is not saved');
         $this->assertFalse($result['pageHasSecret'], 'the secret is never shown');
         $this->assertTrue($result['pageHasNonce']);
-        $this->assertTrue($result['pageSaysLater']);
+        $this->assertTrue($result['pageLinksTheDashboard']);
     }
 
     public function testTheTestAlertGoesToEveryChannelAndWpMailReportsAFailure(): void
@@ -595,6 +604,192 @@ final class WordPressTest extends TestCase
         $this->assertSame(['ops@example.com'], $result['sent']['to']);
         $this->assertSame('j failed', $result['sent']['subject'], 'one line');
         $this->assertStringStartsWith("j\nfailed\n\nthe message", $result['sent']['message']);
+    }
+
+    /** The table prefix of the network the multisite test installs. */
+    private static function networkPrefix(): string
+    {
+        return 'cwms' . getmypid() . '_';
+    }
+
+    /**
+     * A request to the site under PHP's built-in server.
+     *
+     * @param array<string, string> $headers
+     * @return array{int, array<string, string>, string}
+     */
+    private static function http(string $method, string $path, array $headers = [], string $body = ''): array
+    {
+        self::startServer();
+        $lines = [];
+        foreach ($headers as $name => $value) {
+            $lines[] = "{$name}: {$value}";
+        }
+        $context = stream_context_create(['http' => ['method' => $method, 'header' => $lines, 'content' => $body, 'ignore_errors' => true, 'follow_location' => 0, 'timeout' => 30]]);
+        $text = (string) @file_get_contents('http://127.0.0.1:' . self::$port . $path, false, $context);
+        // http_get_last_response_headers() is 8.4's; before it the headers land in a local variable.
+        $received = function_exists('http_get_last_response_headers') ? http_get_last_response_headers() : ($http_response_header ?? []);
+        $status = 0;
+        $out = [];
+        foreach ($received ?? [] as $line) {
+            if (preg_match('#^HTTP/\S+ (\d{3})#', $line, $m) === 1) {
+                $status = (int) $m[1];
+                continue;
+            }
+            [$name, $value] = array_map('trim', explode(':', $line, 2) + [1 => '']);
+            $out[strtolower($name)] = $value;
+        }
+        if ($status === 0) {
+            throw new \RuntimeException("{$method} {$path} got no answer: " . (error_get_last()['message'] ?? '') . "\nserver: "
+                . substr((string) @file_get_contents(self::$dir . '/server.log'), -1500) . "\nerrors: " . substr((string) @file_get_contents(self::$dir . '/php-errors.log'), -1500));
+        }
+        return [$status, $out, $text];
+    }
+
+    /** The Cookie header of a signed-in session for a user, as the login form would set it. */
+    private static function signedIn(string $login): string
+    {
+        $cookies = self::inWp(<<<PHP
+            \$user = get_user_by('login', '{$login}');
+            \$expiration = time() + 3600;
+            \$token = WP_Session_Tokens::get_instance(\$user->ID)->create(\$expiration);
+            echo json_encode([
+                AUTH_COOKIE => wp_generate_auth_cookie(\$user->ID, \$expiration, 'auth', \$token),
+                LOGGED_IN_COOKIE => wp_generate_auth_cookie(\$user->ID, \$expiration, 'logged_in', \$token),
+            ]);
+            PHP);
+        return implode('; ', array_map(fn ($name, $value) => $name . '=' . rawurlencode($value), array_keys($cookies), $cookies));
+    }
+
+    public function testTheDashboardIsInWpAdminForAdministratorsOnly(): void
+    {
+        $admin = ['Cookie' => self::signedIn('admin')];
+        [$status, , $screen] = self::http('GET', '/wp-admin/admin.php?page=cronwatch', $admin);
+        $this->assertSame(200, $status);
+        $this->assertMatchesRegularExpression('#<iframe class="cronwatch-dashboard-frame" title="CronWatch dashboard" src="[^"]*admin\.php\?page=cronwatch&\#038;cw=%2F"#', $screen);
+        $this->assertStringContainsString('page=cronwatch-settings', $screen, 'the settings are a link away');
+
+        [$status, $headers, $page] = self::http('GET', '/wp-admin/admin.php?page=cronwatch&cw=%2F', $admin);
+        $this->assertSame(200, $status);
+        $this->assertSame('text/html; charset=utf-8', $headers['content-type']);
+        $this->assertSame('SAMEORIGIN', $headers['x-frame-options'], 'wp-admin may frame it');
+        $this->assertStringContainsString("frame-ancestors 'self'", $headers['content-security-policy']);
+        $this->assertStringContainsString("default-src 'none'", $headers['content-security-policy']);
+        $this->assertStringStartsWith("<!doctype html>\n", $page, 'the dashboard\'s own page, without wp-admin around it');
+        $this->assertStringContainsString('wp:cwt_ok', $page);
+        $this->assertStringNotContainsString('/__cronwatch_wp_admin__', $page, 'every link points into wp-admin');
+        $this->assertStringNotContainsString('manifest.webmanifest', $page);
+        $this->assertStringNotContainsString('<script', $page);
+        $this->assertMatchesRegularExpression('#href="[^"]*/wp-admin/admin\.php\?page=cronwatch&\#038;cw=%2Fjobs%2Fwp%253Acwt_ok"#', $page);
+
+        // A job's page, through the link the board gives it.
+        [$status, , $job] = self::http('GET', '/wp-admin/admin.php?page=cronwatch&cw=%2Fjobs%2Fwp%253Acwt_ok', $admin);
+        $this->assertSame(200, $status);
+        $this->assertStringContainsString('<h1 class="jobname">wp:cwt_ok</h1>', $job);
+
+        // Changes carry a WordPress nonce, which the forms' actions hold.
+        $this->assertSame(1, preg_match('#<form class="inline" method="post" action="([^"]*cw=%2Fcheck[^"]*)"#', $page, $m));
+        $action = html_entity_decode($m[1]);
+        $this->assertStringContainsString('_wpnonce=', $action);
+        $origin = 'http://127.0.0.1:' . self::$port;
+        [$status, $headers] = self::http('POST', (string) preg_replace('#^https?://[^/]+#', '', $action), $admin + ['Origin' => $origin]);
+        $this->assertSame(303, $status);
+        $this->assertSame("{$origin}/wp-admin/admin.php?page=cronwatch&cw=%2F", $headers['location']);
+        [$status] = self::http('POST', '/wp-admin/admin.php?page=cronwatch&cw=%2Fcheck', $admin + ['Origin' => $origin]);
+        $this->assertSame(403, $status, 'no nonce, no change');
+        [$status] = self::http('POST', (string) preg_replace('#^https?://[^/]+#', '', $action), $admin + ['Origin' => 'https://evil.example']);
+        $this->assertSame(403, $status, 'the dashboard\'s own cross-site check stands too');
+
+        // Not for a subscriber, nor for anyone signed out; and nothing of it outside wp-admin.
+        [$status] = self::http('GET', '/wp-admin/admin.php?page=cronwatch&cw=%2Fapi%2Fjobs', ['Cookie' => self::signedIn('reader')]);
+        $this->assertSame(403, $status);
+        [$status, $headers] = self::http('GET', '/wp-admin/admin.php?page=cronwatch&cw=%2Fapi%2Fjobs');
+        $this->assertSame(302, $status, 'signed out, wp-admin sends the browser to log in');
+        $this->assertStringContainsString('wp-login.php', $headers['location']);
+    }
+
+    public function testTheJsonApiIsOffUntilTheOwnerTurnsItOnWithAToken(): void
+    {
+        $api = '/?rest_route=/cronwatch/v1/api/jobs';
+        [$status] = self::http('GET', $api, ['Authorization' => 'Bearer anything']);
+        $this->assertSame(404, $status, 'off: no route at all');
+
+        $token = self::inWp(<<<'PHP'
+            wp_set_current_user(get_user_by('login', 'admin')->ID);
+            $notice = Cronwatch\WordPress\Admin::saveSettings(['api_enabled' => '1']);
+            echo json_encode([$notice, get_option('cronwatch_settings')['api_token'], (bool) get_transient('cronwatch_new_token_' . get_current_user_id())]);
+            PHP);
+        [$notice, $secret, $shownOnce] = $token;
+        $this->assertSame('saved', $notice);
+        $this->assertSame(40, strlen($secret), 'turned on with no token given, the plugin makes one');
+        $this->assertTrue($shownOnce, 'and the settings page shows it once');
+
+        [$status, $headers, $body] = self::http('GET', $api, ['Authorization' => "Bearer {$secret}"]);
+        $this->assertSame(200, $status);
+        $this->assertSame('application/json; charset=utf-8', $headers['content-type']);
+        $this->assertSame('no-store', $headers['cache-control']);
+        $this->assertStringStartsWith('{"ok":true,"jobs":[', $body);
+        $this->assertStringContainsString('"name":"wp:cwt_ok"', $body);
+        $this->assertStringNotContainsString('\/', $body, 'the library\'s JSON, not the REST server\'s (which escapes slashes)');
+        [$status, , $body] = self::http('GET', $api);
+        $this->assertSame([401, '{"ok":false,"error":"Unauthorized"}'], [$status, $body]);
+        [$status] = self::http('GET', $api, ['Authorization' => 'Bearer wrong']);
+        $this->assertSame(401, $status);
+        [$status, , $body] = self::http('POST', '/?rest_route=/cronwatch/v1/api/check', ['Authorization' => "Bearer {$secret}"]);
+        $this->assertSame(200, $status);
+        $this->assertStringStartsWith('{"ok":true,"checkedAt":', $body);
+        [$status, , $body] = self::http('GET', '/?rest_route=/cronwatch/v1/api/jobs/wp%3Acwt_ok&runs=1', ['Authorization' => "Bearer {$secret}"]);
+        $this->assertSame(200, $status);
+        $this->assertCount(1, json_decode($body, true)['runs']);
+        [$status] = self::http('GET', '/?rest_route=/cronwatch/v1/jobs', ['Authorization' => "Bearer {$secret}"]);
+        $this->assertSame(404, $status, 'only the API: the dashboard\'s pages stay in wp-admin');
+
+        $short = self::inWp('wp_set_current_user(1); echo json_encode(Cronwatch\WordPress\Admin::saveSettings(["api_enabled" => "1", "api_token" => "too-short"]));');
+        $this->assertSame('token', $short);
+        self::inWp('update_option("cronwatch_settings", Cronwatch\WordPress\Plugin::DEFAULTS); echo json_encode(true);');
+        [$status] = self::http('GET', $api, ['Authorization' => "Bearer {$secret}"]);
+        $this->assertSame(404, $status, 'off again');
+    }
+
+    public function testNetworkActivationSchedulesTheCheckOnEverySiteAndOnSitesMadeLater(): void
+    {
+        $dir = self::$dir . '/network';
+        mkdir($dir);
+        $parts = parse_url(self::$url);
+        $host = ($parts['host'] ?? '127.0.0.1') . (isset($parts['port']) ? ':' . $parts['port'] : '');
+        self::must(['core', 'download', '--version=' . self::$version, '--skip-content', '--force'], '', $dir);
+        self::must(['config', 'create', '--dbname=' . ltrim((string) ($parts['path'] ?? ''), '/'), '--dbuser=' . rawurldecode((string) ($parts['user'] ?? '')),
+            '--dbpass=' . rawurldecode((string) ($parts['pass'] ?? '')), "--dbhost={$host}", '--dbprefix=' . self::networkPrefix(), '--skip-check', '--extra-php'],
+            "define( 'DISABLE_WP_CRON', true );\n", $dir);
+        self::must(['core', 'multisite-install', '--url=cwms.test', '--title=CronWatch network', '--admin_user=admin', '--admin_password=' . bin2hex(random_bytes(8)),
+            '--admin_email=admin@example.com', '--skip-email'], '', $dir);
+        @mkdir("{$dir}/wp-content/plugins", 0777, true);
+        $archive = new \ZipArchive();
+        $archive->open(self::buildZip(self::$dir . '/build-network'));
+        $archive->extractTo("{$dir}/wp-content/plugins");
+        $archive->close();
+        self::must(['site', 'create', '--slug=early'], '', $dir);
+
+        $hooks = fn (string $url): array => array_column(json_decode(self::must(['cron', 'event', 'list', "--url={$url}", '--fields=hook', '--format=json'], '', $dir), true), 'hook');
+        $tables = fn (string $site): array => self::pdo()->query('SHOW TABLES LIKE ' . self::pdo()->quote(self::networkPrefix() . $site . 'cronwatch%'))->fetchAll(\PDO::FETCH_COLUMN);
+        self::must(['plugin', 'activate', 'cronwatch', '--network'], '', $dir);
+        $this->assertContains('cronwatch_check', $hooks('cwms.test'));
+        $this->assertContains('cronwatch_check', $hooks('cwms.test/early/'), 'a site made before activation gets the check');
+        $this->assertCount(3, $tables('2_'));
+
+        self::must(['site', 'create', '--slug=later'], '', $dir);
+        $this->assertContains('cronwatch_check', $hooks('cwms.test/later/'), 'a site made after activation gets it too');
+        $this->assertCount(3, $tables('3_'), 'and its tables');
+        $this->assertMatchesRegularExpression('/^cronwatch: checked \d+ jobs?, sent \d+ alerts?$/', trim(self::must(['cronwatch', 'check', '--url=cwms.test/later/'], '', $dir)));
+
+        self::must(['plugin', 'deactivate', 'cronwatch', '--network'], '', $dir);
+        foreach (['cwms.test', 'cwms.test/early/', 'cwms.test/later/'] as $url) {
+            $this->assertNotContains('cronwatch_check', $hooks($url), "{$url} keeps no check once the network deactivates it");
+        }
+        self::must(['plugin', 'uninstall', 'cronwatch'], '', $dir);
+        foreach (['', '2_', '3_'] as $site) {
+            $this->assertSame([], $tables($site), "uninstalling drops site {$site}'s tables");
+        }
     }
 
     public function testUninstallingRemovesTheTablesOptionsAndEvents(): void

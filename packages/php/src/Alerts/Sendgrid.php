@@ -41,7 +41,7 @@ final class Sendgrid implements AlertChannel
         $this->to = Email::recipients('Sendgrid', $from, $to);
         $this->url = $region === 'eu' ? 'https://api.eu.sendgrid.com/v3/mail/send' : 'https://api.sendgrid.com/v3/mail/send';
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

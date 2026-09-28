@@ -1,15 +1,16 @@
 // Draws the dashboard's app icons (the CronWatch clock on the dark rounded
-// square of cronwatch.dev's favicon) and writes them into the SDK, the gem and
-// the Python package as constants, so the dashboard serves them from memory
-// with no files and no dependencies:
+// square of cronwatch.dev's favicon) and writes them into the SDK, the gem,
+// the Python package and the PHP package as constants, so the dashboard serves
+// them from memory with no files and no dependencies:
 //
 //   packages/sdk/src/routes/icons.ts
 //   packages/ruby/lib/cronwatch/web/icons.rb
 //   packages/python/src/cronwatch/web/_icons.py
+//   packages/php/src/Web/Icons.php
 //
 // Run from the repo root after changing the drawing:
 //
-//   node scripts/make-dashboard-icons.mjs            write the three files
+//   node scripts/make-dashboard-icons.mjs            write the four files
 //   node scripts/make-dashboard-icons.mjs --check    exit 1 when any is stale
 //   node scripts/make-dashboard-icons.mjs --out DIR  also write the PNGs and SVGs to DIR
 //
@@ -26,6 +27,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TS_OUT = path.join(ROOT, "packages/sdk/src/routes/icons.ts");
 const RB_OUT = path.join(ROOT, "packages/ruby/lib/cronwatch/web/icons.rb");
 const PY_OUT = path.join(ROOT, "packages/python/src/cronwatch/web/_icons.py");
+const PHP_OUT = path.join(ROOT, "packages/php/src/Web/Icons.php");
 
 // The favicon's colours (site/src/assets/favicon.svg).
 const SQUARE = [0x14, 0x14, 0x17];
@@ -214,6 +216,35 @@ MASKABLE_512_PNG = "${b64("maskable-512.png")}"
 APPLE_TOUCH_ICON_PNG = "${b64("apple-touch-icon.png")}"
 `;
 
+/** A PHP single-quoted string: only the backslash and the quote are special there. */
+const phpString = (text) => `'${text.replace(/[\\']/g, (c) => `\\${c}`)}'`;
+const php = `<?php
+
+// ${NOTE}
+
+declare(strict_types=1);
+
+namespace Cronwatch\\Web;
+
+/**
+ * The dashboard's app icons, as the SDK's routes/icons.ts has them.
+ *
+ * @internal
+ */
+final class Icons
+{
+    /** The favicon: the clock on a dark rounded square. */
+    public const ICON_SVG = ${phpString(ICON_SVG)};
+    /** The same square to every edge, for masks. */
+    public const MASKABLE_SVG = ${phpString(MASKABLE_SVG)};
+    /** PNGs, base64: 192 and 512 for the manifest, a maskable 512, and iOS's 180 home screen icon. */
+    public const ICON_192_PNG = '${b64("icon-192.png")}';
+    public const ICON_512_PNG = '${b64("icon-512.png")}';
+    public const MASKABLE_512_PNG = '${b64("maskable-512.png")}';
+    public const APPLE_TOUCH_ICON_PNG = '${b64("apple-touch-icon.png")}';
+}
+`;
+
 const outDir = process.argv.includes("--out") ? process.argv[process.argv.indexOf("--out") + 1] : null;
 if (outDir) {
   mkdirSync(outDir, { recursive: true });
@@ -224,7 +255,7 @@ if (outDir) {
 
 const sizes = Object.entries(pngs).map(([name, data]) => `${name} ${data.length} bytes`).join(", ");
 if (process.argv.includes("--check")) {
-  const stale = [[TS_OUT, ts], [RB_OUT, rb], [PY_OUT, py]].filter(([file, text]) => {
+  const stale = [[TS_OUT, ts], [RB_OUT, rb], [PY_OUT, py], [PHP_OUT, php]].filter(([file, text]) => {
     try {
       return readFileSync(file, "utf8") !== text;
     } catch {
@@ -240,5 +271,8 @@ if (process.argv.includes("--check")) {
   writeFileSync(TS_OUT, ts);
   writeFileSync(RB_OUT, rb);
   writeFileSync(PY_OUT, py);
-  console.log(`wrote ${path.relative(ROOT, TS_OUT)}, ${path.relative(ROOT, RB_OUT)} and ${path.relative(ROOT, PY_OUT)} (${sizes})`);
+  mkdirSync(path.dirname(PHP_OUT), { recursive: true });
+  writeFileSync(PHP_OUT, php);
+  const written = [TS_OUT, RB_OUT, PY_OUT].map((file) => path.relative(ROOT, file)).join(", ");
+  console.log(`wrote ${written} and ${path.relative(ROOT, PHP_OUT)} (${sizes})`);
 }

@@ -38,6 +38,27 @@ const VERSIONED = [
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
+/**
+ * The WordPress plugin's readme keeps a changelog, one "= X.Y.Z =" section
+ * per release, newest first; the plugin directory shows it, so a released
+ * section is history and is never rewritten. A release adds its own section:
+ * a "= Unreleased =" section written ahead (the notes the release carries)
+ * becomes "= X.Y.Z =", and without one a section saying the plugin carries
+ * the library's release goes on top, with a reminder to write better notes.
+ */
+const CHANGELOG = "packages/php/wordpress/readme.txt";
+
+/** The readme with the new version's changelog section: see CHANGELOG. Returns [text, what changed, whether notes were written ahead]. */
+function addChangelog(text, next) {
+  const heading = (v) => new RegExp(`^= ${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} =$`, "m");
+  if (heading(next).test(text)) return [text, `= ${next} = is already there`, true];
+  if (/^= Unreleased =$/m.test(text)) return [text.replace(/^= Unreleased =$/m, `= ${next} =`), `= Unreleased = -> = ${next} =`, true];
+  const at = text.search(/^= \d+\.\d+\.\d+[^=]* =$/m);
+  if (at < 0 || !/^== Changelog ==$/m.test(text.slice(0, at))) fail(`${CHANGELOG}: no "= X.Y.Z =" section under "== Changelog ==" to add ${next} above`);
+  const entry = `= ${next} =\n\n* Carries version ${next} of the CronWatch library.\n\n`;
+  return [text.slice(0, at) + entry + text.slice(at), `+ = ${next} = (a placeholder entry: write the plugin's notes)`, false];
+}
+
 /** How each package ships, printed after the release commit, in order. Given the semver and the RubyGems version. */
 const PUBLISH = [
   { dir: "packages/sdk", commands: () => ["npm publish --workspace packages/sdk --access public"] },
@@ -261,6 +282,14 @@ const tag = `v${next}`;
 if (git("tag", "--list", tag) !== "") fail(`tag ${tag} already exists`);
 
 const edits = planEdits(current, next);
+{
+  const readme = edits.get(CHANGELOG);
+  if (!readme) fail(`${CHANGELOG} is not in VERSIONED`);
+  const [after, change, written] = addChangelog(readme.after, next);
+  readme.after = after;
+  readme.lines.push([`Changelog`, change]);
+  if (!written) console.log(`Note: ${CHANGELOG} has no "= Unreleased =" section, so the release adds a placeholder changelog entry; edit it before tagging, or write the notes under "= Unreleased =" next time.\n`);
+}
 const ruby = options.skipRuby ? null : findRuby();
 const uv = !options.skipPython && hasUv();
 const php = !options.skipPhp && hasPhp();

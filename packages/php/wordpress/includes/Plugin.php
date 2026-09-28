@@ -7,17 +7,21 @@ namespace Cronwatch\WordPress;
 \defined('ABSPATH') || exit;
 
 use Cronwatch\Alerts\Slack;
+use Cronwatch\Alerts\Transport;
 use Cronwatch\Alerts\Webhook;
 use Cronwatch\CheckResult;
 use Cronwatch\Cronwatch;
 use Cronwatch\Duration;
+use Cronwatch\Env;
 use Cronwatch\Job\RunHandle;
 
 /**
  * The plugin: one client per request on the site's database, the WP-Cron
- * watcher, its own check event, the settings page and the WP-CLI command.
- * Nothing here runs on an ordinary page view but the two cron filters, which
- * only note an event while WP-Cron is running one.
+ * watcher, its own check event (on every site of a network when it is
+ * network activated, and on sites made later), the dashboard and settings
+ * in wp-admin, the JSON API when the owner turns it on, and the WP-CLI
+ * command. Nothing here runs on an ordinary page view but the two cron
+ * filters, which only note an event while WP-Cron is running one.
  */
 final class Plugin
 {
@@ -25,16 +29,25 @@ final class Plugin
     public const CHECK_HOOK = 'cronwatch_check';
     public const CHECK_SCHEDULE = 'cronwatch_five_minutes';
     public const SETTINGS = 'cronwatch_settings';
-    public const DEFAULTS = ['email_to' => '', 'slack_webhook_url' => '', 'webhook_url' => '', 'webhook_secret' => '', 'grace' => '10m'];
+    public const DEFAULTS = ['email_to' => '', 'slack_webhook_url' => '', 'webhook_url' => '', 'webhook_secret' => '', 'grace' => '10m', 'api_enabled' => '', 'api_token' => ''];
 
     private static ?Watcher $watcher = null;
     private static ?Cronwatch $client = null;
 
     public static function boot(): void
     {
+        // Every channel the library makes without an Http of its own goes through wp_remote_post.
+        Transport::set(new WpHttp());
+        // WordPress's environment type (WP_ENVIRONMENT_TYPE, as a variable or a constant) when no variable names one.
+        if (function_exists('wp_get_environment_type')) {
+            Env::setFallback('wp_get_environment_type');
+        }
         self::watcher()->register();
         add_filter('cron_schedules', [self::class, 'schedules']);
         add_action(self::CHECK_HOOK, [self::class, 'runCheck']);
+        add_action('wp_initialize_site', [self::class, 'newSite'], 20);
+        add_action('rest_api_init', [Api::class, 'register']);
+        add_filter('rest_pre_serve_request', [Api::class, 'serve'], 10, 1);
         if (is_admin()) {
             Admin::register();
         }
@@ -55,15 +68,26 @@ final class Plugin
         return $schedules;
     }
 
-    /** Activation: the tables, and the check every five minutes. Refuses a database too old for them. */
-    public static function activate(): void
+    /**
+     * Activation: the tables, and the check every five minutes. Refuses a
+     * database too old for them. Activated for a whole network, it does the
+     * same on every site; sites made later get it from newSite().
+     */
+    public static function activate(bool $networkWide = false): void
     {
         global $wpdb;
         $why = WpdbStore::unsupported((string) $wpdb->db_server_info());
         if ($why !== null) {
-            deactivate_plugins(plugin_basename(CRONWATCH_PLUGIN_FILE));
+            deactivate_plugins(plugin_basename(CRONWATCH_PLUGIN_FILE), false, $networkWide);
             wp_die(esc_html($why), '', ['back_link' => true]);
         }
+        self::eachSite($networkWide, [self::class, 'activateSite']);
+    }
+
+    /** One site's part of activation: its tables, its settings and its check event. */
+    public static function activateSite(): void
+    {
+        global $wpdb;
         (new WpdbStore($wpdb))->install();
         add_option(self::SETTINGS, self::DEFAULTS, '', false);
         if (!wp_next_scheduled(self::CHECK_HOOK)) {
@@ -72,10 +96,49 @@ final class Plugin
         }
     }
 
-    /** Deactivation: the check event goes; the tables and settings stay until the plugin is deleted. */
-    public static function deactivate(): void
+    /** Deactivation: the check event goes (from every site, network wide); the tables and settings stay until the plugin is deleted. */
+    public static function deactivate(bool $networkWide = false): void
     {
-        wp_clear_scheduled_hook(self::CHECK_HOOK);
+        self::eachSite($networkWide, fn () => wp_clear_scheduled_hook(self::CHECK_HOOK));
+    }
+
+    /** Runs `fn` on this site, or, network wide on a multisite, on every site of the network in turn. */
+    private static function eachSite(bool $networkWide, callable $fn): void
+    {
+        if (!$networkWide || !is_multisite()) {
+            $fn();
+            return;
+        }
+        foreach (get_sites(['fields' => 'ids', 'number' => 0, 'network_id' => get_current_network_id()]) as $site) {
+            switch_to_blog((int) $site);
+            try {
+                $fn();
+            } finally {
+                restore_current_blog();
+            }
+        }
+    }
+
+    /**
+     * wp_initialize_site: a site made on a network where the plugin is
+     * active network wide gets its tables and its check, as activation gave
+     * the sites there before it. It runs after WordPress has made the site's
+     * own tables (priority 10).
+     */
+    public static function newSite(\WP_Site $site): void
+    {
+        if (!function_exists('is_plugin_active_for_network')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        if (!is_plugin_active_for_network(plugin_basename(CRONWATCH_PLUGIN_FILE))) {
+            return;
+        }
+        switch_to_blog((int) $site->blog_id);
+        try {
+            self::activateSite();
+        } finally {
+            restore_current_blog();
+        }
     }
 
     /** @return array<string, string> */
@@ -95,7 +158,7 @@ final class Plugin
     public static function channels(?array $settings = null): array
     {
         $settings ??= self::settings();
-        $link = fn (\Cronwatch\Alert $alert): string => admin_url('tools.php?page=cronwatch');
+        $link = fn (\Cronwatch\Alert $alert): string => AdminDashboard::jobUrl($alert->job);
         $channels = [];
         if ($settings['email_to'] !== '') {
             $channels[] = new WpMail($settings['email_to'], null, '[' . wp_specialchars_decode((string) get_bloginfo('name'), ENT_QUOTES) . ']', $link);
@@ -192,13 +255,20 @@ final class Plugin
         return self::declare(self::client(), $name, $jobs[$name])->start(trigger: 'wp-cron');
     }
 
-    /**
-     * One check: every event in the cron array declared as a job, names no
-     * longer in it declared again without their schedule (so an event that
-     * went away with its plugin is never reported missed), then the library's
-     * check.
-     */
+    /** One check: prepare(), then the library's check. */
     public static function check(): CheckResult
+    {
+        return self::prepare()->check();
+    }
+
+    /**
+     * What a check starts with, for the check event, `wp cronwatch check` and
+     * the dashboard's "Run check now": every event in the cron array declared
+     * as a job, and names no longer in it declared again without their
+     * schedule (so an event that went away with its plugin is never reported
+     * missed). Returns the client, ready for check().
+     */
+    public static function prepare(): Cronwatch
     {
         $cw = self::client();
         $jobs = self::cronJobs();
@@ -224,7 +294,7 @@ final class Plugin
                 self::report($error, "job {$stored->name}");
             }
         }
-        return $cw->check();
+        return $cw;
     }
 
     /** The check event's callback. */

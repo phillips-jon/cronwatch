@@ -566,4 +566,71 @@ final class ChannelsTest extends TestCase
         (new Alerts\Slack('https://hooks.slack.example/x', http: $http))->send(self::failed(), self::context());
         $this->assertSame(10_000, $http->requests[0]['timeoutMs']);
     }
+
+    public function testAWebhookUrlThatCannotBePostedToIsRefusedWithoutQuotingIt(): void
+    {
+        $secretPath = implode('/', ['services', 'T0', 'B0', 'not' . 'areal' . 'secret']);
+        $cases = ["hooks.example.com/{$secretPath}" => 'this URL', "ftp://hooks.example.com/{$secretPath}" => 'ftp:', "https://hooks.example.com/{$secretPath} x" => 'this URL'];
+        $http = new FakeHttp();
+        foreach ($cases as $url => $shown) {
+            foreach ([new Alerts\Slack($url, http: $http), new Alerts\Discord($url, http: $http), new Alerts\Webhook($url, http: $http)] as $channel) {
+                try {
+                    $channel->send(self::failed(), self::context());
+                    $this->fail("{$channel->name()} posted to {$shown}");
+                } catch (\InvalidArgumentException $error) {
+                    $this->assertSame("only http and https URLs can be posted to, not {$shown}", $error->getMessage(), $channel->name());
+                    $this->assertStringNotContainsString($secretPath, $error->getMessage());
+                }
+            }
+            // The default Http refuses it too, on the curl path and on the stream path.
+            foreach (extension_loaded('curl') ? [true, false] : [false] as $curl) {
+                try {
+                    (new NativeHttp($curl))->post($url, '{}', []);
+                    $this->fail("NativeHttp posted to {$shown}");
+                } catch (\InvalidArgumentException $error) {
+                    $this->assertSame("only http and https URLs can be posted to, not {$shown}", $error->getMessage());
+                }
+            }
+        }
+        $this->assertSame([], $http->requests, 'nothing was sent');
+        // A stray newline or space around a pasted URL is dropped, as fetch drops it, so it still posts.
+        (new Alerts\Slack("  https://hooks.example.com/{$secretPath}\n", http: $http))->send(self::failed(), self::context());
+        $this->assertSame("https://hooks.example.com/{$secretPath}", $http->requests[0]['url']);
+        $this->assertSame('https://hooks.example.com', Alerts\Shared::origin("https://hooks.example.com/{$secretPath}\n"));
+        $this->assertSame('https://hooks.example.com', Alerts\Shared::origin("https://hooks.exa\tmple.com/x"), 'a tab inside is dropped, as the URL parser drops it');
+    }
+
+    public function testANetworkErrorNamesOnlyTheUrlsOrigin(): void
+    {
+        $secretPath = implode('/', ['hooks', 'not' . 'areal' . 'secret']);
+        $probe = stream_socket_server('tcp://127.0.0.1:0');
+        $name = (string) stream_socket_get_name($probe, false);
+        fclose($probe);
+        $url = "http://{$name}/{$secretPath}?token=" . 'not' . 'real';
+        foreach (extension_loaded('curl') ? [true, false] : [false] as $curl) {
+            try {
+                (new NativeHttp($curl))->post($url, '{}', [], 2000);
+                $this->fail('a closed port answered');
+            } catch (\RuntimeException $error) {
+                $this->assertStringNotContainsString($secretPath, $error->getMessage(), $curl ? 'curl' : 'streams');
+                $this->assertStringNotContainsString('notreal', $error->getMessage());
+            }
+        }
+        $this->assertSame('boom at https://h.example (x)', Alerts\Shared::scrub('boom at https://u:p@h.example/a/b?c=d (x)', 'https://u:p@h.example/a/b?c=d'));
+    }
+
+    public function testAChannelGivenNoHttpUsesTheTransportsDefault(): void
+    {
+        $this->assertInstanceOf(NativeHttp::class, Alerts\Transport::default());
+        $http = new FakeHttp();
+        Alerts\Transport::set($http);
+        try {
+            (new Alerts\Slack('https://hooks.slack.example/x'))->send(self::failed(), self::context());
+            (new Alerts\Webhook('https://hooks.example.com/in'))->send(self::failed(), self::context());
+            $this->assertSame(['https://hooks.slack.example/x', 'https://hooks.example.com/in'], array_column($http->requests, 'url'));
+        } finally {
+            Alerts\Transport::set(null);
+        }
+        $this->assertInstanceOf(NativeHttp::class, Alerts\Transport::default());
+    }
 }

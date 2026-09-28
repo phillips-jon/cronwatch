@@ -46,7 +46,7 @@ final class Mailgun implements AlertChannel
         $host = $region === 'eu' ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net';
         $this->url = "{$host}/v3/" . Shared::encodeUriComponent($domain) . '/messages';
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

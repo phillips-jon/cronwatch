@@ -48,7 +48,7 @@ final class Honeybadger implements AlertChannel
         $this->apiKey = Shared::required($apiKey, 'Honeybadger needs an apiKey');
         $this->url = rtrim($endpoint ?? 'https://api.honeybadger.io', '/') . '/v1/notices';
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

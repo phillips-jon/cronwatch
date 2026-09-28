@@ -90,7 +90,7 @@ final class Twilio implements AlertChannel
         $this->authorization = Shared::basicAuth($user, $password);
         $this->segments = self::segmentBudget($segments);
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

@@ -43,7 +43,7 @@ final class Bugsnag implements AlertChannel
         $this->url = $endpoint ?? 'https://notify.bugsnag.com/';
         $this->now = $now === null ? Js::nowMs(...) : \Closure::fromCallable($now);
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

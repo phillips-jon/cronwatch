@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Cronwatch\Triage;
 
 use Cronwatch\Alerts\Http;
-use Cronwatch\Alerts\NativeHttp;
+use Cronwatch\Alerts\Transport;
 use Cronwatch\Alerts\Shared;
 use Cronwatch\Duration;
 use Cronwatch\Env;
@@ -72,7 +72,7 @@ final class Anthropic
         $this->apiKey = $key === '' ? null : $key;
         $base = $baseUrl ?? Env::read('ANTHROPIC_BASE_URL') ?? 'https://api.anthropic.com';
         $this->url = rtrim($base, '/') . '/v1/messages?beta=true';
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     /** Wraps text the job produced, so the model can tell evidence from instructions. */

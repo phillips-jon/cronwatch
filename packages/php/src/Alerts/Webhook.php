@@ -30,7 +30,7 @@ final class Webhook implements AlertChannel
         if ($url === '') {
             throw new \InvalidArgumentException('Webhook needs a url');
         }
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string
@@ -50,7 +50,7 @@ final class Webhook implements AlertChannel
             $headers['x-cronwatch-signature'] = 'sha256=' . self::hmacSha256Hex((string) $this->secret, $body);
         }
         // A redirect is refused, not followed: the headers (and the signature) would go with it.
-        $response = $this->http->post($this->url, $body, $headers);
+        $response = $this->http->post(Shared::postable($this->url), $body, $headers);
         // Only the origin: a webhook URL's path or query often is the credential.
         if (!$response->ok()) {
             throw new \RuntimeException('Webhook ' . Shared::origin($this->url) . " answered {$response->status}");

@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your PHP app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
 
-This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process and a Node process can share one SQLite file, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command and a WordPress plugin; the dashboard and the Laravel, Symfony, Drupal and Craft integrations follow ([DESIGN.md](DESIGN.md) has the plan). It is not on Packagist yet; the first release comes with the dashboard.
+This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process and a Node process can share one SQLite file, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, and a WordPress plugin; the Laravel, Symfony, Drupal and Craft integrations follow ([DESIGN.md](DESIGN.md) has the plan). It is not on Packagist yet.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -114,9 +114,35 @@ $cw = new Cronwatch(store: new PostgresStore($url), sources: [new Cronwatch\Sour
 
 Jobs pg_cron runs inside Postgres, where nothing can wrap them, are watched too: each check declares them from `cron.job` and copies their runs from `cron.job_run_details`.
 
+### Dashboard and JSON API
+
+The SDK's dashboard, page for page and byte for byte: the jobs' health, the last day as a timeline, each job's week, runs and output, silence, forget and "Run check now", and the small JSON API that [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) talks to. It needs no framework. In a bare script:
+
+```php
+<?php
+// public/cronwatch.php: open /cronwatch.php/ (or rewrite /cronwatch/ to this file)
+$cw = require __DIR__ . '/../cronwatch.php';
+$cw->routes()->serve();
+```
+
+`serve()` reads the request from PHP's superglobals and writes the answer with `header()` and `echo`. `handle(Cronwatch\Web\Request): Cronwatch\Web\Response` is the same routes for anything else, and with `psr/http-message` installed, `Cronwatch\Web\PsrHandler` (a PSR-15 request handler) and `Cronwatch\Web\PsrMiddleware` (answers under its base path, passes the rest on) take a PSR-17 factory:
+
+```php
+$factory = new Nyholm\Psr7\Factory\Psr17Factory();
+$app->add(new Cronwatch\Web\PsrMiddleware($cw->routes(), $factory, $factory));   // Slim, Mezzio, any PSR-15 stack
+```
+
+`routes(token:, basePath:, origin:, trustProxy:)`:
+
+- `token`: everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. Defaults to `CRONWATCH_TOKEN`. With none, the dashboard answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `WP_ENVIRONMENT_TYPE` set to `development`, `dev`, `local`, `test` or `testing`), where it makes one, keeps it in a file in the system's temporary directory so every request asks for the same one, and writes a sign-in link to the server log. `false` serves it open, for behind your own auth. `/api/check` also takes the client's `cronSecret`, for a platform cron.
+- `basePath`: where it is mounted. Default: the script, for a path-info URL like `/cronwatch.php/`, else `/cronwatch`.
+- `origin` (`https://app.example.com`) or `trustProxy: true`: the public origin, for an app behind a proxy, used for the same-origin check on changes, the cookie's `Secure` flag and the redirects.
+
+Changes (silence, forget, the check) are refused from another site, the pages carry a strict CSP and load nothing but their own app shell, and the dashboard installs as an app (a manifest, icons and a service worker that caches only the shell).
+
 ### WordPress
 
-The CronWatch plugin (`wordpress/`, built into the plugin directory's zip with `php wordpress/build.php`) watches every WP-Cron event with no code changes: each event's runs are recorded in the site's own database, and missed, failed, stuck and slow runs are alerted by email, Slack or webhook, set up under Tools > CronWatch. WP-Cron only fires when someone visits the site, so a quiet site's events run late or not at all; the plugin's readme recommends `DISABLE_WP_CRON` and a real crontab, with `wp cronwatch check` running the check from it. See DESIGN.md for how events become jobs.
+The CronWatch plugin (`wordpress/`, built into the plugin directory's zip with `php wordpress/build.php`) watches every WP-Cron event with no code changes: each event's runs are recorded in the site's own database, and missed, failed, stuck and slow runs are alerted by email, Slack or webhook. It adds a CronWatch menu to wp-admin, for administrators: the dashboard above, and its settings. The JSON API, for `@cronwatch/mcp`, is off until turned on there with a token. It works network wide on a multisite. WP-Cron only fires when someone visits the site, so a quiet site's events run late or not at all; the plugin's readme recommends `DISABLE_WP_CRON` and a real crontab, with `wp cronwatch check` running the check from it. See DESIGN.md for how events become jobs.
 
 ## Testing
 
@@ -136,6 +162,8 @@ docker run -d --rm --name cw-pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 554
 CRONWATCH_TEST_MYSQL=mysql://root:pw@127.0.0.1:33061/cw CRONWATCH_TEST_MARIADB=mysql://root:pw@127.0.0.1:33062/cw \
   CRONWATCH_TEST_PG=postgres://postgres:pw@127.0.0.1:55432/cw vendor/bin/phpunit
 ```
+
+`tests/WebGoldenTest.php` replays `packages/ruby/test/web/golden.json`, the SDK routes' answers to a fixed seed, through `handle()`, the superglobals and PSR-7, and every status, header and body must match; `tests/WebServeTest.php` runs `serve()` under `php -S`. The MCP server's end to end test drives the dashboard too: `CRONWATCH_TEST_PHP=1 npm test --workspace packages/mcp` at the root (after `composer install` here).
 
 `tests/ChannelsTest.php` runs the default HTTP client (curl, and PHP's streams) against a local `php -S` server. The WordPress plugin's tests install WordPress with WP-CLI and run the built plugin in it, when `CRONWATCH_TEST_WORDPRESS` is a `mysql://` URL and `CRONWATCH_TEST_WPCLI` the path to `wp-cli.phar` (`CRONWATCH_TEST_WP_VERSION` picks the WordPress version).
 

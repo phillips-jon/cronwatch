@@ -36,7 +36,7 @@ final class Slack implements AlertChannel
             throw new \InvalidArgumentException('Slack needs a webhookUrl');
         }
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string
@@ -57,7 +57,7 @@ final class Slack implements AlertChannel
         if (Shared::present($alert->triage)) {
             $blocks[] = ['type' => 'section', 'text' => ['type' => 'mrkdwn', 'text' => Js::slice16('_Triage:_ ' . self::escape((string) $alert->triage), 3000)]];
         }
-        $response = $this->http->post($this->webhookUrl, Js::stringify([
+        $response = $this->http->post(Shared::postable($this->webhookUrl), Js::stringify([
             // The notification fallback is parsed as mrkdwn too, so it is escaped like the blocks.
             'text' => self::escape("{$alert->title}\n{$alert->message}"),
             'blocks' => $blocks,
