@@ -307,14 +307,18 @@ def test_configure_makes_the_process_client() -> None:
     assert cronwatch.client() is again
 
 
-def test_async_functions_are_refused_until_the_async_variant() -> None:
-    cw, _, _ = make()
+def test_a_plain_function_handing_back_a_coroutine_is_a_failed_run_not_a_quick_success() -> None:
+    cw, _, alerts = make()
     job = cw.job("a")
+    ran: list[int] = []
 
     async def work(ctx: object) -> None:
-        pass
+        ran.append(1)
 
-    with pytest.raises(TypeError, match="async"):
-        job.run(work)
-    with pytest.raises(TypeError, match="async"):
-        job.monitor(work)
+    with pytest.raises(TypeError, match="returned a coroutine"):
+        job.run(lambda ctx: work(ctx))
+    [run] = cw.runs("a")
+    assert run.status == "failed"
+    assert run.error.startswith("TypeError: job a: the function returned a coroutine")
+    assert ran == [], "never started, and closed rather than left to warn"
+    assert alerts.types() == ["failed"]

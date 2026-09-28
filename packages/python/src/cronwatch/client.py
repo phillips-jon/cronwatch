@@ -10,6 +10,7 @@ to ``on_error`` and the job's own outcome is returned or raised.
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import inspect
 import logging
@@ -24,6 +25,7 @@ from typing import Any, TypeVar
 
 from . import _js, _zone
 from ._env import is_production
+from ._response import response_status
 from .alerts import ChannelContext, Console, channel_name, send_to
 from .duration import Duration, format_duration, parse_duration
 from .evaluate import (
@@ -228,6 +230,11 @@ class _Ticker:
             self._wake.notify_all()
 
 
+def is_async_callable(fn: Any) -> bool:
+    """An async def, or something whose call is one (a partial of one, an object with async __call__)."""
+    return inspect.iscoroutinefunction(fn) or inspect.iscoroutinefunction(getattr(fn, "__call__", None))
+
+
 class JobHandle:
     """A declared job. Keep it, and run the job through it:
 
@@ -238,6 +245,10 @@ class JobHandle:
         def nightly(): ...
 
         job.run(lambda ctx: work(ctx))   # a function taking the context
+
+    Each works for async code too: ``async with job.run()``, ``@job.monitor``
+    on an ``async def``, and ``await job.run(async_fn)``. The store is used
+    from a worker thread then, so the event loop is not held up by it.
     """
 
     def __init__(self, client: Cronwatch, definition: JobDefinition) -> None:
@@ -251,26 +262,46 @@ class JobHandle:
         """With a function: run it now as a recorded run, passing the context.
         Returns what it returns and raises what it raises, after the run is
         recorded. A string it returns is the run's output when nothing was
-        logged. Without one: a context manager whose block is the run."""
+        logged. An async function gives a coroutine to await instead. Without
+        one: a context manager whose block is the run (``with`` or ``async with``)."""
         if fn is None:
             return _RunBlock(self._client, self.definition, trigger)
+        if is_async_callable(fn):
+            return self._client._aexecute(self.definition, trigger, fn)
         return self._client._execute(self.definition, trigger, fn)
 
     def monitor(self, fn: Callable[..., T] | None = None, *, trigger: str = "run") -> Any:
         """A decorator: every call of the function is a recorded run. Inside it,
-        ``cronwatch.current()`` is the run's context, for log() and metric()."""
+        ``cronwatch.current()`` is the run's context, for log() and metric().
+        An async function stays async: each await of it is a run."""
 
-        def decorate(target: Callable[..., T]) -> Callable[..., T]:
-            if inspect.iscoroutinefunction(target):
-                raise TypeError(f"job {self.name}: monitor() wraps plain functions; an async variant comes in a later release")
+        def decorate(target: Callable[..., Any]) -> Callable[..., Any]:
+            client = self._client
+            definition = self.definition
+            if is_async_callable(target):
+
+                @functools.wraps(target)
+                async def awrapper(*args: Any, **kwargs: Any) -> Any:
+                    return await client._aexecute(definition, trigger, lambda _ctx: target(*args, **kwargs))
+
+                return awrapper
 
             @functools.wraps(target)
-            def wrapper(*args: Any, **kwargs: Any) -> T:
-                return self._client._execute(self.definition, trigger, lambda _ctx: target(*args, **kwargs))
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                return client._execute(definition, trigger, lambda _ctx: target(*args, **kwargs))
 
             return wrapper
 
         return decorate(fn) if fn is not None else decorate
+
+    def handler(self, fn: Callable[..., Any], *, secret: str | None = _UNSET) -> Any:
+        """A request handler that runs the function for each request carrying
+        the cron secret and records the run: the SDK's handler(), for a
+        platform cron (Vercel, a scheduler calling a URL). ``fn(ctx, request)``
+        is called with the run's context and the request. See cronwatch.handler."""
+        from .handler import make_handler
+
+        return make_handler(self._client, self.definition, fn, secret)
 
     def start(self, *, trigger: str | None = None, id: str | None = None) -> RunHandle:  # noqa: A002
         """Record a running run now and finish it later, perhaps from another
@@ -291,7 +322,7 @@ class JobHandle:
 
 
 class _RunBlock:
-    """``with job.run() as ctx:``: the block is a recorded run."""
+    """``with job.run() as ctx:`` or ``async with job.run() as ctx:``: the block is a recorded run."""
 
     def __init__(self, client: Cronwatch, definition: JobDefinition, trigger: str) -> None:
         self._client = client
@@ -299,32 +330,69 @@ class _RunBlock:
         self._trigger = trigger
         self._execution: _Execution | None = None
 
-    def __enter__(self) -> JobContext:
+    def _fresh(self) -> _Execution:
         if self._execution is not None:
             raise RuntimeError("a job.run() block is entered once; call job.run() again for another run")
         self._execution = _Execution(self._client, self._definition, self._trigger)
-        return self._execution.begin()
+        return self._execution
+
+    def __enter__(self) -> JobContext:
+        return self._fresh().begin()
 
     def __exit__(self, kind: Any, error: BaseException | None, tb: Any) -> None:
         assert self._execution is not None
         self._execution.end(None, error, error is not None)
 
+    async def __aenter__(self) -> JobContext:
+        execution = self._fresh()
+        await asyncio.to_thread(execution.record_start)
+        return execution.enter()
+
+    async def __aexit__(self, kind: Any, error: BaseException | None, tb: Any) -> None:
+        execution = self._execution
+        assert execution is not None
+        execution.leave(None, error, error is not None)
+        await asyncio.to_thread(execution.record_end)
+
+
+@dataclass
+class _Outcome:
+    """How one run of a function ended: the run as recorded, and what the function returned or raised."""
+
+    run: Run
+    result: Any
+    error: BaseException | None
+    threw: bool
+
 
 class _Execution:
-    """One run of a function or a block: begin() records it as running, end() finishes it."""
+    """One run of a function or a block. begin() records it as running and
+    makes its context current; end() finishes it. Each is two halves, the
+    store's (record_start, record_end) and the context's (enter, leave), so an
+    async run can do the store's half in a worker thread and the context's in
+    its own task."""
 
-    def __init__(self, client: Cronwatch, definition: JobDefinition, trigger: str) -> None:
+    def __init__(self, client: Cronwatch, definition: JobDefinition, trigger: str, run_id: str | None = None) -> None:
         self.client = client
         self.definition = definition
         self.trigger = trigger
+        self.run_id = run_id
 
     def begin(self) -> JobContext:
+        self.record_start()
+        return self.enter()
+
+    def end(self, result: Any, error: BaseException | None, threw: bool) -> None:
+        self.leave(result, error, threw)
+        self.record_end()
+
+    def record_start(self) -> None:
         client = self.client
         name = self.definition.name
         client._after_fork_check()
         self.started_at = client.now()
         self.run = Run(
-            id=str(uuid.uuid4()),
+            id=self.run_id or str(uuid.uuid4()),
             job=name,
             status=RunStatus.RUNNING,
             started_at=self.started_at,
@@ -344,17 +412,19 @@ class _Execution:
                 client._update_state(name, lambda before: (on_run_start(before), None))
             except Exception as error:
                 client._report(error, f"starting {name}")
+
+    def enter(self) -> JobContext:
         self.recorder = RunRecorder(self.run, timeout_ms(self.definition))
         self._token = _current.set(self.recorder.context)
         return self.recorder.context
 
-    def end(self, result: Any, error: BaseException | None, threw: bool) -> None:
+    def leave(self, result: Any, error: BaseException | None, threw: bool) -> None:
         client = self.client
-        name = self.definition.name
         _current.reset(self._token)
         self.recorder.signal.settle()
         run = self.run
         finished_at = client.now()
+        self.finished_at = finished_at
         run.finished_at = finished_at
         run.duration_ms = max(0, finished_at - self.started_at)
         run.metrics = self.recorder.metrics()
@@ -362,9 +432,14 @@ class _Execution:
         run.output = logged if logged is not None else (cap_output(result) if isinstance(result, str) else None)
         seen = self.recorder.expect_text()
         expect_text = seen if seen is not None else (result if isinstance(result, str) else None)
-        client._conclude(self.definition, run, error, threw, expect_text)
+        client._conclude(self.definition, run, result, error, threw, expect_text)
+
+    def record_end(self) -> None:
+        client = self.client
+        name = self.definition.name
+        run = self.run
         try:
-            ignored = client._record_finish(self.definition, run, self.recorded, finished_at)
+            ignored = client._record_finish(self.definition, run, self.recorded, self.finished_at)
             if ignored:
                 client._report(RuntimeError(f"run {run.id} of {name} {ignored}; ignored"), f"finishing {name}")
         except Exception as problem:
@@ -432,6 +507,9 @@ class Cronwatch:
                 raise TypeError("a source must have sync(host)")
         secret = os.environ.get("CRON_SECRET") if cron_secret is _UNSET else cron_secret
         self.cron_secret: str | None = str(secret) if secret else None
+        #: cron_secret was passed as None: handlers may run without a secret.
+        self._secret_opt_out = cron_secret is None
+        self._warned_no_secret = False
         self.retention_ms = parse_duration(retention if retention is not None else "30d", "retention")
         self.defaults: dict[str, Any] = {}
         for key, value in (defaults or {}).items():
@@ -885,24 +963,80 @@ class Cronwatch:
         """Runs a function as a recorded run. The function always runs, whatever
         the store is doing: store errors go to on_error. Returns what it
         returns and raises what it raises, after the run is recorded."""
-        if inspect.iscoroutinefunction(fn):
-            raise TypeError(f"job {definition.name}: run() takes a plain function; an async variant comes in a later release")
-        execution = _Execution(self, definition, trigger)
+        outcome = self._execute_outcome(definition, trigger, fn)
+        if outcome.threw:
+            assert outcome.error is not None
+            raise outcome.error
+        result: T = outcome.result
+        return result
+
+    def _execute_outcome(self, definition: JobDefinition, trigger: str, fn: Callable[[JobContext], Any], run_id: str | None = None) -> _Outcome:
+        """_execute(), handing back how the run ended instead of raising an
+        Exception the function raised. Anything outside Exception
+        (KeyboardInterrupt, SystemExit) is recorded and raised again."""
+        if is_async_callable(fn):
+            raise TypeError(f"job {definition.name}: this runs plain functions; await job.run(fn) or use @job.monitor for an async one")
+        execution = _Execution(self, definition, trigger, run_id)
         context = execution.begin()
         try:
             result = fn(context)
+            if inspect.iscoroutine(result):
+                # A plain function that handed back a coroutine (a lambda around an
+                # async call): it has not run, and cannot be awaited here.
+                result.close()
+                raise TypeError(
+                    f"job {definition.name}: the function returned a coroutine, which cannot be awaited here; "
+                    "pass the async function itself and await job.run(fn)"
+                )
         except BaseException as error:
             execution.end(None, error, True)
-            raise
+            if not isinstance(error, Exception):
+                raise
+            return _Outcome(execution.run, None, error, True)
         execution.end(result, None, False)
-        return result
+        return _Outcome(execution.run, result, None, False)
 
-    def _conclude(self, definition: JobDefinition, run: Run, error: Any, threw: bool, expect_text: str | None) -> None:
+    async def _aexecute(self, definition: JobDefinition, trigger: str, fn: Callable[[JobContext], Any]) -> Any:
+        """_execute() for an async function: awaited in the caller's task, with
+        the store's work done in a worker thread so the event loop is never
+        held up by it."""
+        outcome = await self._aexecute_outcome(definition, trigger, fn)
+        if outcome.threw:
+            assert outcome.error is not None
+            raise outcome.error
+        return outcome.result
+
+    async def _aexecute_outcome(self, definition: JobDefinition, trigger: str, fn: Callable[[JobContext], Any]) -> _Outcome:
+        execution = _Execution(self, definition, trigger)
+        await asyncio.to_thread(execution.record_start)
+        context = execution.enter()
+        try:
+            result = fn(context)
+            if inspect.isawaitable(result):
+                result = await result
+        except BaseException as error:
+            # CancelledError too: the run is recorded as interrupted, then the cancellation goes on.
+            execution.leave(None, error, True)
+            await asyncio.to_thread(execution.record_end)
+            if not isinstance(error, Exception):
+                raise
+            return _Outcome(execution.run, None, error, True)
+        execution.leave(result, None, False)
+        await asyncio.to_thread(execution.record_end)
+        return _Outcome(execution.run, result, None, False)
+
+    def _conclude(self, definition: JobDefinition, run: Run, result: Any, error: Any, threw: bool, expect_text: str | None) -> None:
         """Sets a finished run's status and error from how it ended, then redacts
-        its output and error. Shared by runs and RunHandle.finish()."""
+        its output and error. Shared by runs and RunHandle.finish(). A result
+        that is an HTTP response with a status of 400 or more is a failure, as
+        a fetch Response is in the SDK (see cronwatch._response)."""
+        status = None if threw else response_status(result)
         if threw:
             run.status = RunStatus.FAILED
             run.error = error_message(error)
+        elif status is not None and status[0] >= 400:
+            run.status = RunStatus.FAILED
+            run.error = f"HTTP {status[0]}{' ' + status[1] if status[1] else ''}"
         else:
             unmet = check_expectation(definition.expect, expect_text)
             if unmet:
@@ -1102,7 +1236,7 @@ class Cronwatch:
         run.metrics = {**(source.metrics or {}), **recorder.metrics()}
         seen = recorder.expect_text()
         expect_text = _join_lines(head, _join_lines(source.output, seen if seen is not None else (result if isinstance(result, str) else None)))
-        self._conclude(definition, run, error, failed, expect_text)
+        self._conclude(definition, run, result, error, failed, expect_text)
         try:
             why = self._record_finish(definition, run, recorded, finished_at)
         except Exception as problem:
