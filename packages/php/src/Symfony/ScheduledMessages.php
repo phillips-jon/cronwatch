@@ -391,7 +391,7 @@ final class ScheduledMessages
         }
         if ($trigger instanceof PeriodicalTrigger) {
             $seconds = (int) (fn () => $this->intervalInSeconds ?? 0)->call($trigger);
-            return $seconds > 0 ? ['schedule' => "every {$seconds}s"] : null;
+            return $seconds > 0 ? ['schedule' => 'every ' . \Cronwatch\Duration::interval($seconds)] : null;
         }
         return null;
     }

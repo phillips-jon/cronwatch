@@ -59,6 +59,24 @@ final class Duration
         return new \InvalidArgumentException("{$label} \"{$value}\" is not a duration like \"15m\", \"1h30m\" or \"90s\"");
     }
 
+    /**
+     * Whole seconds as an interval schedule reads them, in the largest units
+     * that fit: 86400 is "1d", 43200 "12h", 5400 "1h30m", 90 "1m30s". For
+     * integrations that declare a framework's interval as "every <this>", so
+     * the dashboard shows "every 1d" rather than "every 86400s".
+     */
+    public static function interval(int $seconds): string
+    {
+        $out = '';
+        foreach (['d' => 86400, 'h' => 3600, 'm' => 60, 's' => 1] as $unit => $size) {
+            if ($seconds >= $size) {
+                $out .= intdiv($seconds, $size) . $unit;
+                $seconds %= $size;
+            }
+        }
+        return $out === '' ? '0s' : $out;
+    }
+
     /** 90000 -> "1m 30s". For messages, not for parsing back. */
     public static function format(int|float $ms): string
     {

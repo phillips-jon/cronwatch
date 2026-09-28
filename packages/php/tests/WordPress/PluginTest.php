@@ -65,9 +65,9 @@ final class PluginTest extends TestCase
         $this->assertSame(600, $jobs["wp:custom:{$key}"]['interval'], 'a custom recurrence\'s interval from cron_schedules');
         $this->assertSame('hourly', $jobs['wp:hourly_thing']['recurrence'], 'a recurring event wins over a single one of the same name');
         $this->assertSame([
-            'description' => 'WP-Cron hook custom with args ["a"], every_ten (every 600s)',
+            'description' => 'WP-Cron hook custom with args ["a"], every_ten (every 10m)',
             'tags' => ['wp-cron'],
-            'schedule' => 'every 600s',
+            'schedule' => 'every 10m',
         ], Jobs::options($jobs["wp:custom:{$key}"]));
         $this->assertSame(['description' => 'WP-Cron hook publish_future_post, single events', 'tags' => ['wp-cron']], Jobs::options($jobs['wp:publish_future_post']));
     }

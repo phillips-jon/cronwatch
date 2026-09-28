@@ -336,13 +336,13 @@ final class WordPressTest extends TestCase
         $this->assertSame(2, substr_count($out, "did ok\n"), 'what the callback echoes is passed on');
 
         $hourly = self::definition('wp:cwt_ok');
-        $this->assertSame('every 3600s', $hourly['schedule']);
+        $this->assertSame('every 1h', $hourly['schedule']);
         $this->assertSame(['wp-cron'], $hourly['tags']);
-        $this->assertSame('WP-Cron hook cwt_ok, hourly (every 3600s)', $hourly['description']);
+        $this->assertSame('WP-Cron hook cwt_ok, hourly (every 1h)', $hourly['description']);
         $key = substr(md5(serialize(['x'])), 0, 8);
         $daily = self::definition("wp:cwt_ok:{$key}");
-        $this->assertSame('every 86400s', $daily['schedule']);
-        $this->assertSame('WP-Cron hook cwt_ok with args ["x"], daily (every 86400s)', $daily['description']);
+        $this->assertSame('every 1d', $daily['schedule']);
+        $this->assertSame('WP-Cron hook cwt_ok with args ["x"], daily (every 1d)', $daily['description']);
 
         $run = self::runs('wp:cwt_ok')[0];
         $this->assertSame('ok', $run['status']);
@@ -444,14 +444,14 @@ final class WordPressTest extends TestCase
         self::inWp('delete_option("cwt_now"); echo json_encode(true);');
         self::schedule('cwt_gone', [['twicedaily', []]]);
         self::must(['cronwatch', 'check']);
-        $this->assertSame('every 43200s', self::definition('wp:cwt_gone')['schedule']);
+        $this->assertSame('every 12h', self::definition('wp:cwt_gone')['schedule']);
         self::inWp('wp_clear_scheduled_hook("cwt_gone"); echo json_encode(true);');
         self::must(['cronwatch', 'check']);
         $definition = self::definition('wp:cwt_gone');
         $this->assertArrayNotHasKey('schedule', $definition);
-        $this->assertSame('WP-Cron hook cwt_gone, twicedaily (every 43200s) (no longer scheduled)', $definition['description']);
+        $this->assertSame('WP-Cron hook cwt_gone, twicedaily (every 12h) (no longer scheduled)', $definition['description']);
         self::must(['cronwatch', 'check']);
-        $this->assertSame('WP-Cron hook cwt_gone, twicedaily (every 43200s) (no longer scheduled)', self::definition('wp:cwt_gone')['description'], 'retired once');
+        $this->assertSame('WP-Cron hook cwt_gone, twicedaily (every 12h) (no longer scheduled)', self::definition('wp:cwt_gone')['description'], 'retired once');
     }
 
     public function testTheStoreWritesTheBytesMysqlStoreWritesAndKeepsTheStoreContract(): void

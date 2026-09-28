@@ -515,7 +515,7 @@ final class DrupalTest extends TestCase
         $this->assertMatchesRegularExpression('/^drupal-cron:[0-9a-f-]{36}$/', $definition['tags'][1]);
         $this->assertArrayNotHasKey('schedule', $definition, 'a hook_cron has no schedule of its own');
         // Automated Cron is on, at its default interval.
-        $this->assertSame('every 10800s', self::definition('drupal:cron')['schedule']);
+        $this->assertSame('every 3h', self::definition('drupal:cron')['schedule']);
     }
 
     public function testAHookCronThatThrowsFailsItsOwnRunOnly(): void
@@ -566,7 +566,7 @@ final class DrupalTest extends TestCase
         $this->must(['config:set', 'automated_cron.settings', 'interval', '3600', '-y']);
         $this->must(['config:set', 'cronwatch.settings', 'schedule', '', '-y']);
         $this->must(['cronwatch:check']);
-        $this->assertSame('every 3600s', self::definition('drupal:cron')['schedule']);
+        $this->assertSame('every 1h', self::definition('drupal:cron')['schedule']);
         $this->must(['config:set', 'automated_cron.settings', 'interval', '0', '-y']);
         $this->must(['cronwatch:check']);
         $this->assertArrayNotHasKey('schedule', self::definition('drupal:cron'), 'no schedule when cron has none');

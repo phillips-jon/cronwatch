@@ -204,7 +204,7 @@ final class Recorder {
       $config = $this->configFactory->get('automated_cron.settings');
       $interval = (int) (class_exists('Drush\Drush', FALSE) ? $config->getOriginal('interval', FALSE) : $config->get('interval'));
       if ($interval > 0) {
-        return ["every {$interval}s", 'automated_cron'];
+        return ['every ' . \Cronwatch\Duration::interval((int) $interval), 'automated_cron'];
       }
     }
     return [NULL, 'none'];

@@ -22,7 +22,7 @@ Installing makes three tables in the site's database (`cronwatch_jobs`, `cronwat
 ## What is watched
 
 - **Cron.** Every cron run, whatever starts it (Automated Cron after a page, `drush cron`, a system cron requesting `/cron/<key>`), is a run of the job `drupal:cron`, and each module's `hook_cron` in it a run of `drupal:<module>`, with what it logged and the exception it threw. Drupal carries on past a module's exception, so that module's run fails and the others and the cron run itself do not.
-- **The schedule.** Drupal's cron has no schedule per hook: every `hook_cron` runs on every cron run. So only `drupal:cron` has one, the site's: the one under the settings (what your crontab does, `*/15 * * * *` or `every 1h`), else Automated Cron's interval (`every 10800s` by default), else none. When cron stops, that is one missed alert, not one per module.
+- **The schedule.** Drupal's cron has no schedule per hook: every `hook_cron` runs on every cron run. So only `drupal:cron` has one, the site's: the one under the settings (what your crontab does, `*/15 * * * *` or `every 1h`), else Automated Cron's interval (`every 3h` by default), else none. When cron stops, that is one missed alert, not one per module.
 - **Queues.** Choose queue workers under the settings, or mark a worker class `#[Cronwatch\Watch]`, and every item it processes is a run of `drupal:queue:<worker>` (in cron, `drush queue:run`, anywhere). An item that throws, or asks to be requeued, is a failed attempt; the attempt that succeeds closes the alert.
 
 A module's code can log to its run with `Cronwatch\Cronwatch::current()?->log('...')` and record numbers with `->metric('name', 1.5)`.

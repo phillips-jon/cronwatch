@@ -112,10 +112,11 @@ final class Jobs
             return ['description' => "WP-Cron hook {$hook}, single events", 'tags' => [self::TAG]];
         }
         $args = $job['args'] === [] ? '' : ' with args ' . self::args($job['args']);
+        $every = \Cronwatch\Duration::interval($job['interval']);
         return [
-            'description' => "WP-Cron hook {$hook}{$args}, {$job['recurrence']} (every {$job['interval']}s)",
+            'description' => "WP-Cron hook {$hook}{$args}, {$job['recurrence']} (every {$every})",
             'tags' => [self::TAG],
-            'schedule' => "every {$job['interval']}s",
+            'schedule' => "every {$every}",
         ];
     }
 

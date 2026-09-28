@@ -87,13 +87,13 @@ final class SchedulerTest extends TestCase
             'queued-report', 'Cronwatch.Tests.Symfony.Fixtures.Failing', 'Cronwatch.Tests.Symfony.Fixtures.AsyncReport', "reports:{$plain}",
         ], array_keys($jobs));
         $this->assertSame(['schedule' => '0 2 * * *', 'timezone' => 'Europe/Paris', 'description' => Report::class, 'grace' => '15m', 'expect' => 'Report written', 'tags' => ['symfony-scheduler', self::appTag()], 'name' => 'nightly-report'], $jobs['nightly-report']);
-        $this->assertSame(['schedule' => 'every 3600s', 'description' => Plain::class, 'tags' => ['symfony-scheduler', self::appTag()], 'name' => $plain], $jobs[$plain]);
+        $this->assertSame(['schedule' => 'every 1h', 'description' => Plain::class, 'tags' => ['symfony-scheduler', self::appTag()], 'name' => $plain], $jobs[$plain]);
         $this->assertSame('app:prune --days=30', $jobs['app:prune-days-30-' . substr(md5('app:prune --days=30'), 0, 8)]['description']);
         $this->assertSame(['*/5 * * * *', 'UTC'], [$jobs['app.cleaner.purge']['schedule'], $jobs['app.cleaner.purge']['timezone']]);
         $this->assertSame('0 0 * * *', $jobs['App.Service.Nightly']['schedule']);
         $this->assertSame('every 30s', $jobs['queued-report']['schedule']);
         $this->assertArrayNotHasKey('schedule', $jobs['Cronwatch.Tests.Symfony.Fixtures.Failing'], 'a calendar interval has no fixed length');
-        $this->assertSame('every 7200s', $jobs['Cronwatch.Tests.Symfony.Fixtures.AsyncReport']['schedule'], 'jitter is read through');
+        $this->assertSame('every 2h', $jobs['Cronwatch.Tests.Symfony.Fixtures.AsyncReport']['schedule'], 'jitter is read through');
         $this->assertSame('*/15 * * * *', $jobs["reports:{$plain}"]['schedule']);
         $this->assertSame(['declaring Cronwatch.Tests.Symfony.Fixtures.Failing'], $this->wheres());
     }
