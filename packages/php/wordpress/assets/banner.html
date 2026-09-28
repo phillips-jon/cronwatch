@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CronWatch banner</title>
+<!--
+  The plugin directory's header banner, set at 772x250 CSS pixels and
+  rendered by make.mjs at 1x (banner-772x250.png) and 2x (banner-1544x500.png).
+  The site's light theme: its paper, ink and state colours, Newsreader for
+  the words, IBM Plex Mono for the timeline's labels. make.mjs fills #strip
+  with lanes from the captured dashboard (site/src/demo/dashboard.html).
+  The directory lays the plugin's name over the lower left, so the words
+  stay in the upper left.
+-->
+<style>
+@font-face { font-family: "Newsreader"; src: url("../../../../site/src/assets/fonts/newsreader-normal-200-800.woff2") format("woff2-variations"); font-weight: 200 800; font-style: normal; }
+@font-face { font-family: "Plex Mono"; src: url("../../../../site/src/assets/fonts/plexmono-normal-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "Plex Mono"; src: url("../../../../site/src/assets/fonts/plexmono-normal-500.woff2") format("woff2"); font-weight: 500; }
+:root {
+  --paper: #f4f4f5; --sheet: #ffffff; --sunk: #fafafa; --rule: #e4e4e7; --tick: #909098;
+  --ink: #000000; --body: #18181b; --muted: #71717a; --ok: #15803d; --warn: #a16207; --bad: #b91c1c;
+  --serif: "Newsreader", Georgia, serif; --mono: "Plex Mono", ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 772px; height: 250px; overflow: hidden; background: var(--paper); }
+body { position: relative; color: var(--ink); font-family: var(--serif); font-optical-sizing: auto; -webkit-font-smoothing: antialiased; }
+.brand { position: absolute; left: 44px; top: 44px; display: flex; align-items: center; gap: 13px; }
+.brand img { width: 42px; height: 42px; display: block; }
+.brand span { font-weight: 600; font-size: 44px; line-height: 1; letter-spacing: -0.012em; }
+.say { position: absolute; left: 44px; top: 110px; width: 300px; font-size: 21px; line-height: 1.32; color: var(--body); letter-spacing: -0.004em; }
+.tl { position: absolute; left: 396px; top: 50px; width: 336px; }
+.tl svg { display: block; overflow: visible; }
+.tl .label { fill: var(--muted); font: 400 8.5px/1 var(--mono); letter-spacing: .12em; }
+.tl .now-label { fill: var(--ink); font: 500 8.5px/1 var(--mono); letter-spacing: .04em; }
+.tl .gl { stroke: var(--rule); stroke-width: 1; }
+.tl .future { fill: var(--sunk); }
+.tl .base { stroke: var(--rule); stroke-width: 1; }
+.tl .tick { stroke: var(--tick); stroke-width: 1; }
+.tl .tick.ahead { stroke-dasharray: 2 2; opacity: .75; }
+.tl .run { stroke-width: 1.4; stroke-linejoin: round; }
+.tl .run.ok { fill: var(--ok); stroke: var(--ok); }
+.tl .run.bad { fill: var(--bad); stroke: var(--bad); }
+.tl .run.warn { fill: var(--warn); stroke: var(--warn); }
+.tl .run.running { fill: none; stroke: var(--ink); stroke-width: 1.2; }
+.tl .missed { fill: none; stroke: var(--bad); stroke-width: 1.2; stroke-dasharray: 2.5 2; }
+.tl .now { stroke: var(--ink); stroke-width: 1.2; }
+</style>
+</head>
+<body>
+<p class="brand"><img src="icon.svg" alt=""><span>CronWatch</span></p>
+<p class="say">Every WP-Cron run recorded. Told when one is missed or fails.</p>
+<div class="tl" id="strip"></div>
+</body>
+</html>
