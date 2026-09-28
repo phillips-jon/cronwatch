@@ -238,3 +238,13 @@ func updateRunIfSQL(d Dialect, p string, count int) string {
 	}
 	return text
 }
+
+// deleteRunIfSQL takes back a run only while it is of one job and in one
+// status (the PHP port's deleteRunIf), the same text on every dialect.
+func deleteRunIfSQL(d Dialect, p string) string {
+	text := `DELETE FROM ` + p + `runs WHERE id = ? AND job = ? AND status = ?`
+	if d == Postgres {
+		return number(text)
+	}
+	return text
+}

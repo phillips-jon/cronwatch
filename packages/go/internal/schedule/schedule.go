@@ -235,6 +235,15 @@ func Expect(p *Parsed, lastRunAt *int64, registeredAt int64, graceMs float64) (E
 	return Expectation{DueAt: due, Deadline: float64(due) + graceMs}, true
 }
 
+// FireAfter is the first fire of a cron strictly after from, or false when
+// it never fires again (see fireAfter). For the bridge package's check of a
+// schedule converted from a scheduler's own.
+func FireAfter(p *Parsed, from int64) (int64, bool) { return fireAfter(p, from) }
+
+// DueAfterRun is the first fire of a cron that a run starting at startedAt
+// does not cover, or false when there is none.
+func DueAfterRun(p *Parsed, startedAt int64) (int64, bool) { return dueAfterRun(p, startedAt) }
+
 // dueAfterRun is the first fire that a run starting at startedAt does not
 // cover.
 func dueAfterRun(p *Parsed, startedAt int64) (int64, bool) {

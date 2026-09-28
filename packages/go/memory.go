@@ -28,6 +28,7 @@ func NewMemoryStore() *MemoryStore {
 var (
 	_ RunUpdater    = (*MemoryStore)(nil)
 	_ StateComparer = (*MemoryStore)(nil)
+	_ RunDeleter    = (*MemoryStore)(nil)
 )
 
 // Init does nothing.
@@ -131,6 +132,18 @@ func (m *MemoryStore) UpdateRunIf(_ context.Context, run Run, from []RunStatus) 
 		}
 	}
 	return false, nil
+}
+
+func (m *MemoryStore) DeleteRunIf(_ context.Context, id, job string, status RunStatus) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	existing, ok := m.runs[id]
+	if !ok || existing.Job != job || existing.Status != status {
+		return false, nil
+	}
+	delete(m.runs, id)
+	delete(m.order, id)
+	return true, nil
 }
 
 func (m *MemoryStore) GetRun(_ context.Context, id string) (*Run, error) {

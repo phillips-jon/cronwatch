@@ -665,6 +665,12 @@ jobs:
         ports: ["3307:3306"]
         options: >-
           --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
+      # Asynq's broker, for cronwatch.dev/go/asynq's end-to-end test.
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -679,26 +685,36 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           # The core module has no go.sum: it requires nothing.
-          cache-dependency-path: packages/go/sqltest/go.sum
+          cache-dependency-path: packages/go/*/go.sum
       - name: The core module requires nothing
         working-directory: packages/go
         run: |
           go mod tidy -diff
           test -z "$(go list -m -f '{{if not .Main}}{{.Path}}{{end}}' all)"
+      # The modules nested in packages/go: the SQL tests and the examples
+      # (never tagged), and the scheduler integrations, each requiring its
+      # scheduler at the oldest release it supports.
+      - name: The nested modules are tidy
+        run: |
+          for module in sqltest examples robfigcron gocron river asynq; do
+            (cd "packages/go/$module" && go mod tidy -diff) || exit 1
+          done
       - name: gofmt
         run: test -z "$(gofmt -l packages/go)" || { gofmt -l packages/go; exit 1; }
-      - run: go vet ./...
-        working-directory: packages/go
-      - run: go vet ./...
-        working-directory: packages/go/sqltest
+      - name: go vet
+        run: |
+          for module in . sqltest examples robfigcron gocron river asynq; do
+            (cd "packages/go/$module" && go vet ./...) || exit 1
+          done
       # staticcheck 0.8 needs Go 1.26 to build, so it lints on the newest entry;
       # the tests still run on both.
       - name: staticcheck
         if: matrix.go == '1.26'
         run: |
           go install honnef.co/go/tools/cmd/staticcheck@v0.8.1
-          (cd packages/go && "$(go env GOPATH)/bin/staticcheck" ./...)
-          (cd packages/go/sqltest && "$(go env GOPATH)/bin/staticcheck" ./...)
+          for module in . sqltest examples robfigcron gocron river asynq; do
+            (cd "packages/go/$module" && "$(go env GOPATH)/bin/staticcheck" ./...) || exit 1
+          done
       # A second Postgres with pg_cron, for the pg_cron source's tests against
       # the real extension, as the Node, Ruby, Python and PHP jobs start it.
       - name: Start Postgres with pg_cron
@@ -723,6 +739,30 @@ jobs:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
           CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
           CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
+      # The integrations at the releases their go.mod requires (the oldest
+      # supported: gocron 2.21.0, River 0.44.1, Asynq 0.25.1, robfig/cron
+      # 3.0.1), River against Postgres and Asynq against Redis, and the
+      # crontab example.
+      - name: The integrations and the examples
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+          CRONWATCH_TEST_REDIS: redis://127.0.0.1:6379/0
+        run: |
+          for module in robfigcron gocron river asynq examples; do
+            (cd "packages/go/$module" && go test -race -count=1 ./...) || exit 1
+          done
+      # And at the newest releases: River 0.45 and newer need Go 1.26, so
+      # they run on that entry only. The go.mod changes stay in this job.
+      - name: The integrations at their newest releases
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+          CRONWATCH_TEST_REDIS: redis://127.0.0.1:6379/0
+        run: |
+          (cd packages/go/gocron && go get github.com/go-co-op/gocron/v2@v2.22.0 && go test -race -count=1 ./...) || exit 1
+          (cd packages/go/asynq && go get github.com/hibiken/asynq@v0.26.0 && go test -race -count=1 ./...) || exit 1
+          if [ "${{ matrix.go }}" = "1.26" ]; then
+            (cd packages/go/river && go get github.com/riverqueue/river@v0.47.0 github.com/riverqueue/river/riverdriver/riverpgxv5@v0.47.0 github.com/riverqueue/river/rivertype@v0.47.0 && go test -race -count=1 ./...) || exit 1
+          fi
       # @cronwatch/mcp's tools against the Go dashboard, served by
       # packages/go/internal/webserver through `go run` on this entry's Go.
       - name: MCP server against the Go dashboard
