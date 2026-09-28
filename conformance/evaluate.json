@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.5.1",
+  "sdkVersion": "0.6.0",
   "scenarios": [
     {
       "name": "a failure opens failed once, and a success recovers",
