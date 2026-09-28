@@ -106,6 +106,74 @@ func Slice16(s string, start, end int) string {
 	return b.String()
 }
 
+// Slice16Lone is Slice16 keeping the lone half of a surrogate pair the cut
+// goes through, as JavaScript keeps it, for text that goes into a JSON
+// body: the half is held as its three WTF-8 bytes (ED A0..BF 80..BF),
+// which StringifyLone writes as \ud83d, as JSON.stringify does. Anything
+// else that reads the result sees three bytes that are not UTF-8.
+func Slice16Lone(s string, start, end int) string {
+	n := Length16(s)
+	clamp := func(i int) int {
+		if i < 0 {
+			i = max(i+n, 0)
+		}
+		return min(i, n)
+	}
+	start, end = clamp(start), clamp(end)
+	if start >= end {
+		return ""
+	}
+	var b strings.Builder
+	at := 0
+	for _, r := range s {
+		w := units(r)
+		lo, hi := at, at+w
+		at = hi
+		if hi <= start {
+			continue
+		}
+		if lo >= end {
+			break
+		}
+		switch {
+		case lo >= start && hi <= end:
+			b.WriteRune(r)
+		case lo < start:
+			// The low half: the cut starts inside the pair.
+			writeLone(&b, uint16(0xdc00+(r-0x10000)&0x3ff))
+		default:
+			// The high half: the cut ends inside the pair.
+			writeLone(&b, uint16(0xd800+(r-0x10000)>>10))
+		}
+	}
+	return b.String()
+}
+
+// Head16Lone is s.slice(0, n), keeping a lone half (Slice16Lone).
+func Head16Lone(s string, n int) string {
+	return Slice16Lone(s, 0, n)
+}
+
+// Tail16Lone is s.slice(-n), keeping a lone half (Slice16Lone).
+func Tail16Lone(s string, n int) string {
+	return Slice16Lone(s, Length16(s)-n, Length16(s))
+}
+
+// writeLone writes a surrogate code unit as its WTF-8 bytes.
+func writeLone(b *strings.Builder, u uint16) {
+	b.WriteByte(0xe0 | byte(u>>12))
+	b.WriteByte(0x80 | byte(u>>6&0x3f))
+	b.WriteByte(0x80 | byte(u&0x3f))
+}
+
+// loneAt reads the surrogate code unit whose WTF-8 bytes start at s[i].
+func loneAt(s string, i int) (uint16, bool) {
+	if i+2 >= len(s) || s[i] != 0xed || s[i+1] < 0xa0 || s[i+1] > 0xbf || s[i+2] < 0x80 || s[i+2] > 0xbf {
+		return 0, false
+	}
+	return 0xd000 | uint16(s[i+1]&0x3f)<<6 | uint16(s[i+2]&0x3f), true
+}
+
 // Head16 is s.slice(0, n).
 func Head16(s string, n int) string {
 	return Slice16(s, 0, n)

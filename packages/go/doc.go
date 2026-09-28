@@ -18,7 +18,10 @@
 // Missed and stuck runs are found by Check, called on an interval by Start
 // in a long-running service, or from a crontab line. The sqlstore package
 // keeps everything in SQLite, Postgres or MySQL over the app's own
-// *sql.DB; MemoryStore, the default, forgets on restart.
+// *sql.DB; MemoryStore, the default, forgets on restart. The alerts
+// package holds the SDK's alert channels (Slack, Discord, a webhook, email,
+// SMS and error trackers), the triage package Claude triage, and the pgcron
+// package a source that watches pg_cron's jobs.
 //
 // Every value a store holds is the SDK's JSON: each type's MarshalJSON
 // writes it byte for byte, with keys in JavaScript's order.

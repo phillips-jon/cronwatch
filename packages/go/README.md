@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Go app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
 
-This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text and the same stored rows, so a Go process and a Node process can share one database, and every port reads the tables the others write. This first phase has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store and a `database/sql` store for SQLite, Postgres and MySQL; the alert channels, Claude triage, the pg_cron source, the dashboard and the scheduler integrations follow ([DESIGN.md](DESIGN.md) has the plan and how each part works). It is not released yet.
+This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text and the same stored rows, so a Go process and a Node process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, a `database/sql` store for SQLite, Postgres and MySQL, the SDK's alert channels, Claude triage and the pg_cron source; the dashboard and the scheduler integrations follow ([DESIGN.md](DESIGN.md) has the plan and how each part works). It is not released yet.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -62,6 +62,41 @@ func main() {
 
 A run is recorded when the function returns: a returned error is the failure and is returned from `Run`, and a panic is recorded as a failed run and carries on up the stack. The store failing never stops a job; store errors go to the error handler (`cronwatch.WithErrorHandler`, standard error by default). `cronwatch.RunValue` runs a function that returns a value: a string is the output when nothing was logged, and an `*http.Response` of 400 or more fails the run. Inside a job, `cronwatch.Current(ctx)` is its `JobContext`.
 
+## Alerts
+
+Alerts go to the console until you give channels. `cronwatch.dev/go/alerts` has the SDK's, on `net/http` alone: Slack, Discord, a signed webhook, email through Resend, Postmark, SendGrid, Mailgun or SES, SMS through Twilio, and Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic.
+
+```go
+slack, err := alerts.Slack(alerts.SlackOptions{WebhookURL: os.Getenv("SLACK_WEBHOOK_URL")})
+email, err := alerts.Resend(alerts.ResendOptions{
+	APIKey:       os.Getenv("RESEND_API_KEY"),
+	EmailOptions: alerts.EmailOptions{From: "CronWatch <alerts@example.com>", To: []string{"ops@example.com"}},
+})
+cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithAlerts(slack, email))
+```
+
+Each request is the SDK's, byte for byte, with one ten second deadline, no redirect followed, TLS verified, and errors that name only the provider and the URL's origin, with your keys cut out. Every options struct takes an `HTTPClient` for a proxy or a test.
+
+## Triage
+
+`cronwatch.dev/go/triage` asks Claude for a short diagnosis of each alert (never per run), over plain HTTP, with no SDK to install:
+
+```go
+diagnose, err := triage.Anthropic(triage.AnthropicOptions{Context: "A Go service on Fly.io with a Postgres database."}) // ANTHROPIC_API_KEY
+cw, err := cronwatch.New(cronwatch.WithAlerts(slack), cronwatch.WithTriage(diagnose))
+```
+
+## pg_cron
+
+`cronwatch.dev/go/pgcron` watches pg_cron's jobs, which run inside Postgres where nothing can wrap them: each check reads `cron.job` and `cron.job_run_details` through your `*sql.DB` (any driver) and records their runs, so missed, failed, stuck and slow jobs alert like your own.
+
+```go
+cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(pgcron.New(db, pgcron.Options{Prefix: "db:"})))
+cw.Start(time.Minute)
+```
+
+## Checks
+
 Missed and stuck runs are found by a check. A long-running service calls `cw.Start(time.Minute)`; a program run from a crontab checks from a second crontab line, or calls `cw.Check(ctx)` itself.
 
 A run that starts in one call and ends in another (work handed to a queue, a webhook that reports back later) is one run too:
@@ -77,21 +112,24 @@ h.Finish(ctx) // or h.Fail(ctx, err); a run is judged once, however many process
 ## Testing
 
 ```bash
-cd packages/go && go test -race ./...           # the core, standard library only
+cd packages/go && go test -race ./...           # the core, the channels, triage and pg_cron (against fakes), standard library only
 cd packages/go/sqltest && go test -race ./...   # the SQL store with real drivers
 ```
 
 Run `npm ci && npm run build` at the repository root first: the croner parity test (`internal/schedule`) and the SQLite file shared with Node (`sqltest`) use the built SDK, and skip, with the reason, without it. The tests set the process zone to UTC, as the conformance fixtures are made in UTC.
 
-`sqltest` is a module of its own so that the drivers it uses (`modernc.org/sqlite`, `github.com/jackc/pgx/v5`, `github.com/go-sql-driver/mysql`) never appear in the `cronwatch.dev/go` module. SQLite always runs; Postgres, MySQL and MariaDB run when these are set:
+`sqltest` is a module of its own so that the drivers it uses (`modernc.org/sqlite`, `github.com/jackc/pgx/v5`, `github.com/lib/pq`, `github.com/go-sql-driver/mysql`) never appear in the `cronwatch.dev/go` module. SQLite always runs; Postgres, MySQL and MariaDB run when these are set, and the pg_cron source against a real pg_cron (through pgx and lib/pq) when `CRONWATCH_TEST_PGCRON` names a Postgres with the extension preloaded:
 
 ```bash
 docker run -d --name cw-pg -e POSTGRES_PASSWORD=cw -p 55432:5432 postgres:17
 docker run -d --name cw-mysql -e MYSQL_ROOT_PASSWORD=cw -e MYSQL_DATABASE=cw -p 53306:3306 mysql:8.4
 docker run -d --name cw-mariadb -e MARIADB_ROOT_PASSWORD=cw -e MARIADB_DATABASE=cw -p 53307:3306 mariadb:11.4
+# pg_cron: postgres:16 with postgresql-16-cron installed, run with
+#   postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw
 
 CRONWATCH_TEST_PG=postgres://postgres:cw@127.0.0.1:55432/postgres \
 CRONWATCH_TEST_MYSQL=mysql://root:cw@127.0.0.1:53306/cw \
 CRONWATCH_TEST_MARIADB=mysql://root:cw@127.0.0.1:53307/cw \
+CRONWATCH_TEST_PGCRON=postgres://postgres:cw@127.0.0.1:55433/cw \
 go test -race ./...
 ```
