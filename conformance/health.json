@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/conformance.mjs",
-  "sdkVersion": "0.6.0",
+  "sdkVersion": "0.6.1",
   "jobHealth": [
     {
       "definition": {

@@ -3,8 +3,8 @@ module cronwatch.dev/go/asynq
 go 1.25.0
 
 require (
-	cronwatch.dev/go v0.6.0
-	cronwatch.dev/go/robfigcron v0.6.0
+	cronwatch.dev/go v0.6.1
+	cronwatch.dev/go/robfigcron v0.6.1
 	github.com/hibiken/asynq v0.25.1
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/robfig/cron/v3 v3.0.1
