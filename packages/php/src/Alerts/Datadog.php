@@ -52,7 +52,7 @@ final class Datadog implements AlertChannel
         }
         $this->url = "https://api.{$site}/api/v1/events";
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

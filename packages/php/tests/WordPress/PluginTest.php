@@ -90,6 +90,19 @@ final class PluginTest extends TestCase
         $this->assertStringContainsString('metrics LONGTEXT NOT NULL,', $old[1]);
     }
 
+    /** PHP source without its comments and string literals, so only code is searched. */
+    private static function codeOnly(string $php): string
+    {
+        $out = '';
+        foreach (token_get_all($php) as $token) {
+            if (is_array($token) && in_array($token[0], [T_COMMENT, T_DOC_COMMENT, T_CONSTANT_ENCAPSED_STRING, T_ENCAPSED_AND_WHITESPACE, T_INLINE_HTML], true)) {
+                continue;
+            }
+            $out .= is_array($token) ? $token[1] : $token;
+        }
+        return $out;
+    }
+
     public function testTheZipHoldsThePluginAndTheLibraryAndNothingElse(): void
     {
         if (!class_exists(\ZipArchive::class)) {
@@ -117,6 +130,32 @@ final class PluginTest extends TestCase
                 $this->assertDoesNotMatchRegularExpression('#(^|/)\.|/tests?/|build\.php$|composer\.|phpunit|/dist/|DESIGN\.md$#', $name, "{$name} does not ship");
             }
             $this->assertCount(count(array_unique($names)), $names);
+            $this->assertContains('cronwatch/includes/AdminDashboard.php', $names);
+            $this->assertContains('cronwatch/lib/src/Web/Dashboard.php', $names);
+            // The library's files the plugin never runs are left out: no curl, no PDO stores, no pg_cron, no PSR adapters.
+            $leftOut = ['Alerts/NativeHttp.php', 'Cli.php', 'Sources/PgCron.php', 'Sources/PgCronPdo.php', 'Store/MysqlStore.php', 'Store/PdoStore.php',
+                'Store/PostgresStore.php', 'Store/SqliteStore.php', 'Web/PsrHandler.php', 'Web/PsrMiddleware.php'];
+            foreach ($leftOut as $file) {
+                $this->assertNotContains("cronwatch/lib/src/{$file}", $names);
+            }
+            $zip->open($path);
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $name = (string) $zip->getNameIndex($i);
+                $code = str_ends_with($name, '.php') ? self::codeOnly((string) $zip->getFromIndex($i)) : '';
+                $this->assertDoesNotMatchRegularExpression('/\bcurl_[a-z_]+\s*\(/', $code, "{$name} calls curl directly");
+                $this->assertDoesNotMatchRegularExpression('/\bnew\s+\\\\?PDO\b|\bfsockopen\s*\(/', $code, "{$name} opens its own connection");
+                foreach ($leftOut as $file) {
+                    $class = str_replace('/', '\\', substr($file, 0, -4));
+                    $short = basename($file, '.php');
+                    $this->assertStringNotContainsString("Cronwatch\\{$class}", $code, "{$name} names a class the zip leaves out");
+                    // Within the library a class of the same namespace is named by its short name.
+                    if (str_starts_with($name, 'cronwatch/lib/') && $name !== 'cronwatch/lib/src/Alerts/Transport.php') {
+                        // Transport makes a NativeHttp only when nothing was set; the plugin sets WpHttp when it boots.
+                        $this->assertDoesNotMatchRegularExpression('/\bnew\s+(?:\\\\?Cronwatch\\\\[A-Za-z\\\\]+\\\\)?' . $short . '\s*\(|\b' . $short . '::/', $code, "{$name} uses {$short}");
+                    }
+                }
+            }
+            $zip->close();
             $this->assertStringContainsString(" * Version:           {$version}\n", $header);
             $this->assertStringContainsString(' * License:           GPLv2 or later', $header);
             // The same sources give the same bytes.

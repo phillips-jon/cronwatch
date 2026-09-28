@@ -14,30 +14,40 @@ use Cronwatch\Duration;
 use Cronwatch\JobDefinition;
 
 /**
- * Tools > CronWatch: where alerts go, the grace a run is given, a test
- * alert, and the watched events' health. Every action checks the
- * manage_options capability and a nonce. The full dashboard comes to
- * wp-admin in a later release.
+ * The CronWatch menu in wp-admin: the dashboard (AdminDashboard) and
+ * CronWatch, Settings: where alerts go, the grace a run is given, a test
+ * alert, the JSON API for @cronwatch/mcp (off unless turned on with a
+ * token), and the watched events' health. Every page and action checks the
+ * manage_options capability, and every action a nonce.
  */
 final class Admin
 {
-    public const PAGE = 'cronwatch';
+    public const PAGE = 'cronwatch-settings';
+    /** The least a token the owner types in may be; one the plugin makes is 40. */
+    public const TOKEN_MIN = 24;
 
     public static function register(): void
     {
         add_action('admin_menu', [self::class, 'menu']);
         add_action('admin_post_cronwatch_save', [self::class, 'save']);
         add_action('admin_post_cronwatch_test', [self::class, 'test']);
+        add_action('admin_enqueue_scripts', [AdminDashboard::class, 'styles']);
     }
 
     public static function menu(): void
     {
-        add_management_page(__('CronWatch', 'cronwatch'), __('CronWatch', 'cronwatch'), 'manage_options', self::PAGE, [self::class, 'render']);
+        $hook = add_menu_page(__('CronWatch', 'cronwatch'), __('CronWatch', 'cronwatch'), 'manage_options', AdminDashboard::PAGE, [AdminDashboard::class, 'render'], 'dashicons-clock', 80);
+        add_submenu_page(AdminDashboard::PAGE, __('CronWatch', 'cronwatch'), __('Dashboard', 'cronwatch'), 'manage_options', AdminDashboard::PAGE, [AdminDashboard::class, 'render']);
+        add_submenu_page(AdminDashboard::PAGE, __('CronWatch settings', 'cronwatch'), __('Settings', 'cronwatch'), 'manage_options', self::PAGE, [self::class, 'render']);
+        if (is_string($hook) && $hook !== '') {
+            // The dashboard's own pages (?cw=) are answered before wp-admin writes anything.
+            add_action("load-{$hook}", [AdminDashboard::class, 'load']);
+        }
     }
 
     private static function pageUrl(array $query = []): string
     {
-        return add_query_arg(['page' => self::PAGE] + $query, admin_url('tools.php'));
+        return add_query_arg(['page' => self::PAGE] + $query, admin_url('admin.php'));
     }
 
     /** Stops unless the user may manage options and the request carries this action's nonce. */
@@ -62,7 +72,9 @@ final class Admin
 
     /**
      * Sanitizes and saves the posted settings. Returns the notice to show:
-     * "saved", or "grace" when the grace did not parse (the rest is saved).
+     * "saved", "grace" when the grace did not parse, or "token" when a token
+     * typed in was too short (the rest is saved either way). A token the
+     * plugin makes is kept for the page to show once.
      *
      * @param array<string, mixed> $posted
      */
@@ -78,8 +90,22 @@ final class Admin
             // A secret is never shown again: left blank, the saved one stays.
             'webhook_secret' => !empty($posted['webhook_secret_clear']) ? '' : ($text('webhook_secret') !== '' ? sanitize_text_field($text('webhook_secret')) : $old['webhook_secret']),
             'grace' => $old['grace'],
+            'api_enabled' => !empty($posted['api_enabled']) ? '1' : '',
+            'api_token' => $old['api_token'],
         ];
         $notice = 'saved';
+        // The API's token: one typed in (never shown again), a new one made on request, or one made when the API is first turned on.
+        $token = preg_replace('/\s+/', '', $text('api_token')) ?? '';
+        if ($token !== '') {
+            if (strlen($token) >= self::TOKEN_MIN) {
+                $new['api_token'] = sanitize_text_field($token);
+            } else {
+                $notice = 'token';
+            }
+        } elseif (!empty($posted['api_token_new']) || ($new['api_enabled'] === '1' && $new['api_token'] === '')) {
+            $new['api_token'] = wp_generate_password(40, false);
+            set_transient('cronwatch_new_token_' . get_current_user_id(), $new['api_token'], 600);
+        }
         $grace = sanitize_text_field($text('grace'));
         if ($grace !== '') {
             try {
@@ -150,6 +176,8 @@ final class Admin
             echo '<div class="notice notice-success"><p>' . esc_html__('Settings saved.', 'cronwatch') . '</p></div>';
         } elseif ($notice === 'grace') {
             echo '<div class="notice notice-error"><p>' . esc_html__('The grace was not a duration such as 10m or 1h30m, so it was left as it was. The rest was saved.', 'cronwatch') . '</p></div>';
+        } elseif ($notice === 'token') {
+            echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was shorter than %d characters, so it was not saved. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
         } elseif ($notice === 'tested') {
             $results = get_transient('cronwatch_test_' . get_current_user_id());
             delete_transient('cronwatch_test_' . get_current_user_id());
@@ -164,7 +192,15 @@ final class Admin
             }
         }
 
-        echo '<p>' . esc_html__('CronWatch records every WP-Cron event as it runs and alerts you when one is missed, fails, gets stuck or runs slow. WP-Cron only runs when someone visits the site, so for reliable checks run WP-Cron and the check from the system crontab (see the plugin\'s readme). The full dashboard comes to wp-admin in a later release.', 'cronwatch') . '</p>';
+        $made = get_transient('cronwatch_new_token_' . get_current_user_id());
+        if (is_string($made) && $made !== '') {
+            delete_transient('cronwatch_new_token_' . get_current_user_id());
+            echo '<div class="notice notice-info"><p>' . esc_html__('The new API token is below. Copy it now: it is not shown again.', 'cronwatch') . '</p><p><code>' . esc_html($made) . '</code></p></div>';
+        }
+
+        echo '<p>' . esc_html__('CronWatch records every WP-Cron event as it runs and alerts you when one is missed, fails, gets stuck or runs slow. WP-Cron only runs when someone visits the site, so for reliable checks run WP-Cron and the check from the system crontab (see the plugin\'s readme).', 'cronwatch') . '</p>';
+        echo '<p><a class="button" href="' . esc_url(admin_url('admin.php?page=' . AdminDashboard::PAGE)) . '">' . esc_html__('Open the dashboard', 'cronwatch') . '</a> '
+            . esc_html__('Each event\'s health, its last day and week, and every run with its output.', 'cronwatch') . '</p>';
         if (defined('DISABLE_WP_CRON') && DISABLE_WP_CRON) {
             echo '<p>' . esc_html__('DISABLE_WP_CRON is set: make sure a system cron runs wp-cron.php or `wp cron event run --due-now`, and `wp cronwatch check`.', 'cronwatch') . '</p>';
         }
@@ -183,6 +219,21 @@ final class Admin
             . ($settings['webhook_secret'] !== '' ? ' <label><input type="checkbox" name="cronwatch[webhook_secret_clear]" value="1"> ' . esc_html__('Remove it', 'cronwatch') . '</label>' : ''), $secret);
         self::row('grace', __('Grace', 'cronwatch'), '<input type="text" class="small-text" id="cronwatch-grace" name="cronwatch[grace]" value="' . esc_attr($settings['grace']) . '">', __('How late an event may run before it counts as missed, such as 10m or 1h.', 'cronwatch'));
         echo '</tbody></table>';
+
+        echo '<h2>' . esc_html__('JSON API', 'cronwatch') . '</h2>';
+        echo '<p>' . esc_html__('Off unless you turn it on. When on, CronWatch\'s JSON API (the jobs, their runs, silencing and the check) answers at the address below to anyone who sends the token, so an MCP server (@cronwatch/mcp) or a script can reach this site. The dashboard itself stays in wp-admin.', 'cronwatch') . '</p>';
+        echo '<table class="form-table" role="presentation"><tbody>';
+        self::row('api_enabled', __('Allow the JSON API', 'cronwatch'), '<label><input type="checkbox" id="cronwatch-api_enabled" name="cronwatch[api_enabled]" value="1"' . checked($settings['api_enabled'], '1', false) . '> '
+            . esc_html__('Answer API requests that carry the token', 'cronwatch') . '</label>', sprintf(__('Base URL: %s', 'cronwatch'), Api::baseUrl()));
+        $tokenHelp = $settings['api_token'] !== ''
+            ? __('A token is saved. Leave blank to keep it, or type a new one.', 'cronwatch')
+            : sprintf(__('Leave blank and one is made when you turn the API on, or type one of at least %d characters.', 'cronwatch'), self::TOKEN_MIN);
+        self::row('api_token', __('API token', 'cronwatch'), '<input type="password" class="regular-text" id="cronwatch-api_token" name="cronwatch[api_token]" value="" autocomplete="new-password">'
+            . ($settings['api_token'] !== '' ? ' <label><input type="checkbox" name="cronwatch[api_token_new]" value="1"> ' . esc_html__('Make a new one', 'cronwatch') . '</label>' : ''), $tokenHelp);
+        echo '</tbody></table>';
+        if (Api::enabled($settings)) {
+            echo '<p>' . esc_html__('Add it to Claude Code with:', 'cronwatch') . '</p><p><code>' . esc_html('claude mcp add cronwatch -e CRONWATCH_URL=' . Api::baseUrl() . ' -e CRONWATCH_TOKEN=<token> -- npx -y @cronwatch/mcp') . '</code></p>';
+        }
         submit_button(__('Save', 'cronwatch'));
         echo '</form>';
 

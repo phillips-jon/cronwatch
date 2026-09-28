@@ -14,8 +14,6 @@ namespace Cronwatch\Alerts;
  */
 final class NativeHttp implements Http
 {
-    private static ?self $default = null;
-
     private readonly bool $curl;
 
     /** @param bool|null $curl true or false to choose; null for curl when it is loaded */
@@ -27,14 +25,10 @@ final class NativeHttp implements Http
         }
     }
 
-    /** One shared instance, for channels given no `http:`. */
-    public static function default(): self
-    {
-        return self::$default ??= new self();
-    }
-
     public function post(string $url, string $body, array $headers, int $timeoutMs = self::TIMEOUT_MS): HttpResponse
     {
+        // Refused before curl or a stream sees it, and never quoted: a webhook URL's path is its credential.
+        $url = Shared::postable($url);
         $lines = [];
         foreach ($headers as $name => $value) {
             $lines[] = $name . ': ' . self::headerValue((string) $value);
@@ -94,7 +88,7 @@ final class NativeHttp implements Http
             }
             throw new RequestTimeout();
         }
-        throw new \RuntimeException($error !== '' ? $error : "curl error {$errno}");
+        throw new \RuntimeException(Shared::scrub($error !== '' ? $error : "curl error {$errno}", $url));
     }
 
     /** @param list<string> $lines */
@@ -102,10 +96,6 @@ final class NativeHttp implements Http
     {
         if (!filter_var(ini_get('allow_url_fopen'), FILTER_VALIDATE_BOOLEAN)) {
             throw new \LogicException('sending alerts needs the curl extension or allow_url_fopen');
-        }
-        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
-        if ($scheme !== 'http' && $scheme !== 'https') {
-            throw new \InvalidArgumentException('only http and https URLs can be posted to');
         }
         $deadline = hrtime(true) / 1e9 + $timeoutMs / 1000;
         $context = stream_context_create([
@@ -126,6 +116,8 @@ final class NativeHttp implements Http
             if (stripos($message, 'timed out') !== false || hrtime(true) / 1e9 >= $deadline) {
                 throw new RequestTimeout();
             }
+            // The warning starts "fopen(<url>): "; only the origin may show.
+            $message = Shared::scrub($message, $url);
             throw new \RuntimeException(preg_replace('/^fopen\([^)]*\): /', '', $message) ?? $message);
         }
         try {

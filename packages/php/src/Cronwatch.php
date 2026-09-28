@@ -64,7 +64,7 @@ final class Cronwatch
     public readonly array $alerts;
     /** @var list<Source> */
     public readonly array $sources;
-    /** The secret an outside cron must present to the check endpoint of the web dashboard (a later phase), or null. */
+    /** The secret an outside cron may present to the dashboard's check endpoint (routes()) instead of its token, or null. */
     public readonly ?string $cronSecret;
     public readonly int|float $retentionMs;
     /** @var array<string, mixed> */
@@ -101,7 +101,7 @@ final class Cronwatch
      * @param list<AlertChannel|callable>|null $alerts where alerts go; default the console. A callable is a Custom channel named "custom".
      * @param callable(TriageContext): ?string|null $triage adds a short diagnosis to every alert but recoveries
      * @param list<Source> $sources where runs this process does not wrap come from; each is synced at the start of every check
-     * @param string|false|null $cronSecret the secret the web dashboard's check endpoint (a later phase) requires; null reads
+     * @param string|false|null $cronSecret the secret the dashboard's check endpoint (routes()) also accepts; null reads
      *        CRON_SECRET, "" counts as unset, and false lets the endpoint run without one
      * @param mixed $retention how long finished runs are kept; default "30d"
      * @param array<string, mixed> $defaults grace, timeout, timezone and failuresBeforeAlert for every job that does not set its own
@@ -388,6 +388,21 @@ final class Cronwatch
     public function close(): void
     {
         $this->store->close();
+    }
+
+    /**
+     * The dashboard and JSON API (the SDK's cw.routes()). Call serve() on it
+     * from a script, handle() with a Web\Request, or put it in a PSR-15 stack
+     * with Web\PsrHandler or Web\PsrMiddleware. See Web\Dashboard.
+     *
+     * @param string|false|null $token null reads CRONWATCH_TOKEN, "" counts as unset, false serves the dashboard open
+     * @param string|null $basePath where the dashboard is mounted; default the script of a path-info URL, else "/cronwatch"
+     * @param string|null $origin the public origin, for an app behind a proxy
+     * @param bool $trustProxy take the public origin from X-Forwarded-Proto and X-Forwarded-Host
+     */
+    public function routes(string|false|null $token = null, ?string $basePath = null, ?string $origin = null, bool $trustProxy = false): Web\Dashboard
+    {
+        return new Web\Dashboard($this, token: $token, basePath: $basePath, origin: $origin, trustProxy: $trustProxy);
     }
 
     // ------------------------------------------------------------ internals

@@ -63,7 +63,7 @@ final class Ses implements AlertChannel
         $this->url = "https://email.{$region}.amazonaws.com/v2/email/outbound-emails";
         $this->link = $link === null ? null : \Closure::fromCallable($link);
         $this->now = $now === null ? Js::nowMs(...) : \Closure::fromCallable($now);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

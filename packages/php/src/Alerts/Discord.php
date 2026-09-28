@@ -36,7 +36,7 @@ final class Discord implements AlertChannel
             throw new \InvalidArgumentException('Discord needs a webhookUrl');
         }
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string
@@ -55,7 +55,7 @@ final class Discord implements AlertChannel
             . (Shared::present($alert->triage) ? "\n**Triage:** " . self::escapeMarkdown(Js::slice16((string) $alert->triage, 1000)) : '');
         $embed['color'] = self::COLOR[$alert->type] ?? null;
         $embed['timestamp'] = Js::iso($alert->at);
-        $response = $this->http->post($this->webhookUrl, Js::stringify([
+        $response = $this->http->post(Shared::postable($this->webhookUrl), Js::stringify([
             'content' => $alert->title,
             // Job output can hold anything, "@everyone" included; ping no one.
             'allowed_mentions' => ['parse' => []],

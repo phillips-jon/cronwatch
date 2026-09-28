@@ -5,8 +5,15 @@
  * A must-use plugin the WordPress tests install beside CronWatch: event
  * callbacks that succeed, throw, hit a fatal error and exit, a clock the
  * tests move (the cwt_now option, epoch milliseconds), and an alert channel
- * that keeps each alert in the cwt_alerts option.
+ * that keeps each alert in the cwt_alerts option. WordPress requests
+ * nothing over HTTP: its own events (the update checks, Site Health's
+ * request to the site itself) would reach the network, or wait on the one
+ * request the tests' server answers at a time.
  */
+
+add_filter('pre_http_request', function ($pre, $args, $url) {
+    return new WP_Error('cwt_offline', "the tests make no HTTP requests ({$url})");
+}, 10, 3);
 
 add_action('cwt_ok', function (...$args): void {
     echo "did ok\n";

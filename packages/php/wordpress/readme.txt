@@ -29,7 +29,13 @@ It needs no change to your code or your other plugins. Every scheduled event bec
 
 What a run prints is kept as its output. Your own code can add lines with `cronwatch_log( 'sent 40 emails' );`.
 
-Alerts go by email (through `wp_mail()`, the way the site sends its other mail), to Slack, or to any URL as a signed JSON webhook: set them under Tools, CronWatch, where you can also send a test alert and see each event's health. A dashboard with each job's runs and timeline comes to wp-admin in a later release.
+Alerts go by email (through `wp_mail()`, the way the site sends its other mail), to Slack, or to any URL as a signed JSON webhook: set them under CronWatch, Settings, where you can also send a test alert and see each event's health.
+
+The CronWatch menu in wp-admin opens the dashboard, for administrators: every event's health at a glance, the last 24 hours as a timeline (when each event was due, when it ran and for how long, and the slots nothing ran in), and for each event its last seven days, its runs with their output and errors, and buttons to silence it, forget it or run the check now.
+
+= Ask Claude about your cron =
+
+CronWatch speaks the same small JSON API in every language it runs in, and [@cronwatch/mcp](https://www.npmjs.com/package/@cronwatch/mcp) lets Claude and other AI assistants read it: which events are failing, what a run printed, silencing one for the night. The API is off until you turn it on under CronWatch, Settings, with a token; the page then shows the address and the line that adds it to Claude Code. Only requests that carry the token are answered, and only the API is exposed: the dashboard stays in wp-admin.
 
 CronWatch is the WordPress plugin of [the CronWatch library](https://cronwatch.dev/), which also watches jobs in Node, Ruby, Python and PHP apps and keeps the same tables in every language.
 
@@ -57,7 +63,7 @@ CronWatch finds missed runs with a check every five minutes, which it schedules 
 
 = For developers =
 
-* `cronwatch_alerts` (filter): the list of alert channels. Add any object implementing `Cronwatch\Alerts\AlertChannel`, or a callable taking the `Cronwatch\Alert`.
+* `cronwatch_alerts` (filter): the list of alert channels. Add any object implementing `Cronwatch\Alerts\AlertChannel`, or a callable taking the `Cronwatch\Alert`. The library's channels (Discord, Resend, Twilio, Sentry and the rest) send through `wp_remote_post()` here.
 * `cronwatch_watch_event` (filter): return false to leave an event unwatched. Given `true`, the hook, its arguments and its recurrence name (null for a single event).
 * `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence.
 * `cronwatch_client_args` (filter): the arguments the library's client is made with.
@@ -75,6 +81,8 @@ When you set one, alerts are sent to:
 
 An alert holds the job's name, what went wrong, and the end of the run's output and error.
 
+The JSON API is off unless you turn it on. When it is on, anyone who has the token can read the events, their runs and their output, silence or forget them, and run the check, so keep the token as you would a password, and make a new one under CronWatch, Settings, if it leaks. The plugin itself sends nothing to anyone through it.
+
 = Licence =
 
 The plugin is GPLv2 or later. It includes the cronwatch/cronwatch PHP library (in `lib/`), which is MIT licensed; the MIT licence is compatible with the GPL, and the library's licence text is in `lib/LICENSE`.
@@ -82,8 +90,11 @@ The plugin is GPLv2 or later. It includes the cronwatch/cronwatch PHP library (i
 == Installation ==
 
 1. Install and activate the plugin. It creates its three tables and schedules its check.
-2. Under Tools, CronWatch, enter where alerts should go and send a test alert.
+2. Under CronWatch, Settings, enter where alerts should go and send a test alert.
 3. If the site is not visited every few minutes, set up the server cron described above.
+4. Open CronWatch in wp-admin for the dashboard.
+
+On a multisite network it can be activated network wide: every site gets its own tables and check, including sites made later.
 
 It needs PHP 8.2 or newer and MySQL 5.7.8 or MariaDB 10.3 or newer (the versions with the JSON functions it reads state with). Deleting the plugin removes its tables, settings and scheduled check.
 
@@ -95,14 +106,21 @@ No. On an ordinary page view it does nothing but note, when WP-Cron runs an even
 
 = An event is reported missed but my site is fine =
 
-The event did not run within its recurrence plus the grace. On a quiet site that is WP-Cron waiting for a visit: see "Why a check that runs on page visits misses a quiet site". If an event is late by design, raise the grace under Tools, CronWatch, or give that job its own with the `cronwatch_job_options` filter.
+The event did not run within its recurrence plus the grace. On a quiet site that is WP-Cron waiting for a visit: see "Why a check that runs on page visits misses a quiet site". If an event is late by design, raise the grace under CronWatch, Settings, or give that job its own with the `cronwatch_job_options` filter.
 
 = Can I watch events of one plugin only? =
 
 Yes, with the `cronwatch_watch_event` filter.
+
+= Is the dashboard public? =
+
+No. It is in wp-admin, for users who may manage options, and every change it makes carries a WordPress nonce. The JSON API is the only part that can be reached from outside wp-admin, and only when you turn it on with a token.
 
 == Changelog ==
 
 = 0.5.0 =
 
 * First release: WP-Cron events recorded as jobs, missed, failed, stuck and slow alerts by email, Slack and webhook, `wp cronwatch check`.
+* The dashboard in wp-admin: health, the last 24 hours, each event's week and runs.
+* The JSON API for @cronwatch/mcp, off until turned on with a token.
+* Network activation on multisite, including sites made later.

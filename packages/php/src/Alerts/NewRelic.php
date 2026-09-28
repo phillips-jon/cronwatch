@@ -47,7 +47,7 @@ final class NewRelic implements AlertChannel
         $this->url = "{$host}/v1/accounts/{$account}/events";
         $this->eventType = $eventType ?? 'CronWatchAlert';
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

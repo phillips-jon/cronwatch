@@ -43,8 +43,7 @@ final class Shared
      */
     public static function url(string $url): ?array
     {
-        // The parser drops leading and trailing C0 controls and spaces.
-        $url = trim($url, "\x00..\x20");
+        $url = self::cleanUrl($url);
         if (preg_match('/^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^\/?#]*)([^?#]*)(\?[^#]*)?/', $url, $m) !== 1) {
             return null;
         }
@@ -82,6 +81,60 @@ final class Shared
         ];
     }
 
+    /**
+     * A URL as the URL parser (and so fetch) reads it: characters U+0000 to
+     * U+0020 around it dropped, and every tab, CR and LF inside it removed (a
+     * pasted webhook URL often ends in a newline).
+     */
+    public static function cleanUrl(string $url): string
+    {
+        return str_replace(["\t", "\r", "\n"], '', trim($url, "\x00..\x20"));
+    }
+
+    /**
+     * The URL, cleaned, once it is one a channel can post to: http or https
+     * with a host. Refused without quoting it, since a webhook URL's path is
+     * its credential: "not ftp:" for another scheme with a host, "not this
+     * URL" for anything else (no scheme, no host, or a space or control
+     * character left inside it).
+     */
+    public static function postable(string $url): string
+    {
+        $clean = self::cleanUrl($url);
+        $parts = preg_match('/[\x00-\x20\x7F]/', $clean) === 1 ? null : self::url($clean);
+        if ($parts === null) {
+            throw new \InvalidArgumentException('only http and https URLs can be posted to, not this URL');
+        }
+        if ($parts['scheme'] !== 'http' && $parts['scheme'] !== 'https') {
+            throw new \InvalidArgumentException("only http and https URLs can be posted to, not {$parts['protocol']}");
+        }
+        return $clean;
+    }
+
+    /**
+     * An error message about a request to `url` with the URL's path, query
+     * and credentials taken out, so only its origin can show: what curl,
+     * PHP's streams or WordPress say can quote the URL.
+     */
+    public static function scrub(string $message, string $url): string
+    {
+        $clean = self::cleanUrl($url);
+        $message = str_replace([$clean, $url], self::origin($url), $message);
+        $pieces = [
+            (string) preg_replace('#^[A-Za-z][A-Za-z0-9+.-]*://[^/?\#]*#', '', $clean),
+            (string) parse_url($clean, PHP_URL_PATH),
+            (string) parse_url($clean, PHP_URL_QUERY),
+            (string) parse_url($clean, PHP_URL_USER),
+            (string) parse_url($clean, PHP_URL_PASS),
+        ];
+        foreach ($pieces as $piece) {
+            if (strlen($piece) > 1) {
+                $message = str_replace($piece, '', $message);
+            }
+        }
+        return $message;
+    }
+
     /** new URL(url).origin: the scheme, host and port only. A URL's path or query can hold a credential. */
     public static function origin(string $url): string
     {
@@ -104,7 +157,7 @@ final class Shared
      */
     public static function post(Http $http, string $provider, string $url, array $headers, string $body, array $secrets = []): HttpResponse
     {
-        $response = $http->post($url, $body, $headers);
+        $response = $http->post(self::postable($url), $body, $headers);
         if ($response->ok()) {
             return $response;
         }

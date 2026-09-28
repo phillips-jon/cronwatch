@@ -9,14 +9,23 @@ namespace Cronwatch;
  * single convention, so the first of CRONWATCH_ENV, APP_ENV (Laravel,
  * Symfony, Craft) and WP_ENVIRONMENT_TYPE (WordPress) that is set is used,
  * from getenv(), $_ENV or $_SERVER, since frameworks that read a .env file
- * put its values in one of those. It only decides whether the in-memory
- * store warns that it forgets on restart.
+ * put its values in one of those; failing those, what a framework
+ * integration names with setFallback() (the WordPress plugin gives
+ * wp_get_environment_type(), which also reads the constant of that name).
+ * "development", "dev", "local", "test" and "testing" are development (the
+ * SDK's NODE_ENV "development" and "test", and Laravel's and Symfony's own
+ * names); "production" and "prod" are production.
+ *
+ * It decides whether the in-memory store warns that it forgets, and whether
+ * the dashboard makes a development token when none is configured.
  *
  * @internal
  */
 final class Env
 {
     private const VARIABLES = ['CRONWATCH_ENV', 'APP_ENV', 'WP_ENVIRONMENT_TYPE'];
+
+    private static ?\Closure $fallback = null;
 
     public static function read(string $name): ?string
     {
@@ -32,6 +41,12 @@ final class Env
         return null;
     }
 
+    /** What names the environment when no variable does (a framework's own setting), or null for nothing. */
+    public static function setFallback(?callable $read): void
+    {
+        self::$fallback = $read === null ? null : \Closure::fromCallable($read);
+    }
+
     public static function environment(): ?string
     {
         foreach (self::VARIABLES as $name) {
@@ -39,6 +54,14 @@ final class Env
             if ($value !== null) {
                 return strtolower(trim($value));
             }
+        }
+        if (self::$fallback !== null) {
+            try {
+                $value = (self::$fallback)();
+            } catch (\Throwable) {
+                return null;
+            }
+            return is_string($value) && trim($value) !== '' ? strtolower(trim($value)) : null;
         }
         return null;
     }

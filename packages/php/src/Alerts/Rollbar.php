@@ -36,7 +36,7 @@ final class Rollbar implements AlertChannel
         // A pasted credential often carries a stray space or newline, which a header would refuse or send.
         $this->accessToken = Shared::required($accessToken, 'Rollbar needs an accessToken');
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string

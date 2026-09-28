@@ -40,7 +40,7 @@ final class Postmark implements AlertChannel
         $this->serverToken = Shared::required($serverToken, 'Postmark needs a serverToken');
         $this->to = Email::recipients('Postmark', $from, $to);
         $this->link = $link === null ? null : \Closure::fromCallable($link);
-        $this->http = $http ?? NativeHttp::default();
+        $this->http = $http ?? Transport::default();
     }
 
     public function name(): string
