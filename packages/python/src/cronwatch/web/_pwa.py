@@ -1,0 +1,147 @@
+"""What makes the dashboard an installable web app, as the SDK's
+routes/pwa.ts has it: a manifest, icons, a service worker, the script that
+registers it and a page to show offline. None of it says anything about the
+jobs, so it is served without the token (a browser fetches the manifest and
+icons without cookies in some flows)."""
+
+from __future__ import annotations
+
+import base64
+from dataclasses import dataclass
+
+from .. import _js
+from . import _icons
+
+#: The page colours the app's window takes: the paper behind the sheet, and the sheet the header sits on.
+BACKGROUND_COLOR = "#f4f4f5"
+THEME_COLOR = "#ffffff"
+THEME_COLOR_DARK = "#111113"
+
+#: Registers the service worker, and does nothing else. The page works the
+#: same without it. Its own URL gives the base, so it is the same text
+#: wherever the dashboard is mounted.
+APP_JS = """"use strict";
+(function () {
+  var script = document.currentScript;
+  if (!script || !("serviceWorker" in navigator)) return;
+  var base = new URL("./", script.src);
+  navigator.serviceWorker.register(new URL("sw.js", base).href, { scope: base.pathname }).catch(function () {});
+})();
+"""
+
+#: The service worker. It caches the app shell (the offline page, the
+#: manifest, the icons and app.js) and nothing else: every other request goes
+#: to the network as the page made it, and its answer is never stored, since
+#: the pages and the JSON carry job data. When a page cannot be reached it
+#: shows the offline page. Its scope gives the base, so it is the same text
+#: wherever the dashboard is mounted.
+SW_JS = """"use strict";
+var VERSION = "cronwatch-shell-1";
+var SCOPE = self.registration.scope;
+var CACHE = VERSION + " " + SCOPE;
+var SHELL = ["offline", "manifest.webmanifest", "app.js", "icons/icon.svg", "icons/maskable.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-512.png", "icons/apple-touch-icon.png"].map(function (path) {
+  return new URL(path, SCOPE).href;
+});
+var OFFLINE = SHELL[0];
+
+self.addEventListener("install", function (event) {
+  event.waitUntil(caches.open(CACHE).then(function (cache) {
+    return cache.addAll(SHELL.map(function (url) { return new Request(url, { credentials: "omit", cache: "reload" }); }));
+  }).then(function () { return self.skipWaiting(); }));
+});
+
+self.addEventListener("activate", function (event) {
+  event.waitUntil(caches.keys().then(function (keys) {
+    return Promise.all(keys.filter(function (key) {
+      return key !== CACHE && key.indexOf("cronwatch-shell-") === 0 && key.slice(key.indexOf(" ") + 1) === SCOPE;
+    }).map(function (key) { return caches.delete(key); }));
+  }).then(function () { return self.clients.claim(); }));
+});
+
+self.addEventListener("fetch", function (event) {
+  var request = event.request;
+  if (request.method !== "GET") return;
+  var url = new URL(request.url);
+  url.search = "";
+  if (SHELL.indexOf(url.href) !== -1 && url.href !== OFFLINE) {
+    event.respondWith(caches.open(CACHE).then(function (cache) {
+      return cache.match(url.href).then(function (hit) { return hit || fetch(request); });
+    }));
+    return;
+  }
+  if (request.mode !== "navigate") return;
+  event.respondWith(fetch(request).catch(function () {
+    return caches.open(CACHE).then(function (cache) { return cache.match(OFFLINE); }).then(function (page) {
+      return page || new Response("You are offline.", { status: 503, headers: { "content-type": "text/plain; charset=utf-8" } });
+    });
+  }));
+});
+"""
+
+YEAR = "public, max-age=31536000, immutable"
+REVALIDATE = "no-cache"
+
+
+@dataclass(frozen=True)
+class Asset:
+    """One app shell file: its type, body and Cache-Control, and whether it
+    is the service worker (which may control everything under the base)."""
+
+    type: str
+    body: bytes
+    cache: str
+    worker: bool = False
+
+
+_ICONS: dict[str, tuple[str, str, bool]] = {
+    "/icons/icon.svg": ("image/svg+xml", _icons.ICON_SVG, False),
+    "/icons/maskable.svg": ("image/svg+xml", _icons.MASKABLE_SVG, False),
+    "/icons/icon-192.png": ("image/png", _icons.ICON_192_PNG, True),
+    "/icons/icon-512.png": ("image/png", _icons.ICON_512_PNG, True),
+    "/icons/maskable-512.png": ("image/png", _icons.MASKABLE_512_PNG, True),
+    "/icons/apple-touch-icon.png": ("image/png", _icons.APPLE_TOUCH_ICON_PNG, True),
+}
+
+
+def manifest(base: str) -> str:
+    """The manifest, for the dashboard mounted at `base` ("" at the root)."""
+
+    def icon(name: str, sizes: str, kind: str, purpose: str) -> dict[str, str]:
+        return {"src": f"{base}/icons/{name}", "sizes": sizes, "type": kind, "purpose": purpose}
+
+    return _js.dumps(
+        {
+            "id": f"{base}/",
+            "name": "CronWatch",
+            "short_name": "CronWatch",
+            "description": "The scheduled jobs of this app: their health, their last day and their runs.",
+            "start_url": f"{base}/",
+            "scope": f"{base}/",
+            "display": "standalone",
+            "background_color": BACKGROUND_COLOR,
+            "theme_color": THEME_COLOR,
+            "icons": [
+                icon("icon.svg", "any", "image/svg+xml", "any"),
+                icon("maskable.svg", "any", "image/svg+xml", "maskable"),
+                icon("icon-192.png", "192x192", "image/png", "any"),
+                icon("icon-512.png", "512x512", "image/png", "any"),
+                icon("maskable-512.png", "512x512", "image/png", "maskable"),
+            ],
+        }
+    )
+
+
+def asset(path: str, base: str) -> Asset | None:
+    """The app shell file at `path` (the path under the base), or None. The
+    offline page is HTML and is served by the routes themselves."""
+    if path == "/manifest.webmanifest":
+        return Asset("application/manifest+json", manifest(base).encode(), REVALIDATE)
+    if path == "/app.js":
+        return Asset("text/javascript; charset=utf-8", APP_JS.encode(), REVALIDATE)
+    if path == "/sw.js":
+        return Asset("text/javascript; charset=utf-8", SW_JS.encode(), REVALIDATE, worker=True)
+    found = _ICONS.get(path)
+    if found is None:
+        return None
+    kind, body, binary = found
+    return Asset(kind, base64.b64decode(body) if binary else body.encode(), YEAR)

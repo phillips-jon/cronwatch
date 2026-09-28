@@ -1,6 +1,6 @@
 # @cronwatch/mcp
 
-An MCP server for apps that use [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk). It talks to the JSON API the app mounts with `cw.routes()`, so Claude Code, Cursor or any MCP client can list jobs, read a failing run's error and output, run a check, and silence a job during a fix.
+An MCP server for apps that use [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk). It talks to the JSON API the app mounts with `cw.routes()`, so Claude Code, Cursor or any MCP client can list jobs, read a failing run's error and output, run a check, and silence a job during a fix. The Ruby gem's `Cronwatch::Web` and the Python package's `cw.routes()` (or `cronwatch.django`) serve the same API, so it works against those apps too.
 
 ```bash
 claude mcp add cronwatch \

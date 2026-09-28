@@ -3,7 +3,8 @@
 # project, on the two Node majors better-sqlite3 13 supports. The Ruby gem's
 # tests run on the oldest and newest Ruby it supports, against each
 # supported Rails series. The Python package's tests run on the oldest and
-# newest Python it supports. One Node, one Ruby and one Python entry also
+# newest Python it supports, against each supported Django series. One Node,
+# one Ruby and one Python entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
 # A green run on main is what lets deploy.yml ship the site.
@@ -194,16 +195,22 @@ jobs:
           CRONWATCH_TEST_RUBY: "1"
           CRONWATCH_RUBY: bundle exec ruby
 
-  # The Python package's tests replay conformance/, share a SQLite file with
-  # the built SDK and check the croner port against croner, so the SDK is
-  # built (and the fixtures checked) first. Postgres store tests run against
-  # the service.
+  # The Python package's tests replay conformance/ and the dashboard fixture,
+  # share a SQLite file with the built SDK and check the croner port against
+  # croner, so the SDK is built (and the fixtures checked) first. Postgres
+  # store tests run against the service. Each supported Django series (5.2
+  # LTS, 6.0 and 6.1; 6.x needs Python 3.12 or newer) runs over the dev
+  # group's Django with `uv run --with`.
   python:
-    name: python (Python ${{ matrix.python }})
+    name: python (Python ${{ matrix.python }}, Django ${{ matrix.django }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python: ["3.11", "3.14"]
+        include:
+          - { python: "3.11", django: "5.2" }
+          - { python: "3.14", django: "5.2" }
+          - { python: "3.14", django: "6.0" }
+          - { python: "3.14", django: "6.1" }
     services:
       postgres:
         image: postgres:16-alpine
@@ -220,7 +227,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --no-audit --no-fund
-      # Builds the SDK, then fails if conformance/ is stale.
+      # Builds the SDK, then fails if conformance/, the dashboard fixture
+      # (packages/ruby/test/web/golden.json) or the icons are stale.
       - run: npm run check:conformance
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
@@ -228,7 +236,7 @@ jobs:
       # A second Postgres with pg_cron, for the pg_cron source's tests against
       # the real extension, as the Node and Ruby jobs start it.
       - name: Start Postgres with pg_cron
-        if: matrix.python == '3.14'
+        if: matrix.python == '3.14' && matrix.django == '6.1'
         run: |
           docker run -d --name pgcron -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 5433:5432 postgres:16 \
             bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-cron > /dev/null && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw'
@@ -241,10 +249,17 @@ jobs:
           done
           docker logs pgcron
           exit 1
-      - run: uv run --python ${{ matrix.python }} pytest
+      - run: uv run --python ${{ matrix.python }} --with "django~=${{ matrix.django }}.0" pytest
         working-directory: packages/python
         env:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+      # @cronwatch/mcp's tools against cronwatch.web, served by
+      # packages/python/tests/web_server.py through uv on this entry's Python.
+      - name: MCP server against cronwatch.web
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_PYTHON: "1"
+          UV_PYTHON: ${{ matrix.python }}
       # Build the wheel, install it into an empty virtualenv and use it from a
       # directory outside the project, as an app would.
       - name: Build, install and import the package
@@ -253,13 +268,14 @@ jobs:
           dir="$(mktemp -d)"
           uv build --out-dir "$dir/dist"
           uv venv --python ${{ matrix.python }} "$dir/venv"
-          VIRTUAL_ENV="$dir/venv" uv pip install "$dir"/dist/*.whl
+          VIRTUAL_ENV="$dir/venv" uv pip install "$dir"/dist/*.whl "django~=${{ matrix.django }}.0"
           cd "$dir"
           "$dir/venv/bin/python" -c '
           import cronwatch
           from cronwatch.alerts import Resend
           from cronwatch.sources.pgcron import PgCron
           from cronwatch.stores import SqliteStore
+          import cronwatch.django.urls, cronwatch.django.management.commands.cronwatch_check
           class NoCron:
               def query(self, sql, params):
                   return []
@@ -269,5 +285,9 @@ jobs:
           assert job.run(lambda ctx: ctx.log("ok") or 42) == 42
           run = cw.runs("smoke")[0]
           assert run.ok and run.output == "ok", run
+          web = cw.routes(token="smoke")
+          seen = {}
+          body = web({"REQUEST_METHOD": "GET", "PATH_INFO": "/api/jobs", "HTTP_AUTHORIZATION": "Bearer smoke"}, lambda status, headers: seen.update(status=status))
+          assert seen["status"] == "200 OK" and b'"name":"smoke"' in b"".join(body), seen
           print("cronwatch", cronwatch.__version__, "from", cronwatch.__file__)
           '

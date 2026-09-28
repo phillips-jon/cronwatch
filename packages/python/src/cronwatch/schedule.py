@@ -109,6 +109,35 @@ def _fire_after(parsed: ParsedSchedule, start: int) -> int | None:
     return None
 
 
+def fires_between(parsed: ParsedSchedule, start: int, end: int, limit: int) -> list[int] | None:
+    """Every fire of a cron strictly after `start` and at or before `end`,
+    ascending, or None when there are more than `limit`. Asks for fires in
+    batches, which is far cheaper than one next_fire per fire, and drops any
+    that do not move forward (see _fire_after). The dashboard's timelines draw these."""
+    cron = parsed._cron
+    if cron is None:
+        raise ValueError(f'schedule "{parsed.source}" was not made by parse_schedule')
+    out: list[int] = []
+    probe = start
+    last = start
+    for _ in range(1000):
+        batch = cron.next_runs(min(limit + 1 - len(out), 24), probe)
+        if not batch:
+            return out
+        for t in batch:
+            if t <= last:
+                continue
+            if t > end:
+                return out
+            out.append(t)
+            last = t
+            if len(out) > limit:
+                return None
+        finish = batch[-1]
+        probe = finish if finish > probe else probe + 3_600_000
+    return out
+
+
 def next_fire(parsed: ParsedSchedule, start: int, last_run_at: int | None) -> int | None:
     """The next time the schedule fires strictly after `start`. For an interval, counted from the last run when there is one."""
     if parsed.kind == "interval":

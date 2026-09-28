@@ -100,7 +100,38 @@ alerts = [
 
 `cronwatch.sources.pgcron.PgCron(url_or_connection, prefix="db:")`, passed in `sources=[...]`, watches pg_cron's jobs: each is declared with its schedule, and the rows of `cron.job_run_details` are copied in as runs on every check, so missed, failed, stuck and slow pg_cron jobs alert like any other.
 
-The dashboard and the Django, Celery and APScheduler integrations follow in later releases; [DESIGN.md](DESIGN.md) has the plan.
+### The dashboard
+
+`cw.routes(token=...)` is the SDK's dashboard and JSON API, page for page: a board of every job with its last day drawn as a timeline, a page per job with its week and runs, silence and forget, and the JSON that `@cronwatch/mcp` reads. It is a WSGI app, and its `.asgi` is the same routes as an ASGI app:
+
+```python
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {"/cronwatch": cw.routes()})   # Flask
+app.mount("/cronwatch", cw.routes().asgi)                                         # FastAPI, Starlette
+```
+
+Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. It defaults to `$CRONWATCH_TOKEN`; with none set the routes answer 503, except in development (`CRONWATCH_ENV=development`), where they make one and print a sign-in link. `token=None` serves them open, behind your own auth. `/api/check` also takes the client's `cron_secret` as a bearer, so a platform cron can run checks. Behind a proxy, pass `origin="https://app.example.com"` (or `trust_proxy=True` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`).
+
+### Django
+
+`pip install "cronwatch-sdk[django]"` (Django 5.2 or newer), then:
+
+```python
+# settings.py
+INSTALLED_APPS = [..., "cronwatch.django"]
+CRONWATCH = {
+    "STORE": "myapp.monitoring.make_store",   # a store, or a dotted path to one or to what makes one
+    "ALERTS": [Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])],
+    "TOKEN": os.environ["CRONWATCH_TOKEN"],
+}
+
+# urls.py
+urlpatterns = [..., path("cronwatch/", include("cronwatch.django.urls"))]
+```
+
+`CRONWATCH` takes the client's options in upper case (`STORE`, `ALERTS`, `TRIAGE`, `SOURCES`, `CRON_SECRET`, `RETENTION`, `DEFAULTS`, `REDACT`, `DELIVER`, `ON_ERROR`), or `CLIENT` for a client you made yourself, and the dashboard's (`TOKEN`, `BASE_PATH`, `ORIGIN`, `TRUST_PROXY`). `cronwatch.django.client()` is the client made from them, and `cronwatch.client()` hands out the same one. `python manage.py cronwatch_check` runs one check, for cron to call every few minutes. `DEBUG` is the environment unless `CRONWATCH_ENV` says otherwise: with it on and no token set, the dashboard makes one and prints its sign-in link to the runserver log.
+
+The Celery and APScheduler integrations and an async client follow in a later release; [DESIGN.md](DESIGN.md) has the plan.
 
 ## Testing
 
@@ -111,7 +142,7 @@ uv run pytest                    # the Python uv picks
 uv run --python 3.11 pytest      # any of 3.11 to 3.14
 ```
 
-`tests/test_conformance.py` replays the cases in the repository's `conformance/` directory, generated from the TypeScript SDK. `tests/test_node_compat.py` shares a SQLite file with the built SDK, and `tests/test_schedule_fuzz.py` checks thousands of generated cron expressions against croner itself; both need Node and the SDK built first (`npm ci && npm run build` at the repository root), and skip with the reason otherwise. The Postgres store's tests run when `CRONWATCH_TEST_PG` is a Postgres URL, and the pg_cron source's tests against the real extension when `CRONWATCH_TEST_PGCRON` is the URL of a Postgres with pg_cron in `cron.database_name` (CI starts both). `npm run check:python` at the root runs the suite.
+`tests/test_conformance.py` replays the cases in the repository's `conformance/` directory, generated from the TypeScript SDK. `tests/test_node_compat.py` shares a SQLite file with the built SDK, and `tests/test_schedule_fuzz.py` checks thousands of generated cron expressions against croner itself; both need Node and the SDK built first (`npm ci && npm run build` at the repository root), and skip with the reason otherwise. The Postgres store's tests run when `CRONWATCH_TEST_PG` is a Postgres URL, and the pg_cron source's tests against the real extension when `CRONWATCH_TEST_PGCRON` is the URL of a Postgres with pg_cron in `cron.database_name` (CI starts both). `tests/test_web_golden.py` replays the SDK routes' answers to a fixed seed (`packages/ruby/test/web/golden.json`, which the gem replays too) and compares every page and header byte for byte. `tests/test_django.py` runs on the dev group's Django; CI runs it on each supported series with `uv run --with "django~=5.2.0" pytest` (and 6.0, 6.1). `npm run check:python` at the root runs the suite.
 
 ## License
 

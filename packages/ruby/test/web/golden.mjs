@@ -1,6 +1,8 @@
 // Captures what the SDK's routes answer for a fixed seed, so the gem's
-// Cronwatch::Web can be compared with them byte for byte
-// (test/web_golden_test.rb). Build the SDK first, then from the repo root:
+// Cronwatch::Web and the Python package's cronwatch.web can be compared with
+// them byte for byte (test/web_golden_test.rb and
+// packages/python/tests/test_web_golden.py). Build the SDK first, then from
+// the repo root:
 //
 //   npm run build --workspace packages/sdk
 //   TZ=UTC node packages/ruby/test/web/golden.mjs
@@ -8,7 +10,7 @@
 // With --check it writes nothing and exits 1 when golden.json is stale
 // (`npm run check:conformance`, part of `npm run check`, runs it that way).
 //
-// The seed here and in web_golden_test.rb must stay the same, step for step.
+// The seed here, in web_golden_test.rb and in test_web_golden.py must stay the same, step for step.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

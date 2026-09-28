@@ -1,15 +1,16 @@
 // Draws the dashboard's app icons (the CronWatch clock on the dark rounded
-// square of cronwatch.dev's favicon) and writes them into the SDK and the gem
-// as constants, so the dashboard serves them from memory with no files and no
-// dependencies:
+// square of cronwatch.dev's favicon) and writes them into the SDK, the gem and
+// the Python package as constants, so the dashboard serves them from memory
+// with no files and no dependencies:
 //
 //   packages/sdk/src/routes/icons.ts
 //   packages/ruby/lib/cronwatch/web/icons.rb
+//   packages/python/src/cronwatch/web/_icons.py
 //
 // Run from the repo root after changing the drawing:
 //
-//   node scripts/make-dashboard-icons.mjs            write both files
-//   node scripts/make-dashboard-icons.mjs --check    exit 1 when either is stale
+//   node scripts/make-dashboard-icons.mjs            write the three files
+//   node scripts/make-dashboard-icons.mjs --check    exit 1 when any is stale
 //   node scripts/make-dashboard-icons.mjs --out DIR  also write the PNGs and SVGs to DIR
 //
 // The PNGs are rasterised here in plain JavaScript (signed distances, so the
@@ -24,6 +25,7 @@ import { crc32, deflateSync } from "node:zlib";
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TS_OUT = path.join(ROOT, "packages/sdk/src/routes/icons.ts");
 const RB_OUT = path.join(ROOT, "packages/ruby/lib/cronwatch/web/icons.rb");
+const PY_OUT = path.join(ROOT, "packages/python/src/cronwatch/web/_icons.py");
 
 // The favicon's colours (site/src/assets/favicon.svg).
 const SQUARE = [0x14, 0x14, 0x17];
@@ -198,6 +200,19 @@ module Cronwatch
   end
 end
 `;
+const py = `# ${NOTE}
+"""The dashboard's app icons, as the SDK's routes/icons.ts has them."""
+
+#: The favicon: the clock on a dark rounded square.
+ICON_SVG = ${JSON.stringify(ICON_SVG)}
+#: The same square to every edge, for masks.
+MASKABLE_SVG = ${JSON.stringify(MASKABLE_SVG)}
+#: PNGs, base64: 192 and 512 for the manifest, a maskable 512, and iOS's 180 home screen icon.
+ICON_192_PNG = "${b64("icon-192.png")}"
+ICON_512_PNG = "${b64("icon-512.png")}"
+MASKABLE_512_PNG = "${b64("maskable-512.png")}"
+APPLE_TOUCH_ICON_PNG = "${b64("apple-touch-icon.png")}"
+`;
 
 const outDir = process.argv.includes("--out") ? process.argv[process.argv.indexOf("--out") + 1] : null;
 if (outDir) {
@@ -209,7 +224,7 @@ if (outDir) {
 
 const sizes = Object.entries(pngs).map(([name, data]) => `${name} ${data.length} bytes`).join(", ");
 if (process.argv.includes("--check")) {
-  const stale = [[TS_OUT, ts], [RB_OUT, rb]].filter(([file, text]) => {
+  const stale = [[TS_OUT, ts], [RB_OUT, rb], [PY_OUT, py]].filter(([file, text]) => {
     try {
       return readFileSync(file, "utf8") !== text;
     } catch {
@@ -224,5 +239,6 @@ if (process.argv.includes("--check")) {
 } else {
   writeFileSync(TS_OUT, ts);
   writeFileSync(RB_OUT, rb);
-  console.log(`wrote ${path.relative(ROOT, TS_OUT)} and ${path.relative(ROOT, RB_OUT)} (${sizes})`);
+  writeFileSync(PY_OUT, py);
+  console.log(`wrote ${path.relative(ROOT, TS_OUT)}, ${path.relative(ROOT, RB_OUT)} and ${path.relative(ROOT, PY_OUT)} (${sizes})`);
 }

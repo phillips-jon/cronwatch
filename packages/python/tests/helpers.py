@@ -120,6 +120,76 @@ PGCRON = os.environ.get("CRONWATCH_TEST_PGCRON") or None
 NO_PGCRON = "set CRONWATCH_TEST_PGCRON to the URL of a Postgres with pg_cron (in cron.database_name) to run"
 
 
+class WebResponse:
+    """A response from the routes, read the way the SDK tests read a fetch Response."""
+
+    def __init__(self, status: int, headers: dict[str, str], body: bytes) -> None:
+        self.status = status
+        self.headers = headers
+        self.body = body
+
+    @property
+    def text(self) -> str:
+        return self.body.decode("utf-8")
+
+    def json(self) -> Any:
+        import json
+
+        return json.loads(self.body)
+
+
+def send(
+    app: Any,
+    method: str,
+    url: str,
+    headers: dict[str, str] | None = None,
+    body: str | bytes | None = None,
+    script_name: str = "",
+    raw: bool = True,
+) -> WebResponse:
+    """Sends one request to a WSGI app, as a server would: the path decoded in
+    PATH_INFO and, with `raw`, the request target as sent in RAW_URI (as
+    gunicorn passes it). `url` may be a path on http://app.test."""
+    import io
+    from urllib.parse import unquote_to_bytes, urlsplit
+
+    if url.startswith("/"):
+        url = f"http://app.test{url}"
+    scheme, netloc, _, _, _ = urlsplit(url)
+    target = url[len(f"{scheme}://{netloc}") :] or "/"
+    path, _, query = target.partition("?")
+    data = body.encode() if isinstance(body, str) else (body or b"")
+    decoded = unquote_to_bytes(path).decode("latin-1")
+    environ: dict[str, Any] = {
+        "REQUEST_METHOD": method,
+        "SCRIPT_NAME": script_name,
+        "PATH_INFO": decoded[len(script_name) :] if script_name and decoded.startswith(script_name) else decoded,
+        "QUERY_STRING": query,
+        "SERVER_NAME": netloc.split(":")[0],
+        "SERVER_PORT": netloc.split(":")[1] if ":" in netloc else ("443" if scheme == "https" else "80"),
+        "SERVER_PROTOCOL": "HTTP/1.1",
+        "HTTP_HOST": netloc,
+        "wsgi.url_scheme": scheme,
+        "wsgi.input": io.BytesIO(data),
+        "wsgi.errors": io.StringIO(),
+    }
+    if raw:
+        environ["RAW_URI"] = target
+    if data:
+        environ["CONTENT_LENGTH"] = str(len(data))
+    for name, value in (headers or {}).items():
+        key = name.upper().replace("-", "_")
+        environ[key if key in ("CONTENT_TYPE", "CONTENT_LENGTH") else f"HTTP_{key}"] = value
+    started: dict[str, Any] = {}
+
+    def start_response(status: str, response_headers: list[tuple[str, str]]) -> None:
+        started["status"] = int(status.split(" ", 1)[0])
+        started["headers"] = dict(response_headers)
+
+    out = b"".join(app(environ, start_response))
+    return WebResponse(started["status"], started["headers"], out)
+
+
 def pg_prefix(label: str = "t") -> str:
     """Tables of their own for one test, so tests never see each other's rows."""
     return f"py{label}{os.getpid()}_{uuid.uuid4().hex[:8]}_"

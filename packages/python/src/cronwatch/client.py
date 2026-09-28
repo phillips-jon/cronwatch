@@ -393,7 +393,7 @@ class Cronwatch:
     sources:  where runs this process does not wrap come from. Each is synced at the start of every
               check(); one that raises is reported to on_error and the check carries on.
     cron_secret: the secret an outside cron must present to the check endpoint of the web dashboard
-              (a later release). Defaults to $CRON_SECRET; "" counts as unset; None for none.
+              (routes()). Defaults to $CRON_SECRET; "" counts as unset; None for none.
     retention: how long finished runs are kept. Default "30d".
     defaults: grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
     redact:   applied to every run's output and error before it is stored, shown or sent. The default
@@ -647,6 +647,14 @@ class Cronwatch:
             self._definitions.pop(name, None)
             self._synced.discard(name)
         self.store.delete_job(name)
+
+    def routes(self, **options: Any) -> Any:
+        """The dashboard and JSON API for this client: a cronwatch.web.Web, which
+        is a WSGI app, with the same routes as an ASGI app in its .asgi. Takes
+        token, base_path, origin and trust_proxy (see cronwatch.web)."""
+        from .web import Web
+
+        return Web(self, **options)
 
     def start(self, every: Duration = "1m") -> None:
         """Check on an interval, in a daemon thread, for long-running processes.
