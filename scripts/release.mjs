@@ -10,6 +10,7 @@
  *   --branch <name>    release from this branch instead of main (for testing)
  *   --skip-ruby        skip the gem's tests
  *   --skip-python      skip the Python package's tests
+ *   --skip-php         skip the PHP package's tests
  *   --deprecate <old>  also print `npm deprecate` for these versions (a version
  *                      or range, e.g. "<0.3.0"); may be given more than once
  *
@@ -30,6 +31,7 @@ const VERSIONED = [
   { file: "packages/ruby/lib/cronwatch/version.rb", pattern: /^(\s*VERSION = ")([^"]+)(")/m },
   { file: "packages/python/pyproject.toml", pattern: /^(version = ")([^"]+)(")/m },
   { file: "packages/python/src/cronwatch/__init__.py", pattern: /^(__version__ = ")([^"]+)(")/m },
+  { file: "packages/php/src/Cronwatch.php", pattern: /^( {4}public const VERSION = ')([^']+)(')/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -39,6 +41,10 @@ const PUBLISH = [
   { dir: "packages/mcp", commands: () => ["npm publish --workspace packages/mcp --access public"] },
   { dir: "packages/ruby", commands: (v, gem) => [`(cd packages/ruby && gem build cronwatch.gemspec && gem push cronwatch-${gem}.gem)`] },
   { dir: "packages/python", commands: () => ["(cd packages/python && rm -rf dist && uv build && uv publish)"] },
+  // Packagist publishes from git tags, and reads composer.json from a
+  // repository's root, so there is nothing to run here yet: see "Releasing"
+  // in packages/php/DESIGN.md (a split repository is the plan).
+  { dir: "packages/php", commands: (v) => [`# packages/php: nothing to publish until its Packagist repository exists; the pushed tag v${v} carries it (packages/php/DESIGN.md, Releasing)`] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */
@@ -65,7 +71,7 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const options = { version: null, dryRun: false, branch: "main", skipRuby: false, skipPython: false, deprecate: [] };
+  const options = { version: null, dryRun: false, branch: "main", skipRuby: false, skipPython: false, skipPhp: false, deprecate: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -76,16 +82,17 @@ function parseArgs(argv) {
     if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--skip-ruby") options.skipRuby = true;
     else if (arg === "--skip-python") options.skipPython = true;
+    else if (arg === "--skip-php") options.skipPhp = true;
     else if (arg === "--branch") options.branch = value();
     else if (arg === "--deprecate") options.deprecate.push(value());
     else if (arg === "--help" || arg === "-h") {
-      console.log("usage: node scripts/release.mjs <version> [--dry-run] [--branch <name>] [--skip-ruby] [--skip-python] [--deprecate <old>]");
+      console.log("usage: node scripts/release.mjs <version> [--dry-run] [--branch <name>] [--skip-ruby] [--skip-python] [--skip-php] [--deprecate <old>]");
       process.exit(0);
     } else if (arg.startsWith("--")) fail(`unknown option ${arg}`);
     else if (options.version === null) options.version = arg.replace(/^v/, "");
     else fail(`unexpected argument ${arg}`);
   }
-  if (options.version === null) fail("usage: node scripts/release.mjs <version> [--dry-run] [--branch <name>] [--skip-ruby] [--skip-python] [--deprecate <old>]");
+  if (options.version === null) fail("usage: node scripts/release.mjs <version> [--dry-run] [--branch <name>] [--skip-ruby] [--skip-python] [--skip-php] [--deprecate <old>]");
   return options;
 }
 
@@ -192,6 +199,12 @@ function hasUv() {
   return spawnSync("uv", ["--version"], { cwd: ROOT, encoding: "utf8" }).status === 0;
 }
 
+/** Whether a PHP the PHP package supports (8.2 or newer) and Composer, which run its tests, are on the PATH. */
+function hasPhp() {
+  const php = spawnSync("php", ["-r", "exit(PHP_VERSION_ID >= 80200 ? 0 : 1);"], { cwd: ROOT, encoding: "utf8" });
+  return php.status === 0 && spawnSync("composer", ["--version"], { cwd: ROOT, encoding: "utf8" }).status === 0;
+}
+
 /**
  * A Ruby the gem supports (3.2 or newer) with bundler: the one on PATH, or
  * else the newest such rbenv version. Returns { version, env } or null.
@@ -246,6 +259,7 @@ if (git("tag", "--list", tag) !== "") fail(`tag ${tag} already exists`);
 const edits = planEdits(current, next);
 const ruby = options.skipRuby ? null : findRuby();
 const uv = !options.skipPython && hasUv();
+const php = !options.skipPhp && hasPhp();
 const gem = gemVersion(next, ruby);
 const gemDir = options.dryRun ? path.join(os.tmpdir(), "cronwatch-gem-XXXXXX") : mkdtempSync(path.join(os.tmpdir(), "cronwatch-gem-"));
 const gemFile = path.join(gemDir, `cronwatch-${gem}.gem`);
@@ -264,6 +278,10 @@ const steps = [
     ["Build the gem", "gem", ["build", "cronwatch.gemspec", "--output", gemFile], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env, after: () => checkGem(gemFile, ruby) }],
   ] : []),
   ...(uv ? [["Test the Python package", "uv", ["run", "pytest", "-q"], { cwd: path.join(ROOT, "packages/python") }]] : []),
+  ...(php ? [
+    ["Install the PHP package's dev dependencies", "composer", ["install", "--no-interaction", "--quiet"], { cwd: path.join(ROOT, "packages/php") }],
+    ["Test the PHP package", "php", ["vendor/bin/phpunit"], { cwd: path.join(ROOT, "packages/php") }],
+  ] : []),
 ];
 const leftovers = strays(current);
 
@@ -283,6 +301,9 @@ else console.log(`\nRuby ${ruby.version}${ruby.env.RBENV_VERSION ? " (rbenv)" : 
 if (options.skipPython) console.log("Skipping the Python package's tests (--skip-python).");
 else if (!uv) console.log("No uv found; skipping the Python package's tests. CI runs them.");
 else console.log("uv found; the Python package's tests run.");
+if (options.skipPhp) console.log("Skipping the PHP package's tests (--skip-php).");
+else if (!php) console.log("No PHP 8.2 or newer with Composer found; skipping the PHP package's tests. CI runs them.");
+else console.log("PHP and Composer found; the PHP package's tests run.");
 if (gem !== next) console.log(`RubyGems spells ${next} as ${gem}.`);
 
 if (options.dryRun) {

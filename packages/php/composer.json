@@ -1,0 +1,44 @@
+{
+    "name": "cronwatch/cronwatch",
+    "description": "Cron and scheduled-job monitoring that lives inside your PHP app.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["cron", "monitoring", "scheduled jobs", "alerts", "heartbeat", "laravel", "symfony", "wordpress"],
+    "homepage": "https://cronwatch.dev",
+    "authors": [
+        {"name": "Jon C. Phillips"}
+    ],
+    "support": {
+        "docs": "https://cronwatch.dev/docs/",
+        "issues": "https://github.com/phillips-jon/cronwatch/issues",
+        "source": "https://github.com/phillips-jon/cronwatch/tree/main/packages/php"
+    },
+    "require": {
+        "php": ">=8.2",
+        "ext-json": "*",
+        "ext-pcre": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5 || ^12.0"
+    },
+    "suggest": {
+        "ext-pdo_sqlite": "For Cronwatch\\Store\\SqliteStore",
+        "ext-pdo_mysql": "For Cronwatch\\Store\\MysqlStore (MySQL 8.0.13 or MariaDB 10.6 and newer)"
+    },
+    "autoload": {
+        "psr-4": {
+            "Cronwatch\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Cronwatch\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
