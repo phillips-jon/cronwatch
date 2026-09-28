@@ -116,7 +116,7 @@ final class Api
 
     private static function dashboard(array $settings): Dashboard
     {
-        return new Dashboard(Plugin::client(), token: (string) $settings['api_token'], basePath: '/' . self::NAMESPACE, origin: AdminDashboard::origin(rest_url()));
+        return new Dashboard(Plugin::client(), token: (string) $settings['api_token'], basePath: '/' . self::NAMESPACE, origin: AdminDashboard::origin(rest_url()), head: [AdminDashboard::class, 'head']);
     }
 
     /** The token of `Bearer <token>`, as the dashboard reads it, or null for anything else. */

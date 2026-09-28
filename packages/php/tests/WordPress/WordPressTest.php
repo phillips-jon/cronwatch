@@ -680,6 +680,17 @@ final class WordPressTest extends TestCase
         $this->assertStringNotContainsString('/__cronwatch_wp_admin__', $page, 'every link points into wp-admin');
         $this->assertStringNotContainsString('manifest.webmanifest', $page);
         $this->assertStringNotContainsString('<script', $page);
+        $this->assertStringNotContainsString('<style', $page, 'the stylesheet is a file, enqueued');
+        $this->assertStringNotContainsString('script-src', $headers['content-security-policy'], 'no script at all');
+        $this->assertStringContainsString("style-src 'self' 'unsafe-inline'", $headers['content-security-policy']);
+        // Printed by wp_print_styles(), as WordPress prints an enqueued style.
+        $this->assertSame(1, preg_match("#<link rel=['\"]stylesheet['\"] id=['\"]cronwatch-dashboard-page-css['\"]\\s+href=['\"]([^'\"]*/wp-content/plugins/cronwatch/css/dashboard\\.css\\?ver=[^'\"]+)['\"]#", $page, $css), 'the stylesheet is linked');
+        [$status, $headers, $stylesheet] = self::http('GET', (string) preg_replace('#^https?://[^/]+#', '', html_entity_decode($css[1])));
+        $this->assertSame(200, $status);
+        $this->assertStringStartsWith('text/css', $headers['content-type']);
+        $this->assertSame(ltrim(\Cronwatch\Web\Html::CSS, "\n"), $stylesheet);
+        [$status] = self::http('GET', '/wp-admin/admin.php?page=cronwatch&cw=%2Fapp.js', $admin);
+        $this->assertSame(404, $status, 'the app shell\'s script is not served');
         $this->assertMatchesRegularExpression('#href="[^"]*/wp-admin/admin\.php\?page=cronwatch&\#038;cw=%2Fjobs%2Fwp%253Acwt_ok"#', $page);
 
         // A job's page, through the link the board gives it.

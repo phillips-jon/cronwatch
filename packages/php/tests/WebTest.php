@@ -200,6 +200,41 @@ final class WebTest extends TestCase
         $this->assertSame(404, self::send($web, 'GET', '/cronwatch/nope', self::BEARER)->status);
     }
 
+    public function testAHostsHeadReplacesThePagesAssetsAndTheAppShellItNoLongerNeeds(): void
+    {
+        $cw = $this->client();
+        $cw->job('nightly-report', ['schedule' => '0 2 * * *']);
+        $bases = [];
+        $web = new Dashboard($cw, 'tok', '/cronwatch', head: function (string $base) use (&$bases): string {
+            $bases[] = $base;
+            return "<link rel=\"stylesheet\" href=\"/assets/dashboard.css\">\n";
+        });
+        $plain = $this->routes($cw, 'tok');
+        foreach (['/cronwatch', '/cronwatch/jobs/nightly-report', '/cronwatch/nope'] as $path) {
+            $page = self::send($web, 'GET', $path, self::BEARER)->body;
+            $theirs = self::send($plain, 'GET', $path, self::BEARER)->body;
+            $this->assertStringContainsString("<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"default\">\n<link rel=\"stylesheet\" href=\"/assets/dashboard.css\">\n</head>", $page);
+            $this->assertStringNotContainsString('<script', $page);
+            $this->assertStringNotContainsString('<style', $page);
+            $this->assertStringNotContainsString('manifest', $page);
+            // Everything else is the SDK's page.
+            $this->assertSame(
+                (string) preg_replace('#<link rel="manifest"[\s\S]*</style>\n#', '', $theirs),
+                str_replace("<link rel=\"stylesheet\" href=\"/assets/dashboard.css\">\n", '', $page),
+            );
+        }
+        $this->assertSame(['/cronwatch', '/cronwatch', '/cronwatch'], $bases);
+        $this->assertStringContainsString('<style>' . \Cronwatch\Web\Html::CSS . '</style>', self::send($plain, 'GET', '/cronwatch', self::BEARER)->body);
+        foreach (['/manifest.webmanifest', '/app.js', '/sw.js', '/offline'] as $path) {
+            $this->assertSame(200, self::send($plain, 'GET', "/cronwatch{$path}")->status);
+            $this->assertSame(401, self::send($web, 'GET', "/cronwatch{$path}")->status, "{$path} is not served under a host's head");
+            $this->assertSame(404, self::send($web, 'GET', "/cronwatch{$path}", self::BEARER)->status);
+        }
+        $icon = self::send($web, 'GET', '/cronwatch/icons/icon.svg');
+        $this->assertSame(200, $icon->status);
+        $this->assertSame('image/svg+xml', $icon->headers['content-type']);
+    }
+
     public function testCheckSilenceUnsilenceAndForgetOverTheApi(): void
     {
         [$cw, $web] = $this->app();

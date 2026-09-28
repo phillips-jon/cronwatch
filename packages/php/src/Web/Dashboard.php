@@ -45,6 +45,12 @@ use Cronwatch\Js;
  *             development sign-in line. Read as `new URL(value).origin` reads it; anything that
  *             is not an absolute http or https URL throws InvalidArgumentException here. Takes
  *             precedence over trustProxy.
+ * head:       for a host that shows the dashboard inside its own pages and loads their assets its
+ *             own way: given the base path, it returns the HTML each page's head carries in
+ *             place of the manifest, the icons, app.js and the inline stylesheet (Html::CSS is
+ *             the stylesheet, for the host to serve as a file). The app shell's manifest,
+ *             service worker, app.js and offline page are then not served, since no page asks
+ *             for them; the icons still are. Default null: the pages are the SDK's.
  * trustProxy: take the public origin from X-Forwarded-Proto and X-Forwarded-Host (the first
  *             value of each, falling back to the request's scheme or host for whichever is
  *             missing) when a request carries either. Only for an app whose proxy sets or
@@ -84,11 +90,14 @@ final class Dashboard
     private readonly bool $trustProxy;
     private readonly ?\Closure $log;
     private readonly ?string $developmentTokenFile;
+    /** @var (\Closure(string): string)|null */
+    private readonly ?\Closure $head;
 
     /**
      * @param string|false|null $token the dashboard's token; null reads CRONWATCH_TOKEN, "" counts as unset, false serves it open
      * @param callable(string): void|null $log where the development sign-in line goes; default error_log()
      * @param string|null $developmentTokenFile where a development token is kept between requests; default in sys_get_temp_dir()
+     * @param callable(string): string|null $head the pages' head assets for a host that loads its own (see above)
      */
     public function __construct(
         private readonly Cronwatch $cw,
@@ -98,6 +107,7 @@ final class Dashboard
         bool $trustProxy = false,
         ?callable $log = null,
         ?string $developmentTokenFile = null,
+        ?callable $head = null,
     ) {
         $this->optedOut = $token === false;
         $configured = null;
@@ -109,6 +119,7 @@ final class Dashboard
         $this->trustProxy = $trustProxy;
         $this->log = $log === null ? null : \Closure::fromCallable($log);
         $this->developmentTokenFile = $developmentTokenFile;
+        $this->head = $head === null ? null : \Closure::fromCallable($head);
         // A request handler cannot tell a local caller from a remote one
         // (proxies, tunnels and a server bound to every interface all look
         // alike), so development gets a token too: made on the first request,
@@ -146,7 +157,7 @@ final class Dashboard
                 // Reporting must not turn a 500 into an exception.
             }
             return $wantsHtml
-                ? self::html(Html::messagePage('Something went wrong', 'The request failed and the error was reported.', $base), 500)
+                ? self::html(Html::messagePage('Something went wrong', 'The request failed and the error was reported.', $base, head: $this->head), 500)
                 : self::api(['ok' => false, 'error' => 'Internal error'], 500);
         }
     }
@@ -308,10 +319,11 @@ final class Dashboard
 
         // The app shell: the manifest, icons, service worker, app.js and the
         // offline page. Served to anyone, since a browser fetches some of it
-        // without cookies and none of it says anything about the jobs.
-        if ($method === 'GET' || $method === 'HEAD') {
+        // without cookies and none of it says anything about the jobs. Under a
+        // head of the host's only the icons are, as nothing else is asked for.
+        if (($method === 'GET' || $method === 'HEAD') && ($this->head === null || str_starts_with($path, '/icons/'))) {
             if ($path === '/offline') {
-                return self::html(Html::messagePage('You are offline', 'CronWatch shows live data from your app, so it needs a connection.', $base), 200, 'no-cache');
+                return self::html(Html::messagePage('You are offline', 'CronWatch shows live data from your app, so it needs a connection.', $base, head: $this->head), 200, 'no-cache');
             }
             $asset = Pwa::asset($path, $base);
             if ($asset !== null) {
@@ -322,13 +334,13 @@ final class Dashboard
         // No token outside development: fail closed.
         if ($this->token === null && !$this->optedOut) {
             return $wantsHtml
-                ? self::html(Html::messagePage('CronWatch routes are locked', self::LOCKED, $base), 503)
+                ? self::html(Html::messagePage('CronWatch routes are locked', self::LOCKED, $base, head: $this->head), 503)
                 : self::api(['ok' => false, 'error' => 'CRONWATCH_TOKEN is not set'], 503);
         }
 
         if ($method !== 'GET' && $method !== 'HEAD' && self::crossSite($request, $publicOrigin)) {
             return $wantsHtml
-                ? self::html(Html::messagePage('Cross-site request refused', 'Changes can only be made from the dashboard itself.', $base), 403)
+                ? self::html(Html::messagePage('Cross-site request refused', 'Changes can only be made from the dashboard itself.', $base, head: $this->head), 403)
                 : self::api(['ok' => false, 'error' => 'Cross-site request refused'], 403);
         }
 
@@ -351,11 +363,11 @@ final class Dashboard
             if (!$cronSecretOk && !$tokenOk) {
                 if ($this->generated) {
                     return $wantsHtml
-                        ? self::html(Html::messagePage('Sign in', 'CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.', $base, true), 401)
+                        ? self::html(Html::messagePage('Sign in', 'CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.', $base, true, $this->head), 401)
                         : self::api(['ok' => false, 'error' => 'Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log'], 401);
                 }
                 return $wantsHtml
-                    ? self::html(Html::messagePage('Sign in', 'Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.', $base, true), 401)
+                    ? self::html(Html::messagePage('Sign in', 'Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.', $base, true, $this->head), 401)
                     : self::api(['ok' => false, 'error' => 'Unauthorized'], 401);
             }
             if ($query !== null) {
@@ -380,7 +392,7 @@ final class Dashboard
             $decoded = Request::safeDecode($part);
             if ($decoded === null) {
                 return $wantsHtml
-                    ? self::html(Html::messagePage('Bad request', 'The path is not valid.', $base), 400)
+                    ? self::html(Html::messagePage('Bad request', 'The path is not valid.', $base, head: $this->head), 400)
                     : self::api(['ok' => false, 'error' => 'Bad path'], 400);
             }
             $parts[] = $decoded;
@@ -395,18 +407,18 @@ final class Dashboard
                 $runsByJob[$entry->job->name] = $entry->runs;
             }
             $jobs = array_map(fn (JobWithRuns $entry) => $entry->job, $entries);
-            return self::html(Html::dashboardPage($jobs, $runsByJob, $now, $base, null, $this->boardLanes($entries, $now)));
+            return self::html(Html::dashboardPage($jobs, $runsByJob, $now, $base, null, $this->boardLanes($entries, $now), $this->head));
         }
         if ($method === 'GET' && count($parts) === 2 && $parts[0] === 'jobs') {
             $job = $cw->jobSummary($parts[1]);
             if ($job === null) {
-                return self::html(Html::messagePage('No such job', "{$parts[1]} is not in the store.", $base), 404);
+                return self::html(Html::messagePage('No such job', "{$parts[1]} is not in the store.", $base, head: $this->head), 404);
             }
             $now = $cw->now();
             // Enough runs to draw the job's week; the page lists the newest fifty.
             $limit = Timeline::weekRunsLimit($job, $now);
             $runs = $cw->runs($job->name, $limit);
-            return self::html(Html::jobPage($job, $runs, $now, $base, count($runs) < $limit));
+            return self::html(Html::jobPage($job, $runs, $now, $base, count($runs) < $limit, $this->head));
         }
         if ($method === 'POST' && $path === '/check') {
             $cw->check();
@@ -419,19 +431,19 @@ final class Dashboard
                 return self::redirect("{$base}/");
             }
             if ($action !== 'silence' && $action !== 'unsilence') {
-                return self::html(Html::messagePage('Not found', $path, $base), 404);
+                return self::html(Html::messagePage('Not found', $path, $base, head: $this->head), 404);
             }
             if ($cw->jobSummary($name) === null) {
-                return self::html(Html::messagePage('No such job', "{$name} is not in the store.", $base), 404);
+                return self::html(Html::messagePage('No such job', "{$name} is not in the store.", $base, head: $this->head), 404);
             }
             if ($action === 'silence') {
                 if ($request->bodyTooLarge()) {
-                    return self::html(Html::messagePage('Not silenced', 'The request was too large.', $base), 413);
+                    return self::html(Html::messagePage('Not silenced', 'The request was too large.', $base, head: $this->head), 413);
                 }
                 try {
                     $duration = self::silenceDuration(self::readBody($request)['for'] ?? null);
                 } catch (\InvalidArgumentException $error) {
-                    return self::html(Html::messagePage('Not silenced', $error->getMessage(), $base), 400);
+                    return self::html(Html::messagePage('Not silenced', $error->getMessage(), $base, head: $this->head), 400);
                 }
                 $cw->silence($name, $duration);
             } else {
@@ -445,7 +457,7 @@ final class Dashboard
             return $this->serveApi($request, $method, array_slice($parts, 1), $bearer);
         }
 
-        return self::html(Html::messagePage('Not found', $path, $base), 404);
+        return self::html(Html::messagePage('Not found', $path, $base, head: $this->head), 404);
     }
 
     /** @param list<string> $rest the path's parts after "api" */

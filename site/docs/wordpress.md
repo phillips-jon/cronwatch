@@ -104,20 +104,20 @@ add_filter( 'cronwatch_job_options', function ( array $options, string $hook ) {
     return $options;
 }, 10, 2 );
 
-// More channels: any of the library's, or a callable taking the Cronwatch\Alert.
+// More channels: any AlertChannel (Discord here, from the Composer package), or a callable taking the Cronwatch\Alert.
 add_filter( 'cronwatch_alerts', function ( array $channels ) {
     $channels[] = new \Cronwatch\Alerts\Discord( DISCORD_WEBHOOK_URL );
     return $channels;
 } );
 
-// The arguments the library's client is made with, such as Claude triage.
+// The arguments the library's client is made with, such as Claude triage (from the Composer package).
 add_filter( 'cronwatch_client_args', function ( array $args ) {
     $args['triage'] = new \Cronwatch\Triage\Anthropic( apiKey: ANTHROPIC_API_KEY, context: 'A WooCommerce shop.' );
     return $args;
 } );
 ```
 
-The library's channels (Discord, Resend, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)) and triage send through `wp_remote_post()` here. `cronwatch_reject_unsafe_urls` decides whether an alert URL may reach a private address or an unusual port (WordPress's `reject_unsafe_urls`): true on a multisite network, where a site's administrators may not be the network's, and false otherwise. Inside a watched event, `\Cronwatch\Cronwatch::current()` is the run's context, for `metric()` as well as `log()`.
+The plugin carries only the channels its settings offer: email through `wp_mail()`, Slack and the webhook. The library's other channels (Discord, Resend, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)) and triage come with the Composer package, `composer require cronwatch/cronwatch`, which has them; they send through `wp_remote_post()` here. `cronwatch_reject_unsafe_urls` decides whether an alert URL may reach a private address or an unusual port (WordPress's `reject_unsafe_urls`): true on a multisite network, where a site's administrators may not be the network's, and false otherwise. Inside a watched event, `\Cronwatch\Cronwatch::current()` is the run's context, for `metric()` as well as `log()`.
 
 ## Uninstall
 
