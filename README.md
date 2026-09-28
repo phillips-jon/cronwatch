@@ -44,7 +44,7 @@ export const { GET, POST, DELETE } = cw.routes();
 |---|---|
 | [`@cronwatch/sdk`](packages/sdk) | the library for Node, Cloudflare Workers, Deno and Bun: jobs, runs, checks, stores (memory, SQLite, Postgres, D1), pg_cron jobs read from Postgres, alerts (Slack, Discord, webhook, email, SMS, error trackers), dashboard and API, adapters for Node servers, optional Claude triage |
 | [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob and Sidekiq integration, schedules read from Solid Queue or sidekiq-cron, pg_cron jobs, the same alert channels, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
-| [`cronwatch-sdk` for Python](packages/python) | the Python port, under way: the core (jobs, runs, checks, the same rules and alert text), the memory and SQLite stores, sharing SQLite files with the SDK byte for byte. Postgres, the channels, the dashboard and Django, Celery and APScheduler come next ([its DESIGN.md](packages/python/DESIGN.md)) |
+| [`cronwatch-sdk` for Python](packages/python) | the Python port for Python apps: the memory, SQLite and Postgres stores, the same alert channels and Claude triage, pg_cron jobs, the dashboard as a WSGI and ASGI app, Django, Celery and beat, APScheduler, async jobs, and `handler()` for platform crons and AWS Lambda. |
 | [`cronwatch/cronwatch` for PHP](packages/php) | the PHP port: the core (jobs, runs, checks, the same rules and alert text), the memory, SQLite, MySQL (and MariaDB) and Postgres stores, sharing tables with the SDK byte for byte, every channel, the dashboard, and Laravel, Symfony, WordPress, Drupal and Craft ([its DESIGN.md](packages/php/DESIGN.md)) |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
@@ -52,7 +52,7 @@ export const { GET, POST, DELETE } = cw.routes();
 
 ## Installing
 
-TypeScript and Node: `npm install @cronwatch/sdk`. Ruby and Rails: `bundle add cronwatch` (see [Ruby and Rails](#ruby-and-rails)).
+TypeScript and Node: `npm install @cronwatch/sdk`. Ruby and Rails: `bundle add cronwatch` (see [Ruby and Rails](#ruby-and-rails)). Python: `pip install cronwatch-sdk` (see [its README](packages/python/README.md) and [the Python docs](https://cronwatch.dev/docs/python/)).
 
 The SDK depends only on `croner`. The core, the D1 store, the pg_cron source and every alert channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun; the SQLite and Postgres stores and `@cronwatch/sdk/node` need Node. Each driver is an optional peer, installed only when you use its entry point:
 

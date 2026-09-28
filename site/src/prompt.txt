@@ -2,16 +2,18 @@ Add CronWatch to this project so that every scheduled job is recorded and I am
 told when one is missed, fails, gets stuck, runs slow or goes over budget.
 
 CronWatch is an open source library: @cronwatch/sdk for TypeScript (Node,
-Cloudflare Workers, Deno, Bun), and the cronwatch gem for Ruby and Rails. It runs inside my app and writes to my
-own database. There is no hosted service, no account and no API key.
+Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails, and
+cronwatch-sdk for Python (Django, Celery, APScheduler). It runs inside my app
+and writes to my own database. There is no hosted service, no account and no API key.
 
 First decide which one this project needs. A package.json with a Node server,
 Next.js or other JavaScript runtime means the TypeScript steps below; a
 wrangler.toml (or wrangler.jsonc) means Cloudflare Workers, which follow the
 same steps with the Workers notes in each. A Gemfile
 means the Ruby steps (a Rails app follows them as written; plain Ruby, see
-https://cronwatch.dev/docs/ruby/). If the scheduled jobs live in both, set up
-each side where its jobs run; they can share one database.
+https://cronwatch.dev/docs/ruby/). A pyproject.toml, requirements.txt or
+manage.py means the Python steps. If the scheduled jobs live in more than one,
+set up each side where its jobs run; they can share one database.
 
 TypeScript and Node
 
@@ -147,6 +149,72 @@ Ruby on Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
 6. Set the environment variables you referenced: CRONWATCH_TOKEN and whichever
    alert channel you chose. Do not invent other names.
 
+Python (Python 3.11 or newer)
+
+1. Install it with the extras for what the project uses:
+
+   pip install "cronwatch-sdk[postgres,django,celery]"
+
+   Extras: postgres, django (Django 5.2 or newer), celery (Celery 5.5 or
+   newer), apscheduler (APScheduler 3), anthropic (triage). The import name is
+   cronwatch. Add it to the project's own dependency file (pyproject.toml,
+   requirements.txt) the way the project already does.
+
+2. Use a store every process shares (web, workers and the check must see the
+   same runs): cronwatch.stores.postgres.PostgresStore() (reads DATABASE_URL),
+   or cronwatch.stores.SqliteStore("./data/cronwatch.db") on one machine.
+
+   In Django, configure it in settings.py and add the app:
+
+   INSTALLED_APPS += ["cronwatch.django"]
+   CRONWATCH = {
+       "STORE": "cronwatch.stores.postgres.PostgresStore",
+       "ALERTS": [Slack(os.environ["SLACK_WEBHOOK_URL"])],   # from cronwatch.alerts import Slack
+       "TOKEN": os.environ.get("CRONWATCH_TOKEN", ""),
+   }
+
+   Outside Django, make one client with cronwatch.configure(store=...,
+   alerts=[...]) in a module every entry point imports.
+
+   Other channels in cronwatch.alerts: Discord, Webhook, Resend, Postmark,
+   Sendgrid, Mailgun, Ses, Twilio, Sentry, Honeybadger, Datadog, Rollbar,
+   Bugsnag, NewRelic (and cronwatch.Console). Email senders take from_ (from
+   is a Python keyword). Their options: https://cronwatch.dev/docs/python/
+
+3. Watch each scheduled job:
+
+   - Celery: cronwatch.celery.install(app) after the app is made. Every task
+     beat schedules is watched with beat's schedule, no task changes. Add
+     "cronwatch-check": {"task": "cronwatch.celery.check", "schedule": 300.0}
+     to beat_schedule.
+   - APScheduler: cronwatch.apscheduler.watch(scheduler) before
+     scheduler.start(). Every job is watched with its trigger.
+   - Django management commands and cron scripts: declare the job in
+     <app>/cronwatch_jobs.py (Django imports it at startup), for example
+     nightly = cronwatch.django.client().job("nightly-report",
+     schedule="0 2 * * *", timezone="UTC", grace="15m"), and wrap the work:
+     with nightly.run() as ctx: ... ctx.log("Report written").
+     Outside Django, cw.job(...) the same way. Async functions use
+     async with nightly.run().
+   - A platform that calls a URL on a schedule: nightly.handler(fn) gives
+     .django, .flask, .starlette and .aws_lambda endpoints, which need
+     Authorization: Bearer $CRON_SECRET.
+
+4. Run the check every 5 minutes so missed and stuck runs are noticed: the
+   Celery beat entry above, or a crontab line running
+   python manage.py cronwatch_check (Django) or a script calling cw.check(),
+   or cw.start() once in a long-running process. One checker per store.
+
+5. Mount the dashboard: in Django,
+   path("cronwatch/", include("cronwatch.django.urls")) in urls.py; elsewhere
+   cw.routes() is a WSGI app (.asgi for FastAPI and Starlette) to mount at
+   /cronwatch. Outside development it needs CRONWATCH_TOKEN. Behind the app's
+   own admin auth, pass token=None (TOKEN: None in Django) instead.
+
+6. Set the environment variables you referenced: CRONWATCH_TOKEN,
+   CRON_SECRET if you added a handler, and whichever alert channel you chose.
+   Do not invent other names.
+
 Rules for you:
 - Declare every existing scheduled job in this project, not just one. Find them
   in cron config, workflow files, queue schedulers and any crontab.
@@ -156,8 +224,8 @@ Rules for you:
 - Do not add a retry loop or an uptime ping. CronWatch records what happened; it
   does not re-run work.
 - If this project already has a dashboard route or auth, mount cw.routes()
-  or Cronwatch::Web behind that auth with its token set to null (nil in Ruby)
-  rather than exposing it.
+  or Cronwatch::Web behind that auth with its token set to null (nil in Ruby,
+  None in Python) rather than exposing it.
 - Make sure the process that runs the check knows every job it should expect,
   or a job that never starts at all goes unnoticed. If installs differ, declare
   a job there only where that install runs it.
@@ -165,9 +233,11 @@ Rules for you:
   step, a workflow) uses await job.start({ id }) where it begins and
   (await job.resume(id)).finish() where it ends, with the same id both times.
 - A job that runs where the network or the app's secrets are unavailable gets
-  its own client with deliver: "check" (deliver = :check in Ruby) and the same
+  its own client with deliver: "check" (deliver = :check in Ruby,
+  deliver="check" in Python) and the same
   store; the next check sends its alerts.
 
 Docs: https://cronwatch.dev/docs/
 Rails docs: https://cronwatch.dev/docs/rails/
+Python docs: https://cronwatch.dev/docs/python/ and https://cronwatch.dev/docs/django/
 MCP server for agents: npx -y @cronwatch/mcp
