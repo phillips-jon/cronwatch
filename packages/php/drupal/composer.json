@@ -12,6 +12,6 @@
     },
     "require": {
         "php": ">=8.2",
-        "cronwatch/cronwatch": "^0.6.1"
+        "cronwatch/cronwatch": "^0.7.0"
     }
 }
