@@ -56,7 +56,25 @@ defmodule Cronwatch.JobState do
   end
 
   @doc false
-  def version_or_zero(%__MODULE__{version: v}), do: v || 0
+  def version_or_zero(%__MODULE__{version: v}), do: counted_version(v) || 0
+
+  @max_version 9_007_199_254_740_991
+
+  @doc false
+  # The version a stored `version` value counts as, as the SDK's
+  # stateVersion() reads it: a whole number from 0 to 2^53 - 1 (2.0 is 2),
+  # else nil, which counts as 0. The SQL stores read it the same way, so a
+  # foreign row's 1.5 or "x" is written over by the next update.
+  def counted_version(v) when is_integer(v) and v >= 0 and v <= @max_version, do: v
+  def counted_version(v) when is_float(v) and v >= 0 and v <= @max_version and v == trunc(v), do: trunc(v)
+  def counted_version(_), do: nil
+
+  # A stored integer is kept as it is, so the state reads back as written
+  # (version_or_zero/1 counts it); anything else that is not a whole number
+  # (1.5, "x", true) is dropped, and counts as 0.
+  defp read_version(v) when is_integer(v), do: v
+  defp read_version(v) when is_float(v), do: counted_version(v)
+  defp read_version(_), do: nil
 
   @doc "The state as the SDK writes it."
   @spec to_value(t()) :: Object.t()
@@ -140,7 +158,7 @@ defmodule Cronwatch.JobState do
        last_alert_at: Read.nullable_int(o, "lastAlertAt"),
        pending_recovery: pending,
        undelivered: undelivered,
-       version: if(List.keymember?(extra, "version", 0), do: Read.nullable_int(o, "version")),
+       version: read_version(Object.get(o, "version")),
        extra: extra
      }}
   end

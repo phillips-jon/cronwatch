@@ -127,7 +127,7 @@ defmodule Cronwatch.Audit.CoreTest do
 
     run = only_run(cw, "far")
     assert run.status == "timeout"
-    assert run.duration_ms == 9_223_372_036_854_775_807
+    assert run.duration_ms == 9_007_199_254_740_991, "held at 2^53 - 1, as the SDK's runDuration()"
     assert Enum.reject(wheres(errors), &(&1 =~ "alert")) == []
   end
 

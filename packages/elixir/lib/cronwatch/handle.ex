@@ -400,7 +400,7 @@ defmodule Cronwatch.RunHandle do
             from
             | status: "running",
               finished_at: finished_at,
-              duration_ms: Core.sat(max(0, finished_at - from.started_at)),
+              duration_ms: Evaluate.run_duration(from.started_at, finished_at),
               error: nil,
               output: join_output(from.output, added),
               metrics: Object.merge(from.metrics, snap.metrics)

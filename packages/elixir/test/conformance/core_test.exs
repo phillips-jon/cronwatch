@@ -199,6 +199,25 @@ defmodule Cronwatch.Conformance.CoreTest do
         same(acc, "staleAlert #{i}", Evaluate.stale_alert?(alert, state(field(c, "state"))), field(c, "stale"))
       end)
 
+    fails =
+      f
+      |> list("runDuration")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        got = Evaluate.run_duration(field(c, "startedAt"), field(c, "finishedAt"))
+        same(acc, "runDuration #{i}", got, field(c, "durationMs"))
+      end)
+
+    fails =
+      f
+      |> list("stateVersion")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        {:ok, s} = JobState.from_json(field(c, "state"))
+        same(acc, "stateVersion #{i}", JobState.version_or_zero(s), field(c, "version"))
+      end)
+
+    assert length(list(f, "runDuration")) >= 8 and length(list(f, "stateVersion")) >= 17
     check!(fails, "health")
   end
 

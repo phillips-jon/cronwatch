@@ -32,18 +32,6 @@ defmodule Cronwatch.Core do
 
   def now(c), do: Config.now(c)
 
-  @i64_max 9_223_372_036_854_775_807
-  @i64_min -9_223_372_036_854_775_808
-
-  @doc """
-  A time or duration held in the range a store's 64-bit column holds, as the
-  Rust port's arithmetic saturates: a foreign row's time near the limit
-  (`startedAt` of -1e30, read as the lowest) must not make a duration no
-  store can write.
-  """
-  def sat(n) when is_integer(n), do: n |> max(@i64_min) |> min(@i64_max)
-  def sat(n), do: n
-
   def report(c, error, where), do: Config.report(c, error, where)
 
   @doc "Calls the store, answering its value or raising %Cronwatch.Error{kind: :store}."

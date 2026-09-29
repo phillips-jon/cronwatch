@@ -156,11 +156,22 @@ defmodule Cronwatch.Store.SQL do
     # Insertion order, to break ties between runs that started in the same
     # millisecond, and byte order for names whatever the collation.
     {seq, by_name} = if pg, do: {"seq", ~s(name COLLATE "C")}, else: {"rowid", "name"}
-    # The version inside a state's JSON, 0 when it has none.
+    # The version inside a state's JSON, as JobState.counted_version/1 reads
+    # it: a whole number from 0 to 2^53 - 1, else 0 (none, or a foreign row's
+    # 1.5 or "x", which must neither fail the statement nor refuse every
+    # write for good). Each CASE tests the JSON type before any cast.
     version = fn column ->
-      if pg,
-        do: "COALESCE((#{column}->>'version')::bigint, 0)",
-        else: "COALESCE(json_extract(#{column}, '$.version'), 0)"
+      if pg do
+        v = "(#{column}->>'version')::numeric"
+
+        "CASE WHEN jsonb_typeof(#{column}->'version') <> 'number' THEN 0 " <>
+          "WHEN #{v} % 1 = 0 AND #{v} BETWEEN 0 AND 9007199254740991 THEN #{v}::bigint ELSE 0 END"
+      else
+        v = "json_extract(#{column}, '$.version')"
+
+        "CASE WHEN json_type(#{column}, '$.version') NOT IN ('integer', 'real') THEN 0 " <>
+          "WHEN #{v} = CAST(#{v} AS INTEGER) AND #{v} BETWEEN 0 AND 9007199254740991 THEN CAST(#{v} AS INTEGER) ELSE 0 END"
+      end
     end
 
     # A JSON parameter, and the columns a row is read as: Postgres casts
@@ -220,11 +231,15 @@ defmodule Cronwatch.Store.SQL do
 
   # MySQL's statements, the PHP, Go and Rust ports' text.
   defp mysql_statements(p) do
-    # The version inside a state's JSON text, 0 when it has none. MySQL's
-    # JSON_EXTRACT answers JSON and MariaDB's text; unquoted and cast, both
-    # are a number.
+    # The version inside a state's JSON text, read as on SQLite and Postgres:
+    # a whole number from 0 to 2^53 - 1, else 0. MySQL's JSON_EXTRACT answers
+    # JSON and MariaDB's text; plus 0, both are a number, and the JSON type
+    # is tested first, so a string is never converted.
     version = fn column ->
-      "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(#{column}, '$.version')) AS SIGNED), 0)"
+      v = "JSON_EXTRACT(#{column}, '$.version') + 0"
+
+      "CASE WHEN JSON_TYPE(JSON_EXTRACT(#{column}, '$.version')) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 " <>
+        "WHEN #{v} = FLOOR(#{v}) AND #{v} BETWEEN 0 AND 9007199254740991 THEN CAST(#{v} AS SIGNED) ELSE 0 END"
     end
 
     %{

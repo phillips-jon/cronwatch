@@ -424,6 +424,22 @@ defmodule Cronwatch.Evaluate do
     end
   end
 
+  @max_duration_ms 9_007_199_254_740_991
+
+  @doc "The longest duration written: 2^53 - 1, which every port and store reads back unchanged."
+  def max_duration_ms, do: @max_duration_ms
+
+  @doc """
+  How long a run took, from `started_at` to `finished_at`: 0 when it started
+  later, and never more than 2^53 - 1. A foreign row's start near a 64-bit
+  limit must not make a duration no store can write.
+  """
+  @spec run_duration(integer(), integer()) :: non_neg_integer()
+  def run_duration(started_at, finished_at) do
+    ms = finished_at - started_at
+    if ms > 0, do: min(ms, @max_duration_ms), else: 0
+  end
+
   @doc "Whether a running run has gone on longer than the job's timeout."
   def stuck?(def, %Run{} = run, now) do
     if run.status != "running" do

@@ -65,6 +65,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     alias Cronwatch.Config
     alias Cronwatch.Core
     alias Cronwatch.Error
+    alias Cronwatch.Evaluate
     alias Cronwatch.JS
     alias Cronwatch.JS.Object
     alias Cronwatch.Run
@@ -275,7 +276,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
           status: status,
           started_at: started_at,
           finished_at: finished_at,
-          duration_ms: finished_at && finished_at - started_at,
+          duration_ms: finished_at && Evaluate.run_duration(started_at, finished_at),
           error: if(status == "failed", do: message || "pg_cron reported the run as failed"),
           output: if(status == "ok", do: message),
           metrics: Object.new(),

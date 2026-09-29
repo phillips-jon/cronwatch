@@ -208,7 +208,7 @@ defmodule Cronwatch.Store.Memory.Server do
   def handle_call({:set_state, state}, _from, s), do: {:reply, :ok, %{s | states: Map.put(s.states, state.job, state)}}
 
   def handle_call({:cas, %JobState{} = state, expected}, _from, s) do
-    current = if s.states[state.job], do: s.states[state.job].version || 0, else: 0
+    current = if s.states[state.job], do: JobState.version_or_zero(s.states[state.job]), else: 0
 
     if current == expected,
       do: {:reply, {:ok, true}, %{s | states: Map.put(s.states, state.job, state)}},

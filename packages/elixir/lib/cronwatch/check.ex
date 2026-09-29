@@ -142,7 +142,7 @@ defmodule Cronwatch.Check do
         run
         | status: "timeout",
           finished_at: now,
-          duration_ms: Core.sat(now - run.started_at),
+          duration_ms: Evaluate.run_duration(run.started_at, now),
           error: "Still running after #{Duration.format(timeout)}; marked as timed out"
       }
 

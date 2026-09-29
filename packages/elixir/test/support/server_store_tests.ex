@@ -31,6 +31,7 @@ defmodule Cronwatch.Test.ServerStoreTests do
       alias Cronwatch.Test.Client
       alias Cronwatch.Test.Clock
       alias Cronwatch.Test.Conformance
+      alias Cronwatch.Test.ForeignRows
       alias Cronwatch.Test.Servers
       alias Cronwatch.Test.Stores
 
@@ -42,6 +43,8 @@ defmodule Cronwatch.Test.ServerStoreTests do
         fixture: File.read!(Path.join(Conformance.dir(), "store.json"))
 
       @kind unquote(kind)
+
+      use ForeignRows, store: fn -> Servers.store(@kind) end
 
       test "the store names its dialect" do
         {EctoStore, h} = Servers.store(@kind)

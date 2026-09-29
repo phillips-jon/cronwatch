@@ -13,6 +13,7 @@ defmodule Cronwatch.Store.SQLiteTest do
   alias Cronwatch.Store.Ecto, as: EctoStore
   alias Cronwatch.Store.SQL
   alias Cronwatch.StoreCase
+  alias Cronwatch.Test.ForeignRows
   alias Cronwatch.Test.Repo
 
   defp file, do: Path.join(Repo.tmp_dir(), "t.db")
@@ -48,13 +49,25 @@ defmodule Cronwatch.Store.SQLiteTest do
     q = SQL.statements(:postgres, "cw_")
 
     assert q.cas_update ==
-             "UPDATE cw_state SET state = $1::text::jsonb WHERE job = $2 AND COALESCE((state->>'version')::bigint, 0) = $3"
+             "UPDATE cw_state SET state = $1::text::jsonb WHERE job = $2 AND " <>
+               "CASE WHEN jsonb_typeof(state->'version') <> 'number' THEN 0 " <>
+               "WHEN (state->>'version')::numeric % 1 = 0 AND (state->>'version')::numeric BETWEEN 0 AND 9007199254740991 " <>
+               "THEN (state->>'version')::numeric::bigint ELSE 0 END = $3"
+
+    assert SQL.statements(:sqlite, "cw_").cas_update ==
+             "UPDATE cw_state SET state = ? WHERE job = ? AND " <>
+               "CASE WHEN json_type(state, '$.version') NOT IN ('integer', 'real') THEN 0 " <>
+               "WHEN json_extract(state, '$.version') = CAST(json_extract(state, '$.version') AS INTEGER) " <>
+               "AND json_extract(state, '$.version') BETWEEN 0 AND 9007199254740991 " <>
+               "THEN CAST(json_extract(state, '$.version') AS INTEGER) ELSE 0 END = ?"
 
     assert String.ends_with?(SQL.update_run_if(:postgres, "cw_", 2), "WHERE id = $7 AND status IN ($8, $9)")
 
     assert SQL.statements(:sqlite, "cw_").list_runs ==
              "SELECT * FROM cw_runs WHERE job = ? ORDER BY started_at DESC, rowid DESC LIMIT ?"
   end
+
+  use ForeignRows, store: fn -> Repo.store(file()) end
 
   test "stores with different prefixes share one file" do
     path = file()

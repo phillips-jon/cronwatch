@@ -443,7 +443,7 @@ defmodule Cronwatch.Run.Exec do
           run = %{
             info.run
             | finished_at: finished_at,
-              duration_ms: Core.sat(max(0, finished_at - info.run.started_at))
+              duration_ms: Evaluate.run_duration(info.run.started_at, finished_at)
           }
 
           run = build.(run)

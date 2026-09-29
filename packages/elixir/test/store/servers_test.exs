@@ -26,7 +26,11 @@ defmodule Cronwatch.Store.SQLDialectTest do
 
     assert q.cas_from_zero ==
              "UPDATE cw_state SET state = ? WHERE job = ? AND " <>
-               "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(state, '$.version')) AS SIGNED), 0) = 0"
+               "CASE WHEN JSON_TYPE(JSON_EXTRACT(state, '$.version')) NOT IN " <>
+               "('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 " <>
+               "WHEN JSON_EXTRACT(state, '$.version') + 0 = FLOOR(JSON_EXTRACT(state, '$.version') + 0) " <>
+               "AND JSON_EXTRACT(state, '$.version') + 0 BETWEEN 0 AND 9007199254740991 " <>
+               "THEN CAST(JSON_EXTRACT(state, '$.version') + 0 AS SIGNED) ELSE 0 END = 0"
 
     assert String.ends_with?(SQL.update_run_if(:mysql, "cw_", 1), "status IN (?)")
   end
