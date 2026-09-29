@@ -192,8 +192,8 @@ class WebRoutesTest < Minitest::Test
 
           other = Cronwatch::Web.new(Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil), base_path: "/")
           second, = printed { send_request(other, "GET", "https://dev.example:8443/api/jobs") }
-          assert_match %r{Sign in: https://dev\.example:8443/\?token=[A-Za-z0-9_-]{43}\z}, second[0], "the origin as requested, and a root mount"
-          refute_equal token, second[0][-43..], "each app makes its own"
+          assert_match %r{Sign in: /\?token=[A-Za-z0-9_-]{43} on this server \(the first request's host is not local, so the link leaves it out\)\z}, second[0], "no host that is not local, and a root mount"
+          refute_equal token, second[0][/token=([A-Za-z0-9_-]{43})/, 1], "each app makes its own"
 
           mounted = Cronwatch::Web.new(Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil))
           third, = printed { send_request(mounted, "GET", "http://localhost:3000/admin/cronwatch/api/jobs", script_name: "/admin/cronwatch") }

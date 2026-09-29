@@ -110,7 +110,7 @@ app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {"/cronwatch": cw.routes()})  
 app.mount("/cronwatch", cw.routes().asgi)                                         # FastAPI, Starlette
 ```
 
-Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. It defaults to `$CRONWATCH_TOKEN`; with none set the routes answer 503, except in development (`CRONWATCH_ENV=development`), where they make one and print a sign-in link. `token=None` serves them open, behind your own auth. `/api/check` also takes the client's `cron_secret` as a bearer, so a platform cron can run checks. Behind a proxy, pass `origin="https://app.example.com"` (or `trust_proxy=True` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`).
+Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. It defaults to `$CRONWATCH_TOKEN`; with none set the routes answer 503, except in development (`CRONWATCH_ENV=development`), where they make one and print a sign-in link (naming the host only when `origin` is set or the request's host is loopback, since a client chooses it). `token=None` serves them open, behind your own auth. `/api/check` also takes the client's `cron_secret` as a bearer, so a platform cron can run checks. Behind a proxy, pass `origin="https://app.example.com"` (or `trust_proxy=True` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`).
 
 ### Django
 

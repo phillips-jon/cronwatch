@@ -225,8 +225,8 @@ test("without a token in development, a made-up token is printed once and requir
 
       const other = cronwatch({ alerts: [capture()], cronSecret: null }).routes({ basePath: "/" });
       const { lines: second } = await logged(async () => other.GET(new Request("https://dev.example:8443/api/jobs")));
-      assert.match(second[0]!, /Sign in: https:\/\/dev\.example:8443\/\?token=[A-Za-z0-9_-]{43}$/, "the origin as requested, and a root mount");
-      assert.notEqual(second[0]!.slice(-43), token, "each routes instance makes its own");
+      assert.match(second[0]!, /Sign in: \/\?token=[A-Za-z0-9_-]{43} on this server \(the first request's host is not local, so the link leaves it out\)$/, "no host that is not local, and a root mount");
+      assert.notEqual(/token=([A-Za-z0-9_-]{43})/.exec(second[0]!)![1], token, "each routes instance makes its own");
     });
   }
 });

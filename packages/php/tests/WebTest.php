@@ -358,8 +358,9 @@ final class WebTest extends TestCase
 
         $other = $this->routes($this->client(), null, '/');
         self::send($other, 'GET', 'https://dev.example:8443/api/jobs');
-        $this->assertMatchesRegularExpression('#Sign in: https://dev\.example:8443/\?token=[A-Za-z0-9_-]{43}$#', $this->logged[1], 'the origin as requested, and a root mount');
-        $this->assertNotSame($token, substr($this->logged[1], -43), 'another dashboard makes its own');
+        $this->assertMatchesRegularExpression('#Sign in: /\?token=([A-Za-z0-9_-]{43}) on this server \(the first request\'s host is not local, so the link leaves it out\)$#D', $this->logged[1], 'no host that is not local, and a root mount');
+        preg_match('#token=([A-Za-z0-9_-]{43})#', $this->logged[1], $other);
+        $this->assertNotSame($token, $other[1], 'another dashboard makes its own');
     }
 
     public function testADevelopmentTokenFileSomeoneElseCouldWriteIsNotTrusted(): void
@@ -805,17 +806,52 @@ final class WebTest extends TestCase
         $this->assertSame(303, self::send($web, 'POST', 'http://App.Example.com/cronwatch/check', self::cookie() + ['origin' => 'http://app.example.com'])->status);
     }
 
-    public function testTheDevelopmentSignInLineUsesThePublicOrigin(): void
+    public function testTheDevelopmentSignInLineUsesThePublicOriginWhenSetOrLoopbackAndOtherwiseLeavesTheHostOut(): void
     {
         putenv('CRONWATCH_ENV=development');
-        $forwarded = ['x-forwarded-proto' => 'https', 'x-forwarded-host' => 'proxied.example'];
-        self::send($this->routes($this->client(), null, '/cronwatch', 'https://app.example.com'), 'GET', self::INTERNAL . '/cronwatch/');
-        self::send($this->routes($this->client(), null, '/cronwatch', null, true), 'GET', self::INTERNAL . '/cronwatch/', $forwarded);
-        self::send($this->routes($this->client()), 'GET', self::INTERNAL . '/cronwatch/', $forwarded);
-        $this->assertCount(3, $this->logged);
-        $this->assertMatchesRegularExpression('#Sign in: https://app\.example\.com/cronwatch/\?token=#', $this->logged[0]);
-        $this->assertMatchesRegularExpression('#Sign in: https://proxied\.example/cronwatch/\?token=#', $this->logged[1]);
-        $this->assertMatchesRegularExpression('#Sign in: http://10\.0\.0\.5:8080/cronwatch/\?token=#', $this->logged[2]);
+        $spoofed = ['x-forwarded-proto' => 'https', 'x-forwarded-host' => 'attacker.example'];
+        $cases = [
+            [['/cronwatch', 'https://app.example.com', false], self::INTERNAL . '/cronwatch/', []],
+            [['/cronwatch', 'https://app.example.com', true], self::INTERNAL . '/cronwatch/', $spoofed],
+            [['/cronwatch', null, false], 'http://localhost:3000/cronwatch/', []],
+            [['/cronwatch', null, false], 'http://app.localhost:3000/cronwatch/', []],
+            [['/cronwatch', null, false], 'http://127.0.0.1:3000/cronwatch/', []],
+            [['/cronwatch', null, false], 'http://127.8.9.10/cronwatch/', []],
+            [['/cronwatch', null, false], 'http://[::1]:3000/cronwatch/', []],
+            [['/cronwatch', null, true], self::INTERNAL . '/cronwatch/', ['x-forwarded-host' => 'localhost:5173']],
+            [['/cronwatch', null, false], self::INTERNAL . '/cronwatch/', []],
+            [['/cronwatch', null, false], 'https://app.example.com/cronwatch/', []],
+            [['/cronwatch', null, true], 'http://localhost:3000/cronwatch/', $spoofed],
+            [['/cronwatch', null, false], 'http://localhost.example/cronwatch/', []],
+            [['/cronwatch', null, false], 'http://128.0.0.1/cronwatch/', []],
+            [['/', null, false], 'http://attacker.example/', []],
+        ];
+        foreach ($cases as [[$basePath, $origin, $trustProxy], $url, $headers]) {
+            self::send($this->routes($this->client(), null, $basePath, $origin, $trustProxy), 'GET', $url, $headers);
+        }
+        $intro = '[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: ';
+        $hostless = " on this server (the first request's host is not local, so the link leaves it out)";
+        $expected = [
+            ['https://app.example.com/cronwatch', ''],
+            ['https://app.example.com/cronwatch', ''],
+            ['http://localhost:3000/cronwatch', ''],
+            ['http://app.localhost:3000/cronwatch', ''],
+            ['http://127.0.0.1:3000/cronwatch', ''],
+            ['http://127.8.9.10/cronwatch', ''],
+            ['http://[::1]:3000/cronwatch', ''],
+            ['http://localhost:5173/cronwatch', ''],
+            ['/cronwatch', $hostless],
+            ['/cronwatch', $hostless],
+            ['/cronwatch', $hostless],
+            ['/cronwatch', $hostless],
+            ['/cronwatch', $hostless],
+            ['', $hostless],
+        ];
+        $this->assertCount(count($expected), $this->logged);
+        foreach ($expected as $i => [$link, $tail]) {
+            $this->assertSame(1, preg_match('#token=([A-Za-z0-9_-]{43})#', $this->logged[$i], $token), $this->logged[$i]);
+            $this->assertSame("{$intro}{$link}/?token={$token[1]}{$tail}", $this->logged[$i], "line {$i}");
+        }
     }
 
     // ------------------------------------------------------------ routes-pwa.test.ts

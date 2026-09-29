@@ -584,7 +584,7 @@ func TestRoutesDevelopmentTokenIsPrintedOnceAndRequired(t *testing.T) {
 		out.Reset()
 		other := must[*cronwatch.Routes](t)(cw.Routes(cronwatch.WithBasePath("/")))
 		serve(other, "GET", "https://dev.example:8443/api/jobs", nil, "")
-		if !regexp.MustCompile(`Sign in: https://dev\.example:8443/\?token=[A-Za-z0-9_-]{43}\n$`).MatchString(out.String()) {
+		if !regexp.MustCompile(`Sign in: /\?token=[A-Za-z0-9_-]{43} on this server \(the first request's host is not local, so the link leaves it out\)\n$`).MatchString(out.String()) {
 			t.Errorf("a root mount's line: %q", out.String())
 		}
 		if strings.Contains(out.String(), token) {
@@ -712,18 +712,60 @@ func TestRoutesOrigin(t *testing.T) {
 			status(t, given, serve(routes, "POST", "http://10.0.0.5/cronwatch/api/check", join(auth, hdr{"origin": want}), ""), 200)
 		}
 	})
-	t.Run("the development sign-in line uses the public origin", func(t *testing.T) {
+	t.Run("the development sign-in line uses the public origin when set or loopback, and otherwise leaves the host out", func(t *testing.T) {
 		out := devEnv(t)
 		cw := must[*cronwatch.Client](t)(cronwatch.New(cronwatch.WithoutCronSecret()))
-		forwarded := hdr{"x-forwarded-proto": "https", "x-forwarded-host": "proxied.example"}
-		serve(must[*cronwatch.Routes](t)(cw.Routes(cronwatch.WithOrigin("https://app.example.com"))), "GET", internal+"/cronwatch/", nil, "")
-		serve(must[*cronwatch.Routes](t)(cw.Routes(cronwatch.WithTrustProxy())), "GET", internal+"/cronwatch/", forwarded, "")
-		serve(must[*cronwatch.Routes](t)(cw.Routes()), "GET", internal+"/cronwatch/", forwarded, "")
+		spoofed := hdr{"x-forwarded-proto": "https", "x-forwarded-host": "attacker.example"}
+		for _, c := range []struct {
+			options []cronwatch.RoutesOption
+			url     string
+			headers hdr
+		}{
+			{[]cronwatch.RoutesOption{cronwatch.WithOrigin("https://app.example.com")}, internal + "/cronwatch/", nil},
+			{[]cronwatch.RoutesOption{cronwatch.WithOrigin("https://app.example.com"), cronwatch.WithTrustProxy()}, internal + "/cronwatch/", spoofed},
+			{nil, "http://localhost:3000/cronwatch/", nil},
+			{nil, "http://app.localhost:3000/cronwatch/", nil},
+			{nil, "http://127.0.0.1:3000/cronwatch/", nil},
+			{nil, "http://127.8.9.10/cronwatch/", nil},
+			{nil, "http://[::1]:3000/cronwatch/", nil},
+			{[]cronwatch.RoutesOption{cronwatch.WithTrustProxy()}, internal + "/cronwatch/", hdr{"x-forwarded-host": "localhost:5173"}},
+			{nil, internal + "/cronwatch/", nil},
+			{nil, "https://app.example.com/cronwatch/", nil},
+			{[]cronwatch.RoutesOption{cronwatch.WithTrustProxy()}, "http://localhost:3000/cronwatch/", spoofed},
+			{nil, "http://localhost.example/cronwatch/", nil},
+			{nil, "http://128.0.0.1/cronwatch/", nil},
+			{[]cronwatch.RoutesOption{cronwatch.WithBasePath("/")}, "http://attacker.example/", nil},
+		} {
+			serve(must[*cronwatch.Routes](t)(cw.Routes(c.options...)), "GET", c.url, c.headers, "")
+		}
+		const intro = "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: "
+		const hostless = " on this server (the first request's host is not local, so the link leaves it out)"
+		expected := [][2]string{
+			{"https://app.example.com/cronwatch", ""},
+			{"https://app.example.com/cronwatch", ""},
+			{"http://localhost:3000/cronwatch", ""},
+			{"http://app.localhost:3000/cronwatch", ""},
+			{"http://127.0.0.1:3000/cronwatch", ""},
+			{"http://127.8.9.10/cronwatch", ""},
+			{"http://[::1]:3000/cronwatch", ""},
+			{"http://localhost:5173/cronwatch", ""},
+			{"/cronwatch", hostless},
+			{"/cronwatch", hostless},
+			{"/cronwatch", hostless},
+			{"/cronwatch", hostless},
+			{"/cronwatch", hostless},
+			{"", hostless},
+		}
 		lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-		eq(t, "lines", len(lines), 3)
-		contains(t, "origin", lines[0], "Sign in: https://app.example.com/cronwatch/?token=")
-		contains(t, "trusted", lines[1], "Sign in: https://proxied.example/cronwatch/?token=")
-		contains(t, "own", lines[2], "Sign in: http://10.0.0.5:8080/cronwatch/?token=")
+		eq(t, "lines", len(lines), len(expected))
+		tokenOf := regexp.MustCompile(`token=([A-Za-z0-9_-]{43})`)
+		for i, want := range expected {
+			m := tokenOf.FindStringSubmatch(lines[i])
+			if m == nil {
+				t.Fatalf("line %d: %q", i, lines[i])
+			}
+			eq(t, "line "+want[0]+want[1], lines[i], intro+want[0]+"/?token="+m[1]+want[1])
+		}
 	})
 }
 

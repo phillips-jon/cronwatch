@@ -186,24 +186,60 @@ class WebOriginTest < Minitest::Test
     assert_equal 303, ok.status
   end
 
-  def test_the_development_sign_in_line_uses_the_public_origin
+  def test_the_development_sign_in_line_uses_the_public_origin_when_set_or_loopback_and_otherwise_leaves_the_host_out
     lines = []
+    spoofed = { "x-forwarded-proto" => "https", "x-forwarded-host" => "attacker.example" }
     with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
       cw, = make
-      forwarded = { "x-forwarded-proto" => "https", "x-forwarded-host" => "proxied.example" }
-      [{ origin: "https://app.example.com" }, {}, {}].zip([{}, forwarded, {}]).each do |options, headers|
+      [
+        [{ origin: "https://app.example.com" }, "#{INTERNAL}/cronwatch/", {}],
+        [{ origin: "https://app.example.com" }, "#{INTERNAL}/cronwatch/", spoofed],
+        [{}, "http://localhost:3000/cronwatch/", {}],
+        [{}, "http://app.localhost:3000/cronwatch/", {}],
+        [{}, "http://127.0.0.1:3000/cronwatch/", {}],
+        [{}, "http://127.8.9.10/cronwatch/", {}],
+        [{}, "http://[::1]:3000/cronwatch/", {}],
+        [{}, "#{INTERNAL}/cronwatch/", { "x-forwarded-host" => "localhost:5173" }],
+        [{}, "#{INTERNAL}/cronwatch/", {}],
+        [{}, "https://app.example.com/cronwatch/", {}],
+        [{}, "http://localhost:3000/cronwatch/", spoofed],
+        [{}, "http://localhost.example/cronwatch/", {}],
+        [{}, "http://128.0.0.1/cronwatch/", {}],
+        [{ base_path: "/" }, "http://attacker.example/", {}],
+      ].each do |options, url, headers|
         before = $stdout
         $stdout = StringIO.new
         begin
-          send_request(Cronwatch::Web.new(cw, base_path: "/cronwatch", **options), "GET", "#{INTERNAL}/cronwatch/", headers)
+          send_request(Cronwatch::Web.new(cw, base_path: "/cronwatch", **options), "GET", url, headers)
           lines << $stdout.string.chomp
         ensure
           $stdout = before
         end
       end
     end
-    assert_match(%r{Sign in: https://app\.example\.com/cronwatch/\?token=}, lines[0])
-    assert_match(%r{Sign in: https://proxied\.example/cronwatch/\?token=}, lines[1], "Rack's forwarded origin, without origin:")
-    assert_match(%r{Sign in: http://10\.0\.0\.5:8080/cronwatch/\?token=}, lines[2])
+    intro = "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: "
+    hostless = " on this server (the first request's host is not local, so the link leaves it out)"
+    expected = [
+      ["https://app.example.com/cronwatch", ""],
+      ["https://app.example.com/cronwatch", ""],
+      ["http://localhost:3000/cronwatch", ""],
+      ["http://app.localhost:3000/cronwatch", ""],
+      ["http://127.0.0.1:3000/cronwatch", ""],
+      ["http://127.8.9.10/cronwatch", ""],
+      ["http://[::1]:3000/cronwatch", ""],
+      ["http://localhost:5173/cronwatch", ""],
+      ["/cronwatch", hostless],
+      ["/cronwatch", hostless],
+      ["/cronwatch", hostless],
+      ["/cronwatch", hostless],
+      ["/cronwatch", hostless],
+      ["", hostless],
+    ]
+    assert_equal expected.length, lines.length
+    expected.each_with_index do |(link, tail), i|
+      token = lines[i][/token=([A-Za-z0-9_-]{43})/, 1]
+      assert token, lines[i]
+      assert_equal "#{intro}#{link}/?token=#{token}#{tail}", lines[i], "line #{i}"
+    end
   end
 end
