@@ -186,10 +186,52 @@ func developmentToken() string {
 }
 
 // developmentSignInLine is the line a development token is announced
-// with, once, on the routes' first request. origin is that request's
-// public origin, base the base path without a trailing slash.
+// with, once, on the routes' first request. origin is the WithOrigin value
+// when set, otherwise that request's public origin when its host is
+// loopback, and "" for any other host: the request's host is the client's
+// to choose, so the line then leaves it out rather than point the link,
+// token and all, somewhere else. base is the base path without a trailing
+// slash.
 func developmentSignInLine(origin, base, token string) string {
-	return "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: " + origin + base + "/?token=" + token
+	const intro = "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: "
+	if origin == "" {
+		return intro + base + "/?token=" + token + " on this server (the first request's host is not local, so the link leaves it out)"
+	}
+	return intro + origin + base + "/?token=" + token
+}
+
+var loopbackV4 = regexp.MustCompile(`^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$`)
+
+// isLoopbackOrigin reports whether an origin's host is loopback:
+// "localhost", a name ending in ".localhost", an IPv4 address in
+// 127.0.0.0/8, or the IPv6 address ::1.
+func isLoopbackOrigin(origin string) bool {
+	authority := origin
+	if i := strings.Index(origin, "://"); i >= 0 {
+		authority = origin[i+3:]
+	}
+	host := authority
+	if strings.HasPrefix(authority, "[") {
+		if end := strings.Index(authority, "]"); end >= 0 {
+			host = authority[:end+1]
+		}
+	} else if i := strings.Index(authority, ":"); i >= 0 {
+		host = authority[:i]
+	}
+	host = strings.ToLower(host)
+	if host == "localhost" || host == "[::1]" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	m := loopbackV4.FindStringSubmatch(host)
+	if m == nil {
+		return false
+	}
+	for _, octet := range m[1:] {
+		if n, _ := strconv.Atoi(octet); n > 255 {
+			return false
+		}
+	}
+	return true
 }
 
 // answer is a response the routes built, written once.
@@ -499,7 +541,13 @@ func (rt *Routes) serve(r *http.Request, pathname, path, rawQuery, base string, 
 	query := parseForm(rawQuery)
 
 	if rt.generated {
-		rt.announce.Do(func() { fmt.Fprintln(Stdout, developmentSignInLine(publicOrigin, base, rt.token)) })
+		rt.announce.Do(func() {
+			shown := rt.origin
+			if shown == "" && isLoopbackOrigin(publicOrigin) {
+				shown = publicOrigin
+			}
+			fmt.Fprintln(Stdout, developmentSignInLine(shown, base, rt.token))
+		})
 	}
 
 	// The app shell: the manifest, icons, service worker, app.js and the
