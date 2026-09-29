@@ -72,16 +72,18 @@ defmodule Cronwatch.ReadingsReportTest do
             {:error, why} -> {:error, why}
           end
 
-        {elem(oban, 0), elem(quantum, 0)}
+        both = match?([_, _, day, _, dow] when day != "*" and dow != "*", String.split(expr))
+        {elem(oban, 0), elem(quantum, 0), both}
       end
 
     oban = Enum.count(results, &(elem(&1, 0) == :ok))
     quantum = Enum.count(results, &(elem(&1, 1) == :ok))
+    both = Enum.count(results, &(elem(&1, 2) and elem(&1, 0) != :ok))
 
     IO.puts(
-      "readings report: of #{@count} expressions, Oban runs #{oban} as CronWatch expects, " <>
-        "the crontab package (Quantum) #{quantum}; the rest differ (a day of the month and of the week both named, " <>
-        "or a time a clock change skips or repeats) and are watched without a schedule"
+      "readings report: of #{@count} expressions, Oban runs #{oban} as CronWatch expects and the crontab package " <>
+        "(Quantum) #{quantum}; #{both} of Oban's others name a day of the month and a day of the week both. " <>
+        "The rest are read differently and would be watched without a schedule"
     )
 
     assert oban + quantum > 0
