@@ -137,12 +137,14 @@ defmodule Cronwatch.Transport.Httpc do
         certs -> certs
       end
 
-    [
-      verify: :verify_peer,
-      cacerts: cacerts,
-      depth: 10,
-      server_name_indication: if(ip? or host == "", do: :disable, else: String.to_charlist(host)),
-      customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]
-    ] ++ Keyword.get(opts, :ssl, [])
+    # An IP address is not sent as SNI, and :ssl checks the certificate
+    # against the address it connected to. `server_name_indication:
+    # :disable` would turn that check off too, so it is never given.
+    sni = if ip? or host == "", do: [], else: [server_name_indication: String.to_charlist(host)]
+
+    [verify: :verify_peer, cacerts: cacerts, depth: 10] ++
+      sni ++
+      [customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)]] ++
+      Keyword.get(opts, :ssl, [])
   end
 end
