@@ -74,15 +74,15 @@ defmodule Cronwatch.Test.WebRouter do
   """
   use Plug.Router
 
-  plug(:match)
-  plug(:dispatch)
+  plug :match
+  plug :dispatch
 
-  forward("/cronwatch", to: Cronwatch.Web, init_opts: [instance: Cronwatch.Test.GoldenWeb, token: "tok"])
-  forward("/ops/cron", to: Cronwatch.Web, init_opts: [instance: Cronwatch.Test.GoldenWeb, token: false])
+  forward "/cronwatch", to: Cronwatch.Web, init_opts: [instance: Cronwatch.Test.GoldenWeb, token: "tok"]
+  forward "/ops/cron", to: Cronwatch.Web, init_opts: [instance: Cronwatch.Test.GoldenWeb, token: false]
 
-  forward("/t/:tenant/cw", to: Cronwatch.Web, init_opts: [instance: Cronwatch.Test.GoldenWeb, token: false])
+  forward "/t/:tenant/cw", to: Cronwatch.Web, init_opts: [instance: Cronwatch.Test.GoldenWeb, token: false]
 
-  forward("/cron/served",
+  forward "/cron/served",
     to: Cronwatch.Handler,
     init_opts: [
       instance: Cronwatch.Test.GoldenWeb,
@@ -90,7 +90,6 @@ defmodule Cronwatch.Test.WebRouter do
       run: {Cronwatch.Test.Jobs, :served, []},
       secret: "s3cret"
     ]
-  )
 
   match _ do
     send_resp(conn, 404, "not the dashboard")
@@ -140,11 +139,11 @@ defmodule Cronwatch.Test.PhoenixRouter do
   use Phoenix.Router
 
   scope "/" do
-    forward("/cronwatch", Cronwatch.Web, instance: Cronwatch.Test.GoldenWeb, token: "tok")
+    forward "/cronwatch", Cronwatch.Web, instance: Cronwatch.Test.GoldenWeb, token: "tok"
   end
 
   scope "/admin" do
-    forward("/cw", Cronwatch.Web, instance: Cronwatch.Test.GoldenWeb, token: false)
+    forward "/cw", Cronwatch.Web, instance: Cronwatch.Test.GoldenWeb, token: false
   end
 end
 

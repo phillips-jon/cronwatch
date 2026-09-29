@@ -975,7 +975,8 @@ jobs:
           cargo +nightly fuzz build
 
   # The Elixir port (packages/elixir), on its floor (Elixir 1.18 on OTP 27,
-  # what Debian 13 ships) and the current release. Phase 1 has the core, the
+  # what Debian 13 ships) and the current release, with the MCP server's
+  # end-to-end test against its dashboard (packages/elixir/webserver). Phase 1 has the core, the
   # memory store and the SQL store on SQLite, so no database services yet.
   # The conformance step builds the SDK for the croner parity check and the
   # SQLite file shared with Node. The newest entry also runs the formatter,
@@ -1011,7 +1012,9 @@ jobs:
           path: |
             packages/elixir/deps
             packages/elixir/_build
-          key: elixir-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('packages/elixir/mix.exs') }}
+            packages/elixir/webserver/deps
+            packages/elixir/webserver/_build
+          key: elixir-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('packages/elixir/mix.exs', 'packages/elixir/webserver/mix.exs') }}
           restore-keys: elixir-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-
       - name: mix deps.get
         working-directory: packages/elixir
@@ -1031,6 +1034,13 @@ jobs:
       - name: mix test
         working-directory: packages/elixir
         run: mix test
+      # @cronwatch/mcp's tools against the Elixir dashboard, served by
+      # packages/elixir/webserver (Bandit) through `mix run` on this entry's
+      # Elixir and OTP.
+      - name: MCP server against the Elixir dashboard
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_ELIXIR: "1"
       - name: mix credo
         if: matrix.newest
         working-directory: packages/elixir
