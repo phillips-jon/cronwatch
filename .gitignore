@@ -15,3 +15,7 @@ site/dist/
 
 # Local notes and keys, never committed
 /files/
+
+# Cargo builds
+target/
+packages/rust/Cargo.lock

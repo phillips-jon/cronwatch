@@ -1,0 +1,23 @@
+[workspace]
+resolver = "3"
+members = ["cronwatch", "cronwatch-sqlx"]
+
+[workspace.package]
+version = "0.6.1"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+authors = ["Jon Phillips"]
+repository = "https://github.com/phillips-jon/cronwatch"
+homepage = "https://cronwatch.dev"
+keywords = ["cron", "monitoring", "scheduler", "alerts", "jobs"]
+categories = ["development-tools", "asynchronous"]
+
+# The crates require each other at exactly the release's version, so a
+# release's crates always come together. scripts/release.mjs bumps both the
+# version above and the pin here.
+[workspace.dependencies]
+cronwatch = { path = "cronwatch", version = "=0.6.1" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

@@ -1,0 +1,43 @@
+[package]
+name = "cronwatch-sqlx"
+description = "CronWatch's SQL store over sqlx: runs, jobs and state in the app's own database"
+readme = "README.md"
+version.workspace = true
+edition.workspace = true
+# sqlx 0.9 needs Rust 1.94; the core stays at the workspace's 1.85.
+rust-version = "1.94"
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["cron", "monitoring", "sqlx", "sqlite", "jobs"]
+categories.workspace = true
+include = ["src/**/*", "Cargo.toml", "README.md", "LICENSE"]
+
+[features]
+# SQLite, built from source (libsqlite3-sys bundled), so an app needs a C
+# compiler, as every SQLite crate asks.
+sqlite = ["sqlx/sqlite-bundled"]
+
+[dependencies]
+cronwatch.workspace = true
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio"] }
+tokio = { version = "1.43", default-features = false, features = ["sync", "time"] }
+
+[dev-dependencies]
+cronwatch = { workspace = true, features = ["storetest"] }
+tokio = { version = "1.43", features = ["full"] }
+
+[[test]]
+name = "store"
+required-features = ["sqlite"]
+
+[[test]]
+name = "node_compat"
+required-features = ["sqlite"]
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true

@@ -54,6 +54,11 @@ const VERSIONED = [
     { file: `packages/go/${name}/go.mod`, pattern: /^((?:require |\t)cronwatch\.dev\/go v)(\S+)()$/m },
     { file: `packages/go/${name}/go.mod`, pattern: /^((?:require |\t)cronwatch\.dev\/go\/robfigcron v)(\S+)()$/m },
   ]),
+  // The Rust workspace's crates all take the version from
+  // [workspace.package], and require each other at exactly that release
+  // through [workspace.dependencies]; cronwatch::VERSION is the package's own.
+  { file: "packages/rust/Cargo.toml", pattern: /^(version = ")([^"]+)(")/m },
+  { file: "packages/rust/Cargo.toml", pattern: /^(cronwatch = \{ path = "cronwatch", version = "=)([^"]+)(")/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -104,6 +109,11 @@ const PUBLISH = [
       `git tag -a packages/go/${sub}v${v} -m "Release ${v} (Go${sub ? `, ${sub.slice(0, -1)}` : ""})" v${v}^{} && git push origin packages/go/${sub}v${v}`),
     `# packages/go: then GOPROXY=https://proxy.golang.org go list -m cronwatch.dev/go@v${v} cronwatch.dev/go/robfigcron@v${v} cronwatch.dev/go/gocron@v${v} cronwatch.dev/go/river@v${v} cronwatch.dev/go/asynq@v${v} makes the proxy fetch them (once cronwatch.dev serves the go-import tags)`,
   ] },
+  // crates.io reads each crate from the tarball cargo uploads, so the crates
+  // need no tag of their own. Published by hand for now (packages/rust/DESIGN.md,
+  // Crate name and releases); Cargo 1.90 or newer publishes a workspace's
+  // crates in dependency order.
+  { dir: "packages/rust", commands: () => ["(cd packages/rust && cargo publish --workspace)"] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */
