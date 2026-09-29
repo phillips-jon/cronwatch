@@ -59,6 +59,9 @@ const VERSIONED = [
   // through [workspace.dependencies]; cronwatch::VERSION is the package's own.
   { file: "packages/rust/Cargo.toml", pattern: /^(version = ")([^"]+)(")/m },
   { file: "packages/rust/Cargo.toml", pattern: /^(cronwatch = \{ path = "cronwatch", version = "=)([^"]+)(")/m },
+  // The Hex package's version lives in mix.exs alone; Cronwatch.version/0
+  // reads it from the application's spec.
+  { file: "packages/elixir/mix.exs", pattern: /^(\s*@version ")([^"]+)(")/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -118,6 +121,11 @@ const PUBLISH = [
   // Crate name and releases); Cargo 1.90 or newer publishes a workspace's
   // crates in dependency order.
   { dir: "packages/rust", commands: (v) => [`# packages/rust: the pushed tag v${v} is published to crates.io by .github/workflows/crates.yml (trusted publishing, once CRATES_ENABLED is true); by hand, (cd packages/rust && cargo publish --workspace --exclude cronwatch-webserver --exclude crontab)`] },
+  // Hex reads a package from the tarball `mix hex.publish` uploads, so the
+  // package needs no tag of its own. Published by hand for now
+  // (packages/elixir/DESIGN.md, Package name and releases); hex.yml, on the
+  // pushed tag, comes with the site pass.
+  { dir: "packages/elixir", commands: (v) => [`# packages/elixir: published to Hex by hand for now, as ${v}: (cd packages/elixir && mix hex.publish)`] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */

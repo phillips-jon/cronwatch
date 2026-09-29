@@ -973,3 +973,69 @@ jobs:
         run: |
           cargo fmt --check
           cargo +nightly fuzz build
+
+  # The Elixir port (packages/elixir), on its floor (Elixir 1.18 on OTP 27,
+  # what Debian 13 ships) and the current release. Phase 1 has the core, the
+  # memory store and the SQL store on SQLite, so no database services yet.
+  # The conformance step builds the SDK for the croner parity check and the
+  # SQLite file shared with Node. The newest entry also runs the formatter,
+  # Credo and Dialyzer (its PLTs cached with the build, by the Elixir and
+  # OTP versions); the floor also compiles without the optional
+  # dependencies, as an app with none of them builds the package.
+  elixir:
+    name: elixir (Elixir ${{ matrix.elixir }}, OTP ${{ matrix.otp }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { elixir: "1.18.5", otp: "27.3", newest: false }
+          - { elixir: "1.20", otp: "29", newest: true }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Builds the SDK (for the croner parity and Node compatibility tests),
+      # then fails if conformance/ or the dashboard fixture is stale.
+      - run: npm run check:conformance
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        id: beam
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+      # deps, the build and the PLTs (under _build/plts).
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            packages/elixir/deps
+            packages/elixir/_build
+          key: elixir-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('packages/elixir/mix.exs') }}
+          restore-keys: elixir-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-
+      - name: mix deps.get
+        working-directory: packages/elixir
+        run: mix deps.get
+      - name: mix format
+        if: matrix.newest
+        working-directory: packages/elixir
+        run: mix format --check-formatted
+      - name: mix compile
+        working-directory: packages/elixir
+        run: |
+          MIX_ENV=test mix compile --warnings-as-errors
+          if [ "${{ matrix.newest }}" = "false" ]; then
+            MIX_ENV=dev MIX_BUILD_PATH=_build/no-optional mix compile --no-optional-deps --warnings-as-errors
+          fi
+      # The test alias sets TZ=UTC, as the fixtures are made.
+      - name: mix test
+        working-directory: packages/elixir
+        run: mix test
+      - name: mix credo
+        if: matrix.newest
+        working-directory: packages/elixir
+        run: mix credo --strict
+      - name: mix dialyzer
+        if: matrix.newest
+        working-directory: packages/elixir
+        run: mix dialyzer --format github
