@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Elixir service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go or Rust process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/elixir/DESIGN.md) has the plan and how each part works). Phase 1, this release, has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, telemetry), the memory store, and the SQL store over Ecto on SQLite. Postgres and MySQL, the alert channels beyond the console, Claude triage, the dashboard, a job's handler and the Oban and Quantum integrations follow.
+This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go or Rust process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/elixir/DESIGN.md) has the plan and how each part works). Phase 1, this release, has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, telemetry), the memory store, and the SQL store over Ecto on SQLite. Postgres and MySQL, the alert channels beyond the console, Claude triage, the dashboard and a job's handler follow. The Oban and Quantum integrations and a crontab's check (phase 4) are in.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -84,6 +84,37 @@ defmodule MyApp.StoreTest do
 end
 ```
 
+### Oban
+
+`Cronwatch.Oban` watches Oban 2.20 or newer with no changes to your workers: every worker in the Cron plugin's crontab is a job (named after its module, on the entry's expression in its zone), and each attempt is a run, recorded through Oban's own telemetry in the worker's process, so `Cronwatch.log/1` works inside `perform/1`.
+
+```elixir
+{Cronwatch,
+ store: {Cronwatch.Store.Ecto, repo: MyApp.Repo},
+ integrations: [{Cronwatch.Oban, oban: Oban, defaults: [grace: "5m"], workers: [{MyApp.Workers.Import, timeout: "1h"}]}]}
+
+# config :my_app, Oban, crontab: [...]
+{"0 2 * * *", MyApp.Workers.NightlyReport},
+{"* * * * *", Cronwatch.Oban.CheckWorker}      # the check, once a minute across the cluster
+```
+
+A retry is a new run, so failing attempts open one failed alert and the one that succeeds closes it (`failures_before_alert` says how many attempts to allow first). A `{:snooze, _}` gives the run back, a `{:cancel, _}` fails it, a worker killed at its `timeout/1` is a failed run at once, and an attempt left running by a node that died is failed when Lifeline's rescue runs the job again. Each crontab expression is checked against Oban's own reading of it: Oban matches a day of the month and a day of the week both, where CronWatch (as cron and the SDK) matches either, so an expression the two read differently is reported once and watched without a schedule. Workers outside the crontab are watched only when named in `workers:`. The check worker also declares again, without its schedule, a job taken out of the crontab, so it is never reported missed.
+
+### Quantum
+
+`Cronwatch.Quantum` watches a Quantum 3.5 scheduler the same way: every active job is a job (named after its name), each run is a run through Quantum's telemetry, schedules are checked against the crontab package's fire times, and jobs added, deleted or deactivated at run time are followed.
+
+```elixir
+integrations: [{Cronwatch.Quantum, scheduler: MyApp.Scheduler, jobs: [nightly_report: [grace: "15m"]]}]
+
+# among the scheduler's jobs, the check:
+cronwatch_check: [schedule: "* * * * *", task: {Cronwatch.Quantum, :check, [[scheduler: MyApp.Scheduler]]}]
+```
+
+### A crontab
+
+A script a crontab runs needs no integration: a release's two lines are `bin/my_app eval "MyApp.Nightly.main()"` (which starts the instance and runs the job with `Cronwatch.run/3`) and `bin/my_app eval "Cronwatch.Release.check(MyApp.Cronwatch)"`, which starts the store's repo and an instance with the options under `config :my_app, MyApp.Cronwatch`, runs one check, prints what it did and exits non-zero when it fails. From source, `mix cronwatch.check MyApp.Cronwatch` does the same. `examples/crontab` in the repository is that program on SQLite.
+
 ### Telemetry
 
 `[:cronwatch, :run, :start | :stop | :exception]`, `[:cronwatch, :check, ...]`, `[:cronwatch, :alert, :sent | :failed | :queued | :dropped]` and `[:cronwatch, :error]`; see `Cronwatch.Telemetry`. During a run, Logger metadata carries `cronwatch_job` and `cronwatch_run`.
@@ -99,6 +130,8 @@ mix compile --warnings-as-errors
 mix credo --strict
 mix dialyzer
 ```
+
+The Oban tests run Oban on SQLite (its Lite engine), and on Postgres too when `CRONWATCH_TEST_PG` names one (`postgres://postgres:pw@127.0.0.1:5432/cw`); `CRONWATCH_PIN_OBAN` and `CRONWATCH_PIN_QUANTUM` pin the optional dependency to a release, for testing the oldest one claimed. `examples/crontab` has a test of its own (`mix test` there) that builds its release and runs the two crontab lines on one file.
 
 The tests replay the repository's `conformance/` fixtures, check the croner port against croner itself in Node (3,000 expressions), and share a SQLite file with the SDK; the last two need `npm run build` at the root first, and skip, saying so, without it.
 
