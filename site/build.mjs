@@ -133,7 +133,6 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 <meta name="theme-color" content="${THEME_COLOR}">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://use.typekit.net/gie6nes.css">
-<link rel="preload" href="/assets/fonts/plexmono-normal-400.woff2" as="font" type="font/woff2" crossorigin>
 <script src="${assets.theme}"></script>
 <link rel="stylesheet" href="${assets.css}">
 <script src="${assets.js}" defer></script>

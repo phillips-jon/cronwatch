@@ -4,12 +4,9 @@
    section instead of headlines shouting at you. Neutral greys only; text is
    black on light and white on dark, and the only colours anywhere are the
    four states the library reports. Light by default; the toggle turns the
-   sheet over. The serif is Calluna from Adobe Fonts (the one other origin
-   the page loads from, allowed in the CSP); the mono is self hosted. */
+   sheet over. Type is Calluna and Auger Mono from Adobe Fonts, the one
+   other origin the page loads from, allowed in the CSP. */
 
-@font-face { font-family: "Plex Mono"; src: url("/assets/fonts/plexmono-normal-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
-@font-face { font-family: "Plex Mono"; src: url("/assets/fonts/plexmono-normal-500.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
-@font-face { font-family: "Plex Mono"; src: url("/assets/fonts/plexmono-normal-600.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
 
 :root {
   --paper: #f4f4f5;
@@ -27,7 +24,7 @@
   --bad: #b91c1c;
   --link: #000000;
   --serif: "calluna", Georgia, "Times New Roman", serif;
-  --mono: "Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --mono: "auger-mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color-scheme: light;
 }
 :root[data-theme="dark"] {
