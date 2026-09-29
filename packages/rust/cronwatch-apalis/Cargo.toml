@@ -27,7 +27,7 @@ apalis-core = { version = "=1.0.0-rc.10", default-features = false }
 apalis-cron = { version = "=1.0.0-rc.9", default-features = false }
 tower-layer = "0.3.3"
 tower-service = "0.3.3"
-tokio = { version = "1.43", default-features = false, features = ["time"] }
+tokio = { version = "1.44", default-features = false, features = ["time"] }
 cron = { version = "0.16", optional = true }
 chrono = { version = "0.4.45", default-features = false, features = ["clock"], optional = true }
 chrono-tz = { version = "0.10.4", optional = true }
@@ -37,7 +37,7 @@ apalis = "=1.0.0-rc.10"
 # apalis's Postgres storage, for the tests that run when CRONWATCH_TEST_PG
 # is set; it brings sqlx 0.9, which needs Rust 1.94.
 apalis-postgres = "=1.0.0-rc.9"
-tokio = { version = "1.43", features = ["full", "test-util"] }
+tokio = { version = "1.44", features = ["full", "test-util"] }
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio"] }
 
 [package.metadata.docs.rs]

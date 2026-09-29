@@ -41,7 +41,7 @@ regex = ["dep:regex"]
 serde = ["dep:serde"]
 
 [dependencies]
-tokio = { version = "1.43", default-features = false, features = ["rt", "time", "sync"] }
+tokio = { version = "1.44", default-features = false, features = ["rt", "time", "sync"] }
 getrandom = "0.3"
 jiff = "0.2.15"
 # The app tag's hash (bridge::app_tag), as the PHP and Go ports make it.
@@ -60,16 +60,16 @@ hmac = { version = "0.13", optional = true }
 http = { version = "1.1", optional = true }
 http-body = { version = "1", optional = true }
 http-body-util = { version = "0.1.2", optional = true }
-bytes = { version = "1.6", optional = true }
+bytes = { version = "1.7.1", optional = true }
 tower-service = { version = "0.3.3", optional = true }
 axum = { version = "0.8.4", default-features = false, features = ["original-uri"], optional = true }
 # `JobOptions::expect_match` with a `regex::Regex` (the `regex` feature).
 regex = { version = "1.10", default-features = false, features = ["std", "unicode"], optional = true }
 # Serialize and Deserialize on the public types (the `serde` feature).
-serde = { version = "1.0.200", default-features = false, features = ["std"], optional = true }
+serde = { version = "1.0.219", default-features = false, features = ["std"], optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.43", features = ["full", "test-util"] }
+tokio = { version = "1.44", features = ["full", "test-util"] }
 flate2 = "1.0.35"
 # The serde feature's round trip.
 serde_json = "1"

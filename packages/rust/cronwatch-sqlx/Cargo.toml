@@ -29,7 +29,7 @@ pgcron = ["postgres"]
 [dependencies]
 cronwatch.workspace = true
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio"] }
-tokio = { version = "1.43", default-features = false, features = ["sync", "time"] }
+tokio = { version = "1.44", default-features = false, features = ["sync", "time"] }
 
 [dev-dependencies]
 # storetest for the store's contract tests; the rest for the workspace
@@ -39,7 +39,7 @@ axum = { version = "0.8.4", default-features = false }
 # MySQL 8's default sign-in (caching_sha2_password) over a connection without
 # TLS, as the CI and local test servers have it. An app picks its own.
 sqlx = { version = "0.9", default-features = false, features = ["mysql-rsa"] }
-tokio = { version = "1.43", features = ["full"] }
+tokio = { version = "1.44", features = ["full"] }
 
 [[test]]
 name = "store"
