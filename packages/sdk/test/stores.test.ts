@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import Database from "better-sqlite3";
 import pg from "pg";
@@ -10,7 +11,7 @@ import { retryBusy } from "../src/stores/busy.js";
 import { memory } from "../src/stores/memory.js";
 import { postgres } from "../src/stores/postgres.js";
 import { sqlite } from "../src/stores/sqlite.js";
-import type { JobState } from "../src/types.js";
+import type { JobState, Store } from "../src/types.js";
 import { conformance, run } from "./store-conformance.js";
 
 const PG = process.env.CRONWATCH_TEST_PG;
@@ -93,6 +94,54 @@ await test("sqlite: a prefix keeps two stores apart in one database", async () =
   rmSync(dir, { recursive: true, force: true });
 });
 
+// Rows another process wrote: a state whose version is 1.5 or "x", and a
+// running run that started at the lowest BIGINT. Neither may make a
+// statement fail, or refuse every write of the job for good.
+interface ForeignVersion { stored: string; counts: number; steps: { cas: JobState; expected: number; written: boolean; state?: JobState }[] }
+const storeFixture = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "conformance", "store.json");
+const foreignVersions = (JSON.parse(readFileSync(storeFixture, "utf8")) as { foreignVersion: ForeignVersion[] }).foreignVersion;
+
+async function replayForeignVersions(store: Store, writeRaw: (text: string) => Promise<void>) {
+  await store.init!();
+  for (const c of foreignVersions) {
+    await store.deleteJob("v");
+    await writeRaw(c.stored);
+    for (const step of c.steps) {
+      assert.equal(await store.compareAndSetState!(step.cas, step.expected), step.written, `${c.stored} expecting ${step.expected}`);
+      if (step.state) assert.deepEqual(await store.getState("v"), step.state, c.stored);
+    }
+  }
+}
+
+// The job is silenced: an alert's text shows the start as a date, and no
+// date is that far back.
+async function checkOverForeignRows(store: Store, exec: (sql: string) => Promise<void>, p = "cronwatch_") {
+  const cw = cronwatch({ store, alerts: [], cronSecret: null, onError: (e) => { throw e; } });
+  await store.init!();
+  await store.upsertJob({ name: "far", timeout: "5m" }, 1);
+  await exec(`INSERT INTO ${p}runs (id, job, status, started_at, metrics, trigger) VALUES ('far1', 'far', 'running', -9223372036854775808, '{}', 'run')`);
+  await exec(`INSERT INTO ${p}state (job, state) VALUES ('far', '{"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":4102444800000,"lastAlertAt":null,"version":1.5}')`);
+  for (let i = 0; i < 2; i++) await cw.check();
+  const run = (await store.getRun("far1"))!;
+  assert.equal(run.status, "timeout");
+  assert.equal(run.durationMs, Number.MAX_SAFE_INTEGER, "the duration is held at 2^53 - 1");
+  const state = (await store.getState("far"))!;
+  assert.equal(state.version, 1, "the state's 1.5 counted as 0 and was written over");
+  assert.equal(state.consecutiveFailures, 1);
+}
+
+await test("sqlite: a foreign state's version counts as stateVersion() reads it (store.json foreignVersion)", async () => {
+  const db = new Database(":memory:");
+  await replayForeignVersions(sqlite({ database: db }), async (text) => void db.prepare("INSERT INTO cronwatch_state (job, state) VALUES ('v', ?)").run(text));
+  db.close();
+});
+
+await test("sqlite: a check over a run that started at the lowest BIGINT, and a state whose version is 1.5", async () => {
+  const db = new Database(":memory:");
+  await checkOverForeignRows(sqlite({ database: db }), async (sql) => void db.exec(sql));
+  db.close();
+});
+
 await test("a prefix that is not a plain lowercase identifier is refused", () => {
   for (const prefix of ["1cw_", "cw-", "Cw_", "cw_;drop", "", "x".repeat(48)]) {
     assert.throws(() => sqlite({ path: ":memory:", prefix }), /invalid table prefix/, prefix);
@@ -148,6 +197,32 @@ await test("postgres: two stores racing on one job's state", { skip: NO_PG }, as
   } finally {
     await one.close!();
     await two.close!();
+    await drop(prefix);
+  }
+});
+
+await test("postgres: a foreign state's version counts as stateVersion() reads it (store.json foreignVersion)", { skip: NO_PG }, async () => {
+  const prefix = pgPrefix();
+  const store = postgres({ connectionString: PG, prefix });
+  const pool = new pg.Pool({ connectionString: PG });
+  try {
+    await replayForeignVersions(store, async (text) => void await pool.query(`INSERT INTO ${prefix}state (job, state) VALUES ('v', $1::jsonb)`, [text]));
+  } finally {
+    await pool.end();
+    await store.close!();
+    await drop(prefix);
+  }
+});
+
+await test("postgres: a check over a run that started at the lowest BIGINT, and a state whose version is 1.5", { skip: NO_PG }, async () => {
+  const prefix = pgPrefix();
+  const store = postgres({ connectionString: PG, prefix });
+  const pool = new pg.Pool({ connectionString: PG });
+  try {
+    await checkOverForeignRows(store, async (sql) => void await pool.query(sql), prefix);
+  } finally {
+    await pool.end();
+    await store.close!();
     await drop(prefix);
   }
 });

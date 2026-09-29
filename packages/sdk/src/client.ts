@@ -11,7 +11,9 @@ import {
   onCheck,
   onRunFinish,
   onRunStart,
+  runDuration,
   staleAlert,
+  stateVersion,
   summarize,
   timeoutMs,
   unevaluableSummary,
@@ -504,7 +506,7 @@ export class CronWatch {
         const current = await this.readState(job);
         const { state, result } = await change(current);
         if (sameState(state, current)) return { state: current, result };
-        const version = current.version ?? 0;
+        const version = stateVersion(current);
         const next: JobState = { ...state, version: version + 1 };
         if (await this.writeState(next, version)) return { state: next, result };
         if (attempt >= STATE_ATTEMPTS) {
@@ -572,7 +574,7 @@ export class CronWatch {
 
     const finishedAt = this.now();
     run.finishedAt = finishedAt;
-    run.durationMs = Math.max(0, finishedAt - startedAt);
+    run.durationMs = runDuration(startedAt, finishedAt);
     run.metrics = recorder.metrics();
     run.output = recorder.output() ?? (typeof result === "string" ? capOutput(result) : null);
     this.conclude(definition, run, result, error, threw, recorder.expectText() ?? (typeof result === "string" ? result : null));
@@ -830,7 +832,7 @@ export class CronWatch {
           ...from,
           status: "running",
           finishedAt,
-          durationMs: Math.max(0, finishedAt - from.startedAt),
+          durationMs: runDuration(from.startedAt, finishedAt),
           error: null,
           output: joinOutput(from.output, added),
           metrics: { ...from.metrics, ...recorder.metrics() },
@@ -1034,7 +1036,7 @@ export class CronWatch {
         const timeout = timeoutMs(definition);
         run.status = "timeout";
         run.finishedAt = now;
-        run.durationMs = now - run.startedAt;
+        run.durationMs = runDuration(run.startedAt, now);
         run.error = `Still running after ${formatDuration(timeout)}; marked as timed out`;
         // Only over a row still running: a finish that landed meanwhile wins.
         if (!(await this.writeRunIf(run, ["running"]))) continue;

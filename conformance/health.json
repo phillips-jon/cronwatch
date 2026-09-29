@@ -2207,6 +2207,44 @@
       },
       "now": 1767605400000,
       "stuck": true
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "run": {
+        "id": "a",
+        "job": "j",
+        "status": "running",
+        "startedAt": -4611686018427388000,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "now": 1767605400000,
+      "stuck": true
+    },
+    {
+      "definition": {
+        "timeout": "5m"
+      },
+      "run": {
+        "id": "a",
+        "job": "j",
+        "status": "running",
+        "startedAt": 4611686018427388000,
+        "finishedAt": null,
+        "durationMs": null,
+        "error": null,
+        "output": null,
+        "metrics": {},
+        "trigger": "run"
+      },
+      "now": 1767605400000,
+      "stuck": false
     }
   ],
   "unevaluableSummary": [
@@ -3366,6 +3404,118 @@
         "undelivered": []
       },
       "stale": true
+    }
+  ],
+  "runDuration": [
+    {
+      "startedAt": 1767605398500,
+      "finishedAt": 1767605400000,
+      "durationMs": 1500
+    },
+    {
+      "startedAt": 1767605400000,
+      "finishedAt": 1767605400000,
+      "durationMs": 0
+    },
+    {
+      "startedAt": 1767605400005,
+      "finishedAt": 1767605400000,
+      "durationMs": 0
+    },
+    {
+      "startedAt": -4611686018427388000,
+      "finishedAt": 1767605400000,
+      "durationMs": 9007199254740991
+    },
+    {
+      "startedAt": 4611686018427388000,
+      "finishedAt": 1767605400000,
+      "durationMs": 0
+    },
+    {
+      "startedAt": 1767605400000,
+      "finishedAt": -4611686018427388000,
+      "durationMs": 0
+    },
+    {
+      "startedAt": 0,
+      "finishedAt": 9007199254740991,
+      "durationMs": 9007199254740991
+    },
+    {
+      "startedAt": -1,
+      "finishedAt": 9007199254740991,
+      "durationMs": 9007199254740991
+    }
+  ],
+  "stateVersion": [
+    {
+      "state": "{\"job\":\"j\"}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":7}",
+      "version": 7
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":0}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":1.5}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":\"x\"}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":\"3\"}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":true}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":null}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":-1}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":-0}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":2.0}",
+      "version": 2
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":1e3}",
+      "version": 1000
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":[1]}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":9007199254740991}",
+      "version": 9007199254740991
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":9007199254740992}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":9007199254740993}",
+      "version": 0
+    },
+    {
+      "state": "{\"job\":\"j\",\"version\":1e400}",
+      "version": 0
     }
   ]
 }

@@ -36,7 +36,9 @@ import {
   onRunFinish,
   onRunStart,
   isSilenced,
+  runDuration,
   staleAlert,
+  stateVersion,
   summarize,
   timeoutMs,
   unevaluableSummary,
@@ -818,6 +820,11 @@ function formatCases() {
 
 // ---------------------------------------------------------------- health
 
+// Versions a state's JSON may hold, as written in its text: the SDK's own, and
+// what a foreign row may hold instead. undefined leaves the field out.
+const STATE_VERSIONS = [undefined, "7", "0", "1.5", '"x"', '"3"', "true", "null", "-1", "-0", "2.0", "1e3", "[1]",
+  "9007199254740991", "9007199254740992", "9007199254740993", "1e400"];
+
 function healthCases() {
   const r = (id, status, startedAt, durationMs = 1000, extra = {}) => ({
     id, job: "j", status, startedAt, finishedAt: durationMs === null ? null : startedAt + durationMs, durationMs,
@@ -880,7 +887,24 @@ function healthCases() {
     [{ timeout: "5m" }, r("a", "ok", T0 - HOUR)],
     [{}, r("a", "running", T0 - HOUR - 1, null)],
     [{ timeout: 1000 }, r("a", "running", T0 - 1001, null)],
+    [{ timeout: "5m" }, r("a", "running", -(2 ** 62), null)],
+    [{ timeout: "5m" }, r("a", "running", 2 ** 62, null)],
   ].map(([definition, runValue]) => ({ definition, run: runValue, now: T0, stuck: isStuck(definition, runValue, T0) }));
+
+  // A run's duration, from its start to its finish (or to now, for a run
+  // marked as timed out): 0 for a start after the finish, and at most 2^53 - 1,
+  // however far off a foreign row's start is.
+  const MAX = Number.MAX_SAFE_INTEGER;
+  const durations = [
+    [T0 - 1500, T0], [T0, T0], [T0 + 5, T0], [-(2 ** 62), T0], [2 ** 62, T0], [T0, -(2 ** 62)], [0, MAX], [-1, MAX],
+  ].map(([startedAt, finishedAt]) => ({ startedAt, finishedAt, durationMs: runDuration(startedAt, finishedAt) }));
+
+  // The version a stored state counts as, from the state's JSON text: a whole
+  // number from 0 to 2^53 - 1, else 0.
+  const versions = STATE_VERSIONS.map((v) => {
+    const text = v === undefined ? `{"job":"j"}` : `{"job":"j","version":${v}}`;
+    return { state: text, version: stateVersion(JSON.parse(text)) };
+  });
 
   // A job that could not be evaluated: its summary reads nothing from the definition.
   const broken = { name: "j", definition: { name: "j", schedule: "not a schedule", timeout: "soon" }, createdAt: T0 - DAY, updatedAt: T0 };
@@ -922,7 +946,7 @@ function healthCases() {
 
   return {
     jobHealth: jobHealthCases, summarize: summaries, percentile: stats, median: medians, normalizeState: normalized, muteOpens: mutes, isStuck: stuck,
-    unevaluableSummary: unevaluable, applySilence: silences, staleAlert: staleCases,
+    unevaluableSummary: unevaluable, applySilence: silences, staleAlert: staleCases, runDuration: durations, stateVersion: versions,
   };
 }
 
@@ -1211,7 +1235,26 @@ async function storeCases() {
     else outcome = await once.updateRunIf(step.run, step.from);
     updateRunIf.push({ ...step, ...(outcome === undefined ? {} : { outcome }), stored: await once.getRun("u1") });
   }
-  return { prune: out, compareAndSetState: cas, updateRunIf };
+  // foreignVersion: a state row another process wrote, with its version in
+  // any shape (as its JSON text, for a SQL store to hold as it is). Its
+  // version counts as stateVersion() reads it: a write expecting any other
+  // version is refused, and one expecting it goes through. 1e400 is left
+  // out, as MySQL cannot read it as JSON.
+  const foreignVersion = [];
+  for (const v of STATE_VERSIONS.filter((x) => x !== "1e400")) {
+    const stored = v === undefined ? `{"job":"v"}` : `{"job":"v","version":${v}}`;
+    const counts = stateVersion(JSON.parse(stored));
+    const store = sdk.memory();
+    await store.setState(JSON.parse(stored));
+    const write = s("v", counts + 1, { consecutiveFailures: 1 });
+    const steps = [];
+    for (const expected of [counts === 0 ? 1 : 0, counts]) {
+      const written = await store.compareAndSetState(clone(write), expected);
+      steps.push({ cas: write, expected, written, ...(written ? { state: await store.getState("v") } : {}) });
+    }
+    foreignVersion.push({ stored, counts, steps });
+  }
+  return { prune: out, compareAndSetState: cas, updateRunIf, foreignVersion };
 }
 
 // ---------------------------------------------------------------- channels

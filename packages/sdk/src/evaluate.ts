@@ -36,6 +36,31 @@ export const BASELINE_MIN_RUNS = 5;
 /** How many successful runs a baseline looks at, and how many runs a summary covers. */
 export const BASELINE_WINDOW = 20;
 
+/** The longest duration written: the largest integer JavaScript holds exactly, which every port and store reads back unchanged. */
+export const MAX_DURATION_MS = Number.MAX_SAFE_INTEGER;
+
+/**
+ * How long a run took, from `startedAt` to `finishedAt`: 0 when it started
+ * later, and never more than MAX_DURATION_MS. A foreign row's start near a
+ * 64-bit limit must not make a duration no store can write.
+ */
+export function runDuration(startedAt: number, finishedAt: number): number {
+  const ms = finishedAt - startedAt;
+  return ms > 0 ? Math.min(ms, MAX_DURATION_MS) : 0;
+}
+
+/**
+ * The version a stored state counts as for compareAndSetState: its
+ * `version` when that is a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
+ * else 0, as when it is absent. The SQL stores read it the same way, so a
+ * foreign row's `1.5`, `"x"` or `-1` is written over by the next update
+ * instead of refusing every compare-and-set of its job for good.
+ */
+export function stateVersion(state: Pick<JobState, "version"> | null | undefined): number {
+  const version: unknown = state?.version;
+  return typeof version === "number" && Number.isSafeInteger(version) && version >= 0 ? version + 0 : 0;
+}
+
 export function emptyState(job: string): JobState {
   return { job, open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, pendingRecovery: [], undelivered: [] };
 }

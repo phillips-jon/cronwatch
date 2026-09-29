@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { emptyState, jobHealth, muteOpens, normalizeState, onCheck, onRunFinish, onRunStart, summarize } from "../src/evaluate.js";
+import {
+  emptyState, jobHealth, MAX_DURATION_MS, muteOpens, normalizeState, onCheck, onRunFinish, onRunStart, runDuration, stateVersion, summarize,
+} from "../src/evaluate.js";
 import type { AlertDetails, AlertDraft, JobDefinition, Run, StoredJob } from "../src/types.js";
 import { MIN, HOUR, T0 } from "./helpers.js";
 
@@ -281,4 +283,22 @@ test("summarize takes the last run and stats from the newest twenty runs", () =>
   assert.equal(s.stats.okRate, 18 / 19);
   assert.equal(s.stats.p50Ms, 9000);
   assert.equal(s.stats.p95Ms, 18000);
+});
+
+test("runDuration: 0 for a start after the finish, and at most 2^53 - 1 for a start far back", () => {
+  assert.equal(runDuration(T0 - 1500, T0), 1500);
+  assert.equal(runDuration(T0 + 5, T0), 0);
+  assert.equal(runDuration(-9223372036854775808, T0), MAX_DURATION_MS);
+  assert.equal(runDuration(Number.NaN, T0), 0);
+  assert.equal(MAX_DURATION_MS, Number.MAX_SAFE_INTEGER);
+});
+
+test("stateVersion: a whole number from 0 to 2^53 - 1, else 0", () => {
+  assert.equal(stateVersion(null), 0);
+  assert.equal(stateVersion({}), 0);
+  assert.equal(stateVersion({ version: 7 }), 7);
+  for (const version of [1.5, "x", "3", true, -1, 2 ** 53, Infinity, Number.NaN]) {
+    assert.equal(stateVersion({ version } as unknown as { version: number }), 0, String(version));
+  }
+  assert.ok(Object.is(stateVersion({ version: -0 }), 0));
 });

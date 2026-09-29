@@ -1,4 +1,5 @@
 import type { Source, SourceHost } from "../client.js";
+import { runDuration } from "../evaluate.js";
 import type { Alert, JobOptions, Run, StoredJobDefinition } from "../types.js";
 
 /**
@@ -125,7 +126,7 @@ export function pgCronRun(row: DetailRow, job: string, idPrefix: string, fallbac
     status,
     startedAt,
     finishedAt: end,
-    durationMs: end === null ? null : end - startedAt,
+    durationMs: end === null ? null : runDuration(startedAt, end),
     error: status === "failed" ? (message ?? "pg_cron reported the run as failed") : null,
     output: status === "ok" ? message : null,
     metrics: {},

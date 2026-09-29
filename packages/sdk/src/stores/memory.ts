@@ -1,3 +1,4 @@
+import { stateVersion } from "../evaluate.js";
 import type { JobState, Run, Store, StoredJob, StoredJobDefinition } from "../types.js";
 
 /**
@@ -87,7 +88,7 @@ export function memory(): Store {
       states.set(state.job, clone(state));
     },
     async compareAndSetState(state, expectedVersion) {
-      if ((states.get(state.job)?.version ?? 0) !== expectedVersion) return false;
+      if (stateVersion(states.get(state.job)) !== expectedVersion) return false;
       states.set(state.job, clone(state));
       return true;
     },
