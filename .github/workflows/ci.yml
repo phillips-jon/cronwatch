@@ -779,6 +779,10 @@ jobs:
       matrix:
         # The core's rust-version, and the current stable. cronwatch-sqlx
         # needs 1.94 (sqlx 0.9), so it is linted and tested on stable only.
+        # cronwatch-tokio-cron-scheduler is tested on 1.85 too, and
+        # cronwatch-apalis's library is linted there without its `cron`
+        # feature (the cron crate needs 1.87) or its tests (apalis's
+        # Postgres storage brings sqlx 0.9).
         rust: ["1.85", "stable"]
     # The databases for cronwatch-sqlx's server tests, as the go job has them.
     services:
@@ -848,7 +852,8 @@ jobs:
           if [ "${{ matrix.rust }}" = "stable" ]; then
             cargo clippy --workspace --all-targets --all-features -- -D warnings
           else
-            cargo clippy -p cronwatch --all-targets --all-features -- -D warnings
+            cargo clippy -p cronwatch -p cronwatch-tokio-cron-scheduler --all-targets --all-features -- -D warnings
+            cargo clippy -p cronwatch-apalis --lib -- -D warnings
           fi
       # The workspace's .cargo/config.toml sets TZ=UTC, as the fixtures are made.
       - name: cargo test
@@ -861,5 +866,5 @@ jobs:
           if [ "${{ matrix.rust }}" = "stable" ]; then
             cargo test --workspace --all-features
           else
-            cargo test -p cronwatch --all-features
+            cargo test -p cronwatch -p cronwatch-tokio-cron-scheduler --all-features
           fi
