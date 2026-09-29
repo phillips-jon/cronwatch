@@ -7,6 +7,7 @@ defmodule Cronwatch.ReleaseTest do
   alias Cronwatch.Release
   alias Cronwatch.Store.Ecto, as: EctoStore
   alias Cronwatch.Test.Repo
+  alias Cronwatch.Test.Stores
   alias Mix.Tasks.Cronwatch.Check, as: CheckTask
 
   setup do
@@ -56,6 +57,27 @@ defmodule Cronwatch.ReleaseTest do
   test "config: gives the options themselves" do
     out = capture_io(fn -> Release.check(:release_given, config: [alerts: []], halt: false) end)
     assert out == "cronwatch: checked 0 jobs, sent 0 alerts\n"
+  end
+
+  test "an instance already running is checked as it is, left running, and never halts the node" do
+    {store, hooks} = Stores.hooked(Stores.memory())
+    start_supervised!({Cronwatch, name: :release_running, store: store, alerts: []})
+    out = capture_io(fn -> assert {:ok, _} = Release.check(:release_running) end)
+    assert out == "cronwatch: checked 0 jobs, sent 0 alerts\n"
+    assert :persistent_term.get({Cronwatch, :release_running}, nil) != nil, "the app's instance is left running"
+
+    # A failure is answered, not halted on: halting would stop the live app.
+    for fun <- [:list_jobs, :running_runs], do: Stores.hook(hooks, fun, fn _, _ -> {:error, :down} end)
+    err = capture_io(:stderr, fn -> assert {:error, _} = Release.check(:release_running) end)
+    assert err =~ "cronwatch: the check failed"
+  end
+
+  test "a store without a repo, or with one that is not a repo, is a failure answered, not raised" do
+    for store <- [{EctoStore, []}, {EctoStore, repo: String}] do
+      capture_io(:stderr, fn ->
+        assert {:error, %Cronwatch.Error{}} = Release.check(:release_bad_repo, config: [store: store], halt: false)
+      end)
+    end
   end
 
   test "mix cronwatch.check runs the check for an instance named on the command line" do

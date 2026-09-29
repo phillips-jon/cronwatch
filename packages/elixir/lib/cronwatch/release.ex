@@ -16,7 +16,9 @@ defmodule Cronwatch.Release do
   mails the failure. From source, `mix cronwatch.check` does the same.
 
   The instance's `check_every` and `integrations` are left out: the process
-  checks once and ends.
+  checks once and ends. Called where the instance is already running (`bin/my_app
+  rpc` into the live app), it checks that instance, leaves it running and
+  never halts, since halting would stop the app.
   """
 
   @doc """
@@ -30,7 +32,10 @@ defmodule Cronwatch.Release do
   """
   @spec check(atom(), keyword()) :: {:ok, Cronwatch.CheckResult.t()} | {:error, Cronwatch.Error.t()}
   def check(name \\ Cronwatch, opts \\ []) do
-    result = run(name, opts)
+    # An instance already running here (`bin/my_app rpc` into the live app)
+    # is checked as it is, and a failure never halts the node it runs in.
+    running = is_atom(name) and Process.whereis(Module.concat(name, Supervisor)) != nil
+    result = if running, do: Cronwatch.check(instance: name), else: run(name, opts)
 
     case result do
       {:ok, r} ->
@@ -40,7 +45,7 @@ defmodule Cronwatch.Release do
 
       {:error, e} ->
         IO.puts(:stderr, "cronwatch: the check failed: #{Cronwatch.Config.describe(e)}")
-        if Keyword.get(opts, :halt, true), do: System.halt(1)
+        if not running and Keyword.get(opts, :halt, true), do: System.halt(1)
     end
 
     result
@@ -53,27 +58,29 @@ defmodule Cronwatch.Release do
     with {:ok, config} <- config(name, opts),
          {:ok, _} <- Application.ensure_all_started(:cronwatch),
          {:ok, repos} <- start_repos(config) do
-      try do
-        config = config |> Keyword.drop([:check_every, :integrations]) |> Keyword.put(:name, name)
-
-        case Cronwatch.Supervisor.start_link(config) do
-          {:ok, sup} ->
-            try do
-              Cronwatch.check(instance: name)
-            after
-              stop(sup)
-            end
-
-          {:error, %Cronwatch.Error{} = e} ->
-            {:error, e}
-
-          {:error, reason} ->
-            {:error, Cronwatch.Error.other("the instance did not start: #{inspect(reason)}")}
-        end
-      after
-        Enum.each(repos, &stop/1)
-      end
+      start_and_check(name, config, repos)
     end
+  end
+
+  defp start_and_check(name, config, repos) do
+    config = config |> Keyword.drop([:check_every, :integrations]) |> Keyword.put(:name, name)
+
+    case Cronwatch.Supervisor.start_link(config) do
+      {:ok, sup} ->
+        try do
+          Cronwatch.check(instance: name)
+        after
+          stop(sup)
+        end
+
+      {:error, %Cronwatch.Error{} = e} ->
+        {:error, e}
+
+      {:error, reason} ->
+        {:error, Cronwatch.Error.other("the instance did not start: #{inspect(reason)}")}
+    end
+  after
+    Enum.each(repos, &stop/1)
   end
 
   defp config(name, opts) do
@@ -104,26 +111,41 @@ defmodule Cronwatch.Release do
   end
 
   # The store's Ecto repo, started as the Ecto migrator starts one, unless
-  # it is running already; answers the ones this started.
+  # it is running already; answers the ones this started. A store option
+  # that names no repo, or not a repo, is the check's failure, so `halt:
+  # false` still answers rather than raises.
   defp start_repos(config) do
     case Keyword.get(config, :store) do
       {Cronwatch.Store.Ecto, store_opts} when is_list(store_opts) ->
-        repo = Keyword.fetch!(store_opts, :repo)
-
-        with {:ok, _} <- Application.ensure_all_started(:ecto_sql),
-             {:ok, _} <- repo.__adapter__().ensure_all_started(repo.config(), :temporary) do
-          # Two connections at most, as the Ecto migrator starts a repo.
-          case repo.start_link(pool_size: min(Keyword.get(repo.config(), :pool_size, 2), 2)) do
-            {:ok, pid} -> {:ok, [pid]}
-            {:error, {:already_started, _}} -> {:ok, []}
-            {:error, reason} -> {:error, Cronwatch.Error.store(reason)}
-          end
-        else
-          {:error, reason} -> {:error, Cronwatch.Error.other("the repo could not start: #{inspect(reason)}")}
-        end
+        start_repo(Keyword.get(store_opts, :repo))
 
       _ ->
         {:ok, []}
+    end
+  end
+
+  defp start_repo(repo) when is_atom(repo) and repo not in [nil, true, false] do
+    if Code.ensure_loaded?(repo) and function_exported?(repo, :__adapter__, 0) do
+      start_loaded_repo(repo)
+    else
+      {:error, Cronwatch.Error.invalid("the store's repo #{inspect(repo)} is not an Ecto repo")}
+    end
+  end
+
+  defp start_repo(other),
+    do: {:error, Cronwatch.Error.invalid("the store needs repo: an Ecto repo, not #{inspect(other)}")}
+
+  defp start_loaded_repo(repo) do
+    with {:ok, _} <- Application.ensure_all_started(:ecto_sql),
+         {:ok, _} <- repo.__adapter__().ensure_all_started(repo.config(), :temporary) do
+      # Two connections at most, as the Ecto migrator starts a repo.
+      case repo.start_link(pool_size: min(Keyword.get(repo.config(), :pool_size, 2), 2)) do
+        {:ok, pid} -> {:ok, [pid]}
+        {:error, {:already_started, _}} -> {:ok, []}
+        {:error, reason} -> {:error, Cronwatch.Error.store(reason)}
+      end
+    else
+      {:error, reason} -> {:error, Cronwatch.Error.other("the repo could not start: #{inspect(reason)}")}
     end
   end
 
