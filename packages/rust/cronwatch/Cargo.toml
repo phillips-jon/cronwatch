@@ -21,7 +21,7 @@ blocking = ["tokio/net"]
 storetest = []
 
 [dependencies]
-tokio = { version = "1.43", default-features = false, features = ["rt", "time", "sync", "macros"] }
+tokio = { version = "1.43", default-features = false, features = ["rt", "time", "sync"] }
 getrandom = "0.3"
 jiff = "0.2.15"
 
