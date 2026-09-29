@@ -92,12 +92,29 @@ module Cronwatch
     end
 
     # The line a development token is announced with, printed once to stdout
-    # on the app's first request. `origin` is that request's origin (scheme,
-    # host and any port), `base` the base path without a trailing slash (""
-    # when mounted at the root).
+    # on the app's first request. `origin` is the `origin:` option when set,
+    # otherwise that request's origin (scheme, host and any port) when its
+    # host is loopback, and nil for any other host: the request's host is
+    # the client's to choose, so the line then leaves it out rather than
+    # point the link, token and all, somewhere else. `base` is the base path
+    # without a trailing slash ("" when mounted at the root).
     def self.development_sign_in_line(origin, base, token)
-      "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. " \
-        "Sign in: #{origin}#{base}/?token=#{token}"
+      intro = "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: "
+      return "#{intro}#{base}/?token=#{token} on this server (the first request's host is not local, so the link leaves it out)" if origin.nil?
+
+      "#{intro}#{origin}#{base}/?token=#{token}"
+    end
+
+    # Whether an origin's host is loopback: "localhost", a name ending in
+    # ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1.
+    def self.loopback_origin?(origin)
+      authority = origin.to_s.sub(%r{\A[A-Za-z][A-Za-z0-9+.-]*://}, "")
+      host = authority.start_with?("[") ? authority[0..(authority.index("]") || -1)] : authority.split(":", 2).first.to_s
+      host = host.downcase
+      return true if host == "localhost" || host.end_with?(".localhost") || host == "[::1]"
+
+      octets = /\A127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\z/.match(host)
+      !octets.nil? && octets.captures.all? { |o| o.to_i <= 255 }
     end
 
     # The `origin` option, normalised to scheme://host[:port], or nil when
@@ -319,7 +336,8 @@ module Cronwatch
       end
       return unless first
 
-      $stdout.puts(Web.development_sign_in_line(public_origin(request), base, @token))
+      shown = @origin || (Web.loopback_origin?(request.origin) ? request.origin : nil)
+      $stdout.puts(Web.development_sign_in_line(shown, base, @token))
       $stdout.flush
     end
 

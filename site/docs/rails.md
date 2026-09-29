@@ -344,6 +344,12 @@ Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` o
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
 ```
 
+The link names the host only when `origin:` is set or the request's host is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`). A request's host is the client's to choose, so for any other host the line leaves it out, and a spoofed first request cannot point the link, token and all, somewhere else:
+
+```text
+[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)
+```
+
 Open that link once and the browser stays signed in; until then every request answers 401 and the page says the link is in the server log. Nothing about a request itself lets it in, since proxies, tunnels and `bin/rails server -b 0.0.0.0` all make a remote caller look local. In any other environment it answers 503 until a token is set.
 
 To put it behind the app's own sign in instead, mount it inside that check and pass `token: nil`, so it serves whoever gets through. With Devise:
@@ -364,7 +370,7 @@ A `POST` or `DELETE` carrying an `Origin` that is not the request's own, or a `S
 mount Cronwatch::Web.new(Cronwatch.client, origin: ENV["APP_ORIGIN"]) => "/cronwatch"
 ```
 
-With `origin:` set, a write must carry that `Origin`, the sign-in cookie is `Secure` when it is `https`, a form redirects back only to a `Referer` on it, and the development sign-in line uses it, whatever the request's headers say.
+With `origin:` set, a write must carry that `Origin`, the sign-in cookie is `Secure` when it is `https`, a form redirects back only to a `Referer` on it, and the development sign-in line uses it, whatever the request's headers say. Without it, that line names the request's host only when it is loopback.
 
 `/cronwatch/api/check` runs the check. It accepts the token or, on this path only, the client's `cron_secret` (`CRON_SECRET` by default) as a bearer, so a platform cron or an outside scheduler can call it instead of `CheckJob` without holding the dashboard token. A `GET` must carry a bearer, so a page cannot set it off with the dashboard's cookie. [Dashboard and API](/docs/dashboard/) has every endpoint and JSON shape.
 
