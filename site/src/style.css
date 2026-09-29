@@ -148,6 +148,15 @@ details.peek .out pre { max-height: 360px; overflow-y: auto; }
 .row .body > * + .out, .row .body > * + .install, .row .body > * + .catches { margin-top: 30px; }
 .row .body > * + p.small, .row .body > * + details.peek { margin-top: 24px; }
 .row .body > details.peek + details.peek { margin-top: 12px; }
+/* A list of stacks (or of places the check runs): a mono label down the left
+   of each line, as the rows have, ruled like a table on a printed sheet. */
+.row .body > .stacks { margin: 20px 0 0; max-width: 64ch; border-top: 1px solid var(--rule); }
+.row .body > p.small + p.small { margin-top: 14px; }
+.stacks > div { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 18px; padding: 11px 0 12px; border-bottom: 1px solid var(--rule); }
+.stacks dt { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
+.stacks dd { margin: 0; font-size: 17px; line-height: 1.5; color: var(--ink); text-wrap: pretty; }
+.stacks dd code { font-size: .86em; }
+@media (max-width: 560px) { .stacks > div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
 
 /* Printed things: what the library actually put on a screen. */
 .out { background: var(--sunk); border: 1px solid var(--rule); border-radius: 3px; }
