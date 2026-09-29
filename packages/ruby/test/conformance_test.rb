@@ -364,6 +364,16 @@ class ConformanceTest < Minitest::Test
     end
   end
 
+  def test_run_duration
+    each_case(HEALTH["runDuration"]) { |c| differs(c["durationMs"], Cronwatch::Evaluate.run_duration(c["startedAt"], c["finishedAt"])) }
+  end
+
+  def test_state_version
+    each_case(HEALTH["stateVersion"]) do |c|
+      differs(c["version"], Cronwatch::Evaluate.state_version(Cronwatch::JobState.from_h(JSON.parse(c["state"]))))
+    end
+  end
+
   def test_unevaluable_summary
     each_case(HEALTH["unevaluableSummary"]) do |c|
       stored = Cronwatch::StoredJob.from_h(c["stored"])

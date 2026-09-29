@@ -209,6 +209,36 @@ module StoreConformance
     assert failures.empty?, failures.join("\n")
   end
 
+  # conformance/store.json's foreignVersion cases: a state row another
+  # process wrote, its version in any shape. It counts as
+  # Evaluate.state_version reads it: a write expecting any other version is
+  # refused, and one expecting it goes through. A SQL store's test writes the
+  # row's JSON text as it is (write_raw_state); the memory store holds it parsed.
+  def test_foreign_versions_replay_the_sdk_cases
+    store = make_store
+    store.init if store.respond_to?(:init)
+    failures = []
+    STORE_SCRIPTS["foreignVersion"].each do |c|
+      store.delete_job("v")
+      if respond_to?(:write_raw_state)
+        write_raw_state(store, c["stored"])
+      else
+        store.set_state(Cronwatch::JobState.from_h(JSON.parse(c["stored"])))
+      end
+      c["steps"].each do |step|
+        written = store.compare_and_set_state(Cronwatch::JobState.from_h(step["cas"]), step["expected"])
+        failures << "#{c["stored"]} expecting #{step["expected"]}: wrote #{written}" unless written == step["written"]
+        next unless step["state"]
+
+        expected = Cronwatch::JS.json(step["state"])
+        actual = Cronwatch::JS.json(store.get_state("v")&.to_h)
+        failures << "#{c["stored"]}: expected #{expected}\n    got      #{actual}" unless expected == actual
+      end
+    end
+    assert failures.empty?, failures.join("\n")
+    store.delete_job("v")
+  end
+
   def test_the_store_hands_out_copies
     store = make_store
     store.init if store.respond_to?(:init)

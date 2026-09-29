@@ -18,7 +18,35 @@ module Cronwatch
     CheckEvaluation = Struct.new(:state, :alerts, :next_expected_at, :due_at, keyword_init: true)
     SlowThreshold = Struct.new(:threshold_ms, :basis, keyword_init: true)
 
+    # The longest duration written: the largest integer JavaScript holds
+    # exactly, which every port and store reads back unchanged.
+    MAX_DURATION_MS = 9_007_199_254_740_991
+
     module_function
+
+    # How long a run took, from `started_at` to `finished_at`: 0 when it
+    # started later, and never more than MAX_DURATION_MS. A foreign row's
+    # start near a 64-bit limit must not make a duration no store can write.
+    def run_duration(started_at, finished_at)
+      ms = finished_at - started_at
+      return 0 unless ms.is_a?(Numeric) && ms.positive?
+
+      ms = ms.to_i if ms.is_a?(Float) && ms.finite? && ms == ms.floor
+      [ms, MAX_DURATION_MS].min
+    end
+
+    # The version a stored state counts as for compare_and_set_state: its
+    # `version` when that is a whole number from 0 to MAX_DURATION_MS
+    # (2**53 - 1), else 0, as when it is absent. The SQL stores read it the
+    # same way, so a foreign row's 1.5, "x" or -1 is written over by the next
+    # update instead of refusing every compare-and-set of its job for good.
+    def state_version(state)
+      version = state&.version
+      return 0 unless version.is_a?(Integer) || (version.is_a?(Float) && version.finite? && version == version.floor)
+      return 0 unless version >= 0 && version <= MAX_DURATION_MS
+
+      version.to_i
+    end
 
     def empty_state(job)
       JobState.new(job: job, open: {}, consecutive_failures: 0, silenced_until: nil, last_alert_at: nil,

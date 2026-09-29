@@ -229,7 +229,7 @@ module Cronwatch
 
       finished_at = now
       run.finished_at = finished_at
-      run.duration_ms = [0, finished_at - started_at].max
+      run.duration_ms = Evaluate.run_duration(started_at, finished_at)
       run.metrics = recorder.metrics
       returned = result.is_a?(String) ? Output.utf8(result) : nil
       run.output = recorder.output || (returned && Output.cap(returned))
@@ -687,7 +687,7 @@ module Cronwatch
           state, result = yield(current)
           break [current, result] if same_state?(state, current)
 
-          version = current.version || 0
+          version = Evaluate.state_version(current)
           following = state.dup
           following.version = version + 1
           break [following, result] if write_state(following, version)
@@ -938,7 +938,7 @@ module Cronwatch
       run = from.dup
       run.status = :running
       run.finished_at = finished_at
-      run.duration_ms = [0, finished_at - from.started_at].max
+      run.duration_ms = Evaluate.run_duration(from.started_at, finished_at)
       run.error = nil
       run.output = join_output(from.output, added)
       run.metrics = (from.metrics || {}).merge(recorder.metrics)
@@ -1063,7 +1063,7 @@ module Cronwatch
         timeout = Evaluate.timeout_ms(definition)
         run.status = :timeout
         run.finished_at = at
-        run.duration_ms = at - run.started_at
+        run.duration_ms = Evaluate.run_duration(run.started_at, at)
         run.error = "Still running after #{Duration.format(timeout)}; marked as timed out"
         # Only over a row still running: a finish that landed meanwhile wins.
         next unless write_run_if(run, [:running])

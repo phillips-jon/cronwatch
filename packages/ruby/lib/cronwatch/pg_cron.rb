@@ -161,7 +161,7 @@ module Cronwatch
         finish = done ? [started_at, finished_at || started_at].max : nil
         Run.new(
           id: "#{id_prefix}#{row["runid"]}", job: job, status: status, started_at: started_at, finished_at: finish,
-          duration_ms: finish.nil? ? nil : finish - started_at,
+          duration_ms: finish.nil? ? nil : Evaluate.run_duration(started_at, finish),
           error: status == :failed ? (message || "pg_cron reported the run as failed") : nil,
           output: status == :ok ? message : nil, metrics: {}, trigger: "pg_cron",
         )

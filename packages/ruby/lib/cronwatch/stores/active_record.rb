@@ -344,8 +344,20 @@ module Cronwatch
         seq = pg ? "seq" : "rowid"
         # Byte order on both, so names sort the same whatever the database's collation.
         by_name = pg ? 'name COLLATE "C"' : "name"
-        # The version inside a state's JSON, 0 when it has none.
-        version = ->(column) { pg ? "COALESCE((#{column}->>'version')::bigint, 0)" : "COALESCE(json_extract(#{column}, '$.version'), 0)" }
+        # The version inside a state's JSON, as Evaluate.state_version reads
+        # it: a whole number from 0 to 2**53 - 1, else 0 (none, or a foreign
+        # row's 1.5 or "x", which must neither fail the statement nor refuse
+        # every write for good). Each CASE tests the JSON type before any cast.
+        version = lambda do |column|
+          if pg
+            v = "(#{column}->>'version')::numeric"
+            next "CASE WHEN jsonb_typeof(#{column}->'version') <> 'number' THEN 0 " \
+                 "WHEN #{v} % 1 = 0 AND #{v} BETWEEN 0 AND 9007199254740991 THEN #{v}::bigint ELSE 0 END"
+          end
+          v = "json_extract(#{column}, '$.version')"
+          "CASE WHEN json_type(#{column}, '$.version') NOT IN ('integer', 'real') THEN 0 " \
+            "WHEN #{v} = CAST(#{v} AS INTEGER) AND #{v} BETWEEN 0 AND 9007199254740991 THEN CAST(#{v} AS INTEGER) ELSE 0 END"
+        end
         sql = {
           upsert_job: "INSERT INTO #{p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)\n      " \
                       "ON CONFLICT (name) DO UPDATE SET definition = excluded.definition, updated_at = excluded.updated_at",

@@ -134,7 +134,7 @@ module Cronwatch
       # wrote. See JobState#version.
       def compare_and_set_state(state, expected_version)
         sync do
-          next false unless (@states[state.job]&.version || 0) == expected_version
+          next false unless Evaluate.state_version(@states[state.job]) == expected_version
 
           @states[state.job] = clone(state, JobState)
           true
