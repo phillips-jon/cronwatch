@@ -119,7 +119,15 @@ figure.browser, figure.timeline { font-variant-numeric: lining-nums; }
 .tab-python:hover .logo, .tab-python[aria-selected="true"] .logo { fill: #3776ab; }
 .tab-php:hover .logo, .tab-php[aria-selected="true"] .logo { fill: #777bb4; }
 .tab-go:hover .logo, .tab-go[aria-selected="true"] .logo { fill: #00add8; }
-@media (max-width: 560px) { .tabs { flex-wrap: nowrap; gap: 0; overflow-x: auto; scrollbar-width: none; } .tabs::-webkit-scrollbar { display: none; } .tab { gap: 5px; padding: 8px 5px 9px; letter-spacing: .03em; white-space: nowrap; } }
+.tab-rust:hover .logo, .tab-rust[aria-selected="true"] .logo { fill: #ce422b; }
+/* On a phone six names do not fit in a row, so the logos stand alone, each
+   tab a share of the row, and the names stay for screen readers. */
+@media (max-width: 560px) {
+  .tabs { flex-wrap: nowrap; gap: 0; }
+  .tab { position: relative; flex: 1 1 0; justify-content: center; padding: 11px 0 12px; }
+  .tab .logo { width: 18px; height: 18px; }
+  .tab .name { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+}
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 22px; }
 .prompt-btn { display: inline-flex; align-items: center; gap: 9px; font: 500 14px/1 var(--mono); color: var(--sheet); background: var(--ink); border: 1px solid var(--ink); border-radius: 3px; padding: 11px 14px; }
 .prompt-btn:hover { opacity: .85; }

@@ -47,13 +47,14 @@ export const { GET, POST, DELETE } = cw.routes();
 | [`cronwatch-sdk` for Python](packages/python) | the Python port for Python apps: the memory, SQLite and Postgres stores, the same alert channels and Claude triage, pg_cron jobs, the dashboard as a WSGI and ASGI app, Django, Celery and beat, APScheduler, async jobs, and `handler()` for platform crons and AWS Lambda. |
 | [`cronwatch/cronwatch` for PHP](packages/php) | the PHP port for PHP apps: the memory, SQLite, MySQL (and MariaDB) and Postgres stores, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, `vendor/bin/cronwatch check`, the dashboard (a bare script or PSR-15), `handler()` for platform crons, Laravel and Symfony integrations, a WordPress plugin, a Drupal module (`drupal/cronwatch`) and a Craft CMS plugin (`cronwatch/craft`) ([its DESIGN.md](packages/php/DESIGN.md)) |
 | [`cronwatch.dev/go`](packages/go) | the Go port for Go apps: jobs, runs and checks with `context` throughout and safe across goroutines, the memory store and a `database/sql` store for SQLite, Postgres and MySQL over the app's own driver, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `handler()` as `http.Handler`s, an AWS Lambda adapter, and modules of their own for robfig/cron, gocron, River and Asynq ([its DESIGN.md](packages/go/DESIGN.md)) |
+| [`cronwatch` crate](packages/rust) | the Rust port for Rust services, on tokio: jobs, runs and checks, safe across tasks, the memory store and `cronwatch-sqlx` for SQLite, Postgres, MySQL and MariaDB over the app's own sqlx pool, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `handler()` framework-free with tower and axum adapters (and so AWS Lambda through `lambda_http`), a blocking client, and crates of their own for tokio-cron-scheduler and apalis ([its DESIGN.md](packages/rust/DESIGN.md)) |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
 | [`site`](site) | cronwatch.dev, a static landing page and docs |
 
 ## Installing
 
-TypeScript and Node: `npm install @cronwatch/sdk`. Ruby and Rails: `bundle add cronwatch` (see [Ruby and Rails](#ruby-and-rails)). Python: `pip install cronwatch-sdk` (see [its README](packages/python/README.md) and [the Python docs](https://cronwatch.dev/docs/python/)). PHP: `composer require cronwatch/cronwatch` (see [its README](packages/php/README.md) and [the PHP docs](https://cronwatch.dev/docs/php/)); WordPress: the [CronWatch plugin](https://wordpress.org/plugins/cronwatch/). Go: `go get cronwatch.dev/go`, and `go get cronwatch.dev/go/robfigcron` (or `/gocron`, `/river`, `/asynq`) for a scheduler (see [its README](packages/go/README.md) and [the Go docs](https://cronwatch.dev/docs/go/)).
+TypeScript and Node: `npm install @cronwatch/sdk`. Ruby and Rails: `bundle add cronwatch` (see [Ruby and Rails](#ruby-and-rails)). Python: `pip install cronwatch-sdk` (see [its README](packages/python/README.md) and [the Python docs](https://cronwatch.dev/docs/python/)). PHP: `composer require cronwatch/cronwatch` (see [its README](packages/php/README.md) and [the PHP docs](https://cronwatch.dev/docs/php/)); WordPress: the [CronWatch plugin](https://wordpress.org/plugins/cronwatch/). Go: `go get cronwatch.dev/go`, and `go get cronwatch.dev/go/robfigcron` (or `/gocron`, `/river`, `/asynq`) for a scheduler (see [its README](packages/go/README.md) and [the Go docs](https://cronwatch.dev/docs/go/)). Rust: `cargo add cronwatch`, `cargo add cronwatch-sqlx --features postgres` (or `sqlite`, `mysql`) for the SQL store, and `cronwatch-tokio-cron-scheduler` or `cronwatch-apalis` for a scheduler (see [its README](packages/rust/README.md) and [the Rust docs](https://cronwatch.dev/docs/rust/)).
 
 The SDK depends only on `croner`. The core, the D1 store, the pg_cron source and every alert channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun; the SQLite and Postgres stores and `@cronwatch/sdk/node` need Node. Each driver is an optional peer, installed only when you use its entry point:
 
@@ -104,7 +105,7 @@ npm run check          # dash check, typecheck, tests
 npm run build          # every package and the site
 npm run dev --workspace site    # the site on http://localhost:4321, rebuilding on change
 npm run check:packages # pack both packages and use them from a scratch project (after build)
-npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python, PHP and Go packages
+npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python, PHP, Go and Rust packages
 ```
 
 The gem (Ruby 3.2 or newer), after `npm run build` so its Node compatibility tests can run:
@@ -142,6 +143,14 @@ cd packages/go/sqltest && go test -race ./...   # the SQL store, in a module of 
 ```
 
 It replays `conformance/` too. The SQL store's Postgres, MySQL and MariaDB tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL` and `CRONWATCH_TEST_MARIADB` are set ([its README](packages/go/README.md#testing) has the formats); CI runs both modules on Go 1.25 and 1.26 with the race detector, against all three.
+
+The Rust workspace (Rust 1.85 or newer, 1.94 for `cronwatch-sqlx`), after `npm run build` for the same reason:
+
+```bash
+cd packages/rust && cargo test --workspace --all-features
+```
+
+It replays `conformance/` and the dashboard fixture too. The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set ([its README](packages/rust/README.md#testing) has the rest), and `CRONWATCH_TEST_RUST=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard; CI runs it on Rust 1.85 and stable.
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 

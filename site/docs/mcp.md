@@ -6,7 +6,7 @@ order: 9
 
 # MCP server
 
-`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts with its dashboard, which every port serves at the same paths, so it works the same with a TypeScript, Ruby, Python, PHP or Go app. It needs a URL and the token, and nothing else. It runs on Node through `npx`; your app does not need Node for anything else.
+`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts with its dashboard, which every port serves at the same paths, so it works the same with a TypeScript, Ruby, Python, PHP, Go or Rust app. It needs a URL and the token, and nothing else. It runs on Node through `npx`; your app does not need Node for anything else.
 
 ## Claude Code
 
@@ -42,7 +42,7 @@ Any client that launches stdio servers:
 | TypeScript, `cw.routes()` | the mount point, `https://yourapp.com/cronwatch` by default |
 | Rails, `mount Cronwatch::Web` | the mount point, `https://yourapp.com/cronwatch` |
 | Django, `cronwatch.django.urls` | the prefix you include it under |
-| Python, PHP or Go, the routes served by hand | the path you serve them at |
+| Python, PHP, Go or Rust, the routes served by hand | the path you serve them at |
 | Laravel or Symfony | `https://yourapp.com/cronwatch` ([Laravel](/docs/laravel/), [Symfony](/docs/symfony/)) |
 | Drupal or Craft CMS | `https://yoursite.com/cronwatch`, once a token is set ([Drupal](/docs/drupal/), [Craft CMS](/docs/craft/)) |
 | WordPress | `https://yoursite.com/wp-json/cronwatch/v1`, once the JSON API is on in the plugin's settings ([WordPress](/docs/wordpress/)) |

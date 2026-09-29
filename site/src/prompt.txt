@@ -4,8 +4,9 @@ told when one is missed, fails, gets stuck, runs slow or goes over budget.
 CronWatch is an open source library: @cronwatch/sdk for TypeScript (Node,
 Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails,
 cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch
-for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), and cronwatch.dev/go for
-Go (robfig/cron, gocron, River, Asynq). It runs inside my app and writes to
+for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), cronwatch.dev/go for
+Go (robfig/cron, gocron, River, Asynq), and the cronwatch crate for Rust
+(tokio-cron-scheduler, apalis). It runs inside my app and writes to
 my own database. There is no hosted service, no account and no API key.
 
 First decide which one this project needs. A package.json with a Node server,
@@ -19,7 +20,9 @@ PHP steps (artisan is Laravel, bin/console Symfony, wp-config.php WordPress,
 drupal/core-recommended in composer.json Drupal, craftcms/cms Craft CMS). A go.mod
 means the Go steps (github.com/robfig/cron/v3, github.com/go-co-op/gocron/v2,
 github.com/riverqueue/river or github.com/hibiken/asynq in it names the
-scheduler). If the scheduled jobs live in more than one,
+scheduler). A Cargo.toml means the Rust steps (tokio-cron-scheduler or
+apalis among its dependencies names the scheduler). If the scheduled jobs
+live in more than one,
 set up each side where its jobs run; they can share one database.
 
 TypeScript and Node
@@ -384,6 +387,81 @@ Go (Go 1.25 or newer)
    CRON_SECRET if you added a handler, and whichever alert channel you chose.
    Do not invent other names.
 
+Rust (Rust 1.85 or newer; 1.94 for the SQL store)
+
+1. Add the crate with the features the project needs, the SQL store with
+   the project's database, and the integration for its scheduler, if any:
+
+   cargo add cronwatch --features alerts,axum     # alerts: the channels; axum (or tower): the dashboard
+   cargo add cronwatch-sqlx --features postgres   # or sqlite, mysql
+   cargo add cronwatch-tokio-cron-scheduler       # or cronwatch-apalis
+
+   cronwatch-sqlx works over the project's own sqlx 0.9 pool. Other
+   features: triage (Claude triage), blocking (a client for a program with
+   no tokio runtime), regex, serde.
+
+2. Make one client at startup, inside the tokio runtime, and keep it in the
+   app's state (it is a cheap Clone). Use a store every process shares
+   (web, workers and the check must see the same runs):
+
+   let cw = cronwatch::Client::builder()
+       .store(cronwatch_sqlx::SqlStore::postgres(pool.clone()))   // or SqlStore::sqlite(pool), SqlStore::mysql(pool)
+       .alert(cronwatch::alerts::slack(cronwatch::alerts::SlackOptions {
+           webhook_url: std::env::var("SLACK_WEBHOOK_URL")?,
+           ..Default::default()
+       })?)
+       .build()?;
+
+   Other channels in cronwatch::alerts, each made from an options struct:
+   discord, webhook, resend, postmark, sendgrid, mailgun, ses, twilio,
+   sentry, honeybadger, datadog, rollbar, bugsnag, newrelic. Their options:
+   https://cronwatch.dev/docs/rust/
+
+   If the project uses pg_cron, add .source(Arc::new(PgCron::new(pool,
+   PgCronOptions::default()))) from cronwatch_sqlx (its pgcron feature).
+   Do not declare those jobs yourself.
+
+3. Watch each scheduled job:
+
+   - tokio-cron-scheduler: let watcher = Watcher::new(&cw,
+     Options::default()) from cronwatch_tokio_cron_scheduler, then
+     scheduler.add(watcher.job("nightly-report", "0 0 2 * * *", "UTC",
+     |job| async move { ... }, JobOptions::new().grace("15m"))?) in place of
+     Job::new_async_tz (and watcher.repeated(...) for
+     Job::new_repeated_async). The closure returns a Result. Add
+     watcher.check_job(Duration::from_secs(60))? to the scheduler and call
+     watcher.follow(&scheduler).
+   - apalis: let watcher = Watcher::new(&cw, Options::default()) from
+     cronwatch_apalis; a cron worker's backend is
+     watcher.cron("nightly-report", "0 2 * * *", "UTC", JobOptions::new())?,
+     and every worker gets .layer(watcher.layer()) after its .retry(...).
+     Run watcher.check_worker(Duration::from_secs(60))? beside the others.
+     Pin apalis = "=1.0.0-rc.10" and apalis-cron = "=1.0.0-rc.9".
+   - A program a crontab runs: declare the job with
+     cw.job("nightly-report", JobOptions::new().schedule("0 2 * * *")
+     .timezone("UTC").grace("15m"))? and wrap the work in
+     nightly.run(|job| async move { ... job.log("Report written"); Ok(()) })
+     .await, exiting non-zero on the error run returns.
+   - A platform that calls a URL: nightly.handler(|job, request| async move
+     { ... }, HandlerOptions::new()) is a tower service, for axum's
+     route_service or lambda_http::run on AWS Lambda. It needs
+     Authorization: Bearer $CRON_SECRET.
+
+4. Run the check every 5 minutes so missed and stuck runs are noticed:
+   cw.start(Duration::from_secs(60)) once in a long-running process, the
+   check job or check worker above, or a second crontab line running a
+   command that declares the same jobs and calls cw.check().await.
+
+5. Mount the dashboard: let routes =
+   cw.routes(RoutesOptions::new())? (cronwatch::web::RoutesOptions), then
+   Router::new().nest_service("/cronwatch", routes) in axum. Outside
+   development it needs CRONWATCH_TOKEN; behind the app's own admin auth,
+   pass RoutesOptions::new().no_token() instead.
+
+6. Set the environment variables you referenced: CRONWATCH_TOKEN,
+   CRON_SECRET if you added a handler, and whichever alert channel you chose.
+   Do not invent other names.
+
 Rules for you:
 - Declare every existing scheduled job in this project, not just one. Find them
   in cron config, workflow files, queue schedulers and any crontab.
@@ -394,8 +472,8 @@ Rules for you:
   does not re-run work.
 - If this project already has a dashboard route or auth, mount cw.routes()
   or Cronwatch::Web behind that auth with its token set to null (nil in Ruby,
-  None in Python, false in PHP, cronwatch.WithoutToken() in Go) rather than
-  exposing it.
+  None in Python, false in PHP, cronwatch.WithoutToken() in Go,
+  RoutesOptions::new().no_token() in Rust) rather than exposing it.
 - Make sure the process that runs the check knows every job it should expect,
   or a job that never starts at all goes unnoticed. If installs differ, declare
   a job there only where that install runs it.
@@ -404,11 +482,13 @@ Rules for you:
   (await job.resume(id)).finish() where it ends, with the same id both times
   ($job->start(id: $id) and $job->resume($id)->finish() in PHP;
   job.Start(ctx, cronwatch.WithRunID(id)) and job.Resume(ctx, id), then
-  Finish(ctx), in Go).
+  Finish(ctx), in Go; job.start(StartOptions::new().id(id)).await? and
+  job.resume(id).await?, then .finish().await, in Rust).
 - A job that runs where the network or the app's secrets are unavailable gets
   its own client with deliver: "check" (deliver = :check in Ruby,
   deliver="check" in Python, deliver: 'check' in PHP,
-  cronwatch.WithDeliver(cronwatch.DeliverAtCheck) in Go) and the same
+  cronwatch.WithDeliver(cronwatch.DeliverAtCheck) in Go,
+  .deliver(Deliver::AtCheck) in Rust) and the same
   store; the next check sends its alerts.
 
 Docs: https://cronwatch.dev/docs/
@@ -418,4 +498,5 @@ PHP docs: https://cronwatch.dev/docs/php/, https://cronwatch.dev/docs/laravel/,
 https://cronwatch.dev/docs/symfony/, https://cronwatch.dev/docs/wordpress/,
 https://cronwatch.dev/docs/drupal/ and https://cronwatch.dev/docs/craft/
 Go docs: https://cronwatch.dev/docs/go/ and https://cronwatch.dev/docs/go-schedulers/
+Rust docs: https://cronwatch.dev/docs/rust/ and https://cronwatch.dev/docs/rust-schedulers/
 MCP server for agents: npx -y @cronwatch/mcp
