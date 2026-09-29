@@ -132,6 +132,17 @@ defmodule Cronwatch.Web.Routes do
     end
   end
 
+  # On standard output, where console.info writes it. A closed output (the
+  # Rust audit's case) must not turn the request into a 500; console.info
+  # never throws.
+  defp announce(line) do
+    IO.puts(line)
+  rescue
+    _ -> :ok
+  catch
+    _, _ -> :ok
+  end
+
   ## Answers
 
   defp with_security(headers), do: headers ++ @security_headers
@@ -355,7 +366,7 @@ defmodule Cronwatch.Web.Routes do
 
     if kind == :generated and Runs.flag(opts.instance, {Cronwatch.Web, :announced, opts}) do
       shown = opts.origin || if(Origin.loopback?(public_origin), do: public_origin)
-      IO.puts(sign_in_line(shown, base, token))
+      announce(sign_in_line(shown, base, token))
     end
 
     get = method in ["GET", "HEAD"]
