@@ -46,7 +46,8 @@ defmodule Cronwatch.RuntimeTest do
       run = only_run(cw, "killed")
       assert run.error == "exit: :killed"
       assert run.output == "got this far"
-      assert Capture.types(alerts) == ["failed"]
+      # The alert is delivered after the run is written, so wait for it too.
+      eventually(fn -> Capture.types(alerts) == ["failed"] end)
     end
 
     test "taken down by a linked process's crash, its run fails with that reason" do

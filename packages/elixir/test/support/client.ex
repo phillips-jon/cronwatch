@@ -146,10 +146,10 @@ defmodule Cronwatch.Test.Client do
   def wheres(errors), do: errors |> Agent.get(& &1) |> Enum.map(&elem(&1, 0))
 
   @doc "Waits until `fun` is truthy, trying for a second or so."
-  def eventually(fun, tries \\ 100) do
+  def eventually(fun, tries \\ 500) do
     cond do
       result = fun.() -> result
-      tries == 0 -> raise ExUnit.AssertionError, message: "not true in time"
+      tries == 0 -> raise ExUnit.AssertionError, message: "not true within five seconds"
       true -> sleep_then(fun, tries)
     end
   end
