@@ -151,7 +151,8 @@ defmodule Cronwatch.JSRETest do
 
     assert answers == {:gave_up, :gave_up}
     IO.puts("two budgets of #{Match.max_steps()} steps ran out in #{div(micros, 1000)} ms")
-    assert micros < 20_000_000
+    # Steps bound it, not time: a slow CI runner has taken 22 s for the two.
+    assert micros < 60_000_000
 
     assert JSRE.try_match?(JSRE.compile!(~S"\n*\n*\n*\n*\n*x"), String.duplicate("\n", 20)) == {:ok, false}
     assert JSRE.try_match?(JSRE.compile!(~S"\n*\n*\n*\n*\n*x"), newlines <> "x") == {:ok, true}
