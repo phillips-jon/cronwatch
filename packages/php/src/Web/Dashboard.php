@@ -315,9 +315,17 @@ final class Dashboard
     /**
      * Whether an origin's host is loopback: "localhost", a name ending in
      * ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1.
+     * Only an origin that reads as one counts: a Host header is anyone's to
+     * send, and one such as "evil.example/.localhost" or
+     * "localhost:1@evil.example" must not put the development token in a link
+     * to another host.
      */
     public static function isLoopbackOrigin(string $origin): bool
     {
+        $origin = Origin::bare($origin);
+        if ($origin === null) {
+            return false;
+        }
         $at = strpos($origin, '://');
         $authority = $at === false ? $origin : substr($origin, $at + 3);
         if (str_starts_with($authority, '[')) {

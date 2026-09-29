@@ -136,6 +136,9 @@ test("the development sign-in line uses the public origin when set or loopback, 
     await first({}, "http://localhost.example/cronwatch/");
     await first({}, "http://128.0.0.1/cronwatch/");
     await first({ basePath: "/" }, "http://attacker.example/");
+    // A host with credentials or a path in it is read as a URL, not as text.
+    await first({ trustProxy: true }, "http://10.0.0.5:8080/cronwatch/", { "x-forwarded-host": "localhost:1@evil.example" });
+    await first({ trustProxy: true }, "http://10.0.0.5:8080/cronwatch/", { "x-forwarded-host": "evil.example/.localhost" });
   } finally {
     console.info = info;
     for (const [k, v] of Object.entries(saved)) {
@@ -159,6 +162,8 @@ test("the development sign-in line uses the public origin when set or loopback, 
     ["/cronwatch", hostless],
     ["/cronwatch", hostless],
     ["", hostless],
+    ["/cronwatch", hostless],
+    ["/cronwatch", hostless],
   ];
   assert.equal(lines.length, expected.length);
   expected.forEach(([link, tail], i) => {

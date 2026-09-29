@@ -13,6 +13,16 @@ final class Duration
     public const UNIT_MS = ['ms' => 1, 's' => 1000, 'm' => 60_000, 'h' => 3_600_000, 'd' => 86_400_000, 'w' => 604_800_000];
 
     /**
+     * The longest duration string read, in characters (code points). No real
+     * duration comes near it, and the parts pattern is quadratic on a long run
+     * of digits, so a longer string is refused before it is read.
+     */
+    public const MAX_LENGTH = 64;
+
+    /** How much of a refused, overlong string its error quotes. */
+    private const QUOTED = 32;
+
+    /**
      * "15m" -> 900000. Accepts a plain number of milliseconds, a DateInterval,
      * and compound strings such as "1h30m". Whitespace between parts is fine.
      *
@@ -37,6 +47,9 @@ final class Duration
         if (!is_string($value)) {
             throw self::notADuration($label, Js::string($value));
         }
+        if (strlen($value) > self::MAX_LENGTH) {
+            self::refuseLong($value, $label);
+        }
         $text = strtolower(Js::trim($value));
         if ($text === '') {
             throw new \InvalidArgumentException("{$label} is empty");
@@ -52,6 +65,34 @@ final class Duration
             throw self::notADuration($label, $value);
         }
         return Js::round($total);
+    }
+
+    /**
+     * Throws when $value is over MAX_LENGTH characters, quoting the first
+     * QUOTED. A character is a UTF-8 sequence, and a byte that starts none
+     * counts as one, as it would once read as U+FFFD.
+     */
+    private static function refuseLong(string $value, string $label): void
+    {
+        $n = strlen($value);
+        $count = 0;
+        $head = 0;
+        for ($i = 0; $i < $n;) {
+            $byte = ord($value[$i]);
+            $width = $byte < 0xC0 ? 1 : ($byte < 0xE0 ? 2 : ($byte < 0xF0 ? 3 : 4));
+            $next = $i + 1;
+            while ($next < $n && $next < $i + $width && (ord($value[$next]) & 0xC0) === 0x80) {
+                $next++;
+            }
+            $i = $next;
+            if (++$count === self::QUOTED) {
+                $head = $i;
+            }
+            if ($count > self::MAX_LENGTH) {
+                $quoted = substr($value, 0, $head);
+                throw new \InvalidArgumentException("{$label} \"{$quoted}...\" is too long for a duration (more than " . self::MAX_LENGTH . ' characters)');
+            }
+        }
     }
 
     private static function notADuration(string $label, string $value): \InvalidArgumentException

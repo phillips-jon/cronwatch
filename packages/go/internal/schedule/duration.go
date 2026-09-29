@@ -75,6 +75,11 @@ func notADuration(label, value string) error {
 // and lowercased, every /(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)/g match summed,
 // and the whole refused unless the matches, spaces aside, are all of it.
 func parseText(value, label string) (float64, error) {
+	if len(value) > maxLength {
+		if err := tooLong(value, label); err != nil {
+			return 0, err
+		}
+	}
 	text := strings.ToLower(js.Trim(value))
 	if text == "" {
 		return 0, errors.New(label + " is empty")
@@ -97,6 +102,30 @@ func parseText(value, label string) (float64, error) {
 		return 0, notADuration(label, value)
 	}
 	return round(total), nil
+}
+
+// maxLength is the longest duration string read, in characters (code
+// points). No real duration comes near it, and the scan below is quadratic
+// on a long run of digits, as the SDK's pattern is, so a longer string is
+// refused before it is read. quoted is how much of it the error quotes.
+const (
+	maxLength = 64
+	quoted    = 32
+)
+
+// tooLong is the error for value when it is over maxLength characters.
+func tooLong(value, label string) error {
+	count, head := 0, 0
+	for i := range value {
+		if count == quoted {
+			head = i
+		}
+		count++
+		if count > maxLength {
+			return fmt.Errorf("%s \"%s...\" is too long for a duration (more than %d characters)", label, value[:head], maxLength)
+		}
+	}
+	return nil
 }
 
 func firstRune(s string) (rune, int) {

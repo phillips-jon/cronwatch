@@ -323,6 +323,31 @@ func TestParseDuration(t *testing.T) {
 	}
 }
 
+// The cap on a duration string's length, which the conformance cases also
+// replay: the scan is quadratic on a long run of digits.
+func TestADurationOver64CharactersIsRefusedQuotingItsFirst32(t *testing.T) {
+	const tooLong = `is too long for a duration (more than 64 characters)`
+	if got, err := ParseDuration(strings.Repeat("1m", 32), ""); err != nil || got != 32*minute {
+		t.Errorf("64 characters: %v %v", got, err)
+	}
+	long := " " + strings.Repeat("1m", 32)
+	check := func(value, label, want string) {
+		t.Helper()
+		if _, err := ParseDuration(value, label); err == nil || err.Error() != want {
+			t.Errorf("got %v, want %s", err, want)
+		}
+	}
+	check(long, "grace", `grace "`+long[:32]+`..." `+tooLong)
+	// Characters are code points: forty emoji are eighty UTF-16 units but under the cap.
+	check(strings.Repeat("\U0001F600", 40), "", `duration "`+strings.Repeat("\U0001F600", 40)+`" is not a duration like "15m", "1h30m" or "90s"`)
+	check(strings.Repeat("\U0001F600", 65), "", `duration "`+strings.Repeat("\U0001F600", 32)+`..." `+tooLong)
+	started := time.Now()
+	check(strings.Repeat("1", 1<<20), "silence duration", `silence duration "`+strings.Repeat("1", 32)+`..." `+tooLong)
+	if time.Since(started) > time.Second {
+		t.Errorf("a megabyte of digits took %v", time.Since(started))
+	}
+}
+
 func TestFormatDurationAndRelative(t *testing.T) {
 	for ms, want := range map[float64]string{500: "500ms", 1_000: "1s", 90_000: "1m 30s", hour*26 + minute*5: "1d 2h"} {
 		if got := FormatDuration(ms); got != want {

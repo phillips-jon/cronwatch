@@ -653,6 +653,11 @@ def test_the_development_sign_in_line_uses_the_public_origin_when_set_or_loopbac
         ({}, "http://localhost.example/cronwatch/", {}),
         ({}, "http://128.0.0.1/cronwatch/", {}),
         ({"base_path": "/"}, "http://attacker.example/", {}),
+        # A WSGI server passes a Host header through as sent: it is read as a URL.
+        ({}, f"{INTERNAL}/cronwatch/", {"host": "localhost:1@evil.example"}),
+        ({}, f"{INTERNAL}/cronwatch/", {"host": "evil.example/.localhost"}),
+        ({"trust_proxy": True}, f"{INTERNAL}/cronwatch/", {"x-forwarded-host": "localhost:1@evil.example"}),
+        ({"trust_proxy": True}, f"{INTERNAL}/cronwatch/", {"x-forwarded-host": "evil.example/.localhost"}),
     ]
     for options, url, headers in cases:
         send(cw.routes(**{"base_path": "/cronwatch", **options}), "GET", url, headers)
@@ -674,12 +679,37 @@ def test_the_development_sign_in_line_uses_the_public_origin_when_set_or_loopbac
         ("/cronwatch", hostless),
         ("/cronwatch", hostless),
         ("", hostless),
+        ("/cronwatch", hostless),
+        ("/cronwatch", hostless),
+        ("/cronwatch", hostless),
+        ("/cronwatch", hostless),
     ]
     assert len(lines) == len(expected)
     for i, ((link, tail), line) in enumerate(zip(expected, lines)):
         token = re.search(r"token=([A-Za-z0-9_-]{43})", line)
         assert token, line
         assert line == f"{intro}{link}/?token={token.group(1)}{tail}", f"line {i}"
+
+
+def test_only_an_origin_that_reads_as_one_is_loopback() -> None:
+    from cronwatch.web import is_loopback_origin
+
+    for yes in ("http://localhost", "http://localhost:3000", "http://app.localhost", "https://127.0.0.1", "http://127.8.9.10:1", "http://[::1]:3000"):
+        assert is_loopback_origin(yes), yes
+    for no in (
+        "http://localhost.example",
+        "http://128.0.0.1",
+        "http://127.0.0.256",
+        "http://10.0.0.5:8080",
+        "http://[::2]",
+        # A Host header that is not a host (the Rust audit).
+        "http://evil.example/.localhost",
+        "http://localhost:1@evil.example",
+        "http://evil.example?.localhost",
+        "http://evil.example#.localhost",
+        "http://localhost:1@evil.example:80",
+    ):
+        assert not is_loopback_origin(no), no
 
 
 # ------------------------------------------------------------ routes-pwa.test.ts

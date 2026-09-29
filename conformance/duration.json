@@ -228,6 +228,64 @@
       "input": "2h",
       "label": "silence duration",
       "ms": 7200000
+    },
+    {
+      "input": "1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m",
+      "ms": 1920000
+    },
+    {
+      "input": "                                                                ",
+      "error": "duration is empty"
+    },
+    {
+      "input": " 1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m",
+      "error": "duration \" 1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1...\" is too long for a duration (more than 64 characters)"
+    },
+    {
+      "input": "1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m ",
+      "error": "duration \"1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m1m...\" is too long for a duration (more than 64 characters)"
+    },
+    {
+      "input": "                                                                 ",
+      "error": "duration \"                                ...\" is too long for a duration (more than 64 characters)"
+    },
+    {
+      "input": "1111111111111111111111111111111111111111111111111111111111111111",
+      "error": "duration \"1111111111111111111111111111111111111111111111111111111111111111\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "11111111111111111111111111111111111111111111111111111111111111111",
+      "error": "duration \"11111111111111111111111111111111...\" is too long for a duration (more than 64 characters)"
+    },
+    {
+      "input": "1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+      "label": "silence duration",
+      "error": "silence duration \"11111111111111111111111111111111...\" is too long for a duration (more than 64 characters)"
+    },
+    {
+      "input": "1111111111111111111111111111111111111111111111111111111111111111x",
+      "error": "duration \"11111111111111111111111111111111...\" is too long for a duration (more than 64 characters)"
+    },
+    {
+      "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "error": "duration \"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "error": "duration \"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "error": "duration \"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀...\" is too long for a duration (more than 64 characters)"
+    },
+    {
+      "input": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "label": "grace",
+      "error": "grace \"éééééééééééééééééééééééééééééééé...\" is too long for a duration (more than 64 characters)"
+    },
+    {
+      "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "error": "duration \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx😀...\" is too long for a duration (more than 64 characters)"
     }
   ],
   "format": [

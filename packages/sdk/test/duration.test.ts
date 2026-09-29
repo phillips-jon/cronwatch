@@ -21,6 +21,28 @@ test("parseDuration rejects nonsense", () => {
   assert.throws(() => parseDuration(-5));
 });
 
+test("parseDuration refuses a string over 64 characters, quoting its first 32", () => {
+  assert.equal(parseDuration("1m".repeat(32)), 32 * 60_000);
+  const long = " " + "1m".repeat(32);
+  assert.throws(() => parseDuration(long, "grace"), {
+    message: `grace "${long.slice(0, 32)}..." is too long for a duration (more than 64 characters)`,
+  });
+  // Characters are code points: forty emoji are eighty UTF-16 units but under the cap.
+  assert.throws(() => parseDuration("\u{1F600}".repeat(40)), { message: /^duration "(\u{1F600}){40}" is not a duration like/u });
+  assert.throws(() => parseDuration("\u{1F600}".repeat(65)), {
+    message: `duration "${"\u{1F600}".repeat(32)}..." is too long for a duration (more than 64 characters)`,
+  });
+  assert.throws(() => parseDuration(" ".repeat(65)), { message: /is too long for a duration/ });
+});
+
+test("parseDuration is quick on a megabyte of digits", () => {
+  const started = performance.now();
+  assert.throws(() => parseDuration("1".repeat(1 << 20), "silence duration"), {
+    message: `silence duration "${"1".repeat(32)}..." is too long for a duration (more than 64 characters)`,
+  });
+  assert.ok(performance.now() - started < 1000);
+});
+
 test("formatDuration and formatRelative", () => {
   assert.equal(formatDuration(500), "500ms");
   assert.equal(formatDuration(1_000), "1s");
