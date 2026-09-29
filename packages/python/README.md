@@ -67,6 +67,8 @@ A run that is never finished is marked stuck by the first check after the job's 
 
 `job(name, ...)`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; default the process's), `grace` (default `"10m"`), `timeout` (default `"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (default 1), `description`, `tags`. Durations are strings like `"1h30m"`, milliseconds, or `datetime.timedelta`.
 
+An `expect` pattern is searched in your process by `re`, which backtracks and, like an `expect` function, has no time limit. A pattern with unbounded repeats that can match the same text (`\n*\n*x`, `(a+)+b`, even `.*x`) can take seconds or longer on a long output that does not match: anchor it, avoid a repeat next to or inside another over the same characters, or use a plain string. See [expect rules](https://cronwatch.dev/docs/conditions/#expect-rules).
+
 `Cronwatch(...)`: `store`, `alerts`, `triage` (a function returning a short diagnosis added to each alert), `sources`, `retention` (default `"30d"`), `defaults`, `redact` (secrets are blanked from output and errors by default; pass your own function, or `False`), `deliver` (`"check"` queues alerts for another process's check to send), `on_error` (store and channel failures; default the `cronwatch` logger), `now`.
 
 `check()`, `jobs()`, `jobs_with_runs()`, `job_summary(name)`, `runs(name)`, `get_run(id)`, `silence(name, "2h")`, `unsilence(name)`, `forget(name)`, `record_run(run)`, `start()`, `stop()`, `close()`.

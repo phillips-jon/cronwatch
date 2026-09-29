@@ -362,7 +362,7 @@ A triage of your own is any function that takes the context (`alert`, `recent_ru
 | `on_error` | the `cronwatch` logger | `lambda error, where: ...` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a function returning epoch milliseconds; for tests |
 
-`cw.job(name, **options)` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ValueError` when the job is declared.
+`cw.job(name, **options)` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). An `expect` pattern, like an `expect` function, runs in your process with no time limit, so keep it clear of repeats that can backtrack without end (see [expect rules](/docs/conditions/#expect-rules)). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ValueError` when the job is declared.
 
 The client:
 
