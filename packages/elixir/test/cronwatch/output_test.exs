@@ -6,7 +6,7 @@ defmodule Cronwatch.OutputTest do
   # string here looks like a real credential to a scanner.
   use ExUnit.Case, async: true
 
-  import Cronwatch.Test.Conformance
+  import Cronwatch.Test.Conformance, except: [digest: 1]
 
   alias Cronwatch.JS
   alias Cronwatch.JS.Object

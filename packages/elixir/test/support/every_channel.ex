@@ -10,6 +10,7 @@ defmodule Cronwatch.Test.RewriteTransport do
   @behaviour Cronwatch.Transport
 
   alias Cronwatch.Alerts.URL
+  alias Cronwatch.Transport.Httpc
 
   def spec(server, opts \\ []), do: {__MODULE__, Keyword.put(opts, :to, server.url)}
 
@@ -18,7 +19,7 @@ defmodule Cronwatch.Test.RewriteTransport do
     {:ok, to} = URL.parse(Keyword.fetch!(opts, :to))
     {:ok, u} = URL.parse(request.url)
     url = URL.to_string(%{u | scheme: to.scheme, host: to.host, port: to.port})
-    Cronwatch.Transport.Httpc.post(Keyword.delete(opts, :to), %{request | url: url})
+    Httpc.post(Keyword.delete(opts, :to), %{request | url: url})
   end
 end
 
@@ -46,7 +47,7 @@ defmodule Cronwatch.Test.EveryChannel do
       {Cronwatch.Alerts.Datadog, api_key: "dd-secret-key-123"},
       {Cronwatch.Alerts.Resend, api_key: "re_secret", from: "a@b.c", to: ["d@e.f"]},
       {Cronwatch.Alerts.Postmark, server_token: "pm-secret", from: "a@b.c", to: ["d@e.f"]},
-      {Cronwatch.Alerts.Sendgrid, api_key: "SG.secret", from: "a@b.c", to: ["d@e.f"]},
+      {Cronwatch.Alerts.SendGrid, api_key: "SG.secret", from: "a@b.c", to: ["d@e.f"]},
       {Cronwatch.Alerts.Mailgun, api_key: "key-secret", domain: "mg.example.com", from: "a@b.c", to: ["d@e.f"]},
       {Cronwatch.Alerts.SES,
        region: "us-east-1",

@@ -141,7 +141,7 @@ defmodule Cronwatch.Triage.Anthropic do
     t =
       case opts do
         %__MODULE__{} -> opts
-        other -> with({:ok, t} <- init(other), do: t, else: ({:error, m} -> raise Cronwatch.Error.invalid(m)))
+        other -> started!(other)
       end
 
     key = key(t)
@@ -164,22 +164,27 @@ defmodule Cronwatch.Triage.Anthropic do
     # One attempt, no retries: a retry would run on after the alert has
     # gone out without a diagnosis.
     with {:ok, answer} <- Post.fetch(transport, timeout(), url, headers, JS.stringify_lone(params)) do
-      cond do
-        not Post.ok?(answer) ->
-          {:error, Post.refused("Anthropic", url, answer, [key])}
+      if Post.ok?(answer), do: read(answer, url), else: {:error, Post.refused("Anthropic", url, answer, [key])}
+    end
+  end
 
-        true ->
-          case JS.parse(answer.body) do
-            {:ok, message} ->
-              {:ok, diagnosis(message)}
+  # Options given unchecked (the module called directly rather than through
+  # an instance) are checked now.
+  defp started!(opts) do
+    case init(opts) do
+      {:ok, t} -> t
+      {:error, m} -> raise Cronwatch.Error.invalid(m)
+    end
+  end
 
-            {:error, e} ->
-              {:error,
-               Post.fail(
-                 "Anthropic #{Post.origin(url)} answered #{answer.status} with JSON that could not be read: #{e}"
-               )}
-          end
-      end
+  defp read(answer, url) do
+    case JS.parse(answer.body) do
+      {:ok, message} ->
+        {:ok, diagnosis(message)}
+
+      {:error, e} ->
+        {:error,
+         Post.fail("Anthropic #{Post.origin(url)} answered #{answer.status} with JSON that could not be read: #{e}")}
     end
   end
 
@@ -291,10 +296,10 @@ defmodule Cronwatch.Triage.Anthropic do
               "duration #{duration(run)}, trigger #{run.trigger}"
           ] ++
           if(metrics?(run), do: ["Metrics: #{JS.stringify(run.metrics)}"], else: []) ++
-          if(run.error not in [nil, ""], do: [Units.concat(["Error:\n", data(Units.head(run.error, 3000))])], else: []) ++
-          if(run.output not in [nil, ""],
-            do: [Units.concat(["Output (tail):\n", data(Units.tail(run.output, 3000))])],
-            else: []
+          if(blank?(run.error), do: [], else: [Units.concat(["Error:\n", data(Units.head(run.error, 3000))])]) ++
+          if(blank?(run.output),
+            do: [],
+            else: [Units.concat(["Output (tail):\n", data(Units.tail(run.output, 3000))])]
           )
       else
         lines
@@ -314,11 +319,11 @@ defmodule Cronwatch.Triage.Anthropic do
           ["", "Earlier runs, newest first:"] ++
           Enum.map(earlier, fn r ->
             error =
-              if r.error not in [nil, ""] do
+              if blank?(r.error) do
+                []
+              else
                 first = r.error |> String.split("\n") |> hd()
                 [", error: ", data(Units.head(first, 160))]
-              else
-                []
               end
 
             metrics = if metrics?(r), do: [", metrics #{JS.stringify(r.metrics)}"], else: []
@@ -340,7 +345,7 @@ defmodule Cronwatch.Triage.Anthropic do
         blocks when is_list(blocks) ->
           blocks
           |> Enum.filter(&(match?(%Object{}, &1) and Object.get(&1, "type") == "text"))
-          |> Enum.map_join("\n", fn b -> if is_binary(t = Object.get(b, "text")), do: t, else: "" end)
+          |> Enum.map_join("\n", &block_text/1)
           |> JS.trim()
 
         _ ->
@@ -350,4 +355,14 @@ defmodule Cronwatch.Triage.Anthropic do
   end
 
   def diagnosis(_), do: ""
+
+  defp block_text(block) do
+    case Object.get(block, "text") do
+      t when is_binary(t) -> t
+      _ -> ""
+    end
+  end
+
+  # JavaScript's truthiness for a string field: nil and "" are absent.
+  defp blank?(v), do: v in [nil, ""]
 end

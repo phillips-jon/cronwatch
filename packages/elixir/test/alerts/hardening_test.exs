@@ -10,8 +10,13 @@ defmodule Cronwatch.Alerts.HardeningTest do
   use ExUnit.Case, async: false
 
   alias Cronwatch.Alert
+  alias Cronwatch.Alerts.Discord
   alias Cronwatch.Alerts.Post
+  alias Cronwatch.Alerts.Slack
+  alias Cronwatch.Alerts.URL
+  alias Cronwatch.Alerts.Webhook
   alias Cronwatch.ChannelContext
+  alias Cronwatch.Config
   alias Cronwatch.JS
   alias Cronwatch.Test.Conformance
   alias Cronwatch.Test.EveryChannel
@@ -19,6 +24,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
   alias Cronwatch.Test.RecordingTransport, as: Rec
   alias Cronwatch.Test.RewriteTransport
   alias Cronwatch.Transport.Httpc
+  alias Cronwatch.Transport.Request
 
   defp sample do
     f = Conformance.fixture("channels")
@@ -83,7 +89,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
     Application.put_env(:cronwatch, :post_timeout, 300)
     on_exit(fn -> Application.delete_env(:cronwatch, :post_timeout) end)
     hang = HTTPServer.start(fn _ -> :hang end)
-    err = message(send!({Cronwatch.Alerts.Slack, webhook_url: hang.url <> "/T/B/secret"}))
+    err = message(send!({Slack, webhook_url: hang.url <> "/T/B/secret"}))
     assert err == "The operation was aborted due to timeout"
   end
 
@@ -105,7 +111,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
     {:error, e} = Post.fetch(nil, 10_000, huge.url <> "/p", [], "{}")
     assert Exception.message(e) == "#{huge.url}: body_too_big"
 
-    err = message(send!({Cronwatch.Alerts.Slack, webhook_url: refused.url <> "/T/B/x"}))
+    err = message(send!({Slack, webhook_url: refused.url <> "/T/B/x"}))
     assert JS.len16(err) <= byte_size("Slack webhook answered 500: ") + 200
   end
 
@@ -123,9 +129,9 @@ defmodule Cronwatch.Alerts.HardeningTest do
 
     for {raw, shown} <- cases,
         spec <- [
-          {Cronwatch.Alerts.Slack, webhook_url: raw, transport: Rec.spec(rec)},
-          {Cronwatch.Alerts.Discord, webhook_url: raw, transport: Rec.spec(rec)},
-          {Cronwatch.Alerts.Webhook, url: raw, transport: Rec.spec(rec)}
+          {Slack, webhook_url: raw, transport: Rec.spec(rec)},
+          {Discord, webhook_url: raw, transport: Rec.spec(rec)},
+          {Webhook, url: raw, transport: Rec.spec(rec)}
         ] do
       assert message(send!(spec)) == "only http and https URLs can be posted to, not #{shown}", raw
     end
@@ -138,7 +144,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
           {"  https://hooks.exa\tmple.com/#{path}\n", "https://hooks.example.com/#{path}"},
           {"https://hooks.example.com/#{path} x", "https://hooks.example.com/#{path}%20x"}
         ] do
-      assert send!({Cronwatch.Alerts.Slack, webhook_url: raw, transport: Rec.spec(rec)}) == :ok
+      assert send!({Slack, webhook_url: raw, transport: Rec.spec(rec)}) == :ok
       assert List.last(Rec.taken(rec)).url == posted
     end
 
@@ -155,11 +161,11 @@ defmodule Cronwatch.Alerts.HardeningTest do
   test "an error names only the origin" do
     # Nothing listens on port 1: the transport's own reason is kept, the
     # URL's path is not.
-    err = message(send!({Cronwatch.Alerts.Webhook, url: "http://127.0.0.1:1/hooks/#{secret()}?token=#{secret()}"}))
+    err = message(send!({Webhook, url: "http://127.0.0.1:1/hooks/#{secret()}?token=#{secret()}"}))
     assert err == "http://127.0.0.1:1: econnrefused"
 
     refuse = HTTPServer.start(fn _ -> {403, [], ""} end)
-    err = message(send!({Cronwatch.Alerts.Webhook, url: "#{refuse.url}/services/#{secret()}?key=#{secret()}"}))
+    err = message(send!({Webhook, url: "#{refuse.url}/services/#{secret()}?key=#{secret()}"}))
     assert err == "Webhook #{refuse.url} answered 403"
   end
 
@@ -171,7 +177,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
 
     @impl true
     def post(_, request) do
-      {:ok, u} = Cronwatch.Alerts.URL.parse(request.url)
+      {:ok, u} = URL.parse(request.url)
       {:error, "giving up on #{request.url} (#{Post.percent_decode(u.path)}) after 3 tries"}
     end
   end
@@ -185,20 +191,20 @@ defmodule Cronwatch.Alerts.HardeningTest do
 
   test "an error names only the origin, whatever the transport quotes" do
     url = "https://hooks.example.com/services/#{secret()}%20x?token=#{secret()}"
-    err = message(send!({Cronwatch.Alerts.Webhook, url: url, transport: Quoting}))
+    err = message(send!({Webhook, url: url, transport: Quoting}))
     refute err =~ secret()
     refute err =~ "/services"
     assert String.starts_with?(err, "https://hooks.example.com: ")
 
     # A transport that raises fails the send; it crashes nothing.
-    err = message(send!({Cronwatch.Alerts.Webhook, url: url, transport: Raising}))
+    err = message(send!({Webhook, url: url, transport: Raising}))
     assert err == "https://hooks.example.com: transport broke"
   end
 
   test "TLS is verified" do
     server = HTTPServer.start(fn _ -> {200, [], ""} end, tls: true)
     assert String.starts_with?(server.url, "https://localhost:")
-    err = message(send!({Cronwatch.Alerts.Slack, webhook_url: server.url <> "/T/B/secret"}))
+    err = message(send!({Slack, webhook_url: server.url <> "/T/B/secret"}))
     assert err =~ ~r/unknown ca|certificate/i, "a certificate no one trusts was accepted: #{err}"
     refute err =~ "/T/B/secret"
     assert String.starts_with?(err, server.url <> ": ")
@@ -207,16 +213,14 @@ defmodule Cronwatch.Alerts.HardeningTest do
     # Trusting the server's root, the same request goes through, its host
     # checked against the certificate.
     ok =
-      send!(
-        {Cronwatch.Alerts.Slack, webhook_url: server.url <> "/T/B/secret", transport: {Httpc, cacerts: [server.ca]}}
-      )
+      send!({Slack, webhook_url: server.url <> "/T/B/secret", transport: {Httpc, cacerts: [server.ca]}})
 
     assert ok == :ok
     assert [%{target: "/T/B/secret"}] = HTTPServer.requests(server)
 
     # A certificate for another name is refused even from a trusted root.
     other = String.replace(server.url, "localhost", "127.0.0.1")
-    err = message(send!({Cronwatch.Alerts.Slack, webhook_url: other <> "/x", transport: {Httpc, cacerts: [server.ca]}}))
+    err = message(send!({Slack, webhook_url: other <> "/x", transport: {Httpc, cacerts: [server.ca]}}))
     assert err =~ ~r/hostname|certificate|handshake/i, err
   end
 
@@ -225,21 +229,19 @@ defmodule Cronwatch.Alerts.HardeningTest do
 
     for value <- ["Bearer a\r\nX-Evil: 1", "Bearer a\nb", "a" <> <<0>> <> "b"] do
       spec =
-        {Cronwatch.Alerts.Webhook,
-         url: "https://hooks.example.com/in", headers: [{"authorization", value}], transport: Rec.spec(rec)}
+        {Webhook, url: "https://hooks.example.com/in", headers: [{"authorization", value}], transport: Rec.spec(rec)}
 
       assert message(send!(spec)) == "the authorization header's value may not contain a line break"
     end
 
     spec =
-      {Cronwatch.Alerts.Webhook,
-       url: "https://hooks.example.com/in", headers: [{"bad name", "x"}], transport: Rec.spec(rec)}
+      {Webhook, url: "https://hooks.example.com/in", headers: [{"bad name", "x"}], transport: Rec.spec(rec)}
 
     assert message(send!(spec)) =~ "a header name must be a token"
     assert Rec.taken(rec) == []
 
     spec =
-      {Cronwatch.Alerts.Webhook,
+      {Webhook,
        url: "https://hooks.example.com/in",
        headers: [{"authorization", " Bearer wh-secret\n"}],
        transport: Rec.spec(rec)}
@@ -250,7 +252,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
 
   test "the headers :httpc sends, in the order it sends them" do
     server = HTTPServer.start(fn _ -> {200, [], ""} end)
-    spec = {Cronwatch.Alerts.Webhook, url: server.url <> "/in", headers: [{"authorization", "Bearer t"}], secret: "s"}
+    spec = {Webhook, url: server.url <> "/in", headers: [{"authorization", "Bearer t"}], secret: "s"}
     assert send!(spec) == :ok
     [req] = HTTPServer.requests(server)
     names = Enum.map(req.headers, &elem(&1, 0))
@@ -280,7 +282,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
     a = %{sample() | message: String.duplicate("a", 2899) <> "😀 and on", triage: String.duplicate("b", 2989) <> "😀"}
 
     assert send!(
-             {Cronwatch.Alerts.Slack, webhook_url: "https://hooks.slack.example/T/B/secret", transport: Rec.spec(rec)},
+             {Slack, webhook_url: "https://hooks.slack.example/T/B/secret", transport: Rec.spec(rec)},
              a
            ) == :ok
 
@@ -293,8 +295,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
     a = %{a | message: String.duplicate("c", 3799) <> "😀", triage: String.duplicate("d", 999) <> "😀"}
 
     assert send!(
-             {Cronwatch.Alerts.Discord,
-              webhook_url: "https://discord.example/api/webhooks/1/x", transport: Rec.spec(rec)},
+             {Discord, webhook_url: "https://discord.example/api/webhooks/1/x", transport: Rec.spec(rec)},
              a
            ) == :ok
 
@@ -312,7 +313,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
        name: name,
        cron_secret: false,
        transport: Rec.spec(rec),
-       alerts: [{Cronwatch.Alerts.Slack, webhook_url: "https://hooks.slack.example/T/B/secret"}],
+       alerts: [{Slack, webhook_url: "https://hooks.slack.example/T/B/secret"}],
        jobs: [{"nightly", failures_before_alert: 1}]}
     )
 
@@ -320,14 +321,14 @@ defmodule Cronwatch.Alerts.HardeningTest do
     assert [%{url: "https://hooks.slack.example/T/B/secret"}] = Rec.taken(rec)
 
     assert {:error, %Cronwatch.Error{message: "Cronwatch: Nope is not a Cronwatch.Transport"}} =
-             Cronwatch.Config.new(transport: Nope)
+             Config.new(transport: Nope)
   end
 
   test "a transport given as an option is checked" do
-    assert Cronwatch.Alerts.Slack.init(webhook_url: "https://h.example/x", transport: Nope) ==
+    assert Slack.init(webhook_url: "https://h.example/x", transport: Nope) ==
              {:error, "Cronwatch.Alerts.Slack: Nope is not a Cronwatch.Transport"}
 
-    assert inspect(%Cronwatch.Transport.Request{
+    assert inspect(%Request{
              url: "https://h.example/secret",
              headers: [{"x-api-key", "k"}],
              body: "{}"

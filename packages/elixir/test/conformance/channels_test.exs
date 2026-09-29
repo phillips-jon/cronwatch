@@ -9,7 +9,10 @@ defmodule Cronwatch.Conformance.ChannelsTest do
   use ExUnit.Case, async: true
 
   alias Cronwatch.Alert
+  alias Cronwatch.Alerts.Discord
   alias Cronwatch.Alerts.Post
+  alias Cronwatch.Alerts.Slack
+  alias Cronwatch.Alerts.Webhook
   alias Cronwatch.ChannelContext
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
@@ -32,14 +35,14 @@ defmodule Cronwatch.Conformance.ChannelsTest do
 
   @doc "A channel from a fixture's options, as the script's materialize() makes it."
   def build("slack", o, t),
-    do: init(Cronwatch.Alerts.Slack, webhook_url: field(o, "webhookUrl"), link: link(o), transport: t)
+    do: init(Slack, webhook_url: field(o, "webhookUrl"), link: link(o), transport: t)
 
   def build("discord", o, t),
-    do: init(Cronwatch.Alerts.Discord, webhook_url: field(o, "webhookUrl"), link: link(o), transport: t)
+    do: init(Discord, webhook_url: field(o, "webhookUrl"), link: link(o), transport: t)
 
   def build("webhook", o, t) do
     headers = if h = field(o, "headers"), do: Object.to_list(h), else: []
-    init(Cronwatch.Alerts.Webhook, url: field(o, "url"), secret: field(o, "secret"), headers: headers, transport: t)
+    init(Webhook, url: field(o, "url"), secret: field(o, "secret"), headers: headers, transport: t)
   end
 
   defp link(o) do
@@ -124,17 +127,17 @@ defmodule Cronwatch.Conformance.ChannelsTest do
   end
 
   test "a channel is refused without its URL, in Elixir's words" do
-    assert Cronwatch.Alerts.Slack.init([]) == {:error, "Cronwatch.Alerts.Slack needs :webhook_url"}
-    assert Cronwatch.Alerts.Discord.init(webhook_url: "") == {:error, "Cronwatch.Alerts.Discord needs :webhook_url"}
-    assert Cronwatch.Alerts.Webhook.init(secret: "s") == {:error, "Cronwatch.Alerts.Webhook needs :url"}
-    assert {:error, "Cronwatch.Alerts.Slack: unknown option :webhook"} = Cronwatch.Alerts.Slack.init(webhook: "x")
+    assert Slack.init([]) == {:error, "Cronwatch.Alerts.Slack needs :webhook_url"}
+    assert Discord.init(webhook_url: "") == {:error, "Cronwatch.Alerts.Discord needs :webhook_url"}
+    assert Webhook.init(secret: "s") == {:error, "Cronwatch.Alerts.Webhook needs :url"}
+    assert {:error, "Cronwatch.Alerts.Slack: unknown option :webhook"} = Slack.init(webhook: "x")
   end
 
   test "a channel's credentials never print" do
-    {:ok, s} = Cronwatch.Alerts.Slack.init(webhook_url: "https://hooks.slack.example/T/B/secret")
+    {:ok, s} = Slack.init(webhook_url: "https://hooks.slack.example/T/B/secret")
 
     {:ok, w} =
-      Cronwatch.Alerts.Webhook.init(url: "https://h.example/?key=secret", secret: "s3cret", headers: [{"a", "tok"}])
+      Webhook.init(url: "https://h.example/?key=secret", secret: "s3cret", headers: [{"a", "tok"}])
 
     refute inspect(s) =~ "secret"
     refute inspect(w) =~ "secret"
@@ -142,7 +145,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
   end
 
   test "the webhook's signature is the HMAC-SHA256 of the body" do
-    assert Cronwatch.Alerts.Webhook.signature("key", "The quick brown fox jumps over the lazy dog") ==
+    assert Webhook.signature("key", "The quick brown fox jumps over the lazy dog") ==
              "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
   end
 end
