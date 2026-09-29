@@ -1,6 +1,6 @@
 # cronwatch.dev
 
-A static site: `src/landing.html` plus `docs/*.md`, built by `build.mjs` into `dist/`. The landing page opens with a paragraph rather than a slogan, then runs as labelled rows: the dashboard's last-24-hours timeline and its jobs board in a browser frame, redrawn from the captured dashboard page `src/demo/dashboard.html`, the alerts, the code and the MCP reply, all rendered from the captures in `src/demo`. The two diagrams labelled as illustrations are drawn by hand in `build.mjs`. Fonts are self hosted from `src/assets/fonts`.
+A static site: `src/landing.html` plus `docs/*.md`, built by `build.mjs` into `dist/`. The landing page opens with a paragraph rather than a slogan, then runs as labelled rows: the dashboard's last-24-hours timeline and its jobs board in a browser frame, redrawn from the captured dashboard page `src/demo/dashboard.html`, the alerts, the code and the MCP reply, all rendered from the captures in `src/demo`. The two diagrams labelled as illustrations are drawn by hand in `build.mjs`.
 
 ```bash
 npm run dev:site                  # from the repo root: build, watch, serve on http://localhost:4321

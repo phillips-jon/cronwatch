@@ -1,6 +1,6 @@
 # cronwatch-tokio-cron-scheduler
 
-[tokio-cron-scheduler](https://crates.io/crates/tokio-cron-scheduler) watched by [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev) (not the hosted cronwatch.io): each job is declared as a CronWatch job with its schedule, and every run is recorded, so you are told when one fails, runs late, never runs, gets stuck or runs slow.
+[tokio-cron-scheduler](https://crates.io/crates/tokio-cron-scheduler) watched by [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev): each job is declared as a CronWatch job with its schedule, and every run is recorded, so you are told when one fails, runs late, never runs, gets stuck or runs slow.
 
 tokio-cron-scheduler 0.15, Rust 1.85 or newer.
 

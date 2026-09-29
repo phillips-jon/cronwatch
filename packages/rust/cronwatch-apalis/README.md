@@ -1,6 +1,6 @@
 # cronwatch-apalis
 
-[apalis](https://crates.io/crates/apalis) watched by [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev) (not the hosted cronwatch.io): each attempt of a worker's tasks is recorded as a run through a tower layer, and apalis-cron is given CronWatch's own schedules, so you are told when a job fails, runs late, never runs, gets stuck or runs slow.
+[apalis](https://crates.io/crates/apalis) watched by [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev): each attempt of a worker's tasks is recorded as a run through a tower layer, and apalis-cron is given CronWatch's own schedules, so you are told when a job fails, runs late, never runs, gets stuck or runs slow.
 
 apalis 1.0 has not shipped: this crate is built against its release candidates, pinned exactly (`apalis-core 1.0.0-rc.10`, `apalis-cron 1.0.0-rc.9`), since each changes the API. Rust 1.85 or newer; the `cron` feature needs 1.87 (the `cron` crate does).
 

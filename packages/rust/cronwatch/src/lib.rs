@@ -1,7 +1,7 @@
 //! CronWatch for Rust: know when your cron jobs fail, run late or never run.
 //!
 //! The same library as `@cronwatch/sdk`, the library behind
-//! [cronwatch.dev](https://cronwatch.dev) (not the hosted cronwatch.io): it
+//! [cronwatch.dev](https://cronwatch.dev): it
 //! records each run of a job in a store the app already has, judges it
 //! (failed, stuck, slow, over budget, missed its schedule), and sends one
 //! alert when a condition opens and one recovery when it closes. A Rust

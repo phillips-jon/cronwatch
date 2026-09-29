@@ -16,7 +16,7 @@ CronWatch runs inside your own application and stores job runs, output and alert
 
 The site sets no cookies. If you switch between light and dark paper, your choice is saved in your browser's local storage under one key, `cronwatch-theme`, so the next page opens the same way. It never leaves your browser, and clearing your site data removes it.
 
-The pages load their fonts, styles and scripts from cronwatch.dev itself, and nothing from any other site.
+The pages load their styles and scripts from cronwatch.dev itself. The fonts come from Adobe Fonts (use.typekit.net), which sees your IP address and browser when it serves them; nothing else is loaded from another site.
 
 ## Server logs
 

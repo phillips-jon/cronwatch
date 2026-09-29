@@ -1,6 +1,6 @@
 # cronwatch-sqlx
 
-The SQL store for [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev) (not the hosted cronwatch.io). It keeps CronWatch's jobs, runs and state in the app's own database through sqlx and the app's own pool, in the same tables and bytes as the Node SDK and the Ruby, Python, PHP and Go ports, so processes in any of them can share one database. It also has the pg_cron source, which watches the jobs pg_cron runs inside Postgres.
+The SQL store for [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev). It keeps CronWatch's jobs, runs and state in the app's own database through sqlx and the app's own pool, in the same tables and bytes as the Node SDK and the Ruby, Python, PHP and Go ports, so processes in any of them can share one database. It also has the pg_cron source, which watches the jobs pg_cron runs inside Postgres.
 
 Each database is a feature (sqlx 0.9, Rust 1.94 or newer):
 
