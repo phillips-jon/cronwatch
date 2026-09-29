@@ -44,6 +44,7 @@ mod error;
 mod evaluate;
 mod format;
 mod handle;
+mod handler;
 pub mod js;
 mod jsre;
 mod memory;
@@ -56,6 +57,7 @@ mod serialize;
 mod stats;
 mod store;
 mod types;
+pub mod web;
 
 #[cfg(any(feature = "alerts", feature = "triage"))]
 pub mod alerts;
@@ -71,6 +73,7 @@ pub use client::{Client, ClientBuilder, describe_job};
 pub use deliver::{Channel, ChannelContext, Console, Source, Triage, TriageContext, channel_fn, triage_fn};
 pub use error::Error;
 pub use handle::{RESERVED_RUN_ID_PREFIX, RunHandle};
+pub use handler::{Handler, HandlerOptions};
 pub use memory::MemoryStore;
 pub use options::{Deliver, DurationSpec, JobOptions};
 pub use panics::capture_panic_frames;

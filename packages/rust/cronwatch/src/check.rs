@@ -256,6 +256,11 @@ impl Client {
     /// silence alerts as usual.
     pub async fn silence(&self, name: &str, d: impl Into<DurationSpec>) -> Result<JobState, Error> {
         let ms = schedule::parse_duration(&d.into().to_value(), "silence duration").map_err(Error::Invalid)?;
+        self.silence_ms(name, ms).await
+    }
+
+    /// Silences a job for `ms` milliseconds, a value `parse_duration` read.
+    pub(crate) async fn silence_ms(&self, name: &str, ms: f64) -> Result<JobState, Error> {
         let until = later_by(self.now(), ms);
         self.patch_state(name, move |s| s.silenced_until = Some(until)).await
     }

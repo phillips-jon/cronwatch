@@ -202,7 +202,7 @@ impl JobContext {
 
 /// A future that catches a panic in the future it polls, as
 /// `std::panic::catch_unwind` does for a closure.
-struct CatchUnwind<F: Future>(Pin<Box<F>>);
+pub(crate) struct CatchUnwind<F: Future>(pub(crate) Pin<Box<F>>);
 
 impl<F: Future> Future for CatchUnwind<F> {
     type Output = Result<F::Output, Box<dyn Any + Send>>;
@@ -222,6 +222,26 @@ impl<F: Future> Future for CatchUnwind<F> {
 pub(crate) fn text_of<T: Any>(value: &T) -> Option<String> {
     let any = value as &dyn Any;
     any.downcast_ref::<String>().cloned().or_else(|| any.downcast_ref::<&str>().map(|s| s.to_string()))
+}
+
+/// How a job's function ended.
+pub(crate) enum Outcome<T, E> {
+    Value(T),
+    Error(E),
+    Panic(Box<dyn Any + Send>),
+}
+
+/// A run once recorded, and how its function ended.
+pub(crate) struct Executed<T, E> {
+    pub(crate) run: Run,
+    pub(crate) outcome: Outcome<T, E>,
+}
+
+/// The error a value a job returned fails its run with: an HTTP answer of
+/// 400 or more (`HTTP 503 Service Unavailable`), as the SDK fails a run for
+/// a fetch `Response`. Any other value fails nothing.
+pub(crate) fn http_failure<T: Any>(value: &T) -> Option<String> {
+    crate::web::status_of(value as &dyn Any).and_then(crate::web::http_failure_text)
 }
 
 /// An error as a failed run's error: `Name: message`, the name from the
@@ -380,6 +400,31 @@ impl Client {
         T: 'static,
         E: fmt::Display,
     {
+        match self.execute_run(def, trigger, f, http_failure::<T>).await.outcome {
+            Outcome::Value(v) => Ok(v),
+            Outcome::Error(err) => Err(err),
+            Outcome::Panic(panic) => resume_unwind(panic),
+        }
+    }
+
+    /// `execute`, answering the finished run and how the function ended
+    /// rather than resuming a panic, for the job's handler, which answers
+    /// with both. `judge` gives the error a returned value fails the run
+    /// with: an HTTP answer of 400 or more, as the SDK fails a run for a
+    /// fetch `Response`.
+    pub(crate) async fn execute_run<F, Fut, T, E>(
+        &self,
+        def: Arc<JobDef>,
+        trigger: String,
+        f: F,
+        judge: fn(&T) -> Option<String>,
+    ) -> Executed<T, E>
+    where
+        F: FnOnce(JobContext) -> Fut,
+        Fut: Future<Output = Result<T, E>>,
+        T: 'static,
+        E: fmt::Display,
+    {
         let started_at = self.now();
         let run = Run {
             id: new_id(),
@@ -434,33 +479,33 @@ impl Client {
         guard.armed = false;
         let (recorded, closing) = guard.started.take().unwrap_or((false, None));
 
-        let (value, failure, result_text) = match outcome {
+        let (outcome, failure, result_text) = match outcome {
             Err(panic) => {
                 let text = panic_error(&*panic);
-                let client = self.clone();
-                let task = self.inner.handle.spawn(async move {
-                    client.finish_executed(&def, run, &rec, None, Some(text), recorded, closing).await;
-                });
-                let _ = task.await;
-                resume_unwind(panic);
+                (Outcome::Panic(panic), Some(text), None)
             }
             Ok(Err(err)) => {
                 let text = error_text(&err);
-                (Err(err), Some(text), None)
+                (Outcome::Error(err), Some(text), None)
             }
             Ok(Ok(v)) => {
                 let text = text_of(&v);
-                (Ok(v), None, text)
+                let failure = judge(&v);
+                (Outcome::Value(v), failure, text)
             }
         };
         let client = self.clone();
         let task = self.inner.handle.spawn(async move {
-            client.finish_executed(&def, run, &rec, result_text, failure, recorded, closing).await;
+            client.finish_executed(&def, run, &rec, result_text, failure, recorded, closing).await
         });
         // Dropping this future now detaches the recording rather than
         // cancelling it.
-        let _ = task.await;
-        value
+        let run = match task.await {
+            Ok(run) => run,
+            // The recording panicked (a store's, say): the run as it stood.
+            Err(_) => guard.run.clone(),
+        };
+        Executed { run, outcome }
     }
 
     /// The start of a run: the definition synced, the row inserted, and
@@ -497,7 +542,7 @@ impl Client {
         failure: Option<String>,
         recorded: bool,
         closing: Option<JoinHandle<()>>,
-    ) {
+    ) -> Run {
         let name = def.name.clone();
         let finished_at = self.now();
         run.finished_at = Some(finished_at);
@@ -521,6 +566,7 @@ impl Client {
                 .report(Error::Other(format!("run {} of {name} {why}; ignored", run.id)), &format!("finishing {name}")),
             Ok(None) => {}
         }
+        run
     }
 
     /// Sets a finished run's status and error from how it ended, then redacts

@@ -218,6 +218,7 @@ impl ClientBuilder {
         }
         let retention_ms = schedule::parse_duration(&self.retention.to_value(), "retention").map_err(Error::Invalid)?;
         let default_store = self.store.is_none();
+        let secret_opt_out = self.cron_secret == Some(None);
         let cron_secret = match self.cron_secret {
             Some(secret) => secret,
             None => std::env::var("CRON_SECRET").ok(),
@@ -231,6 +232,8 @@ impl ClientBuilder {
                 triage: self.triage,
                 sources: self.sources,
                 cron_secret,
+                secret_opt_out,
+                warned_no_secret: AtomicBool::new(false),
                 retention_ms,
                 defaults,
                 redact: self.redact,
@@ -281,6 +284,10 @@ pub(crate) struct Inner {
     pub triage: Option<Arc<dyn Triage>>,
     pub sources: Vec<Arc<dyn Source>>,
     cron_secret: Option<String>,
+    /// `no_cron_secret()` was called: handlers may run without a secret.
+    pub secret_opt_out: bool,
+    /// Whether a handler has reported refusing a request for want of one.
+    pub warned_no_secret: AtomicBool,
     pub retention_ms: f64,
     defaults: Object,
     redact: Redact,
