@@ -138,7 +138,7 @@ final class Request
             $path,
             $query,
             $headers,
-            $input ?? static fn (): string => self::readAtMost('php://input'),
+            $input ?? static fn (): string => self::readInput(),
             self::originOf($scheme, $host),
             $mount,
             $form,
@@ -240,10 +240,14 @@ final class Request
         return strlen($this->body()) > self::MAX_BODY;
     }
 
-    /** Up to MAX_BODY bytes of a stream and one more, to tell a body that is too large. */
-    public static function readAtMost(string $uri): string
+    /**
+     * Up to MAX_BODY bytes of this request's body and one more, to tell a body
+     * that is too large. It reads php://input and nothing else: no path or URL
+     * is ever taken from a caller.
+     */
+    public static function readInput(): string
     {
-        $stream = @fopen($uri, 'rb'); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- the request body, read in PHP's own way.
+        $stream = @fopen('php://input', 'rb'); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- the request body (php://input), read in PHP's own way; never a file or a remote URL.
         if ($stream === false) {
             return '';
         }

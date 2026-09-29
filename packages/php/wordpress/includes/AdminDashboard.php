@@ -94,7 +94,7 @@ final class AdminDashboard
                 $query[] = $pair;
             }
         }
-        $globals = Request::fromGlobals($server, Request::readAtMost('php://input'));
+        $globals = Request::fromGlobals($server, Request::readInput());
         $request = new Request($method, Request::normalizePath(self::MARKER . $path), implode('&', $query), $globals->headers, $globals->body(), $globals->origin);
         if ($method === 'POST' && ($path === '/check' || $path === '/api/check')) {
             // The plugin's check: WP-Cron's events declared as jobs first.
