@@ -6,7 +6,7 @@ order: 3.25
 
 # Django
 
-`cronwatch.django` wires [cronwatch-sdk](/docs/python/) into a Django app: one settings dict, the dashboard and JSON API under a URL you choose, and a management command that looks for missed and stuck runs. It needs Django 5.2 or newer and is tested on 5.2 LTS, 6.0 and 6.1.
+`cronwatch.django` wires [cronwatch-sdk](/docs/python/) into a Django app: one settings dict, the dashboard and JSON API under a URL you choose, and a management command that looks for missed and stuck runs. It needs Django 5.2 or newer and is tested on 5.2 LTS, 6.0 and 6.1. Django 5.2 runs on Python 3.11 or newer; Django 6.0 and 6.1 need Python 3.12 or newer.
 
 ```bash
 pip install "cronwatch-sdk[django]"
@@ -31,11 +31,26 @@ CRONWATCH = {
 }
 ```
 
-The client's options are the keys of `CRONWATCH` in upper case: `STORE`, `ALERTS`, `TRIAGE`, `SOURCES`, `CRON_SECRET`, `RETENTION`, `DEFAULTS`, `REDACT`, `DELIVER` and `ON_ERROR`, meaning what they mean on [`Cronwatch()`](/docs/python/#api). A store, channel or source may be a dotted path, to the thing itself or to a class or function that makes it (called once, with no arguments), so settings need not import your code. `CLIENT` instead names a client your app made itself (the client, or a dotted path to it). An unknown key raises `ImproperlyConfigured`, so a typo is found at once.
+The keys of `CRONWATCH`:
+
+| Key | |
+|---|---|
+| `STORE`, `ALERTS`, `TRIAGE`, `SOURCES`, `CRON_SECRET`, `RETENTION`, `DEFAULTS`, `REDACT`, `DELIVER`, `ON_ERROR` | the client's options in upper case, meaning what they mean on [`Cronwatch()`](/docs/python/#api) |
+| `CLIENT` | instead of the client's options, a client your app made itself (the client, or a dotted path to it) |
+| `TOKEN` | the dashboard's token; see [the dashboard](/docs/python/#the-dashboard) |
+| `BASE_PATH` | where the dashboard is mounted; by default wherever its URLs are included |
+| `ORIGIN` | the public origin, pinned whatever a request says |
+| `TRUST_PROXY` | take the origin from `X-Forwarded-Proto` and `X-Forwarded-Host` |
+
+A store, channel or source may be a dotted path, to the thing itself or to a class or function that makes it (called once, with no arguments), so settings need not import your code. An unknown key raises `ImproperlyConfigured`, so a typo is found at once.
 
 The client is made from these settings the first time something asks for it, through `cronwatch.configure`, so `cronwatch.django.client()` and `cronwatch.client()` are the same client everywhere in the process. A change to `CRONWATCH` or `DEBUG`, as `override_settings` makes in a test, drops it and makes it again.
 
-`DEBUG` stands in for the environment when none of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` is set: on is development, off is production. In development the dashboard makes a token of its own when there is none and prints its sign-in link to the console (with the host only when `ORIGIN` is set or the request's host is loopback, such as `localhost` or `127.0.0.1`; otherwise the link is a path to open on this server); in production, without a token, it answers 503 rather than serve your jobs to anyone.
+A job handle keeps the client it was declared on, and the new client does not rebind it: a handle made at import, such as `nightly_report` below, still records to the old client's store under `override_settings`. In a test that swaps the store, declare the job again on the current client (`client().job("nightly-report", ...)`) and run it through that handle.
+
+`DEBUG` stands in for the environment when none of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` is set: on is development, off is production. In development the dashboard makes a token of its own when there is none and prints its sign-in link to the console. In production, without a token, it answers 503 rather than serve your jobs to anyone.
+
+The link names the host only when `ORIGIN` is set or the request's host is loopback, such as `localhost` or `127.0.0.1` (a Host header such as `localhost:1@evil.example` does not count); otherwise it is a path to open on this server.
 
 ## Declare and run jobs
 
@@ -100,7 +115,7 @@ A job that never started records nothing, so something has to look. Add one cron
 
 `cronwatch_check` runs the check and prints `cronwatch: checked N jobs, sent M alerts` (nothing at `--verbosity 0`). Every job in a `cronwatch_jobs` module is declared when Django starts, and every job in the store is checked from its stored definition. Run one checker per store.
 
-A long-running process can check on its own instead: call `client().start()` once in each worker process (with Gunicorn, in its `post_fork` hook), and drop the crontab line.
+A long-running process can check on its own instead: call `client().start()` in exactly one process, and drop the crontab line. Never start it once per Gunicorn worker (in `post_fork`, say), since two checkers on one store can each send the same alert: start it in a process of its own, such as a worker you already run.
 
 ## Mount the dashboard
 
