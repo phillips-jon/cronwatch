@@ -376,7 +376,11 @@ pub(crate) fn sha256_hex(data: &[u8]) -> String {
             *x = x.wrapping_add(y);
         }
     }
-    h.iter().map(|x| format!("{x:08x}")).collect()
+    h.iter().fold(String::new(), |mut out, x| {
+        use std::fmt::Write;
+        let _ = write!(out, "{x:08x}");
+        out
+    })
 }
 
 #[test]

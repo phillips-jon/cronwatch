@@ -586,7 +586,11 @@ pub(crate) fn new_id() -> String {
     }
     b[6] = (b[6] & 0x0f) | 0x40;
     b[8] = (b[8] & 0x3f) | 0x80;
-    let hex: String = b.iter().map(|x| format!("{x:02x}")).collect();
+    let hex = b.iter().fold(String::new(), |mut out, x| {
+        use std::fmt::Write;
+        let _ = write!(out, "{x:02x}");
+        out
+    });
     format!("{}-{}-{}-{}-{}", &hex[..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..])
 }
 

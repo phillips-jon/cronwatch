@@ -11,7 +11,7 @@ repository.workspace = true
 homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
-include = ["src/**/*", "Cargo.toml", "README.md", "LICENSE"]
+include = ["src/**/*", "!src/conformance/**", "!src/**/tests.rs", "!src/**/*_tests.rs", "Cargo.toml", "README.md", "LICENSE"]
 
 [features]
 # A blocking client for programs with no runtime of their own.
