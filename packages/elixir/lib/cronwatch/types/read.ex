@@ -75,14 +75,13 @@ defmodule Cronwatch.Metrics do
   @spec from_value(term()) :: {:ok, t()} | {:error, String.t()}
   def from_value(nil), do: {:ok, Object.new()}
 
-  def from_value(%Object{pairs: pairs}) do
-    Enum.reduce_while(pairs, {:ok, Object.new()}, fn {k, v}, {:ok, acc} ->
-      if Read.number?(v) do
-        {:cont, {:ok, Object.put(acc, k, v)}}
-      else
-        {:halt, {:error, "metric #{Cronwatch.JS.quote(k)} must be a number, not #{Read.kind(v)}"}}
-      end
-    end)
+  # An object's pairs are already in order, each key once, so they are kept
+  # as they are rather than set again one at a time.
+  def from_value(%Object{pairs: pairs} = o) do
+    case Enum.find(pairs, fn {_, v} -> not Read.number?(v) end) do
+      nil -> {:ok, o}
+      {k, v} -> {:error, "metric #{Cronwatch.JS.quote(k)} must be a number, not #{Read.kind(v)}"}
+    end
   end
 
   def from_value(v), do: {:error, "metrics must be an object, not #{Read.kind(v)}"}
@@ -92,9 +91,7 @@ defmodule Cronwatch.Metrics do
   whatever else it holds, and none for anything else.
   """
   @spec lenient(term()) :: t()
-  def lenient(%Object{pairs: pairs}) do
-    Enum.reduce(pairs, Object.new(), fn {k, v}, acc -> if Read.number?(v), do: Object.put(acc, k, v), else: acc end)
-  end
+  def lenient(%Object{pairs: pairs}), do: %Object{pairs: Enum.filter(pairs, fn {_, v} -> Read.number?(v) end)}
 
   def lenient(_), do: Object.new()
 end

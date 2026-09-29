@@ -22,7 +22,31 @@ defmodule Cronwatch.JS.Object do
   in its keys' term order.
   """
   @spec new(Enumerable.t()) :: t()
-  def new(pairs), do: Enum.reduce(pairs, new(), fn {k, v}, o -> put(o, to_key(k), v) end)
+  def new(pairs) do
+    {order, values} =
+      Enum.reduce(pairs, {[], %{}}, fn {k, v}, {order, values} ->
+        k = to_key(k)
+        if Map.has_key?(values, k), do: {order, %{values | k => v}}, else: {[k | order], Map.put(values, k, v)}
+      end)
+
+    from_order(Enum.reverse(order), values)
+  end
+
+  @doc false
+  # The object of these keys, each once, in the order each was first set, and
+  # their values: array indices first, in ascending order, then the rest.
+  # Setting a key at a time costs a walk of the pairs each, which made an
+  # object of many keys (a request body, a stored row) quadratic to read.
+  @spec from_order([String.t()], %{String.t() => Cronwatch.JS.value()}) :: t()
+  def from_order(keys, values) do
+    {indices, rest} =
+      keys
+      |> Enum.map(&{array_index(&1), &1})
+      |> Enum.split_with(fn {n, _} -> n != nil end)
+
+    ordered = Enum.map(Enum.sort(indices), &elem(&1, 1)) ++ Enum.map(rest, &elem(&1, 1))
+    %__MODULE__{pairs: Enum.map(ordered, &{&1, Map.fetch!(values, &1)})}
+  end
 
   defp to_key(k) when is_binary(k), do: k
   defp to_key(k) when is_atom(k), do: Atom.to_string(k)

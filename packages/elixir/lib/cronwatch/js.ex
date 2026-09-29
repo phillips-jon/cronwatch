@@ -182,6 +182,9 @@ defmodule Cronwatch.JS do
   defp write(true), do: "true"
   defp write(false), do: "false"
   defp write(n) when n in [:infinity, :neg_infinity, :nan], do: "null"
+  # An integer past the doubles is the Infinity JavaScript would hold, which
+  # JSON writes as null.
+  defp write(n) when is_integer(n) and abs(n) > @max_safe, do: write(to_float(n))
   defp write(n) when is_number(n), do: format_number(n)
   defp write(s) when is_binary(s), do: quote_iodata(s)
   defp write(a) when is_atom(a), do: quote_iodata(Atom.to_string(a))
@@ -295,7 +298,7 @@ defmodule Cronwatch.JS do
   defp value(<<?{, rest::binary>>, text, depth) do
     case skip_space(rest) do
       <<?}, rest::binary>> -> {:ok, Object.new(), rest}
-      rest -> members(rest, text, depth, Object.new())
+      rest -> members(rest, text, depth, {[], %{}})
     end
   end
 
@@ -317,7 +320,9 @@ defmodule Cronwatch.JS do
   defp value(<<c, _::binary>> = rest, text, _depth) when c == ?- or c in ?0..?9, do: number(rest, text)
   defp value(rest, text, _depth), do: fail("Unexpected token", text, rest)
 
-  defp members(rest, text, depth, o) do
+  # The keys in the order each was first given and their last values, made
+  # into an object at the end.
+  defp members(rest, text, depth, {order, values}) do
     rest = skip_space(rest)
 
     if match?(<<?", _::binary>>, rest) do
@@ -327,11 +332,14 @@ defmodule Cronwatch.JS do
         <<?:, rest::binary>> ->
           case value(skip_space(rest), text, depth + 1) do
             {:ok, v, rest} ->
-              o = Object.put(o, k, v)
+              {order, values} =
+                if Map.has_key?(values, k),
+                  do: {order, %{values | k => v}},
+                  else: {[k | order], Map.put(values, k, v)}
 
               case skip_space(rest) do
-                <<?,, rest::binary>> -> members(rest, text, depth, o)
-                <<?}, rest::binary>> -> {:ok, o, rest}
+                <<?,, rest::binary>> -> members(rest, text, depth, {order, values})
+                <<?}, rest::binary>> -> {:ok, Object.from_order(Enum.reverse(order), values), rest}
                 rest -> fail("Expected ',' or '}' after property value", text, rest)
               end
 
