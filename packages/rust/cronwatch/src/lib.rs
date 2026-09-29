@@ -44,6 +44,9 @@ mod env;
 mod error;
 mod evaluate;
 mod format;
+#[cfg(fuzzing)]
+#[doc(hidden)]
+pub mod fuzz;
 mod handle;
 mod handler;
 pub mod js;

@@ -1,0 +1,68 @@
+# The cargo-fuzz targets for what reads untrusted input: JSON, durations,
+# cron schedules, jsre patterns, a dashboard request (its Host and origin),
+# and stored rows. Not a member of the workspace in packages/rust, and never
+# published. `cargo +nightly fuzz run <target>` in packages/rust/fuzz; see
+# DESIGN.md (Testing and CI).
+[package]
+name = "cronwatch-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4.10", features = ["arbitrary-derive"] }
+cronwatch = { path = "../cronwatch" }
+tokio = { version = "1.44", features = ["rt"] }
+
+# A workspace of its own, so packages/rust's does not take it in.
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "json"
+path = "fuzz_targets/json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "duration"
+path = "fuzz_targets/duration.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cron"
+path = "fuzz_targets/cron.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jsre"
+path = "fuzz_targets/jsre.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "request"
+path = "fuzz_targets/request.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "rows"
+path = "fuzz_targets/rows.rs"
+test = false
+doc = false
+bench = false

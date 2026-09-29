@@ -21,3 +21,6 @@ cronwatch = { path = "cronwatch", version = "=0.6.1" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+# cargo-fuzz builds with --cfg fuzzing, which opens cronwatch::fuzz to the
+# targets in fuzz/.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fuzzing)"] }
