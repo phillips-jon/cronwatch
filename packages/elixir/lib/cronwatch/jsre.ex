@@ -24,10 +24,11 @@ defmodule Cronwatch.JSRE do
   backreferences, `\\c`, `\\p{...}` and `\\u{...}`.
 
   The bounds are the Rust port's: a pattern longer than 4096 characters, or
-  with groups nested more than 100 deep, is not read; a match gives up past
-  512 frames of recursion; and a budgeted match (`try_match?/2`) gives up
-  past #{50_000_000} steps (each attempt at a node, and each code unit a
-  repeat scans).
+  with groups nested more than 100 deep, is not read; and a match gives up
+  past 512 frames of recursion. A budgeted match (`try_match?/2`) gives up
+  past #{10_000_000} steps (each attempt at a node, and each code unit
+  a repeat scans), a fifth of the Rust port's budget, since a step costs the
+  BEAM far more.
   """
 
   import Bitwise
@@ -36,13 +37,14 @@ defmodule Cronwatch.JSRE do
   alias Cronwatch.JSRE.Match
   alias Cronwatch.JSRE.Parse
 
-  defstruct [:source, :flags, :global, :nodes, :start, :captures, :loops, :first]
+  defstruct [:source, :flags, :global, :nodes, :sets, :start, :captures, :loops, :first]
 
   @type t :: %__MODULE__{
           source: String.t(),
           flags: String.t(),
           global: boolean(),
           nodes: tuple(),
+          sets: tuple(),
           start: non_neg_integer(),
           captures: non_neg_integer(),
           loops: non_neg_integer(),
@@ -71,7 +73,7 @@ defmodule Cronwatch.JSRE do
 
       case c.err do
         nil ->
-          nodes = List.to_tuple(for i <- 0..(c.count - 1), do: Map.fetch!(c.nodes, i))
+          {nodes, sets} = intern(for i <- 0..(c.count - 1), do: Map.fetch!(c.nodes, i))
 
           first =
             case first(tree, 0) do
@@ -85,6 +87,7 @@ defmodule Cronwatch.JSRE do
              flags: flags,
              global: global,
              nodes: nodes,
+             sets: sets,
              start: start,
              captures: captures,
              loops: c.loops,
@@ -329,6 +332,31 @@ defmodule Cronwatch.JSRE do
 
   defp once(%{kind: kind}, cont, c) when kind in [:word_b, :not_word_b, :start, :end] do
     push(c, mk_node(kind, next: cont))
+  end
+
+  # The nodes with each set (a repeat's own and its guard) as an index into
+  # one tuple of the distinct sets, so a pattern that names one set many
+  # times holds it once, however often the pattern is copied between
+  # processes or into a table (a copy does not keep terms shared). A set's
+  # integer is for compiling only, 65,536 bits a node, and is dropped.
+  defp intern(nodes) do
+    {nodes, {_index, sets}} =
+      Enum.map_reduce(nodes, {%{}, []}, fn node, acc ->
+        {set, acc} = index_of(node.set, acc)
+        {guard, acc} = index_of(node.guard, acc)
+        {%{node | set: set, guard: guard, set_int: 0}, acc}
+      end)
+
+    {List.to_tuple(nodes), sets |> Enum.reverse() |> List.to_tuple()}
+  end
+
+  defp index_of(nil, acc), do: {nil, acc}
+
+  defp index_of(set, {index, sets} = acc) do
+    case index do
+      %{^set => i} -> {i, acc}
+      _ -> {map_size(index), {Map.put(index, set, map_size(index)), [set | sets]}}
+    end
   end
 
   # Sets each repeat's guard, visiting every node once.

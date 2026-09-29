@@ -43,7 +43,13 @@ defmodule Cronwatch.JSRE.Parse do
   @doc false
   # Reads a pattern's source into a tree and its number of captures.
   def parse(source, fold) do
-    src = source |> String.to_charlist() |> List.to_tuple()
+    # Read as UTF-16 code units, as JavaScript reads a pattern without the
+    # `u` flag: a character outside the BMP is its two halves in turn, each
+    # an atom of its own, so a quantifier after it takes the second alone,
+    # an escape before it escapes the first, and in a class `[a-😀]` is the
+    # range a to the first half, then the second.
+    src = for <<u::16 <- Cronwatch.JS.units(source)>>, into: [], do: u
+    src = List.to_tuple(src)
     p = %{src: src, len: tuple_size(src), i: 0, fold: fold, captures: 0, depth: 0, source: source}
 
     try do
@@ -136,15 +142,6 @@ defmodule Cronwatch.JSRE.Parse do
 
       ?) ->
         raise_at(p, "unmatched ')'")
-
-      # A character outside the BMP is two code units in turn, as JavaScript
-      # without the `u` flag reads it: a quantifier after it takes the second
-      # alone.
-      c when c >= 0x10000 ->
-        r = c - 0x10000
-        high = char_tree(add(new_set(), 0xD800 + (r >>> 10)))
-        {low, p} = quantifier(char_tree(add(new_set(), 0xDC00 + (r &&& 0x3FF))), adv(p))
-        {tree(:seq, children: [high, low]), p}
 
       c ->
         quantifier(char_tree(folded(p, add(new_set(), c))), adv(p))
@@ -269,13 +266,79 @@ defmodule Cronwatch.JSRE.Parse do
     end
   end
 
-  # The set with the other case of every ASCII letter in it, under /i.
+  # JavaScript's Canonicalize without the `u` flag: a code unit's upper case
+  # when that is one code unit, unless it would take a character outside
+  # ASCII into it (so `ſ` is not `s` and the Kelvin sign is not `K`). Code
+  # units whose canonical forms agree match each other under /i. Built when
+  # the module compiles, from Elixir's own Unicode tables, which may be a
+  # version apart from V8's.
+  canon = fn c ->
+    cond do
+      c in ?a..?z ->
+        c - 32
+
+      c < 128 or c in 0xD800..0xDFFF ->
+        c
+
+      true ->
+        case String.to_charlist(String.upcase(<<c::utf8>>)) do
+          [u] when u >= 128 and u < 0x10000 -> u
+          _ -> c
+        end
+    end
+  end
+
+  groups =
+    0..0xFFFF
+    |> Enum.group_by(canon)
+    |> Map.values()
+    |> Enum.filter(&(length(&1) > 1))
+
+  # Each code unit outside ASCII that shares its canonical form, with the
+  # others that share it.
+  @fold_of groups |> Enum.reject(&(hd(&1) < 128)) |> Enum.flat_map(fn g -> Enum.map(g, &{&1, g}) end) |> Map.new()
+  @foldable @fold_of |> Map.keys() |> Enum.reduce(0, &(&2 ||| 1 <<< &1))
+
+  # The set with every code unit that matches one of its members under /i in
+  # it: the other case of each ASCII letter, and of each character outside
+  # ASCII that has one.
   defp folded(%{fold: false}, s), do: s
 
   defp folded(_p, s) do
-    Enum.reduce(?A..?Z, s, fn c, s ->
-      if has_raw(s, c) or has_raw(s, c + 32), do: s |> add(c) |> add(c + 32), else: s
-    end)
+    s =
+      Enum.reduce(?A..?Z, s, fn c, s ->
+        if has_raw(s, c) or has_raw(s, c + 32), do: s |> add(c) |> add(c + 32), else: s
+      end)
+
+    case s.bits &&& @foldable do
+      0 ->
+        s
+
+      @foldable ->
+        s
+
+      some ->
+        %{
+          s
+          | bits:
+              some |> members() |> Enum.flat_map(&Map.fetch!(@fold_of, &1)) |> Enum.reduce(s.bits, &(&2 ||| 1 <<< &1))
+        }
+    end
+  end
+
+  # The code units in a bitmap, reading it a byte at a time, up to its
+  # highest.
+  defp members(int) do
+    for <<byte <- :binary.encode_unsigned(int, :little)>>, reduce: {0, []} do
+      {at, acc} ->
+        acc =
+          if byte == 0,
+            do: acc,
+            else: Enum.reduce(0..7, acc, fn k, acc -> if (byte >>> k &&& 1) == 1, do: [at + k | acc], else: acc end)
+
+        {at + 8, acc}
+    end
+    |> elem(1)
   end
 
   defp class(p) do
@@ -399,9 +462,6 @@ defmodule Cronwatch.JSRE.Parse do
           {add(set, c), p}
         end
 
-      c when c >= 0x10000 ->
-        throw({:jsre, "jsre: escape of a character outside the BMP is not supported"})
-
       c ->
         {add(set, c), p}
     end
@@ -414,12 +474,6 @@ defmodule Cronwatch.JSRE.Parse do
   ## Sets
 
   defp new_set, do: %{bits: 0, space: false, not_space: false, negate: false}
-
-  defp add(s, r) when r >= 0x10000 do
-    # A character outside the BMP would be two code units.
-    r = r - 0x10000
-    s |> add(0xD800 + (r >>> 10)) |> add(0xDC00 + (r &&& 0x3FF))
-  end
 
   defp add(s, r), do: %{s | bits: s.bits ||| 1 <<< r}
 
@@ -459,7 +513,40 @@ defmodule Cronwatch.JSRE.Parse do
   end
 
   @doc false
-  def frozen(int), do: {int, bits_binary(int)}
+  # The set as the matcher tests it: a tuple of at most #{@max_ranges} ranges,
+  # `{lo1, hi1, lo2, hi2, ...}` in ascending order, for the sets nearly every
+  # pattern is made of (a character, a letter in both cases, `[a-z]`, `\d`,
+  # `\w`, `.`, `[^x]`), else the bitmap of every code unit. A bitmap is 2048
+  # words, so a pattern of 4096 characters held one per character came to
+  # some 130 MB, copied again whenever a job's definition was read from the
+  # instance's table.
+  def frozen(int) do
+    case ranges(int, 0, []) do
+      {:ok, flat} -> {int, List.to_tuple(flat)}
+      :many -> {int, bits_binary(int)}
+    end
+  end
+
+  @max_ranges 4
+
+  defp ranges(0, _n, acc), do: {:ok, Enum.reverse(acc)}
+  defp ranges(_x, @max_ranges, _acc), do: :many
+
+  defp ranges(x, n, acc) do
+    lo = low_bit(x)
+    # The first clear bit above lo ends the run.
+    len = low_bit(bnot(x >>> lo))
+    hi = lo + len - 1
+    ranges(x &&& bnot((1 <<< (hi + 1)) - 1), n + 1, [hi, lo | acc])
+  end
+
+  # The index of the lowest set bit of a nonzero integer.
+  defp low_bit(x) do
+    p = x &&& -x
+    bytes = :binary.encode_unsigned(p)
+    <<top, _::binary>> = bytes
+    (byte_size(bytes) - 1) * 8 + bit_index(top, 0)
+  end
 
   # The bitmap as 2048 words of 32 bits, bit c of the integer at bit c &&& 31
   # of word c >>> 5: a lookup is one elem and a shift.

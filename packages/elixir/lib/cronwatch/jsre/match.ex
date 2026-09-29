@@ -26,9 +26,12 @@ defmodule Cronwatch.JSRE.Match do
   @max_depth 512
 
   # How much work a budgeted match does before it gives up: each attempt at a
-  # node is a step, and so is each code unit a repeat scans. See
-  # DESIGN.md's Decisions for the measurement behind the number.
-  @max_steps 50_000_000
+  # node is a step, and so is each code unit a repeat scans. A fifth of the
+  # Rust port's 50 million, since a step costs the BEAM some twenty times
+  # what it costs Rust: 10 million take a third of a second here, and could
+  # take two on a slow shared host, where 50 million took eleven. See
+  # DESIGN.md's Decisions for the measurements.
+  @max_steps 10_000_000
 
   # An unbudgeted match's steps: more than any match could take.
   @unbounded 1 <<< 58
@@ -111,7 +114,7 @@ defmodule Cronwatch.JSRE.Match do
   defp slice(input, from, to), do: binary_part(input, from * 2, (to - from) * 2)
 
   defp env(re, input) do
-    %{re: re, nodes: re.nodes, input: input, len: div(byte_size(input), 2), ncaps: 2 * (re.captures + 1)}
+    %{re: re, nodes: re.nodes, sets: re.sets, input: input, len: div(byte_size(input), 2), ncaps: 2 * (re.captures + 1)}
   end
 
   defp exec(e, s, steps) when s > e.len, do: {:none, steps}
@@ -144,6 +147,19 @@ defmodule Cronwatch.JSRE.Match do
     u
   end
 
+  # A set is up to four ranges in ascending order, or a bitmap of 2048
+  # words (see Cronwatch.JSRE.Parse.frozen/1).
+  defp has?({lo, hi}, c), do: c >= lo and c <= hi
+  defp has?({lo, hi, lo2, hi2}, c), do: (c >= lo and c <= hi) or (c >= lo2 and c <= hi2)
+
+  defp has?({lo, hi, lo2, hi2, lo3, hi3}, c),
+    do: (c >= lo and c <= hi) or (c >= lo2 and c <= hi2) or (c >= lo3 and c <= hi3)
+
+  defp has?({lo, hi, lo2, hi2, lo3, hi3, lo4, hi4}, c),
+    do: (c >= lo and c <= hi) or (c >= lo2 and c <= hi2) or (c >= lo3 and c <= hi3) or (c >= lo4 and c <= hi4)
+
+  defp has?({}, _c), do: false
+
   defp has?(set, c) do
     (elem(set, c >>> 5) >>> (c &&& 31) &&& 1) == 1
   end
@@ -152,7 +168,8 @@ defmodule Cronwatch.JSRE.Match do
 
   defp word_at?(e, i), do: i >= 0 and i < e.len and word?(unit(e.input, i))
 
-  defp guarded?(e, %{guard: g}, at), do: g == nil or (at < e.len and has?(g, unit(e.input, at)))
+  defp guarded?(_e, %{guard: nil}, _at), do: true
+  defp guarded?(e, %{guard: g}, at), do: at < e.len and has?(elem(e.sets, g), unit(e.input, at))
 
   # Whether the chain from `n` matches at `pos`: `{:ok, state, steps}` with
   # the captures and the end set, or `{:fail, steps}`. Past the depth or out
@@ -167,7 +184,7 @@ defmodule Cronwatch.JSRE.Match do
       :rep ->
         limit = limit(e, node, pos)
         rest = binary_part(e.input, pos * 2, limit * 2)
-        k = scan(rest, node.set, 0)
+        k = scan(rest, elem(e.sets, node.set), 0)
         steps = max(steps - k, 0)
 
         cond do
