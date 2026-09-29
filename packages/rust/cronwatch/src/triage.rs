@@ -89,6 +89,8 @@ struct Anthropic {
     url: String,
 }
 
+crate::alerts::opaque_debug!(AnthropicOptions);
+
 /// Triage backed by Claude, for [`ClientBuilder::triage`](crate::ClientBuilder::triage).
 /// It makes one attempt, no retries, within [`REQUEST_TIMEOUT`]. A refused
 /// request is an error naming the status and the start of the answer, the

@@ -8,7 +8,7 @@ Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
 ## Install
 
-Rust 1.85 or newer for `cronwatch`, `cronwatch-tokio-cron-scheduler` and `cronwatch-apalis`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 does. The core depends on tokio, `getrandom`, `jiff`, `sha2` (the dashboard's cookie) and `md-5` (the app tag the scheduler integrations share) and nothing else: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses), so every port agrees on every fire time. The `alerts` and `triage` features add reqwest on rustls (whose aws-lc-rs needs a C compiler), `url` and `hmac`; `tower` adds `http`, `http-body`, `http-body-util`, `bytes` and `tower-service`, and `axum` adds axum itself.
+Rust 1.85 or newer for `cronwatch`, `cronwatch-tokio-cron-scheduler` and `cronwatch-apalis`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 does. The core depends on tokio, `getrandom`, `jiff`, `sha2` (the dashboard's cookie) and `md-5` (the app tag the scheduler integrations share) and nothing else: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses), so every port agrees on every fire time. The `alerts` and `triage` features add reqwest on rustls (whose aws-lc-rs needs a C compiler), `url` and `hmac`; `tower` adds `http`, `http-body`, `http-body-util`, `bytes` and `tower-service`, and `axum` adds axum itself. `regex` lets `expect_match` take a `regex::Regex`, and `serde` gives the public types `Serialize` and `Deserialize` (the SDK's JSON, field for field) for your own use.
 
 ```toml
 [dependencies]

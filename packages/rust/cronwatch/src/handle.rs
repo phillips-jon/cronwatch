@@ -331,6 +331,16 @@ impl RunHandle {
     /// lines, but a flush never undoes a finish. Problems go to the error
     /// handler.
     pub async fn flush(&self) {
+        // In a task of its own, so a caller that drops this future part way
+        // never loses the lines it had taken.
+        let this = self.clone();
+        let task = self.inner.client.inner.handle.spawn(async move { this.flush_now().await });
+        if let Err(panic) = task.await {
+            self.inner.client.report_panicked(panic, &format!("flushing {}", self.inner.def.name));
+        }
+    }
+
+    async fn flush_now(&self) {
         let h = &self.inner;
         let _turn = h.turn.lock().await;
         let (c, name) = (&h.client, &h.def.name);
@@ -437,7 +447,22 @@ impl RunHandle {
         self.finish_inner(None, Some(output::error_message(output::error_name(type_name), message, &[]))).await
     }
 
+    /// Finishes the run in a task of its own, so a caller that drops the
+    /// future part way leaves the finish to complete rather than the handle
+    /// marked finished with nothing recorded.
     async fn finish_inner(&self, result_text: Option<String>, failure: Option<String>) -> Option<Run> {
+        let this = self.clone();
+        let task = self.inner.client.inner.handle.spawn(async move { this.finish_now(result_text, failure).await });
+        match task.await {
+            Ok(run) => run,
+            Err(panic) => {
+                self.inner.client.report_panicked(panic, &format!("finishing {}", self.inner.def.name));
+                None
+            }
+        }
+    }
+
+    async fn finish_now(&self, result_text: Option<String>, failure: Option<String>) -> Option<Run> {
         let h = &self.inner;
         let was_inactive = {
             let mut state = lock(&h.state);
@@ -499,7 +524,7 @@ impl RunHandle {
         let mut run = from.clone();
         run.status = RunStatus::Running;
         run.finished_at = Some(finished_at);
-        run.duration_ms = Some((finished_at - from.started_at).max(0));
+        run.duration_ms = Some(finished_at.saturating_sub(from.started_at).max(0));
         run.error = None;
         run.output = join_output(from.output.as_deref(), added);
         run.metrics = from.metrics.merged(&recorder_metrics(&rec));

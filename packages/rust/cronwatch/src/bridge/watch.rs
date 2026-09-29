@@ -14,11 +14,31 @@ use crate::client::{Client, describe_job, lock};
 use crate::error::Error;
 use crate::js;
 use crate::options::JobOptions;
-use crate::run::Job;
+use crate::panics::panic_text;
+use crate::run::{CatchUnwind, Job};
 
 /// Bounds one write of a declaration to the store, so a store that hangs
 /// never holds the writing task for good.
 const SAVE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The writing task's hold on `saving`. A task that never finished (its
+/// runtime shut down before it ran, or it was cancelled) lets go of it, so
+/// the next declaration starts another rather than waiting on one that
+/// will never write, and `settle` does not wait for good.
+struct Saving {
+    watch: Watch,
+    done: bool,
+}
+
+impl Drop for Saving {
+    fn drop(&mut self) {
+        if !self.done {
+            let mut state = lock(&self.watch.inner.state);
+            state.saving = false;
+            self.watch.inner.settled.send_replace(true);
+        }
+    }
+}
 
 /// One job a scheduler runs, as an integration reads it.
 #[derive(Clone, Debug, Default)]
@@ -294,8 +314,18 @@ impl Watch {
         }
         state.saving = true;
         self.inner.settled.send_replace(false);
+        // Released before the spawn: a runtime that has shut down drops the
+        // task at once, and the guard's drop takes this lock.
+        drop(state);
         let watch = self.clone();
-        self.inner.cw.inner.handle.spawn(async move { watch.save_all().await });
+        let guard = Saving { watch: self.clone(), done: false };
+        self.inner.cw.inner.handle.spawn(async move {
+            // Moved in whole: a closure's capture of `guard.done` alone
+            // would drop the guard here, at once.
+            let mut guard = guard;
+            watch.save_all().await;
+            guard.done = true;
+        });
     }
 
     async fn save_all(&self) {
@@ -314,9 +344,15 @@ impl Watch {
                 if !defined.contains(&name) {
                     continue; // forgotten since
                 }
-                if let Err(err) = self.sync_job(&name).await {
-                    self.inner.cw.report_error(err, &format!("declaring {name}"));
-                }
+                // A store that panics is that declaration's failure, not the
+                // end of every declaration after it.
+                let written = CatchUnwind(Box::pin(self.sync_job(&name))).await;
+                let err = match written {
+                    Ok(Ok(_)) => continue,
+                    Ok(Err(err)) => err,
+                    Err(panic) => Error::Other(format!("panicked: {}", panic_text(&*panic))),
+                };
+                self.inner.cw.report_error(err, &format!("declaring {name}"));
             }
         }
     }

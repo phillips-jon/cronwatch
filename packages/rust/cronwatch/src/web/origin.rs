@@ -348,7 +348,15 @@ pub(crate) fn request_origin(tls: bool, host: &[u8]) -> String {
 
 /// Whether an origin's host is loopback: `localhost`, a name ending in
 /// `.localhost`, an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1.
+/// Only an origin that reads as one counts: a `Host` header is anyone's to
+/// send, and one such as `evil.example/.localhost` or
+/// `localhost:1@evil.example` must not put the development token in a link
+/// to another host.
 pub(crate) fn is_loopback_origin(origin: &str) -> bool {
+    let Some(origin) = bare_origin(origin) else {
+        return false;
+    };
+    let origin = origin.as_str();
     let authority = origin.find("://").map_or(origin, |i| &origin[i + 3..]);
     let host = if authority.starts_with('[') {
         authority.find(']').map_or(authority, |end| &authority[..=end])
@@ -438,6 +446,11 @@ mod tests {
             "http://127.0.0.256",
             "http://10.0.0.5:8080",
             "http://[::2]",
+            // A Host header that is not a host (the audit).
+            "http://evil.example/.localhost",
+            "http://localhost:1@evil.example",
+            "http://evil.example?.localhost",
+            "http://evil.example#.localhost",
         ] {
             assert!(!is_loopback_origin(no), "{no}");
         }

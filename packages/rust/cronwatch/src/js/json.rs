@@ -323,9 +323,16 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
+/// How deep arrays and objects may nest. The parser, `to_json` and `Drop`
+/// all recurse, so text nested thousands deep (a request body, a stored
+/// row) would overflow a thread's stack and abort the process; nothing
+/// CronWatch or an app stores comes near this.
+pub(crate) const MAX_DEPTH: usize = 256;
+
 /// `JSON.parse`: objects in JavaScript's key order (a key given twice keeps
 /// its first place and its last value). A lone surrogate escape (`\ud800`)
-/// becomes U+FFFD.
+/// becomes U+FFFD. Arrays and objects nested more than 256 deep are
+/// refused.
 pub fn parse(text: &str) -> Result<Value, ParseError> {
     let mut p = Parser { s: text.as_bytes(), text, i: 0 };
     p.space();
@@ -359,7 +366,7 @@ impl Parser<'_> {
     }
 
     fn value(&mut self, depth: usize) -> Result<Value, ParseError> {
-        if depth > 10_000 {
+        if depth >= MAX_DEPTH {
             return Err(ParseError("JSON nested too deeply".into()));
         }
         if self.i >= self.s.len() {
@@ -582,5 +589,22 @@ mod tests {
         );
         assert!(parse("-").is_err());
         assert!(parse("\"\u{1}\"").is_err());
+    }
+
+    #[test]
+    fn nesting_is_held_to_max_depth() {
+        let nested = |n: usize| format!("{}{}", "[".repeat(n), "]".repeat(n));
+        assert!(parse(&nested(MAX_DEPTH)).is_ok());
+        assert_eq!(parse(&nested(MAX_DEPTH + 1)).unwrap_err().to_string(), "JSON nested too deeply");
+        // Far past it, on a thread with a tokio worker's stack, it is refused rather
+        // than overflowing the stack (the audit).
+        let deep = format!("{}{}", r#"{"a":"#.repeat(200_000), "}".repeat(200_000));
+        let refused = std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(move || parse(&nested(1_000_000)).is_err() && parse(&deep).is_err())
+            .unwrap()
+            .join()
+            .unwrap();
+        assert!(refused);
     }
 }

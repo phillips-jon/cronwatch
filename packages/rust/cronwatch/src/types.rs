@@ -15,6 +15,7 @@ macro_rules! string_enum {
         /// A value another writer stored that this release does not know is
         /// kept as `Other`, so it is written back as it was.
         #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+        #[non_exhaustive]
         pub enum $name {
             $($(#[$vdoc])* $variant,)*
             /// A value this release does not know.
@@ -512,7 +513,9 @@ impl JobState {
             s.pending_recovery = Some(list.iter().filter_map(|c| c.as_str().map(Condition::parse)).collect());
         }
         if let Some(Value::Array(list)) = o.get("undelivered") {
-            s.undelivered = Some(list.iter().map(Alert::from_value).collect::<Result<_, _>>()?);
+            // An entry that is not an alert is dropped rather than fail
+            // every read of the state: it could never be delivered.
+            s.undelivered = Some(list.iter().filter_map(|a| Alert::from_value(a).ok()).collect());
         }
         for (k, v) in o.iter() {
             if STATE_KEYS.contains(&k) {
@@ -551,6 +554,7 @@ impl BudgetBreach {
 
 /// What an alert carries beyond its title and message.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum AlertDetails {
     /// Which run was missed.
     Missed { due_at: i64, deadline: f64, grace_ms: f64, last_run_at: Option<i64> },
@@ -704,8 +708,17 @@ impl Alert {
             return Err(JsonError(format!("an alert must be an object, not {}", v.kind())));
         };
         let alert_type = AlertType::parse(&str_of(o, "type"));
+        // A queued alert's run keeps the metrics that are numbers, as a
+        // stored run row does, so one another writer stored otherwise
+        // cannot fail every read of the job's state.
         let run = match o.get("run") {
             None | Some(Value::Null) => None,
+            Some(Value::Object(r)) => {
+                let mut r = r.clone();
+                let metrics = Metrics::lenient(r.get("metrics").unwrap_or(&Value::Null));
+                r.set("metrics", metrics.to_value());
+                Some(Run::from_value(&Value::Object(r))?)
+            }
             Some(r) => Some(Run::from_value(r)?),
         };
         let empty = Object::new();
@@ -847,6 +860,17 @@ mod tests {
         assert_eq!(s.version, Some(3));
         assert_eq!(s.open_at(&Condition::Missed), Some(5));
         assert_eq!(s.to_json(), text);
+    }
+
+    #[test]
+    fn a_queued_alert_of_another_shape_does_not_fail_the_state() {
+        // The audit: a metric that is not a number, or an entry that is not
+        // an alert, failed every read of the job's state.
+        let text = r#"{"job":"k","version":1,"undelivered":[{"type":"failed","job":"k","run":{"id":"x","metrics":{"a":null,"b":2}}},7]}"#;
+        let s = JobState::from_json(text).unwrap();
+        let queued = s.undelivered.unwrap();
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].run.as_ref().unwrap().metrics.to_json(), r#"{"b":2}"#);
     }
 
     #[test]

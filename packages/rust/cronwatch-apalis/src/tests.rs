@@ -5,6 +5,11 @@ fn a_deferred_attempt_or_a_task_cancelled_is_given_back() {
     assert!(given_back(&DeferredError::new("later")));
     let boxed: BoxDynError = Box::new(DeferredError::new("later"));
     assert!(given_back(&boxed));
+    // Put back as pending after a while, as a River snooze (the audit).
+    let later = std::time::Duration::from_secs(1);
+    assert!(given_back(&RetryAfterError::new("later", later)));
+    let boxed: BoxDynError = Box::new(RetryAfterError::new("later", later));
+    assert!(given_back(&boxed));
     let failed: BoxDynError = "down".into();
     assert!(!given_back(&failed));
     let aborted: BoxDynError = Box::new(AbortError::new("stop retrying"));

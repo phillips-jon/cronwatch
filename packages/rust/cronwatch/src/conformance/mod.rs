@@ -111,7 +111,7 @@ struct JsRegExp(Regexp);
 
 impl Matcher for JsRegExp {
     fn is_match(&self, text: &str) -> bool {
-        self.0.is_match(text)
+        self.0.try_is_match(text).unwrap_or(true)
     }
 
     fn source(&self) -> String {

@@ -18,6 +18,30 @@ pub trait Matcher: Send + Sync {
     fn source(&self) -> String;
 }
 
+/// A `regex::Regex` (the `regex` feature), stored as `/source/`, a `/` in
+/// it escaped as JavaScript's `RegExp.prototype.source` escapes one. Its
+/// flags are inline (`(?i)`), so none follow the last slash.
+#[cfg(feature = "regex")]
+impl Matcher for regex::Regex {
+    fn is_match(&self, text: &str) -> bool {
+        regex::Regex::is_match(self, text)
+    }
+
+    fn source(&self) -> String {
+        let mut out = String::from("/");
+        let mut escaped = false;
+        for c in self.as_str().chars() {
+            if c == '/' && !escaped {
+                out.push('\\');
+            }
+            escaped = c == '\\' && !escaped;
+            out.push(c);
+        }
+        out.push('/');
+        out
+    }
+}
+
 /// A job's expect option: what a successful run's output must satisfy, and
 /// how the rule is described in the stored definition.
 #[derive(Clone)]
@@ -43,7 +67,15 @@ impl ExpectRule {
             ExpectRule::Contains(text) => {
                 (!output.contains(text.as_str())).then(|| format!("Output did not contain {}", js::quote(text)))
             }
-            ExpectRule::Matches(m) => (!m.is_match(output)).then(|| format!("Output did not match {}", m.source())),
+            // An app's own Matcher can panic; that fails the run as a
+            // panicking expect function does, rather than the recording.
+            ExpectRule::Matches(m) => {
+                match catch_unwind(AssertUnwindSafe(|| (!m.is_match(output)).then(|| m.source()))) {
+                    Ok(None) => None,
+                    Ok(Some(source)) => Some(format!("Output did not match {source}")),
+                    Err(panic) => Some(format!("Output check threw: {}", crate::panics::panic_text(&*panic))),
+                }
+            }
             ExpectRule::Func(f) => match catch_unwind(AssertUnwindSafe(|| f(output))) {
                 Ok(true) => None,
                 Ok(false) => Some("Output did not pass the expect() check".into()),

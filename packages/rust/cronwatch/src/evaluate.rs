@@ -448,7 +448,7 @@ pub(crate) fn is_stuck(def: &Definition, run: &Run, now: i64) -> Result<bool, St
     if run.status != RunStatus::Running {
         return Ok(false);
     }
-    Ok((now - run.started_at) as f64 > timeout_ms(def)?)
+    Ok(now.saturating_sub(run.started_at) as f64 > timeout_ms(def)?)
 }
 
 /// `next` with nothing opened that was not open in `previous`. While a job

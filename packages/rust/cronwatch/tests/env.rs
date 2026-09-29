@@ -220,6 +220,8 @@ fn the_sign_in_line_shows_the_host_only_when_configured_or_loopback() {
         ("/cronwatch", hostless),
         ("/cronwatch", hostless),
         ("", hostless),
+        ("/cronwatch", hostless),
+        ("/cronwatch", hostless),
     ];
     let lines = announced(&out);
     assert_eq!(lines.len(), expected.len(), "{out}");
@@ -269,6 +271,12 @@ async fn child_sign_in_lines() {
         serve(&routes, "GET", &url, headers).await;
         // Printed once per routes value, however many requests it answers.
         serve(&routes, "GET", &url, headers).await;
+    }
+    // A Host header that is not a host is not loopback, however it ends
+    // (the audit): the link leaves it out.
+    for host in ["evil.example/.localhost", "localhost:1@evil.example"] {
+        let routes = cw.routes(RoutesOptions::new()).unwrap();
+        routes.handle(Request::new("GET", "/cronwatch/").with_header("host", host)).await;
     }
 }
 

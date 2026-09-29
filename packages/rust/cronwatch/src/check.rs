@@ -21,6 +21,9 @@ use crate::types::{Alert, CheckResult, JobState, JobSummary, Run, RunStatus, Sto
 const PRUNE_INTERVAL: i64 = 60 * 60_000;
 /// How long `start` waits before its first check.
 const FIRST_CHECK_DELAY: Duration = Duration::from_secs(1);
+/// The longest interval `start` checks on, the SDK's: setInterval's longest
+/// delay, 2^31 - 1 ms (some 24.8 days).
+const TIMER_MAX_MS: u64 = (1 << 31) - 1;
 
 /// A check's outcome, shared by every caller waiting on it.
 pub(crate) type CheckResultShared = Result<CheckResult, Error>;
@@ -143,7 +146,7 @@ impl Client {
         }
         run.status = RunStatus::Timeout;
         run.finished_at = Some(now);
-        run.duration_ms = Some(now - run.started_at);
+        run.duration_ms = Some(now.saturating_sub(run.started_at));
         run.error = Some(format!("Still running after {}; marked as timed out", timeout_text(&def)));
         // Only over a row still running: a finish that landed meanwhile wins.
         if self.write_run_if(&run, &[RunStatus::Running]).await? {
@@ -308,7 +311,10 @@ impl Client {
         if timer.is_some() {
             return;
         }
-        let every = if every.is_zero() { Duration::from_secs(60) } else { every }.max(Duration::from_secs(5));
+        // At most the SDK's longest interval (setInterval's), which also
+        // keeps tokio's clock from overflowing on `Duration::MAX`.
+        let every = if every.is_zero() { Duration::from_secs(60) } else { every }
+            .clamp(Duration::from_secs(5), Duration::from_millis(TIMER_MAX_MS));
         if self.inner.defer_delivery && !self.inner.warned_deferred_start.swap(true, Ordering::Relaxed) {
             eprintln!(
                 "[cronwatch] start() was called with Deliver::AtCheck, so these checks send no alerts. Another process must run checks with Deliver::Now (the default) to send them."
@@ -319,10 +325,17 @@ impl Client {
             tokio::time::sleep(FIRST_CHECK_DELAY).await;
             let mut ticker =
                 tokio::time::interval_at(tokio::time::Instant::now() + every - FIRST_CHECK_DELAY.min(every), every);
+            // Each tick asks for a check without waiting on it, as
+            // setInterval does: a tick while a long check runs shares that
+            // check, and the ticks it outlasted are not run back to back
+            // after it.
             loop {
-                if let Err(err) = client.check().await {
-                    client.report(err, "check");
-                }
+                let client = client.clone();
+                client.inner.handle.clone().spawn(async move {
+                    if let Err(err) = client.check().await {
+                        client.report(err, "check");
+                    }
+                });
                 ticker.tick().await;
             }
         }));

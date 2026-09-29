@@ -44,7 +44,7 @@ pub(crate) fn date_utc(year: i64, month: i64, day: i64, hour: i64, minute: i64, 
 /// six-digit year outside 0 to 9999.
 pub(crate) fn iso_string(ms: i64) -> String {
     let days = floor_div(ms, 86_400_000);
-    let rest = ms - days * 86_400_000;
+    let rest = ms.rem_euclid(86_400_000);
     let (y, m, d) = civil_from_days(days);
     let year = if y < 0 {
         format!("-{:06}", -y)

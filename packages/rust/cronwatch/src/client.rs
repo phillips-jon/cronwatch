@@ -54,6 +54,9 @@ enum Redact {
 pub struct ClientBuilder {
     store: Option<Arc<dyn Store>>,
     alerts: Vec<Arc<dyn Channel>>,
+    /// Whether `alerts` is still the default console, which the first
+    /// `alert` replaces.
+    default_alerts: bool,
     triage: Option<Arc<dyn Triage>>,
     sources: Vec<Arc<dyn Source>>,
     cron_secret: Option<Option<String>>,
@@ -76,6 +79,7 @@ impl Default for ClientBuilder {
         ClientBuilder {
             store: None,
             alerts: vec![Arc::new(Console)],
+            default_alerts: true,
             triage: None,
             sources: Vec::new(),
             cron_secret: None,
@@ -106,8 +110,9 @@ impl ClientBuilder {
     /// Adds a channel alerts go to. The first call replaces the default
     /// console channel.
     pub fn alert(mut self, channel: Arc<dyn Channel>) -> Self {
-        if self.alerts.len() == 1 && self.alerts[0].name() == "console" {
+        if self.default_alerts {
             self.alerts.clear();
+            self.default_alerts = false;
         }
         self.alerts.push(channel);
         self
@@ -117,6 +122,7 @@ impl ClientBuilder {
     /// sends nowhere.
     pub fn alerts(mut self, channels: impl IntoIterator<Item = Arc<dyn Channel>>) -> Self {
         self.alerts = channels.into_iter().collect();
+        self.default_alerts = false;
         self
     }
 
@@ -209,7 +215,14 @@ impl ClientBuilder {
         })?;
         let mut defaults = Object::new();
         if let Some(options) = self.defaults {
-            if let Some(key) = options.set.iter().find(|k| !DEFAULTABLE.contains(k)) {
+            // Every field counts, `JobOptions::field`'s included.
+            let refused = options
+                .fields
+                .keys()
+                .find(|k| !DEFAULTABLE.contains(k))
+                .map(str::to_string)
+                .or_else(|| options.expect.is_some().then(|| "expect".to_string()));
+            if let Some(key) = refused {
                 return Err(Error::Invalid(format!(
                     "defaults takes grace, timeout, timezone and failuresBeforeAlert, not {key}"
                 )));

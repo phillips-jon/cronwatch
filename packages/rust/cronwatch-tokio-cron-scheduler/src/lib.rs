@@ -115,6 +115,7 @@ pub struct Options {
 
 /// Why a job could not be made.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// tokio-cron-scheduler refused it (a schedule it cannot read).
     Scheduler(JobSchedulerError),
@@ -290,9 +291,13 @@ impl Watcher {
         }
     }
 
+    /// Declares the jobs made here that are not gone. The list is read and
+    /// declared under one lock, so two declarations at once (two jobs made
+    /// on two threads, a job made while a sync runs) never land in the
+    /// wrong order, the older list taking the newer job for gone.
     fn declare(&self) {
-        let entries: Vec<Entry> =
-            lock(&self.shared.tracked).iter().filter(|t| !t.gone).map(|t| t.entry.clone()).collect();
+        let tracked = lock(&self.shared.tracked);
+        let entries: Vec<Entry> = tracked.iter().filter(|t| !t.gone).map(|t| t.entry.clone()).collect();
         self.shared.watch.declare(&entries);
     }
 
@@ -318,8 +323,21 @@ impl Watcher {
             Box::pin(async move {
                 // The job as declared now (its schedule may have changed
                 // since), else as it was made.
-                if let Some(job) = watch.job(&name).or_else(|| made.get().cloned()) {
-                    let _ = job.run_with(RunOptions::new().trigger(TRIGGER), |jc| f(jc)).await;
+                match watch.job(&name).or_else(|| made.get().cloned()) {
+                    Some(job) => {
+                        let _ = job.run_with(RunOptions::new().trigger(TRIGGER), |jc| f(jc)).await;
+                    }
+                    // Only a client that refused the job after it was
+                    // validated gets here; the function takes a run's
+                    // context, so it cannot run without one. Said once
+                    // rather than skipped in silence.
+                    None => watch.report_once(
+                        &format!(
+                            "cronwatch: {SCHEDULER} job {} did not run: no CronWatch job is declared under its name",
+                            quote(&name)
+                        ),
+                        SCHEDULER,
+                    ),
                 }
             })
         }
@@ -327,9 +345,14 @@ impl Watcher {
 
     /// Follows `scheduler`: a job made here that it removes is declared again
     /// without its schedule at once (with a sync of the store, within 30
-    /// seconds), rather than at the next [`sync`](Self::sync). Spawns a task
-    /// that ends with the scheduler.
-    pub fn follow(&self, scheduler: &JobScheduler) {
+    /// seconds), rather than at the next [`sync`](Self::sync). It spawns a
+    /// task on the current tokio runtime (call it inside one, as
+    /// `JobScheduler::new` is), which holds the scheduler and so runs until
+    /// the returned handle aborts it or the runtime ends:
+    /// `JobScheduler::shutdown` does not end it, since it closes none of the
+    /// scheduler's channels (nor removes any job, so none is taken for
+    /// gone).
+    pub fn follow(&self, scheduler: &JobScheduler) -> tokio::task::JoinHandle<()> {
         let context = scheduler.context();
         let mut created = context.job_created_tx.subscribe();
         let mut deleted = context.job_deleted_tx.subscribe();
@@ -356,7 +379,7 @@ impl Watcher {
                     },
                 }
             }
-        });
+        })
     }
 
     fn saw(&self, uuid: Uuid) {

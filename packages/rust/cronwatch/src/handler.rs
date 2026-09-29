@@ -23,9 +23,21 @@ use crate::web::{Request, Response, constant_time_eq, latin1};
 
 /// How [`Job::handler`] checks its requests: the SDK's `HandlerOptions`,
 /// with Rust's three ways for the secret.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct HandlerOptions {
     secret: Option<Option<String>>,
+}
+
+/// Says whether a secret is set, never the secret.
+impl fmt::Debug for HandlerOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let secret = match &self.secret {
+            None => "the client's",
+            Some(None) => "none",
+            Some(Some(_)) => "set",
+        };
+        f.debug_struct("HandlerOptions").field("secret", &secret).finish()
+    }
 }
 
 impl HandlerOptions {

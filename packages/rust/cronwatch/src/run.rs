@@ -247,7 +247,10 @@ pub(crate) fn http_failure<T: Any>(value: &T) -> Option<String> {
 /// An error as a failed run's error: `Name: message`, the name from the
 /// error's type (see `output::error_name`), capped like output.
 pub(crate) fn error_text<E: fmt::Display + ?Sized>(err: &E) -> String {
-    output::error_message(output::error_name(type_name::<E>()), &err.to_string(), &[])
+    // An error whose Display panics must not leave its run running.
+    let message = catch_unwind(AssertUnwindSafe(|| err.to_string()))
+        .unwrap_or_else(|panic| format!("its Display panicked: {}", panic_text(&*panic)));
+    output::error_message(output::error_name(type_name::<E>()), &message, &[])
 }
 
 /// A panic as a failed run's error: `panic: <message>`, with the frames the
@@ -284,6 +287,19 @@ struct DropGuard {
     start: Option<JoinHandle<Started>>,
     started: Option<Started>,
     armed: bool,
+    /// Whether the start closed missed and stuck; a run that may be given
+    /// back leaves that to its end, which a dropped run has reached.
+    closed_on_start: bool,
+}
+
+/// A task aborted when this is dropped: the job's timeout timer, which
+/// would otherwise outlive a run whose future was dropped.
+struct AbortOnDrop(JoinHandle<()>);
+
+impl Drop for AbortOnDrop {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 impl DropGuard {
@@ -308,11 +324,16 @@ impl Drop for DropGuard {
         let rec = self.rec.clone();
         let start = self.start.take();
         let started = self.started.take();
+        let closed_on_start = self.closed_on_start;
         self.client.inner.handle.spawn(async move {
             let (recorded, closing) = match (start, started) {
                 (Some(start), _) => start.await.unwrap_or((false, None)),
                 (None, Some(started)) => started,
                 (None, None) => (false, None),
+            };
+            let closing = match closing {
+                None if recorded && !closed_on_start => Some(client.close_on_start(&def.name)),
+                closing => closing,
             };
             let failure = "Cancelled: the run's future was dropped before it finished".to_string();
             client.finish_executed(&def, run, &rec, None, Some(failure), recorded, closing).await;
@@ -498,18 +519,20 @@ impl Client {
             start: Some(start),
             started: None,
             armed: true,
+            closed_on_start: close_on_start,
         };
         guard.wait_start().await;
 
         let timeout = timeout_ms(&def.stored).unwrap_or(crate::evaluate::DEFAULT_TIMEOUT_MS);
         let (cancel, cancelled) = watch::channel(false);
-        let timer = self.inner.handle.spawn(async move {
+        // Aborted when the run ends or its future is dropped.
+        let timer = AbortOnDrop(self.inner.handle.spawn(async move {
             tokio::time::sleep(ms_duration(timeout)).await;
             let _ = cancel.send(true);
             // Held until the run ends, so `cancelled` sees the value, not a
             // closed channel.
             std::future::pending::<()>().await;
-        });
+        }));
         let jc = JobContext {
             inner: Arc::new(ContextInner {
                 name: def.name.clone(),
@@ -519,8 +542,14 @@ impl Client {
                 cancelled,
             }),
         };
-        let outcome = CatchUnwind(Box::pin(CURRENT.scope(jc.clone(), f(jc)))).await;
-        timer.abort();
+        // A function that panics before it returns its future panics here,
+        // not while it is polled; both are the run's panic. `f` is called
+        // before any await, so its own type need not be `Send`.
+        let outcome = match catch_unwind(AssertUnwindSafe(|| CURRENT.sync_scope(jc.clone(), || f(jc.clone())))) {
+            Ok(fut) => CatchUnwind(Box::pin(CURRENT.scope(jc, fut))).await,
+            Err(panic) => Err(panic),
+        };
+        drop(timer);
         guard.armed = false;
         let (recorded, closing) = guard.started.take().unwrap_or((false, None));
 
@@ -530,17 +559,33 @@ impl Client {
                 (Outcome::Panic(panic), Some(text), None)
             }
             Ok(Err(err)) => {
+                let text = error_text(&err);
                 if let Some(discard) = &discard {
                     if self.given_back(&def.name, discard, &err) {
+                        // Taking the run back and, when that fails, finishing
+                        // it are one task, so a caller that drops this future
+                        // meanwhile never leaves the run running.
                         let client = self.clone();
-                        let run = run.clone();
-                        let task = self.inner.handle.spawn(async move { !recorded || client.discard_run(&run).await });
-                        if task.await.unwrap_or(false) {
-                            return Executed { run: guard.run.clone(), outcome: Outcome::Error(err) };
-                        }
+                        let task = self.inner.handle.spawn(async move {
+                            if !recorded || client.discard_run(&run).await {
+                                return None;
+                            }
+                            let closing = Some(client.close_on_start(&def.name));
+                            Some(client.finish_executed(&def, run, &rec, None, Some(text), recorded, closing).await)
+                        });
+                        let run = match task.await {
+                            Ok(run) => run,
+                            Err(panic) => {
+                                self.report_panicked(panic, &format!("discarding {}", guard.def.name));
+                                None
+                            }
+                        };
+                        return Executed {
+                            run: run.unwrap_or_else(|| guard.run.clone()),
+                            outcome: Outcome::Error(err),
+                        };
                     }
                 }
-                let text = error_text(&err);
                 (Outcome::Error(err), Some(text), None)
             }
             Ok(Ok(v)) => {
@@ -561,10 +606,22 @@ impl Client {
         // cancelling it.
         let run = match task.await {
             Ok(run) => run,
-            // The recording panicked (a store's, say): the run as it stood.
-            Err(_) => guard.run.clone(),
+            // The recording panicked (a store's, say): reported, and the run
+            // as it stood.
+            Err(panic) => {
+                self.report_panicked(panic, &format!("recording {}", guard.def.name));
+                guard.run.clone()
+            }
         };
         Executed { run, outcome }
+    }
+
+    /// Reports a task of the client's own that panicked (a store's panic, a
+    /// channel's), which would otherwise go unseen.
+    pub(crate) fn report_panicked(&self, err: tokio::task::JoinError, where_: &str) {
+        if let Ok(panic) = err.try_into_panic() {
+            self.report(Error::Other(format!("panicked: {}", panic_text(&*panic))), where_);
+        }
     }
 
     /// `discard(err)`, with a panic in it reported and the run not given
@@ -668,7 +725,9 @@ impl Client {
         }
         self.conclude(def, &mut run, failure, expect_text.as_deref());
         if let Some(closing) = closing {
-            let _ = closing.await;
+            if let Err(panic) = closing.await {
+                self.report_panicked(panic, &format!("starting {name}"));
+            }
         }
         match self.record_finish(def, &run, recorded, finished_at).await {
             Err(err) => self.report(err, &format!("recording {name}")),

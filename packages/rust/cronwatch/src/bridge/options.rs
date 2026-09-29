@@ -134,7 +134,7 @@ impl StoredPattern {
 
 impl Matcher for StoredPattern {
     fn is_match(&self, text: &str) -> bool {
-        self.regexp.as_ref().is_none_or(|r| r.is_match(text))
+        self.regexp.as_ref().is_none_or(|r| r.try_is_match(text).unwrap_or(true))
     }
 
     fn source(&self) -> String {

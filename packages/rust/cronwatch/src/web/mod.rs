@@ -59,11 +59,17 @@ pub struct Request {
     pub(crate) mount: Option<String>,
 }
 
+/// Header values and the query are left out: a request can carry the
+/// dashboard's token in either (`?token=`, `Authorization`, the cookie).
 impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let path = match self.target.split_once('?') {
+            Some((path, _)) => format!("{path}?..."),
+            None => self.target.clone(),
+        };
         f.debug_struct("Request")
             .field("method", &self.method)
-            .field("target", &self.target)
+            .field("target", &path)
             .field("headers", &self.headers.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>())
             .field("tls", &self.tls)
             .finish_non_exhaustive()
@@ -176,6 +182,7 @@ impl fmt::Debug for Body {
 
 /// Why a body could not be read.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum BodyError {
     /// The body is longer than the limit it was read with.
     TooLarge,

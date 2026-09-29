@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::io::Write;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -60,12 +61,29 @@ const SECURITY_HEADERS: [(&str, &str); 3] =
 
 /// How [`Client::routes`] serves the dashboard: the SDK's `RoutesOptions`,
 /// with Rust's three ways for the token.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct RoutesOptions {
     token: Option<Option<String>>,
     base_path: Option<String>,
     origin: Option<String>,
     trust_proxy: bool,
+}
+
+/// Says whether a token is set, never the token.
+impl fmt::Debug for RoutesOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let token = match &self.token {
+            None => "CRONWATCH_TOKEN",
+            Some(None) => "none",
+            Some(Some(_)) => "set",
+        };
+        f.debug_struct("RoutesOptions")
+            .field("token", &token)
+            .field("base_path", &self.base_path)
+            .field("origin", &self.origin)
+            .field("trust_proxy", &self.trust_proxy)
+            .finish()
+    }
 }
 
 impl RoutesOptions {
@@ -187,6 +205,9 @@ impl Client {
         // log.
         let generated = configured.is_empty() && !opted_out && environment() == "development";
         let token = if generated { development_token() } else { configured };
+        // Without the system's randomness no token was made, so there is
+        // nothing to announce and the routes stay locked.
+        let generated = generated && !token.is_empty();
         let cookie =
             if token.is_empty() { String::new() } else { hex(&Sha256::digest(format!("cronwatch-cookie:{token}"))) };
         Ok(Routes {
@@ -516,7 +537,10 @@ impl Routes {
                 .origin
                 .clone()
                 .or_else(|| is_loopback_origin(&said.public_origin).then(|| said.public_origin.clone()));
-            println!("{}", development_sign_in_line(shown.as_deref(), base, &rt.token));
+            // Not println!, which panics when standard output is closed; the
+            // SDK's console.info never throws.
+            let line = development_sign_in_line(shown.as_deref(), base, &rt.token);
+            let _ = writeln!(std::io::stdout().lock(), "{line}");
         }
 
         // The app shell: the manifest, icons, service worker, app.js and the

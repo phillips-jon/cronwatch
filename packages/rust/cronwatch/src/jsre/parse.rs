@@ -57,11 +57,16 @@ struct Parser {
     i: usize,
     fold: bool,
     captures: usize,
+    /// How many groups the parser is inside.
+    depth: usize,
 }
+
+/// How deep groups may nest.
+const MAX_NESTING: usize = 100;
 
 /// Reads a pattern's source into a tree and its number of captures.
 pub(super) fn parse(source: &str, fold: bool) -> Result<(Tree, usize), String> {
-    let mut p = Parser { src: source.chars().collect(), i: 0, fold, captures: 0 };
+    let mut p = Parser { src: source.chars().collect(), i: 0, fold, captures: 0, depth: 0 };
     let t = p.disjunction()?;
     if p.i < p.src.len() {
         return Err(p.fail("unmatched ')'"));
@@ -143,7 +148,14 @@ impl Parser {
                     self.captures += 1;
                     g.capture = self.captures;
                 }
+                // The parser and the compiler recurse into groups, so a
+                // pattern of thousands of '(' would overflow the stack.
+                self.depth += 1;
+                if self.depth > MAX_NESTING {
+                    return Err(self.fail("groups nested too deeply"));
+                }
                 let inner = self.disjunction()?;
+                self.depth -= 1;
                 if !self.more() || self.peek() != ')' {
                     return Err(self.fail("missing ')'"));
                 }
@@ -192,6 +204,20 @@ impl Parser {
             }
             '*' | '+' | '?' => return Err(self.fail("nothing to repeat")),
             ')' => return Err(self.fail("unmatched ')'")),
+            // A character outside the BMP is two code units in turn, as
+            // JavaScript without the `u` flag reads it: a quantifier after it
+            // takes the second alone (the audit; it was read as either one).
+            _ if c as u32 >= 0x10000 => {
+                self.i += 1;
+                let r = c as u32 - 0x10000;
+                let (mut high, mut low) = (CharSet::new(), CharSet::new());
+                high.add(0xd800 + (r >> 10));
+                low.add(0xdc00 + (r & 0x3ff));
+                let mut seq = Tree::new(Kind::Seq);
+                seq.children.push(Tree::char(high));
+                seq.children.push(self.quantifier(Tree::char(low))?);
+                return Ok(seq);
+            }
             _ => {
                 self.i += 1;
                 let mut set = CharSet::new();

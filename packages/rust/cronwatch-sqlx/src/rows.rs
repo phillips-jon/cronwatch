@@ -133,12 +133,15 @@ pub(crate) fn parse_timestamp(text: &str) -> Option<i64> {
     let offset = match rest {
         [] | [b'Z'] | [b'z'] => 0,
         [sign @ (b'+' | b'-'), tail @ ..] => {
+            // Each part of an offset is two digits at most, so no offset
+            // can overflow the arithmetic below.
+            let two = |s: &[u8]| if s.len() <= 2 { num(s) } else { None };
             let parts: Vec<&[u8]> = tail.split(|c| *c == b':').collect();
             let (oh, om, os) = match parts.as_slice() {
-                [hh] if hh.len() == 4 => (num(&hh[..2])?, num(&hh[2..])?, 0),
-                [hh] => (num(hh)?, 0, 0),
-                [hh, mm] => (num(hh)?, num(mm)?, 0),
-                [hh, mm, ss] => (num(hh)?, num(mm)?, num(ss)?),
+                [hh] if hh.len() == 4 => (two(&hh[..2])?, two(&hh[2..])?, 0),
+                [hh] => (two(hh)?, 0, 0),
+                [hh, mm] => (two(hh)?, two(mm)?, 0),
+                [hh, mm, ss] => (two(hh)?, two(mm)?, two(ss)?),
                 _ => return None,
             };
             let secs = oh * 3600 + om * 60 + os;
@@ -168,8 +171,10 @@ pub(crate) fn sqlite_row(row: &sqlx::sqlite::SqliteRow) -> Result<Row, BoxError>
             match raw.type_info().name() {
                 "INTEGER" => Cell::Int(row.try_get_unchecked::<i64, _>(i)?),
                 "REAL" => Cell::Real(row.try_get_unchecked::<f64, _>(i)?),
-                "BLOB" => Cell::Text(String::from_utf8_lossy(&row.try_get_unchecked::<Vec<u8>, _>(i)?).into_owned()),
-                _ => Cell::Text(row.try_get_unchecked::<String, _>(i)?),
+                // Text read as bytes, so one value that is not UTF-8 reads with
+                // U+FFFD, as the SDK reads it, rather than failing every read
+                // its row is part of.
+                _ => Cell::Text(String::from_utf8_lossy(&row.try_get_unchecked::<Vec<u8>, _>(i)?).into_owned()),
             }
         };
         out.push((column.name().to_ascii_lowercase(), cell));
@@ -332,6 +337,9 @@ mod tests {
         assert_eq!(parse_timestamp("2026-01-05 03:00:00"), Some(base));
         assert_eq!(parse_timestamp("1969-12-31 23:59:59.999+00"), Some(-1));
         assert_eq!(parse_timestamp("yesterday"), None);
+        // An offset too long to be one is refused, not overflowed (the audit).
+        assert_eq!(parse_timestamp("2026-01-05 03:00:00+99999999999999999"), None);
+        assert_eq!(parse_timestamp("2026-01-05 03:00:00+05:999999999999999999"), None);
     }
 
     #[test]

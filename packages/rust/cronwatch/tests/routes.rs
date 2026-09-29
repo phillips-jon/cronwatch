@@ -459,6 +459,21 @@ async fn a_panic_is_a_generic_500_reported_as_routes() {
     assert_eq!(w.k.messages(), ["panic: the store fell over"]);
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_body_nested_deeply_is_refused_not_a_stack_overflow() {
+    let w = Web::new();
+    w.ok("s").await;
+    let body = format!("{}{}", "[".repeat(100_000), "]".repeat(100_000));
+    // On a worker thread, whose stack is tokio's 2 MiB.
+    let routes = w.routes.clone();
+    let res = tokio::spawn(async move {
+        serve(&routes, "POST", "http://app.test/cronwatch/api/jobs/s/silence", &[AUTH, JSON], &body).await
+    })
+    .await
+    .expect("answered, not aborted");
+    status("deep", &res, 200);
+}
+
 #[tokio::test]
 async fn silence_durations() {
     let w = Web::new();

@@ -54,6 +54,8 @@ mod output;
 mod panics;
 mod run;
 mod schedule;
+#[cfg(feature = "serde")]
+mod serde_impls;
 mod serialize;
 mod stats;
 mod store;

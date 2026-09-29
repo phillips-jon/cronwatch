@@ -97,6 +97,17 @@ async fn rows_of_another_shape_are_read_as_the_sdk_reads_them() {
     assert_eq!(running[0].metrics.to_json(), r#"{"b":2}"#, "metrics keep the numbers");
     assert_eq!(running[0].started_at, 5);
     assert_eq!(running[0].trigger, "run");
+
+    // Text that is not UTF-8 reads with U+FFFD rather than failing every
+    // read of the job's runs (the audit).
+    sqlx::query(
+        "INSERT INTO cronwatch_runs (id, job, status, started_at, output, trigger) VALUES ('y', 'odd', 'ok', 6, CAST(x'61ff62' AS TEXT), 'run')",
+    )
+    .execute(&p)
+    .await
+    .unwrap();
+    let runs = s.list_runs("odd", 10).await.expect("the runs read");
+    assert_eq!(runs[0].output.as_deref(), Some("a\u{fffd}b"));
 }
 
 #[tokio::test]

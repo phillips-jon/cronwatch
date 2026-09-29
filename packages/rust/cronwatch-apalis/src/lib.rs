@@ -56,9 +56,9 @@
 //! and the one that succeeds closes it, and `failures_before_alert` rides
 //! through retries. A panic is a failed run, then carries on to apalis's
 //! `catch_panic` layer or the task. An attempt apalis gives back without
-//! failing (a `DeferredError`, which puts the task back as pending, or a
-//! task cancelled while it ran) is taken back rather than judged
-//! ([`cronwatch::Job::run_or_discard`]).
+//! failing (a `DeferredError` or a `RetryAfterError`, which put the task
+//! back as pending, or a task cancelled while it ran) is taken back rather
+//! than judged ([`cronwatch::Job::run_or_discard`]).
 //!
 //! It works over any backend: a worker on apalis's Postgres, MySQL, SQLite
 //! or Redis storage records its tasks the same way. A worker whose job this
@@ -88,7 +88,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use apalis_core::error::{AbortError, BoxDynError, DeferredError};
+use apalis_core::error::{AbortError, BoxDynError, DeferredError, RetryAfterError};
 use apalis_core::layers::Identity;
 use apalis_core::task::Task;
 use apalis_core::worker::Worker;
@@ -386,17 +386,18 @@ where
 }
 
 /// Whether an attempt ended without failing and without doing its work:
-/// deferred (`DeferredError`, the task put back as pending), or cancelled
+/// deferred (`DeferredError` or `RetryAfterError`, the task put back as
+/// pending, as River's snooze is given back in the Go port), or cancelled
 /// while it ran (apalis's `AbortError` around its lifecycle's `Exit`).
 fn given_back<E: 'static>(err: &E) -> bool {
     let any = err as &dyn Any;
-    if any.is::<DeferredError>() {
+    if any.is::<DeferredError>() || any.is::<RetryAfterError>() {
         return true;
     }
     let Some(boxed) = any.downcast_ref::<BoxDynError>() else {
         return false;
     };
-    if boxed.is::<DeferredError>() {
+    if boxed.is::<DeferredError>() || boxed.is::<RetryAfterError>() {
         return true;
     }
     boxed.downcast_ref::<AbortError>().is_some_and(|abort| {
