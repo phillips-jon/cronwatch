@@ -205,6 +205,8 @@ defmodule Cronwatch.Delivery do
     module.name(state)
   rescue
     _ -> inspect(module)
+  catch
+    _, _ -> inspect(module)
   end
 
   # Sets the alert's triage to the diagnosis, or to nil when there is none, so

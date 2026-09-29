@@ -44,6 +44,9 @@ defmodule Cronwatch.Lines do
     head? = head_size < @cap
     if head?, do: :ets.update_counter(table, {key, :meta}, {4, n + 1})
     :ets.insert(table, {{key, seq}, line, n, head?})
+    # A close between the counter and the insert (a Task logging as its run
+    # ends) would leave the line behind for good.
+    unless :ets.member(table, {key, :meta}), do: :ets.delete(table, {key, seq})
     if size > @window, do: trim(table, key)
     :ok
   rescue
@@ -83,6 +86,8 @@ defmodule Cronwatch.Lines do
         unless :ets.insert_new(table, {{key, :metric, name}, order, value}) do
           :ets.update_element(table, {key, :metric, name}, {3, value})
         end
+
+        unless :ets.member(table, {key, :meta}), do: :ets.delete(table, {key, :metric, name})
       end
     end
 

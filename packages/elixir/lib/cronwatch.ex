@@ -213,7 +213,7 @@ defmodule Cronwatch do
   def check_metric!(name, value) do
     name = to_string(name)
 
-    if is_number(value),
+    if is_number(value) and Cronwatch.Duration.double?(value),
       do: {:ok, name, Cronwatch.JS.normalize(value)},
       else: raise(Error.invalid("metric #{Cronwatch.JS.quote(name)} must be a finite number"))
   end

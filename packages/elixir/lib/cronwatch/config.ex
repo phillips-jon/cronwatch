@@ -11,6 +11,10 @@ defmodule Cronwatch.Config do
 
   require Logger
 
+  # The handler's shared secret is never printed (a crash report, an
+  # IO.inspect of the config); the channels' and triage's states print only
+  # what their own Inspect allows.
+  @derive {Inspect, except: [:cron_secret]}
   defstruct name: Cronwatch,
             store: nil,
             default_store: false,

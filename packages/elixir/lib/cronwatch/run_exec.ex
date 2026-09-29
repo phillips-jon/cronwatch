@@ -51,7 +51,7 @@ defmodule Cronwatch.Run.Exec do
       Telemetry.run_span(meta, fn ->
         outcome =
           if isolate,
-            do: call_isolated(c, ctx, info, fun, timeout, kill),
+            do: call_isolated(c, ctx, info, fun, timeout, kill, &settle(c, job, info, &1, discard, opts)),
             else: call_here(c, ctx, info, fun, timeout)
 
         {outcome, Map.put(meta, :status, status_of(outcome))}
@@ -79,15 +79,19 @@ defmodule Cronwatch.Run.Exec do
         exit(:timeout)
 
       _ ->
-        if discard && given_back?(c, job, discard, outcome) && take_back(c, job, info) do
-          Lines.close(lines, info.key)
-        else
-          c
-          |> record_outcome(job, info, outcome)
-          |> recorded(opts)
-        end
-
+        settle(c, job, info, outcome, discard, opts)
         hand_back(outcome, isolate)
+    end
+  end
+
+  # Takes the run back (discard_when) or records it as it ended.
+  defp settle(c, job, info, outcome, discard, opts) do
+    if discard && given_back?(c, job, discard, outcome) && take_back(c, job, info) do
+      Lines.close(Runs.table(c.name, :lines), info.key)
+    else
+      c
+      |> record_outcome(job, info, outcome)
+      |> recorded(opts)
     end
   end
 
@@ -332,49 +336,89 @@ defmodule Cronwatch.Run.Exec do
   # In a task of the instance, for a function that should not take its
   # caller down. With kill_at_timeout, the task is killed at the job's
   # timeout and the run recorded as a check would mark it.
-  defp call_isolated(c, ctx, info, fun, timeout, kill) do
+  #
+  # Whoever closes the run in Cronwatch.Runs records it: the task, when its
+  # function returns, hands the outcome to the caller and waits for the
+  # caller to take it, and records it itself when the caller is gone (killed
+  # while it waited), so the run is never left running; the caller, at the
+  # timeout or when the task dies; or the monitor, when the task is killed.
+  defp call_isolated(c, ctx, info, fun, timeout, kill, orphan) do
     parent = self()
+    id = ctx.run_id
 
     task =
       Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(c.name), fn ->
-        Runs.register(c.name, ctx.run_id, self(), info, timeout)
-        send(parent, {:cronwatch_registered, ctx.run_id})
+        Runs.register(c.name, id, self(), info, timeout)
+        send(parent, {:cronwatch_registered, id})
         Context.push(ctx)
-        Logger.metadata(cronwatch_job: ctx.job, cronwatch_run: ctx.run_id)
+        Logger.metadata(cronwatch_job: ctx.job, cronwatch_run: id)
         outcome = invoke(fun, ctx)
         # Closed here, before the task ends, so the monitor never takes a
         # normal end for a death.
-        Runs.close(c.name, ctx.run_id)
-        outcome
+        if Runs.close(c.name, id), do: hand_over(parent, id, outcome, orphan)
+        :ok
       end)
 
+    task_ref = task.ref
+
     receive do
-      {:cronwatch_registered, id} when id == ctx.run_id -> :ok
+      {:cronwatch_registered, ^id} ->
+        deadline = if kill, do: now_ms() + max(Cronwatch.JS.to_int(timeout), 0)
+        await_isolated(c, task, id, deadline, timeout)
+
+      # Gone before it was registered: no one else knows of the run.
+      {:DOWN, ^task_ref, :process, _, reason} ->
+        {:exit, reason, []}
     end
+  end
 
-    wait = if kill, do: max(Cronwatch.JS.to_int(timeout), 0), else: :infinity
+  # The longest a receive can wait at once.
+  @max_wait 4_294_967_295
 
-    case Task.yield(task, wait) do
-      {:ok, outcome} ->
+  defp now_ms, do: System.monotonic_time(:millisecond)
+
+  defp await_isolated(c, task, id, deadline, timeout) do
+    wait = if deadline, do: min(max(deadline - now_ms(), 0), @max_wait), else: :infinity
+    task_ref = task.ref
+
+    receive do
+      {:cronwatch_outcome, ^id, pid, outcome} ->
+        send(pid, {:cronwatch_taken, id})
+        Task.yield(task, :infinity)
         outcome
 
-      {:exit, reason} ->
-        # Whoever closes the run records it: the monitor, or this caller.
-        if Runs.close(c.name, ctx.run_id),
+      {:DOWN, ^task_ref, :process, _, reason} ->
+        if Runs.close(c.name, id),
           do: {:exit, reason, []},
           else: {:recorded_elsewhere, reason}
+    after
+      wait ->
+        cond do
+          deadline - now_ms() > 0 ->
+            await_isolated(c, task, id, deadline, timeout)
 
-      nil ->
-        # Past the timeout: closed first, so the monitor does not record the
-        # kill as a failure; a function that returned meanwhile is recorded
-        # as it ended.
-        closed = Runs.close(c.name, ctx.run_id)
+          # Past the timeout: closed first, so the monitor does not record
+          # the kill as a failure.
+          Runs.close(c.name, id) ->
+            Task.shutdown(task, :brutal_kill)
+            {:timed_out, timeout}
 
-        case Task.shutdown(task, :brutal_kill) do
-          {:ok, outcome} -> outcome
-          _ when closed -> {:timed_out, timeout}
-          _ -> {:recorded_elsewhere, :killed}
+          # The function returned meanwhile: its outcome is on its way.
+          true ->
+            await_isolated(c, task, id, nil, timeout)
         end
+    end
+  end
+
+  # The task's side: the caller records the outcome once it has taken it; a
+  # caller that died first leaves the recording to the task.
+  defp hand_over(parent, id, outcome, orphan) do
+    ref = Process.monitor(parent)
+    send(parent, {:cronwatch_outcome, id, self(), outcome})
+
+    receive do
+      {:cronwatch_taken, ^id} -> Process.demonitor(ref, [:flush])
+      {:DOWN, ^ref, :process, _, _} -> orphan.(outcome)
     end
   end
 
@@ -391,34 +435,62 @@ defmodule Cronwatch.Run.Exec do
   defp record(c, job, info, build) do
     task =
       Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(c.name), fn ->
-        finished_at = Core.now(c)
-        run = %{info.run | finished_at: finished_at, duration_ms: max(0, finished_at - info.run.started_at)}
-        run = build.(run)
-        Lines.close(Runs.table(c.name, :lines), info.key)
-        wait_for(c, job, info.started)
+        lines = Runs.table(c.name, :lines)
 
         try do
-          case Core.record_finish!(c, job, run, info.recorded, finished_at) do
-            nil ->
-              :ok
+          finished_at = Core.now(c)
 
-            why ->
-              Core.report(
-                c,
-                Cronwatch.Error.other("run #{run.id} of #{job.name} #{why}; ignored"),
-                "finishing #{job.name}"
-              )
+          run = %{
+            info.run
+            | finished_at: finished_at,
+              duration_ms: Core.sat(max(0, finished_at - info.run.started_at))
+          }
+
+          run = build.(run)
+          Lines.close(lines, info.key)
+          wait_for(c, job, info.started)
+
+          try do
+            case Core.record_finish!(c, job, run, info.recorded, finished_at) do
+              nil ->
+                :ok
+
+              why ->
+                Core.report(
+                  c,
+                  Cronwatch.Error.other("run #{run.id} of #{job.name} #{why}; ignored"),
+                  "finishing #{job.name}"
+                )
+            end
+          rescue
+            e -> Core.report(c, e, "recording #{job.name}")
           end
-        rescue
-          e -> Core.report(c, e, "recording #{job.name}")
-        end
 
-        run
+          run
+        rescue
+          e ->
+            Core.report(c, e, "recording #{job.name}")
+            nil
+        catch
+          kind, reason ->
+            Core.report(c, {kind, reason}, "recording #{job.name}")
+            nil
+        after
+          # Whatever happened (an app's clock that raised), the run's lines
+          # do not outlive it.
+          Lines.close(lines, info.key)
+        end
       end)
 
+    # nil when the recording itself failed, so a caller's recorded: function
+    # is never handed something that is not a run.
     case Task.yield(task, :infinity) do
-      {:ok, run} -> run
-      {:exit, reason} -> Core.report(c, {:exit, reason}, "recording #{job.name}")
+      {:ok, run} ->
+        run
+
+      {:exit, reason} ->
+        Core.report(c, {:exit, reason}, "recording #{job.name}")
+        nil
     end
   end
 

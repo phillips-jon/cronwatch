@@ -94,10 +94,13 @@ defmodule Cronwatch.Context do
     end
   end
 
-  defp caller_stack(pid) when is_pid(pid) do
-    case Process.info(pid, :dictionary) do
-      {:dictionary, dict} -> with {_, stack} <- List.keyfind(dict, @stack, 0), do: stack
-      nil -> nil
+  # Only the one key is read, not the caller's whole dictionary; a caller on
+  # another node (a Task started from there) cannot be asked, and has no run
+  # here.
+  defp caller_stack(pid) when is_pid(pid) and node(pid) == node() do
+    case :erlang.process_info(pid, {:dictionary, @stack}) do
+      {{:dictionary, @stack}, stack} when is_list(stack) -> stack
+      _ -> nil
     end
   end
 

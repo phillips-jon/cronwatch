@@ -45,6 +45,12 @@ defmodule Cronwatch.Check do
           e ->
             Core.report(c, e, "source #{source_name(source)}")
             []
+        catch
+          # An exit (a call to a process that timed out) or a throw is the
+          # source's failure too, never the whole check's.
+          kind, reason ->
+            Core.report(c, {kind, reason}, "source #{source_name(source)}")
+            []
         end
       end)
 
@@ -111,6 +117,8 @@ defmodule Cronwatch.Check do
     module.name(opts)
   rescue
     _ -> inspect(module)
+  catch
+    _, _ -> inspect(module)
   end
 
   defp stuck(c, run, now) do
@@ -134,7 +142,7 @@ defmodule Cronwatch.Check do
         run
         | status: "timeout",
           finished_at: now,
-          duration_ms: now - run.started_at,
+          duration_ms: Core.sat(now - run.started_at),
           error: "Still running after #{Duration.format(timeout)}; marked as timed out"
       }
 

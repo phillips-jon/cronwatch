@@ -119,6 +119,14 @@ defmodule Cronwatch.Runs do
     end
   end
 
+  @doc """
+  Forgets a handle that is done with (finished, or found finished), and the
+  lines it held, rather than keep it until its owner ends: a long-lived
+  process that starts and finishes a run a minute would otherwise fill the
+  table.
+  """
+  def drop_handle(instance, id), do: GenServer.call(server(instance), {:drop_handle, id}, :infinity)
+
   @doc "Changes a handle's state."
   def put_handle(instance, id, state) do
     :ets.update_element(table(instance, :handles), id, {3, state})
@@ -184,6 +192,32 @@ defmodule Cronwatch.Runs do
     {:reply, :ok, %{s | owners: owners}}
   end
 
+  def handle_call({:drop_handle, id}, _from, s) do
+    owners =
+      case :ets.lookup(table(s.instance, :handles), id) do
+        [{_, owner, _}] ->
+          :ets.delete(table(s.instance, :handles), id)
+          Lines.close(table(s.instance, :lines), {:handle, id})
+
+          case s.owners do
+            %{^owner => {ref, [^id]}} ->
+              Process.demonitor(ref, [:flush])
+              Map.delete(s.owners, owner)
+
+            %{^owner => {ref, ids}} ->
+              Map.put(s.owners, owner, {ref, List.delete(ids, id)})
+
+            _ ->
+              s.owners
+          end
+
+        [] ->
+          s.owners
+      end
+
+    {:reply, :ok, %{s | owners: owners}}
+  end
+
   @impl true
   def handle_info({:DOWN, ref, :process, pid, reason}, s) do
     case s.runs do
@@ -230,7 +264,14 @@ defmodule Cronwatch.Runs do
     :ok
   end
 
+  # A timeout no double holds (refused when a job is declared, so only a
+  # store's foreign definition could hold one) never fires, rather than
+  # crash this process and the instance with it.
   defp arm(id, ms) do
+    if Cronwatch.Duration.double?(ms), do: arm_ms(id, ms)
+  end
+
+  defp arm_ms(id, ms) do
     ms = Cronwatch.JS.to_int(Float.ceil(ms * 1.0))
     wait = min(ms, @max_timer)
     Process.send_after(self(), {:timeout, id, ms - wait}, wait)

@@ -321,14 +321,25 @@ defmodule Cronwatch.RunHandle do
         was_inactive = s.finished
         update(h, &%{&1 | finish_called: true, finished: true})
 
-        Locks.with_lock(c.name, {:handle, h.ref}, fn ->
-          if was_inactive do
-            ignored.(s.inactive)
-            nil
-          else
-            do_finish(c, h, outcome, ignored)
-          end
-        end)
+        result =
+          Locks.with_lock(c.name, {:handle, h.ref}, fn ->
+            if was_inactive do
+              ignored.(s.inactive)
+              nil
+            else
+              do_finish(c, h, outcome, ignored)
+            end
+          end)
+
+        # Done with for good, unless the store failed part way and it can be
+        # finished again: forgotten now, as a finished handle answers the
+        # same whether its state is kept or not.
+        case state(h) do
+          %{finish_called: true} -> Runs.drop_handle(c.name, h.ref)
+          _ -> :ok
+        end
+
+        result
     end
   end
 
@@ -389,7 +400,7 @@ defmodule Cronwatch.RunHandle do
             from
             | status: "running",
               finished_at: finished_at,
-              duration_ms: max(0, finished_at - from.started_at),
+              duration_ms: Core.sat(max(0, finished_at - from.started_at)),
               error: nil,
               output: join_output(from.output, added),
               metrics: Object.merge(from.metrics, snap.metrics)

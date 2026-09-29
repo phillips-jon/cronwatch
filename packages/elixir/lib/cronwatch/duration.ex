@@ -30,12 +30,29 @@ defmodule Cronwatch.Duration do
   def parse(value, label) when is_binary(value), do: parse_text(value, label)
 
   def parse(n, label) when is_number(n) or n in [:infinity, :neg_infinity, :nan] do
-    if JS.finite?(n) and n >= 0,
+    if JS.finite?(n) and double?(n) and n >= 0,
       do: {:ok, n},
       else: {:error, "#{label} must be a non-negative number of milliseconds"}
   end
 
   def parse(other, label), do: {:error, not_a_duration(label, js_string(other))}
+
+  @doc """
+  Whether a number is one JavaScript can hold: an integer too large for a
+  double (`10 ** 400`) is `Infinity` there, which the SDK refuses, and here
+  would fail every timer and float made from it.
+  """
+  @spec double?(number()) :: boolean()
+  def double?(n) when is_float(n), do: true
+
+  def double?(n) when is_integer(n) do
+    _ = n * 1.0
+    true
+  rescue
+    ArithmeticError -> false
+  end
+
+  def double?(_), do: false
 
   # String(value) for a JSON value, as the SDK's message would quote it.
   defp js_string(nil), do: "null"
