@@ -99,10 +99,15 @@ pub struct ReqwestTransport {
 }
 
 impl ReqwestTransport {
-    /// The default: a client that never follows a redirect.
+    /// The default: a client that never follows a redirect, and keeps no
+    /// idle connections. Alerts are rare, and a pooled connection belongs to
+    /// the tokio runtime that opened it, so one shared transport would fail
+    /// in an app with more than one runtime (the blocking client's and its
+    /// own, say).
     pub fn new() -> Result<ReqwestTransport, BoxError> {
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            .pool_max_idle_per_host(0)
             .build()
             .map_err(|e| BoxError::from(e.without_url()))?;
         Ok(ReqwestTransport { client })
