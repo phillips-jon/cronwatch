@@ -103,7 +103,21 @@ The first value of each comma-separated header is used, and whichever header is 
 
 The board opens with how many jobs there are and how many need attention (any health but healthy), then a count for each health: failing, stuck, late, healthy, silenced and never ran.
 
-Under it is the day. Each job gets a lane across the last 24 hours and the next three, in UTC. A faint tick marks every time the job was due, worked out from its schedule with the same code the checks use: for a cron, each time it fires; for an interval, one period after each run started, and once a period after the last one for as long as nothing runs. Ticks still ahead are dashed. Every run the store recorded is a mark on top, as wide as it took and coloured by how it ended: green for ok, red for failed, a pale red box for timed out, amber for the last run when it went over budget or ran slow, and an outline for a run still going (red once it is past its timeout). A dashed red box is the slot the check reported missed, and every later slot whose grace has run out. A solid vertical line marks now. The empty part of a lane carries a short note about anything open, such as `due 22:36, nothing ran`, `failed at 03:00, 2 in a row` or `running since 22:40`. A job due more often than every five minutes shows its cadence as a dotted line rather than a tick per fire.
+Under it is the day. Each job gets a lane across the last 24 hours and the next three, in UTC, drawn with the marks below. Every run the store recorded is a mark as wide as it took, coloured by how it ended.
+
+| Mark | Means |
+|---|---|
+| a faint tick | a time the job was due, worked out from its schedule with the same code the checks use: for a cron, each time it fires; for an interval, one period after each run started, and once a period after the last one for as long as nothing runs. Ticks still ahead are dashed |
+| a dotted line | the cadence of a job due more often than every five minutes, in place of a tick per fire |
+| green | a run that ended ok |
+| red | a failed run |
+| a pale red box | a run that timed out |
+| amber | the last run, when it went over budget or ran slow |
+| an outline | a run still going (red once it is past its timeout) |
+| a dashed red box | the slot the check reported missed, and every later slot whose grace has run out |
+| a solid vertical line | now |
+
+The empty part of a lane carries a short note about anything open, such as `due 22:36, nothing ran`, `failed at 03:00, 2 in a row` or `running since 22:40`.
 
 The timeline draws the first thirty jobs and says so when there are more; the table below lists every job. Hovering a mark shows what it was, and a visually hidden list says the same for screen readers. A job page draws the same thing for that job, one lane per UTC day for the last seven days, today first, and reads as many runs as that takes (up to 500).
 
@@ -137,18 +151,31 @@ The service worker keeps only that shell in its cache. Every page, form post and
 
 | Method and path | Does | Returns |
 |---|---|---|
-| `GET /api/jobs` | list jobs | `{ jobs: JobSummary[] }` |
-| `GET /api/jobs/:name?runs=20` | one job with recent runs (`runs` is 1 to 500) | `{ job: JobSummary, runs: Run[] }` |
+| `GET /api/jobs` | list jobs | `{ ok: true, jobs: JobSummary[] }` |
+| `GET /api/jobs/:name?runs=20` | one job with recent runs (`runs` is 1 to 500) | `{ ok: true, job: JobSummary, runs: Run[] }` |
 | `DELETE /api/jobs/:name` | forget the job and its runs | `{ ok: true }` |
-| `POST /api/jobs/:name/silence` | body `{ "for": "2h" }` | `{ state: JobState }` |
-| `POST /api/jobs/:name/unsilence` | | `{ state: JobState }` |
-| `POST /api/check` | run the check now | `{ checkedAt, jobs, alerts, pruned }` |
-| `GET /api/check` | the same, with a bearer only | `{ checkedAt, jobs, alerts, pruned }` |
-| `GET /api/runs/:id` | one run | `{ run: Run }` |
+| `POST /api/jobs/:name/silence` | body `{ "for": "2h" }` | `{ ok: true, state: JobState }` |
+| `POST /api/jobs/:name/unsilence` | | `{ ok: true, state: JobState }` |
+| `POST /api/check` | run the check now | `{ ok: true, checkedAt, jobs, alerts, pruned }` |
+| `GET /api/check` | the same, with a bearer only | `{ ok: true, checkedAt, jobs, alerts, pruned }` |
+| `GET /api/runs/:id` | one run | `{ ok: true, run: Run }` |
 
-`for` is a duration string such as `"30m"`, `"2h"` or `"1h30m"`, or a number of milliseconds (a JSON number or a string of digits). It defaults to one hour when left out, from the body or a `?for=` query. Anything else, such as `"forever"` or `"2 hours"`, is refused with 400 and the reason, and nothing is silenced. The dashboard's silence form shows the same error as a page. Silencing or unsilencing a job that is not in the store answers 404.
+Every success body carries `ok: true` beside its fields.
+
+`for` is a duration string such as `"30m"`, `"2h"` or `"1h30m"`, at most 64 characters, or a number of milliseconds (a JSON number or a string of digits). It defaults to one hour when left out, from the body or a `?for=` query. Anything else, such as `"forever"` or `"2 hours"`, is refused with 400 and the reason, and nothing is silenced. The dashboard's silence form shows the same error as a page. Silencing or unsilencing a job that is not in the store answers 404.
 
 Errors are `{ ok: false, error }` with 400, 401, 403, 404, 405 or 503. An unexpected failure answers a bare 500 (`"Internal error"`, or a plain page) and the error itself goes to the client's `onError`.
+
+The dashboard's own buttons post HTML forms to paths outside `/api`. They take the cookie or the bearer like everything else, are refused cross-site, and answer with a redirect rather than JSON:
+
+| Method and path | Does | Then |
+|---|---|---|
+| `POST /check` | run the check now | redirects back to the page it came from (a `Referer` on this origin), or to the board |
+| `POST /jobs/:name/silence` | form field `for`, read as above (one hour when left out) | redirects back; a bad `for` is a 400 page saying why |
+| `POST /jobs/:name/unsilence` | resume alerts | redirects back |
+| `POST /jobs/:name/forget` | forget the job and its runs | redirects to the board |
+
+Silencing or unsilencing a job that is not in the store answers a 404 page here too.
 
 ## JobSummary
 

@@ -8,7 +8,13 @@ order: 1
 
 CronWatch is a library. You install it in the app that runs your scheduled jobs, it records every run in a database you already have, and it alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. There is nothing to sign up for and no server to run.
 
-This page sets up the TypeScript library. For Ruby and Rails there is the `cronwatch` gem, a port with the same rules, alerts and stored rows: see [Ruby on Rails](/docs/rails/) and [Ruby](/docs/ruby/). For Python there is `cronwatch-sdk`, the same again: see [Django](/docs/django/), [Celery](/docs/celery/) and [Python](/docs/python/). For PHP there is `cronwatch/cronwatch`, and a plugin for WordPress: see [PHP](/docs/php/), [WordPress](/docs/wordpress/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/). For Go there is `cronwatch.dev/go`, with modules for robfig/cron, gocron, River and Asynq: see [Go](/docs/go/) and [Go schedulers](/docs/go-schedulers/). For Rust there is the `cronwatch` crate, with crates for tokio-cron-scheduler and apalis: see [Rust](/docs/rust/) and [Rust schedulers](/docs/rust-schedulers/).
+This page sets up the TypeScript library. Every other language has a port with the same rules, alerts and stored rows, so processes in any of them can share one database:
+
+- **Ruby**: the `cronwatch` gem. See [Ruby on Rails](/docs/rails/) and [Ruby](/docs/ruby/).
+- **Python**: `cronwatch-sdk`. See [Django](/docs/django/), [Celery](/docs/celery/) and [Python](/docs/python/).
+- **PHP**: `cronwatch/cronwatch`, and a plugin for WordPress. See [PHP](/docs/php/), [WordPress](/docs/wordpress/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/).
+- **Go**: `cronwatch.dev/go`, with modules for robfig/cron, gocron, River and Asynq. See [Go](/docs/go/) and [Go schedulers](/docs/go-schedulers/).
+- **Rust**: the `cronwatch` crate, with crates for tokio-cron-scheduler and apalis. See [Rust](/docs/rust/) and [Rust schedulers](/docs/rust-schedulers/).
 
 ## Install
 
@@ -101,7 +107,7 @@ import { cw } from "@/lib/cronwatch";
 export const { GET, POST, DELETE } = cw.routes();
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without one, while `NODE_ENV` is `development` or `test`, the routes make a token of their own and print a sign-in link to the server log on the first request; anywhere else they answer 503 (unless you pass `token: null` to serve them open).
+Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without one, while `NODE_ENV` is `development` or `test`, the routes make a token of their own and print a sign-in link to the server log on the first request. The link names the host only when that request came to a loopback host (`localhost`, a `.localhost` name, `127.0.0.0/8` or `::1`) or you set `origin`; otherwise it gives the path alone, for you to open on your own host. With `NODE_ENV` anything else, they answer 503 (unless you pass `token: null` to serve them open).
 
 ## Run the check
 
