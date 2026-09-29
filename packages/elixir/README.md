@@ -132,13 +132,23 @@ forward "/cron/nightly", Cronwatch.Handler, job: "nightly-report", run: {MyApp.R
 `Cronwatch.Oban` watches Oban 2.20 or newer with no changes to your workers: every worker in the Cron plugin's crontab is a job (named after its module, on the entry's expression in its zone), and each attempt is a run, recorded through Oban's own telemetry in the worker's process, so `Cronwatch.log/1` works inside `perform/1`.
 
 ```elixir
+# among your application's children
 {Cronwatch,
  store: {Cronwatch.Store.Ecto, repo: MyApp.Repo},
  integrations: [{Cronwatch.Oban, oban: Oban, defaults: [grace: "5m"], workers: [{MyApp.Workers.Import, timeout: "1h"}]}]}
+```
 
-# config :my_app, Oban, crontab: [...]
-{"0 2 * * *", MyApp.Workers.NightlyReport},
-{"* * * * *", Cronwatch.Oban.CheckWorker}      # the check, once a minute across the cluster
+```elixir
+# config/config.exs
+config :my_app, Oban,
+  repo: MyApp.Repo,
+  plugins: [
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"0 2 * * *", MyApp.Workers.NightlyReport},
+       {"* * * * *", Cronwatch.Oban.CheckWorker}   # the check, once a minute across the cluster
+     ]}
+  ]
 ```
 
 A retry is a new run, so failing attempts open one failed alert and the one that succeeds closes it (`failures_before_alert` says how many attempts to allow first). A `{:snooze, _}` gives the run back, a `{:cancel, _}` fails it, a worker killed at its `timeout/1` is a failed run at once, and an attempt left running by a node that died is failed when Lifeline's rescue runs the job again. Each crontab expression is checked against Oban's own reading of it: Oban matches a day of the month and a day of the week both, where CronWatch (as cron and the SDK) matches either, so an expression the two read differently is reported once and watched without a schedule. Workers outside the crontab are watched only when named in `workers:`. The check worker also declares again, without its schedule, a job taken out of the crontab, so it is never reported missed.
@@ -149,9 +159,15 @@ A retry is a new run, so failing attempts open one failed alert and the one that
 
 ```elixir
 integrations: [{Cronwatch.Quantum, scheduler: MyApp.Scheduler, jobs: [nightly_report: [grace: "15m"]]}]
+```
 
-# among the scheduler's jobs, the check:
-cronwatch_check: [schedule: "* * * * *", task: {Cronwatch.Quantum, :check, [[scheduler: MyApp.Scheduler]]}]
+```elixir
+# config/config.exs: the check among the scheduler's jobs
+config :my_app, MyApp.Scheduler,
+  jobs: [
+    nightly_report: [schedule: "0 2 * * *", task: {MyApp.Reports, :nightly, []}],
+    cronwatch_check: [schedule: "* * * * *", task: {Cronwatch.Quantum, :check, [[scheduler: MyApp.Scheduler]]}]
+  ]
 ```
 
 ### A crontab
