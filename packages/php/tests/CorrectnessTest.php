@@ -181,6 +181,36 @@ final class CorrectnessTest extends TestCase
         }
     }
 
+    public function testAPatternThatBacktracksWithoutEndStopsAtTheLimitAndFailsTheRun(): void
+    {
+        // Stars back to back over newlines they do not match backtrack
+        // polynomially (V8 takes seconds over 100); PCRE's backtrack limit,
+        // at its default, stops them in milliseconds and the run fails.
+        $cw = new Cronwatch(alerts: [new Capture()], cronSecret: false);
+        $output = str_repeat("\n", 32_000);
+        $started = hrtime(true);
+        $cw->job('slow', ['expect' => new Pattern('/\n*\n*\n*\n*\n*[xy]/')])->run(fn () => $output);
+        $took = (hrtime(true) - $started) / 1e9;
+        $run = $cw->runs('slow')[0];
+        $this->assertSame('failed', $run->status);
+        $this->assertSame('Output did not match /\n*\n*\n*\n*\n*[xy]/ (Backtrack limit exhausted)', $run->error);
+        $this->assertLessThan(3.0, $took);
+        // Without the JIT too, where the limit counts the same way.
+        $jit = ini_get('pcre.jit');
+        ini_set('pcre.jit', '0');
+        try {
+            $started = hrtime(true);
+            $this->assertSame(
+                'Output did not match /\n*\n*\n*\n*\n*[xy]/ (Backtrack limit exhausted)',
+                \Cronwatch\Serialize::checkExpectation(new Pattern('/\n*\n*\n*\n*\n*[xy]/'), $output),
+            );
+            $this->assertLessThan(3.0, (hrtime(true) - $started) / 1e9);
+        } finally {
+            ini_set('pcre.jit', (string) $jit);
+        }
+        $this->assertNull(\Cronwatch\Serialize::checkExpectation(new Pattern('/\n*\n*\n*\n*\n*[xy]/'), $output . 'y'));
+    }
+
     public function testADateIntervalIsItsMillisecondsAndANegativeOneIsRefused(): void
     {
         $this->assertSame(5_400_000, \Cronwatch\Duration::parse(new \DateInterval('PT1H30M')));
