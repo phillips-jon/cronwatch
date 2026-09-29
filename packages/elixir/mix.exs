@@ -47,11 +47,25 @@ defmodule Cronwatch.MixProject do
       {:tz, "~> 0.28"},
       {:telemetry, "~> 1.0"},
       {:ecto_sql, "~> 3.12", optional: true},
+      {:oban, pinned(:oban, "~> 2.20"), optional: true},
+      {:quantum, pinned(:quantum, "~> 3.5"), optional: true},
       {:ecto_sqlite3, "~> 0.17", only: :test},
+      {:postgrex, "~> 0.19", only: :test},
       {:stream_data, "~> 1.1", only: :test},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
+  end
+
+  # An optional dependency at the release CRONWATCH_PIN_<NAME> names
+  # (CRONWATCH_PIN_OBAN=2.20.0), for the CI entry that tests the oldest
+  # release each requirement claims, since Mix has no minimal-versions
+  # resolver; the requirement as written otherwise.
+  defp pinned(dep, requirement) do
+    case System.get_env("CRONWATCH_PIN_" <> String.upcase(to_string(dep))) do
+      version when is_binary(version) and version != "" -> "== " <> version
+      _ -> requirement
+    end
   end
 
   # The fixtures are made with TZ=UTC, and a schedule without a zone is read

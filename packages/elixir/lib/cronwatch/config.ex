@@ -25,7 +25,8 @@ defmodule Cronwatch.Config do
             on_error: nil,
             clock: nil,
             check_every: nil,
-            jobs: []
+            jobs: [],
+            integrations: []
 
   @known [
     :name,
@@ -41,7 +42,8 @@ defmodule Cronwatch.Config do
     :on_error,
     :clock,
     :check_every,
-    :jobs
+    :jobs,
+    :integrations
   ]
 
   @doc "The options, checked: {:ok, config} or {:error, %Cronwatch.Error{}}."
@@ -58,6 +60,7 @@ defmodule Cronwatch.Config do
          {:ok, redact} <- redact(Keyword.get(opts, :redact, :default)),
          {:ok, deliver} <- deliver(Keyword.get(opts, :deliver, :now)),
          {:ok, check_every} <- check_every(Keyword.get(opts, :check_every)),
+         {:ok, integrations} <- integrations(Keyword.get(opts, :integrations, [])),
          {:ok, cron_secret} <- cron_secret(opts) do
       {:ok,
        %__MODULE__{
@@ -75,10 +78,44 @@ defmodule Cronwatch.Config do
          on_error: Keyword.get(opts, :on_error),
          clock: Keyword.get(opts, :clock),
          check_every: check_every,
-         jobs: Keyword.get(opts, :jobs, [])
+         jobs: Keyword.get(opts, :jobs, []),
+         integrations: integrations
        }}
     end
   end
+
+  # The scheduler integrations (Cronwatch.Oban, Cronwatch.Quantum), each
+  # compiled only when its scheduler is a dependency of the app.
+  defp integrations(list) when is_list(list) do
+    Enum.reduce_while(list, {:ok, []}, fn spec, {:ok, acc} ->
+      case integration(spec) do
+        {:ok, i} -> {:cont, {:ok, acc ++ [i]}}
+        {:error, _} = e -> {:halt, e}
+      end
+    end)
+  end
+
+  defp integrations(other),
+    do: {:error, Error.invalid("Cronwatch: integrations must be a list, not #{inspect(other)}")}
+
+  defp integration(module) when is_atom(module), do: integration({module, []})
+
+  defp integration({module, opts}) when is_atom(module) and is_list(opts) do
+    cond do
+      not Code.ensure_loaded?(module) ->
+        {:error,
+         Error.invalid("Cronwatch: integration #{inspect(module)} is not available (is its scheduler a dependency?)")}
+
+      not function_exported?(module, :child_spec, 1) ->
+        {:error, Error.invalid("Cronwatch: #{inspect(module)} is not an integration")}
+
+      true ->
+        {:ok, {module, opts}}
+    end
+  end
+
+  defp integration(other),
+    do: {:error, Error.invalid("Cronwatch: integrations must be {module, opts}, not #{inspect(other)}")}
 
   defp known(opts) do
     case Enum.find(opts, fn {k, _} -> k not in @known end) do

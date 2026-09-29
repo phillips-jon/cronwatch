@@ -64,9 +64,15 @@ defmodule Cronwatch.Supervisor do
           {Cronwatch.Locks, config.name},
           {Task.Supervisor, name: tasks(config.name)},
           {Cronwatch.Checker, config.name}
-        ]
+        ] ++ integrations(config)
 
     Supervisor.init(children, strategy: :rest_for_one)
+  end
+
+  # The scheduler integrations, last, so they start once the instance can
+  # record and stop before it does.
+  defp integrations(config) do
+    Enum.map(config.integrations, fn {module, opts} -> module.child_spec([{:instance, config.name} | opts]) end)
   end
 
   # A store module may define child_spec/1 for its own use in an app's tree
