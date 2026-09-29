@@ -44,6 +44,14 @@ ssh joncpu /var/www/cronwatch.dev/deploy/rollback                 # back to the 
 
 The copy of `release-deploy` that runs is the live release's, so a push that changes the script is deployed by the previous version; run it once by hand with `--force` to exercise a new one.
 
+A deploy never touches the nginx vhost, so a change to `deploy/nginx.conf` (the CSP, say) is installed by hand once the release carrying it is live:
+
+```
+sudo diff /etc/nginx/sites-available/cronwatch.dev /var/www/cronwatch.dev/deploy/nginx.conf
+sudo cp /var/www/cronwatch.dev/deploy/nginx.conf /etc/nginx/sites-available/cronwatch.dev
+sudo nginx -t && sudo systemctl reload nginx
+```
+
 ## Contact form
 
 The site is static except for one thing: the form on `/contact/` posts to `/contact`, which nginx hands to `deploy/contact/server.mjs` on `127.0.0.1:3790`. The service checks the form (a honeypot field, a minimum fill time, field lengths, a sane email address), sends one email to the maintainer through Amazon SES with the sender's address as Reply-To, and redirects the browser to `/contact/sent/` or `/contact/error/`. It has no dependencies, so it runs straight from the live release with the Node the builds use. nginx limits it to 5 posts a minute per address (burst 3) and 16 KB a post, and sends the error page when the service is down or a limit is hit. The service logs one line per post to the journal: time, outcome, reason and IP address, never the message, the sender's details or a credential.

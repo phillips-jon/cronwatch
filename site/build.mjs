@@ -132,7 +132,7 @@ ${head ? `${head}\n` : ""}<meta property="og:title" content="${escape(fullTitle)
 ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta property="og:type" content="website">
 <meta name="theme-color" content="${THEME_COLOR}">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="preload" href="/assets/fonts/newsreader-normal-200-800.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="https://use.typekit.net/gie6nes.css">
 <link rel="preload" href="/assets/fonts/plexmono-normal-400.woff2" as="font" type="font/woff2" crossorigin>
 <script src="${assets.theme}"></script>
 <link rel="stylesheet" href="${assets.css}">
