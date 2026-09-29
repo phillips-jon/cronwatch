@@ -4,6 +4,15 @@ module Cronwatch
   module Serialize
     module_function
 
+    # How long one expect pattern may take over a run's output, in seconds.
+    # Onigmo memoizes most patterns into linear time, but not one with a
+    # backreference or a lookaround, which can backtrack for minutes over an
+    # output it does not match. A match that times out does not match, so
+    # the run fails as the other ports' bounded engines fail it. A pattern
+    # with a shorter timeout of its own (or a shorter Regexp.timeout) keeps
+    # it.
+    PATTERN_TIMEOUT = 1.0
+
     # A definition as a store can hold it: `expect` becomes a description, and
     # moves to the end, as it does in the SDK.
     def to_stored(definition)
@@ -36,7 +45,7 @@ module Cronwatch
         # match? keeps no position between calls (JavaScript's /g and /y do,
         # which is why the SDK resets lastIndex) and does not touch $~, so
         # every run is checked from the start whatever the flags.
-        expect.match?(text) ? nil : "Output did not match #{expect.inspect}"
+        matches?(expect, text) ? nil : "Output did not match #{expect.inspect}"
       else
         ok = false
         begin
@@ -46,6 +55,14 @@ module Cronwatch
         end
         ok ? nil : "Output did not pass the expect() check"
       end
+    end
+
+    # Whether the pattern matches within PATTERN_TIMEOUT; a timeout is no.
+    def matches?(pattern, text)
+      limit = [pattern.timeout, Regexp.timeout, PATTERN_TIMEOUT].compact.min
+      Regexp.new(pattern, timeout: limit).match?(text)
+    rescue Regexp::TimeoutError
+      false
     end
   end
 end

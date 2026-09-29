@@ -81,6 +81,29 @@ class ClientTest < Minitest::Test
     assert_equal "custom function", cw.store.get_job("b").definition.expect
   end
 
+  def test_an_expect_pattern_that_backtracks_without_end_times_out_and_fails
+    # A backreference turns off Onigmo's memoization, so this backtracks
+    # polynomially over newlines it does not match; the timeout stops it.
+    cw, = make
+    output = "#{"\n" * 32_000}zx"
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    cw.job("slow", expect: /(\n*)\n*\n*\1x/).run { output }
+    took = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+    run = cw.runs("slow").first
+    assert_equal :failed, run.status
+    assert_equal "Output did not match /(\\n*)\\n*\\n*\\1x/", run.error
+    assert_operator took, :<, 3, "took #{took}s"
+    # A shorter timeout of the pattern's own is kept; the pattern is not changed.
+    short = Regexp.new('(\n*)\n*\n*\1x', timeout: 0.1)
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    assert_equal "Output did not match /(\\n*)\\n*\\n*\\1x/", Cronwatch::Serialize.check_expectation(short, output)
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 0.9
+    assert_in_delta 0.1, short.timeout
+    # Patterns that finish answer as before, flags and all.
+    assert_nil Cronwatch::Serialize.check_expectation(/DONE$/i, "all done")
+    assert_nil Cronwatch::Serialize.check_expectation(/(\n*)\n*\n*\1x/, "\n\nx")
+  end
+
   def test_run_defines_on_first_use_and_validates_names_and_schedules
     cw, = make
     assert_equal 1, cw.run("adhoc", schedule: "every 5m") { 1 }
