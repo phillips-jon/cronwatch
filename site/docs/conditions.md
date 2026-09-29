@@ -2,6 +2,7 @@
 title: What it catches
 description: The conditions CronWatch reports, how each is decided, baselines, expect rules, budgets and silence.
 order: 5
+group: Reference
 ---
 
 # What it catches

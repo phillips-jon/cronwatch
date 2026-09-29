@@ -2,6 +2,7 @@
 title: TypeScript API reference
 description: Every option on cronwatch(), cw.job(), the job handle, the job context and the client.
 order: 12
+group: Reference
 ---
 
 # TypeScript API reference

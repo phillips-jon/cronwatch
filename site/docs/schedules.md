@@ -2,6 +2,7 @@
 title: Schedules, grace and timeouts
 description: Cron expressions, intervals, timezones, and exactly how a missed or stuck run is decided.
 order: 4
+group: Reference
 ---
 
 # Schedules, grace and timeouts

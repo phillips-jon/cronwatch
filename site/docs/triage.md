@@ -2,6 +2,7 @@
 title: AI triage
 description: Attach a short diagnosis from Claude to every alert except recoveries, with your own API key.
 order: 6.5
+group: Reference
 ---
 
 # AI triage

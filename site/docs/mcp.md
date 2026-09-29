@@ -2,6 +2,7 @@
 title: MCP server
 description: Give Claude Code, Cursor or any MCP client read and control access to your jobs.
 order: 9
+group: Reference
 ---
 
 # MCP server

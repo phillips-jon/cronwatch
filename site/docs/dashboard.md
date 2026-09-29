@@ -2,6 +2,7 @@
 title: Dashboard and API
 description: The routes, the token, the endpoints and the JSON shapes the MCP server reads.
 order: 8
+group: Reference
 ---
 
 # Dashboard and API

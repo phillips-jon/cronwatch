@@ -2,6 +2,7 @@
 title: Alerts
 description: Slack, Discord, signed webhooks, email, SMS, error trackers, the console, custom channels, and the alert payload.
 order: 6
+group: Reference
 ---
 
 # Alerts

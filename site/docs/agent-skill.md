@@ -2,6 +2,7 @@
 title: Agent skill
 description: A Claude Code skill so the agent that writes a cron job also writes its monitor.
 order: 10
+group: Reference
 ---
 
 # Agent skill

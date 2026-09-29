@@ -2,6 +2,7 @@
 title: Limits and design notes
 description: What a library cannot see, how it behaves across instances, and what it deliberately does not do.
 order: 13
+group: Reference
 ---
 
 # Limits and design notes

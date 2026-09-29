@@ -2,6 +2,7 @@
 title: Stores
 description: Memory, SQLite, Postgres and D1 stores, retention, and the interface for writing your own.
 order: 7
+group: Reference
 ---
 
 # Stores
