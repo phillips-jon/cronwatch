@@ -34,10 +34,16 @@ def quietly(fn: Any) -> None:
         pass  # A failed run is part of the seed.
 
 
-def seed() -> Cronwatch:
+def seed(errors: list[str] | None = None) -> Cronwatch:
     """The seed in golden.mjs, step for step."""
     clock = Clock()
-    cw = Cronwatch(now=clock.now, store=MemoryStore(), alerts=[Custom("capture", lambda alert: None)], cron_secret=None)
+    cw = Cronwatch(
+        now=clock.now,
+        store=MemoryStore(),
+        alerts=[Custom("capture", lambda alert: None)],
+        cron_secret=None,
+        on_error=lambda error, where: (errors if errors is not None else []).append(f"{where}: {error}"),
+    )
     nightly = cw.job(
         "nightly-report",
         schedule="0 2 * * *",
@@ -83,6 +89,16 @@ def seed() -> Cronwatch:
     far_back = cw.job("far-back", timeout="5m", expect="far")
     clock.set(-62_135_596_800_001)
     quietly(lambda: far_back.run(lambda job: clock.advance(1000) and None))
+
+    # Cron jobs whose last run is as far off: counted from the first
+    # millisecond of the year 1, the first is due then (and is missed at the
+    # check); after 9999 the other is never due again.
+    far_cron_back = cw.job("far-cron-back", schedule="0 2 * * *", timezone="UTC", grace="10m")
+    clock.set(-62_135_596_800_001)
+    far_cron_back.run(lambda job: clock.advance(1000) and None)
+    far_cron_ahead = cw.job("far-cron-ahead", schedule="0 2 * * *", timezone="UTC", grace="10m")
+    clock.set(253_402_300_800_000)
+    far_cron_ahead.run(lambda job: clock.advance(1000) and None)
     clock.set(T0)
     return cw
 
@@ -112,8 +128,9 @@ def through_handle(web: Web, method: str, path: str, headers: dict[str, str], bo
 def test_the_json_api_and_pages_match_the_sdk_routes(deliver: Any) -> None:
     data = golden()
     assert data["t0"] == T0
-    assert len(data["captures"]) == 59
-    cw = seed()
+    assert len(data["captures"]) == 63
+    errors: list[str] = []
+    cw = seed(errors)
     web = cw.routes(token="tok", base_path="/cronwatch")
     ids: dict[str, str] = {}
 
@@ -132,3 +149,5 @@ def test_the_json_api_and_pages_match_the_sdk_routes(deliver: Any) -> None:
         shown = {k: v for k, v in headers.items() if k not in IGNORED_HEADERS}
         assert shown == capture["responseHeaders"], label
         assert body == capture["responseBody"], label
+    # Nothing in the seed or the requests reported an error, however far off a run's start is.
+    assert errors == []

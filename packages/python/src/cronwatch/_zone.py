@@ -55,8 +55,24 @@ def is_valid(name: object) -> bool:
         return False
 
 
+#: Four hundred Gregorian years in seconds, after which the calendar, and a
+#: zone's rules both long before and long after today, repeat.
+_CYCLE_SEC = 146_097 * 86_400
+#: The start of the year 2 and of the year 9999: outside them a local time
+#: could fall outside datetime's years 1 to 9999.
+_SAFE_FIRST_SEC = -62_104_060_800
+_SAFE_LAST_SEC = 253_370_764_800
+
+
 def offset(sec: int, tz: str | None) -> int:
-    """Seconds the wall clock is ahead of UTC at epoch second `sec`."""
+    """Seconds the wall clock is ahead of UTC at epoch second `sec`. A time
+    near or past the ends of the years 1 to 9999 is read a 400-year cycle or
+    more nearer today, where datetime can hold its local time and the zone
+    keeps the same offset."""
+    if sec < _SAFE_FIRST_SEC:
+        sec += -((sec - _SAFE_FIRST_SEC) // _CYCLE_SEC) * _CYCLE_SEC
+    elif sec >= _SAFE_LAST_SEC:
+        sec -= ((sec - _SAFE_LAST_SEC) // _CYCLE_SEC + 1) * _CYCLE_SEC
     if tz is None:
         return time.localtime(sec).tm_gmtoff
     moment = datetime.fromtimestamp(sec, tz=_utc_zone.utc).astimezone(get(tz))

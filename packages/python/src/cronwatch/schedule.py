@@ -12,7 +12,7 @@ from typing import Any
 
 from . import _js, _zone
 from ._cron import Cron, CronError
-from .duration import parse_duration
+from .duration import FIRST_DATE_MS, LAST_DATE_MS, parse_duration
 
 #: How early a run may start and still count for the fire it was meant for.
 EARLY_SLACK_MS = 60_000
@@ -89,6 +89,49 @@ def parse_schedule(schedule: str, timezone: str | None = None) -> ParsedSchedule
     return parsed
 
 
+#: Four hundred Gregorian years: 146,097 days, a whole number of weeks, after
+#: which the calendar repeats date for date and weekday for weekday.
+CYCLE_MS = 146_097 * 86_400_000
+#: Times before the year 400 are asked a cycle or more later, as the SDK asks
+#: croner (which misreads a year below 100).
+_CRONER_FIRST_MS = _js.date_utc(400, 0, 1)
+#: Times from the year 2800 are asked a cycle or more earlier, as the SDK asks
+#: croner (which finds no fire past the year 3000, and nor does its port).
+_CRONER_LAST_MS = _js.date_utc(2800, 0, 1)
+
+
+def _runs_after(cron: Cron, count: int, start: int) -> list[int]:
+    """The next `count` fires of a cron strictly after `start`, which lies
+    within the years 1 to 9999, dropping any after 9999. A time outside the
+    years 400 to 2800 is moved by whole 400-year cycles into them, and its
+    fires moved back: a time before 400 goes forward, into the same local
+    mean time every zone kept then, and one from 2800 goes back, to where the
+    zone's present rules already hold."""
+    shift = 0
+    if start < _CRONER_FIRST_MS:
+        shift = -((start - _CRONER_FIRST_MS) // CYCLE_MS) * CYCLE_MS
+    elif start >= _CRONER_LAST_MS:
+        shift = -((start - _CRONER_LAST_MS) // CYCLE_MS + 1) * CYCLE_MS
+    out: list[int] = []
+    for fire in cron.next_runs(count, start + shift):
+        t = fire - shift
+        if t > LAST_DATE_MS:
+            break
+        out.append(t)
+    return out
+
+
+def _count_from(start: int) -> int | None:
+    """A stored time as a cron's fires are counted from it. A start read from
+    a foreign or damaged row can be any number: one before the year 1 counts
+    from just before its first millisecond, so the first fire of the year 1
+    is the next one, and one at or after the last millisecond of 9999 has no
+    fire after it at all (None). No fire is ever after 9999."""
+    if start >= LAST_DATE_MS:
+        return None
+    return start if start >= FIRST_DATE_MS else FIRST_DATE_MS - 1
+
+
 def _fire_after(parsed: ParsedSchedule, start: int) -> int | None:
     """The first fire strictly after `start`, or None when the cron never fires
     again. Croner answers with times in the past when asked from inside the
@@ -97,13 +140,16 @@ def _fire_after(parsed: ParsedSchedule, start: int) -> int | None:
     cron = parsed._cron
     if cron is None:
         raise ValueError(f'schedule "{parsed.source}" was not made by parse_schedule')
-    probe = start
+    counted = _count_from(start)
+    if counted is None:
+        return None
+    probe = counted
     for _ in range(4):
-        runs = cron.next_runs(8, probe)
+        runs = _runs_after(cron, 8, probe)
         if not runs:
             return None
         for fire in runs:
-            if fire > start:
+            if fire > counted:
                 return fire
         probe += 3_600_000
     return None
@@ -118,10 +164,13 @@ def fires_between(parsed: ParsedSchedule, start: int, end: int, limit: int) -> l
     if cron is None:
         raise ValueError(f'schedule "{parsed.source}" was not made by parse_schedule')
     out: list[int] = []
-    probe = start
-    last = start
+    counted = _count_from(start)
+    if counted is None:
+        return out
+    probe = counted
+    last = counted
     for _ in range(1000):
-        batch = cron.next_runs(min(limit + 1 - len(out), 24), probe)
+        batch = _runs_after(cron, min(limit + 1 - len(out), 24), probe)
         if not batch:
             return out
         for t in batch:
@@ -166,7 +215,9 @@ def expectation(parsed: ParsedSchedule, last_run_at: int | None, registered_at: 
 
 
 def _due_after_run(parsed: ParsedSchedule, started_at: int) -> int | None:
-    """The first fire that a run starting at `started_at` does not cover."""
+    """The first fire that a run starting at `started_at` does not cover. A
+    start before the year 1 covers none of them, so the first fire of the
+    year 1 is due; after 9999 there is none (see _count_from)."""
     # A fire at or before the start is covered by the run itself.
     upcoming = _fire_after(parsed, started_at)
     if upcoming is None:
@@ -194,6 +245,9 @@ def _in_spring_forward_gap(parsed: ParsedSchedule, started_at: int, fire_at: int
     first fire after it when that fire lies within one gap of it, is taken to
     cover that fire, so neither scheduler's run is reported as missed."""
     lookback = 3 * 3_600_000
+    # Every zone kept its local mean time, with no clock change, in the year 1.
+    if fire_at - lookback < FIRST_DATE_MS:
+        return False
     after = _utc_offset(fire_at, parsed.timezone)
     before = _utc_offset(fire_at - lookback, parsed.timezone)
     gap = after - before

@@ -318,3 +318,34 @@ def test_a_check_over_a_run_that_started_at_the_lowest_bigint_and_a_state_whose_
     assert capture.alerts[0].message.split("\n")[0] == (
         "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h."
     )
+
+
+@pytest.mark.parametrize("started_at", ["-62135596800001", "253402300800000", "-9223372036854775808", "9223372036854775807"])
+def test_a_check_and_the_dashboard_over_a_cron_job_whose_last_run_started_far_off(sql_store: Any, started_at: str) -> None:
+    """A cron job's last run as a foreign or damaged row could hold it: before
+    the year 1 (the first fire of the year 1 was missed) or after 9999 (never
+    due again). Neither a check nor the dashboard reports an error."""
+    from cronwatch import Cronwatch
+
+    from helpers import Capture, Errors, send
+
+    store = sql_store
+    store.init()
+    store.upsert_job(definition(name="far", schedule="0 2 * * *", timezone="UTC", grace="10m"), 1)
+    execute = store._run if isinstance(store, SqliteStore) else store._execute
+    p = store.prefix
+    execute(
+        f"INSERT INTO {p}runs (id, job, status, started_at, finished_at, duration_ms, metrics, trigger) "
+        f"VALUES ('far1', 'far', 'ok', {started_at}, {started_at}, 0, '{{}}', 'run')"
+    )
+    errors = Errors()
+    capture = Capture()
+    cw = Cronwatch(store=store, alerts=[capture], cron_secret=None, on_error=errors)
+    cw.check()
+    web = cw.routes(token="tok", base_path="/cronwatch")
+    for path in ["/cronwatch/", "/cronwatch/jobs/far", "/cronwatch/api/jobs/far"]:
+        assert send(web, "GET", path, {"authorization": "Bearer tok"}).status == 200, path
+    assert errors.items == []
+    assert capture.types() == (["missed"] if started_at.startswith("-") else [])
+    if capture.alerts:
+        assert capture.alerts[0].message.startswith("Due 0001-01-01 02:00:00 UTC ")
