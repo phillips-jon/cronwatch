@@ -153,7 +153,7 @@ defmodule Cronwatch.Delivery do
     tasks =
       Enum.map(c.alerts, fn {module, state} = channel ->
         name = channel_name(channel)
-        ctx = %ChannelContext{on_error: fn e -> Core.report(c, e, "alert channel #{name}") end}
+        ctx = %ChannelContext{on_error: fn e -> Core.report(c, e, "alert channel #{name}") end, transport: c.transport}
 
         task =
           Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(c.name), fn ->
@@ -217,7 +217,7 @@ defmodule Cronwatch.Delivery do
         _ -> []
       end
 
-    context = %{alert: alert, recent_runs: recent}
+    context = %{alert: alert, recent_runs: recent, transport: c.transport}
 
     task =
       Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(c.name), fn ->

@@ -24,14 +24,14 @@ defmodule Cronwatch.MixProject do
       dialyzer: [
         plt_local_path: "_build/plts",
         plt_core_path: "_build/plts",
-        plt_add_apps: [:ex_unit, :mix, :ecto, :ecto_sql, :db_connection]
+        plt_add_apps: [:ex_unit, :mix, :ecto, :ecto_sql, :db_connection, :inets, :ssl, :public_key]
       ]
     ]
   end
 
   def application do
     [
-      extra_applications: [:logger, :crypto]
+      extra_applications: [:logger, :crypto, :inets, :ssl, :public_key]
     ]
   end
 
@@ -51,6 +51,7 @@ defmodule Cronwatch.MixProject do
       {:quantum, pinned(:quantum, "~> 3.5"), optional: true},
       {:ecto_sqlite3, "~> 0.17", only: :test},
       {:postgrex, "~> 0.19", only: :test},
+      {:myxql, "~> 0.7", only: :test},
       {:stream_data, "~> 1.1", only: :test},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}

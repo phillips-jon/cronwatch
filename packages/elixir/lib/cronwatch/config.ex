@@ -16,6 +16,7 @@ defmodule Cronwatch.Config do
             default_store: false,
             alerts: [],
             triage: nil,
+            transport: nil,
             sources: [],
             cron_secret: nil,
             retention_ms: 30 * 86_400_000,
@@ -33,6 +34,7 @@ defmodule Cronwatch.Config do
     :store,
     :alerts,
     :triage,
+    :transport,
     :sources,
     :cron_secret,
     :retention,
@@ -54,6 +56,8 @@ defmodule Cronwatch.Config do
          :ok <- check_name(name),
          {:ok, store, default?} <- store(Keyword.get(opts, :store), name),
          {:ok, alerts} <- alerts(Keyword.get(opts, :alerts)),
+         {:ok, triage} <- triage(Keyword.get(opts, :triage)),
+         :ok <- transport(Keyword.get(opts, :transport)),
          {:ok, retention} <- Options.duration_ms(Keyword.get(opts, :retention, "30d"), "retention"),
          defaults = Keyword.get(opts, :defaults, []),
          :ok <- Options.check_defaults(defaults),
@@ -68,7 +72,8 @@ defmodule Cronwatch.Config do
          store: store,
          default_store: default?,
          alerts: alerts,
-         triage: Keyword.get(opts, :triage),
+         triage: triage,
+         transport: Keyword.get(opts, :transport),
          sources: Keyword.get(opts, :sources, []),
          cron_secret: cron_secret,
          retention_ms: retention,
@@ -182,6 +187,36 @@ defmodule Cronwatch.Config do
   end
 
   defp channel(other), do: {:error, Error.invalid("Cronwatch: not an alert channel: #{inspect(other)}")}
+
+  # Triage given as {module, opts} whose module has init/1 has its options
+  # checked once, now, as a channel's are (Cronwatch.Triage.Anthropic
+  # refuses to start without an API key, as the SDK's anthropic() throws).
+  defp triage({module, opts}) when is_atom(module) do
+    Code.ensure_loaded(module)
+
+    if function_exported?(module, :init, 1) do
+      case module.init(opts) do
+        {:ok, state} -> {:ok, {module, state}}
+        {:error, message} -> {:error, Error.invalid(message)}
+      end
+    else
+      {:ok, {module, opts}}
+    end
+  end
+
+  defp triage(module) when is_atom(module) and module not in [nil, true, false] do
+    Code.ensure_loaded(module)
+    if function_exported?(module, :init, 1), do: triage({module, []}), else: {:ok, module}
+  end
+
+  defp triage(other), do: {:ok, other}
+
+  defp transport(spec) do
+    case Cronwatch.Transport.check(spec, "Cronwatch") do
+      :ok -> :ok
+      {:error, message} -> {:error, Error.invalid(message)}
+    end
+  end
 
   defp redact(:default), do: {:ok, :default}
   defp redact(nil), do: {:ok, :default}

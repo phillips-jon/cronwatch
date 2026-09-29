@@ -12,7 +12,9 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     Options:
 
       * `:repo` (required): the app's Ecto repo. Its adapter picks the
-        dialect; SQLite (`Ecto.Adapters.SQLite3`) today.
+        dialect: SQLite (`Ecto.Adapters.SQLite3`), Postgres
+        (`Ecto.Adapters.Postgres`) or MySQL 8.0.13 and MariaDB 10.6 or newer
+        (`Ecto.Adapters.MyXQL`).
       * `:prefix`: what every table name starts with, lowercase letters,
         digits and underscores. Default `"cronwatch_"`.
       * `:dynamic_repo`: a repo started with `name: nil` (its pid) or under
@@ -33,6 +35,14 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     and a `busy_timeout` of at least 5000, as the SDK's store sets them. An
     in-memory database is one per connection, so a `database: ":memory:"`
     repo needs `pool_size: 1`.
+
+    On Postgres the tables and statements are the SDK's (`JSONB` for the
+    JSON, `BIGINT` times, names sorted `COLLATE "C"`), and many processes can
+    start at once: `c:Cronwatch.Store.init/1` makes the tables under an
+    advisory lock per prefix. On MySQL and MariaDB the dialect is the PHP, Go
+    and Rust ports': the JSON columns are `LONGTEXT` holding the SDK's bytes
+    (never MySQL's `JSON` type, which rewrites them), names compare by byte
+    (`utf8mb4_bin`), and a run's trigger is cut to 255 characters.
     """
 
     @behaviour Cronwatch.Store
@@ -93,7 +103,8 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       case repo.__adapter__() do
         Ecto.Adapters.SQLite3 -> {:ok, :sqlite}
         Ecto.Adapters.Postgres -> {:ok, :postgres}
-        other -> {:error, "Cronwatch.Store.Ecto does not support the #{inspect(other)} adapter yet"}
+        Ecto.Adapters.MyXQL -> {:ok, :mysql}
+        other -> {:error, "Cronwatch.Store.Ecto does not support the #{inspect(other)} adapter"}
       end
     end
 
@@ -399,7 +410,20 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     end
 
     @impl Cronwatch.Store
-    def insert_run(h, %Run{} = run), do: exec(h, h.sql.insert_run, insert_params(run))
+    def insert_run(h, %Run{} = run) do
+      # MySQL's trigger column is VARCHAR(255), which refuses anything longer
+      # (the others are TEXT): a long trigger is cut to fit rather than lose
+      # the whole run.
+      run =
+        with :mysql <- h.dialect,
+             points when length(points) > 255 <- String.codepoints(run.trigger) do
+          %{run | trigger: points |> Enum.take(255) |> Enum.join()}
+        else
+          _ -> run
+        end
+
+      exec(h, h.sql.insert_run, insert_params(run))
+    end
 
     @impl Cronwatch.Store
     def update_run(h, %Run{} = run), do: exec(h, h.sql.update_run, update_params(run))
@@ -409,8 +433,36 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     def update_run_if(h, %Run{} = run, from) do
       sql = SQL.update_run_if(h.dialect, h.prefix, length(from))
-      with {:ok, n} <- changed(h, sql, update_params(run) ++ from), do: {:ok, n > 0}
+
+      with {:ok, n} <- changed(h, sql, update_params(run) ++ from) do
+        if n > 0 or h.dialect != :mysql, do: {:ok, n > 0}, else: landed_run(h, run, from)
+      end
     end
+
+    # A MySQL connection that counts only the rows an UPDATE changed answers
+    # 0 for a row that already held these values (and matched): it was
+    # written all the same. MyXQL asks for found rows, so this is for a
+    # server or proxy that does not honour it.
+    defp landed_run(h, run, from) do
+      case get_run(h, run.id) do
+        {:ok, %Run{} = stored} -> {:ok, stored.status in from and written(stored) == written(run)}
+        {:ok, nil} -> {:ok, false}
+        {:error, _} = e -> e
+      end
+    end
+
+    # What an update of a run writes, compared whatever order a JSON column
+    # gave an object's keys back in.
+    defp written(%Run{} = r) do
+      {r.status, r.finished_at, r.duration_ms, r.error, r.output, canonical(r.metrics), r.id}
+    end
+
+    defp canonical(%Object{} = o),
+      do: o |> Object.to_list() |> Enum.map(fn {k, v} -> {k, canonical(v)} end) |> Enum.sort()
+
+    defp canonical(list) when is_list(list), do: Enum.map(list, &canonical/1)
+    defp canonical(n) when is_number(n), do: JS.stringify(n)
+    defp canonical(other), do: other
 
     @doc "Deletes a run only while it is of `job` and in `status`, in one statement."
     @impl Cronwatch.Store
@@ -439,6 +491,41 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     end
 
     @impl Cronwatch.Store
+    def compare_and_set_state(%__MODULE__{dialect: :mysql} = h, %JobState{} = state, 0) do
+      body = JobState.to_json(state)
+
+      # Version 0 on MySQL is a row at version 0 (or with none), or no row at
+      # all.
+      case changed(h, h.sql.cas_from_zero, [body, state.job]) do
+        {:ok, n} when n > 0 ->
+          {:ok, true}
+
+        {:ok, 0} ->
+          case changed(h, h.sql.cas_insert, [state.job, body]) do
+            {:ok, _} ->
+              {:ok, true}
+
+            {:error, _} = e ->
+              # A row is there: another process wrote first, unless it holds
+              # exactly what this write sent, when the write landed and only
+              # its answer was lost (a row at version 0 that already held
+              # these values, which a connection counting changed rows
+              # answers 0 for, or a connection dropped after the commit), as
+              # the PHP port's stateLanded() reads it. Counting that as
+              # refused would have the client work the change out again over
+              # its own write, and the alert the first attempt opened would
+              # never go out.
+              case get_state(h, state.job) do
+                {:ok, %JobState{} = stored} -> {:ok, JobState.to_json(stored) == body}
+                _ -> e
+              end
+          end
+
+        {:error, _} = e ->
+          e
+      end
+    end
+
     def compare_and_set_state(h, %JobState{} = state, 0) do
       with {:ok, n} <- changed(h, h.sql.cas_insert, [state.job, JobState.to_json(state)]), do: {:ok, n > 0}
     end

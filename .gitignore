@@ -25,3 +25,4 @@ packages/elixir/**/_build/
 packages/elixir/**/deps/
 packages/elixir/**/mix.lock
 packages/elixir/**/erl_crash.dump
+packages/elixir/_build_floor/

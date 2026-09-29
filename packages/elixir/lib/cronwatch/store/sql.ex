@@ -9,12 +9,18 @@ defmodule Cronwatch.Store.SQL do
   a JSON parameter through the repo's JSON library and decode a `jsonb` column
   into a map, losing the SDK's key order and numbers, so a JSON parameter is
   written `$n::text::jsonb` and a JSON column is read `col::text`. The schema
-  does not differ. The Postgres dialect is here for phase 2 and not yet run
-  against a server; MySQL (the PHP, Go and Rust ports' dialect) comes then too.
+  does not differ.
+
+  MySQL (and MariaDB) has a dialect of its own, the PHP, Go and Rust ports'
+  (`packages/go/sqlstore/sql.go`), since it has no `ON CONFLICT`, no partial
+  index and no `TEXT` primary key: the same tables, columns and values, with
+  the JSON columns as `LONGTEXT` holding the SDK's JSON byte for byte, never
+  MySQL's `JSON` type, which would rewrite it. It needs MySQL 8.0.13 or
+  MariaDB 10.6 or newer.
   """
 
   @typedoc "The database's SQL."
-  @type dialect :: :sqlite | :postgres
+  @type dialect :: :sqlite | :postgres | :mysql
 
   @default_prefix "cronwatch_"
   # Postgres truncates identifiers past 63 bytes; the longest name built is
@@ -52,6 +58,8 @@ defmodule Cronwatch.Store.SQL do
   template, whitespace and all, cut into its statements.
   """
   @spec schema(dialect(), String.t()) :: [String.t()]
+  def schema(:mysql, p), do: mysql_schema(p)
+
   def schema(dialect, p) do
     {int, json, seq} =
       case dialect do
@@ -90,11 +98,59 @@ defmodule Cronwatch.Store.SQL do
     |> Enum.reject(&(String.trim(&1) == ""))
   end
 
+  # MySQL's tables (the PHP, Go and Rust ports'): VARCHAR(255) keys, BIGINT
+  # times, LONGTEXT JSON, utf8mb4_bin so names compare and sort by byte, seq
+  # for insertion order, and a plain index where the others have a partial
+  # one.
+  defp mysql_schema(p) do
+    table = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"
+
+    [
+      """
+      CREATE TABLE IF NOT EXISTS #{p}jobs (
+            name VARCHAR(255) NOT NULL,
+            definition LONGTEXT NOT NULL,
+            created_at BIGINT NOT NULL,
+            updated_at BIGINT NOT NULL,
+            PRIMARY KEY (name)
+          ) #{table}\
+      """,
+      """
+      CREATE TABLE IF NOT EXISTS #{p}runs (
+            seq BIGINT NOT NULL AUTO_INCREMENT,
+            id VARCHAR(255) NOT NULL,
+            job VARCHAR(255) NOT NULL,
+            status VARCHAR(255) NOT NULL,
+            started_at BIGINT NOT NULL,
+            finished_at BIGINT,
+            duration_ms BIGINT,
+            error MEDIUMTEXT,
+            output MEDIUMTEXT,
+            metrics LONGTEXT NOT NULL DEFAULT ('{}'),
+            `trigger` VARCHAR(255) NOT NULL DEFAULT 'run',
+            PRIMARY KEY (id),
+            UNIQUE KEY #{p}runs_seq (seq),
+            KEY #{p}runs_job_started (job, started_at DESC),
+            KEY #{p}runs_running (status)
+          ) #{table}\
+      """,
+      """
+      CREATE TABLE IF NOT EXISTS #{p}state (
+            job VARCHAR(255) NOT NULL,
+            state LONGTEXT NOT NULL,
+            PRIMARY KEY (job)
+          ) #{table}\
+      """
+    ]
+  end
+
   @doc """
-  The statements by name, with `?` placeholders on SQLite and `$1`, `$2`, ...
-  on Postgres, as `sql.ts` numbers them.
+  The statements by name, with `?` placeholders on SQLite and MySQL and `$1`,
+  `$2`, ... on Postgres, as `sql.ts` numbers them.
   """
   @spec statements(dialect(), String.t()) :: %{atom() => String.t()}
+  def statements(:mysql, p), do: mysql_statements(p)
+
   def statements(dialect, p) do
     pg = dialect == :postgres
     # Insertion order, to break ties between runs that started in the same
@@ -160,6 +216,55 @@ defmodule Cronwatch.Store.SQL do
       delete_run_if: "DELETE FROM #{p}runs WHERE id = ? AND job = ? AND status = ?"
     }
     |> Map.new(fn {k, v} -> {k, if(pg, do: number(v), else: v)} end)
+  end
+
+  # MySQL's statements, the PHP, Go and Rust ports' text.
+  defp mysql_statements(p) do
+    # The version inside a state's JSON text, 0 when it has none. MySQL's
+    # JSON_EXTRACT answers JSON and MariaDB's text; unquoted and cast, both
+    # are a number.
+    version = fn column ->
+      "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(#{column}, '$.version')) AS SIGNED), 0)"
+    end
+
+    %{
+      upsert_job: """
+      INSERT INTO #{p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE definition = VALUES(definition), updated_at = VALUES(updated_at)\
+      """,
+      get_job: "SELECT * FROM #{p}jobs WHERE name = ?",
+      list_jobs: "SELECT * FROM #{p}jobs ORDER BY name",
+      delete_runs: "DELETE FROM #{p}runs WHERE job = ?",
+      delete_state: "DELETE FROM #{p}state WHERE job = ?",
+      delete_job: "DELETE FROM #{p}jobs WHERE name = ?",
+      insert_run: """
+      INSERT INTO #{p}runs (id, job, status, started_at, finished_at, duration_ms, error, output, metrics, `trigger`)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\
+      """,
+      update_run:
+        "UPDATE #{p}runs SET status = ?, finished_at = ?, duration_ms = ?, error = ?, output = ?, metrics = ? WHERE id = ?",
+      get_run: "SELECT * FROM #{p}runs WHERE id = ?",
+      list_runs: "SELECT * FROM #{p}runs WHERE job = ? ORDER BY started_at DESC, seq DESC LIMIT ?",
+      running_runs: "SELECT * FROM #{p}runs WHERE status = 'running' ORDER BY started_at, seq",
+      get_state: "SELECT state FROM #{p}state WHERE job = ?",
+      set_state: "INSERT INTO #{p}state (job, state) VALUES (?, ?) ON DUPLICATE KEY UPDATE state = VALUES(state)",
+      # compareAndSetState from version 0, in two steps that each decide
+      # alone: a row at version 0 (or without one) is updated, and failing
+      # that the row is inserted, which a row already there refuses. Neither
+      # leans on how the connection counts affected rows.
+      cas_from_zero: "UPDATE #{p}state SET state = ? WHERE job = ? AND #{version.("state")} = 0",
+      cas_insert: "INSERT INTO #{p}state (job, state) VALUES (?, ?)",
+      cas_update: "UPDATE #{p}state SET state = ? WHERE job = ? AND #{version.("state")} = ?",
+      # MySQL refuses a subquery on the table a DELETE deletes from, so the
+      # newest start per job is a derived table joined in (grouped, so it is
+      # materialized rather than merged).
+      prune: """
+      DELETE r FROM #{p}runs r
+            JOIN (SELECT job, MAX(started_at) AS newest FROM #{p}runs GROUP BY job) n ON n.job = r.job
+            WHERE r.status <> 'running' AND r.started_at < ? AND r.started_at < n.newest\
+      """,
+      delete_run_if: "DELETE FROM #{p}runs WHERE id = ? AND job = ? AND status = ?"
+    }
   end
 
   @doc """
