@@ -8,7 +8,9 @@
 # Postgres and WordPress, against each supported Laravel and Symfony
 # series, and in a real Drupal and a real Craft. The Go module's tests run
 # on the two Go releases Go supports, with the race detector, against
-# SQLite, Postgres, MySQL and MariaDB. The MCP server is driven against each port's
+# SQLite, Postgres, MySQL and MariaDB. The Rust workspace's tests run on
+# its rust-version (1.85, the core) and on stable (everything), with
+# rustfmt and clippy. The MCP server is driven against each port's
 # dashboard. One Node, one Ruby, one Python, one PHP and one Go entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
@@ -769,3 +771,48 @@ jobs:
         run: npm test --workspace packages/mcp
         env:
           CRONWATCH_TEST_GO: "1"
+
+  rust:
+    name: rust (Rust ${{ matrix.rust }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The core's rust-version, and the current stable. cronwatch-sqlx
+        # needs 1.94 (sqlx 0.9), so it is linted and tested on stable only.
+        rust: ["1.85", "stable"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Builds the SDK (for the croner parity and Node compatibility tests),
+      # then fails if conformance/ or the dashboard fixture is stale.
+      - run: npm run check:conformance
+      # rustup is on the runner, so no third-party action is needed.
+      - name: Install Rust ${{ matrix.rust }}
+        run: |
+          rustup toolchain install ${{ matrix.rust }} --profile minimal --component rustfmt,clippy
+          rustup default ${{ matrix.rust }}
+      - name: cargo fmt
+        if: matrix.rust == 'stable'
+        working-directory: packages/rust
+        run: cargo fmt --check
+      - name: cargo clippy
+        working-directory: packages/rust
+        run: |
+          if [ "${{ matrix.rust }}" = "stable" ]; then
+            cargo clippy --workspace --all-targets --all-features -- -D warnings
+          else
+            cargo clippy -p cronwatch --all-targets --all-features -- -D warnings
+          fi
+      # The workspace's .cargo/config.toml sets TZ=UTC, as the fixtures are made.
+      - name: cargo test
+        working-directory: packages/rust
+        run: |
+          if [ "${{ matrix.rust }}" = "stable" ]; then
+            cargo test --workspace --all-features
+          else
+            cargo test -p cronwatch --all-features
+          fi
