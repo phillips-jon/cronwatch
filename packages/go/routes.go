@@ -294,7 +294,13 @@ func (rt *Routes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := stripBase(pathname, base)
 	wantsHTML := !strings.HasPrefix(path, "/api")
 	failed := func(err error) answer {
-		rt.c.report(err, "routes")
+		// A request that ended first (the caller gave up, its deadline
+		// passed) failed for that alone, and nobody reads the answer:
+		// reporting each would only be noise.
+		ended := r.Context().Err()
+		if ended == nil || !(errors.Is(err, ended) || errors.Is(err, context.Cause(r.Context()))) {
+			rt.c.report(err, "routes")
+		}
 		if wantsHTML {
 			return page(messagePage("Something went wrong", "The request failed and the error was reported.", base, false), http.StatusInternalServerError)
 		}

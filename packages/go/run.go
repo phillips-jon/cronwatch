@@ -215,6 +215,13 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 		started.Add(1)
 		go func() {
 			defer started.Done()
+			// A panic here (a store's) would end the process, where the
+			// same panic beside the job is the job's to see: reported.
+			defer func() {
+				if p := recover(); p != nil {
+					c.report(fmt.Errorf("panicked: %v", p), "starting "+name)
+				}
+			}()
 			closeOnStart()
 		}()
 	}

@@ -74,7 +74,9 @@ func (j *Job) Handler(fn HandlerFunc, options ...HandlerOption) http.Handler {
 // RunValue is Run's: a string is the run's output when nothing was logged,
 // and an *http.Response (a call to another service, say) is the answer,
 // copied to the caller, its status of 400 or more failing the run with
-// "HTTP <status> <reason>". The response's body is closed.
+// "HTTP <status> <reason>". The response's body is closed. A response
+// returned with an error is not the answer: the run failed with the error,
+// and the caller gets the JSON answer.
 func HandlerValue[T any](job *Job, fn func(ctx context.Context, job *JobContext, w http.ResponseWriter, r *http.Request) (T, error), options ...HandlerOption) http.Handler {
 	cfg := handlerConfig{}
 	for _, o := range options {
@@ -137,6 +139,16 @@ func (h *jobHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	aw := &answerWriter{ResponseWriter: w}
 	out := h.run(aw, r)
+	// A response the function returned is the answer only when it returned
+	// no error with it (the SDK cannot return one and throw) and wrote no
+	// answer of its own; otherwise its body is closed unread.
+	res, _ := out.result.(*http.Response)
+	if res != nil && (out.panicked || out.err != nil || aw.wrote) {
+		if res.Body != nil {
+			_ = res.Body.Close()
+		}
+		res = nil
+	}
 	if out.panicked {
 		// The run is recorded as failed. http.ErrAbortHandler is net/http's
 		// own way to abort a response, and one the function had begun to
@@ -148,7 +160,7 @@ func (h *jobHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else if aw.wrote {
 		return
 	}
-	if res, ok := out.result.(*http.Response); ok && res != nil && !out.panicked {
+	if res != nil {
 		copyResponse(w, res)
 		return
 	}

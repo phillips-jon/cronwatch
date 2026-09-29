@@ -101,6 +101,43 @@ func TestHandlerAResponseIsTheAnswerAndFailsTheRunAt400(t *testing.T) {
 	eq(t, "its output", *runs(t, k.cw, "h")[0].Output, "Report written")
 }
 
+// closeCounter is a body that counts its closes.
+type closeCounter struct {
+	io.Reader
+	closed *int
+}
+
+func (b closeCounter) Close() error { *b.closed++; return nil }
+
+// The audit: a response returned with an error was the answer (a 200 for a
+// failed run), and one returned by a function that wrote its own answer
+// was never closed.
+func TestHandlerAResponseReturnedWithAnErrorIsNotTheAnswer(t *testing.T) {
+	k := newKit(t)
+	job := must[*cronwatch.Job](t)(k.cw.Job("h"))
+	closed := 0
+	upstream := func() *http.Response {
+		return &http.Response{StatusCode: 200, Status: "200 OK", Body: closeCounter{strings.NewReader("fine"), &closed}, ContentLength: 4}
+	}
+	failing := cronwatch.HandlerValue(job, func(ctx context.Context, j *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) (*http.Response, error) {
+		return upstream(), errors.New("the report was empty")
+	})
+	res := serve(failing, "GET", "http://x/", nil, "")
+	status(t, "the run's answer", res, 500)
+	eq(t, "not ok", decode(t, res)["ok"], any(false))
+	eq(t, "closed", closed, 1)
+	eq(t, "error", *runs(t, k.cw, "h")[0].Error, "Error: the report was empty")
+
+	wrote := cronwatch.HandlerValue(job, func(ctx context.Context, j *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) (*http.Response, error) {
+		w.WriteHeader(http.StatusAccepted)
+		return upstream(), nil
+	})
+	k.c.Advance(1000)
+	res = serve(wrote, "GET", "http://x/", nil, "")
+	status(t, "its own answer", res, 202)
+	eq(t, "closed too", closed, 2)
+}
+
 func TestHandlerFailsClosedWithoutASecretOutsideDevelopment(t *testing.T) {
 	t.Setenv("CRONWATCH_ENV", "")
 	t.Setenv("APP_ENV", "")

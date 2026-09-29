@@ -578,3 +578,44 @@ func queued(t *testing.T, store cronwatch.Store, c *clockOf, name string) {
 		t.Fatal("the job should fail")
 	}
 }
+
+// The audit: a store that panicked in a Start with a run id left that id's
+// start in flight for good, so every later Start of it waited forever.
+func TestAStartThatPanickedEndsForTheNextOne(t *testing.T) {
+	store := newTestStore()
+	k := newKit(t, cronwatch.WithStore(store))
+	job := k.cw.MustJob("resumable")
+	store.hook("GetRun", func() { panic("the store fell over") })
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("the panic did not reach the caller")
+			}
+		}()
+		_, _ = job.Start(bg, cronwatch.WithRunID("run-1"))
+	}()
+	done := make(chan error, 1)
+	go func() {
+		_, err := job.Start(bg, cronwatch.WithRunID("run-1"))
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		check(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the next start waited on the one that panicked")
+	}
+}
+
+// The audit: a store that panicked while a run's start closed missed and
+// stuck, in the goroutine beside the job, ended the process.
+func TestAPanicClosingMissedAtTheStartIsReported(t *testing.T) {
+	store := newTestStore()
+	k := newKit(t, cronwatch.WithStore(store))
+	job := k.cw.MustJob("nightly")
+	store.hook("GetState", func() { panic("the store fell over") })
+	check(t, job.Run(bg, func(context.Context, *cronwatch.JobContext) error { return nil }))
+	if got := strings.Join(k.errors.List(), "\n"); got != "starting nightly: panicked: the store fell over" {
+		t.Fatalf("reported: %q", got)
+	}
+}

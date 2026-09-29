@@ -160,6 +160,12 @@ func readHost(host string) (string, error) {
 	}
 	decoded = strings.ToLower(decoded)
 	if !isASCII(decoded) {
+		// Punycode takes time in the label's length times its distinct
+		// characters, and a Host header is anyone's to send: a name no
+		// DNS could hold (253 bytes) is refused well past that bound.
+		if len(decoded) > maxIDNHost {
+			return "", errNotURL
+		}
 		labels := strings.Split(decoded, ".")
 		for i, label := range labels {
 			if !isASCII(label) {
@@ -182,6 +188,9 @@ func readHost(host string) (string, error) {
 	}
 	return decoded, nil
 }
+
+// maxIDNHost is the longest host outside ASCII read, in bytes.
+const maxIDNHost = 1024
 
 func isASCII(s string) bool {
 	for i := 0; i < len(s); i++ {

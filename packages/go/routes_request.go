@@ -212,7 +212,10 @@ func param(pairs []formPair, name string) (string, bool) {
 }
 
 // readLimited reads a body up to MaxBody, or errBodyTooLarge past it (by
-// its Content-Length, or once more than that has arrived).
+// its Content-Length, or once more than that has arrived). A body that
+// could not be read to its end (the client went away, a read deadline) is
+// none, as the SDK's readBody has it, never the part that arrived:
+// "for=7d" cut short is "for=7", a silence of 7 ms.
 func readLimited(r *http.Request) ([]byte, error) {
 	if r.Body == nil || r.Body == http.NoBody {
 		return nil, nil
@@ -224,7 +227,10 @@ func readLimited(r *http.Request) ([]byte, error) {
 	if len(data) > MaxBody {
 		return nil, errBodyTooLarge
 	}
-	return data, err
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // readBody is the form fields or JSON object of a request, each value as

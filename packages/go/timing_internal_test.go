@@ -8,6 +8,7 @@ package cronwatch
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -392,4 +393,28 @@ func (s *panickyStore) RunningRuns(ctx context.Context) ([]Run, error) {
 		}
 	}
 	return s.MemoryStore.RunningRuns(ctx)
+}
+
+// The audit: a Host header of many distinct characters outside ASCII,
+// sent before any token is checked, took seconds to punycode.
+func TestALongHostOutsideASCIIIsNotRead(t *testing.T) {
+	var b strings.Builder
+	for r := rune(0x4e00); b.Len() <= maxIDNHost; r++ {
+		b.WriteRune(r)
+	}
+	if _, err := readHost(b.String()); err == nil {
+		t.Fatal("a host past the bound was read")
+	}
+	if got, err := readHost("bücher.example"); err != nil || got != "xn--bcher-kva.example" {
+		t.Fatalf("got %q %v", got, err)
+	}
+	for r := rune(0x4e00 + maxIDNHost); r < 0x4e00+40000; r++ {
+		b.WriteRune(r)
+	}
+	started := time.Now()
+	r := &http.Request{Host: b.String()}
+	_ = requestOrigin(r)
+	if d := time.Since(started); d > time.Second {
+		t.Fatalf("took %v", d)
+	}
 }

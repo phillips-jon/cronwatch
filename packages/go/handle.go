@@ -62,14 +62,19 @@ func (j *Job) Start(ctx context.Context, options ...RunOption) (*RunHandle, erro
 		<-call.done
 		return call.handle, call.err
 	}
-	call := &startCall{done: make(chan struct{})}
+	// The error stands for a start that panicked (a store's panic, carried
+	// on up this caller's stack): the call still ends, so the start of this
+	// id waiting on it, and every later one, is not left waiting for good.
+	call := &startCall{done: make(chan struct{}), err: fmt.Errorf("starting run %s of %s panicked", cfg.id, js.Quote(def.name))}
 	c.starting[key] = call
 	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		delete(c.starting, key)
+		c.mu.Unlock()
+		close(call.done)
+	}()
 	call.handle, call.err = c.recordStart(ctx, def, cfg.trigger, cfg.id, true)
-	c.mu.Lock()
-	delete(c.starting, key)
-	c.mu.Unlock()
-	close(call.done)
 	return call.handle, call.err
 }
 
@@ -224,18 +229,23 @@ func (h *RunHandle) Active() bool {
 	return !h.finished
 }
 
-func (h *RunHandle) recorder() *output.Recorder {
+// Log adds a line of output, kept in the handle until Flush or Finish.
+// It holds the handle's lock as it writes, so a line logged as a Flush
+// takes the recorder goes to the one taken or to its successor, never to
+// one already read.
+func (h *RunHandle) Log(parts ...any) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.rec
+	h.rec.Log(parts...)
 }
-
-// Log adds a line of output, kept in the handle until Flush or Finish.
-func (h *RunHandle) Log(parts ...any) { h.recorder().Log(parts...) }
 
 // Metric reports a number for this run. A later value for the same name
 // replaces an earlier one.
-func (h *RunHandle) Metric(name string, value float64) error { return h.recorder().Metric(name, value) }
+func (h *RunHandle) Metric(name string, value float64) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.rec.Metric(name, value)
+}
 
 func (h *RunHandle) ignored(why string) {
 	h.c.report(fmt.Errorf("run %s of %s %s; ignored", h.id, h.def.name, why), "finishing "+h.def.name)

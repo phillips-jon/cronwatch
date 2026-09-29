@@ -383,6 +383,55 @@ func TestRoutesSilenceDurations(t *testing.T) {
 	eq(t, "the query when the body has none", int64(decode(t, w.send("POST", "/cronwatch/api/jobs/s/silence?for=3h", auth, ""))["state"].(map[string]any)["silencedUntil"].(float64))-T0, 3*HOUR)
 }
 
+// ctxStore fails ListJobs with its context's error, as a network store does.
+type ctxStore struct{ *cronwatch.MemoryStore }
+
+func (s ctxStore) ListJobs(ctx context.Context) ([]cronwatch.StoredJob, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return s.MemoryStore.ListJobs(ctx)
+}
+
+// The audit: every request that ended before its answer (a platform cron
+// that timed out, a browser gone elsewhere) was reported as a failure.
+func TestRoutesARequestThatEndedIsNotReported(t *testing.T) {
+	w := newWeb(t, nil, cronwatch.WithStore(ctxStore{cronwatch.NewMemoryStore()}))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	rec := httptest.NewRecorder()
+	w.routes.ServeHTTP(rec, request("GET", "http://app.test/cronwatch/api/jobs", auth, "").WithContext(ctx))
+	status(t, "failed", rec, 500)
+	eq(t, "reported", len(w.errors.List()), 0)
+	status(t, "a request still open", w.get("/cronwatch/api/jobs", auth), 200)
+}
+
+// cutShort is a body that ends in an error after its first bytes, as one
+// whose client went away does.
+type cutShort struct{ r io.Reader }
+
+func (c *cutShort) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	if err == io.EOF {
+		err = io.ErrUnexpectedEOF
+	}
+	return n, err
+}
+
+// The audit: a body cut short was read as far as it came, so "for=7d"
+// silenced the job for 7 ms. The SDK reads a body it cannot read as none.
+func TestRoutesABodyCutShortIsNone(t *testing.T) {
+	w := newWeb(t, nil)
+	check(t, w.cw.Run(bg, "s", ok))
+	r := request("POST", "http://app.test/cronwatch/api/jobs/s/silence", join(auth, form), "")
+	r.Body = io.NopCloser(&cutShort{strings.NewReader("for=7")})
+	r.ContentLength = int64(len("for=7d"))
+	rec := httptest.NewRecorder()
+	w.routes.ServeHTTP(rec, r)
+	status(t, "silenced", rec, 200)
+	eq(t, "the default hour", *summary(t, w.cw, "s").SilencedUntil, T0+HOUR)
+}
+
 func TestRoutesTheSilenceFormShowsAnError(t *testing.T) {
 	w := newWeb(t, nil)
 	check(t, w.cw.Run(bg, "s", ok))
