@@ -36,6 +36,8 @@
 
 mod check;
 mod client;
+#[cfg(test)]
+mod conformance;
 mod deliver;
 mod env;
 mod error;

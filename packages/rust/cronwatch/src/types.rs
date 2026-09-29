@@ -568,7 +568,7 @@ pub enum AlertDetails {
 }
 
 impl AlertDetails {
-    fn to_value(&self) -> Value {
+    pub(crate) fn to_value(&self) -> Value {
         let o = match self {
             AlertDetails::Missed { due_at, deadline, grace_ms, last_run_at } => Object::new()
                 .with("dueAt", *due_at)
@@ -600,7 +600,7 @@ impl AlertDetails {
         Value::Object(o)
     }
 
-    fn from_value(t: &AlertType, o: &Object) -> AlertDetails {
+    pub(crate) fn from_value(t: &AlertType, o: &Object) -> AlertDetails {
         match t {
             AlertType::Missed => AlertDetails::Missed {
                 due_at: int_of(o, "dueAt"),

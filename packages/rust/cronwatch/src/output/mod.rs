@@ -227,4 +227,4 @@ pub(crate) fn redact_secrets(text: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

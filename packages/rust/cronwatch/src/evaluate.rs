@@ -455,7 +455,7 @@ pub(crate) fn is_stuck(def: &Definition, run: &Run, now: i64) -> Result<bool, St
 /// is silenced nothing new is recorded as an incident: conditions may close
 /// (so a job that recovered during the silence shows as healthy) but none
 /// may open, so the first problem after the silence ends alerts normally.
-fn mute_opens(previous: &JobState, next: &JobState) -> JobState {
+pub(crate) fn mute_opens(previous: &JobState, next: &JobState) -> JobState {
     let mut muted = clone_state(next);
     muted.open.retain(|o| previous.open_at(&o.condition).is_some());
     muted
