@@ -7,23 +7,23 @@ cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch
 for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), cronwatch.dev/go for
 Go (robfig/cron, gocron, River, Asynq), and the cronwatch crate for Rust
 (tokio-cron-scheduler, apalis). It runs inside my app and writes to
-my own database. There is no hosted service, no account and no API key.
+my own database. There is no hosted service and no account to make; the only
+key it can use is an Anthropic API key, for triage, which is optional.
 
-First decide which one this project needs. A package.json with a Node server,
-Next.js or other JavaScript runtime means the TypeScript steps below; a
-wrangler.toml (or wrangler.jsonc) means Cloudflare Workers, which follow the
-same steps with the Workers notes in each. A Gemfile
-means the Ruby steps (a Rails app follows them as written; plain Ruby, see
-https://cronwatch.dev/docs/ruby/). A pyproject.toml, requirements.txt or
-manage.py means the Python steps. A composer.json or wp-config.php means the
-PHP steps (artisan is Laravel, bin/console Symfony, wp-config.php WordPress,
-drupal/core-recommended in composer.json Drupal, craftcms/cms Craft CMS). A go.mod
-means the Go steps (github.com/robfig/cron/v3, github.com/go-co-op/gocron/v2,
-github.com/riverqueue/river or github.com/hibiken/asynq in it names the
-scheduler). A Cargo.toml means the Rust steps (tokio-cron-scheduler or
-apalis among its dependencies names the scheduler). If the scheduled jobs
-live in more than one,
-set up each side where its jobs run; they can share one database.
+First decide which steps this project needs:
+- package.json (Node, Next.js or another JavaScript runtime): TypeScript. With
+  wrangler.toml or wrangler.jsonc it is Cloudflare Workers; follow the Workers notes.
+- Gemfile: Ruby. A Rails app follows the steps as written; for plain Ruby see
+  https://cronwatch.dev/docs/ruby/
+- pyproject.toml, requirements.txt or manage.py: Python.
+- composer.json or wp-config.php: PHP. artisan is Laravel, bin/console Symfony,
+  wp-config.php WordPress, drupal/core-recommended Drupal, craftcms/cms Craft CMS.
+- go.mod: Go. robfig/cron/v3, go-co-op/gocron/v2, riverqueue/river or hibiken/asynq
+  in it names the scheduler.
+- Cargo.toml: Rust. tokio-cron-scheduler or apalis among its dependencies names the
+  scheduler.
+If scheduled jobs live in more than one, set up each side where its jobs run;
+they can share one database.
 
 TypeScript and Node
 
@@ -35,7 +35,7 @@ TypeScript and Node
    npm install @cronwatch/sdk                    # for d1 on Workers: no driver
 
 2. Create one client for the whole app, in its own module, and export it.
-   Pick the store that matches this project: sqlite for a long running server,
+   Pick the store that matches this project: sqlite for a long-running server,
    postgres for serverless or anything with more than one instance, d1 on
    Cloudflare Workers.
 
@@ -44,7 +44,8 @@ TypeScript and Node
    import { slack } from "@cronwatch/sdk/slack";
    // Other channels, one import each: discord, webhook, resend, postmark,
    // sendgrid, mailgun, ses, twilio, sentry, honeybadger, datadog, rollbar,
-   // bugsnag, newrelic. Omit alerts for the console.
+   // bugsnag, newrelic. custom(name, fn) from "@cronwatch/sdk" makes a channel
+   // of your own. Omit alerts for the console.
 
    export const cw = cronwatch({
      store: sqlite({ path: "./data/cronwatch.db" }),
@@ -86,7 +87,7 @@ TypeScript and Node
    from "@cronwatch/sdk/node".
 
 5. Make missed and stuck runs detectable. A job that never fires cannot report
-   itself, so something has to look. In a long running server call cw.start()
+   itself, so something has to look. In a long-running server call cw.start()
    once at boot. On serverless, mount the routes and point a cron at the check
    endpoint every few minutes. On Workers, give the check a Cron Trigger of
    its own that calls cw.check() in scheduled(); never cw.start() there.
@@ -99,7 +100,7 @@ TypeScript and Node
 6. Set the environment variables you referenced: CRON_SECRET, CRONWATCH_TOKEN,
    and whichever alert channel you chose. Do not invent other names.
 
-Ruby on Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
+Ruby and Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
 
 1. Install the gem, generate the migration and initializer, and migrate:
 
@@ -118,7 +119,12 @@ Ruby on Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
 
    Other channels under Cronwatch::Alerts: Discord, Webhook, Resend, Postmark,
    Sendgrid, Mailgun, Ses, Twilio, Sentry, Honeybadger, Datadog, Rollbar,
-   Bugsnag, NewRelic, Console. Their options: https://cronwatch.dev/docs/ruby/
+   Bugsnag, NewRelic, Console, and Custom.new("name") { |alert| ... } for a
+   channel of your own. Their options: https://cronwatch.dev/docs/ruby/
+
+   If the project uses pg_cron, require "cronwatch/pg_cron" and add
+   c.sources = [Cronwatch::Sources::PgCron.new(ActiveRecord::Base)]. Each
+   check then reads pg_cron's own tables. Do not declare those jobs yourself.
 
 3. Watch each scheduled job in its class. For ActiveJob:
 
@@ -138,7 +144,7 @@ Ruby on Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
    entry in that file at once, add Cronwatch.declare_from_scheduler!(grace: "10m")
    to the initializer after Cronwatch.configure.
 
-4. Schedule Cronwatch::CheckJob every 5 minutes, beside the other recurring
+4. Schedule Cronwatch::CheckJob every few minutes, beside the other recurring
    jobs, so missed and stuck runs are noticed. In config/recurring.yml:
 
    production:
@@ -146,8 +152,10 @@ Ruby on Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
        class: Cronwatch::CheckJob
        schedule: every 5 minutes
 
-   With sidekiq-cron, add the same class with cron "*/5 * * * *". With neither,
-   a crontab line runs bin/rails cronwatch:check every 5 minutes.
+   With sidekiq-cron, add the same class with cron "*/5 * * * *", or
+   Cronwatch::Sidekiq::CheckWorker when the Sidekiq jobs do not go through
+   ActiveJob. With neither, a crontab line runs bin/rails cronwatch:check
+   every 5 minutes.
 
 5. Mount the dashboard in config/routes.rb (no require needed in Rails):
 
@@ -166,9 +174,10 @@ Python (Python 3.11 or newer)
    pip install "cronwatch-sdk[postgres,django,celery]"
 
    Extras: postgres, django (Django 5.2 or newer), celery (Celery 5.5 or
-   newer), apscheduler (APScheduler 3), anthropic (triage). The import name is
-   cronwatch. Add it to the project's own dependency file (pyproject.toml,
-   requirements.txt) the way the project already does.
+   newer), apscheduler (APScheduler 3.10 or newer, not 4), anthropic
+   (triage). The import name is cronwatch. Add it to the project's own
+   dependency file (pyproject.toml, requirements.txt) the way the project
+   already does.
 
 2. Use a store every process shares (web, workers and the check must see the
    same runs): cronwatch.stores.postgres.PostgresStore() (reads DATABASE_URL),
@@ -188,8 +197,14 @@ Python (Python 3.11 or newer)
 
    Other channels in cronwatch.alerts: Discord, Webhook, Resend, Postmark,
    Sendgrid, Mailgun, Ses, Twilio, Sentry, Honeybadger, Datadog, Rollbar,
-   Bugsnag, NewRelic (and cronwatch.Console). Email senders take from_ (from
-   is a Python keyword). Their options: https://cronwatch.dev/docs/python/
+   Bugsnag, NewRelic, Console, and Custom("name", fn) for a channel of your
+   own. Email senders take from_ (from is a Python keyword). Their options:
+   https://cronwatch.dev/docs/python/
+
+   If the project uses pg_cron, add sources=[PgCron(os.environ["DATABASE_URL"])]
+   ("SOURCES" in Django) with from cronwatch.sources.pgcron import PgCron.
+   Each check then reads pg_cron's own tables. Do not declare those jobs
+   yourself.
 
 3. Watch each scheduled job:
 
@@ -210,7 +225,7 @@ Python (Python 3.11 or newer)
      .django, .flask, .starlette and .aws_lambda endpoints, which need
      Authorization: Bearer $CRON_SECRET.
 
-4. Run the check every 5 minutes so missed and stuck runs are noticed: the
+4. Run the check every few minutes so missed and stuck runs are noticed: the
    Celery beat entry above, or a crontab line running
    python manage.py cronwatch_check (Django) or a script calling cw.check(),
    or cw.start() once in a long-running process. One checker per store.
@@ -228,10 +243,13 @@ Python (Python 3.11 or newer)
 PHP (PHP 8.2 or newer)
 
 1. Pick the steps for the framework. Each records every run in the app's own
-   database through a connection of its own, and needs no other service.
+   database, and needs no other service.
 
-   - WordPress: install and activate the CronWatch plugin
-     (wp plugin install cronwatch --activate). Every WP-Cron event is watched
+   - WordPress: the plugin is not in the wordpress.org directory yet; it is
+     attached to the GitHub release. Install and activate it with
+     wp plugin install https://github.com/phillips-jon/cronwatch/releases/download/v0.7.0/cronwatch-0.7.0.zip --activate
+     or upload that zip under Plugins, Add New Plugin in wp-admin. Every
+     WP-Cron event is watched
      with no code. Set the alert channel under CronWatch, Settings. If the
      site is not visited every few minutes, add define('DISABLE_WP_CRON',
      true) to wp-config.php and crontab lines running
@@ -247,7 +265,9 @@ PHP (PHP 8.2 or newer)
      cronwatch: { alerts: { slack: '%env(CRONWATCH_SLACK_WEBHOOK_URL)%' } }.
      Every Scheduler message is watched, and the check is added to the
      default schedule, so the worker consuming scheduler_default runs it.
-   - Drupal: composer require drupal/cronwatch, drush pm:install cronwatch.
+   - Drupal: composer require drupal/cronwatch, drush pm:install cronwatch,
+     once the drupal.org release is out; until then, see
+     https://cronwatch.dev/docs/drupal/
      Every cron run and each module's hook_cron is watched. Set the alert
      channel and the cron schedule under Configuration, System, CronWatch.
    - Craft CMS: composer require cronwatch/craft,
@@ -263,7 +283,7 @@ PHP (PHP 8.2 or newer)
    the client:
 
    $cw = new Cronwatch\Cronwatch(
-       store: new Cronwatch\Store\MysqlStore(getenv('DATABASE_URL')),   // or SqliteStore('/var/lib/app/cronwatch.db'), PostgresStore(...)
+       store: new Cronwatch\Store\MysqlStore(getenv('DATABASE_URL')),   // MySQL or MariaDB; or SqliteStore('/var/lib/app/cronwatch.db'), PostgresStore(...)
        alerts: [new Cronwatch\Alerts\Slack(getenv('SLACK_WEBHOOK_URL'))],
    );
    $cw->job('nightly-report', ['schedule' => '0 2 * * *', 'timezone' => 'UTC', 'grace' => '15m']);
@@ -271,8 +291,13 @@ PHP (PHP 8.2 or newer)
 
    Other channels under Cronwatch\Alerts: Discord, Webhook, Resend,
    Postmark, Sendgrid, Mailgun, Ses, Twilio, Sentry, Honeybadger, Datadog,
-   Rollbar, Bugsnag, NewRelic, with named arguments. Their options:
-   https://cronwatch.dev/docs/php/
+   Rollbar, Bugsnag, NewRelic, with named arguments, and
+   new Custom('name', fn (Alert $alert) => ...) for a channel of your own.
+   Their options: https://cronwatch.dev/docs/php/
+
+   If the project uses pg_cron, add
+   sources: [new Cronwatch\Sources\PgCron(getenv('DATABASE_URL'))]. Each
+   check then reads pg_cron's own tables. Do not declare those jobs yourself.
 
 3. Watch each scheduled job:
 
@@ -294,7 +319,7 @@ PHP (PHP 8.2 or newer)
      called with the request in a Symfony controller. It needs
      Authorization: Bearer $CRON_SECRET.
 
-4. Run the check every 5 minutes so missed and stuck runs are noticed:
+4. Run the check every few minutes so missed and stuck runs are noticed:
    Laravel schedules php artisan cronwatch:check itself, Symfony adds it to
    the default schedule, Drupal runs it after each cron run (add
    drush cronwatch:check to the crontab too), Craft CMS needs a crontab line
@@ -336,8 +361,9 @@ Go (Go 1.25 or newer)
 
    Other channels in cronwatch.dev/go/alerts, each made from an options
    struct: Discord, Webhook, Resend, Postmark, Sendgrid, Mailgun, SES,
-   Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, NewRelic. Their
-   options: https://cronwatch.dev/docs/go/
+   Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, NewRelic, and
+   cronwatch.ChannelFunc(name, fn) for a channel of your own. Their options:
+   https://cronwatch.dev/docs/go/
 
    If the project uses pg_cron, add
    cronwatch.WithSources(pgcron.New(db, pgcron.Options{})) from
@@ -363,7 +389,7 @@ Go (Go 1.25 or newer)
      scheduler.Register("*/5 * * * *", cwasynq.CheckTask()) and
      mux.Handle(cwasynq.CheckType, w.CheckHandler()).
    - A program a crontab runs: declare the job with
-     cw.Job("nightly-report", cronwatch.Schedule("0 2 * * *"),
+     nightly, err := cw.Job("nightly-report", cronwatch.Schedule("0 2 * * *"),
      cronwatch.Timezone("UTC"), cronwatch.Grace("15m")) and wrap the work in
      nightly.Run(ctx, func(ctx context.Context, job *cronwatch.JobContext)
      error { ... job.Log("Report written"); return err }), exiting non-zero
@@ -372,16 +398,16 @@ Go (Go 1.25 or newer)
      nightly.Handler(fn)), or lambda.Start(cronwatch.Lambda(handler)) on AWS
      Lambda. It needs Authorization: Bearer $CRON_SECRET.
 
-4. Run the check every 5 minutes so missed and stuck runs are noticed:
+4. Run the check every few minutes so missed and stuck runs are noticed:
    cw.Start(time.Minute) once in a long-running process (robfig/cron and
    gocron apps included), the River or Asynq check job above, or a second
    crontab line running a command that declares the same jobs and calls
    cw.Check(ctx).
 
-5. Mount the dashboard: routes, err := cw.Routes(), then
-   mux.Handle("/cronwatch/", routes). Outside development it needs
-   CRONWATCH_TOKEN; behind the app's own admin auth, pass
-   cronwatch.WithoutToken() instead.
+5. Mount the dashboard: routes, err := cw.Routes() (or cw.MustRoutes() at
+   package level), then mux.Handle("/cronwatch/", routes). Outside
+   development it needs CRONWATCH_TOKEN; behind the app's own admin auth,
+   pass cronwatch.WithoutToken() instead.
 
 6. Set the environment variables you referenced: CRONWATCH_TOKEN,
    CRON_SECRET if you added a handler, and whichever alert channel you chose.
@@ -414,8 +440,9 @@ Rust (Rust 1.85 or newer; 1.94 for the SQL store)
 
    Other channels in cronwatch::alerts, each made from an options struct:
    discord, webhook, resend, postmark, sendgrid, mailgun, ses, twilio,
-   sentry, honeybadger, datadog, rollbar, bugsnag, newrelic. Their options:
-   https://cronwatch.dev/docs/rust/
+   sentry, honeybadger, datadog, rollbar, bugsnag, newrelic, and
+   cronwatch::channel_fn(name, |alert| async move { ... }) for a channel of
+   your own. Their options: https://cronwatch.dev/docs/rust/
 
    If the project uses pg_cron, add .source(Arc::new(PgCron::new(pool,
    PgCronOptions::default()))) from cronwatch_sqlx (its pgcron feature).
@@ -426,11 +453,11 @@ Rust (Rust 1.85 or newer; 1.94 for the SQL store)
    - tokio-cron-scheduler: let watcher = Watcher::new(&cw,
      Options::default()) from cronwatch_tokio_cron_scheduler, then
      scheduler.add(watcher.job("nightly-report", "0 0 2 * * *", "UTC",
-     |job| async move { ... }, JobOptions::new().grace("15m"))?) in place of
-     Job::new_async_tz (and watcher.repeated(...) for
+     |job| async move { ... }, JobOptions::new().grace("15m"))?).await? in
+     place of Job::new_async_tz (and watcher.repeated(...) for
      Job::new_repeated_async). The closure returns a Result. Add
-     watcher.check_job(Duration::from_secs(60))? to the scheduler and call
-     watcher.follow(&scheduler).
+     scheduler.add(watcher.check_job(Duration::from_secs(60))?).await? and
+     call watcher.follow(&scheduler).
    - apalis: let watcher = Watcher::new(&cw, Options::default()) from
      cronwatch_apalis; a cron worker's backend is
      watcher.cron("nightly-report", "0 2 * * *", "UTC", JobOptions::new())?,
@@ -438,16 +465,20 @@ Rust (Rust 1.85 or newer; 1.94 for the SQL store)
      Run watcher.check_worker(Duration::from_secs(60))? beside the others.
      Pin apalis = "=1.0.0-rc.10" and apalis-cron = "=1.0.0-rc.9".
    - A program a crontab runs: declare the job with
-     cw.job("nightly-report", JobOptions::new().schedule("0 2 * * *")
-     .timezone("UTC").grace("15m"))? and wrap the work in
-     nightly.run(|job| async move { ... job.log("Report written"); Ok(()) })
-     .await, exiting non-zero on the error run returns.
+     let nightly = cw.job("nightly-report", JobOptions::new()
+     .schedule("0 2 * * *").timezone("UTC").grace("15m"))?; and wrap the work
+     in nightly.run(|job| async move { ... job.log("Report written");
+     Ok::<(), String>(()) }).await, exiting non-zero on the error run returns.
    - A platform that calls a URL: nightly.handler(|job, request| async move
      { ... }, HandlerOptions::new()) is a tower service, for axum's
      route_service or lambda_http::run on AWS Lambda. It needs
      Authorization: Bearer $CRON_SECRET.
 
-4. Run the check every 5 minutes so missed and stuck runs are noticed:
+   Rust cannot infer these closures' error type, so each ends by naming
+   it: Ok::<(), String>(()) rather than Ok(()), or the project's own error
+   type in place of String when the closure uses ? on it.
+
+4. Run the check every few minutes so missed and stuck runs are noticed:
    cw.start(Duration::from_secs(60)) once in a long-running process, the
    check job or check worker above, or a second crontab line running a
    command that declares the same jobs and calls cw.check().await.
@@ -480,7 +511,9 @@ Rules for you:
 - Work that starts in one call and finishes in another (a webhook, a queue
   step, a workflow) uses await job.start({ id }) where it begins and
   (await job.resume(id)).finish() where it ends, with the same id both times
-  ($job->start(id: $id) and $job->resume($id)->finish() in PHP;
+  (job.start(id: id) and job.resume(id).finish in Ruby; job.start(id=id) and
+  job.resume(id).finish() in Python; $job->start(id: $id) and
+  $job->resume($id)->finish() in PHP;
   job.Start(ctx, cronwatch.WithRunID(id)) and job.Resume(ctx, id), then
   Finish(ctx), in Go; job.start(StartOptions::new().id(id)).await? and
   job.resume(id).await?, then .finish().await, in Rust).
@@ -493,10 +526,11 @@ Rules for you:
 
 Docs: https://cronwatch.dev/docs/
 Rails docs: https://cronwatch.dev/docs/rails/
-Python docs: https://cronwatch.dev/docs/python/ and https://cronwatch.dev/docs/django/
+Python docs: https://cronwatch.dev/docs/python/, https://cronwatch.dev/docs/django/
+and https://cronwatch.dev/docs/celery/
 PHP docs: https://cronwatch.dev/docs/php/, https://cronwatch.dev/docs/laravel/,
 https://cronwatch.dev/docs/symfony/, https://cronwatch.dev/docs/wordpress/,
 https://cronwatch.dev/docs/drupal/ and https://cronwatch.dev/docs/craft/
 Go docs: https://cronwatch.dev/docs/go/ and https://cronwatch.dev/docs/go-schedulers/
 Rust docs: https://cronwatch.dev/docs/rust/ and https://cronwatch.dev/docs/rust-schedulers/
-MCP server for agents: npx -y @cronwatch/mcp
+MCP server for agents: npx -y @cronwatch/mcp, https://cronwatch.dev/docs/mcp/
