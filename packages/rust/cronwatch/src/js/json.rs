@@ -327,11 +327,11 @@ impl std::error::Error for ParseError {}
 /// all recurse, so text nested thousands deep (a request body, a stored
 /// row) would overflow a thread's stack and abort the process; nothing
 /// CronWatch or an app stores comes near this.
-pub const MAX_DEPTH: usize = 256;
+pub(crate) const MAX_DEPTH: usize = 256;
 
 /// `JSON.parse`: objects in JavaScript's key order (a key given twice keeps
 /// its first place and its last value). A lone surrogate escape (`\ud800`)
-/// becomes U+FFFD. Arrays and objects nested deeper than [`MAX_DEPTH`] are
+/// becomes U+FFFD. Arrays and objects nested more than 256 deep are
 /// refused.
 pub fn parse(text: &str) -> Result<Value, ParseError> {
     let mut p = Parser { s: text.as_bytes(), text, i: 0 };
