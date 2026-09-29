@@ -63,6 +63,16 @@ class WebGoldenTest < Minitest::Test
     far_back = cw.job("far-back", timeout: "5m", expect: "far")
     clock.now = -62_135_596_800_001
     quietly.call { far_back.run { clock.advance(1000) } }
+
+    # Cron jobs whose last run is as far off: counted from the first
+    # millisecond of the year 1, the first is due then; after 9999 the other
+    # is never due again.
+    far_cron_back = cw.job("far-cron-back", schedule: "0 2 * * *", timezone: "UTC", grace: "10m")
+    clock.now = -62_135_596_800_001
+    far_cron_back.run { clock.advance(1000) }
+    far_cron_ahead = cw.job("far-cron-ahead", schedule: "0 2 * * *", timezone: "UTC", grace: "10m")
+    clock.now = 253_402_300_800_000
+    far_cron_ahead.run { clock.advance(1000) }
     clock.now = T0
     cw
   end

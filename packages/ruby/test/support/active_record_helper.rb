@@ -229,6 +229,36 @@ module ActiveRecordStoreTests
                  sent.first.message.split("\n").first
   end
 
+  # A cron job's last run as a foreign or damaged row could hold it: before
+  # the year 1 (the first fire of the year 1 was missed) or after 9999 (never
+  # due again), and at the BIGINT extremes. Neither a check nor the dashboard
+  # reports an error.
+  def test_a_check_and_the_dashboard_over_a_cron_job_whose_last_run_started_far_off
+    require "cronwatch/web"
+    require "rack/mock"
+    %w[-62135596800001 253402300800000 -9223372036854775808 9223372036854775807].each do |started_at|
+      store = make_store
+      p = store.prefix
+      errors = []
+      sent = []
+      cw = Cronwatch.new(store: store, alerts: [Cronwatch::Alerts::Custom.new("capture") { |alert| sent << alert }],
+                         cron_secret: nil, on_error: ->(e, where) { errors << "#{where}: #{e.message}" })
+      store.upsert_job({ "name" => "far", "schedule" => "0 2 * * *", "timezone" => "UTC", "grace" => "10m" }, 1)
+      with_conn do |conn|
+        conn.execute("INSERT INTO #{p}runs (id, job, status, started_at, finished_at, duration_ms, metrics, trigger) " \
+                     "VALUES ('far1', 'far', 'ok', #{started_at}, #{started_at}, 0, '{}', 'run')")
+      end
+      cw.check
+      web = Rack::MockRequest.new(Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch"))
+      ["/cronwatch/", "/cronwatch/jobs/far", "/cronwatch/api/jobs/far"].each do |path|
+        assert_equal 200, web.get(path, "HTTP_AUTHORIZATION" => "Bearer tok").status, "#{started_at} #{path}"
+      end
+      assert_equal [], errors, started_at
+      assert_equal(started_at.start_with?("-") ? [:missed] : [], sent.map { |a| a.type.to_sym }, started_at)
+      assert_match(/\ADue 0001-01-01 02:00:00 UTC /, sent.first.message) unless sent.empty?
+    end
+  end
+
   def test_names_sort_in_byte_order_as_the_sdk_sql_stores_do
     store = make_store
     ["\u{FF5E}", "\u{1F600}", "z", "Z", "é"].each { |name| store.upsert_job({ "name" => name }, 1) }

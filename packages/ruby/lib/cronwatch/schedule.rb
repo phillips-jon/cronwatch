@@ -15,6 +15,15 @@ module Cronwatch
     # How early a run may start and still count for the fire it was meant for.
     EARLY_SLACK_MS = 60_000
 
+    # Four hundred Gregorian years: 146,097 days, a whole number of weeks,
+    # after which the calendar repeats date for date and weekday for weekday.
+    CYCLE_MS = 146_097 * 86_400_000
+    # The years the walker searches in, as croner does: a time before 400 is
+    # asked a cycle or more later (croner misreads a year below 100), and one
+    # from 2800 a cycle or more earlier (croner finds no fire past 3000).
+    WALK_FIRST_MS = -49_544_438_400_000 # 0400-01-01T00:00:00Z
+    WALK_LAST_MS = 26_192_246_400_000 # 2800-01-01T00:00:00Z
+
     Parsed = Struct.new(:kind, :source, :timezone, :every_ms, keyword_init: true) do
       include Serializable
 
@@ -80,12 +89,15 @@ module Cronwatch
     def fire_after(parsed, from)
       raise ArgumentError, "schedule \"#{parsed.source}\" was not made by Schedule.parse" unless parsed.pattern
 
-      probe = from
+      start = count_from(from)
+      return nil if start.nil?
+
+      probe = start
       4.times do
         runs = next_runs(parsed, 8, probe)
         return nil if runs.empty?
 
-        found = runs.find { |t| t > from }
+        found = runs.find { |t| t > start }
         return found if found
 
         probe += 3_600_000
@@ -101,8 +113,11 @@ module Cronwatch
       raise ArgumentError, "schedule \"#{parsed.source}\" was not made by Schedule.parse" unless parsed.pattern
 
       out = []
-      probe = from
-      last = from
+      start = count_from(from)
+      return out if start.nil?
+
+      probe = start
+      last = start
       1000.times do
         batch = next_runs(parsed, [limit + 1 - out.length, 24].min, probe)
         return out if batch.empty?
@@ -121,15 +136,39 @@ module Cronwatch
       out
     end
 
-    # Up to `count` fires, each found from the one before, as croner's nextRuns.
+    # A stored time as a cron's fires are counted from it. A start read from
+    # a foreign or damaged row can be any number: one before the year 1
+    # counts from just before its first millisecond, so the first fire of the
+    # year 1 is the next one, and one at or after the last millisecond of 9999
+    # has no fire after it at all (nil). Ported from countFrom in schedule.ts.
+    def count_from(from)
+      return nil if from >= Duration::LAST_DATE_MS
+
+      from >= Duration::FIRST_DATE_MS ? from : Duration::FIRST_DATE_MS - 1
+    end
+
+    # Up to `count` fires, each found from the one before, as croner's
+    # nextRuns, and none after 9999. A time outside the years the walker
+    # searches is moved by whole 400-year cycles into them, and its fires
+    # moved back, as runsAfter in schedule.ts asks croner: a time before 400
+    # goes forward, into the same local mean time every zone kept then, and
+    # one from 2800 goes back, to where the zone's present rules already hold.
     def next_runs(parsed, count, from)
+      from = count_from(from)
+      return [] if from.nil?
+
+      shift =
+        if from < WALK_FIRST_MS then -((from - WALK_FIRST_MS).div(CYCLE_MS)) * CYCLE_MS
+        elsif from >= WALK_LAST_MS then -((from - WALK_LAST_MS).div(CYCLE_MS) + 1) * CYCLE_MS
+        else 0
+        end
       runs = []
-      at = from
+      at = from + shift
       count.times do
         at = parsed.pattern.next_after(at, parsed.timezone)
-        break if at.nil?
+        break if at.nil? || at - shift > Duration::LAST_DATE_MS
 
-        runs << at
+        runs << (at - shift)
       end
       runs
     end
@@ -159,7 +198,9 @@ module Cronwatch
       due_at.nil? ? nil : Expectation.new(due_at: due_at, deadline: due_at + grace_ms)
     end
 
-    # The first fire that a run starting at `started_at` does not cover.
+    # The first fire that a run starting at `started_at` does not cover. A
+    # start before the year 1 covers none of them, so the first fire of the
+    # year 1 is due; after 9999 there is none (see count_from).
     def due_after_run(parsed, started_at)
       # A fire at or before the start is covered by the run itself.
       following_fire = fire_after(parsed, started_at)
@@ -189,6 +230,9 @@ module Cronwatch
     # ran early by up to an hour.
     def in_spring_forward_gap?(parsed, started_at, fire_at)
       lookback = 3 * 3_600_000
+      # Every zone kept its local mean time, with no clock change, in the year 1.
+      return false if fire_at - lookback < Duration::FIRST_DATE_MS
+
       after = utc_offset(fire_at, parsed.timezone)
       before = utc_offset(fire_at - lookback, parsed.timezone)
       gap = after - before
