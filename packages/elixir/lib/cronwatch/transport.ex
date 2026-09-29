@@ -2,8 +2,8 @@ defmodule Cronwatch.Transport do
   @moduledoc """
   Sends the one POST the alert channels and Claude triage make: a behaviour,
   so an app can send it its own way (its Finch pool, a proxy, Req's
-  retries). The default is `Cronwatch.Transport.Httpc`, on OTP's own
-  `:httpc`.
+  retries). The default is `Cronwatch.Transport.HTTP`, a small HTTP/1.1
+  client over OTP's own `:gen_tcp` and `:ssl`.
 
   A transport is given as `{module, opts}` (or the module alone for `[]`),
   on a channel or triage (`transport: {MyApp.ReqTransport, []}`) or on the
@@ -51,11 +51,11 @@ defmodule Cronwatch.Transport do
 
   @doc """
   The transport to use: the one given, else the instance's (`fallback`),
-  else `Cronwatch.Transport.Httpc`.
+  else `Cronwatch.Transport.HTTP`.
   """
   @spec resolve(spec(), spec()) :: {module(), term()}
   def resolve(given, fallback \\ nil)
-  def resolve(nil, nil), do: {Cronwatch.Transport.Httpc, []}
+  def resolve(nil, nil), do: {Cronwatch.Transport.HTTP, []}
   def resolve(nil, fallback), do: resolve(fallback, nil)
   def resolve({module, opts}, _) when is_atom(module), do: {module, opts}
   def resolve(module, _) when is_atom(module), do: {module, []}
@@ -71,7 +71,8 @@ defmodule Cronwatch.Transport do
       else: {:error, "#{who}: #{inspect(module)} is not a Cronwatch.Transport"}
   end
 
-  def check(other, who), do: {:error, "#{who}: transport must be a module or {module, opts}, not #{inspect(other)}"}
+  # Not quoted: a transport's options can hold a credential (a proxy's).
+  def check(_other, who), do: {:error, "#{who}: transport must be a module or {module, opts}"}
 end
 
 defmodule Cronwatch.Transport.Request do

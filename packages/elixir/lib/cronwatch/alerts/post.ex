@@ -268,8 +268,9 @@ defmodule Cronwatch.Alerts.Post do
     end
   end
 
-  # A transport's error as one line: an :httpc reason as the reason it
-  # holds (econnrefused, a TLS alert's text), an exception as its message.
+  # A transport's error as one line: a socket's reason as itself
+  # (econnrefused), a TLS alert as its text, an :httpc failure (an app's
+  # transport on it) as the reason it holds, an exception as its message.
   defp describe({:failed_connect, list}) when is_list(list) do
     case List.last(list) do
       {_, _, reason} -> describe(reason)

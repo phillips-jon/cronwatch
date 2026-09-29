@@ -163,7 +163,8 @@ defmodule Cronwatch.Alerts.URL do
   defp host("[" <> rest) do
     v6 = String.trim_trailing(rest, "]")
 
-    case :inet.parse_ipv6strict_address(String.to_charlist(v6)) do
+    # WHATWG's IPv6 parser has no zone (`%eth0`), which OTP's reads and drops.
+    case not String.contains?(v6, "%") and :inet.parse_ipv6strict_address(String.to_charlist(v6)) do
       {:ok, addr} -> {:ok, "[" <> ipv6(addr) <> "]"}
       _ -> :error
     end

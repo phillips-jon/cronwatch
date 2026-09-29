@@ -13,7 +13,7 @@ defmodule Cronwatch.Alerts.Slack do
     * `:link`: a function of the alert answering a link back to the job in
       your dashboard.
     * `:transport`: a `Cronwatch.Transport` for the request, else the
-      instance's, else `Cronwatch.Transport.Httpc`.
+      instance's, else `Cronwatch.Transport.HTTP`.
 
   The message goes in a code block cut to 2,900 characters, a triage in a
   block of its own cut to 3,000, and Slack's `&`, `<` and `>` are escaped,

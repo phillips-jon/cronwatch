@@ -4,7 +4,7 @@ defmodule Cronwatch.Alerts.PostTest do
   alias Cronwatch.Alerts.Post
   alias Cronwatch.Alerts.Shared
   alias Cronwatch.Test.HTTPServer
-  alias Cronwatch.Transport.Httpc
+  alias Cronwatch.Transport.HTTP
 
   test "URLs are read as fetch reads them" do
     ok = fn raw -> Post.postable(raw) |> elem(1) end
@@ -58,7 +58,7 @@ defmodule Cronwatch.Alerts.PostTest do
              "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
   end
 
-  test "a request through :httpc reaches a real server with the body and headers given" do
+  test "a request through the default transport reaches a real server with the body and headers given" do
     server = HTTPServer.start(fn _ -> {200, [], "fine"} end)
     headers = [{"content-type", "application/json"}, {"authorization", "Bearer t"}]
     assert {:ok, %{status: 200, body: "fine"}} = Post.fetch(nil, 5000, server.url <> "/in", headers, ~s({"a":1}))
@@ -72,9 +72,10 @@ defmodule Cronwatch.Alerts.PostTest do
   end
 
   test "the TLS options verify the peer against the system's roots" do
-    opts = Httpc.ssl("https://h.example/x", [])
+    opts = HTTP.ssl("h.example", [])
     assert opts[:verify] == :verify_peer
     assert opts[:server_name_indication] == ~c"h.example"
-    refute Keyword.has_key?(Httpc.ssl("https://127.0.0.1/", []), :server_name_indication)
+    refute Keyword.has_key?(HTTP.ssl("127.0.0.1", []), :server_name_indication)
+    refute Keyword.has_key?(HTTP.ssl("[::1]", []), :server_name_indication)
   end
 end

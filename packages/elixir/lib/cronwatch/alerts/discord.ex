@@ -12,7 +12,7 @@ defmodule Cronwatch.Alerts.Discord do
     * `:link`: a function of the alert answering a link back to the job in
       your dashboard.
     * `:transport`: a `Cronwatch.Transport` for the request, else the
-      instance's, else `Cronwatch.Transport.Httpc`.
+      instance's, else `Cronwatch.Transport.HTTP`.
 
   The message goes in a code block cut to 3,800 characters, a triage after
   it cut to 1,000 with Discord's markdown escaped, and the request pings no

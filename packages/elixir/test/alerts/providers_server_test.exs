@@ -1,5 +1,5 @@
 defmodule Cronwatch.Alerts.ProvidersServerTest do
-  # The provider channels against real local servers through :httpc (the
+  # The provider channels against real local servers through the default transport (the
   # Rust port's hardening_tests.rs, the providers' part): Twilio texting
   # every number at once and reporting the refusals, credentials trimmed on
   # the wire, and a secret that straddles the error's cut still cut out.
@@ -16,16 +16,16 @@ defmodule Cronwatch.Alerts.ProvidersServerTest do
   defmodule ToServer do
     @moduledoc false
     # Sends each request to the test's local server, keeping its path and
-    # query, through the default :httpc transport.
+    # query, through the default transport.
     @behaviour Cronwatch.Transport
 
-    alias Cronwatch.Transport.Httpc
+    alias Cronwatch.Transport.HTTP
 
     @impl true
     def post(base, request) do
       uri = URI.parse(request.url)
       path = (uri.path || "/") <> if(uri.query, do: "?" <> uri.query, else: "")
-      Httpc.post([], %{request | url: base <> path})
+      HTTP.post([], %{request | url: base <> path})
     end
   end
 

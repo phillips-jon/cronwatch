@@ -31,7 +31,7 @@ defmodule Cronwatch.Triage.Anthropic do
     * `:context`: anything the model should know about this app.
     * `:base_url`: else `ANTHROPIC_BASE_URL`, else `https://api.anthropic.com`.
     * `:transport`: a `Cronwatch.Transport` for the request, else the
-      instance's, else `Cronwatch.Transport.Httpc`.
+      instance's, else `Cronwatch.Transport.HTTP`.
 
   The environment is read when triage runs, never when a module is
   compiled.

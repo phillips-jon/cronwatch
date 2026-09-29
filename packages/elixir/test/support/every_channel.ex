@@ -2,15 +2,15 @@ defmodule Cronwatch.Test.RewriteTransport do
   @moduledoc """
   A transport that sends every request to a local test server instead of
   where it was addressed (the scheme, host and port rewritten, the path and
-  query kept) through `Cronwatch.Transport.Httpc`, so a provider's channel
+  query kept) through `Cronwatch.Transport.HTTP`, so a provider's channel
   can be pointed at `Cronwatch.Test.HTTPServer`. Options: `to:` the
-  server's URL, and any `Cronwatch.Transport.Httpc` options.
+  server's URL, and any `Cronwatch.Transport.HTTP` options.
   """
 
   @behaviour Cronwatch.Transport
 
   alias Cronwatch.Alerts.URL
-  alias Cronwatch.Transport.Httpc
+  alias Cronwatch.Transport.HTTP
 
   def spec(server, opts \\ []), do: {__MODULE__, Keyword.put(opts, :to, server.url)}
 
@@ -19,7 +19,7 @@ defmodule Cronwatch.Test.RewriteTransport do
     {:ok, to} = URL.parse(Keyword.fetch!(opts, :to))
     {:ok, u} = URL.parse(request.url)
     url = URL.to_string(%{u | scheme: to.scheme, host: to.host, port: to.port})
-    Httpc.post(Keyword.delete(opts, :to), %{request | url: url})
+    HTTP.post(Keyword.delete(opts, :to), %{request | url: url})
   end
 end
 

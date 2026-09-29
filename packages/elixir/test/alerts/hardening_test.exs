@@ -23,7 +23,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
   alias Cronwatch.Test.HTTPServer
   alias Cronwatch.Test.RecordingTransport, as: Rec
   alias Cronwatch.Test.RewriteTransport
-  alias Cronwatch.Transport.Httpc
+  alias Cronwatch.Transport.HTTP
   alias Cronwatch.Transport.Request
 
   defp sample do
@@ -97,7 +97,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
     mib = Post.max_body()
     big = String.duplicate("x", 3 * mib)
 
-    # Streamed (a 200) and read by :httpc whole (a 500): 1 MiB either way.
+    # Whatever the status: 1 MiB either way.
     ok = HTTPServer.start(fn _ -> {200, [], big} end)
     assert {:ok, %{status: 200, body: body}} = Post.fetch(nil, 10_000, ok.url, [], "{}")
     assert byte_size(body) == mib
@@ -106,10 +106,10 @@ defmodule Cronwatch.Alerts.HardeningTest do
     assert {:ok, %{status: 500, body: body}} = Post.fetch(nil, 10_000, refused.url, [], "{}")
     assert byte_size(body) == mib
 
-    # Past :httpc's own hold, a refusal's answer is refused whole.
+    # A refusal far past the cap is read to the cap, not refused whole.
     huge = HTTPServer.start(fn _ -> {500, [], String.duplicate("x", 9 * mib)} end)
-    {:error, e} = Post.fetch(nil, 10_000, huge.url <> "/p", [], "{}")
-    assert Exception.message(e) == "#{huge.url}: body_too_big"
+    assert {:ok, %{status: 500, body: body}} = Post.fetch(nil, 10_000, huge.url <> "/p", [], "{}")
+    assert byte_size(body) == mib
 
     err = message(send!({Slack, webhook_url: refused.url <> "/T/B/x"}))
     assert JS.len16(err) <= byte_size("Slack webhook answered 500: ") + 200
@@ -213,14 +213,14 @@ defmodule Cronwatch.Alerts.HardeningTest do
     # Trusting the server's root, the same request goes through, its host
     # checked against the certificate.
     ok =
-      send!({Slack, webhook_url: server.url <> "/T/B/secret", transport: {Httpc, cacerts: [server.ca]}})
+      send!({Slack, webhook_url: server.url <> "/T/B/secret", transport: {HTTP, cacerts: [server.ca]}})
 
     assert ok == :ok
     assert [%{target: "/T/B/secret"}] = HTTPServer.requests(server)
 
     # A certificate for another name is refused even from a trusted root.
     other = String.replace(server.url, "localhost", "127.0.0.1")
-    err = message(send!({Slack, webhook_url: other <> "/x", transport: {Httpc, cacerts: [server.ca]}}))
+    err = message(send!({Slack, webhook_url: other <> "/x", transport: {HTTP, cacerts: [server.ca]}}))
     assert err =~ ~r/hostname|certificate|handshake/i, err
   end
 
@@ -250,13 +250,13 @@ defmodule Cronwatch.Alerts.HardeningTest do
     assert {"authorization", "Bearer wh-secret"} in hd(Rec.taken(rec)).headers
   end
 
-  test "the headers :httpc sends, in the order it sends them" do
+  test "the headers the default transport sends, in the order it sends them" do
     server = HTTPServer.start(fn _ -> {200, [], ""} end)
     spec = {Webhook, url: server.url <> "/in", headers: [{"authorization", "Bearer t"}], secret: "s"}
     assert send!(spec) == :ok
     [req] = HTTPServer.requests(server)
     names = Enum.map(req.headers, &elem(&1, 0))
-    assert names == ~w(content-type content-length user-agent host authorization connection x-cronwatch-signature)
+    assert names == ~w(host content-type user-agent authorization x-cronwatch-signature content-length connection)
     assert {"user-agent", "cronwatch"} in req.headers
     refute "accept-encoding" in names
   end

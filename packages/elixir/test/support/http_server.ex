@@ -17,7 +17,8 @@ defmodule Cronwatch.Test.HTTPServer do
       chunk after a pause, closing at the end (no length);
     * `:hang`: nothing, the connection held open until the test ends.
 
-  With `tls: true` it serves TLS with a certificate for `localhost` made
+  With `tls: true` it serves TLS with a certificate for `localhost` (or the
+  subject alternative names given as `san:`, `[iPAddress: [127, 0, 0, 1]]`) made
   at run time by `:public_key`'s test helpers, from a root no system
   trusts; `ca(server)` is that root, DER encoded, for a test that trusts it.
   """
@@ -26,7 +27,7 @@ defmodule Cronwatch.Test.HTTPServer do
   def start(handler, opts \\ []) do
     tls? = Keyword.get(opts, :tls, false)
     {:ok, requests} = ExUnit.Callbacks.start_supervised({Agent, fn -> [] end}, id: {__MODULE__, make_ref()})
-    certs = if tls?, do: certificates()
+    certs = if tls?, do: certificates(Keyword.get(opts, :san, dNSName: ~c"localhost"))
 
     {:ok, listen} =
       :gen_tcp.listen(0, [:binary, packet: :raw, active: false, reuseaddr: true, ip: {127, 0, 0, 1}])
@@ -172,9 +173,10 @@ defmodule Cronwatch.Test.HTTPServer do
   # P-256 keys signed with SHA-256, which every TLS version takes.
   defp ec, do: [key: {:namedCurve, :secp256r1}, digest: :sha256]
 
-  # A root, and a certificate for localhost signed by it, made now.
-  defp certificates do
-    san = {:Extension, {2, 5, 29, 17}, false, [dNSName: ~c"localhost"]}
+  # A root, and a certificate for localhost (or the names given) signed by
+  # it, made now.
+  defp certificates(names) do
+    san = {:Extension, {2, 5, 29, 17}, false, names}
 
     data =
       :public_key.pkix_test_data(%{

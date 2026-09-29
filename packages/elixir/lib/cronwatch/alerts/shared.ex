@@ -24,8 +24,9 @@ defmodule Cronwatch.Alerts.Shared do
     end
   end
 
-  def options(other, module, _known),
-    do: {:error, "#{inspect(module)}: options must be a keyword list, not #{inspect(other)}"}
+  # Never quoted: options given the wrong way still hold the credentials.
+  def options(_other, module, _known),
+    do: {:error, "#{inspect(module)}: options must be a keyword list"}
 
   @doc "Refuses a missing or empty option with the SDK's refusal in Elixir's words: `Cronwatch.Alerts.Slack needs :webhook_url`."
   def required(o, key, module) do

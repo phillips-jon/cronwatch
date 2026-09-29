@@ -10,7 +10,7 @@ defmodule Cronwatch.Alerts.Resend do
   Options: `:api_key` (required, `re_...`), the email options of
   `Cronwatch.Alerts.Email` (`:from`, `:to`, `:subject_prefix`, `:link`, at
   the top level or under `email:`), and `:transport` (a
-  `Cronwatch.Transport`; the default is `:httpc`). The same alert sent twice
+  `Cronwatch.Transport`; the default is `Cronwatch.Transport.HTTP`). The same alert sent twice
   within 24 hours is delivered once, through Resend's idempotency key.
   """
   @behaviour Cronwatch.Channel

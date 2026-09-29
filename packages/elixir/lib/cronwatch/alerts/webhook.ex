@@ -22,7 +22,7 @@ defmodule Cronwatch.Alerts.Webhook do
       sha256=<hex>`, the HMAC-SHA256 of the raw body with this secret, so
       the receiver can verify it (see `signature/2`).
     * `:transport`: a `Cronwatch.Transport` for the request, else the
-      instance's, else `Cronwatch.Transport.Httpc`.
+      instance's, else `Cronwatch.Transport.HTTP`.
   """
 
   @behaviour Cronwatch.Channel
