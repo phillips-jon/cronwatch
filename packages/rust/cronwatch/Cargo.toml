@@ -48,10 +48,18 @@ hmac = { version = "0.13", optional = true }
 tokio = { version = "1.43", features = ["full", "test-util"] }
 flate2 = "1.0.35"
 sha2 = "0.11"
+# A certificate made at run time and a TLS server, for the test that an
+# untrusted certificate is refused. rcgen 0.14 needs Rust 1.88.
+rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["aws_lc_rs", "tls12"] }
 
 [[test]]
 name = "store"
 required-features = ["storetest"]
+
+[[test]]
+name = "alerts"
+required-features = ["alerts", "triage"]
 
 [package.metadata.docs.rs]
 all-features = true

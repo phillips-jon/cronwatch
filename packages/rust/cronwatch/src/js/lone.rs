@@ -14,7 +14,9 @@ pub(crate) fn head16_units(s: &str, n: usize) -> Vec<u16> {
     s.encode_utf16().take(n).collect()
 }
 
-/// `s.slice(-n)` as UTF-16 code units, the lone half kept.
+/// `s.slice(-n)` as UTF-16 code units, the lone half kept (triage's output
+/// tail).
+#[cfg_attr(not(feature = "triage"), allow(dead_code))]
 pub(crate) fn tail16_units(s: &str, n: usize) -> Vec<u16> {
     let units: Vec<u16> = s.encode_utf16().collect();
     units[units.len().saturating_sub(n)..].to_vec()
