@@ -212,6 +212,22 @@ impl JobOptions {
         self.fields.set(key.into(), value);
         self
     }
+
+    /// These options followed by `other`'s, as JavaScript spreads two option
+    /// objects into one (`{ ...these, ...other }`): a field both set keeps
+    /// its place here and takes `other`'s value, and `other`'s expect rule,
+    /// when it has one, replaces this one's. A source uses it to put an
+    /// app's options between its own.
+    pub fn merge(mut self, other: JobOptions) -> Self {
+        for (k, v) in other.fields.iter() {
+            self.fields.set(k, v.clone());
+        }
+        if other.expect.is_some() {
+            self.expect = other.expect;
+        }
+        self.set.extend(other.set);
+        self
+    }
 }
 
 /// Whether a job name is 1 to 120 characters of letters, digits, `.`, `_`,
@@ -317,5 +333,14 @@ mod tests {
         assert_eq!(o.fields.to_json(), r#"{"grace":900000,"schedule":"@hourly","budget":{"cost":2,"rows":5}}"#);
         let d = JobOptions::new().timeout(Duration::from_millis(1500));
         assert_eq!(d.fields.to_json(), r#"{"timeout":1500}"#);
+    }
+
+    #[test]
+    fn merged_options_spread_as_javascript_does() {
+        let a = JobOptions::new().description("a").tags(["x"]).expect("one");
+        let b = JobOptions::new().grace("1m").description("b").expect("two");
+        let m = a.merge(b).schedule("@hourly");
+        assert_eq!(m.fields.to_json(), r#"{"description":"b","tags":["x"],"grace":"1m","schedule":"@hourly"}"#);
+        assert!(matches!(m.expect, Some(ExpectRule::Contains(ref t)) if t == "two"));
     }
 }
