@@ -255,3 +255,5 @@ custom("latency", (alert) => {
 ```ts
 cronwatch({ onError: (error, where) => Sentry.captureException(error, { tags: { where } }) });
 ```
+
+Every port has the same channels, sending the same requests, and the same triage: see Alerts in [Ruby](/docs/ruby/#alerts), [Python](/docs/python/#alerts), [PHP](/docs/php/#alerts), [Go](/docs/go/#alerts) and [Rust](/docs/rust/#alerts).

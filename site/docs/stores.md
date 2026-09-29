@@ -111,3 +111,15 @@ To prevent that the state carries a `version`, inside its JSON, that goes up by 
 The built-in stores do this with one conditional statement and no schema change: SQLite and D1 compare `json_extract(state, '$.version')`, Postgres `(state->>'version')::bigint`, each treating a missing version as 0; expecting 0 is an upsert, so the first write for a job inserts its row. The Ruby gem's ActiveRecord store reads and writes the same three tables with the same bytes (the same JSON, the same `version`), so a Rails app and a Node service can share one database and keep each other's updates.
 
 The built-in stores pass the same conformance test, in [`packages/sdk/test/store-conformance.ts`](https://github.com/phillips-jon/cronwatch/blob/main/packages/sdk/test/store-conformance.ts) in the repository (D1 runs it in Miniflare). It is not shipped in the npm package; copy it from there to check your own store.
+
+## Other languages
+
+Every port writes the same three tables with the same bytes, so any of them can share a store with the others:
+
+| Language | Stores |
+|---|---|
+| [Ruby](/docs/ruby/#stores) | memory, and ActiveRecord on Postgres or SQLite |
+| [Python](/docs/python/#stores) | memory, SQLite and Postgres |
+| [PHP](/docs/php/#stores) | memory, SQLite, MySQL and MariaDB, and Postgres |
+| [Go](/docs/go/#stores) | memory, and `sqlstore` over `database/sql` for SQLite, Postgres, MySQL and MariaDB |
+| [Rust](/docs/rust/#stores) | memory, and `cronwatch-sqlx` over sqlx for SQLite, Postgres, MySQL and MariaDB |
