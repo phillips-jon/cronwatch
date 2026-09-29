@@ -86,6 +86,7 @@ pub(crate) fn beyond_dates(ms: f64) -> &'static str {
 }
 
 /// `iso_time`, or the words for a time outside its years.
+#[cfg(feature = "triage")]
 pub(crate) fn iso_or_words(ms: i64) -> String {
     iso_time(ms).unwrap_or_else(|| beyond_dates(ms as f64).to_string())
 }
@@ -104,8 +105,11 @@ mod tests {
         assert_eq!(iso_time(LAST_DATE_MS).as_deref(), Some("9999-12-31T23:59:59.999Z"));
         assert_eq!(iso_time(FIRST_DATE_MS - 1), None);
         assert_eq!(iso_time(LAST_DATE_MS + 1), None);
-        assert_eq!(iso_or_words(i64::MIN), "before 0001-01-01 00:00:00 UTC");
-        assert_eq!(iso_or_words(i64::MAX), "after 9999-12-31 23:59:59 UTC");
+        #[cfg(feature = "triage")]
+        {
+            assert_eq!(iso_or_words(i64::MIN), "before 0001-01-01 00:00:00 UTC");
+            assert_eq!(iso_or_words(i64::MAX), "after 9999-12-31 23:59:59 UTC");
+        }
         assert_eq!(date_utc(2026, 0, 5, 9, 30, 0, 0), 1_767_605_400_000);
         assert_eq!(date_utc(2025, 12, 5, 9, 30, 0, 0), 1_767_605_400_000);
         assert_eq!(civil_from_days(days_from_civil(2024, 2, 29)), (2024, 2, 29));
