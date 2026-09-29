@@ -107,6 +107,30 @@ func TestConformanceHealth(t *testing.T) {
 			t.Errorf("isStuck %d: %v %v", i, stuck, err)
 		}
 	}
+	durations := 0
+	for i, c := range objects(f, "runDuration") {
+		got := runDuration(int64(field(c, "startedAt").(float64)), int64(field(c, "finishedAt").(float64)))
+		if want := int64(field(c, "durationMs").(float64)); got != want {
+			t.Errorf("runDuration %d: %d, want %d", i, got, want)
+		}
+		durations++
+	}
+	versions := 0
+	for i, c := range objects(f, "stateVersion") {
+		parsed, err := js.Parse(field(c, "state").(string))
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The state reads (a foreign version reads as none), and counts as the SDK counts it.
+		s := fixtureState(t, parsed)
+		if want := int64(field(c, "version").(float64)); s.version() != want {
+			t.Errorf("stateVersion %d (%s): %d, want %d", i, field(c, "state"), s.version(), want)
+		}
+		versions++
+	}
+	if durations == 0 || versions == 0 {
+		t.Error("no runDuration or stateVersion cases")
+	}
 	for i, c := range objects(f, "unevaluableSummary") {
 		s := unevaluableSummary(fixtureStored(t, field(c, "stored")), fixtureRuns(t, field(c, "recent")), fixtureState(t, field(c, "state")), now(c))
 		sameJSON(t, fmt.Sprintf("unevaluableSummary %d", i), s.JSValue(), field(c, "summary"))

@@ -288,7 +288,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 
 	finishedAt := c.now()
 	run.FinishedAt = ptr(finishedAt)
-	run.DurationMs = ptr(max(0, finishedAt-startedAt))
+	run.DurationMs = ptr(runDuration(startedAt, finishedAt))
 	run.Metrics = recorderMetrics(rec)
 	run.Output = rec.Output()
 	resultText, isText := out.result.(string)

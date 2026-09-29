@@ -456,8 +456,29 @@ func isStuck(def Definition, run Run, now int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return float64(now-run.StartedAt) > timeout, nil
+	return elapsedMs(run.StartedAt, now) > timeout, nil
 }
+
+// maxDurationMs is the longest duration written: 2^53 - 1, the largest
+// integer JavaScript holds exactly, which every port and store reads back
+// unchanged (the SDK's MAX_DURATION_MS).
+const maxDurationMs = 9007199254740991
+
+// runDuration is how long a run took, from startedAt to finishedAt: 0 when
+// it started later, and never more than maxDurationMs (the SDK's
+// runDuration). A foreign row's start near a 64-bit limit must not wrap, or
+// make a duration no store can write.
+func runDuration(startedAt, finishedAt int64) int64 {
+	if finishedAt <= startedAt {
+		return 0
+	}
+	// Exact: the difference of two int64s, the larger first, fits a uint64.
+	return int64(min(uint64(finishedAt)-uint64(startedAt), maxDurationMs))
+}
+
+// elapsedMs is to minus from as the SDK computes it, in float64, so a
+// foreign time near a 64-bit limit cannot wrap.
+func elapsedMs(from, to int64) float64 { return float64(to) - float64(from) }
 
 // muteOpens is next with nothing opened that was not open in previous.
 // While a job is silenced nothing new is recorded as an incident:

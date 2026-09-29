@@ -127,11 +127,14 @@ type statements struct {
 
 func newStatements(d Dialect, p string) statements {
 	if d == MySQL {
-		// The version inside a state's JSON text, 0 when it has none. MySQL's
-		// JSON_EXTRACT answers JSON and MariaDB's text; unquoted and cast,
-		// both are a number.
+		// The version inside a state's JSON text, as the SDK's stateVersion()
+		// reads it: a whole number from 0 to 2^53 - 1, else 0. MySQL's
+		// JSON_EXTRACT answers JSON and MariaDB's text; plus 0, both are a
+		// number, and the CASE tests the JSON type before any arithmetic.
 		version := func(column string) string {
-			return "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(" + column + ", '$.version')) AS SIGNED), 0)"
+			v := "JSON_EXTRACT(" + column + ", '$.version')"
+			return "CASE WHEN JSON_TYPE(" + v + ") NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN " +
+				v + " + 0 = FLOOR(" + v + " + 0) AND " + v + " + 0 BETWEEN 0 AND 9007199254740991 THEN CAST(" + v + " + 0 AS SIGNED) ELSE 0 END"
 		}
 		return statements{
 			upsertJob: `INSERT INTO ` + p + `jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
@@ -169,11 +172,22 @@ func newStatements(d Dialect, p string) statements {
 	seq := "rowid"
 	// Byte order on both, so names sort the same whatever the database's collation.
 	byName := "name"
-	// The version inside a state's JSON, 0 when it has none.
-	version := func(column string) string { return "COALESCE(json_extract(" + column + ", '$.version'), 0)" }
+	// The version inside a state's JSON, as the SDK's stateVersion() reads
+	// it: a whole number from 0 to 2^53 - 1, else 0 (none, or a foreign
+	// row's 1.5 or "x", which must neither fail the statement nor refuse
+	// every write for good). Each CASE tests the JSON type before any cast.
+	version := func(column string) string {
+		v := "json_extract(" + column + ", '$.version')"
+		return "CASE WHEN json_type(" + column + ", '$.version') NOT IN ('integer', 'real') THEN 0 WHEN " +
+			v + " = CAST(" + v + " AS INTEGER) AND " + v + " BETWEEN 0 AND 9007199254740991 THEN CAST(" + v + " AS INTEGER) ELSE 0 END"
+	}
 	if pg {
 		seq, byName = "seq", `name COLLATE "C"`
-		version = func(column string) string { return "COALESCE((" + column + "->>'version')::bigint, 0)" }
+		version = func(column string) string {
+			v := "(" + column + "->>'version')::numeric"
+			return "CASE WHEN jsonb_typeof(" + column + "->'version') <> 'number' THEN 0 WHEN " +
+				v + " % 1 = 0 AND " + v + " BETWEEN 0 AND 9007199254740991 THEN " + v + "::bigint ELSE 0 END"
+		}
 	}
 	s := statements{
 		upsertJob: `INSERT INTO ` + p + `jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)

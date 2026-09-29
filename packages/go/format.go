@@ -236,7 +236,7 @@ func composeAlert(draft alertDraft, def Definition, now int64) Alert {
 	case AlertStuck:
 		title = name + " is stuck"
 		if run != nil {
-			ran := float64(now - run.StartedAt)
+			ran := elapsedMs(run.StartedAt, now)
 			if run.DurationMs != nil {
 				ran = float64(*run.DurationMs)
 			}

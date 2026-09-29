@@ -117,7 +117,7 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 			timeout, _ := timeoutMs(def)
 			run.Status = StatusTimeout
 			run.FinishedAt = ptr(now)
-			run.DurationMs = ptr(now - run.StartedAt)
+			run.DurationMs = ptr(runDuration(run.StartedAt, now))
 			run.Error = ptr(fmt.Sprintf("Still running after %s; marked as timed out", schedule.FormatDuration(timeout)))
 			// Only over a row still running: a finish that landed meanwhile wins.
 			ok, err := c.writeRunIf(ctx, run, StatusRunning)

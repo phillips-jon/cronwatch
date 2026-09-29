@@ -488,6 +488,67 @@ func ReplayFixture(t *testing.T, path string, newStore func(t *testing.T) cronwa
 	}
 }
 
+// ReplayForeignVersions replays the foreignVersion cases of
+// conformance/store.json (at path) against store, which must implement
+// cronwatch.StateComparer: a state row another process wrote, its version
+// in any shape (1.5, "x", -1, 2.0, 2^53), counts as the SDK's
+// stateVersion() reads it, a whole number from 0 to 2^53 - 1 or else 0. So
+// a write expecting any other version is refused, and one expecting it goes
+// through, where a brittle cast would fail every write of the job for good.
+// writeRaw stores a state row for job "v" holding the JSON text given as it
+// is, as a store's own writes never would; the replay deletes job "v"
+// before each case.
+func ReplayForeignVersions(t *testing.T, path string, store cronwatch.Store, writeRaw func(text string) error) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := js.Parse(string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	field := func(o *js.Object, key string) any { v, _ := o.Get(key); return v }
+	cas := store.(cronwatch.StateComparer)
+	list, _ := field(root.(*js.Object), "foreignVersion").([]any)
+	if len(list) == 0 {
+		t.Fatal("no foreignVersion cases")
+	}
+	for _, v := range list {
+		c := v.(*js.Object)
+		stored := field(c, "stored").(string)
+		if err := store.DeleteJob(ctx, "v"); err != nil {
+			t.Fatal(err)
+		}
+		if err := writeRaw(stored); err != nil {
+			t.Fatalf("%s: %v", stored, err)
+		}
+		for _, sv := range field(c, "steps").([]any) {
+			step := sv.(*js.Object)
+			var st cronwatch.JobState
+			if err := json.Unmarshal([]byte(js.Stringify(field(step, "cas"))), &st); err != nil {
+				t.Fatal(err)
+			}
+			expected := int64(field(step, "expected").(float64))
+			wrote, err := cas.CompareAndSetState(ctx, st, expected)
+			if err != nil {
+				t.Fatalf("%s expecting %d: %v", stored, expected, err)
+			}
+			if wrote != field(step, "written").(bool) {
+				t.Errorf("%s expecting %d: wrote %v", stored, expected, wrote)
+			}
+			if want, ok := step.Get("state"); ok {
+				got, err := store.GetState(ctx, "v")
+				if err != nil {
+					t.Fatal(err)
+				}
+				sameJSON(t, stored+", the state written", got, js.Stringify(want))
+			}
+		}
+	}
+}
+
 // NewRunPlain is the fixture script's run: as NewRun, with no metrics.
 func NewRunPlain(id, job string, status cronwatch.RunStatus, startedAt int64) cronwatch.Run {
 	r := NewRun(id, job, status, startedAt)

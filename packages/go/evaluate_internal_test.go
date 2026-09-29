@@ -5,6 +5,7 @@ package cronwatch
 // once" (composeAlert).
 
 import (
+	"math"
 	"regexp"
 	"strings"
 	"testing"
@@ -150,6 +151,38 @@ func TestAFailedAlertNamesTheErrorOnce(t *testing.T) {
 		m := message(c.err)
 		if !regexp.MustCompile(c.want).MatchString(m) || strings.Contains(m, "Error: Error:") {
 			t.Errorf("%q: %q", c.err, m)
+		}
+	}
+}
+
+// A foreign row's times at the 64-bit limits: no wrap, and a duration every
+// store can write.
+func TestRunDurationAndIsStuckAtTheInt64Limits(t *testing.T) {
+	cases := []struct{ from, to, want int64 }{
+		{math.MinInt64, t0, maxDurationMs},
+		{math.MinInt64, math.MaxInt64, maxDurationMs},
+		{math.MaxInt64, t0, 0},
+		{math.MaxInt64, math.MinInt64, 0},
+		{t0 - 1500, t0, 1500},
+		{t0, t0, 0},
+		{0, maxDurationMs + 1, maxDurationMs},
+	}
+	for _, c := range cases {
+		if got := runDuration(c.from, c.to); got != c.want {
+			t.Errorf("runDuration(%d, %d) = %d, want %d", c.from, c.to, got, c.want)
+		}
+	}
+	running := Run{Status: StatusRunning, StartedAt: math.MinInt64}
+	if stuck, err := isStuck(def(t, `{"name":"j","timeout":"5m"}`), running, t0); err != nil || !stuck {
+		t.Errorf("a start at the lowest int64 is stuck: %v %v", stuck, err)
+	}
+	running.StartedAt = math.MaxInt64
+	if stuck, _ := isStuck(def(t, `{"name":"j","timeout":"5m"}`), running, t0); stuck {
+		t.Error("a start at the highest int64 is not stuck")
+	}
+	for _, v := range []int64{-1, maxDurationMs + 1, math.MaxInt64, math.MinInt64} {
+		if got := (JobState{Version: &v}).version(); got != 0 {
+			t.Errorf("version %d counts as %d, want 0", v, got)
 		}
 	}
 }

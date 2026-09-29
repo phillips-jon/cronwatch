@@ -420,7 +420,7 @@ func (h *RunHandle) finish(ctx context.Context, result any, failure error) *Run 
 	run := from.clone()
 	run.Status = StatusRunning
 	run.FinishedAt = ptr(finishedAt)
-	run.DurationMs = ptr(max(0, finishedAt-from.StartedAt))
+	run.DurationMs = ptr(runDuration(from.StartedAt, finishedAt))
 	run.Error = nil
 	run.Output = joinOutput(from.Output, added)
 	run.Metrics = from.Metrics.merged(recorderMetrics(rec))

@@ -212,7 +212,7 @@ func describeRun(run Run, tone string, job JobSummary, now int64) string {
 	at := whenUTC(run.StartedAt, now) + " UTC"
 	switch tone {
 	case "running":
-		return "running since " + at + ", " + schedule.FormatDuration(float64(now-run.StartedAt)) + " so far"
+		return "running since " + at + ", " + schedule.FormatDuration(elapsedMs(run.StartedAt, now)) + " so far"
 	case "stuck":
 		return "running since " + at + ", past its " + timeoutText(job) + " timeout"
 	}
@@ -327,7 +327,7 @@ func lane(input laneInput, sp span, nowInLane bool, name string) laneParts {
 	job := input.job
 	from, to, now := sp.from, sp.to, sp.now
 	x := func(t int64) float64 {
-		return math.Min(laneWidth, math.Max(0, (float64(t-from)/float64(to-from))*laneWidth))
+		return math.Min(laneWidth, math.Max(0, (elapsedMs(from, t)/float64(to-from))*laneWidth))
 	}
 	parsed := laneSchedule(job)
 	times, dense := dueTimes(job, parsed, input.runs, from, to)

@@ -227,7 +227,9 @@ func RunOf(row Row, job, idPrefix string, fallbackAt int64) *cronwatch.Run {
 		if finishedAt != nil {
 			end = max(startedAt, *finishedAt)
 		}
-		duration := end - startedAt
+		// Held to 2^53 - 1 as the SDK's runDuration holds it: Postgres
+		// timestamps span more milliseconds than that, never a wrap.
+		duration := min(end-startedAt, 9007199254740991)
 		run.FinishedAt, run.DurationMs = &end, &duration
 	}
 	switch status {

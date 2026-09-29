@@ -343,7 +343,9 @@ type JobState struct {
 	// Alerts no channel accepted, each retried once per check. Nil is absent.
 	Undelivered []Alert
 	// Goes up by one on every write (see Store.CompareAndSetState). Nil is
-	// a state written before versions, which counts as 0.
+	// a state written before versions, which counts as 0, as does a
+	// version outside 0 to 2^53 - 1. One that is not a whole number (a
+	// foreign row's 1.5 or "x") reads as nil.
 	Version *int64
 
 	// Keys after the known ones, in stored order: "version" and any a newer
@@ -362,8 +364,13 @@ func (s JobState) openAt(c Condition) (int64, bool) {
 	return 0, false
 }
 
+// version is the version the state counts as for CompareAndSetState, as
+// the SDK's stateVersion() reads it: a whole number from 0 to 2^53 - 1,
+// else 0. The SQL stores read it the same way, so a foreign row's 1.5, "x"
+// or -1 is written over by the next update instead of refusing every
+// compare-and-set of its job for good.
 func (s JobState) version() int64 {
-	if s.Version == nil {
+	if s.Version == nil || *s.Version < 0 || *s.Version > maxDurationMs {
 		return 0
 	}
 	return *s.Version
@@ -489,7 +496,12 @@ func stateFrom(v any) (JobState, error) {
 		}
 		s.tail = append(s.tail, k)
 		if k == "version" {
-			s.Version = nullableInt(o, "version")
+			// A whole number is kept as it is (version() counts one outside
+			// 0 to 2^53 - 1 as 0); anything else (a foreign row's 1.5 or
+			// "x") reads as none, which counts as 0 too.
+			if f, ok := get(o, "version").(float64); ok && f == math.Trunc(f) && f >= math.MinInt64 && f < math.MaxInt64 {
+				s.Version = ptr(int64(f))
+			}
 			continue
 		}
 		if s.extra == nil {
