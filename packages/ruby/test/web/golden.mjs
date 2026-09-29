@@ -191,7 +191,7 @@ if (process.argv.includes("--check")) {
     }
   });
   if (staleAssets.length) {
-    console.error(`the Rust dashboard's ${staleAssets.map(([name]) => name).join(", ")} differ from the SDK's. Regenerate them:\n  npm run build --workspace packages/sdk && TZ=UTC node packages/ruby/test/web/golden.mjs`);
+    console.error(`the Rust dashboard's copies of ${staleAssets.map(([name]) => name).join(", ")} are stale. Regenerate them:\n  npm run build --workspace packages/sdk && TZ=UTC node packages/ruby/test/web/golden.mjs`);
     process.exit(1);
   }
   let current = null;
