@@ -294,3 +294,44 @@ func check2(t *testing.T, err error) {
 		t.Fatal(err)
 	}
 }
+
+// listingStore calls meanwhile as ListJobs answers, once.
+type listingStore struct {
+	*cronwatch.MemoryStore
+	meanwhile func()
+}
+
+func (s *listingStore) ListJobs(ctx context.Context) ([]cronwatch.StoredJob, error) {
+	jobs, err := s.MemoryStore.ListJobs(ctx)
+	if f := s.meanwhile; f != nil {
+		s.meanwhile = nil
+		f()
+	}
+	return jobs, err
+}
+
+// The audit: an entry declared while Unschedule read the store was taken
+// for gone, and its job lost its schedule for the life of the process.
+func TestUnscheduleKeepsAnEntryDeclaredMeanwhile(t *testing.T) {
+	store := &listingStore{MemoryStore: cronwatch.NewMemoryStore()}
+	earlier, _ := newClient(t, store)
+	if _, err := earlier.Job("added", cronwatch.Schedule("0 2 * * *"), cronwatch.Tags("gocron", "gocron:billing")); err != nil {
+		t.Fatal(err)
+	}
+	check(t, earlier)
+
+	cw, _ := newClient(t, store)
+	w := bridge.NewWatch(cw, "gocron", "billing", "gocron")
+	entries := []bridge.Entry{{Name: "first", Where: "x", Schedule: "0 1 * * *"}}
+	w.Declare(entries)
+	w.Settle()
+	store.meanwhile = func() {
+		w.Declare(append(entries, bridge.Entry{Name: "added", Where: "y", Schedule: "0 2 * * *"}))
+	}
+	names, err := w.Unschedule(context.Background())
+	check2(t, err)
+	eq(t, "names", strings.Join(names, ","), "")
+	eq(t, "kept", cw.DefinedJobs()[1].Schedule(), "0 2 * * *")
+	w.Settle()
+	eq(t, "stored", strings.Contains(stored(t, store.MemoryStore, "added"), `"schedule":"0 2 * * *"`), true)
+}

@@ -54,6 +54,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	cronwatch "cronwatch.dev/go"
 	"cronwatch.dev/go/bridge"
@@ -159,6 +160,10 @@ func (l logger) Error(err error, msg string, keysAndValues ...any) {
 	l.inner.Error(err, msg, keysAndValues...)
 }
 
+// syncTimeout bounds a sync this watcher starts itself (the store's reads
+// and writes), so a store that hangs never holds its goroutine for good.
+const syncTimeout = 30 * time.Second
+
 // later syncs in a goroutine of its own, once more if asked again while one
 // is under way.
 func (w *Watcher) later() {
@@ -172,9 +177,11 @@ func (w *Watcher) later() {
 	w.mu.Unlock()
 	go func() {
 		for {
-			if err := w.Sync(context.Background()); err != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+			if err := w.Sync(ctx); err != nil {
 				w.cw.ReportError(err, "robfig/cron")
 			}
+			cancel()
 			w.mu.Lock()
 			if !w.again {
 				w.pending = false
@@ -277,7 +284,9 @@ func (w *Watcher) jobFor(name string) *cronwatch.Job {
 	if job := w.watch.Job(name); job != nil {
 		return job
 	}
-	if err := w.Sync(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+	defer cancel()
+	if err := w.Sync(ctx); err != nil {
 		w.cw.ReportError(err, "robfig/cron")
 	}
 	return w.watch.Job(name)

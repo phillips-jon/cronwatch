@@ -102,6 +102,18 @@ func TestTheConstructorsMetadataIsKept(t *testing.T) {
 	eq(t, "theirs", metadata["team"], any("ops"))
 }
 
+// The audit: metadata of JSON null panicked in River's enqueuer, and
+// metadata that is not an object was replaced.
+func TestMetadataOfAnotherShape(t *testing.T) {
+	mark := func(metadata string) string {
+		return string(cwriver.MarkForTest(func() (river.JobArgs, *river.InsertOpts) {
+			return ReportArgs{}, &river.InsertOpts{Metadata: []byte(metadata)}
+		}, "nightly-report"))
+	}
+	eq(t, "null", mark(`null`), `{"cronwatch":"nightly-report"}`)
+	eq(t, "an array is the app's", mark(`[1,2]`), `[1,2]`)
+}
+
 func eq[T comparable](t *testing.T, what string, got, want T) {
 	t.Helper()
 	if got != want {

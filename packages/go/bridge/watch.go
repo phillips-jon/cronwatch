@@ -400,6 +400,15 @@ func (w *Watch) Unschedule(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, errors.Join(append(failed, err)...)
 	}
+	// In turn with Declare and Fallback, and with what is declared read
+	// again: a job declared since the first read (a scheduler entry added
+	// while the store was read) must keep its schedule.
+	w.declaring.Lock()
+	defer w.declaring.Unlock()
+	clear(defined)
+	for _, def := range w.cw.DefinedJobs() {
+		defined[def.Name()] = true
+	}
 	var names []string
 	for _, job := range stored {
 		def := job.Definition

@@ -181,9 +181,17 @@ func marked(constructor river.PeriodicJobConstructor, name string) river.Periodi
 		if opts != nil {
 			made = *opts
 		}
-		metadata := map[string]json.RawMessage{}
+		var metadata map[string]json.RawMessage
 		if len(made.Metadata) > 0 {
-			_ = json.Unmarshal(made.Metadata, &metadata)
+			// Metadata that is not an object is the app's own, left as it
+			// is rather than replaced; the job's runs are then recorded
+			// only by its kind (Options.Kinds).
+			if json.Unmarshal(made.Metadata, &metadata) != nil {
+				return args, opts
+			}
+		}
+		if metadata == nil {
+			metadata = map[string]json.RawMessage{} // none, or JSON null
 		}
 		metadata[MetadataKey], _ = json.Marshal(name)
 		made.Metadata, _ = json.Marshal(metadata)

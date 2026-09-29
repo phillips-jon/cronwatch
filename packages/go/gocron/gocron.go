@@ -46,9 +46,9 @@
 // scheduler's (gocron.WithLocation), read from a job's next run once the
 // scheduler has started, else Options.Location, else time.Local, gocron's
 // default. A job added, updated or removed later is followed: added or
-// updated at once, removed at the next sync (the next run of any job, or
-// Sync), when its job is declared again without its schedule so it is never
-// reported missed.
+// updated at once, removed at the next sync (the next run of a job not
+// declared yet, or Sync), when its job is declared again without its
+// schedule so it is never reported missed.
 //
 // gocron's options that change when a job runs without showing in its
 // definition are not seen: WithIntervalFromCompletion (a duration counted
@@ -175,6 +175,10 @@ func (w *Watcher) jobOption() gocron.JobOption {
 	}).Interface().(gocron.JobOption)
 }
 
+// syncTimeout bounds a sync this watcher starts itself (the store's reads
+// and writes), so a store that hangs never holds its goroutine for good.
+const syncTimeout = 30 * time.Second
+
 // later syncs in a goroutine of its own, once the scheduler holds the job
 // being added, and once more if asked again meanwhile.
 func (w *Watcher) later() {
@@ -189,9 +193,11 @@ func (w *Watcher) later() {
 	go func() {
 		for {
 			time.Sleep(settle)
-			if err := w.Sync(context.Background()); err != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+			if err := w.Sync(ctx); err != nil {
 				w.cw.ReportError(err, "gocron")
 			}
+			cancel()
 			w.mu.Lock()
 			if !w.again {
 				w.pending = false
@@ -287,31 +293,39 @@ func (w *Watcher) location(jobs []gocron.Job) *time.Location {
 	return time.Local
 }
 
-// job is the CronWatch job a gocron run belongs to, or nil for one left
-// out. A job not declared yet (added a moment ago) is declared from what
-// the store holds, else without a schedule, until the sync this starts
-// gives it its own.
-func (w *Watcher) job(name string) *cronwatch.Job {
+// job is the CronWatch job a gocron run belongs to, and whether the run is
+// watched at all (false for one left out). A job not declared yet (added a
+// moment ago) is declared from what the store holds, else without a
+// schedule, until the sync this starts gives it its own; nil when that
+// declaration failed.
+func (w *Watcher) job(name string) (*cronwatch.Job, bool) {
 	clean, err := bridge.FuncName(name)
 	if err != nil || slices.Contains(w.options.Exclude, clean) {
-		return nil
+		return nil, false
 	}
 	if job := w.watch.Job(clean); job != nil {
-		return job
+		return job, true
 	}
 	w.later()
-	return w.watch.Fallback(context.Background(), clean, slices.Concat(w.options.Defaults, w.options.Jobs[clean]))
+	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
+	defer cancel()
+	return w.watch.Fallback(ctx, clean, slices.Concat(w.options.Defaults, w.options.Jobs[clean])), true
 }
 
 func (w *Watcher) before(id uuid.UUID, name string) {
-	job := w.job(name)
-	if job == nil {
+	job, watched := w.job(name)
+	if !watched {
 		return
 	}
-	handle, err := job.Start(context.Background(), cronwatch.WithTrigger(Trigger))
-	if err != nil {
-		w.cw.ReportError(err, "starting "+job.Name())
-		return
+	// A run that could not be started still takes its place in line (as
+	// nil), so its end is never paired with a later run of the job.
+	var handle *cronwatch.RunHandle
+	if job != nil {
+		var err error
+		if handle, err = job.Start(context.Background(), cronwatch.WithTrigger(Trigger)); err != nil {
+			w.cw.ReportError(err, "starting "+job.Name())
+			handle = nil
+		}
 	}
 	w.mu.Lock()
 	w.running[id] = append(w.running[id], handle)
