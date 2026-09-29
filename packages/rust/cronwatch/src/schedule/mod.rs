@@ -17,9 +17,9 @@ use std::sync::{Arc, LazyLock, Mutex};
 use jiff::tz::TimeZone;
 
 use crate::js::{Object, Value, floor_div, is_space, trim};
-pub(crate) use duration::{format_duration, parse_duration};
 pub(crate) use duration::format_relative;
 use duration::parse_duration_text;
+pub(crate) use duration::{format_duration, parse_duration};
 
 /// How early a run may start and still count for the fire it was meant for.
 pub(crate) const EARLY_SLACK_MS: i64 = 60_000;

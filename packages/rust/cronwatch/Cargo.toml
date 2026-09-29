@@ -63,8 +63,10 @@ flate2 = "1.0.35"
 # The dashboard's golden replay and the handler behind a real server.
 axum = { version = "0.8.4", default-features = false, features = ["original-uri", "tokio", "http1"] }
 hyper = { version = "1.6", features = ["client", "http1"] }
-hyper-util = { version = "0.1.14", features = ["client-legacy", "http1", "tokio"] }
+hyper-util = { version = "0.1.14", features = ["http1", "tokio"] }
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
+# The job's handler and the dashboard served on AWS Lambda.
+lambda_http = { version = "1", default-features = false, features = ["apigw_http"] }
 # A certificate made at run time and a TLS server, for the test that an
 # untrusted certificate is refused. rcgen 0.14 needs Rust 1.88.
 rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
@@ -80,6 +82,18 @@ required-features = ["alerts", "triage"]
 
 [[test]]
 name = "routes_golden"
+required-features = ["axum"]
+
+[[test]]
+name = "routes"
+required-features = ["axum"]
+
+[[test]]
+name = "lambda"
+required-features = ["axum"]
+
+[[test]]
+name = "handler"
 required-features = ["axum"]
 
 [package.metadata.docs.rs]

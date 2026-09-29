@@ -266,3 +266,26 @@ impl Routes {
         axum::Router::new().nest_service(&base, self)
     }
 }
+
+impl crate::Job {
+    /// [`run`](crate::Job::run) for a function that answers an
+    /// `http::Response` of any body, the SDK's `run` given a fetch
+    /// `Response`: a status of 400 or more fails the run with
+    /// `HTTP <status> <reason>`, and the response is handed back either way.
+    /// (`run` itself does the same for the body types
+    /// [`Job::handler`](crate::Job::handler) lists.)
+    pub async fn run_http<F, Fut, B, E>(&self, f: F) -> Result<http::Response<B>, E>
+    where
+        F: FnOnce(crate::JobContext) -> Fut,
+        Fut: std::future::Future<Output = Result<http::Response<B>, E>>,
+        B: 'static,
+        E: std::fmt::Display,
+    {
+        let judge: fn(&http::Response<B>) -> Option<String> = |r| super::http_failure_text(r.status().as_u16());
+        match self.client.execute_run(self.def.clone(), "run".into(), f, judge).await.outcome {
+            crate::run::Outcome::Value(v) => Ok(v),
+            crate::run::Outcome::Error(err) => Err(err),
+            crate::run::Outcome::Panic(panic) => std::panic::resume_unwind(panic),
+        }
+    }
+}

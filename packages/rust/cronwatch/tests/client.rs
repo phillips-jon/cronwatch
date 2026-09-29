@@ -1,4 +1,4 @@
-//! client.test.ts, as the Go port has it. The handler tests wait for phase 3.
+//! client.test.ts, as the Go port has it. The handler tests are in handler.rs and env.rs.
 
 mod common;
 
