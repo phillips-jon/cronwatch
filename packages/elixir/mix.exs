@@ -47,8 +47,11 @@ defmodule Cronwatch.MixProject do
       {:tz, "~> 0.28"},
       {:telemetry, "~> 1.0"},
       {:ecto_sql, "~> 3.12", optional: true},
+      {:plug, "~> 1.16", optional: true},
       {:ecto_sqlite3, "~> 0.17", only: :test},
       {:stream_data, "~> 1.1", only: :test},
+      {:bandit, "~> 1.5", only: :test},
+      {:phoenix, "~> 1.7", only: :test},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]

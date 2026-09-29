@@ -228,7 +228,8 @@ defmodule Cronwatch.StartFinishTest do
 
     {:ok, http} = Cronwatch.start(job)
     bad = Cronwatch.finish(http, {:ok, %{__struct__: Req.Response, status: 502}})
-    assert bad.error == "HTTP 502"
+    # The reason is Plug's, so it is named only where Plug is loaded.
+    assert bad.error == if(Code.ensure_loaded?(Plug.Conn.Status), do: "HTTP 502 Bad Gateway", else: "HTTP 502")
   end
 
   test "a store failing during start does not raise; finish records the run once the store is back" do

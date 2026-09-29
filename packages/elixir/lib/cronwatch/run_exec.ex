@@ -60,7 +60,8 @@ defmodule Cronwatch.Run.Exec do
         exit(reason)
 
       {:timed_out, _} ->
-        record(c, job, info, fn run ->
+        c
+        |> record(job, info, fn run ->
           snap = Lines.snapshot(lines, run.id)
 
           %{
@@ -71,6 +72,7 @@ defmodule Cronwatch.Run.Exec do
               error: Core.clean(c, "Still running after #{Cronwatch.Duration.format(timeout)}; marked as timed out")
           }
         end)
+        |> recorded(opts)
 
         exit(:timeout)
 
@@ -78,14 +80,25 @@ defmodule Cronwatch.Run.Exec do
         failure = failure_text(outcome)
         result = result_of(outcome)
 
-        record(c, job, info, fn run ->
+        c
+        |> record(job, info, fn run ->
           snap = Lines.snapshot(lines, run.id)
           text = returned_text(result)
           run = %{run | metrics: snap.metrics, output: Lines.output(snap) || (text && Output.cap(text))}
           Core.conclude(c, job.expect, run, failure, Lines.expect_text(snap) || text)
         end)
+        |> recorded(opts)
 
         hand_back(outcome, isolate)
+    end
+  end
+
+  # The run as it was recorded, to the caller's own `recorded:` function
+  # (Cronwatch.Handler answers with it), before the outcome is handed back.
+  defp recorded(run, opts) do
+    case Keyword.get(opts, :recorded) do
+      f when is_function(f, 1) -> f.(run)
+      _ -> :ok
     end
   end
 
