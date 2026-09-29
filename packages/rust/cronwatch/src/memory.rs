@@ -76,7 +76,9 @@ impl Store for MemoryStore {
         let mut inner = self.lock();
         let name = definition.name().to_string();
         let created_at = inner.jobs.get(&name).map_or(now, |j| j.created_at);
-        inner.jobs.insert(name.clone(), StoredJob { name, definition: definition.clone(), created_at, updated_at: now });
+        inner
+            .jobs
+            .insert(name.clone(), StoredJob { name, definition: definition.clone(), created_at, updated_at: now });
         ready(())
     }
 
@@ -133,7 +135,12 @@ impl Store for MemoryStore {
         ready(wrote)
     }
 
-    fn delete_run_if<'a>(&'a self, id: &'a str, job: &'a str, status: &'a RunStatus) -> BoxFuture<'a, Result<bool, BoxError>> {
+    fn delete_run_if<'a>(
+        &'a self,
+        id: &'a str,
+        job: &'a str,
+        status: &'a RunStatus,
+    ) -> BoxFuture<'a, Result<bool, BoxError>> {
         let mut inner = self.lock();
         let matches = inner.runs.get(id).is_some_and(|(r, _)| r.job == job && &r.status == status);
         if matches {
@@ -169,7 +176,11 @@ impl Store for MemoryStore {
         ready(())
     }
 
-    fn compare_and_set_state<'a>(&'a self, state: &'a JobState, expected: i64) -> BoxFuture<'a, Result<bool, BoxError>> {
+    fn compare_and_set_state<'a>(
+        &'a self,
+        state: &'a JobState,
+        expected: i64,
+    ) -> BoxFuture<'a, Result<bool, BoxError>> {
         let mut inner = self.lock();
         let current = inner.states.get(&state.job).map_or(0, JobState::version_or_zero);
         if current != expected {

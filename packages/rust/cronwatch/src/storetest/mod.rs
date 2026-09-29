@@ -1,0 +1,1 @@
+//! The store contract test.

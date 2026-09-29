@@ -350,7 +350,12 @@ impl Job {
 impl Client {
     /// Runs a job by name without keeping a handle, declaring it on first use
     /// (or again, when `options` is given).
-    pub async fn run<F, Fut, T, E>(&self, name: &str, options: Option<crate::JobOptions>, f: F) -> Result<Result<T, E>, Error>
+    pub async fn run<F, Fut, T, E>(
+        &self,
+        name: &str,
+        options: Option<crate::JobOptions>,
+        f: F,
+    ) -> Result<Result<T, E>, Error>
     where
         F: FnOnce(JobContext) -> Fut,
         Fut: Future<Output = Result<T, E>> + Send,
@@ -394,8 +399,15 @@ impl Client {
             self.inner.handle.spawn(async move { client.begin_run(&def, &run).await })
         };
         let rec = Arc::new(Recorder::new());
-        let mut guard =
-            DropGuard { client: self.clone(), def: def.clone(), run: run.clone(), rec: rec.clone(), start: Some(start), started: None, armed: true };
+        let mut guard = DropGuard {
+            client: self.clone(),
+            def: def.clone(),
+            run: run.clone(),
+            rec: rec.clone(),
+            start: Some(start),
+            started: None,
+            armed: true,
+        };
         guard.wait_start().await;
 
         let timeout = timeout_ms(&def.stored).unwrap_or(crate::evaluate::DEFAULT_TIMEOUT_MS);
@@ -504,9 +516,8 @@ impl Client {
         }
         match self.record_finish(def, &run, recorded, finished_at).await {
             Err(err) => self.report(err, &format!("recording {name}")),
-            Ok(Some(why)) => {
-                self.report(Error::Other(format!("run {} of {name} {why}; ignored", run.id)), &format!("finishing {name}"))
-            }
+            Ok(Some(why)) => self
+                .report(Error::Other(format!("run {} of {name} {why}; ignored", run.id)), &format!("finishing {name}")),
             Ok(None) => {}
         }
     }
@@ -695,10 +706,21 @@ impl Client {
     }
 
     /// `record_run` for a run already stored.
-    async fn record_over(&self, def: &Definition, stored: &Run, run: &Run, evaluate: bool) -> Result<Vec<Alert>, Error> {
+    async fn record_over(
+        &self,
+        def: &Definition,
+        stored: &Run,
+        run: &Run,
+        evaluate: bool,
+    ) -> Result<Vec<Alert>, Error> {
         if stored.job != run.job {
             self.report(
-                Error::Other(format!("run {} of {} belongs to job {}; ignored", run.id, run.job, js::quote(&stored.job))),
+                Error::Other(format!(
+                    "run {} of {} belongs to job {}; ignored",
+                    run.id,
+                    run.job,
+                    js::quote(&stored.job)
+                )),
                 &format!("recording {}", run.job),
             );
             return Ok(Vec::new());

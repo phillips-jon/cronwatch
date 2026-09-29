@@ -576,7 +576,10 @@ mod tests {
     fn numbers_and_errors() {
         assert_eq!(parse("[1e400,-0,2.50]").unwrap().to_json(), "[null,0,2.5]");
         assert_eq!(parse("{").unwrap_err().to_string(), "Expected property name at position 1");
-        assert_eq!(parse("1 2").unwrap_err().to_string(), "Unexpected non-whitespace character after JSON at position 2");
+        assert_eq!(
+            parse("1 2").unwrap_err().to_string(),
+            "Unexpected non-whitespace character after JSON at position 2"
+        );
         assert!(parse("-").is_err());
         assert!(parse("\"\u{1}\"").is_err());
     }

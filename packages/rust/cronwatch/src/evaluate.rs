@@ -183,11 +183,7 @@ pub(crate) fn js_number(v: &Value) -> f64 {
         Value::Bool(b) => f64::from(u8::from(*b)),
         Value::String(s) => {
             let text = js::trim(s);
-            if text.is_empty() {
-                0.0
-            } else {
-                string_to_number(text)
-            }
+            if text.is_empty() { 0.0 } else { string_to_number(text) }
         }
         _ => f64::NAN,
     }
@@ -215,7 +211,10 @@ fn string_to_number(text: &str) -> f64 {
         if sign < 0.0 || text.starts_with('+') || body.len() == 2 {
             return f64::NAN;
         }
-        return body[2..].chars().try_fold(0.0, |acc, c| c.to_digit(radix).map(|d| acc * radix as f64 + d as f64)).unwrap_or(f64::NAN);
+        return body[2..]
+            .chars()
+            .try_fold(0.0, |acc, c| c.to_digit(radix).map(|d| acc * radix as f64 + d as f64))
+            .unwrap_or(f64::NAN);
     }
     let valid = !body.is_empty()
         && !body.starts_with(['+', '-'])
@@ -332,6 +331,7 @@ pub(crate) fn on_run_finish(
 pub(crate) struct CheckOutcome {
     pub evaluation: Evaluation,
     pub next_expected_at: Option<i64>,
+    #[allow(dead_code)] // the dashboard's timelines use it (phase 3)
     pub due_at: Option<i64>,
 }
 
@@ -395,7 +395,11 @@ pub(crate) fn on_check(
                 },
             });
         }
-        return Ok(CheckOutcome { evaluation: Evaluation { state: next, alerts }, next_expected_at: None, due_at: None });
+        return Ok(CheckOutcome {
+            evaluation: Evaluation { state: next, alerts },
+            next_expected_at: None,
+            due_at: None,
+        });
     }
 
     let parsed = parsed_schedule(def)?;
@@ -486,7 +490,12 @@ pub(crate) fn stale_alert(alert: &Alert, state: &JobState) -> bool {
 }
 
 /// How a job looks at a glance. Silence wins, then stuck, failing and late.
-pub(crate) fn job_health(def: &Definition, last_run: Option<&Run>, state: &JobState, now: i64) -> Result<JobHealth, String> {
+pub(crate) fn job_health(
+    def: &Definition,
+    last_run: Option<&Run>,
+    state: &JobState,
+    now: i64,
+) -> Result<JobHealth, String> {
     let open = open_conditions(state);
     if is_silenced(state, now) {
         return Ok(JobHealth::Silenced);
@@ -544,11 +553,8 @@ fn summary(
     let window = &recent[..recent.len().min(BASELINE_WINDOW)];
     let finished = window.iter().filter(|r| r.status != RunStatus::Running).count();
     let ok = window.iter().filter(|r| r.status == RunStatus::Ok).count();
-    let ok_durations: Vec<f64> = window
-        .iter()
-        .filter(|r| r.status == RunStatus::Ok)
-        .filter_map(|r| r.duration_ms.map(|d| d as f64))
-        .collect();
+    let ok_durations: Vec<f64> =
+        window.iter().filter(|r| r.status == RunStatus::Ok).filter_map(|r| r.duration_ms.map(|d| d as f64)).collect();
     let ok_rate = if finished > 0 { ok as f64 / finished as f64 } else { 1.0 };
     JobSummary {
         name: stored.name.clone(),

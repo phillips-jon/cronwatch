@@ -318,9 +318,10 @@ impl RunHandle {
 
     fn ignored(&self, why: &str) {
         let name = &self.inner.def.name;
-        self.inner
-            .client
-            .report(Error::Other(format!("run {} of {name} {why}; ignored", self.inner.id)), &format!("finishing {name}"));
+        self.inner.client.report(
+            Error::Other(format!("run {} of {name} {why}; ignored", self.inner.id)),
+            &format!("finishing {name}"),
+        );
     }
 
     /// Appends the lines and metrics added so far to the stored run, which

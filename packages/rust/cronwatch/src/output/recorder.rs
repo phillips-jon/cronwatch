@@ -60,13 +60,6 @@ impl Recorder {
         }
     }
 
-    /// Appends a line of parts, each written as `log_text` writes it and
-    /// joined by spaces, as `console.log` joins its arguments.
-    pub(crate) fn log_parts(&self, parts: &[&dyn std::fmt::Display]) {
-        let texts: Vec<String> = parts.iter().map(|p| super::log_text(*p)).collect();
-        self.log(texts.join(" "));
-    }
-
     /// What the run stores as its output: the lines kept, capped. `None`
     /// when nothing was logged.
     pub(crate) fn output(&self) -> Option<String> {

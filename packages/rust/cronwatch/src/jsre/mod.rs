@@ -27,6 +27,7 @@ mod parse;
 
 use parse::{Bits, CharSet, Kind, Tree};
 
+#[cfg(test)]
 use crate::js;
 
 /// No node: the end of a chain that never continues.
@@ -466,11 +467,13 @@ impl Regexp {
     }
 
     /// Whether the pattern matches anywhere in the units.
+    #[cfg(test)]
     pub(crate) fn is_match_units(&self, input: &[u16]) -> bool {
         self.exec(&mut self.matcher(input), 0)
     }
 
     /// Whether the pattern matches anywhere in `s`.
+    #[cfg(test)]
     pub(crate) fn is_match(&self, s: &str) -> bool {
         self.is_match_units(&js::units(s))
     }
@@ -507,11 +510,13 @@ impl Regexp {
 
     /// `replace` with a replacement string: `$1` to `$99` are the groups
     /// ("" for one that did not take part), `$&` the match, `$$` a "$".
+    #[cfg(test)]
     pub(crate) fn replace_template_units(&self, input: &[u16], template: &str) -> Vec<u16> {
         self.replace_units(input, |m| js::units(&expand(template, m)))
     }
 
     /// `replace_template_units` on text.
+    #[cfg(test)]
     pub(crate) fn replace(&self, s: &str, template: &str) -> String {
         js::from_units(&self.replace_template_units(&js::units(s), template))
     }
@@ -524,6 +529,7 @@ impl std::fmt::Display for Regexp {
     }
 }
 
+#[cfg(test)]
 fn expand(template: &str, m: &Match<'_>) -> String {
     let t = template.as_bytes();
     let mut b: Vec<u8> = Vec::with_capacity(t.len());
@@ -808,6 +814,7 @@ impl Match<'_> {
     }
 
     /// Group `i` as text, "" when it did not take part.
+    #[cfg(test)]
     pub(crate) fn text(&self, i: usize) -> String {
         js::from_units(self.group(i).unwrap_or(&[]))
     }

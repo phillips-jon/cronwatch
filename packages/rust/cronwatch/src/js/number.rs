@@ -1,6 +1,3 @@
-/// `Number.MAX_SAFE_INTEGER`.
-pub(crate) const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0;
-
 /// `String(n)`: the shortest digits that read back as `n`, in plain notation
 /// from 1e-7 up to 1e21 and exponential notation outside it, as
 /// `Number.prototype.toString` writes them.

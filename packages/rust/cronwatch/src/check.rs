@@ -58,7 +58,8 @@ impl Client {
                         let result = match client.inner.handle.spawn(async move { inner.run_check().await }).await {
                             Ok(result) => result,
                             Err(join) => {
-                                let text = if join.is_panic() { panic_text(&*join.into_panic()) } else { "cancelled".into() };
+                                let text =
+                                    if join.is_panic() { panic_text(&*join.into_panic()) } else { "cancelled".into() };
                                 Err(Error::Other(format!("the check panicked: {text}")))
                             }
                         };
@@ -152,7 +153,12 @@ impl Client {
     }
 
     /// One job's part of a check: missed, then retries and sends.
-    async fn check_job(&self, job: &StoredJob, now: i64, spent: &mut Duration) -> Result<(JobSummary, Vec<Alert>), Error> {
+    async fn check_job(
+        &self,
+        job: &StoredJob,
+        now: i64,
+        spent: &mut Duration,
+    ) -> Result<(JobSummary, Vec<Alert>), Error> {
         let recent = self.inner.store.list_runs(&job.name, BASELINE_WINDOW).await.map_err(Error::store)?;
         let last = recent.first();
         let (state, (drafts, next_expected_at)) = self
@@ -172,7 +178,8 @@ impl Client {
     /// cannot be evaluated is reported and shown as failing.
     async fn snapshot(&self, job: &StoredJob, now: i64, runs: usize) -> JobWithRuns {
         let read = async {
-            let recent = self.inner.store.list_runs(&job.name, runs.max(BASELINE_WINDOW)).await.map_err(Error::store)?;
+            let recent =
+                self.inner.store.list_runs(&job.name, runs.max(BASELINE_WINDOW)).await.map_err(Error::store)?;
             let state = self.read_state(&job.name).await?;
             let out = on_check(&job.definition, job, recent.first(), &state, now).map_err(Error::Other)?;
             let summary = summarize(job, &recent, &state, out.next_expected_at, now).map_err(Error::Other)?;
@@ -305,7 +312,8 @@ impl Client {
         let client = self.clone();
         *timer = Some(self.inner.handle.spawn(async move {
             tokio::time::sleep(FIRST_CHECK_DELAY).await;
-            let mut ticker = tokio::time::interval_at(tokio::time::Instant::now() + every - FIRST_CHECK_DELAY.min(every), every);
+            let mut ticker =
+                tokio::time::interval_at(tokio::time::Instant::now() + every - FIRST_CHECK_DELAY.min(every), every);
             loop {
                 if let Err(err) = client.check().await {
                     client.report(err, "check");

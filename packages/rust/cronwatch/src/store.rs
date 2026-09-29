@@ -81,7 +81,11 @@ pub trait Store: Send + Sync + 'static {
 
     /// Writes `state` only when the stored state's version (absent, or no
     /// row at all, counts as 0) equals `expected`, and says whether it wrote.
-    fn compare_and_set_state<'a>(&'a self, state: &'a JobState, expected: i64) -> BoxFuture<'a, Result<bool, BoxError>> {
+    fn compare_and_set_state<'a>(
+        &'a self,
+        state: &'a JobState,
+        expected: i64,
+    ) -> BoxFuture<'a, Result<bool, BoxError>> {
         let _ = (state, expected);
         Box::pin(async { Err(Unsupported.into()) })
     }
@@ -91,7 +95,12 @@ pub trait Store: Send + Sync + 'static {
     /// ?`), and says whether it deleted. The SDK has no counterpart: it is
     /// how an attempt a queue gave back without failing leaves no run behind,
     /// as the PHP and Go ports' stores take one back.
-    fn delete_run_if<'a>(&'a self, id: &'a str, job: &'a str, status: &'a RunStatus) -> BoxFuture<'a, Result<bool, BoxError>> {
+    fn delete_run_if<'a>(
+        &'a self,
+        id: &'a str,
+        job: &'a str,
+        status: &'a RunStatus,
+    ) -> BoxFuture<'a, Result<bool, BoxError>> {
         let _ = (id, job, status);
         Box::pin(async { Err(Unsupported.into()) })
     }

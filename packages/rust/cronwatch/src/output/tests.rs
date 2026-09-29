@@ -318,7 +318,7 @@ fn recorder_metrics_and_lines() {
     }
     assert_eq!(r.metrics().keys().collect::<Vec<_>>(), ["10", "200", "zeta"]);
     assert!(r.output().is_none() && r.expect_text().is_none(), "nothing logged");
-    r.log_parts(&[&"a", &1, &"Error: e"]);
+    r.log(format!("{} {} {}", "a", 1, "Error: e"));
     r.log("second");
     assert_eq!(r.output().as_deref(), Some("a 1 Error: e\nsecond"));
 }

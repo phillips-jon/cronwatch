@@ -212,7 +212,9 @@ impl Metrics {
         for (k, x) in o.iter() {
             match x {
                 Value::Number(n) => out.set(k, *n),
-                other => return Err(JsonError(format!("metric {} must be a number, not {}", js::quote(k), other.kind()))),
+                other => {
+                    return Err(JsonError(format!("metric {} must be a number, not {}", js::quote(k), other.kind())));
+                }
             }
         }
         Ok(out)
@@ -707,7 +709,8 @@ impl Alert {
             Some(r) => Some(Run::from_value(r)?),
         };
         let empty = Object::new();
-        let details = AlertDetails::from_value(&alert_type, o.get("details").and_then(Value::as_object).unwrap_or(&empty));
+        let details =
+            AlertDetails::from_value(&alert_type, o.get("details").and_then(Value::as_object).unwrap_or(&empty));
         Ok(Alert {
             run,
             details,

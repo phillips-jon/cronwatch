@@ -1,23 +1,23 @@
 /// Whether JavaScript's `\s` matches `c`: WhiteSpace and LineTerminator,
 /// which is also what `String.prototype.trim` removes.
 pub(crate) fn is_space(c: char) -> bool {
-    matches!(
-        c,
-        '\t' | '\n'
-            | '\u{0b}'
-            | '\u{0c}'
-            | '\r'
-            | ' '
-            | '\u{a0}'
-            | '\u{1680}'
-            | '\u{2000}'..='\u{200a}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202f}'
-            | '\u{205f}'
-            | '\u{3000}'
-            | '\u{feff}'
-    )
+    ('\u{2000}'..='\u{200a}').contains(&c)
+        || matches!(
+            c,
+            '\t' | '\n'
+                | '\u{0b}'
+                | '\u{0c}'
+                | '\r'
+                | ' '
+                | '\u{a0}'
+                | '\u{1680}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202f}'
+                | '\u{205f}'
+                | '\u{3000}'
+                | '\u{feff}'
+        )
 }
 
 /// `String.prototype.trim`.

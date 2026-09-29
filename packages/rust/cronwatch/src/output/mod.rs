@@ -6,7 +6,6 @@
 
 mod recorder;
 
-use std::fmt::Display;
 use std::sync::OnceLock;
 
 pub(crate) use recorder::Recorder;
@@ -55,7 +54,9 @@ pub(crate) fn error_message(name: &str, message: &str, frames: &[String]) -> Str
 }
 
 /// The SDK's `errorMessage` for a thrown value that is not an `Error`: a
-/// string as it is, anything else as its JSON, capped like output.
+/// string as it is, anything else as its JSON, capped like output. Rust
+/// throws nothing but panics, so only the conformance replay needs it.
+#[cfg(test)]
 pub(crate) fn value_message(value: &js::Value) -> String {
     match value {
         js::Value::String(s) => cap_output(s),
@@ -80,12 +81,6 @@ pub(crate) fn error_name(type_name: &str) -> &str {
         return "Error";
     }
     name
-}
-
-/// One part of a logged line, as `job.ts`'s `stringify` writes a string:
-/// Rust values are written with their `Display`.
-pub(crate) fn log_text(part: &dyn Display) -> String {
-    part.to_string()
 }
 
 /// What replaces a secret.

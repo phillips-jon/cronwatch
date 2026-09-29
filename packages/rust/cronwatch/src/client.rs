@@ -216,8 +216,7 @@ impl ClientBuilder {
             }
             defaults = options.fields;
         }
-        let retention_ms =
-            schedule::parse_duration(&self.retention.to_value(), "retention").map_err(Error::Invalid)?;
+        let retention_ms = schedule::parse_duration(&self.retention.to_value(), "retention").map_err(Error::Invalid)?;
         let default_store = self.store.is_none();
         let cron_secret = match self.cron_secret {
             Some(secret) => secret,
@@ -236,13 +235,11 @@ impl ClientBuilder {
                 defaults,
                 redact: self.redact,
                 defer_delivery: self.deliver == Deliver::AtCheck,
-                on_error: self.on_error.unwrap_or_else(|| {
-                    Arc::new(|err: &Error, where_: &str| eprintln!("[cronwatch] {where_}: {err}"))
-                }),
+                on_error: self
+                    .on_error
+                    .unwrap_or_else(|| Arc::new(|err: &Error, where_: &str| eprintln!("[cronwatch] {where_}: {err}"))),
                 now: self.clock.unwrap_or_else(|| {
-                    Arc::new(|| {
-                        SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64)
-                    })
+                    Arc::new(|| SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as i64))
                 }),
                 handle,
                 declared: Mutex::new(Declared::default()),
@@ -386,8 +383,11 @@ impl Client {
             fields.set(k, v.clone());
         }
         fields.set("name", name);
-        let def =
-            Arc::new(JobDef { name: name.to_string(), stored: to_stored(&fields, options.expect.as_ref()), expect: options.expect });
+        let def = Arc::new(JobDef {
+            name: name.to_string(),
+            stored: to_stored(&fields, options.expect.as_ref()),
+            expect: options.expect,
+        });
         validate_definition(name, &def.stored)?;
         let mut declared = lock(&self.inner.declared);
         if !declared.definitions.contains_key(name) {

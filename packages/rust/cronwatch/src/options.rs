@@ -312,7 +312,8 @@ mod tests {
 
     #[test]
     fn fields_keep_the_order_given() {
-        let o = JobOptions::new().grace("5m").schedule("@hourly").budget("cost", 2.0).budget("rows", 5.0).grace(900_000u64);
+        let o =
+            JobOptions::new().grace("5m").schedule("@hourly").budget("cost", 2.0).budget("rows", 5.0).grace(900_000u64);
         assert_eq!(o.fields.to_json(), r#"{"grace":900000,"schedule":"@hourly","budget":{"cost":2,"rows":5}}"#);
         let d = JobOptions::new().timeout(Duration::from_millis(1500));
         assert_eq!(d.fields.to_json(), r#"{"timeout":1500}"#);

@@ -161,6 +161,7 @@ pub(crate) fn format_duration(ms: f64) -> String {
 
 /// The SDK's `formatRelative`: "5m ago", "in 2h", or "now" within five
 /// seconds of now.
+#[allow(dead_code)] // the dashboard's pages use it (phase 3)
 pub(crate) fn format_relative(at: i64, now: i64) -> String {
     let diff = at.saturating_sub(now);
     let abs = diff.saturating_abs();

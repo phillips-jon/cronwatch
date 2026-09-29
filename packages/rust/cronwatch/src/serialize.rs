@@ -99,6 +99,9 @@ mod tests {
         let panics = ExpectRule::Func(Arc::new(|_: &str| panic!("bad check")));
         assert_eq!(panics.check("x").as_deref(), Some("Output check threw: bad check"));
         assert_eq!(check_expectation(None, None), None);
-        assert_eq!(check_expectation(Some(&contains), None).as_deref(), Some(r#"Output did not contain "done \"ok\"""#));
+        assert_eq!(
+            check_expectation(Some(&contains), None).as_deref(),
+            Some(r#"Output did not contain "done \"ok\"""#)
+        );
     }
 }

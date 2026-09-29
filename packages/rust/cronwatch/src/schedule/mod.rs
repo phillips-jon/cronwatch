@@ -17,7 +17,9 @@ use std::sync::{Arc, LazyLock, Mutex};
 use jiff::tz::TimeZone;
 
 use crate::js::{Object, Value, floor_div, is_space, trim};
-pub(crate) use duration::{format_duration, format_relative, parse_duration, parse_duration_text, parse_number, round};
+pub(crate) use duration::{format_duration, parse_duration};
+#[allow(unused_imports)] // the dashboard's pages use them (phase 3)
+pub(crate) use duration::{format_relative, parse_duration_text};
 
 /// How early a run may start and still count for the fire it was meant for.
 pub(crate) const EARLY_SLACK_MS: i64 = 60_000;
@@ -36,6 +38,7 @@ pub(crate) enum ScheduleKind {
 
 impl ScheduleKind {
     /// The SDK's name for the kind: "cron" or "interval".
+    #[allow(dead_code)] // the dashboard's timelines use it (phase 3)
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             ScheduleKind::Cron => "cron",
@@ -50,8 +53,10 @@ impl ScheduleKind {
 #[derive(Clone, Debug)]
 pub(crate) struct Parsed {
     pub(crate) kind: ScheduleKind,
+    #[allow(dead_code)] // the dashboard's timelines use it (phase 3)
     pub(crate) source: String,
     /// The IANA zone a cron is read in, "" when none was given.
+    #[allow(dead_code)] // the dashboard's timelines use it (phase 3)
     pub(crate) timezone: String,
     /// An interval's period in milliseconds.
     pub(crate) every_ms: i64,
@@ -67,6 +72,7 @@ impl Parsed {
     /// The SDK's JSON of a parsed schedule: `{kind, source, timezone}` for a
     /// cron (timezone only when given) and `{kind, source, everyMs}` for an
     /// interval.
+    #[allow(dead_code)] // the dashboard's timelines use it (phase 3)
     pub(crate) fn to_value(&self) -> Value {
         let mut o = Object::new().with("kind", self.kind.as_str()).with("source", self.source.as_str());
         if self.is_interval() {
@@ -192,6 +198,7 @@ pub(crate) fn fire_after(p: &Parsed, from: i64) -> Option<i64> {
 /// ascending, or None when there are more than `limit`. It asks for fires
 /// in batches, far cheaper than one `next_fire` each, and drops any that do
 /// not move forward (see `fire_after`).
+#[allow(dead_code)] // the dashboard's timelines use it (phase 3)
 pub(crate) fn fires_between(p: &Parsed, from: i64, to: i64, limit: usize) -> Option<Vec<i64>> {
     let mut out = Vec::new();
     let (mut probe, mut last) = (from, from);
@@ -335,6 +342,7 @@ pub(crate) fn is_timezone(name: &str) -> bool {
 
 /// The zone an IANA name names, matched without regard to case as `Intl`
 /// matches it; "" is the process's own zone.
+#[allow(dead_code)] // the scheduler integrations use it (phase 4)
 pub(crate) fn load_zone(name: &str) -> Result<TimeZone, String> {
     cron::load_zone(name).map_err(|_| format!("timezone \"{name}\" is not an IANA timezone"))
 }

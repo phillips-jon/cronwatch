@@ -333,10 +333,7 @@ impl Client {
                     false
                 }
                 Ok(Err(_)) => {
-                    client.report(
-                        Error::Other(format!("timed out after {}ms", CHANNEL_TIMEOUT.as_millis())),
-                        &where_,
-                    );
+                    client.report(Error::Other(format!("timed out after {}ms", CHANNEL_TIMEOUT.as_millis())), &where_);
                     false
                 }
                 Err(join) => {
