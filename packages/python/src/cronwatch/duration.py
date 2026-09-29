@@ -13,6 +13,12 @@ Duration = Union[str, int, float, timedelta]
 
 UNIT_MS = {"ms": 1, "s": 1000, "m": 60_000, "h": 3_600_000, "d": 86_400_000, "w": 604_800_000}
 _PART = re.compile(f"([0-9]+(?:\\.[0-9]+)?)[{_js.WHITESPACE}]*(ms|s|m|h|d|w)")
+# The longest duration string read, in characters. No real duration comes near
+# it, and _PART is quadratic on a long run of digits, so a longer string is
+# refused before it is read.
+MAX_LENGTH = 64
+# How much of a refused, overlong string its error quotes.
+_QUOTED = 32
 
 
 def _not_a_duration(label: str, value: Any) -> ValueError:
@@ -30,6 +36,8 @@ def parse_duration(value: Duration, label: str = "duration") -> int | float:
         return value
     if not isinstance(value, str):
         raise _not_a_duration(label, value)
+    if len(value) > MAX_LENGTH:
+        raise ValueError(f'{label} "{value[:_QUOTED]}..." is too long for a duration (more than {MAX_LENGTH} characters)')
     text = _js.trim(value).lower()
     if text == "":
         raise ValueError(f"{label} is empty")

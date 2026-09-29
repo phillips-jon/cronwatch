@@ -368,8 +368,15 @@ _LOOPBACK_V4 = re.compile(r"127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})")
 
 def is_loopback_origin(origin: str) -> bool:
     """Whether an origin's host is loopback: "localhost", a name ending in
-    ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1."""
-    authority = origin.split("://", 1)[1] if "://" in origin else origin
+    ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1.
+    Only an origin that reads as one counts: a Host header is anyone's to
+    send, and one such as "evil.example/.localhost" or
+    "localhost:1@evil.example" must not put the development token in a link
+    to another host."""
+    bare = _origin.bare(origin)
+    if bare is None:
+        return False
+    authority = bare.split("://", 1)[1] if "://" in bare else bare
     if authority.startswith("["):
         end = authority.find("]")
         host = authority[: end + 1] if end >= 0 else authority
