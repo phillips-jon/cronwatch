@@ -98,7 +98,7 @@ alerts: [
 triage: {Cronwatch.Triage.Anthropic, context: "A Phoenix app with a Postgres database."}
 ```
 
-Requests go through OTP's own `:httpc`, with one ten second deadline, redirects refused, at most 1 MiB of an answer read, TLS always verified, and only a URL's origin in any error; no credential is printed by `inspect`. `transport:` on a channel or the instance takes a `Cronwatch.Transport` of your own (over Req or Finch, say). `Cronwatch.Triage.Anthropic` reads `ANTHROPIC_API_KEY` unless given `api_key:`.
+Requests go through a small HTTP/1.1 client of the package's own, over OTP's `:gen_tcp` and `:ssl`, with one ten second deadline, redirects refused, at most 1 MiB of any answer read as it arrives, TLS always verified, and only a URL's origin in any error; no credential is printed by `inspect`. `transport:` on a channel or the instance takes a `Cronwatch.Transport` of your own (over Req or Finch, say). `Cronwatch.Triage.Anthropic` reads `ANTHROPIC_API_KEY` unless given `api_key:`.
 
 ### pg_cron
 

@@ -24,14 +24,14 @@ defmodule Cronwatch.MixProject do
       dialyzer: [
         plt_local_path: "_build/plts",
         plt_core_path: "_build/plts",
-        plt_add_apps: [:ex_unit, :mix, :ecto, :ecto_sql, :db_connection, :inets, :ssl, :public_key]
+        plt_add_apps: [:ex_unit, :mix, :ecto, :ecto_sql, :db_connection, :ssl, :public_key]
       ]
     ]
   end
 
   def application do
     [
-      extra_applications: [:logger, :crypto, :inets, :ssl, :public_key]
+      extra_applications: [:logger, :crypto, :ssl, :public_key]
     ]
   end
 
