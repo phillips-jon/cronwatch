@@ -1,0 +1,4 @@
+# The conformance fixtures are made with TZ=UTC, and a test cannot set the
+# process zone before the harness starts, so Cargo sets it for every run.
+[env]
+TZ = "UTC"
