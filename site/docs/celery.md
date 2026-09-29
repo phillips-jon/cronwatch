@@ -1,7 +1,8 @@
 ---
 title: Celery
 description: Watch Celery tasks and beat schedules with no task changes: every run recorded from Celery's signals, retries and lost workers handled, and a check task for beat.
-order: 3.255
+order: 3.62
+group: Python
 ---
 
 # Celery

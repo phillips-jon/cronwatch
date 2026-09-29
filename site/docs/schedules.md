@@ -48,6 +48,8 @@ Every run is recorded as `running` when it starts. Normally it is updated to `ok
 
 Inside the process, `job.signal` is an `AbortSignal` that fires when the timeout elapses, so work that can stop early may honour it; nothing is killed for you. In Ruby, `job.aborted?` turns true and `job.signal.check!` raises once the timeout has passed.
 
+In Go the run's `ctx` is cancelled at the timeout, with a cause that names the job; in Rust `job.cancelled()` resolves then.
+
 ## Next due
 
 The dashboard and API show `nextExpectedAt`: the next fire after now for a cron, or the last run's start plus the interval.

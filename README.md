@@ -44,9 +44,9 @@ export const { GET, POST, DELETE } = cw.routes();
 |---|---|
 | [`@cronwatch/sdk`](packages/sdk) | the library for Node, Cloudflare Workers, Deno and Bun: jobs, runs, checks, stores (memory, SQLite, Postgres, D1), pg_cron jobs read from Postgres, alerts (Slack, Discord, webhook, email, SMS, error trackers), dashboard and API, adapters for Node servers, optional Claude triage |
 | [`cronwatch` gem](packages/ruby) | the Ruby port for Ruby and Rails apps: ActiveRecord store, ActiveJob and Sidekiq integration, schedules read from Solid Queue or sidekiq-cron, pg_cron jobs, the same alert channels, a check job, the dashboard as a Rack app. Same rules, alerts and stored rows as the SDK |
-| [`cronwatch-sdk` for Python](packages/python) | the Python port for Python apps: the memory, SQLite and Postgres stores, the same alert channels and Claude triage, pg_cron jobs, the dashboard as a WSGI and ASGI app, Django, Celery and beat, APScheduler, async jobs, and `handler()` for platform crons and AWS Lambda. |
+| [`cronwatch-sdk` for Python](packages/python) | the Python port for Python apps: the memory, SQLite and Postgres stores, the same alert channels and Claude triage, pg_cron jobs, the dashboard as a WSGI and ASGI app, Django, Celery and beat, APScheduler, async jobs, and `handler()` for platform crons and AWS Lambda |
 | [`cronwatch/cronwatch` for PHP](packages/php) | the PHP port for PHP apps: the memory, SQLite, MySQL (and MariaDB) and Postgres stores, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, `vendor/bin/cronwatch check`, the dashboard (a bare script or PSR-15), `handler()` for platform crons, Laravel and Symfony integrations, a WordPress plugin, a Drupal module (`drupal/cronwatch`) and a Craft CMS plugin (`cronwatch/craft`) ([its DESIGN.md](packages/php/DESIGN.md)) |
-| [`cronwatch.dev/go`](packages/go) | the Go port for Go apps: jobs, runs and checks with `context` throughout and safe across goroutines, the memory store and a `database/sql` store for SQLite, Postgres and MySQL over the app's own driver, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `handler()` as `http.Handler`s, an AWS Lambda adapter, and modules of their own for robfig/cron, gocron, River and Asynq ([its DESIGN.md](packages/go/DESIGN.md)) |
+| [`cronwatch.dev/go`](packages/go) | the Go port for Go apps: jobs, runs and checks with `context` throughout and safe across goroutines, the memory store and a `database/sql` store for SQLite, Postgres, MySQL and MariaDB over the app's own driver, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `job.Handler` as `http.Handler`s, an AWS Lambda adapter, and modules of their own for robfig/cron, gocron, River and Asynq ([its DESIGN.md](packages/go/DESIGN.md)) |
 | [`cronwatch` crate](packages/rust) | the Rust port for Rust services, on tokio: jobs, runs and checks, safe across tasks, the memory store and `cronwatch-sqlx` for SQLite, Postgres, MySQL and MariaDB over the app's own sqlx pool, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `handler()` framework-free with tower and axum adapters (and so AWS Lambda through `lambda_http`), a blocking client, and crates of their own for tokio-cron-scheduler and apalis ([its DESIGN.md](packages/rust/DESIGN.md)) |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
@@ -54,7 +54,17 @@ export const { GET, POST, DELETE } = cw.routes();
 
 ## Installing
 
-TypeScript and Node: `npm install @cronwatch/sdk`. Ruby and Rails: `bundle add cronwatch` (see [Ruby and Rails](#ruby-and-rails)). Python: `pip install cronwatch-sdk` (see [its README](packages/python/README.md) and [the Python docs](https://cronwatch.dev/docs/python/)). PHP: `composer require cronwatch/cronwatch` (see [its README](packages/php/README.md) and [the PHP docs](https://cronwatch.dev/docs/php/)); WordPress: the [CronWatch plugin](https://wordpress.org/plugins/cronwatch/). Go: `go get cronwatch.dev/go`, and `go get cronwatch.dev/go/robfigcron` (or `/gocron`, `/river`, `/asynq`) for a scheduler (see [its README](packages/go/README.md) and [the Go docs](https://cronwatch.dev/docs/go/)). Rust: `cargo add cronwatch`, `cargo add cronwatch-sqlx --features postgres` (or `sqlite`, `mysql`) for the SQL store, and `cronwatch-tokio-cron-scheduler` or `cronwatch-apalis` for a scheduler (see [its README](packages/rust/README.md) and [the Rust docs](https://cronwatch.dev/docs/rust/)).
+| Language | Install | Docs |
+|---|---|---|
+| TypeScript and Node | `npm install @cronwatch/sdk`, and the driver for a store (below) | [Getting started](https://cronwatch.dev/docs/) |
+| Ruby and Rails | `bundle add cronwatch` | [Ruby and Rails](#ruby-and-rails), [Rails](https://cronwatch.dev/docs/rails/), [Ruby](https://cronwatch.dev/docs/ruby/) |
+| Python | `pip install cronwatch-sdk` | [Python](https://cronwatch.dev/docs/python/), [its README](packages/python/README.md) |
+| PHP | `composer require cronwatch/cronwatch` | [PHP](https://cronwatch.dev/docs/php/), [its README](packages/php/README.md) |
+| WordPress | the plugin's zip, [cronwatch-0.7.0.zip](https://github.com/phillips-jon/cronwatch/releases/download/v0.7.0/cronwatch-0.7.0.zip): upload it under Plugins, Add New, or `wp plugin install https://github.com/phillips-jon/cronwatch/releases/download/v0.7.0/cronwatch-0.7.0.zip --activate` (it will be in the plugin directory once it is approved) | [WordPress](https://cronwatch.dev/docs/wordpress/) |
+| Drupal | `composer require drupal/cronwatch`, then `drush pm:install cronwatch` | [Drupal](https://cronwatch.dev/docs/drupal/) |
+| Craft CMS | `composer require cronwatch/craft`, then `php craft plugin/install cronwatch` | [Craft CMS](https://cronwatch.dev/docs/craft/) |
+| Go | `go get cronwatch.dev/go`, and `go get cronwatch.dev/go/robfigcron` (or `/gocron`, `/river`, `/asynq`) for a scheduler | [Go](https://cronwatch.dev/docs/go/), [Go schedulers](https://cronwatch.dev/docs/go-schedulers/), [its README](packages/go/README.md) |
+| Rust | `cargo add cronwatch --features alerts`, `cargo add cronwatch-sqlx --features postgres` (or `sqlite`, `mysql`), `cargo add sqlx --no-default-features --features runtime-tokio,postgres` and `cargo add tokio --features macros,rt-multi-thread`; `cronwatch-tokio-cron-scheduler` or `cronwatch-apalis` for a scheduler | [Rust](https://cronwatch.dev/docs/rust/), [Rust schedulers](https://cronwatch.dev/docs/rust-schedulers/), [its README](packages/rust/README.md) |
 
 The SDK depends only on `croner`. The core, the D1 store, the pg_cron source and every alert channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun; the SQLite and Postgres stores and `@cronwatch/sdk/node` need Node. Each driver is an optional peer, installed only when you use its entry point:
 
@@ -138,11 +148,12 @@ It replays `conformance/` as well. Its MySQL and MariaDB tests run when `CRONWAT
 The Go module (Go 1.25 or newer), after `npm run build` for the same reason:
 
 ```bash
-cd packages/go && go test -race ./...           # the core: standard library only
-cd packages/go/sqltest && go test -race ./...   # the SQL store, in a module of its own that holds the drivers
+cd packages/go && go test -race ./...             # the core: standard library only
+cd packages/go/sqltest && go test -race ./...     # the SQL store, in a module of its own that holds the drivers
+cd packages/go/robfigcron && go test -race ./...  # and gocron, river, asynq and examples, each a module of its own
 ```
 
-It replays `conformance/` too. The SQL store's Postgres, MySQL and MariaDB tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL` and `CRONWATCH_TEST_MARIADB` are set ([its README](packages/go/README.md#testing) has the formats); CI runs both modules on Go 1.25 and 1.26 with the race detector, against all three.
+It replays `conformance/` too. The SQL store's Postgres, MySQL and MariaDB tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL` and `CRONWATCH_TEST_MARIADB` are set, River's when `CRONWATCH_TEST_PG` is, and Asynq's end-to-end test when `CRONWATCH_TEST_REDIS` names a Redis (`redis://127.0.0.1:6379/0`); each skips without them ([its README](packages/go/README.md#testing) has the formats). The scheduler modules require their schedulers at the oldest release they support. CI runs every module on Go 1.25 and 1.26 with the race detector, against all three databases and a Redis, and the scheduler modules again at their schedulers' newest releases.
 
 The Rust workspace (Rust 1.85 or newer, 1.94 for `cronwatch-sqlx`), after `npm run build` for the same reason:
 
@@ -150,20 +161,29 @@ The Rust workspace (Rust 1.85 or newer, 1.94 for `cronwatch-sqlx`), after `npm r
 cd packages/rust && cargo test --workspace --all-features
 ```
 
-It replays `conformance/` and the dashboard fixture too. The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set ([its README](packages/rust/README.md#testing) has the rest), and `CRONWATCH_TEST_RUST=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard; CI runs it on Rust 1.85 and stable.
+It replays `conformance/` and the dashboard fixture too. The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set ([its README](packages/rust/README.md#testing) has the rest), and `CRONWATCH_TEST_RUST=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard. CI runs the core and `cronwatch-tokio-cron-scheduler` on Rust 1.85, `cronwatch-sqlx` and `cronwatch-apalis` on 1.94, and the whole workspace on stable, on Linux, macOS and Windows.
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 
 ## Releasing
 
-The SDK, the MCP server, the gem, the Python and PHP packages and the skill share one version. From a clean `main`:
+Every package shares one version: the SDK, the MCP server, the gem, the Python and PHP packages (the WordPress plugin with them, and the Drupal module and the Craft plugin requiring the library at it), the Go module and its scheduler modules, the Rust crates, and the skill. From a clean `main`:
 
 ```bash
-npm run release -- 0.4.0 --dry-run   # show every change and command, write nothing
-npm run release -- 0.4.0             # bump, regenerate, check, commit "Release 0.4.0", tag v0.4.0
+npm run release -- 0.8.0 --dry-run   # show every change and command, write nothing
+npm run release -- 0.8.0             # bump, regenerate, check, commit "Release 0.8.0", tag v0.8.0
 ```
 
-It bumps every file listed at the top of `scripts/release.mjs`, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, runs `npm run check`, the build, `npm run check:packages` and (with Ruby 3.2 or newer; `--skip-ruby` skips them) the gem's tests, then builds the gem and checks what it carries, and (with uv; `--skip-python` skips them) the Python package's tests, and (with PHP 8.2 or newer and Composer; `--skip-php` skips them) the PHP package's tests. It does not push or publish: it prints the `git push`, `npm publish`, `gem push` and `uv publish` commands to run next (RubyGems spells a prerelease `0.4.0-beta.1` as `0.4.0.pre.beta.1` and refuses `+build` metadata, so the script does too), and `npm deprecate` lines for any `--deprecate <old>`; Packagist, once the PHP package is there, reads the pushed tag. A new package under `packages/` needs a row in both of its tables (the file holding its version, and how it ships), or the script refuses to run.
+It bumps every file listed in `VERSIONED` at the top of `scripts/release.mjs` (and turns the WordPress readme's `= Unreleased =` changelog section into the release's, or adds a placeholder to rewrite), lists any other tracked file that still names the old version, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, and runs `npm run check`, the build and `npm run check:packages`; then, when it finds what they need, the gem's tests and build, with a check of what the gem carries (Ruby 3.2 or newer; `--skip-ruby` skips them), the Python package's tests (uv; `--skip-python`) and the PHP package's (PHP 8.2 or newer and Composer; `--skip-php`). The Go and Rust tests are CI's. RubyGems spells a prerelease `0.8.0-beta.1` as `0.8.0.pre.beta.1` and refuses `+build` metadata, so the script does too.
+
+It does not push or publish. It prints what to run next, in order:
+
+- `git push origin main v0.8.0`. The tag starts the workflows that publish from it: `pypi.yml` (PyPI, once `PYPI_ENABLED` is `true`), `php-split.yml` (the PHP package's own repository, which Packagist reads, once `PHP_SPLIT_ENABLED` is `true`), `php-plugins-split.yml` (the Drupal module's and the Craft plugin's repositories, once `DRUPAL_SPLIT_ENABLED` and `CRAFT_SPLIT_ENABLED` are; then make the drupal.org release from the tag) and `crates.yml` (crates.io, once `CRATES_ENABLED` is `true`; the printed `cargo publish --workspace` line does it by hand).
+- `npm publish` for the SDK and the MCP server, and `gem build` and `gem push` for the gem.
+- A tag and its push for the Go module (`packages/go/v0.8.0`) and for each scheduler module (`packages/go/robfigcron/v0.8.0` and the rest), then a `go list -m` that makes the Go proxy fetch them.
+- `npm deprecate` lines for each `--deprecate <old>`.
+
+A new package under `packages/` needs a row in both of the script's tables (`VERSIONED`, the file holding its version, and `PUBLISH`, how it ships), or the script refuses to run.
 
 ## Deploying the site
 

@@ -1,7 +1,8 @@
 ---
 title: PHP
 description: cronwatch/cronwatch in plain PHP: jobs, crontab scripts, vendor/bin/cronwatch check, the dashboard, stores, alert channels, Claude triage, pg_cron, and sharing one database with Node, Ruby, Python, Go and Rust.
-order: 3.28
+order: 3.76
+group: PHP
 ---
 
 # PHP

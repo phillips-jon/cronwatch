@@ -2,7 +2,7 @@
 title: NestJS
 description: A module that provides the client, @Cron methods wrapped with job.run(), and the dashboard through a controller.
 order: 3.33
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # NestJS

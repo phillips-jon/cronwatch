@@ -1,7 +1,7 @@
 ---
 title: AI triage
 description: Attach a short diagnosis from Claude to every alert except recoveries, with your own API key.
-order: 11
+order: 6.5
 ---
 
 # AI triage
@@ -58,3 +58,5 @@ cronwatch({
   },
 });
 ```
+
+Every port has the same triage, sending the same request, beside the same channels: see Triage in [Ruby](/docs/ruby/#triage), [Python](/docs/python/#triage), [PHP](/docs/php/#triage), [Go](/docs/go/#triage) and [Rust](/docs/rust/#triage).

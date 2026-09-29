@@ -1,7 +1,8 @@
 ---
 title: Symfony
 description: cronwatch/cronwatch in a Symfony app: a bundle that watches every Scheduler message with no code changes, Messenger messages that opt in, the check in your default schedule, and the dashboard behind your security.
-order: 3.271
+order: 3.72
+group: PHP
 ---
 
 # Symfony

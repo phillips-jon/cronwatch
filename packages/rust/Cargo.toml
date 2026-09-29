@@ -13,7 +13,7 @@ homepage = "https://cronwatch.dev"
 keywords = ["cron", "monitoring", "scheduler", "alerts", "jobs"]
 categories = ["development-tools", "asynchronous"]
 
-# The crates require each other at exactly the release's version, so a
+# The other crates require cronwatch at exactly the release's version, so a
 # release's crates always come together. scripts/release.mjs bumps both the
 # version above and the pin here.
 [workspace.dependencies]

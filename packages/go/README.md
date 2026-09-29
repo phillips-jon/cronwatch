@@ -2,11 +2,16 @@
 
 Cron and scheduled-job monitoring that lives inside your Go app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
 
-This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text and the same stored rows, so a Go process and a Node process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, a `database/sql` store for SQLite, Postgres and MySQL, the SDK's alert channels, Claude triage, the pg_cron source, the dashboard with its JSON API, job handlers for platform crons, and integrations for robfig/cron, gocron, River and Asynq ([DESIGN.md](DESIGN.md) has how each part works). It is not released yet.
+This is the Go port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Go process and a Node, Ruby, Python, PHP or Rust process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, a `database/sql` store for SQLite, Postgres, MySQL and MariaDB, the SDK's alert channels, Claude triage, the pg_cron source, the dashboard with its JSON API, job handlers for platform crons, and integrations for robfig/cron, gocron, River and Asynq ([DESIGN.md](DESIGN.md) has how each part works).
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
 ## Install
+
+```bash
+go get cronwatch.dev/go
+go get cronwatch.dev/go/robfigcron   # or /gocron, /river, /asynq, for a scheduler you run
+```
 
 Go 1.25 or newer. The module requires nothing: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses) and zones come from Go's own `time` package. The SQL store works over the `*sql.DB` your app already has, with the driver it already uses; the module imports none.
 
@@ -144,6 +149,9 @@ cw, err := cronwatch.New(cronwatch.WithAlerts(slack), cronwatch.WithTriage(diagn
 
 ```go
 cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(pgcron.New(db, pgcron.Options{Prefix: "db:"})))
+if err != nil {
+	log.Fatal(err)
+}
 cw.Start(time.Minute)
 ```
 
@@ -165,11 +173,13 @@ Everything needs the token: send it as `Authorization: Bearer <token>`, or open 
 
 ```go
 mux.Handle("POST /api/cron/nightly", nightly.Handler(func(ctx context.Context, job *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) error {
-	return buildReport(ctx)
+	path, err := buildReport(ctx)
+	job.Log("Report written:", path)
+	return err
 }))
 ```
 
-The answer is `{"ok","job","run","status","durationMs"}`, 200 or 500 (a panic in the function too, recorded as a failed run), unless the function wrote its own, in which case a status of 400 or more fails the run. `cronwatch.HandlerValue` takes a function returning a value, such as the `*http.Response` of a call it made, which becomes the answer. Without a secret the handler answers 503 outside development; `cronwatch.WithoutSecret()` lets anyone in. `cronwatch.Lambda(handler)` is any handler (a job's, or the dashboard) as an AWS Lambda function behind API Gateway or a function URL, for `lambda.Start`, with no AWS module in this one.
+The answer is `{"ok","job","run","status","durationMs"}`, 200 or 500 (a panic in the function too, recorded as a failed run), unless the function wrote its own, in which case a status of 400 or more fails the run; a panic after it began writing is recorded and then aborts the response, as net/http does. `cronwatch.HandlerValue` takes a function returning a value, such as the `*http.Response` of a call it made, which becomes the answer. Without a secret the handler answers 503 outside development; `cronwatch.WithoutSecret()` lets anyone in. `cronwatch.Lambda(handler)` is any handler (a job's, or the dashboard) as an AWS Lambda function behind API Gateway or a function URL, for `lambda.Start`, with no AWS module in this one.
 
 ## Checks
 

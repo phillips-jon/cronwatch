@@ -2,7 +2,7 @@
 title: Strapi
 description: Cron tasks in config/cron-tasks wrapped with job.run(), the check from bootstrap, and the dashboard as a global middleware.
 order: 3.34
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # Strapi

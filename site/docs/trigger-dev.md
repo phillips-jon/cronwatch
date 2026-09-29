@@ -2,7 +2,7 @@
 title: Trigger.dev
 description: schedules.task runs wrapped with job.run(), attempts and retries, the Postgres store reachable from Trigger.dev, and where the check runs.
 order: 3.38
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # Trigger.dev

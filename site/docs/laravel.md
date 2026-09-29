@@ -1,7 +1,8 @@
 ---
 title: Laravel
 description: cronwatch/cronwatch in a Laravel app: every scheduled task watched with no code changes, per-task options, queued jobs, the check in the scheduler, the store in the app's database and the dashboard behind a gate.
-order: 3.27
+order: 3.71
+group: PHP
 ---
 
 # Laravel

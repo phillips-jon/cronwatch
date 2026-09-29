@@ -2,7 +2,7 @@
 title: Firebase
 description: Scheduled functions from firebase-functions/v2/scheduler wrapped with job.run(), a scheduled check, and the dashboard as an HTTP function.
 order: 3.36
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # Firebase

@@ -2,7 +2,7 @@
 title: Nuxt and Nitro
 description: Nitro scheduled tasks wrapped with job.run(), a Nitro plugin for the check, and the dashboard as a server route.
 order: 3.31
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # Nuxt and Nitro

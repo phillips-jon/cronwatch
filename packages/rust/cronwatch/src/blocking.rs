@@ -150,7 +150,9 @@ impl Client {
         }
     }
 
-    /// The async client this wraps, for its reads.
+    /// The async client this wraps, for what the blocking client does not
+    /// carry: the dashboard (`routes`), `defined_jobs`, `store` and the rest,
+    /// or async code that shares the client.
     pub fn as_async(&self) -> &crate::Client {
         &self.inner
     }

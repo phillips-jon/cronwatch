@@ -2,7 +2,7 @@
 title: SvelteKit
 description: A +server.ts endpoint for each job, the dashboard in a catch-all route, and the check on adapter-node or a platform cron.
 order: 3.3
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # SvelteKit

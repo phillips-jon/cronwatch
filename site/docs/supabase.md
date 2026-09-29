@@ -2,7 +2,7 @@
 title: Supabase and pg_cron
 description: Watch pg_cron jobs, including Supabase Cron, by reading cron.job and cron.job_run_details on every check.
 order: 3.392
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # Supabase and pg_cron
@@ -45,7 +45,7 @@ Jobs you wrap in code and pg_cron jobs live side by side in the same store, dash
 pgCron(pool, {
   jobs: ["nightly-rollup", 12],           // names or jobids, or (job) => boolean. Default every job the role can see
   prefix: "db:",                          // before every name: "db:nightly-rollup"
-  jobName: (job) => job.jobname ?? `job-${job.jobid}`,
+  jobName: (job) => `job-${job.jobid}`,   // default: its jobname, other characters as "-", else "pg_cron:<jobid>"
   options: { grace: "5m", timeout: "30m" },  // or (job) => ({ ... }); the schedule always comes from pg_cron
   timezone: "UTC",                        // see Timezones below
 });
@@ -165,3 +165,5 @@ Failures, durations and output all come from `cron.job_run_details`, so they nee
 - **One reader per store for a given cluster.** Run ids are `pgcron:<runid>` (with the `prefix` after `pgcron:` when one is set). Two databases with pg_cron writing into one CronWatch store need different prefixes.
 - **Stuck is judged by CronWatch.** A run still `running` after the job's `timeout` (default one hour) is marked timed out and alerts as stuck. The reader keeps reading it: when pg_cron later says it succeeded, the run is recorded as it ended and stuck closes with a recovery; a late failure is recorded without counting twice.
 - **Checks read at most 5,000 run details each.** A backlog larger than that (a checker that was down for a long time over a busy job) is worked through over the following checks.
+
+Every port has the same pg_cron reader, with the same rules: see pg_cron in [Ruby](/docs/ruby/#pg-cron), [Python](/docs/python/#pg-cron), [PHP](/docs/php/#pg-cron), [Go](/docs/go/#pg-cron) and [Rust](/docs/rust/#pg-cron).

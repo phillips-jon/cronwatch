@@ -1,7 +1,8 @@
 ---
 title: Drupal
 description: The CronWatch module for Drupal: every cron run and each module's hook_cron recorded with no code, queue workers that opt in, drush cronwatch:check, the store in the site's database and the dashboard under Reports.
-order: 3.273
+order: 3.74
+group: PHP
 ---
 
 # Drupal

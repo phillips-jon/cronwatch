@@ -1,7 +1,8 @@
 ---
 title: Rust schedulers
 description: Watch tokio-cron-scheduler and apalis: jobs declared with the scheduler's own schedules, checked against its fire times, every run and retry recorded, and the check running beside them.
-order: 3.292
+order: 3.92
+group: Rust
 ---
 
 # Rust schedulers
@@ -24,7 +25,7 @@ Both need Rust 1.85 or newer. A program that a crontab runs needs no integration
 - **Jobs are declared from the scheduler.** Each job you make through the integration is a CronWatch job with the schedule you gave the scheduler, so a job that stops running is reported missed without you writing a cron expression twice. Where the scheduler reads the expression itself, it is checked against the scheduler's own fire times; one that differs is reported once to the error handler and the job is watched without a schedule, so its failures, duration and budgets still alert but it is never reported missed.
 - **Jobs gone lose their schedule.** A job taken out of the scheduler, in this process or since an earlier deploy, is declared again without its schedule and with ` (no longer scheduled)` after its description, so it keeps its history and is never reported missed; a missed alert already open closes with a recovery.
 - **Jobs belong to an app.** Every job is tagged with the integration (`tokio-cron-scheduler`, `apalis`) and the app (`apalis:billing`), so two apps sharing a store never take each other's jobs for gone. The app is `Options::app`, else `CRONWATCH_APP_ID`, else the running executable's file name. Set `CRONWATCH_APP_ID` when one app's processes are different executables, or two apps' executables share a name.
-- **Nothing runs unwatched.** A name, option or schedule CronWatch refuses is an error from the constructor, with the SDK's message, and nothing is made.
+- **Nothing runs unwatched.** A name or option CronWatch refuses is an error from the constructor, with the SDK's message, and nothing is made. So is a schedule the scheduler refuses, and for apalis, whose worker runs on CronWatch's own reading of the expression, one CronWatch refuses. tokio-cron-scheduler reads the expression itself, so one it takes and CronWatch cannot read is reported once and its job watched without a schedule, as one whose fire times differ is.
 - **Declarations reach the store** in the background. Each watcher's `wait().await` waits for those writes, for tests and a clean exit.
 - **Options per job.** `Options::defaults` are job options for every job, and each constructor takes the job's own `JobOptions` after them.
 
@@ -113,7 +114,7 @@ apalis = "=1.0.0-rc.10"
 apalis-cron = "=1.0.0-rc.9"
 ```
 
-**Schedules.** `watcher.cron(name, expr, zone, options)` declares the job and gives apalis-cron a schedule that is CronWatch's own reading of the expression, so the worker runs on exactly the fire times CronWatch expects and nothing needs checking. Five or six fields, nicknames and `every 5m` all work, in any IANA zone (`""` for the process's own). `cronwatch_apalis::schedule(expr, zone)` is the same schedule without a declaration. With the crate's `cron` feature (Rust 1.87), `watcher.cron_schedule(name, schedule, tz, options)` takes a `cron::Schedule`, which apalis-cron runs itself, and declares its source text once it is checked against the `cron` crate's own fire times; one that differs (the `cron` crate counts the days of the week from 1, Sunday) is reported once and watched without a schedule. apalis-cron's English routines and builder have no text CronWatch reads, so a worker on one is watched through the layer without a schedule.
+**Schedules.** `watcher.cron(name, expr, zone, options)` declares the job and gives apalis-cron a schedule that is CronWatch's own reading of the expression, so the worker runs on exactly the fire times CronWatch expects and nothing needs checking; an expression or zone CronWatch cannot read is an error from `cron`, and nothing is made. Five or six fields, nicknames and `every 5m` all work, in any IANA zone (`""` for the process's own). `cronwatch_apalis::schedule(expr, zone)` is the same schedule without a declaration. With the crate's `cron` feature (Rust 1.87), `watcher.cron_schedule(name, schedule, tz, options)` takes a `cron::Schedule`, which apalis-cron runs itself, and declares its source text once it is checked against the `cron` crate's own fire times; one that differs (the `cron` crate counts the days of the week from 1, Sunday) is reported once and watched without a schedule. apalis-cron's English routines and builder have no text CronWatch reads, so a worker on one is watched through the layer without a schedule.
 
 **Runs.** `watcher.layer()` is a tower layer for `WorkerBuilder::layer` that records each attempt of the worker's tasks as a run (trigger `apalis`) of the job named after the worker; `watcher.layer_for(name)` names it. The handler finds the run with `cronwatch::current()` to log and add metrics. Added after `.retry(...)`, it sits inside the retry layer, so every attempt is a run of its own and retries follow [the rule above](#retries). A panic is a failed run and carries on to apalis's `catch_panic`. A `DeferredError` or `RetryAfterError`, which put the task back as pending, and a task cancelled while it ran are given back; an `AbortError` a task returns to stop its retries is a failure.
 
