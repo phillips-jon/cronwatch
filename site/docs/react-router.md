@@ -2,7 +2,7 @@
 title: React Router and Remix
 description: Resource routes for job endpoints and the dashboard, in React Router framework mode and Remix 2.
 order: 3.32
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # React Router and Remix

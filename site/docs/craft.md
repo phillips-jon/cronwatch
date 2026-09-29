@@ -1,7 +1,8 @@
 ---
 title: Craft CMS
 description: The CronWatch plugin for Craft CMS: the console commands your crontab runs and the queue jobs you choose, craft cronwatch/check, the store in Craft's database and the dashboard in the Control Panel.
-order: 3.274
+order: 3.75
+group: PHP
 ---
 
 # Craft CMS

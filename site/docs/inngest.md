@@ -2,7 +2,7 @@
 title: Inngest
 description: Cron-triggered Inngest functions as one run each, started in the first step and finished in the last, with failures from onFailure, and the check as another cron function.
 order: 3.39
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # Inngest

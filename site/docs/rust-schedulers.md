@@ -1,7 +1,8 @@
 ---
 title: Rust schedulers
 description: Watch tokio-cron-scheduler and apalis: jobs declared with the scheduler's own schedules, checked against its fire times, every run and retry recorded, and the check running beside them.
-order: 3.292
+order: 3.92
+group: Rust
 ---
 
 # Rust schedulers

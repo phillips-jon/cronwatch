@@ -2,7 +2,7 @@
 title: Netlify
 description: Scheduled functions wrapped with job.run(), a scheduled function for the check, and the dashboard as a function on a path.
 order: 3.35
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # Netlify

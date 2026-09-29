@@ -1,5 +1,5 @@
 ---
-title: Servers and scripts
+title: Node servers and scripts
 description: Long-running Node servers, node-cron, BullMQ, and plain scripts run from crontab.
 order: 3
 ---

@@ -2,7 +2,7 @@
 title: Convex
 description: Convex crons calling Node actions wrapped with job.run(), a Postgres store outside Convex, and a cron for the check.
 order: 3.37
-group: More platforms
+group: More JavaScript platforms
 ---
 
 # Convex

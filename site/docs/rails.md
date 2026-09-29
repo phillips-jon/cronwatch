@@ -1,7 +1,8 @@
 ---
 title: Ruby on Rails
 description: The cronwatch gem in a Rails app: the install generator, ActiveJob and Sidekiq jobs, schedules read from Solid Queue or sidekiq-cron, the check job and the dashboard.
-order: 3.1
+order: 3.51
+group: Ruby
 ---
 
 # Ruby on Rails

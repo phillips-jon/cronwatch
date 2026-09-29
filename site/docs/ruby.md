@@ -1,7 +1,8 @@
 ---
 title: Ruby
 description: The cronwatch gem in plain Ruby, its API, and sharing one database with a Node app.
-order: 3.2
+order: 3.52
+group: Ruby
 ---
 
 # Ruby

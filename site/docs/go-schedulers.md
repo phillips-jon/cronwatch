@@ -1,7 +1,8 @@
 ---
 title: Go schedulers
 description: Watch robfig/cron, gocron, River and Asynq with one line each: entries become jobs with their schedules, every run and retry is recorded, and the check runs beside them.
-order: 3.29
+order: 3.82
+group: Go
 ---
 
 # Go schedulers

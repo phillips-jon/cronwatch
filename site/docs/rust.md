@@ -1,7 +1,8 @@
 ---
 title: Rust
 description: The cronwatch crate in a Rust service: jobs on tokio, the check, the dashboard nested in axum or served as a tower service, job handlers and AWS Lambda, the sqlx store, alert channels, Claude triage, pg_cron, the blocking client, and sharing one database with the other languages.
-order: 3.293
+order: 3.91
+group: Rust
 ---
 
 # Rust

@@ -1,7 +1,8 @@
 ---
 title: Python
 description: cronwatch-sdk in plain Python: jobs, the check, stores, alert channels, Claude triage, pg_cron, and sharing one database with a Node or Ruby app.
-order: 3.26
+order: 3.63
+group: Python
 ---
 
 # Python

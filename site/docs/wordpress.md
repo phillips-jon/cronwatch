@@ -1,7 +1,8 @@
 ---
 title: WordPress
 description: The CronWatch plugin for WordPress: every WP-Cron event watched with no code, alerts by email, Slack or webhook, a real cron for quiet sites, the dashboard in wp-admin and the JSON API for agents.
-order: 3.272
+order: 3.73
+group: PHP
 ---
 
 # WordPress

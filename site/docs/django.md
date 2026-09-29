@@ -1,7 +1,8 @@
 ---
 title: Django
 description: cronwatch-sdk in a Django app: settings, jobs in management commands, the cronwatch_check command for cron, and the dashboard under your URLs.
-order: 3.25
+order: 3.61
+group: Python
 ---
 
 # Django

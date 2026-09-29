@@ -1,7 +1,8 @@
 ---
 title: Go
 description: cronwatch.dev/go in a Go app: jobs with context, the check, the dashboard as an http.Handler, job handlers and AWS Lambda, the database/sql store, alert channels, Claude triage, pg_cron, and sharing one database with the other languages.
-order: 3.291
+order: 3.81
+group: Go
 ---
 
 # Go
