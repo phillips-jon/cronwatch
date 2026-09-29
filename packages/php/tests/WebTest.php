@@ -825,9 +825,15 @@ final class WebTest extends TestCase
             [['/cronwatch', null, false], 'http://localhost.example/cronwatch/', []],
             [['/cronwatch', null, false], 'http://128.0.0.1/cronwatch/', []],
             [['/', null, false], 'http://attacker.example/', []],
+            [['/cronwatch', null, true], self::INTERNAL . '/cronwatch/', ['x-forwarded-host' => 'localhost:1@evil.example']],
+            [['/cronwatch', null, true], self::INTERNAL . '/cronwatch/', ['x-forwarded-host' => 'evil.example/.localhost']],
         ];
         foreach ($cases as [[$basePath, $origin, $trustProxy], $url, $headers]) {
             self::send($this->routes($this->client(), null, $basePath, $origin, $trustProxy), 'GET', $url, $headers);
+        }
+        // PHP passes a Host header through as sent: it is read as a URL.
+        foreach (['localhost:1@evil.example', 'evil.example/.localhost'] as $host) {
+            $this->routes($this->client())->handle(Request::fromGlobals(['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/cronwatch/', 'HTTP_HOST' => $host], ''));
         }
         $intro = '[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: ';
         $hostless = " on this server (the first request's host is not local, so the link leaves it out)";
@@ -846,11 +852,30 @@ final class WebTest extends TestCase
             ['/cronwatch', $hostless],
             ['/cronwatch', $hostless],
             ['', $hostless],
+            ['/cronwatch', $hostless],
+            ['/cronwatch', $hostless],
+            ['/cronwatch', $hostless],
+            ['/cronwatch', $hostless],
         ];
         $this->assertCount(count($expected), $this->logged);
         foreach ($expected as $i => [$link, $tail]) {
             $this->assertSame(1, preg_match('#token=([A-Za-z0-9_-]{43})#', $this->logged[$i], $token), $this->logged[$i]);
             $this->assertSame("{$intro}{$link}/?token={$token[1]}{$tail}", $this->logged[$i], "line {$i}");
+        }
+    }
+
+    public function testOnlyAnOriginThatReadsAsOneIsLoopback(): void
+    {
+        foreach (['http://localhost', 'http://localhost:3000', 'http://app.localhost', 'https://127.0.0.1', 'http://127.8.9.10:1', 'http://[::1]:3000'] as $yes) {
+            $this->assertTrue(Dashboard::isLoopbackOrigin($yes), $yes);
+        }
+        foreach ([
+            'http://localhost.example', 'http://128.0.0.1', 'http://127.0.0.256', 'http://10.0.0.5:8080', 'http://[::2]',
+            // A Host header that is not a host (the Rust audit).
+            'http://evil.example/.localhost', 'http://localhost:1@evil.example', 'http://evil.example?.localhost',
+            'http://evil.example#.localhost', 'http://localhost:1@evil.example:80',
+        ] as $no) {
+            $this->assertFalse(Dashboard::isLoopbackOrigin($no), $no);
         }
     }
 
