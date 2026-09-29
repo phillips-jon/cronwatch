@@ -71,6 +71,8 @@ cw.start();
 
 Each condition alerts once when it opens. When a successful run leaves nothing open, one recovered message names everything that closed.
 
+An `expect` RegExp runs in your process on the runtime's own engine and, like an `expect` function, has no time limit. A pattern with unbounded repeats that can match the same text (`/\n*\n*x/`, `/(a+)+b/`, `/.*x/`) can take seconds on a long output that does not match: anchor it, avoid a repeat next to or inside another over the same characters, or use a plain string. See [expect rules](https://cronwatch.dev/docs/conditions/#expect-rules).
+
 ## Entry points
 
 | Import | |

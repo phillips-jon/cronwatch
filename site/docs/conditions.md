@@ -64,6 +64,8 @@ cw.job("export", { expect: (out) => out.split("\n").length > 3 });   // or pass 
 
 In Ruby, `expect:` takes a string, a `Regexp` or a callable in the same way.
 
+A pattern runs in your own process, on the platform's engine, and like an `expect` function it has no time limit in Node or Python. Most engines backtrack, so a pattern with several unbounded repeats that can match the same text (`/\n*\n*\n*x/`, `/(a+)+b/`, or even `/.*x/`) can take seconds or longer on an output that almost matches but does not. Anchor a pattern where you can, avoid a repeat next to or inside another over the same characters, and prefer a plain string when a substring will do. The other ports bound it where their engine allows, and a pattern that runs out of its bound counts as not matching, so the run fails with the usual `Output did not match` message: Ruby gives each match a one second timeout, PHP stops at PCRE's backtrack limit (`pcre.backtrack_limit`), and Rust stops a pattern it reads back from another process's stored definition after ten million steps. Go's `regexp` and Rust's `regex` crate run in linear time and need no bound.
+
 ## Baselines
 
 Baselines use the last twenty successful runs, reading past any failures in between, and need at least five. Before that, only explicit limits apply. A job's history is its own: a slow job is compared to itself.

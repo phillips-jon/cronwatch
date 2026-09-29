@@ -792,6 +792,13 @@ function formatCases() {
     ["wrote", "wrote 12 files"], ["wrote", "nothing to do"], ["wrote", null], ["", ""], ["say \"hi\"", "hello"],
     [/wrote \d+ files/, "wrote 12 files"], [/wrote \d+ files/, "wrote files"], [/ok/i, "OK"], [/^done$/, "done"],
     [/^done$/, "not done"],
+    // Patterns that backtrack without end over a long output that does not
+    // match. The SDK and Python answer them in full (sized to stay well under
+    // a second there); Rust's jsre runs out of its step budget (the dot star)
+    // or its 512 frames (the group), Ruby could time out and PHP could hit
+    // PCRE's backtrack limit, and each then counts the pattern as not
+    // matching, so every port reports the same failure.
+    [/\n*\n*\n*\n*\n*x/, "\n".repeat(40)], [/.*x/, "a".repeat(10_000)], [/(?:ab)*c/, "ab".repeat(1_000)],
   ];
   const regex = (value) => (value instanceof RegExp ? { regex: { source: value.source, flags: value.flags } } : value);
   return {

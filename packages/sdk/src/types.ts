@@ -40,7 +40,10 @@ export interface JobOptions {
    * A successful run must produce output that satisfies this, or it counts as
    * failed. A string must appear in the output, a RegExp must match it, and a
    * function must return true for it. Catches the job that exits cleanly and
-   * did nothing.
+   * did nothing. A RegExp runs on the runtime's own engine with no time limit,
+   * as a function does, so avoid unbounded repeats that can match the same
+   * text (`/\n*\n*x/`, `/(a+)+b/`): over a long output that does not match
+   * they backtrack for seconds.
    */
   expect?: ExpectRule;
   /** Alert on the Nth consecutive failure rather than the first. Default 1. */

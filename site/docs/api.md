@@ -34,7 +34,7 @@ Names are 1 to 120 characters, starting with a letter or digit, of letters, digi
 | `timeout` | `"1h"` | a run still going after this is stuck |
 | `maxDuration` | baseline | a successful run longer than this is slow |
 | `budget` | baseline | `{ metric: ceiling }`, each ceiling a finite number, 0 or more |
-| `expect` | | string, RegExp or `(output) => boolean` the output must satisfy |
+| `expect` | | string, RegExp or `(output) => boolean` the output must satisfy. A RegExp, like a function, runs without a time limit: see [expect rules](/docs/conditions/#expect-rules) |
 | `failuresBeforeAlert` | `1` | alert on the Nth consecutive failure; a whole number, 1 or more |
 | `description`, `tags` | | shown on the dashboard |
 
