@@ -10,6 +10,15 @@ const UNIT_MS: Record<string, number> = {
 };
 
 /**
+ * The longest duration string read, in characters (code points). No real
+ * duration comes near it, and the pattern below is quadratic on a long run of
+ * digits, so a longer string is refused before it is read.
+ */
+const MAX_LENGTH = 64;
+/** How much of a refused, overlong string its error quotes. */
+const QUOTED = 32;
+
+/**
  * "15m" -> 900000. Accepts a plain number of milliseconds, and compound
  * strings such as "1h30m". Whitespace between parts is fine.
  */
@@ -18,6 +27,7 @@ export function parseDuration(value: Duration, label = "duration"): number {
     if (!Number.isFinite(value) || value < 0) throw new Error(`${label} must be a non-negative number of milliseconds`);
     return value;
   }
+  if (value.length > MAX_LENGTH) tooLong(value, label);
   const text = value.trim().toLowerCase();
   if (text === "") throw new Error(`${label} is empty`);
   const re = /(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)/g;
@@ -32,6 +42,18 @@ export function parseDuration(value: Duration, label = "duration"): number {
     throw new Error(`${label} "${value}" is not a duration like "15m", "1h30m" or "90s"`);
   }
   return Math.round(total);
+}
+
+/** Throws if `value` is over MAX_LENGTH characters, quoting the first QUOTED. */
+function tooLong(value: string, label: string): void {
+  let count = 0;
+  let head = "";
+  for (const char of value) {
+    if (count < QUOTED) head += char;
+    if (++count > MAX_LENGTH) {
+      throw new Error(`${label} "${head}..." is too long for a duration (more than ${MAX_LENGTH} characters)`);
+    }
+  }
 }
 
 /** 90000 -> "1m 30s". For messages, not for parsing back. */

@@ -89,6 +89,11 @@ function durationCases() {
     ["1y"], ["1h,30m"], ["+1m"],
     [1234], [0], [1.5], [-5], [NaN], [Infinity], [-Infinity],
     ["soon", "grace"], ["", "timeout"], [-1, "maxDuration"], ["every", "schedule interval"], ["2h", "silence duration"],
+    // Over 64 characters (code points) is refused before it is read, quoting the first 32.
+    ["1m".repeat(32)], [" ".repeat(64)], [" " + "1m".repeat(32)], ["1m".repeat(32) + " "], [" ".repeat(65)],
+    ["1".repeat(64)], ["1".repeat(65)], ["1".repeat(400), "silence duration"], ["1".repeat(64) + "x"],
+    ["\u{1F600}".repeat(40)], ["\u{1F600}".repeat(64)], ["\u{1F600}".repeat(65)], ["\u00e9".repeat(65), "grace"],
+    ["x".repeat(31) + "\u{1F600}".repeat(40)],
   ];
   const format = [
     0, 1, 0.4, 0.5, 499.5, 999.4, 999.5, 1000, 1499, 1500, 1999, 59_999, 60_000, 61_000, 90_000, 3_599_499,
