@@ -1,0 +1,76 @@
+# A release tag -> the WordPress plugin's zip (packages/php/wordpress/build.php)
+# attached to the tag's GitHub release, which this makes when it is not there
+# yet. Until the plugin is in the wordpress.org directory, the release is
+# where people get it. The zip goes up twice: as cronwatch-X.Y.Z.zip, and as
+# cronwatch.zip, so that
+# https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip,
+# the link the docs, the setup prompt, llms.txt, the README and the skill
+# give, always serves the newest release's plugin. Uploads replace a file of
+# the same name, so a rerun is safe. Can also be started by hand for a tag.
+#
+# Needs no repository variable or secret: it writes only to this
+# repository's releases, with the workflow's own token.
+name: WordPress zip
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to attach the zip to (v0.7.0, say)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpress-zip
+  cancel-in-progress: false
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: "8.2"
+          extensions: zip
+          coverage: none
+          tools: none
+      - name: Build the zip and attach it to the release
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          version="${TAG#v}"
+          # build.php refuses a zip whose plugin header, readme Stable tag and
+          # changelog disagree with Cronwatch::VERSION; the plugin's version
+          # must also be the tag's, or the release would carry another one.
+          plugin="$(sed -n 's/^ \* Version: *\([^ ]*\)$/\1/p' packages/php/wordpress/cronwatch.php)"
+          if [ "$plugin" != "$version" ]; then echo "the plugin is $plugin, the tag is $TAG"; exit 1; fi
+          out="$RUNNER_TEMP/wordpress"
+          mkdir -p "$out"
+          php packages/php/wordpress/build.php "$out"
+          zip="$out/cronwatch-$version.zip"
+          if [ ! -f "$zip" ]; then echo "build.php did not write $zip"; exit 1; fi
+          cp "$zip" "$out/cronwatch.zip"
+          # A release written by hand first keeps its title and notes. A
+          # prerelease (v0.8.0-beta.1) is marked one, so releases/latest
+          # keeps serving the newest stable release's zip.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            set --
+            case "$version" in *-*) set -- --prerelease ;; esac
+            gh release create "$TAG" --verify-tag "$@" --title "CronWatch $version" \
+              --notes "CronWatch $version. Docs: https://cronwatch.dev/docs/. The WordPress plugin's zip is attached below until it is listed in the WordPress plugin directory."
+          fi
+          gh release upload "$TAG" "$zip" "$out/cronwatch.zip" --clobber
