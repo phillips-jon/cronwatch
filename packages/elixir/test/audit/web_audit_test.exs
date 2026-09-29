@@ -101,6 +101,7 @@ defmodule Cronwatch.Audit.WebServerTest do
   @moduletag :capture_log
 
   alias Cronwatch.Test.Clock
+  alias Cronwatch.Test.HTTP
 
   @inst Cronwatch.Test.GoldenWeb
   @t0 Clock.t0()
@@ -109,7 +110,7 @@ defmodule Cronwatch.Audit.WebServerTest do
   setup do
     start_supervised!({Cronwatch, name: @inst, clock: Clock.fun(Clock.new(@t0)), alerts: [], cron_secret: false})
     Cronwatch.run("x", fn _ -> :ok end, instance: @inst)
-    %{port: Cronwatch.Test.HTTP.serve(Cronwatch.Test.WebRouter)}
+    %{port: HTTP.serve(Cronwatch.Test.WebRouter)}
   end
 
   defp body(size) do
