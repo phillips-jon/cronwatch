@@ -60,6 +60,61 @@ final class Schedule
     }
 
     /**
+     * Four hundred Gregorian years: 146,097 days, a whole number of weeks,
+     * after which the calendar repeats date for date and weekday for weekday.
+     */
+    private const CYCLE_MS = 146_097 * 86_400_000;
+    /** Date.UTC(400, 0, 1). croner misreads a year below 100, so earlier times are asked a cycle or more later. */
+    private const CRONER_FIRST_MS = -49_544_438_400_000;
+    /** Date.UTC(2800, 0, 1). croner finds no fire past the year 3000, so later times are asked a cycle or more earlier. */
+    private const CRONER_LAST_MS = 26_192_246_400_000;
+
+    /**
+     * The next `n` fires of a cron strictly after `from`, which lies within
+     * the years 1 to 9999, dropping any after 9999. A time croner cannot
+     * answer for is moved by whole 400-year cycles into the years it can, and
+     * its fires moved back, as schedule.ts's runsAfter does, so this port
+     * agrees with Node's answers: a time before 400 goes forward, into the
+     * same local mean time every zone kept then, and one from 2800 goes back,
+     * to where the zone's present rules already hold.
+     *
+     * @return list<int>
+     */
+    private static function runsAfter(Cron $cron, int $n, int $from): array
+    {
+        $shift = 0;
+        if ($from < self::CRONER_FIRST_MS) {
+            $shift = intdiv(self::CRONER_FIRST_MS - $from + self::CYCLE_MS - 1, self::CYCLE_MS) * self::CYCLE_MS;
+        } elseif ($from >= self::CRONER_LAST_MS) {
+            $shift = -(intdiv($from - self::CRONER_LAST_MS, self::CYCLE_MS) + 1) * self::CYCLE_MS;
+        }
+        $out = [];
+        foreach ($cron->nextRuns($n, $from + $shift) as $fire) {
+            $t = $fire - $shift;
+            if ($t > Js::LAST_DATE_MS) {
+                break;
+            }
+            $out[] = $t;
+        }
+        return $out;
+    }
+
+    /**
+     * A stored time as a cron's fires are counted from it. A start read from
+     * a foreign or damaged row can be any number: one before the year 1
+     * counts from just before its first millisecond, so the first fire of the
+     * year 1 is the next one, and one at or after the last millisecond of
+     * 9999 has no fire after it at all (null). No fire is ever after 9999.
+     */
+    private static function countFrom(int|float $from): ?int
+    {
+        if ($from >= Js::LAST_DATE_MS) {
+            return null;
+        }
+        return $from >= Js::FIRST_DATE_MS ? (int) Js::floor($from) : Js::FIRST_DATE_MS - 1;
+    }
+
+    /**
      * The first fire strictly after `from`, or null when the cron never fires
      * again. Croner answers with times in the past when asked from inside the
      * hour that repeats when clocks go back, so its answers are filtered, and
@@ -68,14 +123,20 @@ final class Schedule
     private static function fireAfter(ParsedSchedule $parsed, int|float $from): ?int
     {
         $cron = self::cronOf($parsed);
-        $probe = Js::floor($from);
+        $start = self::countFrom($from);
+        if ($start === null) {
+            return null;
+        }
+        // A fraction counts from its floor, but a fire must still be after the time itself.
+        $after = $from >= Js::FIRST_DATE_MS ? $from : $start;
+        $probe = $start;
         for ($attempt = 0; $attempt < 4; $attempt++) {
-            $runs = $cron->nextRuns(8, (int) $probe);
+            $runs = self::runsAfter($cron, 8, $probe);
             if ($runs === []) {
                 return null;
             }
             foreach ($runs as $fire) {
-                if ($fire > $from) {
+                if ($fire > $after) {
                     return $fire;
                 }
             }
@@ -100,10 +161,14 @@ final class Schedule
     {
         $cron = self::cronOf($parsed);
         $out = [];
-        $probe = $from;
-        $last = $from;
+        $start = self::countFrom($from);
+        if ($start === null) {
+            return $out;
+        }
+        $probe = $start;
+        $last = $start;
         for ($guard = 0; $guard < 1000; $guard++) {
-            $batch = $cron->nextRuns(min($limit + 1 - count($out), 24), $probe);
+            $batch = self::runsAfter($cron, min($limit + 1 - count($out), 24), $probe);
             if ($batch === []) {
                 return $out;
             }
@@ -158,7 +223,11 @@ final class Schedule
         return $dueAt === null ? null : new Expectation($dueAt, $dueAt + $graceMs);
     }
 
-    /** The first fire that a run starting at `startedAt` does not cover. */
+    /**
+     * The first fire that a run starting at `startedAt` does not cover. A
+     * start before the year 1 covers none of them, so the first fire of the
+     * year 1 is due; after 9999 there is none (see countFrom).
+     */
     private static function dueAfterRun(ParsedSchedule $parsed, int|float $startedAt): ?int
     {
         // A fire at or before the start is covered by the run itself.
@@ -195,6 +264,10 @@ final class Schedule
     private static function inSpringForwardGap(ParsedSchedule $parsed, int|float $startedAt, int $fireAt): bool
     {
         $lookback = 3 * 3_600_000;
+        // Every zone kept its local mean time, with no clock change, in the year 1.
+        if ($fireAt - $lookback < Js::FIRST_DATE_MS) {
+            return false;
+        }
         $after = self::utcOffset($fireAt, $parsed->timezone);
         $before = self::utcOffset($fireAt - $lookback, $parsed->timezone);
         $gap = $after - $before;

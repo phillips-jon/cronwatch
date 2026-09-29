@@ -78,9 +78,10 @@ final class Timeline
     }
 
     /**
-     * "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
-     * before the year 1 or after 9999 (a start read from a foreign or damaged
-     * row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
+     * "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42", and
+     * "1 Jan 0001 02:00" in another UTC year. A time before the year 1 or
+     * after 9999 (a start read from a foreign or damaged row) is "before 1
+     * Jan 0001 00:00" or "after 31 Dec 9999 23:59".
      */
     public static function when(int|float $t, int|float $now): string
     {
@@ -93,8 +94,10 @@ final class Timeline
         if (floor($t / self::DAY) == floor($now / self::DAY)) {
             return self::clock($t);
         }
-        [, $month, $day] = self::date($t);
-        return "{$day} " . self::MONTHS[$month - 1] . ' ' . self::clock($t);
+        [$year, $month, $day] = self::date($t);
+        // In another UTC year than now's, the year too: "1 Jan 0001 02:00".
+        $other = $year === self::date($now)[0] ? '' : ' ' . str_pad((string) $year, 4, '0', STR_PAD_LEFT);
+        return "{$day} " . self::MONTHS[$month - 1] . $other . ' ' . self::clock($t);
     }
 
     /** A time as new Date(t) holds it: whole milliseconds, cut toward zero. */

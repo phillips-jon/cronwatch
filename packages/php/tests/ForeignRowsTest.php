@@ -11,6 +11,7 @@ use Cronwatch\Evaluate;
 use Cronwatch\JobDefinition;
 use Cronwatch\RunStatus;
 use Cronwatch\Tests\Support\Backend;
+use Cronwatch\Web\Request;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -77,6 +78,62 @@ final class ForeignRowsTest extends TestCase
             $this->assertSame(1, $state->consecutiveFailures);
             $this->assertSame(['stuck'], array_map(fn (Alert $a) => $a->type, $sent));
             $this->assertSame('Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h.', explode("\n", $sent[0]->message)[0]);
+        } finally {
+            $backend->done();
+        }
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function farCronStarts(): iterable
+    {
+        foreach (['sqlite', 'mysql', 'mariadb', 'postgres'] as $kind) {
+            foreach (['-62135596800001', '253402300800000', '-9223372036854775808', '9223372036854775807'] as $start) {
+                yield "{$kind} {$start}" => [$kind, $start];
+            }
+        }
+    }
+
+    /**
+     * A cron job's last run as a foreign or damaged row could hold it:
+     * before the year 1 (the first fire of the year 1 was missed) or after
+     * 9999 (never due again), and at BIGINT's ends. Neither a check nor the
+     * dashboard reports an error (cronOverForeignRow in the SDK's
+     * stores.test.ts).
+     */
+    #[DataProvider('farCronStarts')]
+    public function testACheckAndTheDashboardOverACronJobWhoseLastRunStartedFarOff(string $kind, string $start): void
+    {
+        $why = Backend::unavailable($kind);
+        if ($why !== null) {
+            $this->markTestSkipped($why);
+        }
+        $backend = Backend::make($kind);
+        try {
+            $store = $backend->open();
+            $store->init();
+            $store->upsertJob(JobDefinition::fromJson(['name' => 'far', 'schedule' => '0 2 * * *', 'timezone' => 'UTC', 'grace' => '10m']), 1);
+            $p = $backend->tables();
+            $trigger = $kind === 'mysql' || $kind === 'mariadb' ? '`trigger`' : 'trigger';
+            $backend->pdo()->exec("INSERT INTO {$p}runs (id, job, status, started_at, finished_at, duration_ms, metrics, {$trigger}) VALUES ('far1', 'far', 'ok', {$start}, {$start}, 0, '{}', 'run')");
+            $sent = [];
+            $errors = [];
+            $capture = new Custom('capture', function (Alert $alert) use (&$sent): void {
+                $sent[] = $alert;
+            });
+            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: false, onError: function (\Throwable $e, string $context) use (&$errors): void {
+                $errors[] = "{$context}: {$e->getMessage()}";
+            });
+            $cw->check();
+            $web = $cw->routes(token: 'tok', basePath: '/cronwatch');
+            foreach (['/cronwatch/', '/cronwatch/jobs/far', '/cronwatch/api/jobs/far'] as $path) {
+                $response = $web->handle(Request::create('GET', "http://app.test{$path}", ['authorization' => 'Bearer tok'], ''));
+                $this->assertSame(200, $response->status, $path);
+            }
+            $this->assertSame([], $errors);
+            $this->assertSame(str_starts_with($start, '-') ? ['missed'] : [], array_map(fn (Alert $a) => $a->type, $sent));
+            if ($sent !== []) {
+                $this->assertStringStartsWith('Due 0001-01-01 02:00:00 UTC ', $sent[0]->message);
+            }
         } finally {
             $backend->done();
         }

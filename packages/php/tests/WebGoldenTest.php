@@ -39,11 +39,23 @@ final class WebGoldenTest extends TestCase
     /** The one header the SDK leaves to the server. */
     private const IGNORED_HEADERS = ['content-length'];
 
+    /** @var list<string> What the seed and the requests reported to onError: nothing, however far off a run's start is. */
+    private static array $errors = [];
+
     /** The seed in golden.mjs, step for step. */
     private static function seed(): Cronwatch
     {
         $clock = new Clock();
-        $cw = new Cronwatch(store: new MemoryStore(), alerts: [new Custom('capture', fn () => null)], cronSecret: false, now: $clock);
+        self::$errors = [];
+        $cw = new Cronwatch(
+            store: new MemoryStore(),
+            alerts: [new Custom('capture', fn () => null)],
+            cronSecret: false,
+            now: $clock,
+            onError: function (\Throwable $error, string $context): void {
+                self::$errors[] = "{$context}: {$error->getMessage()}";
+            },
+        );
         $quietly = function (callable $fn): void {
             try {
                 $fn();
@@ -89,6 +101,20 @@ final class WebGoldenTest extends TestCase
         $quietly(fn () => $farBack->run(function () use ($clock): void {
             $clock->advance(1000);
         }));
+
+        // Cron jobs whose last run is as far off: counted from the first
+        // millisecond of the year 1, the first is due then (and is missed at
+        // the check); after 9999 the other is never due again.
+        $farCronBack = $cw->job('far-cron-back', ['schedule' => '0 2 * * *', 'timezone' => 'UTC', 'grace' => '10m']);
+        $clock->set(-62_135_596_800_001);
+        $farCronBack->run(function () use ($clock): void {
+            $clock->advance(1000);
+        });
+        $farCronAhead = $cw->job('far-cron-ahead', ['schedule' => '0 2 * * *', 'timezone' => 'UTC', 'grace' => '10m']);
+        $clock->set(253_402_300_800_000);
+        $farCronAhead->run(function () use ($clock): void {
+            $clock->advance(1000);
+        });
         $clock->set(Clock::T0);
         return $cw;
     }
@@ -104,7 +130,7 @@ final class WebGoldenTest extends TestCase
     {
         $data = json_decode((string) file_get_contents(self::GOLDEN), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(Clock::T0, $data['t0']);
-        $this->assertCount(59, $data['captures']);
+        $this->assertCount(63, $data['captures']);
         $cw = self::seed();
         $web = $cw->routes(token: 'tok', basePath: '/cronwatch');
         $ids = [];
@@ -127,6 +153,7 @@ final class WebGoldenTest extends TestCase
             $this->assertSame($expected, $headers, $label);
             $this->assertSame($capture['responseBody'], $body, $label);
         }
+        $this->assertSame([], self::$errors);
     }
 
     /** @param array<string, string> $headers */
