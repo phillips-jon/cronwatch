@@ -268,3 +268,48 @@ def test_a_forked_child_opens_a_sqlite_connection_of_its_own(tmp_path: Path) -> 
     assert os.waitstatus_to_exitcode(status) == 0
     assert store._db is parent_connection
     assert store.get_run("from-child") is not None
+
+@pytest.fixture(params=["sqlite", pytest.param("postgres", marks=pytest.mark.skipif(not PG, reason=NO_PG))])
+def sql_store(request: pytest.FixtureRequest, tmp_path: Path) -> Any:
+    if request.param == "postgres":
+        from cronwatch.stores.postgres import PostgresStore
+
+        prefix = pg_prefix("f")
+        made: Any = PostgresStore(PG, prefix=prefix)
+        yield made
+        made.close()
+        drop_pg_tables(prefix)
+        return
+    made = SqliteStore(tmp_path / "foreign.db")
+    yield made
+    made.close()
+
+
+def test_a_check_over_a_run_that_started_at_the_lowest_bigint_and_a_state_whose_version_is_1_5(sql_store: Any) -> None:
+    """Rows another process wrote. The job is silenced: an alert's text shows
+    the start as a date, and no date is that far back."""
+    from cronwatch import Cronwatch
+
+    from helpers import Errors
+
+    store = sql_store
+    store.init()
+    store.upsert_job(definition(name="far", timeout="5m"), 1)
+    execute = store._run if isinstance(store, SqliteStore) else store._execute
+    p = store.prefix
+    execute(f"INSERT INTO {p}runs (id, job, status, started_at, metrics, trigger) VALUES ('far1', 'far', 'running', -9223372036854775808, '{{}}', 'run')")
+    execute(
+        f"INSERT INTO {p}state (job, state) VALUES ('far', "
+        """'{"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":4102444800000,"lastAlertAt":null,"version":1.5}')"""
+    )
+    errors = Errors()
+    cw = Cronwatch(store=store, alerts=[], cron_secret=None, on_error=errors)
+    cw.check()
+    cw.check()
+    assert errors.items == []
+    stuck = store.get_run("far1")
+    assert stuck.status == "timeout"
+    assert stuck.duration_ms == 9_007_199_254_740_991, "the duration is held at 2^53 - 1"
+    state = store.get_state("far")
+    assert state.version == 1, "the state's 1.5 counted as 0 and was written over"
+    assert state.consecutive_failures == 1

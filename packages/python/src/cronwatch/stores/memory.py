@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from typing import Any, TypeVar
 
 from .. import _js
+from ..evaluate import state_version
 from ..types import JobDefinition, JobState, Run, RunStatus, StoredJob
 
 T = TypeVar("T")
@@ -127,7 +128,7 @@ class MemoryStore:
         state at all, counts as 0) is `expected_version`. Returns whether it wrote."""
         with self._lock:
             current = self._states.get(state.job)
-            if ((current.version if current else None) or 0) != expected_version:
+            if state_version(current) != expected_version:
                 return False
             self._states[state.job] = _clone(state, JobState)
             return True

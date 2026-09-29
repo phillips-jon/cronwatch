@@ -36,6 +36,31 @@ SLOW_FLOOR_MS = 10_000
 BASELINE_MIN_RUNS = 5
 #: How many successful runs a baseline looks at, and how many runs a summary covers.
 BASELINE_WINDOW = 20
+#: The longest duration written: the largest integer JavaScript holds exactly,
+#: which every port and store reads back unchanged.
+MAX_DURATION_MS = 9_007_199_254_740_991
+
+
+def run_duration(started_at: float, finished_at: float) -> float:
+    """How long a run took, from `started_at` to `finished_at`: 0 when it
+    started later, and never more than MAX_DURATION_MS. A foreign row's start
+    near a 64-bit limit must not make a duration no store can write."""
+    ms = finished_at - started_at
+    return min(ms, MAX_DURATION_MS) if ms > 0 else 0
+
+
+def state_version(state: JobState | None) -> int:
+    """The version a stored state counts as for compare_and_set_state: its
+    `version` when that is a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
+    else 0, as when it is absent. The SQL stores read it the same way, so a
+    foreign row's 1.5, "x" or -1 is written over by the next update instead of
+    refusing every compare-and-set of its job for good."""
+    version = None if state is None else state.version
+    if isinstance(version, bool) or not isinstance(version, (int, float)):
+        return 0
+    if isinstance(version, float) and not version.is_integer():
+        return 0
+    return int(version) if 0 <= version <= MAX_DURATION_MS else 0
 
 
 @dataclass

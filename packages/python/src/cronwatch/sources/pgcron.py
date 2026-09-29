@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .. import _js
+from ..evaluate import run_duration
 from ..types import Alert, JobDefinition, Run, RunStatus
 
 #: How many of a job's newest runs are copied, without alerting, the first time it is seen.
@@ -150,7 +151,7 @@ def run(row: Mapping[str, Any], job: str, id_prefix: str, fallback_at: int | Non
         status=status,
         started_at=started_at,
         finished_at=end,
-        duration_ms=None if end is None else end - started_at,
+        duration_ms=None if end is None else run_duration(started_at, end),
         error=(message or "pg_cron reported the run as failed") if status == RunStatus.FAILED else None,
         output=message if status == RunStatus.OK else None,
         metrics={},

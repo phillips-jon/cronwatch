@@ -39,7 +39,9 @@ from .evaluate import (
     on_check,
     on_run_finish,
     on_run_start,
+    run_duration,
     stale_alert,
+    state_version,
     summarize,
     timeout_ms,
     unevaluable_summary,
@@ -442,7 +444,7 @@ class _Execution:
         finished_at = client.now()
         self.finished_at = finished_at
         run.finished_at = finished_at
-        run.duration_ms = max(0, finished_at - self.started_at)
+        run.duration_ms = run_duration(self.started_at, finished_at)
         run.metrics = self.recorder.metrics()
         logged = self.recorder.output()
         run.output = logged if logged is not None else (cap_output(result) if isinstance(result, str) else None)
@@ -947,7 +949,7 @@ class Cronwatch:
                 state, result = change(current)
                 if self._same_state(state, current):
                     return current, result
-                version = current.version or 0
+                version = state_version(current)
                 following = state.copy()
                 following.version = version + 1
                 if self._write_state(following, version):
@@ -1246,7 +1248,7 @@ class Cronwatch:
         run = source.copy()
         run.status = RunStatus.RUNNING
         run.finished_at = finished_at
-        run.duration_ms = max(0, finished_at - source.started_at)
+        run.duration_ms = run_duration(source.started_at, finished_at)
         run.error = None
         run.output = _join_output(source.output, added)
         run.metrics = {**(source.metrics or {}), **recorder.metrics()}
@@ -1359,7 +1361,7 @@ class Cronwatch:
                 timeout = timeout_ms(judged)
                 run.status = RunStatus.TIMEOUT
                 run.finished_at = at
-                run.duration_ms = at - run.started_at
+                run.duration_ms = run_duration(run.started_at, at)
                 run.error = f"Still running after {format_duration(timeout)}; marked as timed out"
                 # Only over a row still running: a finish that landed meanwhile wins.
                 if not self._write_run_if(run, [RunStatus.RUNNING]):

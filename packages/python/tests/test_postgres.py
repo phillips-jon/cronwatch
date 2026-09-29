@@ -40,7 +40,11 @@ def test_a_prefix_that_is_not_a_plain_lowercase_identifier_is_refused() -> None:
 
 def test_statements_are_the_sdks_with_numbered_placeholders() -> None:
     sql = _sql.statements("postgres", "cronwatch_")
-    assert sql["cas_update"] == "UPDATE cronwatch_state SET state = $1 WHERE job = $2 AND COALESCE((state->>'version')::bigint, 0) = $3"
+    assert sql["cas_update"] == (
+        "UPDATE cronwatch_state SET state = $1 WHERE job = $2 AND CASE WHEN jsonb_typeof(state->'version') <> 'number' THEN 0 "
+        "WHEN (state->>'version')::numeric % 1 = 0 AND (state->>'version')::numeric BETWEEN 0 AND 9007199254740991 "
+        "THEN (state->>'version')::numeric::bigint ELSE 0 END = $3"
+    )
     assert sql["list_runs"] == "SELECT * FROM cronwatch_runs WHERE job = $1 ORDER BY started_at DESC, seq DESC LIMIT $2"
     assert sql["list_jobs"] == 'SELECT * FROM cronwatch_jobs ORDER BY name COLLATE "C"'
     assert _sql.update_run_if_sql("postgres", "cronwatch_", 2).endswith("WHERE id = $7 AND status IN ($8, $9)")

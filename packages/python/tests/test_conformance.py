@@ -396,6 +396,14 @@ def test_apply_silence() -> None:
     each_case(HEALTH["applySilence"], check)
 
 
+def test_run_duration() -> None:
+    each_case(HEALTH["runDuration"], lambda c: differs(c["durationMs"], evaluate.run_duration(c["startedAt"], c["finishedAt"])))
+
+
+def test_state_version() -> None:
+    each_case(HEALTH["stateVersion"], lambda c: differs(c["version"], evaluate.state_version(JobState.from_dict(json.loads(c["state"])))))
+
+
 def test_stale_alert() -> None:
     each_case(HEALTH["staleAlert"], lambda c: differs(c["stale"], evaluate.stale_alert(Alert.from_dict(c["alert"]), state_from(c["state"]))))  # type: ignore[arg-type]
 
@@ -561,6 +569,35 @@ def test_store_update_run_if(kind: str, tmp_path: Path) -> None:
         return differs(expected, [outcome, stored.to_dict() if stored else None])
 
     each_case(STORE["updateRunIf"], check)
+    store.close()
+
+
+def write_raw_state(store: Any, text: str) -> None:
+    """A state row as another process wrote it: the JSON text as it is."""
+    if isinstance(store, MemoryStore):
+        store.set_state(JobState.from_dict(json.loads(text)))
+    elif isinstance(store, SqliteStore):
+        store._run(f"INSERT INTO {store.prefix}state (job, state) VALUES ('v', ?)", [text])
+    else:
+        store._execute(f"INSERT INTO {store.prefix}state (job, state) VALUES ('v', $1::jsonb)", [text])
+
+
+@pytest.mark.parametrize("kind", STORES)
+def test_store_foreign_version(kind: str, tmp_path: Path) -> None:
+    store = make_store(kind, tmp_path)
+
+    def check(c: dict[str, Any]) -> str | None:
+        store.delete_job("v")
+        write_raw_state(store, c["stored"])
+        for step in c["steps"]:
+            written = store.compare_and_set_state(JobState.from_dict(step["cas"]), step["expected"])
+            if written != step["written"]:
+                return f"expecting {step['expected']}: wrote {written}"
+            if "state" in step and (mismatch := differs(step["state"], store.get_state("v"))):
+                return mismatch
+        return None
+
+    each_case(STORE["foreignVersion"], check)
     store.close()
 
 

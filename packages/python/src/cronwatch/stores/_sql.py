@@ -83,8 +83,21 @@ def statements(dialect: str, p: str) -> dict[str, str]:
     by_name = 'name COLLATE "C"' if pg else "name"
 
     def version(column: str) -> str:
-        """The version inside a state's JSON, 0 when it has none."""
-        return f"COALESCE(({column}->>'version')::bigint, 0)" if pg else f"COALESCE(json_extract({column}, '$.version'), 0)"
+        """The version inside a state's JSON, as state_version() reads it: a
+        whole number from 0 to 2^53 - 1, else 0 (none, or a foreign row's 1.5
+        or "x", which must neither fail the statement nor refuse every write
+        for good). Each CASE tests the JSON type before any cast."""
+        if pg:
+            v = f"({column}->>'version')::numeric"
+            return (
+                f"CASE WHEN jsonb_typeof({column}->'version') <> 'number' THEN 0 "
+                f"WHEN {v} % 1 = 0 AND {v} BETWEEN 0 AND 9007199254740991 THEN {v}::bigint ELSE 0 END"
+            )
+        v = f"json_extract({column}, '$.version')"
+        return (
+            f"CASE WHEN json_type({column}, '$.version') NOT IN ('integer', 'real') THEN 0 "
+            f"WHEN {v} = CAST({v} AS INTEGER) AND {v} BETWEEN 0 AND 9007199254740991 THEN CAST({v} AS INTEGER) ELSE 0 END"
+        )
 
     sql = {
         "upsert_job": f"""INSERT INTO {p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
