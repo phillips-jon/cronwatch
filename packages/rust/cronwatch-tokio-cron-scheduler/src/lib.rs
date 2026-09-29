@@ -115,6 +115,7 @@ pub struct Options {
 
 /// Why a job could not be made.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// tokio-cron-scheduler refused it (a schedule it cannot read).
     Scheduler(JobSchedulerError),

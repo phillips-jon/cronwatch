@@ -18,6 +18,30 @@ pub trait Matcher: Send + Sync {
     fn source(&self) -> String;
 }
 
+/// A `regex::Regex` (the `regex` feature), stored as `/source/`, a `/` in
+/// it escaped as JavaScript's `RegExp.prototype.source` escapes one. Its
+/// flags are inline (`(?i)`), so none follow the last slash.
+#[cfg(feature = "regex")]
+impl Matcher for regex::Regex {
+    fn is_match(&self, text: &str) -> bool {
+        regex::Regex::is_match(self, text)
+    }
+
+    fn source(&self) -> String {
+        let mut out = String::from("/");
+        let mut escaped = false;
+        for c in self.as_str().chars() {
+            if c == '/' && !escaped {
+                out.push('\\');
+            }
+            escaped = c == '\\' && !escaped;
+            out.push(c);
+        }
+        out.push('/');
+        out
+    }
+}
+
 /// A job's expect option: what a successful run's output must satisfy, and
 /// how the rule is described in the stored definition.
 #[derive(Clone)]

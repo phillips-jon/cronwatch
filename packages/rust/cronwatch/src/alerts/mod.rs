@@ -113,6 +113,7 @@ macro_rules! opaque_debug {
         })*
     };
 }
+#[cfg(feature = "triage")]
 pub(crate) use opaque_debug;
 
 #[cfg(feature = "alerts")]

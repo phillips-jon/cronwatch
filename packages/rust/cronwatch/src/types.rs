@@ -15,6 +15,7 @@ macro_rules! string_enum {
         /// A value another writer stored that this release does not know is
         /// kept as `Other`, so it is written back as it was.
         #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+        #[non_exhaustive]
         pub enum $name {
             $($(#[$vdoc])* $variant,)*
             /// A value this release does not know.
@@ -553,6 +554,7 @@ impl BudgetBreach {
 
 /// What an alert carries beyond its title and message.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum AlertDetails {
     /// Which run was missed.
     Missed { due_at: i64, deadline: f64, grace_ms: f64, last_run_at: Option<i64> },

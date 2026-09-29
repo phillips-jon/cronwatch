@@ -34,6 +34,11 @@ axum = ["tower", "dep:axum"]
 # roots, and the WHATWG URL parser fetch reads URLs with. Not for apps to
 # name: turn on `alerts` or `triage`.
 __transport = ["dep:reqwest", "dep:url", "dep:idna_adapter"]
+# `JobOptions::expect_match` takes a `regex::Regex`.
+regex = ["dep:regex"]
+# Serialize and Deserialize on the public types, for the app's own use
+# (the stores and channels never use them).
+serde = ["dep:serde"]
 
 [dependencies]
 tokio = { version = "1.43", default-features = false, features = ["rt", "time", "sync"] }
@@ -58,10 +63,16 @@ http-body-util = { version = "0.1.2", optional = true }
 bytes = { version = "1.6", optional = true }
 tower-service = { version = "0.3.3", optional = true }
 axum = { version = "0.8.4", default-features = false, features = ["original-uri"], optional = true }
+# `JobOptions::expect_match` with a `regex::Regex` (the `regex` feature).
+regex = { version = "1.10", default-features = false, features = ["std", "unicode"], optional = true }
+# Serialize and Deserialize on the public types (the `serde` feature).
+serde = { version = "1.0.200", default-features = false, features = ["std"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full", "test-util"] }
 flate2 = "1.0.35"
+# The serde feature's round trip.
+serde_json = "1"
 # The dashboard's golden replay and the handler behind a real server.
 axum = { version = "0.8.4", default-features = false, features = ["original-uri", "tokio", "http1"] }
 hyper = { version = "1.6", features = ["client", "http1"] }

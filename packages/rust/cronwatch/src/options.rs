@@ -20,6 +20,7 @@ use crate::types::Definition;
 /// [`Duration`], or a whole or fractional number of milliseconds. A
 /// `Duration` is stored as its milliseconds, as the SDK stores a number.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum DurationSpec {
     /// The SDK's text, stored as written.
     Text(String),
@@ -292,6 +293,7 @@ pub(crate) fn validate_definition(name: &str, def: &Definition) -> Result<(), Er
 
 /// Where alerts are sent from.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Deliver {
     /// Each alert goes out from the process that produced it. The default.
     #[default]

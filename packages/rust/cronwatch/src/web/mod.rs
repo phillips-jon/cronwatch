@@ -182,6 +182,7 @@ impl fmt::Debug for Body {
 
 /// Why a body could not be read.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum BodyError {
     /// The body is longer than the limit it was read with.
     TooLarge,
