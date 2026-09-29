@@ -67,7 +67,7 @@ defmodule Cronwatch.Options do
 
       {:error,
        Error.invalid(
-         "job name #{JS.quote(text)} must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\""
+         ~s(job name #{JS.quote(text)} must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-")
        )}
     end
   end
@@ -92,15 +92,13 @@ defmodule Cronwatch.Options do
   defp pairs(name, options, allowed) when is_list(options) do
     Enum.reduce_while(options, {:ok, []}, fn
       {key, value}, {:ok, acc} when is_atom(key) ->
-        cond do
-          key not in allowed ->
-            {:halt, {:error, Error.invalid("job #{JS.quote(to_string(name))}: unknown option #{inspect(key)}")}}
-
-          true ->
-            case json_value(name, key, value) do
-              {:ok, v} -> {:cont, {:ok, acc ++ [{@keys[key], v}]}}
-              {:error, _} = e -> {:halt, e}
-            end
+        if key in allowed do
+          case json_value(name, key, value) do
+            {:ok, v} -> {:cont, {:ok, acc ++ [{@keys[key], v}]}}
+            {:error, _} = e -> {:halt, e}
+          end
+        else
+          {:halt, {:error, Error.invalid("job #{JS.quote(to_string(name))}: unknown option #{inspect(key)}")}}
         end
 
       other, _ ->
@@ -197,9 +195,8 @@ defmodule Cronwatch.Options do
              if ms <= 0, do: invalid.("job #{quoted}: maxDuration must be longer than zero"), else: :ok
            end),
          :ok <- check_failures(quoted, def),
-         :ok <- check_budget(quoted, def),
-         :ok <- check_tags(quoted, def) do
-      :ok
+         :ok <- check_budget(quoted, def) do
+      check_tags(quoted, def)
     end
   end
 

@@ -96,7 +96,7 @@ defmodule Cronwatch.Alert do
 
   def details_value("recovered", d) do
     o = %Object{pairs: [{"after", d.after}]}
-    o = if d[:reason] not in [nil, ""], do: Object.put(o, "reason", d.reason), else: o
+    o = if d[:reason] in [nil, ""], do: o, else: Object.put(o, "reason", d.reason)
     if d[:since] != nil, do: Object.put(o, "since", d.since), else: o
   end
 

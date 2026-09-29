@@ -7,6 +7,7 @@ defmodule Cronwatch.Config do
   alias Cronwatch.Error
   alias Cronwatch.Options
   alias Cronwatch.Output
+  alias Cronwatch.Types.Read
 
   require Logger
 
@@ -157,7 +158,7 @@ defmodule Cronwatch.Config do
   defp deliver(d) when d in ["now", "check"], do: {:ok, String.to_existing_atom(d)}
 
   defp deliver(other),
-    do: {:error, Error.invalid("deliver must be \"now\" or \"check\", not #{inspect(other)}")}
+    do: {:error, Error.invalid(~s(deliver must be "now" or "check", not #{inspect(other)}))}
 
   # The SDK's start(every): at least five seconds, and at most setTimeout's
   # longest delay.
@@ -235,7 +236,7 @@ defmodule Cronwatch.Config do
   def redact(%__MODULE__{redact: f} = c, text) do
     case f.(text) do
       out when is_binary(out) -> out
-      other -> raise ArgumentError, "redact must return a string, not #{Cronwatch.Types.Read.kind(other)}"
+      other -> raise ArgumentError, "redact must return a string, not #{Read.kind(other)}"
     end
   rescue
     e ->

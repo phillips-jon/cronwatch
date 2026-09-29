@@ -170,7 +170,7 @@ defmodule Cronwatch.Duration do
     if parts == [], do: "0s", else: Enum.join(parts, " ")
   end
 
-  @doc "The SDK's `formatRelative`: `\"5m ago\"`, `\"in 2h\"`, or `\"now\"` within five seconds of `now`."
+  @doc ~s(The SDK's `formatRelative`: `"5m ago"`, `"in 2h"`, or `"now"` within five seconds of `now`.)
   @spec relative(integer(), integer()) :: String.t()
   def relative(at, now) do
     diff = at - now

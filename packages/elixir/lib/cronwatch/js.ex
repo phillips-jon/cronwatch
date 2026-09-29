@@ -138,8 +138,8 @@ defmodule Cronwatch.JS do
   @min_i64 -9_223_372_036_854_775_808
   @max_i64 9_223_372_036_854_775_807
   def to_int(n) when is_integer(n), do: n |> max(@min_i64) |> min(@max_i64)
-  def to_int(n) when is_float(n) and n >= 9.223372036854776e18, do: @max_i64
-  def to_int(n) when is_float(n) and n <= -9.223372036854776e18, do: @min_i64
+  def to_int(n) when is_float(n) and n >= 9.223_372_036_854_776e18, do: @max_i64
+  def to_int(n) when is_float(n) and n <= -9.223_372_036_854_776e18, do: @min_i64
   def to_int(n) when is_float(n), do: trunc(n)
   def to_int(:infinity), do: @max_i64
   def to_int(:neg_infinity), do: @min_i64

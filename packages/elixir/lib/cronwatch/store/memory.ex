@@ -96,6 +96,7 @@ defmodule Cronwatch.Store.Memory.Server do
   use GenServer
 
   alias Cronwatch.JobState
+  alias Cronwatch.JS.Object
   alias Cronwatch.Run
   alias Cronwatch.StoredJob
 
@@ -108,7 +109,7 @@ defmodule Cronwatch.Store.Memory.Server do
 
   @impl GenServer
   def handle_call({:upsert_job, definition, now}, _from, s) do
-    name = Cronwatch.JS.Object.get(definition, "name")
+    name = Object.get(definition, "name")
 
     created =
       case s.jobs[name] do

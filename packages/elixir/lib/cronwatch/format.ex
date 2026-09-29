@@ -158,7 +158,7 @@ defmodule Cronwatch.Format do
       if run do
         ran = if run.duration_ms != nil, do: ", ran #{Duration.format(run.duration_ms)}", else: ""
         lines = lines ++ ["Started #{when_at(run.started_at, now)}#{ran}."]
-        lines = if run.error not in [nil, ""], do: lines ++ [error_line(run.error)], else: lines
+        lines = if run.error in [nil, ""], do: lines, else: lines ++ [error_line(run.error)]
         out = tail(run.output, 8)
         if out != "", do: lines ++ ["Output (tail):\n#{out}"], else: lines
       else

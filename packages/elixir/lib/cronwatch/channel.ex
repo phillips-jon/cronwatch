@@ -121,7 +121,7 @@ defmodule Cronwatch.Alerts.Console do
 
   @impl true
   def send(_state, alert, _ctx) do
-    triage = if alert.triage not in [nil, ""], do: "\nTriage: #{alert.triage}", else: ""
+    triage = if alert.triage in [nil, ""], do: "", else: "\nTriage: #{alert.triage}"
     line = "[cronwatch] #{alert.title}\n#{alert.message}#{triage}"
     if alert.type == "recovered", do: Logger.info(line), else: Logger.error(line)
     :ok

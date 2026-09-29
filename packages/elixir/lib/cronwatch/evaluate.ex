@@ -358,7 +358,9 @@ defmodule Cronwatch.Evaluate do
   def on_check(def, %StoredJob{} = stored, last_run, state, now) do
     next = clone(state)
 
-    if not Format.truthy?(Object.get(def, "schedule")) do
+    if Format.truthy?(Object.get(def, "schedule")) do
+      check_schedule(def, stored, last_run, next, now)
+    else
       case JobState.open_at(next, "missed") do
         nil ->
           {:ok, {{next, []}, nil, nil}}
@@ -378,44 +380,46 @@ defmodule Cronwatch.Evaluate do
           draft = {"recovered", last_run, %{after: ["missed"], reason: "unscheduled", since: since}}
           {:ok, {{next, [draft]}, nil, nil}}
       end
-    else
-      with {:ok, parsed} <- parsed_schedule(def),
-           {:ok, grace} <- grace_ms(def) do
-        last_run_at = if last_run, do: last_run.started_at
-        interval? = parsed.kind == "interval"
+    end
+  end
 
-        next_expected_at =
-          if interval?,
-            do: Schedule.next_fire(parsed, stored.created_at, last_run_at),
-            else: Schedule.next_fire(parsed, now, nil)
+  defp check_schedule(def, stored, last_run, next, now) do
+    with {:ok, parsed} <- parsed_schedule(def),
+         {:ok, grace} <- grace_ms(def) do
+      last_run_at = if last_run, do: last_run.started_at
+      interval? = parsed.kind == "interval"
 
-        case Schedule.expectation(parsed, last_run_at, stored.created_at, grace) do
-          nil ->
-            {:ok, {{next, []}, next_expected_at, nil}}
+      next_expected_at =
+        if interval?,
+          do: Schedule.next_fire(parsed, stored.created_at, last_run_at),
+          else: Schedule.next_fire(parsed, now, nil)
 
-          %{due_at: due_at, deadline: deadline} ->
-            cond do
-              # An interval's next run is due a period after the last one
-              # started. If that run is still going, the job is busy, not
-              # late; stuck covers one that never ends.
-              interval? and last_run != nil and last_run.status == "running" ->
-                {:ok, {{next, []}, next_expected_at, due_at}}
+      case Schedule.expectation(parsed, last_run_at, stored.created_at, grace) do
+        nil ->
+          {:ok, {{next, []}, next_expected_at, nil}}
 
-              now > deadline ->
-                case open_condition(next, "missed", now) do
-                  {next, true} ->
-                    details = %{due_at: due_at, deadline: deadline, grace_ms: grace, last_run_at: last_run_at}
-                    {:ok, {{next, [{"missed", last_run, details}]}, next_expected_at, due_at}}
+        %{due_at: due_at, deadline: deadline} ->
+          cond do
+            # An interval's next run is due a period after the last one
+            # started. If that run is still going, the job is busy, not
+            # late; stuck covers one that never ends.
+            interval? and last_run != nil and last_run.status == "running" ->
+              {:ok, {{next, []}, next_expected_at, due_at}}
 
-                  {next, false} ->
-                    {:ok, {{next, []}, next_expected_at, due_at}}
-                end
+            now > deadline ->
+              case open_condition(next, "missed", now) do
+                {next, true} ->
+                  details = %{due_at: due_at, deadline: deadline, grace_ms: grace, last_run_at: last_run_at}
+                  {:ok, {{next, [{"missed", last_run, details}]}, next_expected_at, due_at}}
 
-              true ->
-                # A run has started since it opened, or the grace was widened.
-                {:ok, {{close_condition(next, "missed"), []}, next_expected_at, due_at}}
-            end
-        end
+                {next, false} ->
+                  {:ok, {{next, []}, next_expected_at, due_at}}
+              end
+
+            true ->
+              # A run has started since it opened, or the grace was widened.
+              {:ok, {{close_condition(next, "missed"), []}, next_expected_at, due_at}}
+          end
       end
     end
   end

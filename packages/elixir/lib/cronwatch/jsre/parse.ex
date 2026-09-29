@@ -227,45 +227,45 @@ defmodule Cronwatch.JSRE.Parse do
   end
 
   defp quantifier(t, p) do
-    if not more?(p) do
-      {t, p}
-    else
-      bounds =
-        case peek(p) do
-          ?* ->
-            {0, nil, adv(p)}
+    if more?(p), do: quantifier_at(t, p), else: {t, p}
+  end
 
-          ?+ ->
-            {1, nil, adv(p)}
+  defp quantifier_at(t, p) do
+    bounds =
+      case peek(p) do
+        ?* ->
+          {0, nil, adv(p)}
 
-          ?? ->
-            {0, 1, adv(p)}
+        ?+ ->
+          {1, nil, adv(p)}
 
-          ?{ ->
-            case brace(p) do
-              nil ->
-                nil
+        ?? ->
+          {0, 1, adv(p)}
 
-              {n, m, after_brace} ->
-                if m != nil and m < n, do: raise_at(p, "numbers out of order in {} quantifier")
-                {n, m, %{p | i: after_brace}}
-            end
+        ?{ ->
+          case brace(p) do
+            nil ->
+              nil
 
-          _ ->
-            nil
-        end
+            {n, m, after_brace} ->
+              if m != nil and m < n, do: raise_at(p, "numbers out of order in {} quantifier")
+              {n, m, %{p | i: after_brace}}
+          end
 
-      case bounds do
-        nil ->
-          {t, p}
-
-        {lo, hi, p} ->
-          if more?(p) and peek(p) == ??, do: raise_at(p, "lazy quantifiers are not supported")
-          if t.kind == :look and t.behind, do: raise_at(p, "a lookbehind cannot be quantified")
-          # A quantified term is wrapped, so its own min and max stay 1.
-          t = if once?(t), do: t, else: tree(:group, children: [t])
-          {%{t | min: lo, max: hi}, p}
+        _ ->
+          nil
       end
+
+    case bounds do
+      nil ->
+        {t, p}
+
+      {lo, hi, p} ->
+        if more?(p) and peek(p) == ??, do: raise_at(p, "lazy quantifiers are not supported")
+        if t.kind == :look and t.behind, do: raise_at(p, "a lookbehind cannot be quantified")
+        # A quantified term is wrapped, so its own min and max stay 1.
+        t = if once?(t), do: t, else: tree(:group, children: [t])
+        {%{t | min: lo, max: hi}, p}
     end
   end
 

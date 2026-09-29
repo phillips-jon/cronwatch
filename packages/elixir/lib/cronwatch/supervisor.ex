@@ -11,6 +11,7 @@ defmodule Cronwatch.Supervisor do
 
   alias Cronwatch.Config
   alias Cronwatch.Job
+  alias Cronwatch.Store.Memory
 
   def start_link(opts) do
     with {:ok, config} <- Config.new(opts),
@@ -71,6 +72,6 @@ defmodule Cronwatch.Supervisor do
   # A store module may define child_spec/1 for its own use in an app's tree
   # (the memory store started on its own); the instance starts it only for a
   # handle that asks for a process.
-  defp owns_process?(Cronwatch.Store.Memory, handle), do: Cronwatch.Store.Memory.owned?(handle)
+  defp owns_process?(Memory, handle), do: Memory.owned?(handle)
   defp owns_process?(_module, _handle), do: true
 end

@@ -47,6 +47,7 @@ defmodule Cronwatch do
   alias Cronwatch.Lines
   alias Cronwatch.Options
   alias Cronwatch.Run
+  alias Cronwatch.Run.Exec
   alias Cronwatch.RunHandle
   alias Cronwatch.Runs
 
@@ -144,7 +145,7 @@ defmodule Cronwatch do
   def run(job, fun, opts \\ []) when is_function(fun, 1) do
     {run_opts, job_opts} = Keyword.split(opts, @run_options)
     job = resolve!(job, job_opts, run_opts)
-    Cronwatch.Run.Exec.run(job, fun, run_opts)
+    Exec.run(job, fun, run_opts)
   end
 
   defp resolve!(%Job{} = job, [], _), do: job
