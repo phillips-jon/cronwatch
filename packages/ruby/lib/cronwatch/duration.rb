@@ -83,5 +83,22 @@ module Cronwatch
       text = format(abs)
       diff.negative? ? "#{text} ago" : "in #{text}"
     end
+
+    # The first millisecond written as a date: 0001-01-01T00:00:00.000Z.
+    FIRST_DATE_MS = -62_135_596_800_000
+    # The last millisecond written as a date: 9999-12-31T23:59:59.999Z.
+    LAST_DATE_MS = 253_402_300_799_999
+
+    # "2026-01-05T09:30:00.000Z", or nil for a time before the year 1 or
+    # after 9999. A start read from another process's row, or a damaged one,
+    # can be any number; outside those years it is not written as a date.
+    def iso_time(at)
+      at >= FIRST_DATE_MS && at <= LAST_DATE_MS ? JS.iso(at) : nil
+    end
+
+    # The words that stand in for a time iso_time does not write.
+    def beyond_dates(at)
+      at > LAST_DATE_MS ? "after 9999-12-31 23:59:59 UTC" : "before 0001-01-01 00:00:00 UTC"
+    end
   end
 end
