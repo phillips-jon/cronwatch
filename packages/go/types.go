@@ -160,6 +160,21 @@ func metricsFrom(v any) (Metrics, error) {
 	return out, nil
 }
 
+// numberMetrics is a stored row's metrics as the SDK reads them: the
+// numbers of an object, whatever else it holds, and none for anything else.
+func numberMetrics(v any) Metrics {
+	out := Metrics{}
+	if o, ok := v.(*js.Object); ok {
+		for _, k := range o.Keys() {
+			x, _ := o.Get(k)
+			if f, ok := x.(float64); ok {
+				out.Set(k, f)
+			}
+		}
+	}
+	return out
+}
+
 // Run is one execution of a job, as a store keeps it. Times are epoch
 // milliseconds.
 type Run struct {
@@ -461,11 +476,11 @@ func stateFrom(v any) (JobState, error) {
 	if list, ok := get(o, "undelivered").([]any); ok {
 		s.Undelivered = []Alert{}
 		for _, a := range list {
-			alert, err := alertFrom(a)
-			if err != nil {
-				return JobState{}, err
+			// An entry that is not an alert is dropped rather than fail
+			// every read of the state: it could never be delivered.
+			if alert, err := alertFrom(a); err == nil {
+				s.Undelivered = append(s.Undelivered, alert)
 			}
-			s.Undelivered = append(s.Undelivered, alert)
 		}
 	}
 	for _, k := range o.Keys() {
@@ -653,6 +668,15 @@ func alertFrom(v any) (Alert, error) {
 	}
 	a := Alert{Type: AlertType(str(o, "type")), Job: str(o, "job"), Title: str(o, "title"), Message: str(o, "message"), At: integer(o, "at")}
 	if r := get(o, "run"); r != nil {
+		// A queued alert's run keeps the metrics that are numbers, as a
+		// stored run row does, so one another writer stored otherwise
+		// cannot fail every read of the job's state.
+		if ro, ok := r.(*js.Object); ok {
+			ro = ro.Clone()
+			m, _ := ro.Get("metrics")
+			ro.Set("metrics", numberMetrics(m).JSValue())
+			r = ro
+		}
 		run, err := runFrom(r)
 		if err != nil {
 			return Alert{}, err
