@@ -143,19 +143,33 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       previous = if dyn, do: repo.put_dynamic_repo(dyn)
 
       try do
-        if repo.in_transaction?() do
-          task =
-            Task.async(fn ->
-              if dyn, do: repo.put_dynamic_repo(dyn)
-              fun.()
-            end)
-
-          Task.await(task, :infinity)
-        else
-          fun.()
-        end
+        if repo.in_transaction?(), do: apart(repo, dyn, fun), else: fun.()
       after
         if dyn, do: repo.put_dynamic_repo(previous)
+      end
+    end
+
+    @doc false
+    # Runs `fun` in a task, on a connection of its own, and hands back what
+    # it answered, or raises in the caller what it raised: a raise in a
+    # linked task would otherwise take the caller (a job's own process) down
+    # with it, where the same raise outside a transaction is a store error
+    # the client reports.
+    def apart(repo, dyn, fun) do
+      task =
+        Task.async(fn ->
+          if dyn, do: repo.put_dynamic_repo(dyn)
+
+          try do
+            {:ok, fun.()}
+          catch
+            kind, reason -> {:raised, kind, reason, __STACKTRACE__}
+          end
+        end)
+
+      case Task.await(task, :infinity) do
+        {:ok, value} -> value
+        {:raised, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
       end
     end
 

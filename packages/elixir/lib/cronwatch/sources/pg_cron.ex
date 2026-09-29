@@ -69,6 +69,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     alias Cronwatch.JS.Object
     alias Cronwatch.Run
     alias Cronwatch.Runs
+    alias Cronwatch.Store.Ecto, as: EctoStore
 
     defmodule Job do
       @moduledoc """
@@ -425,15 +426,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       previous = if dyn, do: repo.put_dynamic_repo(dyn)
 
       try do
-        if repo.in_transaction?() do
-          Task.async(fn ->
-            if dyn, do: repo.put_dynamic_repo(dyn)
-            fun.()
-          end)
-          |> Task.await(:infinity)
-        else
-          fun.()
-        end
+        if repo.in_transaction?(), do: EctoStore.apart(repo, dyn, fun), else: fun.()
       after
         if dyn, do: repo.put_dynamic_repo(previous)
       end
