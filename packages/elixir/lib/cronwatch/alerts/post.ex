@@ -139,7 +139,7 @@ defmodule Cronwatch.Alerts.Post do
   @spec text(binary()) :: String.t()
   def text(data) do
     case JS.scrub(data) do
-      "﻿" <> rest -> rest
+      <<0xFEFF::utf8, rest::binary>> -> rest
       s -> s
     end
   end
