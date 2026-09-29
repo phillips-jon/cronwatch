@@ -155,7 +155,8 @@
   <div class="body">
     <h2>Ask your coding agent what failed, and why.</h2>
     <p>CronWatch comes with an MCP server, so Claude Code, Cursor or any MCP client reads the same records you do. It can tell you what broke overnight, read the error and the output, and silence the job while it ships the fix.</p>
-    <div class="install"><code translate="no">claude mcp add cronwatch -e CRONWATCH_URL=… -e CRONWATCH_TOKEN=… -- npx -y @cronwatch/mcp</code><button class="copy" type="button" aria-label="Copy the MCP command">Copy</button></div>
+    <div class="install"><code translate="no">claude mcp add cronwatch -e CRONWATCH_URL=https://yourapp.com/cronwatch -e CRONWATCH_TOKEN=your-token -- npx -y @cronwatch/mcp</code><button class="copy" type="button" aria-label="Copy the MCP command">Copy</button></div>
+    <p class="small"><code>CRONWATCH_URL</code> is where your app mounts the dashboard. <code>CRONWATCH_TOKEN</code> is the token your app reads from its own <code>CRONWATCH_TOKEN</code>; in development, the app prints a sign-in link with one on its first request. More in <a href="/docs/mcp/">the MCP docs</a>.</p>
     <div class="actions">
       <button class="prompt-btn" type="button" data-prompt aria-label="Copy the setup instructions for a coding agent">Copy setup prompt for your AI</button>
       <p class="prompt-note">It sets up CronWatch and declares every job you already have. Also at <a href="/prompt.txt">/prompt.txt</a>.</p>

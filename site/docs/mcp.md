@@ -6,7 +6,7 @@ order: 9
 
 # MCP server
 
-`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts: `cw.routes()` in a TypeScript app, or `Cronwatch::Web` in a Ruby or Rails one, which serves the same API at the same paths. It needs a URL and the token, and nothing else. It runs on Node through `npx` either way; a Rails app does not need Node for anything else.
+`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts with its dashboard, which every port serves at the same paths, so it works the same with a TypeScript, Ruby, Python, PHP or Go app. It needs a URL and the token, and nothing else. It runs on Node through `npx`; your app does not need Node for anything else.
 
 ## Claude Code
 
@@ -33,7 +33,29 @@ Any client that launches stdio servers:
 }
 ```
 
-`--url` and `--token` work as flags too. The URL is the mount point (`/cronwatch` in the examples, wherever `cw.routes()` or `mount Cronwatch::Web` put it). For a local app without `CRONWATCH_TOKEN`, a development server makes a token of its own and prints a sign-in link to its log on the first request; pass the `?token=` from that link as `CRONWATCH_TOKEN` here, or set one yourself.
+## Setting the URL and token
+
+**`CRONWATCH_URL`** is where your app serves the dashboard, the same address you open it at in a browser:
+
+| Your app | `CRONWATCH_URL` |
+|---|---|
+| TypeScript, `cw.routes()` | the mount point, `https://yourapp.com/cronwatch` by default |
+| Rails, `mount Cronwatch::Web` | the mount point, `https://yourapp.com/cronwatch` |
+| Django, `cronwatch.django.urls` | the prefix you include it under |
+| Python, PHP or Go, the routes served by hand | the path you serve them at |
+| Laravel or Symfony | `https://yourapp.com/cronwatch` ([Laravel](/docs/laravel/), [Symfony](/docs/symfony/)) |
+| Drupal or Craft CMS | `https://yoursite.com/cronwatch`, once a token is set ([Drupal](/docs/drupal/), [Craft CMS](/docs/craft/)) |
+| WordPress | `https://yoursite.com/wp-json/cronwatch/v1`, once the JSON API is on in the plugin's settings ([WordPress](/docs/wordpress/)) |
+
+**`CRONWATCH_TOKEN`** is the token your app reads from its own `CRONWATCH_TOKEN` (the WordPress plugin's comes from its settings), the one you sign in to the dashboard with. Choose any long random string, set it in the app's environment, and give the same one here:
+
+```bash
+openssl rand -base64 32
+```
+
+For a local app in development without `CRONWATCH_TOKEN`, the app makes a token of its own and prints a sign-in link to its log on the first request; pass the `?token=` from that link as `CRONWATCH_TOKEN` here, or set one yourself.
+
+`--url` and `--token` work as flags too, but a flag is visible to anyone who can list processes, so keep the token in the environment.
 
 ## Tools
 
