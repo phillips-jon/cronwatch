@@ -64,8 +64,8 @@ func readGolden(t *testing.T) goldenFile {
 	if g.T0 != T0 {
 		t.Fatalf("golden.json's t0 is %d, not %d", g.T0, T0)
 	}
-	if len(g.Captures) != 57 {
-		t.Fatalf("golden.json has %d captures, not 57", len(g.Captures))
+	if len(g.Captures) != 59 {
+		t.Fatalf("golden.json has %d captures, not 59", len(g.Captures))
 	}
 	return g
 }
@@ -119,6 +119,14 @@ func seedGolden(t *testing.T) *cronwatch.Client {
 		return nil
 	})
 	must[*cronwatch.Job](t)(cw.Job("never-ran", cronwatch.Schedule("0 * * * *")))
+	// A run as a foreign or damaged row could hold it: started before the
+	// year 1, so the pages write it in words rather than as a date.
+	farBack := must[*cronwatch.Job](t)(cw.Job("far-back", cronwatch.Timeout("5m"), cronwatch.Expect("far")))
+	clock.Set(-62_135_596_800_001)
+	_ = farBack.Run(bg, func(context.Context, *cronwatch.JobContext) error {
+		clock.Advance(1000)
+		return nil
+	})
 	clock.Set(T0)
 	return cw
 }

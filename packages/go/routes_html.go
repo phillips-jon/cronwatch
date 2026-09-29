@@ -147,7 +147,10 @@ func stamp(at *int64, now int64) string {
 	if at == nil {
 		return `<span class="muted">never</span>`
 	}
-	iso := js.ISOString(*at)
+	iso, ok := js.ISOTime(*at)
+	if !ok {
+		return `<span class="nowrap">` + js.BeyondDates(*at) + `</span>`
+	}
 	return `<time class="nowrap" datetime="` + iso + `" title="` + strings.Replace(iso, "T", " ", 1)[:19] + ` UTC">` + escapeHTML(schedule.FormatRelative(*at, now)) + `</time>`
 }
 
