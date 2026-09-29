@@ -107,6 +107,34 @@ defmodule Cronwatch.Test.Jobs do
   end
 end
 
+defmodule Cronwatch.Test.Handlers do
+  @moduledoc "Functions the handler tests run: each is given the run's context and the conn first."
+
+  import Plug.Conn
+
+  def count(_job, _conn, pid) do
+    send(pid, :ran)
+    :ok
+  end
+
+  def fail(_job, _conn, message), do: {:error, message}
+  def raise_it(_job, _conn, message), do: raise(message)
+
+  def log_path(job, conn) do
+    Cronwatch.log(job, conn.request_path)
+    if get_req_header(conn, "x-fail") != [], do: {:error, "nope\nsecond line"}, else: :ok
+  end
+
+  def answer(_job, conn, status, body), do: conn |> put_resp_header("x-upstream", "1") |> resp(status, body)
+  def sent(_job, conn, status, body), do: send_resp(conn, status, body)
+  def text(_job, _conn, text), do: text
+
+  def current(job, _conn, pid) do
+    send(pid, {:current, Cronwatch.current(), job})
+    :ok
+  end
+end
+
 defmodule Cronwatch.Test.PhoenixRouter do
   @moduledoc "A Phoenix router with the dashboard forwarded outside any pipeline."
   use Phoenix.Router
@@ -150,4 +178,61 @@ end
 defmodule Cronwatch.Test.ErrorJSON do
   @moduledoc "The endpoint's error page, for a body Plug.Parsers refuses."
   def render(template, _assigns), do: %{error: template}
+end
+
+defmodule Cronwatch.Test.Web do
+  @moduledoc "Sending the dashboard a request as a server would hand it over, and reading the answer."
+
+  alias Cronwatch.JS
+  alias Cronwatch.JS.Object
+
+  @doc """
+  Sends `Cronwatch.Web` a request for a full URL through `Plug.Test`: the
+  scheme and `Host` from the URL, the headers in order (a name given twice is
+  sent twice), and the body. Answers `%{status, headers, body}`.
+  """
+  def send(opts, method, url, headers \\ [], body \\ nil) do
+    {tls, rest} =
+      case url do
+        "https://" <> rest -> {true, rest}
+        "http://" <> rest -> {false, rest}
+      end
+
+    {authority, target} =
+      case :binary.match(rest, "/") do
+        {i, _} -> {binary_part(rest, 0, i), binary_part(rest, i, byte_size(rest) - i)}
+        :nomatch -> {rest, "/"}
+      end
+
+    conn = Plug.Test.conn(method, target, body)
+
+    conn = %{
+      conn
+      | scheme: if(tls, do: :https, else: :http),
+        port: if(tls, do: 443, else: 80),
+        req_headers: [{"host", authority} | headers]
+    }
+
+    conn = Cronwatch.Web.call(conn, Cronwatch.Web.init(opts))
+    %{status: conn.status, headers: conn.resp_headers, body: conn.resp_body}
+  end
+
+  @doc "A header of the answer, or nil."
+  def header(%{headers: headers}, name) do
+    case List.keyfind(headers, name, 0) do
+      {_, v} -> v
+      nil -> nil
+    end
+  end
+
+  @doc "The answer's body as a JSON object."
+  def json(%{body: body}) do
+    %Object{} = JS.parse!(body)
+  end
+
+  @doc "A field of a JSON object, by its path."
+  def field(o, path), do: Enum.reduce(path, o, fn k, o -> Object.get(o, k) end)
+
+  @doc "The cookie a sign-in with the token `tok` sets."
+  def token_cookie, do: "cronwatch_token=" <> Base.encode16(:crypto.hash(:sha256, "cronwatch-cookie:tok"), case: :lower)
 end

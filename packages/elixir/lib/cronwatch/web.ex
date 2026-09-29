@@ -197,7 +197,9 @@ if Code.ensure_loaded?(Plug.Conn) do
             nil
         end
 
-      if length != nil and length > limit do
+      # A body the endpoint's parsers read was held to the endpoint's own
+      # limit; its length says nothing about what is left to read.
+      if length != nil and length > limit and not parsed?(conn) do
         :too_large
       else
         case Plug.Conn.read_body(conn, length: limit + 1) do
