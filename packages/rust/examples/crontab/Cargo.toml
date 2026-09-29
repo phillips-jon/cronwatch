@@ -1,0 +1,22 @@
+[package]
+name = "cronwatch-example-crontab"
+description = "A job a crontab runs, watched by CronWatch, and the check a second crontab line runs, on SQLite"
+version.workspace = true
+edition.workspace = true
+# cronwatch-sqlx's: sqlx 0.9 needs Rust 1.94.
+rust-version = "1.94"
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "crontab"
+path = "src/main.rs"
+
+[dependencies]
+cronwatch.workspace = true
+cronwatch-sqlx = { path = "../../cronwatch-sqlx", features = ["sqlite"] }
+sqlx = { version = "0.9", default-features = false, features = ["sqlite-bundled", "runtime-tokio"] }
+tokio = { version = "1.43", features = ["rt", "macros"] }
+
+[lints]
+workspace = true
