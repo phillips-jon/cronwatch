@@ -30,6 +30,7 @@ use std::time::Duration;
 use md5::{Digest, Md5};
 
 use crate::error::Error;
+use crate::options::JobOptions;
 use crate::schedule::{self, Parsed};
 
 pub use check::{SAMPLE_RUNS, ScheduleError, check_fires, never_fires};
@@ -97,6 +98,20 @@ pub fn app_tag(tag: &str, app: &str) -> String {
 /// `_`, `:` or `-`, starting with a letter or digit.
 pub fn valid_name(name: &str) -> bool {
     crate::options::valid_name(name)
+}
+
+/// What [`Client::job`](crate::Client::job) would refuse a job declared
+/// with `options` for (its name, or an option the SDK refuses, with the
+/// SDK's message), without declaring anything, so an integration can
+/// refuse to make a scheduler job whose runs it could not record.
+pub fn validate(name: &str, options: &JobOptions) -> Result<(), Error> {
+    if !valid_name(name) {
+        return Err(Error::Invalid(format!(
+            "job name {} must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"",
+            crate::js::quote(name)
+        )));
+    }
+    crate::options::validate_definition(name, &crate::describe_job(name, options))
 }
 
 /// An interval as CronWatch's schedule text, exact to the millisecond:

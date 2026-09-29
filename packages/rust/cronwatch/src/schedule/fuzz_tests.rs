@@ -313,3 +313,87 @@ fn the_port_agrees_with_croner() {
         );
     }
 }
+
+/// The `croner` crate's answer to a case, as `answer` gives this port's:
+/// read with its default parser (seconds optional, either day matching, as
+/// croner reads them), fires found one after another in the case's zone.
+fn crate_answer(c: &Case) -> Object {
+    use std::str::FromStr;
+    let cron = match croner::Cron::from_str(&c.schedule) {
+        Ok(cron) => cron,
+        Err(e) => return Object::new().with("error", e.to_string()),
+    };
+    let zone = if c.timezone.is_empty() { "UTC" } else { c.timezone.as_str() };
+    let Ok(tz) = chrono_tz::Tz::from_str(zone) else {
+        return Object::new().with("error", format!("unknown zone {zone}"));
+    };
+    let Some(mut at) = chrono::DateTime::from_timestamp_millis(c.from).map(|t| t.with_timezone(&tz)) else {
+        return Object::new().with("error", "out of range");
+    };
+    let mut fires = Vec::new();
+    for _ in 0..c.count {
+        match cron.find_next_occurrence(&at, false) {
+            Ok(next) => {
+                fires.push(Value::from(next.timestamp_millis()));
+                at = next;
+            }
+            Err(_) => {
+                fires.push(Value::Null);
+                break;
+            }
+        }
+    }
+    Object::new().with("fires", fires)
+}
+
+/// The report DESIGN.md keeps on how far the `croner` crate (by croner's
+/// author, and tokio-cron-scheduler's parser) is from croner 10, which this
+/// port translates: the same 3,000 expressions, never a failure, since the
+/// crate is its own implementation. Run with `--nocapture` to read it.
+#[test]
+fn the_croner_crate_report() {
+    let (mut both_refused, mut same, mut differ, mut crate_refused, mut crate_took) = (0, 0, 0, 0, 0);
+    let mut examples: Vec<String> = Vec::new();
+    let note = |examples: &mut Vec<String>, kind: &str, c: &Case, ours: &Object, theirs: &Object| {
+        if examples.iter().filter(|e| e.starts_with(kind)).count() < 3 {
+            examples.push(format!(
+                "{kind}: {} in {:?}\n    croner 10 {}\n    crate     {}",
+                c.schedule,
+                c.timezone,
+                show(ours),
+                show(theirs)
+            ));
+        }
+    };
+    for seed in [1u64, 2, 3] {
+        for c in fuzz_cases(seed, 1000) {
+            let (ours, theirs) = (answer(&c), crate_answer(&c));
+            match (ours.has("error"), theirs.has("error")) {
+                (true, true) => both_refused += 1,
+                (false, true) => {
+                    crate_refused += 1;
+                    note(&mut examples, "the crate refuses", &c, &ours, &theirs);
+                }
+                (true, false) => {
+                    crate_took += 1;
+                    note(&mut examples, "the crate takes", &c, &ours, &theirs);
+                }
+                (false, false)
+                    if stringify(&Value::Object(ours.clone())) == stringify(&Value::Object(theirs.clone())) =>
+                {
+                    same += 1
+                }
+                (false, false) => {
+                    differ += 1;
+                    note(&mut examples, "fire times differ", &c, &ours, &theirs);
+                }
+            }
+        }
+    }
+    eprintln!(
+        "croner crate report, 3000 expressions: {same} with the same fire times, {both_refused} refused by both, \
+         {differ} with other fire times, {crate_refused} refused only by the crate, {crate_took} taken only by the crate\n{}",
+        examples.join("\n")
+    );
+    assert_eq!(same + both_refused + differ + crate_refused + crate_took, 3000);
+}
