@@ -102,3 +102,15 @@ fn to_number_and_parse_int() {
         assert!(to_number(text).is_nan(), "Number({text:?})");
     }
 }
+
+#[test]
+fn a_start_no_javascript_date_holds_has_no_fires() {
+    // A foreign row's time near i64::MIN or i64::MAX overflowed the walk
+    // (found by the cron fuzz target); croner is never given one.
+    for text in ["0 * * * *", "0 0 L * ?", "0 0 * * 5#2"] {
+        for from in [i64::MIN, i64::MIN + 1, -8_640_000_000_000_001, 8_640_000_000_000_001, i64::MAX] {
+            assert_eq!(runs(text, "Europe/London", 2, from), Vec::<String>::new(), "{text} from {from}");
+        }
+    }
+    assert_eq!(runs("0 0 1 1 *", "UTC", 1, -8_640_000_000_000_000), ["-271820-01-01T00:00:00.000Z"]);
+}
