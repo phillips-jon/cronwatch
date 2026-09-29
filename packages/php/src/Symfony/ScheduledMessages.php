@@ -41,11 +41,13 @@ use Symfony\Component\Scheduler\Trigger\TriggerInterface;
  *
  * A schedule other than "default" puts its name in front: `reports:App.Message.Build`.
  * A CronExpressionTrigger gives its expression and zone (a hashed "#" one
- * as resolved), a PeriodicalTrigger `every <seconds>s`, and a JitterTrigger
- * its inner trigger's; a trigger that does not fire at fixed times
- * (ExcludeTimeTrigger, CallbackTrigger, a calendar interval such as "1
- * month") leaves the job without a schedule, reported once. Two messages
- * with one name on different schedules are one job without a schedule.
+ * as resolved), a PeriodicalTrigger `every <interval>` in the largest
+ * units that fit (Duration::interval: 3600 seconds is "every 1h", 5400
+ * "every 1h30m"), and a JitterTrigger its inner trigger's; a trigger that
+ * does not fire at fixed times (ExcludeTimeTrigger, CallbackTrigger, a
+ * calendar interval such as "1 month") leaves the job without a schedule,
+ * reported once. Two messages with one name on different schedules are
+ * one job without a schedule.
  *
  * @internal
  */

@@ -6,7 +6,7 @@ order: 3.274
 
 # Craft CMS
 
-The CronWatch plugin watches the work a Craft CMS site does in the background: the console commands its crontab runs and the queue jobs you choose. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. It is the Craft CMS plugin of the PHP library, [`cronwatch/cronwatch`](/docs/php/), with the same rules, alert text and stored rows. It needs Craft CMS 5.3 or newer, PHP 8.2 or newer, and Craft's own database (MySQL, MariaDB or Postgres).
+The CronWatch plugin watches the work a Craft CMS site does in the background: the console commands its crontab runs and the queue jobs you choose. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. It is the Craft CMS plugin of the PHP library, [`cronwatch/cronwatch`](/docs/php/), with the same rules, alert text and stored rows. It needs Craft CMS 5.3 or newer, PHP 8.2 or newer, and Craft's own database (MySQL 8.0.13 or newer, MariaDB 10.6 or newer, or Postgres).
 
 ## Install
 

@@ -23,7 +23,7 @@ and again when the event recovers. Every condition alerts once, when it starts, 
 
 It needs no change to your code or your other plugins. Every scheduled event becomes a job:
 
-* A recurring event (hourly, twice daily, daily, weekly, or any schedule a plugin adds) is a job named `wp:<hook>`, expected every interval of its recurrence. One scheduled with arguments is `wp:<hook>:<key>`, the key being the start of WordPress's own key for those arguments, so the same hook on two schedules is two jobs.
+* A recurring event (hourly, twice daily, daily, weekly, or any schedule a plugin adds) is a job named `wp:<hook>`, expected every interval of its recurrence. One scheduled with arguments is `wp:<hook>:<key>`, the key being the start of WordPress's own key for those arguments, so the same hook with two sets of arguments is two jobs.
 * Single events (`wp_schedule_single_event`, such as a scheduled post's publishing) are one job per hook, with no schedule: they are one-offs, so a failure is reported but there is no cadence to miss. If WP-Cron stops running altogether, the recurring events WordPress itself schedules (update checks, twice daily and hourly) are reported missed, which is how you find out.
 * An event that is no longer scheduled (its plugin was deactivated, say) keeps its history and is never reported missed.
 
@@ -37,7 +37,7 @@ The CronWatch menu in wp-admin opens the dashboard, for administrators: every ev
 
 CronWatch speaks the same small JSON API in every language it runs in, and [@cronwatch/mcp](https://www.npmjs.com/package/@cronwatch/mcp) lets Claude and other AI assistants read it: which events are failing, what a run printed, silencing one for the night. The API is off until you turn it on under CronWatch, Settings, with a token; the page then shows the address and the line that adds it to Claude Code. Only requests that carry the token are answered, and only the API is exposed: the dashboard stays in wp-admin.
 
-CronWatch is the WordPress plugin of [the CronWatch library](https://cronwatch.dev/), which also watches jobs in Node, Ruby, Python and PHP apps and keeps the same tables in every language.
+CronWatch is the WordPress plugin of [the CronWatch library](https://cronwatch.dev/), which also watches jobs in Node, Ruby, Python, PHP, Go and Rust apps and keeps the same tables in every language.
 
 = Why a check that runs on page visits misses a quiet site =
 
@@ -133,6 +133,10 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 = 0.7.0 =
 
 * Carries version 0.7.0 of the CronWatch library.
+* The dashboard reads a request's body from `php://input` only, never from a path or URL.
+* "Send a test alert" says where the alert really went: with no channel set, that it was written to the PHP error log, where alerts go until you set one up.
+* A save that refuses both the grace and the API token shows both notices, not only one.
+* Before anything is recorded, the dashboard says that WP-Cron's events appear after the first check, and how to run it now.
 
 = 0.6.1 =
 

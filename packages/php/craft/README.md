@@ -2,11 +2,11 @@
 
 Monitoring for the work a Craft CMS site does in the background: its queue jobs and the console commands its crontab runs. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. No server to run, no account to make.
 
-This is the Craft CMS plugin of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in Node, Ruby, Python, Laravel, Symfony, WordPress and Drupal apps and keeps the same tables in every language.
+This is the Craft CMS plugin of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in Node, Ruby, Python, Go and Rust apps, plain PHP, Laravel, Symfony, WordPress and Drupal, and keeps the same tables in every language.
 
 ## Requirements
 
-Craft CMS 5.3 or newer, PHP 8.2 or newer, and Craft's own database (MySQL, MariaDB or Postgres).
+Craft CMS 5.3 or newer, PHP 8.2 or newer, and Craft's own database (MySQL 8.0.13 or newer, MariaDB 10.6 or newer, or Postgres).
 
 ## Install
 
