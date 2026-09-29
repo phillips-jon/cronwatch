@@ -96,6 +96,6 @@ defmodule Cronwatch.Conformance.TriageTest do
         end)
 
     assert failures == [], "triage.json: #{length(failures)} cases differ:\n" <> Enum.join(failures, "\n")
-    assert length(list(f, "requests")) + length(list(f, "responses")) + length(list(f, "wire")) == 17
+    assert length(list(f, "requests")) + length(list(f, "responses")) + length(list(f, "wire")) == 20
   end
 end

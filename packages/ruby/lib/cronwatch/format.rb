@@ -9,7 +9,10 @@ module Cronwatch
     def at_time(at, now)
       return "never" if at.nil?
 
-      "#{JS.iso(at).tr("T", " ")[0, 19]} UTC (#{Duration.relative(at, now)})"
+      iso = Duration.iso_time(at)
+      return Duration.beyond_dates(at) if iso.nil?
+
+      "#{iso.tr("T", " ")[0, 19]} UTC (#{Duration.relative(at, now)})"
     end
 
     def first_lines(text, n)

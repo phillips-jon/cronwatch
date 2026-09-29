@@ -58,6 +58,11 @@ class WebGoldenTest < Minitest::Test
     quietly.call { sync.run { clock.advance(12_345) } }
 
     cw.job("never-ran", schedule: "0 * * * *")
+
+    # A run as a foreign or damaged row could hold it: started before the year 1.
+    far_back = cw.job("far-back", timeout: "5m", expect: "far")
+    clock.now = -62_135_596_800_001
+    quietly.call { far_back.run { clock.advance(1000) } }
     clock.now = T0
     cw
   end

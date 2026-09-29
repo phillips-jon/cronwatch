@@ -267,6 +267,9 @@ defmodule Cronwatch.Triage.Anthropic do
 
   defp skip(<<_::binary-size(16), rest::binary>>), do: rest
 
+  # "2026-01-05T09:30:00.000Z", or the words for a time before the year 1 or after 9999.
+  defp stamp(at), do: JS.iso_time(at) || JS.beyond_dates(at)
+
   defp duration(%Run{duration_ms: nil}), do: "unknown"
   defp duration(%Run{duration_ms: d}), do: Cronwatch.Duration.format(d)
 
@@ -292,7 +295,7 @@ defmodule Cronwatch.Triage.Anthropic do
         lines ++
           [
             "",
-            "Triggering run: status #{run.status}, started #{JS.iso_string(run.started_at)}, " <>
+            "Triggering run: status #{run.status}, started #{stamp(run.started_at)}, " <>
               "duration #{duration(run)}, trigger #{run.trigger}"
           ] ++
           if(metrics?(run), do: ["Metrics: #{JS.stringify(run.metrics)}"], else: []) ++
@@ -327,7 +330,7 @@ defmodule Cronwatch.Triage.Anthropic do
               end
 
             metrics = if metrics?(r), do: [", metrics #{JS.stringify(r.metrics)}"], else: []
-            Units.concat(["- #{r.status}, #{JS.iso_string(r.started_at)}, #{duration(r)}"] ++ error ++ metrics)
+            Units.concat(["- #{r.status}, #{stamp(r.started_at)}, #{duration(r)}"] ++ error ++ metrics)
           end)
       end
 

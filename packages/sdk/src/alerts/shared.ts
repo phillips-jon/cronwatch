@@ -3,6 +3,7 @@
  * channels run on Node, Cloudflare Workers, Deno and Bun alike. Not an entry
  * point: each channel bundles its own copy.
  */
+import { isoTime } from "../duration.js";
 import type { Alert } from "../types.js";
 
 export const TIMEOUT_MS = 10_000;
@@ -123,11 +124,11 @@ export function cut(text: string, max: number): string {
   return text.slice(0, end);
 }
 
-/** The run fields worth attaching to a tracker event. */
+/** The run fields worth attaching to a tracker event. A start before the year 1 or after 9999 is null. */
 export function runSummary(alert: Alert): Record<string, unknown> | null {
   const run = alert.run;
   if (!run) return null;
-  return { id: run.id, status: run.status, startedAt: new Date(run.startedAt).toISOString(), durationMs: run.durationMs, trigger: run.trigger };
+  return { id: run.id, status: run.status, startedAt: isoTime(run.startedAt), durationMs: run.durationMs, trigger: run.trigger };
 }
 
 /** Title, message, triage and link as one plain text block, the way every channel reads. */

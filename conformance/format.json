@@ -1097,6 +1097,560 @@
         "message": "It has no schedule now, so nothing is due; the missed alert is closed.",
         "at": 1767605400000
       }
+    },
+    {
+      "draft": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": -9007199254740991,
+          "finishedAt": null,
+          "durationMs": 9007199254740991,
+          "error": null,
+          "output": "started",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": -9007199254740991,
+          "finishedAt": null,
+          "durationMs": 9007199254740991,
+          "error": null,
+          "output": "started",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly is stuck",
+        "message": "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h.\nOutput so far (tail):\nstarted\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": -8640000000000001,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": -8640000000000001,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly is stuck",
+        "message": "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 100020458d 9h.\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": -62135596800001,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": -62135596800001,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started before 0001-01-01 00:00:00 UTC, ran 2s.\nError: boom",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": -62135596800000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": -62135596800000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started 0001-01-01 00:00:00 UTC (739620d 9h ago), ran 2s.\nError: boom",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "slow",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 253402300799999,
+          "finishedAt": 1767605401500,
+          "durationMs": 15000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "durationMs": 15000,
+          "thresholdMs": 10000,
+          "basis": "maxDuration"
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "slow",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 253402300799999,
+          "finishedAt": 1767605401500,
+          "durationMs": 15000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "durationMs": 15000,
+          "thresholdMs": 10000,
+          "basis": "maxDuration"
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly was slow",
+        "message": "Took 15s; the limit is 10s (maxDuration).\nStarted 9999-12-31 23:59:59 UTC (in 2912438d 14h).",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "over_budget",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 253402300800000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "breaches": [
+            {
+              "metric": "cost",
+              "value": 1.2,
+              "limit": 1,
+              "basis": "budget"
+            }
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "over_budget",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 253402300800000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "breaches": [
+            {
+              "metric": "cost",
+              "value": 1.2,
+              "limit": 1,
+              "basis": "budget"
+            }
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly went over budget",
+        "message": "cost: 1.2, limit 1 (budget).\nStarted after 9999-12-31 23:59:59 UTC.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 8640000000000001,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "failed"
+          ]
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 8640000000000001,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "failed"
+          ]
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly recovered",
+        "message": "A run after 9999-12-31 23:59:59 UTC succeeded after: failed.\nRan 2s.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 9007199254740991,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": -9007199254740991
+        }
+      },
+      "definition": {
+        "name": "nightly"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "recovered",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "ok",
+          "startedAt": 9007199254740991,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "after": [
+            "missed"
+          ],
+          "reason": "unscheduled",
+          "since": -9007199254740991
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly"
+        },
+        "title": "nightly is no longer scheduled",
+        "message": "Missed since before 0001-01-01 00:00:00 UTC. It has no schedule now, so nothing is due; the missed alert is closed.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "missed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": -9007199254740991,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "dueAt": -9007199251140991,
+          "deadline": -9007199250240991,
+          "graceMs": 900000,
+          "lastRunAt": -9007199254740991
+        }
+      },
+      "definition": {
+        "name": "hourly",
+        "schedule": "every 1h",
+        "grace": "15m"
+      },
+      "now": 1767605400000,
+      "alert": {
+        "type": "missed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": -9007199254740991,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "dueAt": -9007199251140991,
+          "deadline": -9007199250240991,
+          "graceMs": 900000,
+          "lastRunAt": -9007199254740991
+        },
+        "job": "hourly",
+        "definition": {
+          "name": "hourly",
+          "schedule": "every 1h",
+          "grace": "15m"
+        },
+        "title": "hourly missed its scheduled run",
+        "message": "Due before 0001-01-01 00:00:00 UTC, and no run had started by before 0001-01-01 00:00:00 UTC (grace 15m).\nSchedule: every 1h.\nLast run: timeout before 0001-01-01 00:00:00 UTC.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "draft": {
+        "type": "missed",
+        "run": null,
+        "details": {
+          "dueAt": 253402300499999,
+          "deadline": 253402301399999,
+          "graceMs": 900000,
+          "lastRunAt": null
+        }
+      },
+      "definition": {
+        "name": "nightly",
+        "schedule": "0 2 * * *",
+        "grace": "15m"
+      },
+      "now": 253402301999999,
+      "alert": {
+        "type": "missed",
+        "run": null,
+        "details": {
+          "dueAt": 253402300499999,
+          "deadline": 253402301399999,
+          "graceMs": 900000,
+          "lastRunAt": null
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly missed its scheduled run",
+        "message": "Due 9999-12-31 23:54:59 UTC (25m ago), and no run had started by after 9999-12-31 23:59:59 UTC (grace 15m).\nSchedule: 0 2 * * *.\nLast run: never.",
+        "at": 253402301999999
+      }
     }
   ],
   "numbers": [

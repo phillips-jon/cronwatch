@@ -61,3 +61,37 @@ func ISOString(ms int64) string {
 	}
 	return fmt.Sprintf("%s-%02d-%02dT%02d:%02d:%02d.%03dZ", year, m, d, rest/3_600_000, rest/60_000%60, rest/1000%60, rest%1000)
 }
+
+// FirstDateMs is the first millisecond written as a date,
+// 0001-01-01T00:00:00.000Z, and LastDateMs the last, 9999-12-31T23:59:59.999Z.
+const (
+	FirstDateMs int64 = -62_135_596_800_000
+	LastDateMs  int64 = 253_402_300_799_999
+)
+
+// ISOTime is ISOString for a time from the year 1 through 9999, and false
+// for any other. A start read from another process's row, or a damaged one,
+// can be any number; outside those years it is not written as a date at all.
+func ISOTime(ms int64) (string, bool) {
+	if ms < FirstDateMs || ms > LastDateMs {
+		return "", false
+	}
+	return ISOString(ms), true
+}
+
+// BeyondDates is the words that stand in for a time ISOTime does not write:
+// "before 0001-01-01 00:00:00 UTC" or "after 9999-12-31 23:59:59 UTC".
+func BeyondDates(ms int64) string {
+	if ms > LastDateMs {
+		return "after 9999-12-31 23:59:59 UTC"
+	}
+	return "before 0001-01-01 00:00:00 UTC"
+}
+
+// Stamp is ISOString, or BeyondDates for a time outside the years 1 to 9999.
+func Stamp(ms int64) string {
+	if iso, ok := ISOTime(ms); ok {
+		return iso
+	}
+	return BeyondDates(ms)
+}

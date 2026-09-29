@@ -194,7 +194,7 @@ func Describe(tc cronwatch.TriageContext) string {
 	}
 	if run != nil {
 		lines = append(lines, "",
-			"Triggering run: status "+string(run.Status)+", started "+js.ISOString(run.StartedAt)+", duration "+duration(*run)+", trigger "+js.WellFormed(run.Trigger))
+			"Triggering run: status "+string(run.Status)+", started "+js.Stamp(run.StartedAt)+", duration "+duration(*run)+", trigger "+js.WellFormed(run.Trigger))
 		if len(run.Metrics) > 0 {
 			lines = append(lines, "Metrics: "+js.Stringify(run.Metrics))
 		}
@@ -217,7 +217,7 @@ func Describe(tc cronwatch.TriageContext) string {
 	if len(earlier) > 0 {
 		lines = append(lines, "", "Earlier runs, newest first:")
 		for _, r := range earlier {
-			line := "- " + string(r.Status) + ", " + js.ISOString(r.StartedAt) + ", " + duration(r)
+			line := "- " + string(r.Status) + ", " + js.Stamp(r.StartedAt) + ", " + duration(r)
 			if r.Error != nil && *r.Error != "" {
 				first, _, _ := strings.Cut(*r.Error, "\n")
 				line += ", error: " + data(js.Head16Lone(first, 160))

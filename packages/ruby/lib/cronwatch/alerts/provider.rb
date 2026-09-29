@@ -93,13 +93,14 @@ module Cronwatch
         JS.head16(text, max)
       end
 
-      # The run fields worth attaching to a tracker event.
+      # The run fields worth attaching to a tracker event. A start before the
+      # year 1 or after 9999 is nil.
       def run_summary(alert)
         run = alert.run
         return nil unless run
 
         {
-          "id" => run.id, "status" => run.status.to_s, "startedAt" => JS.iso(run.started_at),
+          "id" => run.id, "status" => run.status.to_s, "startedAt" => Duration.iso_time(run.started_at),
           "durationMs" => run.duration_ms, "trigger" => run.trigger,
         }
       end

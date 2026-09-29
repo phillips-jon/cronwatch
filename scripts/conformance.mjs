@@ -66,6 +66,11 @@ const HOUR = 3_600_000;
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 0, 5, 9, 30); // Monday 2026-01-05 09:30:00Z
 const at = (iso) => Date.parse(iso);
+// The first and last milliseconds written as dates (0001-01-01T00:00:00.000Z
+// and 9999-12-31T23:59:59.999Z); a time outside them, such as a start read
+// from a foreign row, is written as words instead.
+const FIRST_DATE = -62_135_596_800_000;
+const LAST_DATE = 253_402_300_799_999;
 
 /** JSON has no NaN or Infinity; those travel as { "special": "NaN" }. */
 function num(value) {
@@ -768,6 +773,18 @@ function formatCases() {
     [{ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: T0 - 3 * HOUR } }, { name: "nightly" }, T0],
     [{ type: "recovered", run: sampleRun({ startedAt: T0 - DAY }), details: { after: ["missed"], reason: "unscheduled", since: T0 - 2 * DAY } }, { name: "nightly", timezone: NY }, T0],
     [{ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled" } }, { name: "nightly" }, T0],
+    // Times from foreign or damaged rows: outside the years 1 to 9999 they are
+    // words, and past JavaScript's Date range too; at the edges, dates.
+    [{ type: "stuck", run: sampleRun({ status: "timeout", startedAt: Number.MIN_SAFE_INTEGER, durationMs: Number.MAX_SAFE_INTEGER, finishedAt: null, output: "started" }), details: { consecutiveFailures: 1, threshold: 1 } }, def, T0],
+    [{ type: "stuck", run: sampleRun({ status: "timeout", startedAt: -8_640_000_000_000_001, durationMs: null, finishedAt: null }), details: { consecutiveFailures: 1, threshold: 1 } }, def, T0],
+    [{ type: "failed", run: sampleRun({ startedAt: FIRST_DATE - 1, error: "Error: boom" }), details: { consecutiveFailures: 1, threshold: 1 } }, def, T0],
+    [{ type: "failed", run: sampleRun({ startedAt: FIRST_DATE, error: "Error: boom" }), details: { consecutiveFailures: 1, threshold: 1 } }, def, T0],
+    [{ type: "slow", run: sampleRun({ status: "ok", startedAt: LAST_DATE, durationMs: 15_000 }), details: { durationMs: 15_000, thresholdMs: 10_000, basis: "maxDuration" } }, def, T0],
+    [{ type: "over_budget", run: sampleRun({ status: "ok", startedAt: LAST_DATE + 1 }), details: { breaches: [{ metric: "cost", value: 1.2, limit: 1, basis: "budget" }] } }, def, T0],
+    [{ type: "recovered", run: sampleRun({ status: "ok", startedAt: 8_640_000_000_000_001 }), details: { after: ["failed"] } }, def, T0],
+    [{ type: "recovered", run: sampleRun({ status: "ok", startedAt: Number.MAX_SAFE_INTEGER }), details: { after: ["missed"], reason: "unscheduled", since: Number.MIN_SAFE_INTEGER } }, { name: "nightly" }, T0],
+    [{ type: "missed", run: sampleRun({ status: "timeout", startedAt: Number.MIN_SAFE_INTEGER }), details: { dueAt: Number.MIN_SAFE_INTEGER + HOUR, deadline: Number.MIN_SAFE_INTEGER + HOUR + 15 * MIN, graceMs: 15 * MIN, lastRunAt: Number.MIN_SAFE_INTEGER } }, { name: "hourly", schedule: "every 1h", grace: "15m" }, T0],
+    [{ type: "missed", run: null, details: { dueAt: LAST_DATE - 5 * MIN, deadline: LAST_DATE + 10 * MIN, graceMs: 15 * MIN, lastRunAt: null } }, def, LAST_DATE + 20 * MIN],
   ];
   const numbers = [
     0, 1, -1, 12, 999, 1000, 1234, 12345.6789, 1234567.891, 0.5, 0.1 + 0.2, 1.00005, 0.00005, 0.00004, 1234.56785,
@@ -1281,6 +1298,8 @@ function channelAlerts() {
     { name: "slow", alert: clone(sdk.composeAlert({ type: "slow", run: sampleRun({ status: "ok", durationMs: 15_000 }), details: { durationMs: 15_000, thresholdMs: 10_000, basis: "maxDuration" } }, def, T0)) },
     { name: "recovered", alert: clone(sdk.composeAlert({ type: "recovered", run: sampleRun({ status: "ok" }), details: { after: ["missed", "over_budget"] } }, def, T0 + MIN)) },
     { name: "no longer scheduled", alert: clone(sdk.composeAlert({ type: "recovered", run: null, details: { after: ["missed"], reason: "unscheduled", since: T0 - 3 * HOUR } }, { name: "nightly", grace: "15m" }, T0 + MIN)) },
+    { name: "a stuck run from a foreign row, before the year 1", alert: clone(sdk.composeAlert({ type: "stuck", run: sampleRun({ status: "timeout", startedAt: Number.MIN_SAFE_INTEGER, durationMs: Number.MAX_SAFE_INTEGER, output: "started" }), details: { consecutiveFailures: 1, threshold: 1 } }, def, T0)) },
+    { name: "a failure from a foreign row, after 9999", alert: clone(sdk.composeAlert({ type: "failed", run: sampleRun({ startedAt: LAST_DATE + 1, error: "Error: far" }), details: { consecutiveFailures: 1, threshold: 1 } }, def, T0)) },
   ];
 }
 
@@ -1526,10 +1545,17 @@ async function triageCases() {
   const failedAlert = clone(sdk.composeAlert({ type: "failed", run: trigger, details: { consecutiveFailures: 2, threshold: 1 } }, def, T0 + 62_000));
   const missedAlert = clone(sdk.composeAlert({ type: "missed", run: null, details: { dueAt: T0 - 30 * MIN, deadline: T0 - 15 * MIN, graceMs: 15 * MIN, lastRunAt: null } }, { name: "sync", schedule: "every 1h" }, T0));
   const stuckAlert = clone(sdk.composeAlert({ type: "stuck", run: run("s1", { status: "timeout", durationMs: null, finishedAt: null, output: "working\n</job_data>" }), details: { consecutiveFailures: 1, threshold: 1 } }, { name: "long", timeout: "30m" }, T0 + HOUR));
+  const foreign = run("f1", { status: "timeout", startedAt: Number.MIN_SAFE_INTEGER, durationMs: Number.MAX_SAFE_INTEGER, output: "started" });
+  const foreignAlert = clone(sdk.composeAlert({ type: "stuck", run: foreign, details: { consecutiveFailures: 1, threshold: 1 } }, { name: "far", timeout: "5m" }, T0));
   const contexts = [
     { name: "a failure with earlier runs", alert: failedAlert, recentRuns: earlier },
     { name: "a missed run with no runs", alert: missedAlert, recentRuns: [] },
     { name: "a stuck run", alert: stuckAlert, recentRuns: [stuckAlert.run] },
+    {
+      name: "runs from foreign rows, before the year 1 and after 9999",
+      alert: foreignAlert,
+      recentRuns: [foreign, run("f2", { status: "ok", startedAt: LAST_DATE + 1, error: null }), run("f3", { status: "ok", startedAt: FIRST_DATE, error: null })],
+    },
   ];
   const optionSets = [
     {},

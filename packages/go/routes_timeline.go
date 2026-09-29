@@ -69,7 +69,15 @@ func dayLabel(t int64) string {
 }
 
 // whenUTC is "22:42" on the same UTC day as now, otherwise "25 Sep 22:42".
+// A time before the year 1 or after 9999 (a start read from a foreign or
+// damaged row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
 func whenUTC(t, now int64) string {
+	if t > js.LastDateMs {
+		return "after 31 Dec 9999 23:59"
+	}
+	if t < js.FirstDateMs {
+		return "before 1 Jan 0001 00:00"
+	}
 	if js.FloorDiv(t, dayMs) == js.FloorDiv(now, dayMs) {
 		return clockUTC(t)
 	}

@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from .. import _js
-from ..duration import format_duration, format_relative
+from ..duration import beyond_dates, format_duration, format_relative, iso_time
 from ..types import JobSummary, Run
 from . import _timeline as timeline
 from ._escape import encode_uri_component, entries, h, name_html, text, to_fixed, truthy
@@ -277,7 +277,9 @@ def _sparkline(runs: Sequence[Run]) -> str:
 def _stamp(at: float | None, now: int) -> str:
     if at is None:
         return '<span class="muted">never</span>'
-    iso = _js.iso(int(at))
+    iso = iso_time(int(at))
+    if iso is None:
+        return f'<span class="nowrap">{beyond_dates(at)}</span>'
     return f'<time class="nowrap" datetime="{iso}" title="{iso.replace("T", " ", 1)[:19]} UTC">{h(format_relative(at, now))}</time>'
 
 

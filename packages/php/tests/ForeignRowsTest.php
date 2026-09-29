@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cronwatch\Tests;
 
+use Cronwatch\Alert;
+use Cronwatch\Alerts\Custom;
 use Cronwatch\Cronwatch;
 use Cronwatch\Evaluate;
 use Cronwatch\JobDefinition;
@@ -38,8 +40,8 @@ final class ForeignRowsTest extends TestCase
     }
 
     /**
-     * The job is silenced: an alert's text shows the start as a date, and no
-     * date is that far back.
+     * The stuck alert is sent: its text writes a start before the year 1 as
+     * words, not as a date.
      */
     #[DataProvider('stores')]
     public function testACheckOverARunThatStartedAtTheLowestBigintAndAStateWhoseVersionIsOnePointFive(string $kind): void
@@ -57,8 +59,12 @@ final class ForeignRowsTest extends TestCase
             $trigger = $kind === 'mysql' || $kind === 'mariadb' ? '`trigger`' : 'trigger';
             $pdo = $backend->pdo();
             $pdo->exec("INSERT INTO {$p}runs (id, job, status, started_at, metrics, {$trigger}) VALUES ('far1', 'far', 'running', -9223372036854775808, '{}', 'run')");
-            $pdo->exec("INSERT INTO {$p}state (job, state) VALUES ('far', '{\"job\":\"far\",\"open\":{},\"consecutiveFailures\":0,\"silencedUntil\":4102444800000,\"lastAlertAt\":null,\"version\":1.5}')");
-            $cw = new Cronwatch(store: $store, alerts: [], cronSecret: false, onError: function (\Throwable $e): void {
+            $pdo->exec("INSERT INTO {$p}state (job, state) VALUES ('far', '{\"job\":\"far\",\"open\":{},\"consecutiveFailures\":0,\"silencedUntil\":null,\"lastAlertAt\":null,\"version\":1.5}')");
+            $sent = [];
+            $capture = new Custom('capture', function (Alert $alert) use (&$sent): void {
+                $sent[] = $alert;
+            });
+            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: false, onError: function (\Throwable $e): void {
                 throw $e;
             });
             $cw->check();
@@ -67,8 +73,10 @@ final class ForeignRowsTest extends TestCase
             $this->assertSame(RunStatus::TIMEOUT, $run?->status);
             $this->assertSame(9007199254740991, $run->durationMs, 'the duration is held at 2^53 - 1');
             $state = $store->getState('far');
-            $this->assertSame(1, $state?->version, "the state's 1.5 counted as 0 and was written over");
+            $this->assertSame(2, $state?->version, "the state's 1.5 counted as 0, then the timeout and the alert each wrote it");
             $this->assertSame(1, $state->consecutiveFailures);
+            $this->assertSame(['stuck'], array_map(fn (Alert $a) => $a->type, $sent));
+            $this->assertSame('Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h.', explode("\n", $sent[0]->message)[0]);
         } finally {
             $backend->done();
         }

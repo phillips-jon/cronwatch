@@ -58,6 +58,7 @@ func asUUID(id string) string {
 }
 
 // runSummary is the run fields worth attaching to a tracker event, or nil.
+// A start before the year 1 or after 9999 is null.
 func runSummary(a cronwatch.Alert) any {
 	r := a.Run
 	if r == nil {
@@ -67,7 +68,11 @@ func runSummary(a cronwatch.Alert) any {
 	if r.DurationMs != nil {
 		duration = *r.DurationMs
 	}
-	return js.NewObject("id", r.ID, "status", string(r.Status), "startedAt", js.ISOString(r.StartedAt), "durationMs", duration, "trigger", r.Trigger)
+	var started any
+	if iso, ok := js.ISOTime(r.StartedAt); ok {
+		started = iso
+	}
+	return js.NewObject("id", r.ID, "status", string(r.Status), "startedAt", started, "durationMs", duration, "trigger", r.Trigger)
 }
 
 // details is the alert's details as the SDK writes them.

@@ -87,6 +87,12 @@ final class Anthropic
     }
 
     /** The prompt: the alert, the definition, the triggering run and up to five earlier ones. */
+    /** "2026-01-05T09:30:00.000Z", or the words for a time before the year 1 or after 9999. */
+    private static function stamp(int|float $at): string
+    {
+        return Js::isoTime($at) ?? Js::beyondDates($at);
+    }
+
     public static function describe(TriageContext $context): string
     {
         $alert = $context->alert;
@@ -98,7 +104,7 @@ final class Anthropic
         $lines[] = 'Job definition: ' . Js::stringify($alert->definition);
         if ($run !== null) {
             $lines[] = '';
-            $lines[] = "Triggering run: status {$run->status}, started " . Js::iso($run->startedAt) . ', duration ' . self::duration($run) . ", trigger {$run->trigger}";
+            $lines[] = "Triggering run: status {$run->status}, started " . self::stamp($run->startedAt) . ', duration ' . self::duration($run) . ", trigger {$run->trigger}";
             if ($run->metrics !== []) {
                 $lines[] = 'Metrics: ' . Js::stringify(Js::obj($run->metrics));
             }
@@ -116,7 +122,7 @@ final class Anthropic
             foreach ($earlier as $r) {
                 $error = $r->error !== null && $r->error !== '' ? ', error: ' . self::data(Js::slice16(explode("\n", $r->error)[0], 160)) : '';
                 $metrics = $r->metrics !== [] ? ', metrics ' . Js::stringify(Js::obj($r->metrics)) : '';
-                $lines[] = "- {$r->status}, " . Js::iso($r->startedAt) . ', ' . self::duration($r) . $error . $metrics;
+                $lines[] = "- {$r->status}, " . self::stamp($r->startedAt) . ', ' . self::duration($r) . $error . $metrics;
             }
         }
         return implode("\n", $lines);

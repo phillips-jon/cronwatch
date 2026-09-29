@@ -92,6 +92,11 @@ module Cronwatch
         "<job_data>\n#{text.gsub(TAG, "<_job_data")}\n</job_data>"
       end
 
+      # "2026-01-05T09:30:00.000Z", or the words for a time before the year 1 or after 9999.
+      def self.stamp(at)
+        Duration.iso_time(at) || Duration.beyond_dates(at)
+      end
+
       # The prompt: the alert, the definition, the triggering run and up to five earlier ones.
       def self.describe(triage_context)
         alert = triage_context.alert
@@ -104,7 +109,7 @@ module Cronwatch
         lines << "Job definition: #{JS.json(definition.respond_to?(:to_h) ? definition.to_h : definition)}"
         if run
           lines << ""
-          lines << "Triggering run: status #{run.status}, started #{JS.iso(run.started_at)}, duration #{duration(run)}, trigger #{run.trigger}"
+          lines << "Triggering run: status #{run.status}, started #{stamp(run.started_at)}, duration #{duration(run)}, trigger #{run.trigger}"
           lines << "Metrics: #{JS.json(run.metrics)}" if run.metrics && !run.metrics.empty?
           lines << "Error:\n#{data(JS.head16(run.error, 3000))}" if present?(run.error)
           lines << "Output (tail):\n#{data(JS.tail16(run.output, 3000))}" if present?(run.output)
@@ -116,7 +121,7 @@ module Cronwatch
           earlier.each do |r|
             error = present?(r.error) ? ", error: #{data(JS.head16(r.error.split("\n", -1).first.to_s, 160))}" : ""
             metrics = r.metrics && !r.metrics.empty? ? ", metrics #{JS.json(r.metrics)}" : ""
-            lines << "- #{r.status}, #{JS.iso(r.started_at)}, #{duration(r)}#{error}#{metrics}"
+            lines << "- #{r.status}, #{stamp(r.started_at)}, #{duration(r)}#{error}#{metrics}"
           end
         end
         lines.join("\n")

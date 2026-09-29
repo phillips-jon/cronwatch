@@ -329,7 +329,9 @@ module Cronwatch
       def stamp(at, now)
         return %(<span class="muted">never</span>) if at.nil?
 
-        iso = JS.iso(at.to_i)
+        iso = Duration.iso_time(at.to_i)
+        return %(<span class="nowrap">#{Duration.beyond_dates(at.to_i)}</span>) if iso.nil?
+
         %(<time class="nowrap" datetime="#{iso}" title="#{iso.sub("T", " ")[0, 19]} UTC">#{h(Duration.relative(at, now))}</time>)
       end
 

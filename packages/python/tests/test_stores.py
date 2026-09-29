@@ -286,11 +286,11 @@ def sql_store(request: pytest.FixtureRequest, tmp_path: Path) -> Any:
 
 
 def test_a_check_over_a_run_that_started_at_the_lowest_bigint_and_a_state_whose_version_is_1_5(sql_store: Any) -> None:
-    """Rows another process wrote. The job is silenced: an alert's text shows
-    the start as a date, and no date is that far back."""
+    """Rows another process wrote. The stuck alert is sent: its text writes a
+    start before the year 1 as words, not as a date."""
     from cronwatch import Cronwatch
 
-    from helpers import Errors
+    from helpers import Capture, Errors
 
     store = sql_store
     store.init()
@@ -300,10 +300,11 @@ def test_a_check_over_a_run_that_started_at_the_lowest_bigint_and_a_state_whose_
     execute(f"INSERT INTO {p}runs (id, job, status, started_at, metrics, trigger) VALUES ('far1', 'far', 'running', -9223372036854775808, '{{}}', 'run')")
     execute(
         f"INSERT INTO {p}state (job, state) VALUES ('far', "
-        """'{"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":4102444800000,"lastAlertAt":null,"version":1.5}')"""
+        """'{"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":null,"lastAlertAt":null,"version":1.5}')"""
     )
     errors = Errors()
-    cw = Cronwatch(store=store, alerts=[], cron_secret=None, on_error=errors)
+    capture = Capture()
+    cw = Cronwatch(store=store, alerts=[capture], cron_secret=None, on_error=errors)
     cw.check()
     cw.check()
     assert errors.items == []
@@ -311,5 +312,9 @@ def test_a_check_over_a_run_that_started_at_the_lowest_bigint_and_a_state_whose_
     assert stuck.status == "timeout"
     assert stuck.duration_ms == 9_007_199_254_740_991, "the duration is held at 2^53 - 1"
     state = store.get_state("far")
-    assert state.version == 1, "the state's 1.5 counted as 0 and was written over"
+    assert state.version == 2, "the state's 1.5 counted as 0, then the timeout and the alert each wrote it"
     assert state.consecutive_failures == 1
+    assert [str(a.type) for a in capture.alerts] == ["stuck"]
+    assert capture.alerts[0].message.split("\n")[0] == (
+        "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h."
+    )

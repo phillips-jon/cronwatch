@@ -81,6 +81,14 @@ final class WebGoldenTest extends TestCase
         }));
 
         $cw->job('never-ran', ['schedule' => '0 * * * *']);
+
+        // A run as a foreign or damaged row could hold it: started before the
+        // year 1, so the pages write it in words rather than as a date.
+        $farBack = $cw->job('far-back', ['timeout' => '5m', 'expect' => 'far']);
+        $clock->set(-62_135_596_800_001);
+        $quietly(fn () => $farBack->run(function () use ($clock): void {
+            $clock->advance(1000);
+        }));
         $clock->set(Clock::T0);
         return $cw;
     }
@@ -96,7 +104,7 @@ final class WebGoldenTest extends TestCase
     {
         $data = json_decode((string) file_get_contents(self::GOLDEN), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(Clock::T0, $data['t0']);
-        $this->assertCount(57, $data['captures']);
+        $this->assertCount(59, $data['captures']);
         $cw = self::seed();
         $web = $cw->routes(token: 'tok', basePath: '/cronwatch');
         $ids = [];

@@ -2,6 +2,7 @@ package sqltest
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 
 	cronwatch "cronwatch.dev/go"
@@ -27,9 +28,9 @@ func foreignVersions(t *testing.T, db *sql.DB, dialect sqlstore.Dialect, p strin
 }
 
 // checkOverForeignRows: a check marks the run timed out with its duration
-// held at 2^53 - 1, and writes the state over its version of 1.5. The job
-// is silenced, as an alert's text shows the start as a date and no date is
-// that far back.
+// held at 2^53 - 1, and writes the state over its version of 1.5. The
+// stuck alert is sent: its text writes a start before the year 1 as words,
+// not as a date.
 func checkOverForeignRows(t *testing.T, db *sql.DB, dialect sqlstore.Dialect, p string) {
 	store := newStore(t, db, dialect, p)
 	must(t, store.Init(ctx))
@@ -42,7 +43,7 @@ func checkOverForeignRows(t *testing.T, db *sql.DB, dialect sqlstore.Dialect, p 
 	}
 	_, err := db.ExecContext(ctx, "INSERT INTO "+p+"runs (id, job, status, started_at, metrics, "+trigger+") VALUES ('far1', 'far', 'running', -9223372036854775808, '{}', 'run')")
 	must(t, err)
-	_, err = db.ExecContext(ctx, "INSERT INTO "+p+`state (job, state) VALUES ('far', '{"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":4102444800000,"lastAlertAt":null,"version":1.5}')`)
+	_, err = db.ExecContext(ctx, "INSERT INTO "+p+`state (job, state) VALUES ('far', '{"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":null,"lastAlertAt":null,"version":1.5}')`)
 	must(t, err)
 
 	proc := process(t, store, storetest.NewClock(storetest.T0).Now)
@@ -60,8 +61,17 @@ func checkOverForeignRows(t *testing.T, db *sql.DB, dialect sqlstore.Dialect, p 
 	}
 	st, err := store.GetState(ctx, "far")
 	must(t, err)
-	if st.Version == nil || *st.Version != 1 || st.ConsecutiveFailures != 1 {
+	// 1.5 counted as 0, then the timeout and the alert each wrote the state.
+	if st.Version == nil || *st.Version != 2 || st.ConsecutiveFailures != 1 {
 		t.Errorf("the state: version %v, %d failures", st.Version, st.ConsecutiveFailures)
+	}
+	sent := proc.Alerts.List()
+	if len(sent) != 1 || sent[0].Type != "stuck" {
+		t.Fatalf("alerts: %v", proc.Alerts.Types())
+	}
+	want := "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h."
+	if first, _, _ := strings.Cut(sent[0].Message, "\n"); first != want {
+		t.Errorf("the stuck alert's first line: %q", first)
 	}
 	must(t, proc.Client.Close())
 }

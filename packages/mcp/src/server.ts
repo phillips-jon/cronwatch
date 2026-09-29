@@ -10,8 +10,12 @@ export interface ServerOptions {
   fetch?: typeof fetch;
 }
 
+/** A time before the year 1 or after 9999 (a start read from a foreign or damaged row) is not written as a date. */
 function iso(at: number | null): string {
-  return at === null ? "never" : new Date(at).toISOString();
+  if (at === null) return "never";
+  if (at > 253_402_300_799_999) return "after 9999-12-31 23:59:59 UTC";
+  if (!(at >= -62_135_596_800_000)) return "before 0001-01-01 00:00:00 UTC";
+  return new Date(at).toISOString();
 }
 
 function ms(v: number | null): string {

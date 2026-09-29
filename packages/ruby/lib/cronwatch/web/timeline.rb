@@ -86,8 +86,13 @@ module Cronwatch
         "#{WEEKDAYS[d.wday]} #{d.day} #{MONTHS[d.month - 1]}"
       end
 
-      # "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42".
+      # "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
+      # before the year 1 or after 9999 (a start read from a foreign or
+      # damaged row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
       def when_at(t, now)
+        return "after 31 Dec 9999 23:59" if t > Duration::LAST_DATE_MS
+        return "before 1 Jan 0001 00:00" if t < Duration::FIRST_DATE_MS
+
         return clock(t) if t.div(DAY) == now.div(DAY)
 
         d = utc(t)

@@ -13,6 +13,7 @@ defmodule Cronwatch.Test.ForeignRows do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
   alias Cronwatch.Store.Ecto, as: EctoStore
+  alias Cronwatch.Test.Capture
   alias Cronwatch.Test.Client
   alias Cronwatch.Test.Conformance
   alias Cronwatch.Test.Servers
@@ -62,11 +63,12 @@ defmodule Cronwatch.Test.ForeignRows do
   @doc """
   A check over a running run that started at the lowest BIGINT and a state
   whose version is 1.5: the run is marked timed out, its duration held at
-  2^53 - 1, and the state written over at version 1. The job is silenced: an
-  alert's text shows the start as a date, and no date is that far back.
+  2^53 - 1, and the state's 1.5 counted as 0. The stuck alert is sent: its
+  text writes a start before the year 1 as words, not as a date, and the
+  timeout and the alert each write the state, so it ends at version 2.
   """
   def check_over({EctoStore, h} = store) do
-    %{cw: cw, errors: errors} = Client.make(store: Stores.option(store))
+    %{cw: cw, errors: errors, alerts: alerts} = Client.make(store: Stores.option(store))
     :ok = EctoStore.init(h)
     :ok = EctoStore.upsert_job(h, JS.parse!(~s({"name":"far","timeout":"5m"})), 1)
     trigger = if h.dialect == :mysql, do: "`trigger`", else: "trigger"
@@ -78,7 +80,7 @@ defmodule Cronwatch.Test.ForeignRows do
     )
 
     state =
-      ~s({"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":4102444800000,"lastAlertAt":null,"version":1.5})
+      ~s({"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":null,"lastAlertAt":null,"version":1.5})
 
     sql(h, "INSERT INTO #{h.prefix}state (job, state) VALUES ('far', #{param(h.dialect)})", [state])
 
@@ -88,8 +90,14 @@ defmodule Cronwatch.Test.ForeignRows do
     assert run.status == "timeout"
     assert run.duration_ms == 9_007_199_254_740_991, "the duration is held at 2^53 - 1"
     {:ok, st} = EctoStore.get_state(h, "far")
-    assert st.version == 1, "the state's 1.5 counted as 0 and was written over"
+    assert st.version == 2, "the state's 1.5 counted as 0, then the timeout and the alert each wrote it"
     assert st.consecutive_failures == 1
+    assert Capture.types(alerts) == ["stuck"]
+    [sent] = Capture.alerts(alerts)
+
+    assert hd(String.split(sent.message, "\n")) ==
+             "Started before 0001-01-01 00:00:00 UTC and never reported finishing. " <>
+               "Marked as timed out after 104249991d 8h."
   end
 
   defp param(:postgres), do: "$1::text::jsonb"

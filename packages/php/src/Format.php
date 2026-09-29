@@ -12,7 +12,11 @@ final class Format
         if ($at === null) {
             return 'never';
         }
-        return substr(str_replace('T', ' ', Js::iso($at)), 0, 19) . ' UTC (' . Duration::relative($at, $now) . ')';
+        $iso = Js::isoTime($at);
+        if ($iso === null) {
+            return Js::beyondDates($at);
+        }
+        return substr(str_replace('T', ' ', $iso), 0, 19) . ' UTC (' . Duration::relative($at, $now) . ')';
     }
 
     private static function firstLines(?string $text, int $n): string

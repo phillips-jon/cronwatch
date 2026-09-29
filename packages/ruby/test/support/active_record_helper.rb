@@ -202,27 +202,31 @@ module ActiveRecordStoreTests
 
   # Rows another process wrote: a running run that started at the lowest
   # BIGINT, and a state whose version is 1.5. The check writes the run with
-  # its duration held at 2**53 - 1, and writes over the state. The job is
-  # silenced: an alert's text shows the start as a date, and no date is that
-  # far back.
+  # its duration held at 2**53 - 1, writes over the state, and sends the
+  # stuck alert, whose text writes a start before the year 1 in words.
   def test_a_check_over_a_run_that_started_at_the_lowest_bigint_and_a_state_whose_version_is_1_5
     store = make_store
     p = store.prefix
-    cw = Cronwatch.new(store: store, alerts: [], cron_secret: nil, on_error: ->(e, _where) { raise e })
+    sent = []
+    cw = Cronwatch.new(store: store, alerts: [Cronwatch::Alerts::Custom.new("capture") { |alert| sent << alert }],
+                       cron_secret: nil, on_error: ->(e, _where) { raise e })
     store.upsert_job({ "name" => "far", "timeout" => "5m" }, 1)
     with_conn do |conn|
       conn.execute("INSERT INTO #{p}runs (id, job, status, started_at, metrics, trigger) " \
                    "VALUES ('far1', 'far', 'running', -9223372036854775808, '{}', 'run')")
       conn.execute("INSERT INTO #{p}state (job, state) VALUES ('far', '{\"job\":\"far\",\"open\":{},\"consecutiveFailures\":0," \
-                   "\"silencedUntil\":4102444800000,\"lastAlertAt\":null,\"version\":1.5}')")
+                   "\"silencedUntil\":null,\"lastAlertAt\":null,\"version\":1.5}')")
     end
     2.times { cw.check }
     run = store.get_run("far1")
     assert_equal :timeout, run.status
     assert_equal 9_007_199_254_740_991, run.duration_ms, "the duration is held at 2**53 - 1"
     state = store.get_state("far")
-    assert_equal 1, state.version, "the state's 1.5 counted as 0 and was written over"
+    assert_equal 2, state.version, "the state's 1.5 counted as 0, then the timeout and the alert each wrote it"
     assert_equal 1, state.consecutive_failures
+    assert_equal [:stuck], sent.map { |a| a.type.to_sym }
+    assert_equal "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h.",
+                 sent.first.message.split("\n").first
   end
 
   def test_names_sort_in_byte_order_as_the_sdk_sql_stores_do

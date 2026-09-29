@@ -82,3 +82,23 @@ export function formatRelative(at: number, now: number): string {
   if (abs < 5_000) return text;
   return diff < 0 ? `${text} ago` : `in ${text}`;
 }
+
+/** The first millisecond written as a date: 0001-01-01T00:00:00.000Z. */
+export const FIRST_DATE_MS = -62_135_596_800_000;
+/** The last millisecond written as a date: 9999-12-31T23:59:59.999Z. */
+export const LAST_DATE_MS = 253_402_300_799_999;
+
+/**
+ * "2026-01-05T09:30:00.000Z", or null for a time before the year 1 or after
+ * 9999. A start read from another process's row, or a damaged one, can be
+ * any number; outside those years it is not written as a date at all (and
+ * past JavaScript's Date range, toISOString would throw).
+ */
+export function isoTime(at: number): string | null {
+  return at >= FIRST_DATE_MS && at <= LAST_DATE_MS ? new Date(at).toISOString() : null;
+}
+
+/** The words that stand in for a time isoTime() does not write: "before 0001-01-01 00:00:00 UTC" or "after 9999-12-31 23:59:59 UTC". */
+export function beyondDates(at: number): string {
+  return at > LAST_DATE_MS ? "after 9999-12-31 23:59:59 UTC" : "before 0001-01-01 00:00:00 UTC";
+}

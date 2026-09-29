@@ -12,7 +12,7 @@
  *
  * Every time is UTC: without script the page cannot know the viewer's zone.
  */
-import { formatDuration } from "../duration.js";
+import { FIRST_DATE_MS, LAST_DATE_MS, formatDuration } from "../duration.js";
 import { graceMs, isStuck, timeoutMs } from "../evaluate.js";
 import { expectation, firesBetween, parseSchedule, type ParsedSchedule } from "../schedule.js";
 import type { JobSummary, Run } from "../types.js";
@@ -58,8 +58,14 @@ export function dayLabel(t: number): string {
   return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
-/** "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". */
+/**
+ * "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
+ * before the year 1 or after 9999 (a start read from a foreign or damaged
+ * row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
+ */
 export function when(t: number, now: number): string {
+  if (t > LAST_DATE_MS) return "after 31 Dec 9999 23:59";
+  if (!(t >= FIRST_DATE_MS)) return "before 1 Jan 0001 00:00";
   if (Math.floor(t / DAY) === Math.floor(now / DAY)) return clock(t);
   const d = new Date(t);
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${clock(t)}`;

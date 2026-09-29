@@ -77,9 +77,19 @@ final class Timeline
         return self::WEEKDAYS[$weekday] . " {$day} " . self::MONTHS[$month - 1];
     }
 
-    /** "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". */
+    /**
+     * "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
+     * before the year 1 or after 9999 (a start read from a foreign or damaged
+     * row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
+     */
     public static function when(int|float $t, int|float $now): string
     {
+        if ($t > Js::LAST_DATE_MS) {
+            return 'after 31 Dec 9999 23:59';
+        }
+        if (!($t >= Js::FIRST_DATE_MS)) {
+            return 'before 1 Jan 0001 00:00';
+        }
         if (floor($t / self::DAY) == floor($now / self::DAY)) {
             return self::clock($t);
         }

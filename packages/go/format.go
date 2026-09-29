@@ -91,10 +91,17 @@ func group(digits string) string {
 	return b.String()
 }
 
-// when is "2026-01-05 09:30:00 UTC (5m ago)", or "never".
+// when is "2026-01-05 09:30:00 UTC (5m ago)", or "never". A time before the
+// year 1 or after 9999 is words, with no relative part.
 func when(at *float64, now int64) string {
 	if at == nil {
 		return "never"
+	}
+	if !(*at >= float64(js.FirstDateMs) && *at <= float64(js.LastDateMs)) {
+		if *at > float64(js.LastDateMs) {
+			return js.BeyondDates(js.LastDateMs + 1)
+		}
+		return js.BeyondDates(js.FirstDateMs - 1)
 	}
 	iso := js.ISOString(int64(math.Trunc(*at)))
 	return strings.Replace(iso, "T", " ", 1)[:19] + " UTC (" + relative(*at, now) + ")"

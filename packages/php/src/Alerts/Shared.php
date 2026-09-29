@@ -290,14 +290,14 @@ final class Shared
         return $at >= 0 && substr($head, $at) === "\u{FFFD}" && substr($text, $at, 3) !== "\u{FFFD}" ? substr($head, 0, $at) : $head;
     }
 
-    /** The run fields worth attaching to a tracker event. */
+    /** The run fields worth attaching to a tracker event. A start before the year 1 or after 9999 is null. */
     public static function runSummary(Alert $alert): ?array
     {
         $run = $alert->run;
         if ($run === null) {
             return null;
         }
-        return ['id' => $run->id, 'status' => $run->status, 'startedAt' => Js::iso($run->startedAt), 'durationMs' => $run->durationMs, 'trigger' => $run->trigger];
+        return ['id' => $run->id, 'status' => $run->status, 'startedAt' => Js::isoTime($run->startedAt), 'durationMs' => $run->durationMs, 'trigger' => $run->trigger];
     }
 
     /** Title, message, triage and link as one plain text block, the way every channel reads. */

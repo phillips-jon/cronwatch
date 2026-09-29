@@ -162,7 +162,13 @@ defmodule Cronwatch.Web.HTML do
   defp stamp(nil, _now), do: ~s(<span class="muted">never</span>)
 
   defp stamp(at, now) do
-    iso = JS.iso_string(at)
+    case JS.iso_time(at) do
+      nil -> ~s(<span class="nowrap">#{JS.beyond_dates(at)}</span>)
+      iso -> stamp_iso(iso, at, now)
+    end
+  end
+
+  defp stamp_iso(iso, at, now) do
     title = iso |> String.replace("T", " ", global: false) |> binary_part(0, 19)
     ~s(<time class="nowrap" datetime="#{iso}" title="#{title} UTC">#{h(Duration.relative(at, now))}</time>)
   end
