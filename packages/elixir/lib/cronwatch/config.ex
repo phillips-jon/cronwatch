@@ -105,7 +105,7 @@ defmodule Cronwatch.Config do
   end
 
   defp integrations(other),
-    do: {:error, Error.invalid("Cronwatch: integrations must be a list, not #{inspect(other)}")}
+    do: {:error, Error.invalid("Cronwatch: integrations must be a list, not #{shape(other)}")}
 
   defp integration(module) when is_atom(module), do: integration({module, []})
 
@@ -124,7 +124,7 @@ defmodule Cronwatch.Config do
   end
 
   defp integration(other),
-    do: {:error, Error.invalid("Cronwatch: integrations must be {module, opts}, not #{inspect(other)}")}
+    do: {:error, Error.invalid("Cronwatch: integrations must be {module, opts}, not #{shape(other)}")}
 
   defp known(opts) do
     case Enum.find(opts, fn {k, _} -> k not in @known end) do
@@ -155,7 +155,7 @@ defmodule Cronwatch.Config do
   end
 
   defp store(other, _name),
-    do: {:error, Error.invalid("Cronwatch: store must be {module, opts}, not #{inspect(other)}")}
+    do: {:error, Error.invalid("Cronwatch: store must be {module, opts}, not #{shape(other)}")}
 
   defp alerts(nil), do: alerts([Cronwatch.Alerts.Console])
 
@@ -168,7 +168,7 @@ defmodule Cronwatch.Config do
     end)
   end
 
-  defp alerts(other), do: {:error, Error.invalid("Cronwatch: alerts must be a list of channels, not #{inspect(other)}")}
+  defp alerts(other), do: {:error, Error.invalid("Cronwatch: alerts must be a list of channels, not #{shape(other)}")}
 
   defp channel(module) when is_atom(module), do: channel({module, []})
 
@@ -190,7 +190,7 @@ defmodule Cronwatch.Config do
     end
   end
 
-  defp channel(other), do: {:error, Error.invalid("Cronwatch: not an alert channel: #{inspect(other)}")}
+  defp channel(other), do: {:error, Error.invalid("Cronwatch: not an alert channel: #{shape(other)}")}
 
   # Triage given as {module, opts} whose module has init/1 has its options
   # checked once, now, as a channel's are (Cronwatch.Triage.Anthropic
@@ -228,7 +228,7 @@ defmodule Cronwatch.Config do
   defp redact(f) when is_function(f, 1), do: {:ok, f}
 
   defp redact(other),
-    do: {:error, Error.invalid("Cronwatch: redact must be a function of one argument or false, not #{inspect(other)}")}
+    do: {:error, Error.invalid("Cronwatch: redact must be a function of one argument or false, not #{shape(other)}")}
 
   defp deliver(d) when d in [:now, :check], do: {:ok, d}
   defp deliver(d) when d in ["now", "check"], do: {:ok, String.to_existing_atom(d)}
@@ -255,7 +255,7 @@ defmodule Cronwatch.Config do
       {:ok, nil} -> {:ok, :env}
       {:ok, false} -> {:ok, false}
       {:ok, s} when is_binary(s) -> {:ok, s}
-      {:ok, other} -> {:error, Error.invalid("Cronwatch: cron_secret must be a string or false, not #{inspect(other)}")}
+      {:ok, other} -> {:error, Error.invalid("Cronwatch: cron_secret must be a string or false, not #{shape(other)}")}
     end
   end
 
@@ -298,6 +298,18 @@ defmodule Cronwatch.Config do
 
     :ok
   end
+
+  # What an option was given as, never its value: a channel given as its
+  # webhook URL, or a secret given as a charlist, must not be quoted in the
+  # refusal a boot log prints.
+  defp shape(value) when is_binary(value), do: "a string"
+  defp shape(value) when is_list(value), do: "a list"
+  defp shape(value) when is_map(value), do: "a map"
+  defp shape(value) when is_tuple(value), do: "a tuple of #{tuple_size(value)}"
+  defp shape(value) when is_number(value), do: "a number"
+  defp shape(value) when is_function(value), do: "a function of #{elem(:erlang.fun_info(value, :arity), 1)} arguments"
+  defp shape(value) when is_atom(value), do: inspect(value)
+  defp shape(_), do: "a term of another type"
 
   @doc false
   def describe(%Error{message: m}), do: m

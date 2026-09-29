@@ -137,6 +137,26 @@ defmodule Cronwatch.Audit.CoreTest do
     assert inspect(config) =~ "Cronwatch.Config"
   end
 
+  test "an option given the wrong way is refused without quoting it" do
+    url = "https://hooks.slack.com/services/T0/B0/s3cret-webhook"
+
+    for opts <- [
+          [alerts: [url]],
+          [alerts: url],
+          [store: url],
+          [integrations: url],
+          [integrations: [url]],
+          [redact: url],
+          [cron_secret: ~c"s3cret-webhook"]
+        ] do
+      assert {:error, %Cronwatch.Error{message: message}} = Cronwatch.Config.new(opts)
+      refute message =~ "s3cret", message
+    end
+
+    assert {:error, %Cronwatch.Error{message: "Cronwatch: not an alert channel: a string"}} =
+             Cronwatch.Config.new(alerts: [url])
+  end
+
   defmodule ExitingSource do
     @moduledoc false
     def name(_opts), do: throw(:no_name)
