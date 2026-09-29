@@ -43,7 +43,7 @@ pub(crate) fn format_number(n: f64) -> String {
             b.push_str(&digits[1..]);
         }
         b.push('e');
-        if point - 1 >= 0 {
+        if point >= 1 {
             b.push('+');
         }
         b.push_str(&(point - 1).to_string());
