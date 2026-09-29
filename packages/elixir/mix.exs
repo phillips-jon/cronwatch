@@ -46,8 +46,8 @@ defmodule Cronwatch.MixProject do
     [
       {:tz, "~> 0.28"},
       {:telemetry, "~> 1.0"},
-      {:ecto_sql, "~> 3.12", optional: true},
-      {:plug, "~> 1.16", optional: true},
+      {:ecto_sql, pinned(:ecto_sql, "~> 3.12"), optional: true},
+      {:plug, pinned(:plug, "~> 1.16"), optional: true},
       {:oban, pinned(:oban, "~> 2.20"), optional: true},
       {:quantum, pinned(:quantum, "~> 3.5"), optional: true},
       {:ecto_sqlite3, "~> 0.17", only: :test},

@@ -1108,13 +1108,18 @@ jobs:
           mix format --check-formatted
           mix test
 
-  # The Elixir integrations against the oldest Oban and Quantum they claim
-  # (Mix has no minimal-versions resolver, so mix.exs pins each to the
-  # release CRONWATCH_PIN_<NAME> names), on the floor toolchain.
+  # The Elixir package against the oldest release of each optional
+  # dependency it claims (Mix has no minimal-versions resolver, so mix.exs
+  # pins each to the release CRONWATCH_PIN_<NAME> names), on the floor
+  # toolchain: the whole suite, so the dashboard and handler run on the
+  # oldest Plug and the store on the oldest Ecto SQL, with the Postgres
+  # service for the store's and Oban's server tests.
   elixir-oldest:
-    name: elixir-oldest (Oban 2.20.0, Quantum 3.5.0)
+    name: elixir-oldest (Plug 1.16.0, Ecto SQL 3.12.0, Oban 2.20.0, Quantum 3.5.0)
     runs-on: ubuntu-latest
     env:
+      CRONWATCH_PIN_PLUG: "1.16.0"
+      CRONWATCH_PIN_ECTO_SQL: "3.12.0"
       CRONWATCH_PIN_OBAN: "2.20.0"
       CRONWATCH_PIN_QUANTUM: "3.5.0"
     services:
@@ -1143,10 +1148,50 @@ jobs:
       - name: mix deps.get
         working-directory: packages/elixir
         run: mix deps.get
-      - name: mix test (the integrations)
+      - name: mix test
         working-directory: packages/elixir
         env:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
         run: |
           MIX_ENV=test mix compile --warnings-as-errors
-          mix test test/integrations test/bridge test/release_test.exs
+          mix test
+
+  # The Elixir package on macOS and Windows, on the newest Elixir and OTP:
+  # the suite without database services or the built SDK, so the server
+  # tests, the croner parity check and the SQLite file shared with Node skip
+  # as they say. It covers tz's bundled zones where there is no system
+  # database, paths, line endings and SQLite's NIF on each system.
+  # setup-beam has no macOS builds, so macOS takes Homebrew's Elixir.
+  elixir-platforms:
+    name: elixir (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # The dashboard's assets and the fixtures are compared byte for byte,
+      # so Windows checks them out as committed, without CRLF.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Elixir (macOS)
+        if: runner.os == 'macOS'
+        run: brew install elixir
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        if: runner.os == 'Windows'
+        with:
+          elixir-version: "1.20"
+          otp-version: "29"
+      - name: mix deps.get
+        working-directory: packages/elixir
+        run: |
+          mix local.hex --force
+          mix deps.get
+      - name: mix test
+        working-directory: packages/elixir
+        run: |
+          MIX_ENV=test mix compile --warnings-as-errors
+          mix test
