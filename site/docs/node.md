@@ -17,7 +17,7 @@ cw.start("1m");
 process.on("SIGTERM", () => { cw.stop(); });
 ```
 
-The interval is unref'd, so it never keeps a process alive on its own.
+The first check runs about a second after `start()`, then one every interval. The interval is held between 5 seconds and about 24.8 days (the longest delay a timer keeps), and it is unref'd, so it never keeps a process alive on its own.
 
 ## node-cron
 
@@ -107,11 +107,15 @@ import { Hono } from "hono";
 import { cw } from "./cronwatch.js";
 
 const hourly = cw.job("hourly-sync", { schedule: "@hourly" });
-const app = new Hono();
 const routes = cw.routes({ basePath: "/cronwatch" });
+const runHourly = hourly.handler(async (job) => { /* ... */ });
+
+const app = new Hono();
 app.all("/cronwatch/*", (c) => routes.handler(c.req.raw));
-app.get("/jobs/hourly", (c) => hourly.handler(async () => { /* ... */ })(c.req.raw));
+app.get("/jobs/hourly", (c) => runHourly(c.req.raw));
 ```
+
+Make each handler once, at module level as here, rather than inside the route callback: it is the same function every time, and building it per request only adds work.
 
 Behind a proxy that terminates TLS, `@hono/node-server` builds `c.req.raw` from the connection it sees, so its URL says `http://` and the internal host, and the dashboard refuses its own forms as cross-site. Tell the routes the public origin:
 
@@ -126,14 +130,56 @@ See [behind a proxy](/docs/dashboard/#behind-a-proxy).
 A handler requires `Authorization: Bearer <CRON_SECRET>`. With no `CRON_SECRET` set (an empty value counts as unset) it answers 503 and runs nothing, unless `NODE_ENV` is `development` or `test`. For an endpoint that is protected some other way, say so explicitly with `secret: null`:
 
 ```ts
-app.post("/internal/reindex", (c) => reindex.handler(async () => { /* ... */ }, { secret: null })(c.req.raw));
+const runReindex = reindex.handler(async (job) => { /* ... */ }, { secret: null });
+app.post("/internal/reindex", (c) => runReindex(c.req.raw));
 ```
 
 Without a secret the response never includes the job's error text, only its status.
 
 The routes want `CRONWATCH_TOKEN` in the same way. Without it, while `NODE_ENV` is `development` or `test`, they make a token and print a sign-in link to the process's log on their first request (`[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...`); open it once. With `NODE_ENV` anything else they answer 503 until a token is set. See [access](/docs/dashboard/#access).
 
-The stores use Node drivers (`better-sqlite3`, `pg`), so the process needs Node compatibility. `better-sqlite3` crashes in Bun; on Bun, use the Postgres store.
+### Bun
+
+`Bun.serve` takes a fetch handler, so the routes and any job `handler()` go straight in:
+
+```ts
+// server.ts: bun run server.ts
+import { cronwatch } from "@cronwatch/sdk";
+import { postgres } from "@cronwatch/sdk/postgres";
+
+const cw = cronwatch({ store: postgres({ connectionString: process.env.DATABASE_URL }) });
+const routes = cw.routes({ basePath: "/cronwatch" });
+
+cw.start();
+Bun.serve({ port: 3000, fetch: (request) => routes.handler(request) });
+```
+
+### Deno
+
+Deno imports the packages with `npm:` specifiers and reads `CRONWATCH_TOKEN` and `CRON_SECRET` through its `process` global, so give it `--allow-env` as well as `--allow-net`. Import `pg` yourself and pass the pool: Deno does not install the store's optional peer driver on its own.
+
+```ts
+// main.ts: deno run --allow-net --allow-env main.ts
+import pg from "npm:pg";
+import { cronwatch } from "npm:@cronwatch/sdk";
+import { postgres } from "npm:@cronwatch/sdk/postgres";
+
+const pool = new pg.Pool({ connectionString: Deno.env.get("DATABASE_URL") });
+const cw = cronwatch({ store: postgres({ pool }) });
+const routes = cw.routes({ basePath: "/cronwatch" });
+
+cw.start();
+Deno.serve({ port: 3000 }, (request) => routes.handler(request));
+```
+
+### Which store where
+
+- **Postgres** (`@cronwatch/sdk/postgres`, through `pg`) works on Node, Bun and Deno.
+- **SQLite** (`@cronwatch/sdk/sqlite`, through `better-sqlite3`) is a native Node addon. It works on Node, crashes in Bun, and is not tested on Deno, so use Postgres on those two.
+- **Memory**, the default, works everywhere and keeps nothing across a restart.
+- **D1** is for Cloudflare Workers only; see [Cloudflare Workers](/docs/cloudflare/).
+
+The core, the routes and every alert channel need only `fetch` and Web Crypto, so they run the same on all three. `@cronwatch/sdk/node`, below, is for Node's own request objects and is not needed on Bun or Deno.
 
 ## Express, Koa and plain Node servers
 
