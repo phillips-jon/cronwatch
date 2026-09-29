@@ -10,7 +10,7 @@
 //! whether it came over TLS) and writes the [`Response`] back.
 
 mod html;
-mod origin;
+pub(crate) mod origin;
 mod pwa;
 mod request;
 mod routes;

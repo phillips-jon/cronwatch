@@ -30,6 +30,10 @@ use date::Date;
 pub(crate) use pattern::{Error, Pattern};
 pub(crate) use zone::{load_zone, offset, wall_at};
 
+/// The instants a JavaScript Date holds, in milliseconds either side of the
+/// epoch.
+const DATE_RANGE: i64 = 8_640_000_000_000_000;
+
 /// What the schedule uses of croner's Cron: an expression that schedules
 /// nothing and only answers `next_runs`.
 #[derive(Clone, Debug)]
@@ -78,6 +82,12 @@ impl Cron {
     /// each found from the one before. Fewer when the expression stops
     /// firing.
     pub(crate) fn next_runs(&self, count: usize, start: i64) -> Vec<i64> {
+        // Croner is only ever given a time a JavaScript Date holds. A start
+        // outside that (a foreign row's time near i64::MIN, say) overflowed
+        // the walk's arithmetic; there is no fire after it.
+        if !(-DATE_RANGE..=DATE_RANGE).contains(&start) {
+            return Vec::new();
+        }
         let mut runs = Vec::with_capacity(count);
         let mut d = Date::from_ms(start, &self.tz);
         for _ in 0..count {

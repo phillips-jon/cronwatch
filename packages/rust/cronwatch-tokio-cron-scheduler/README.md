@@ -18,6 +18,14 @@ use cronwatch::{Client, JobOptions};
 use cronwatch_tokio_cron_scheduler::{Options, Watcher};
 use std::time::Duration;
 use tokio_cron_scheduler::JobScheduler;
+# #[derive(Debug)]
+# struct ReportError;
+# impl std::fmt::Display for ReportError {
+#     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.write_str("no report") }
+# }
+# async fn build_report() -> Result<String, ReportError> { Ok(String::new()) }
+# async fn poll() -> Result<(), std::io::Error> { Ok(()) }
+# async fn doc(store: cronwatch::MemoryStore) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 let cw = Client::builder().store(store).build()?;
 let watcher = Watcher::new(&cw, Options::default());
@@ -39,6 +47,8 @@ scheduler.add(watcher.repeated("poll", Duration::from_secs(300), |_| poll(), Job
 scheduler.add(watcher.check_job(Duration::from_secs(60))?).await?; // or cw.start(...)
 watcher.follow(&scheduler);
 scheduler.start().await?;
+# Ok(())
+# }
 ```
 
 An `Err` fails the run, a `String` returned is its output when nothing was logged, and a panic is recorded as a failed run before it goes on to tokio. The run's context is also `cronwatch::current()`.

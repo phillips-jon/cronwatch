@@ -18,11 +18,13 @@ cronwatch-sqlx = { version = "0.7", features = ["sqlite"] } # or "postgres", "my
 
 ## Use
 
-```rust
+```rust,no_run
 use cronwatch::{Client, JobOptions};
 use cronwatch_sqlx::SqlStore;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 use std::time::Duration;
+# async fn page(_title: &str, _message: &str) -> Result<(), cronwatch::BoxError> { Ok(()) }
+# async fn build_report(_job: cronwatch::JobContext) -> Result<String, std::io::Error> { Ok(String::new()) }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -60,18 +62,25 @@ A job's function returns a `Result`; an `Err` fails the run and comes back from 
 Something has to notice a run that never happened. A long-running service checks in itself:
 
 ```rust
+# use std::time::Duration;
+# fn doc(cw: cronwatch::Client) {
 cw.start(Duration::from_secs(60)); // a task that checks every minute
+# }
 ```
 
 A program a crontab runs checks from a second crontab line instead, `cw.check().await?`, on the same database. Without a runtime of its own, it can use the blocking client (the `blocking` feature):
 
 ```rust
+# use cronwatch::JobOptions;
+# fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 let cw = cronwatch::blocking::Client::new(cronwatch::Client::builder())?;
 let job = cw.job("backup", JobOptions::new().schedule("0 3 * * *").timezone("UTC"))?;
 job.run(|run| {
     run.log("copied");
     Ok::<_, std::io::Error>(())
 })?;
+# Ok(())
+# }
 ```
 
 ## Alerts
@@ -81,11 +90,15 @@ With the `alerts` feature, `cronwatch::alerts` has the SDK's channels: Slack, Di
 ```rust
 use cronwatch::alerts::{self, SlackOptions};
 use cronwatch::triage::{self, AnthropicOptions};
+# use cronwatch::Client;
+# fn doc() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 let cw = Client::builder()
     .alert(alerts::slack(SlackOptions { webhook_url: std::env::var("SLACK_WEBHOOK_URL")?, ..Default::default() })?)
     .triage(triage::anthropic(AnthropicOptions { context: "An axum service on Postgres.".into(), ..Default::default() })?) // reads ANTHROPIC_API_KEY
     .build()?;
+# Ok(())
+# }
 ```
 
 Every request refuses redirects, ends after ten seconds, reads at most 1 MiB of an answer, and names only the URL's origin in an error.
@@ -96,9 +109,13 @@ Every request refuses redirects, ends after ten seconds, reads at most 1 MiB of 
 
 ```rust
 use cronwatch::web::RoutesOptions;
+# fn doc(cw: cronwatch::Client) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 let routes = cw.routes(RoutesOptions::new().token(std::env::var("CRONWATCH_TOKEN")?))?;
 let app = axum::Router::new().nest_service("/cronwatch", routes); // or routes.into_router()
+# let _: axum::Router = app;
+# Ok(())
+# }
 ```
 
 Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. Without a token it answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `RUST_ENV` set to `development`, `test` or `local`), where it makes one and prints a sign-in link on its first request; `RoutesOptions::no_token()` serves it open behind your own auth. Writes from another site are refused. Behind a proxy, `origin("https://app.example.com")` or `trust_proxy()` says what the browser sees. With the `tower` feature `Routes` is a `tower::Service` for hyper, tonic or anything else built on tower; without it, `routes.handle(web::Request)` answers a `web::Response` for a framework of your own.
@@ -109,9 +126,13 @@ Send the token as `Authorization: Bearer <token>`, or open the dashboard once wi
 
 ```rust
 use cronwatch::HandlerOptions;
+# async fn build_report(_job: cronwatch::JobContext) -> Result<String, std::io::Error> { Ok(String::new()) }
+# fn doc(nightly: cronwatch::Job) {
 
 let handler = nightly.handler(|job, _request| async move { build_report(job).await }, HandlerOptions::new());
 let app = axum::Router::new().route_service("/api/cron/nightly", handler);
+# let _: axum::Router = app;
+# }
 ```
 
 It is a tower service too, so on AWS Lambda `lambda_http::run(handler)` serves it (and `lambda_http::run(routes)` the dashboard) with no code of the crate's own. An EventBridge Scheduler invoking the function directly sends no bearer, so give that handler `HandlerOptions::new().no_secret()`.
@@ -121,12 +142,15 @@ It is a tower service too, so on AWS Lambda `lambda_http::run(handler)` serves i
 A run started in one place and finished in another (a queue's callback, another process) uses a handle:
 
 ```rust
+# async fn doc(cw: cronwatch::Client, job: cronwatch::Job) -> Result<(), cronwatch::Error> {
 let run = job.start(cronwatch::StartOptions::new().id("evt-1")).await?;
 run.log("loaded 40 recipients");
 run.flush().await;
 // later, perhaps elsewhere:
 let run = cw.resume_run("digest", "evt-1").await?;
 run.finish().await;
+# Ok(())
+# }
 ```
 
 ## Schedulers
@@ -140,4 +164,4 @@ A program a crontab runs needs neither: [`examples/crontab`](examples/crontab/sr
 
 ## Testing
 
-`cargo test --workspace --all-features` in `packages/rust`. The dashboard's tests replay the SDK's answers (`packages/ruby/test/web/golden.json`) straight into `Routes::handle`, through the tower service and through a real server with the dashboard nested in axum; the ones that need an environment of their own (development, a missing token) run in a child process of the test binary, as do the Lambda tests, against a fake Lambda runtime API. `CRONWATCH_TEST_RUST=1 npm test --workspace packages/mcp` at the repository root drives `@cronwatch/mcp` against the dashboard `webserver` serves (`cargo run -p cronwatch-webserver -- PORT`). The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` hold URLs of servers to use (`postgres://...`, `mysql://...`), and say they skipped otherwise; `CRONWATCH_TEST_PG` also runs `cronwatch-apalis` over apalis's Postgres storage. The scheduler tests run real schedulers on the wall clock, a few seconds in all. The workspace's `.cargo/config.toml` sets `TZ=UTC`, as the conformance fixtures are made. The croner parity check and the SQLite file shared with Node run when `node` and the built SDK (`npm run build --workspace packages/sdk`) are there, and skip with the reason otherwise.
+`cargo test --workspace --all-features` in `packages/rust`. The dashboard's tests replay the SDK's answers (`packages/ruby/test/web/golden.json`) straight into `Routes::handle`, through the tower service and through a real server with the dashboard nested in axum; the ones that need an environment of their own (development, a missing token) run in a child process of the test binary, as do the Lambda tests, against a fake Lambda runtime API. `CRONWATCH_TEST_RUST=1 npm test --workspace packages/mcp` at the repository root drives `@cronwatch/mcp` against the dashboard `webserver` serves (`cargo run -p cronwatch-webserver -- PORT`). The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` hold URLs of servers to use (`postgres://...`, `mysql://...`), and say they skipped otherwise; `CRONWATCH_TEST_PG` also runs `cronwatch-apalis` over apalis's Postgres storage. The scheduler tests run real schedulers on the wall clock, a few seconds in all. The workspace's `.cargo/config.toml` sets `TZ=UTC`, as the conformance fixtures are made. The croner parity check and the SQLite file shared with Node run when `node` and the built SDK (`npm run build --workspace packages/sdk`) are there, and skip with the reason otherwise. Every README's examples are doc tests, compiled with the rest of the suite. `packages/rust/fuzz` has cargo-fuzz targets for what reads untrusted input (JSON, durations, cron schedules, `jsre` patterns, a dashboard request, stored rows): `cargo +nightly fuzz run <target>` there, after `cargo install cargo-fuzz`. CI also runs the tests on macOS and Windows, checks each feature alone (`cargo hack`), the docs with warnings denied, the packaged crates and the lowest versions the manifests allow, and runs the fuzz targets once a week.

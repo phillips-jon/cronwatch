@@ -1,0 +1,42 @@
+# Once a week, and by hand: each cargo-fuzz target in packages/rust/fuzz
+# runs for a minute on nightly, off the path of a push (CI only builds
+# them). A failure prints the input that found it on libFuzzer's "Base64:"
+# line; saved to a file, `cargo +nightly fuzz run <target> <file>` in
+# packages/rust/fuzz replays it.
+name: Fuzz
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [json, duration, cron, jsre, request, rows]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Rust nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: Fuzz ${{ matrix.target }} for a minute
+        working-directory: packages/rust/fuzz
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          # jsre backtracks as JavaScript's engine does, so a pattern of
+          # stars back to back over a long output is slow there as it is in
+          # the SDK (see DESIGN.md); its slow inputs are let go, and only a
+          # crash fails it.
+          extra=""
+          if [ "$TARGET" = jsre ]; then extra="-fork=1 -ignore_timeouts=1"; fi
+          cargo +nightly fuzz run "$TARGET" -- -max_total_time=60 -timeout=10 $extra

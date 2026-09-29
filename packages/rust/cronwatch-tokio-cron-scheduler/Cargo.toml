@@ -17,13 +17,13 @@ include = ["src/**/*", "!src/**/tests.rs", "Cargo.toml", "README.md", "LICENSE"]
 cronwatch.workspace = true
 tokio-cron-scheduler = "0.15"
 croner = "3"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-chrono-tz = { version = "0.10", features = ["case-insensitive"] }
-uuid = "1"
-tokio = { version = "1.43", default-features = false, features = ["rt", "sync", "time", "macros"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+chrono-tz = { version = "0.10.4", features = ["case-insensitive"] }
+uuid = "1.1"
+tokio = { version = "1.44", default-features = false, features = ["rt", "sync", "time", "macros"] }
 
 [dev-dependencies]
-tokio = { version = "1.43", features = ["full", "test-util"] }
+tokio = { version = "1.44", features = ["full", "test-util"] }
 
 [package.metadata.docs.rs]
 all-features = true

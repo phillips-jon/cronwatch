@@ -16,7 +16,7 @@ path = "src/main.rs"
 cronwatch.workspace = true
 cronwatch-sqlx = { path = "../../cronwatch-sqlx", features = ["sqlite"] }
 sqlx = { version = "0.9", default-features = false, features = ["sqlite-bundled", "runtime-tokio"] }
-tokio = { version = "1.43", features = ["rt", "macros"] }
+tokio = { version = "1.44", features = ["rt", "macros"] }
 
 [lints]
 workspace = true
