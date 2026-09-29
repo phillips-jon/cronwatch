@@ -45,7 +45,9 @@ final class JobState
             lastAlertAt: $f['lastAlertAt'] ?? null,
             pendingRecovery: is_array($pending) ? array_values(array_map('strval', $pending)) : null,
             undelivered: is_array($undelivered) ? array_values(array_map(fn ($a) => Alert::fromJson($a), $undelivered)) : null,
-            version: $f['version'] ?? null,
+            // A foreign row's version may be anything; one that is not a
+            // number reads as none. Evaluate::stateVersion() says what it counts as.
+            version: is_int($f['version'] ?? null) || is_float($f['version'] ?? null) ? $f['version'] : null,
         );
     }
 

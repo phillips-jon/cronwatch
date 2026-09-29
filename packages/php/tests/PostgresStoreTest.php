@@ -86,7 +86,12 @@ final class PostgresStoreTest extends TestCase
     public function testTheStatementsAreTheSdksTheServerNumbersThePlaceholders(): void
     {
         $sql = Sql::statements('postgres', 'cronwatch_');
-        $this->assertSame("UPDATE cronwatch_state SET state = ? WHERE job = ? AND COALESCE((state->>'version')::bigint, 0) = ?", $sql['casUpdate']);
+        $this->assertSame(
+            "UPDATE cronwatch_state SET state = ? WHERE job = ? AND CASE WHEN jsonb_typeof(state->'version') <> 'number' THEN 0 "
+            . "WHEN (state->>'version')::numeric % 1 = 0 AND (state->>'version')::numeric BETWEEN 0 AND 9007199254740991 "
+            . "THEN (state->>'version')::numeric::bigint ELSE 0 END = ?",
+            $sql['casUpdate'],
+        );
         $this->assertSame('SELECT * FROM cronwatch_runs WHERE job = ? ORDER BY started_at DESC, seq DESC LIMIT ?', $sql['listRuns']);
         $this->assertSame('SELECT * FROM cronwatch_jobs ORDER BY name COLLATE "C"', $sql['listJobs']);
         $this->assertStringEndsWith('WHERE id = ? AND status IN (?, ?)', Sql::updateRunIfSql('cronwatch_', 2));

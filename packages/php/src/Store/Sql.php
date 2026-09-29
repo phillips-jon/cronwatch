@@ -164,9 +164,20 @@ final class Sql
             // placeholders are numbered $1, $2, ... by PDO's native prepare, so
             // the server sees the SDK's text.
             $pg = $dialect === 'postgres';
+            // The version inside a state's JSON, as Evaluate::stateVersion()
+            // reads it: a whole number from 0 to 2^53 - 1, else 0 (none, or a
+            // foreign row's 1.5 or "x", which must neither fail the statement
+            // nor refuse every write for good). Each CASE tests the JSON type
+            // before any cast.
             $version = $pg
-                ? fn (string $column) => "COALESCE(({$column}->>'version')::bigint, 0)"
-                : fn (string $column) => "COALESCE(json_extract({$column}, '\$.version'), 0)";
+                ? function (string $column): string {
+                    $v = "({$column}->>'version')::numeric";
+                    return "CASE WHEN jsonb_typeof({$column}->'version') <> 'number' THEN 0 WHEN {$v} % 1 = 0 AND {$v} BETWEEN 0 AND 9007199254740991 THEN {$v}::bigint ELSE 0 END";
+                }
+                : function (string $column): string {
+                    $v = "json_extract({$column}, '\$.version')";
+                    return "CASE WHEN json_type({$column}, '\$.version') NOT IN ('integer', 'real') THEN 0 WHEN {$v} = CAST({$v} AS INTEGER) AND {$v} BETWEEN 0 AND 9007199254740991 THEN CAST({$v} AS INTEGER) ELSE 0 END";
+                };
             // Insertion order breaks ties; byte order for names whatever the database's collation.
             $seq = $pg ? 'seq' : 'rowid';
             $byName = $pg ? 'name COLLATE "C"' : 'name';
@@ -197,9 +208,17 @@ final class Sql
       AND started_at < (SELECT MAX(r.started_at) FROM {$p}runs r WHERE r.job = {$p}runs.job)",
             ];
         }
-        // The version inside a state's JSON text, 0 when it has none. MySQL's
-        // JSON_EXTRACT answers JSON and MariaDB's text; unquoted and cast, both are a number.
-        $version = fn (string $column) => "COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT({$column}, '\$.version')) AS SIGNED), 0)";
+        // The version inside a state's JSON text, as Evaluate::stateVersion()
+        // reads it: a whole number from 0 to 2^53 - 1, else 0. JSON_TYPE is
+        // tested first, so nothing but a number is ever converted (a string's
+        // conversion warns, which strict mode makes an error in an UPDATE).
+        // MySQL's JSON_EXTRACT answers JSON and MariaDB's text; plus 0, both
+        // are a number.
+        $version = function (string $column): string {
+            $v = "JSON_EXTRACT({$column}, '\$.version') + 0";
+            return "CASE WHEN JSON_TYPE(JSON_EXTRACT({$column}, '\$.version')) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 "
+                . "WHEN {$v} = FLOOR({$v}) AND {$v} BETWEEN 0 AND 9007199254740991 THEN CAST({$v} AS SIGNED) ELSE 0 END";
+        };
         return [
             'upsertJob' => "INSERT INTO {$p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE definition = VALUES(definition), updated_at = VALUES(updated_at)",

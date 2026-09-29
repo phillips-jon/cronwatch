@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cronwatch\Store;
 
+use Cronwatch\Evaluate;
 use Cronwatch\JobDefinition;
 use Cronwatch\JobState;
 use Cronwatch\Js;
@@ -164,7 +165,7 @@ final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState, De
     public function compareAndSetState(JobState $state, int|float $expectedVersion): bool
     {
         $current = $this->states[$state->job] ?? null;
-        if (($current?->version ?? 0) != $expectedVersion) {
+        if (Evaluate::stateVersion($current) != $expectedVersion) {
             return false;
         }
         $this->states[$state->job] = self::clone($state);

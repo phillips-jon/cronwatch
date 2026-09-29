@@ -6,6 +6,7 @@ namespace Cronwatch\Sources;
 
 use Cronwatch\Alert;
 use Cronwatch\Cronwatch;
+use Cronwatch\Evaluate;
 use Cronwatch\JobDefinition;
 use Cronwatch\Js;
 use Cronwatch\Run;
@@ -266,7 +267,7 @@ final class PgCron implements Source
             status: $state,
             startedAt: $startedAt,
             finishedAt: $end,
-            durationMs: $end === null ? null : $end - $startedAt,
+            durationMs: $end === null ? null : Evaluate::runDuration($startedAt, $end),
             error: $state === RunStatus::FAILED ? ($message ?? 'pg_cron reported the run as failed') : null,
             output: $state === RunStatus::OK ? $message : null,
             metrics: [],

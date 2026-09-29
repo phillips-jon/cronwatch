@@ -329,6 +329,16 @@ final class ConformanceTest extends TestCase
         $this->eachCase(self::fixture('health.json')->isStuck, fn (\stdClass $c) => self::differs($c->stuck, Evaluate::isStuck(JobDefinition::fromJson($c->definition), Run::fromJson($c->run), $c->now)));
     }
 
+    public function testRunDuration(): void
+    {
+        $this->eachCase(self::fixture('health.json')->runDuration, fn (\stdClass $c) => self::differs($c->durationMs, Evaluate::runDuration($c->startedAt, $c->finishedAt)));
+    }
+
+    public function testStateVersion(): void
+    {
+        $this->eachCase(self::fixture('health.json')->stateVersion, fn (\stdClass $c) => self::differs($c->version, Evaluate::stateVersion(JobState::fromJson(Js::parse($c->state)))));
+    }
+
     public function testUnevaluableSummary(): void
     {
         $this->eachCase(self::fixture('health.json')->unevaluableSummary, fn (\stdClass $c) => self::differs(
@@ -525,6 +535,48 @@ final class ConformanceTest extends TestCase
                     $outcome = $store->updateRunIf(Run::fromJson($c->run), $c->from);
                 }
                 return self::differs([$c->outcome ?? null, $c->stored], [$outcome, $store->getRun('u1')]);
+            });
+        } finally {
+            $backend->done();
+        }
+    }
+
+    /**
+     * A state row another process wrote, its version in any shape: held as
+     * its JSON text as it is (on the memory store, as the SDK's reader reads
+     * it), it counts as Evaluate::stateVersion() says.
+     */
+    #[DataProvider('stores')]
+    public function testStoreForeignVersion(string $kind): void
+    {
+        $backend = $this->backend($kind);
+        try {
+            $store = $backend->open();
+            $store->init();
+            $pdo = $kind === 'memory' ? null : $backend->pdo();
+            $insert = match ($kind) {
+                'memory' => null,
+                'postgres' => "INSERT INTO {$backend->tables()}state (job, state) VALUES ('v', CAST(? AS jsonb))",
+                default => "INSERT INTO {$backend->tables()}state (job, state) VALUES ('v', ?)",
+            };
+            $this->eachCase(self::fixture('store.json')->foreignVersion, function (\stdClass $c) use ($store, $pdo, $insert): ?string {
+                $store->deleteJob('v');
+                if ($pdo === null) {
+                    $store->setState(JobState::fromJson(Js::parse($c->stored)));
+                } else {
+                    $pdo->prepare((string) $insert)->execute([$c->stored]);
+                }
+                foreach ($c->steps as $i => $step) {
+                    $written = $store->compareAndSetState(JobState::fromJson($step->cas), $step->expected);
+                    $mismatch = self::differs(
+                        property_exists($step, 'state') ? [$step->written, $step->state] : [$step->written],
+                        property_exists($step, 'state') ? [$written, $store->getState('v')] : [$written],
+                    );
+                    if ($mismatch !== null) {
+                        return "step {$i}: {$mismatch}";
+                    }
+                }
+                return null;
             });
         } finally {
             $backend->done();

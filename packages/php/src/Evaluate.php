@@ -20,6 +20,42 @@ final class Evaluate
     public const BASELINE_MIN_RUNS = 5;
     /** How many successful runs a baseline looks at, and how many runs a summary covers. */
     public const BASELINE_WINDOW = 20;
+    /** The longest duration written: the largest integer JavaScript holds exactly, which every port and store reads back unchanged. */
+    public const MAX_DURATION_MS = Js::MAX_SAFE_INTEGER;
+
+    /**
+     * How long a run took, from `startedAt` to `finishedAt` (runDuration): 0
+     * when it started later, and never more than MAX_DURATION_MS. A foreign
+     * row's start near a 64-bit limit must not make a duration no store can
+     * write; PHP's int turns to a float past the limit, which the cap brings back.
+     */
+    public static function runDuration(int|float $startedAt, int|float $finishedAt): int|float
+    {
+        $ms = $finishedAt - $startedAt;
+        if (!($ms > 0)) {
+            return 0;
+        }
+        return $ms >= self::MAX_DURATION_MS ? self::MAX_DURATION_MS : $ms;
+    }
+
+    /**
+     * The version a stored state counts as for compareAndSetState
+     * (stateVersion): a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
+     * else 0, as when it is absent. The SQL stores read it the same way, so a
+     * foreign row's 1.5, "x" or -1 is written over by the next update instead
+     * of refusing every compare-and-set of its job for good.
+     */
+    public static function stateVersion(?JobState $state): int
+    {
+        $version = $state?->version;
+        if (is_int($version)) {
+            return $version >= 0 && $version <= self::MAX_DURATION_MS ? $version : 0;
+        }
+        if (is_float($version) && is_finite($version) && floor($version) === $version && $version >= 0 && $version <= self::MAX_DURATION_MS) {
+            return (int) $version;
+        }
+        return 0;
+    }
 
     public static function emptyState(string $job): JobState
     {

@@ -587,7 +587,7 @@ final class Cronwatch
             if (self::sameState($state, $current)) {
                 return [$current, $result];
             }
-            $version = $current->version ?? 0;
+            $version = Evaluate::stateVersion($current);
             $next = clone $state;
             $next->version = $version + 1;
             if ($this->writeState($next, $version)) {
@@ -783,7 +783,7 @@ final class Cronwatch
         $name = (string) $definition->get('name');
         $finishedAt = $this->now();
         $run->finishedAt = $finishedAt;
-        $run->durationMs = max(0, $finishedAt - $run->startedAt);
+        $run->durationMs = Evaluate::runDuration($run->startedAt, $finishedAt);
         $run->metrics = $recorder->metrics();
         $run->output = $recorder->output() ?? (is_string($result) ? Output::capOutput(Js::wellFormed($result)) : null);
         $expectText = $recorder->expectText() ?? (is_string($result) ? Js::wellFormed($result) : null);
@@ -1109,7 +1109,7 @@ final class Cronwatch
         $run = clone $source;
         $run->status = RunStatus::RUNNING;
         $run->finishedAt = $finishedAt;
-        $run->durationMs = max(0, $finishedAt - $source->startedAt);
+        $run->durationMs = Evaluate::runDuration($source->startedAt, $finishedAt);
         $run->error = null;
         $run->output = self::joinOutput($source->output, $added);
         $run->metrics = array_replace($source->metrics, $recorder->metrics());
@@ -1257,7 +1257,7 @@ final class Cronwatch
                 $timeout = Evaluate::timeoutMs($judged);
                 $run->status = RunStatus::TIMEOUT;
                 $run->finishedAt = $at;
-                $run->durationMs = $at - $run->startedAt;
+                $run->durationMs = Evaluate::runDuration($run->startedAt, $at);
                 $run->error = 'Still running after ' . Duration::format($timeout) . '; marked as timed out';
                 // Only over a row still running: a finish that landed meanwhile wins.
                 if (!$this->writeRunIf($run, [RunStatus::RUNNING])) {

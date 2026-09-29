@@ -7,6 +7,7 @@ namespace Cronwatch\Tests\Support;
 use Cronwatch\Store\MemoryStore;
 use Cronwatch\Store\MysqlStore;
 use Cronwatch\Store\PostgresStore;
+use Cronwatch\Store\Sql;
 use Cronwatch\Store\SqliteStore;
 use Cronwatch\Store\Store;
 
@@ -87,6 +88,23 @@ final class Backend
             'postgres' => ['kind' => 'postgres', 'url' => $this->url, 'prefix' => $this->prefix],
             default => ['kind' => 'mysql', 'url' => $this->url, 'prefix' => $this->prefix],
         };
+    }
+
+    /** A connection of its own to this backend's database, for writing rows as another process would; the tables are those of tables(). */
+    public function pdo(): \PDO
+    {
+        [$dsn, $user, $password] = match ($this->kind) {
+            'sqlite' => ["sqlite:{$this->dir}/cw.db", null, null],
+            'postgres' => PostgresStore::connection((string) $this->url),
+            default => MysqlStore::connection((string) $this->url),
+        };
+        return new \PDO($dsn, $user, $password, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
+    }
+
+    /** The prefix of the tables open() makes. */
+    public function tables(): string
+    {
+        return $this->kind === 'sqlite' ? Sql::DEFAULT_PREFIX : $this->prefix;
     }
 
     public function path(string $name): string
