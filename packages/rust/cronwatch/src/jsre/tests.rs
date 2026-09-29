@@ -117,6 +117,16 @@ fn deep_matches_give_up_rather_than_overflow_the_stack() {
 }
 
 #[test]
+fn a_character_outside_the_bmp_is_its_two_units_in_turn() {
+    // /a😀b/.test("a😀b"), and "x😀😀y".replace(/😀{2}/g, "-"): the quantifier
+    // takes the second unit alone, as V8 reads a pattern without `u`.
+    assert_eq!(Regexp::must("a\u{1f600}b", "").try_is_match("a\u{1f600}b"), Some(true));
+    assert_eq!(Regexp::must("a\u{1f600}b", "").try_is_match("ab"), Some(false));
+    assert_eq!(replace("\u{1f600}+", "g", "x\u{1f600}\u{1f600}y", "-"), "x--y");
+    assert_eq!(replace("\u{1f600}{2}", "g", "x\u{1f600}\u{1f600}y", "-"), "x\u{1f600}\u{1f600}y");
+}
+
+#[test]
 fn patterns_too_deep_or_long_are_refused() {
     let nested = format!("{}a{}", "(".repeat(2000), ")".repeat(2000));
     assert!(Regexp::new(&nested, "").unwrap_err().contains("nested too deeply"));

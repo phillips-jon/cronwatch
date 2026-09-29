@@ -204,6 +204,20 @@ impl Parser {
             }
             '*' | '+' | '?' => return Err(self.fail("nothing to repeat")),
             ')' => return Err(self.fail("unmatched ')'")),
+            // A character outside the BMP is two code units in turn, as
+            // JavaScript without the `u` flag reads it: a quantifier after it
+            // takes the second alone (the audit; it was read as either one).
+            _ if c as u32 >= 0x10000 => {
+                self.i += 1;
+                let r = c as u32 - 0x10000;
+                let (mut high, mut low) = (CharSet::new(), CharSet::new());
+                high.add(0xd800 + (r >> 10));
+                low.add(0xdc00 + (r & 0x3ff));
+                let mut seq = Tree::new(Kind::Seq);
+                seq.children.push(Tree::char(high));
+                seq.children.push(self.quantifier(Tree::char(low))?);
+                return Ok(seq);
+            }
             _ => {
                 self.i += 1;
                 let mut set = CharSet::new();
