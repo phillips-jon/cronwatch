@@ -94,10 +94,12 @@ defmodule Cronwatch.Transport.Request do
   defimpl Inspect do
     import Inspect.Algebra
 
+    alias Cronwatch.Alerts.Post
+
     def inspect(r, opts) do
       concat([
         "#Cronwatch.Transport.Request<origin: ",
-        to_doc(Cronwatch.Alerts.Post.origin(r.url), opts),
+        to_doc(Post.origin(r.url), opts),
         ", headers: ",
         to_doc(Enum.map(r.headers, &elem(&1, 0)), opts),
         ", body: #{byte_size(r.body)} bytes>"

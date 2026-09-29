@@ -75,6 +75,6 @@ defmodule Cronwatch.Alerts.PostTest do
     opts = Httpc.ssl("https://h.example/x", [])
     assert opts[:verify] == :verify_peer
     assert opts[:server_name_indication] == ~c"h.example"
-    assert Httpc.ssl("https://127.0.0.1/", [])[:server_name_indication] == :disable
+    refute Keyword.has_key?(Httpc.ssl("https://127.0.0.1/", []), :server_name_indication)
   end
 end

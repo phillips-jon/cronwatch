@@ -11,6 +11,39 @@ defmodule Cronwatch.Alerts.Shared do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
 
+  @doc """
+  A channel's options as a map, a keyword list or a map given; an option
+  the channel does not know is refused, naming it.
+  """
+  def options(opts, module, known) when is_list(opts) or is_map(opts) do
+    o = Map.new(opts)
+
+    case Enum.find(Map.keys(o), &(&1 not in known)) do
+      nil -> {:ok, o}
+      key -> {:error, "#{inspect(module)}: unknown option #{inspect(key)}"}
+    end
+  end
+
+  def options(other, module, _known),
+    do: {:error, "#{inspect(module)}: options must be a keyword list, not #{inspect(other)}"}
+
+  @doc "Refuses a missing or empty option with the SDK's refusal in Elixir's words: `Cronwatch.Alerts.Slack needs :webhook_url`."
+  def required(o, key, module) do
+    case Map.get(o, key) do
+      v when is_binary(v) and v != "" -> :ok
+      _ -> {:error, "#{inspect(module)} needs #{inspect(key)}"}
+    end
+  end
+
+  @doc "Refuses a `:link` that is not a function of one argument."
+  def check_link(o, module) do
+    case Map.get(o, :link) do
+      nil -> :ok
+      f when is_function(f, 1) -> :ok
+      _ -> {:error, "#{inspect(module)}: :link must be a function of the alert"}
+    end
+  end
+
   @doc "The level for trackers that have levels. Recovered is informational."
   def severity("recovered"), do: "info"
   def severity(t) when t in ["slow", "over_budget"], do: "warning"

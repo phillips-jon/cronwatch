@@ -23,6 +23,18 @@ defmodule Cronwatch.Test.Conformance do
   @doc "`o[key]` as a list."
   def list(%Object{} = o, key), do: Object.get(o, key) || []
 
+  @doc """
+  The fixtures' digest of a text (scripts/conformance.mjs's `digest`): the
+  text itself up to 400 UTF-16 units, else its length in units and its
+  SHA-256.
+  """
+  def digest(text) do
+    if JS.len16(text) <= 400,
+      do: Object.new([{"text", text}]),
+      else:
+        Object.new([{"length", JS.len16(text)}, {"sha256", Base.encode16(:crypto.hash(:sha256, text), case: :lower)}])
+  end
+
   @doc "Starts collecting failures for one fixture."
   def failures, do: []
 

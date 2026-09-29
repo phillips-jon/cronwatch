@@ -16,6 +16,7 @@ defmodule Cronwatch.JS do
   """
 
   alias Cronwatch.JS.Object
+  alias Cronwatch.JS.Units
 
   @type number_value :: integer() | float() | :infinity | :neg_infinity | :nan
   @type value :: nil | boolean() | number_value() | String.t() | [value()] | Object.t()
@@ -187,7 +188,7 @@ defmodule Cronwatch.JS do
   defp write([]), do: "[]"
   defp write(list) when is_list(list), do: [?[, Enum.intersperse(Enum.map(list, &write/1), ?,), ?]]
   defp write(%Object{pairs: pairs}), do: write_pairs(pairs)
-  defp write(%Cronwatch.JS.Units{} = u), do: quote_units(u)
+  defp write(%Units{} = u), do: quote_units(u)
   defp write(%{} = map) when not is_struct(map), do: write(Object.new(map))
 
   defp write_pairs([]), do: "{}"
@@ -208,7 +209,7 @@ defmodule Cronwatch.JS do
 
   defp quote_units(u) do
     parts =
-      Enum.map(Cronwatch.JS.Units.segments(u), fn
+      Enum.map(Units.segments(u), fn
         {:text, s} -> escape(s, s, 0, 0, [])
         {:lone, unit} -> "\\u" <> String.downcase(Integer.to_string(unit, 16))
       end)

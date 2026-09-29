@@ -139,7 +139,7 @@ defmodule Cronwatch.Alerts.Post do
   @spec text(binary()) :: String.t()
   def text(data) do
     case JS.scrub(data) do
-      "﻿" <> rest -> rest
+      <<0xFEFF::utf8, rest::binary>> -> rest
       s -> s
     end
   end
@@ -256,7 +256,7 @@ defmodule Cronwatch.Alerts.Post do
       {:ok, chunk} when is_binary(chunk) ->
         room = @max_body - n
         taken = binary_part(chunk, 0, min(byte_size(chunk), room))
-        acc = [acc | taken]
+        acc = [acc, taken]
         n = n + byte_size(taken)
         if n >= @max_body, do: {:full, IO.iodata_to_binary(acc)}, else: read_chunks(next, acc, n)
 

@@ -169,14 +169,17 @@ defmodule Cronwatch.Test.HTTPServer do
   defp close({:tcp, s}), do: :gen_tcp.close(s)
   defp close({:ssl, s}), do: :ssl.close(s)
 
+  # P-256 keys signed with SHA-256, which every TLS version takes.
+  defp ec, do: [key: {:namedCurve, :secp256r1}, digest: :sha256]
+
   # A root, and a certificate for localhost signed by it, made now.
   defp certificates do
     san = {:Extension, {2, 5, 29, 17}, false, [dNSName: ~c"localhost"]}
 
     data =
       :public_key.pkix_test_data(%{
-        server_chain: %{root: [], intermediates: [], peer: [extensions: [san]]},
-        client_chain: %{root: [], intermediates: [], peer: []}
+        server_chain: %{root: ec(), intermediates: [], peer: ec() ++ [extensions: [san]]},
+        client_chain: %{root: ec(), intermediates: [], peer: ec()}
       })
 
     server = data.server_config
