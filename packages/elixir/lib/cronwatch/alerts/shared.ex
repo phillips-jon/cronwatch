@@ -72,14 +72,14 @@ defmodule Cronwatch.Alerts.Shared do
   def as_uuid(<<a::binary-8, b::binary-4, c::binary-4, d::binary-4, e::binary-12, _::binary>>),
     do: "#{a}-#{b}-#{c}-#{d}-#{e}"
 
-  @doc "The run fields worth attaching to a tracker event, or nil."
+  @doc "The run fields worth attaching to a tracker event, or nil. A start before the year 1 or after 9999 is nil."
   def run_summary(%Alert{run: nil}), do: nil
 
   def run_summary(%Alert{run: r}) do
     Object.new([
       {"id", r.id},
       {"status", r.status},
-      {"startedAt", JS.iso_string(r.started_at)},
+      {"startedAt", JS.iso_time(r.started_at)},
       {"durationMs", r.duration_ms},
       {"trigger", r.trigger}
     ])

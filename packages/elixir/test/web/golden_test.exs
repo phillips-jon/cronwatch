@@ -41,7 +41,7 @@ defmodule Cronwatch.Web.GoldenTest do
     golden = JS.parse!(File.read!(@golden))
     assert Object.get(golden, "t0") == @t0, "golden.json's t0"
     captures = Object.get(golden, "captures")
-    assert length(captures) == 57, "golden.json's captures"
+    assert length(captures) == 59, "golden.json's captures"
 
     Enum.map(captures, fn c ->
       %{
@@ -111,6 +111,12 @@ defmodule Cronwatch.Web.GoldenTest do
     Cronwatch.run(sync, fn _ -> Clock.advance(clock, 12_345) end)
 
     Cronwatch.job!("never-ran", [schedule: "0 * * * *"] ++ inst)
+
+    # A run as a foreign or damaged row could hold it: started before the
+    # year 1, so the pages write it in words rather than as a date.
+    far_back = Cronwatch.job!("far-back", [timeout: "5m", expect: "far"] ++ inst)
+    Clock.set(clock, -62_135_596_800_001)
+    Cronwatch.run(far_back, fn _ -> Clock.advance(clock, 1000) end)
     Clock.set(clock, @t0)
   end
 

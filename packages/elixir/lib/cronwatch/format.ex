@@ -62,10 +62,17 @@ defmodule Cronwatch.Format do
     Enum.join(if(head > 0, do: [first | chunks], else: chunks), ",")
   end
 
-  # `2026-01-05 09:30:00 UTC (5m ago)`.
+  # `2026-01-05 09:30:00 UTC (5m ago)`, or `before 0001-01-01 00:00:00 UTC`
+  # for a time before the year 1 (after 9999 likewise).
   defp when_at(at, now) do
-    iso = at |> JS.to_int() |> JS.iso_string() |> String.replace("T", " ", global: false)
-    "#{JS.head16(iso, 19)} UTC (#{relative(at, now)})"
+    case JS.iso_time(to_number(at)) do
+      nil ->
+        JS.beyond_dates(to_number(at))
+
+      iso ->
+        iso = String.replace(iso, "T", " ", global: false)
+        "#{JS.head16(iso, 19)} UTC (#{relative(at, now)})"
+    end
   end
 
   # formatRelative for a time that may carry a fraction of a millisecond (a

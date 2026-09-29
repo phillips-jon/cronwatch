@@ -123,7 +123,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
     assert failures == [], "channels.json: #{length(failures)} cases differ:\n" <> Enum.join(failures, "\n")
 
     count = length(list(f, "sends")) + length(list(f, "failures")) + length(list(field(f, "textCuts"), "errorBodies"))
-    assert count == 78 + 18 + 6
+    assert count == 90 + 18 + 6
   end
 
   test "a channel is refused without its URL, in Elixir's words" do

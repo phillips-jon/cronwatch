@@ -70,7 +70,14 @@ defmodule Cronwatch.Web.Timeline do
     "#{elem(@weekday_names, wd)} #{d} #{elem(@month_names, m - 1)}"
   end
 
-  @doc ~s("22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42".)
+  @doc """
+  "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
+  before the year 1 or after 9999 (a start read from a foreign or damaged
+  row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
+  """
+  def when_utc(t, _now) when t > 253_402_300_799_999, do: "after 31 Dec 9999 23:59"
+  def when_utc(t, _now) when t < -62_135_596_800_000, do: "before 1 Jan 0001 00:00"
+
   def when_utc(t, now) do
     if JS.floor_div(t, @day_ms) == JS.floor_div(now, @day_ms) do
       clock_utc(t)

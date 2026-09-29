@@ -695,4 +695,22 @@ defmodule Cronwatch.JS do
   end
 
   defp pad(n, width), do: n |> Integer.to_string() |> String.pad_leading(width, "0")
+
+  @first_date_ms -62_135_596_800_000
+  @last_date_ms 253_402_300_799_999
+
+  @doc """
+  The SDK's isoTime: `iso_string/1`, or nil for a time before the year 1 or
+  after 9999 (0001-01-01T00:00:00.000Z to 9999-12-31T23:59:59.999Z). A start
+  read from another process's row, or a damaged one, can be any number;
+  outside those years it is not written as a date at all.
+  """
+  @spec iso_time(number()) :: String.t() | nil
+  def iso_time(ms) when ms >= @first_date_ms and ms <= @last_date_ms, do: ms |> to_int() |> iso_string()
+  def iso_time(_ms), do: nil
+
+  @doc ~s(The SDK's beyondDates: the words for a time `iso_time/1` does not write.)
+  @spec beyond_dates(number()) :: String.t()
+  def beyond_dates(ms) when ms > @last_date_ms, do: "after 9999-12-31 23:59:59 UTC"
+  def beyond_dates(_ms), do: "before 0001-01-01 00:00:00 UTC"
 end
