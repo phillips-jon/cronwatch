@@ -16,18 +16,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
   alias Cronwatch.Test.Conformance
   alias Cronwatch.Test.RecordingTransport, as: Rec
 
-  import Conformance, only: [field: 2, list: 2]
-
-  @doc "The fixture's digest of a text: itself when short, else its UTF-16 length and SHA-256."
-  def digest(text) do
-    if JS.len16(text) <= 400,
-      do: Object.new([{"text", text}]),
-      else:
-        Object.new([
-          {"length", JS.len16(text)},
-          {"sha256", Base.encode16(:crypto.hash(:sha256, text), case: :lower)}
-        ])
-  end
+  import Conformance, only: [field: 2, list: 2, digest: 1]
 
   @doc "The fixture's alerts, by name, and the first."
   def alerts(f) do
