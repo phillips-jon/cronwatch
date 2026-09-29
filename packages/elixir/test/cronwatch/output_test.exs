@@ -11,7 +11,7 @@ defmodule Cronwatch.OutputTest do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
   alias Cronwatch.Output
-  alias Cronwatch.Output.Recorder
+  alias Cronwatch.Lines
 
   # The fixture's recipe for long text: a string, or {parts: [[piece, times], ...]} joined.
   defp expand(s) when is_binary(s), do: s
@@ -110,10 +110,13 @@ defmodule Cronwatch.OutputTest do
     cases
     |> Enum.reduce(failures(), fn c, f ->
       name = field(c, "name")
-      rec = c |> list("lines") |> lines() |> Enum.reduce(Recorder.new(), &Recorder.log(&2, &1))
-      text = Recorder.expect_text(rec)
+      t = lines_table()
+      Lines.open(t, :run)
+      for line <- c |> list("lines") |> lines(), do: Lines.log(t, :run, line)
+      snap = Lines.snapshot(t, :run)
+      text = Lines.expect_text(snap)
       f = same(f, "#{name}: expectText", digest(text), field(c, "expectText"))
-      f = same(f, "#{name}: output", digest(Recorder.output(rec)), field(c, "output"))
+      f = same(f, "#{name}: output", digest(Lines.output(snap)), field(c, "output"))
 
       Enum.reduce(list(c, "checks"), f, fn ch, f ->
         needle = field(ch, "expect")
@@ -290,20 +293,34 @@ defmodule Cronwatch.OutputTest do
   end
 
   test "the recorder's metrics and lines" do
-    r = Recorder.new()
-    assert Recorder.metric(r, "cost", :infinity) == {:error, "metric \"cost\" must be a finite number"}
-    assert Recorder.metric(r, "cost", "1") == {:error, "metric \"cost\" must be a finite number"}
+    assert_raise Cronwatch.Error, ~s(metric "cost" must be a finite number), fn ->
+      Cronwatch.check_metric!("cost", Process.get(:no_such_key, :infinity))
+    end
 
-    r =
-      Enum.reduce(["zeta", "200", "10"], r, fn name, r ->
-        {:ok, r} = Recorder.metric(r, name, 2.0)
-        r
-      end)
+    assert_raise Cronwatch.Error, fn -> Cronwatch.check_metric!("cost", "1") end
 
-    assert Object.keys(Recorder.metrics(r)) == ["10", "200", "zeta"]
-    assert Recorder.output(r) == nil and Recorder.expect_text(r) == nil
-    r = r |> Recorder.log("a 1 Error: e") |> Recorder.log("second")
-    assert Recorder.output(r) == "a 1 Error: e\nsecond"
-    assert JS.stringify(Recorder.metrics(r)) == ~s({"10":2,"200":2,"zeta":2})
+    t = lines_table()
+    Lines.open(t, :run)
+    for name <- ["zeta", "200", "10"], do: Lines.metric(t, :run, name, 2.0)
+    assert Object.keys(Lines.metrics(t, :run)) == ["10", "200", "zeta"]
+    snap = Lines.snapshot(t, :run)
+    assert Lines.output(snap) == nil and Lines.expect_text(snap) == nil
+    Lines.log(t, :run, "a 1 Error: e")
+    Lines.log(t, :run, "second")
+    assert Lines.output(Lines.snapshot(t, :run)) == "a 1 Error: e\nsecond"
+    assert JS.stringify(Lines.metrics(t, :run)) == ~s({"10":2.0,"200":2.0,"zeta":2.0}) |> String.replace(".0", "")
   end
+
+  test "the recorder keeps the head for expect and drops the window's front" do
+    t = lines_table()
+    Lines.open(t, :run)
+    Lines.log(t, :run, "done early")
+    for _ <- 1..100, do: Lines.log(t, :run, String.duplicate("x", 1000))
+    snap = Lines.snapshot(t, :run)
+    assert snap.dropped
+    assert String.starts_with?(Lines.expect_text(snap), "done early\n")
+    assert JS.len16(Lines.output(snap)) == 16 * 1024 + JS.len16("[earlier output trimmed]\n")
+  end
+
+  defp lines_table, do: :ets.new(:lines, [:ordered_set, :public])
 end

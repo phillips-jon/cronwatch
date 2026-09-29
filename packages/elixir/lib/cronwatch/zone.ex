@@ -135,7 +135,7 @@ defmodule Cronwatch.Zone do
 
   defp fixed_offset(_), do: nil
 
-  defp digits?(s), do: s != "" and s |> :binary.bin_to_list() |> Enum.all?(&(&1 in ?0..?9))
+  defp digits?(s), do: s |> :binary.bin_to_list() |> Enum.all?(&(&1 in ?0..?9))
 
   @doc """
   The process's own zone: `$TZ` when it names a zone (a leading `:` aside),

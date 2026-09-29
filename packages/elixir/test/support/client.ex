@@ -147,7 +147,12 @@ defmodule Cronwatch.Test.Client do
     cond do
       result = fun.() -> result
       tries == 0 -> raise ExUnit.AssertionError, message: "not true in time"
-      true -> Process.sleep(10) && eventually(fun, tries - 1)
+      true -> sleep_then(fun, tries)
     end
+  end
+
+  defp sleep_then(fun, tries) do
+    Process.sleep(10)
+    eventually(fun, tries - 1)
   end
 end
