@@ -3,7 +3,7 @@ defmodule Cronwatch.Cron do
   A port of croner 10, the cron library the SDK uses: its reading of an
   expression (`Cronwatch.Cron.Pattern`, with its checks and its messages
   word for word) and its walk to the next matching time
-  (`Cronwatch.Cron.Date`), habits included: a day the month does not have
+  (Cronwatch.Cron.Date, internal), habits included: a day the month does not have
   rolls over, a wall-clock time in a spring-forward gap moves forward by the
   gap, and a time that happens twice is the earlier one. The names and the
   order of every step follow croner's source, as the Go, Python, PHP and Rust

@@ -20,7 +20,12 @@ defmodule Cronwatch.MixProject do
       package: package(),
       source_url: @source_url,
       homepage_url: "https://cronwatch.dev",
-      docs: [main: "readme", extras: ["README.md"], source_ref: "v#{@version}"],
+      docs: [
+        main: "readme",
+        extras: ["README.md"],
+        source_ref: "v#{@version}",
+        filter_modules: &public_module?/2
+      ],
       dialyzer: [
         plt_local_path: "_build/plts",
         plt_core_path: "_build/plts",
@@ -72,6 +77,18 @@ defmodule Cronwatch.MixProject do
       _ -> requirement
     end
   end
+
+  # Modules no public type or function hands an app keep their documentation
+  # for whoever reads the code, but are not the package's API, so HexDocs
+  # leaves them out and they can change in any release: the croner port's
+  # walk and the SQL dialects, whose public faces are Cronwatch.Cron and
+  # Cronwatch.Store.Ecto.create_statements/1.
+  @internal [
+    Cronwatch.Cron.Date,
+    Cronwatch.Store.Sql
+  ]
+
+  defp public_module?(module, _meta), do: module not in @internal
 
   # The fixtures are made with TZ=UTC, and a schedule without a zone is read
   # in the process's own, so the tests always run in UTC (test_helper.exs
