@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Elixir service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go or Rust process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/elixir/DESIGN.md) has the plan and how each part works). Phase 1, this release, has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, telemetry), the memory store, and the SQL store over Ecto on SQLite. Postgres and MySQL, the alert channels beyond the console, Claude triage, the dashboard, a job's handler and the Oban and Quantum integrations follow.
+This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go or Rust process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/elixir/DESIGN.md) has the plan and how each part works). Phases 1 and 2 have the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, telemetry), the memory store, the SQL store over Ecto on SQLite, Postgres, MySQL and MariaDB, the pg_cron source, the SDK's fifteen alert channels and Claude triage. The dashboard, a job's handler and the Oban and Quantum integrations follow.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -74,7 +74,7 @@ Cronwatch.finish(run)                                    # or Cronwatch.fail(run
 
 ### Stores
 
-`Cronwatch.Store.Memory` is the default, for tests and trying it out. `{Cronwatch.Store.Ecto, repo: MyApp.Repo, prefix: "cw_"}` keeps the SDK's three tables in your database through your own repo (SQLite in this release). The tables are made on first use, byte for byte as the SDK makes them, so a Node process and an Elixir process can share them in either order; `Cronwatch.Store.Ecto.create_statements/1` gives the statements for a migration of your own. On SQLite keep `journal_mode: :wal` and a `busy_timeout` of at least 5000, and an in-memory database needs `pool_size: 1`. A store's writes never join a transaction your code has open, so a failed run is not rolled back with it.
+`Cronwatch.Store.Memory` is the default, for tests and trying it out. `{Cronwatch.Store.Ecto, repo: MyApp.Repo, prefix: "cw_"}` keeps the SDK's three tables in your database through your own repo, on SQLite (`ecto_sqlite3`), Postgres (`postgrex`), or MySQL 8.0.13 and MariaDB 10.6 or newer (`myxql`). The tables are made on first use, byte for byte as the SDK makes them, so a Node process and an Elixir process can share them in either order; `Cronwatch.Store.Ecto.create_statements/1` gives the statements for a migration of your own. On SQLite keep `journal_mode: :wal` and a `busy_timeout` of at least 5000, and an in-memory database needs `pool_size: 1`. A store's writes never join a transaction your code has open, so a failed run is not rolled back with it.
 
 A store of your own implements `Cronwatch.Store` and is held to the contract every store passes:
 
@@ -83,6 +83,26 @@ defmodule MyApp.StoreTest do
   use Cronwatch.StoreCase, store: {MyApp.Store, []}, fixture: File.read!("path/to/conformance/store.json")
 end
 ```
+
+### Alerts and triage
+
+The SDK's channels, request for request: `Cronwatch.Alerts.Slack`, `Discord`, `Webhook` (signed), `Resend`, `Postmark`, `SendGrid`, `Mailgun`, `SES`, `Twilio`, `Sentry`, `Honeybadger`, `Datadog`, `Rollbar`, `Bugsnag` and `NewRelic`, each given as `{module, opts}` with the SDK's options in snake_case, checked when the instance starts:
+
+```elixir
+alerts: [
+  {Cronwatch.Alerts.Slack, webhook_url: System.fetch_env!("SLACK_WEBHOOK_URL")},
+  {Cronwatch.Alerts.Resend,
+   api_key: System.fetch_env!("RESEND_API_KEY"),
+   from: "CronWatch <alerts@example.com>", to: ["ops@example.com"]}
+],
+triage: {Cronwatch.Triage.Anthropic, context: "A Phoenix app with a Postgres database."}
+```
+
+Requests go through OTP's own `:httpc`, with one ten second deadline, redirects refused, at most 1 MiB of an answer read, TLS always verified, and only a URL's origin in any error; no credential is printed by `inspect`. `transport:` on a channel or the instance takes a `Cronwatch.Transport` of your own (over Req or Finch, say). `Cronwatch.Triage.Anthropic` reads `ANTHROPIC_API_KEY` unless given `api_key:`.
+
+### pg_cron
+
+`{Cronwatch.Sources.PgCron, repo: MyApp.Repo}` in the instance's `sources:` records the runs of pg_cron jobs inside a Postgres database, as the SDK's source does; `jobs:`, `job_ids:` or `pick:` choose which.
 
 ### Telemetry
 
@@ -100,7 +120,7 @@ mix credo --strict
 mix dialyzer
 ```
 
-The tests replay the repository's `conformance/` fixtures, check the croner port against croner itself in Node (3,000 expressions), and share a SQLite file with the SDK; the last two need `npm run build` at the root first, and skip, saying so, without it.
+The tests replay the repository's `conformance/` fixtures, check the croner port against croner itself in Node (3,000 expressions), and share a SQLite file with the SDK; the last two need `npm run build` at the root first, and skip, saying so, without it. The store's server tests and the pg_cron source's run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` hold URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip without them.
 
 ## License
 
