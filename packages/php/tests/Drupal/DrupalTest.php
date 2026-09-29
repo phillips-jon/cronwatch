@@ -576,6 +576,10 @@ final class DrupalTest extends TestCase
     public function testTheCheckReportsCronMissedAndTheNextRunRecovers(): void
     {
         self::setState('cwt.alerts', []);
+        // The check a cron run ends with would itself report missed whenever
+        // the run took longer than the schedule and grace (2s here), leaving
+        // nothing for cronwatch:check to send. Only the explicit check runs.
+        $this->must(['config:set', 'cronwatch.settings', 'check_on_cron', '0', '-y']);
         $this->must(['config:set', 'cronwatch.settings', 'schedule', 'every 1s', '-y']);
         $this->must(['config:set', 'cronwatch.settings', 'grace', '1s', '-y']);
         $this->must(['cron']);
@@ -587,6 +591,7 @@ final class DrupalTest extends TestCase
         $this->assertSame(['missed', 'recovered'], array_column(self::alerts(), 'type'));
         $this->must(['config:set', 'cronwatch.settings', 'schedule', '', '-y']);
         $this->must(['config:set', 'cronwatch.settings', 'grace', '10m', '-y']);
+        $this->must(['config:set', 'cronwatch.settings', 'check_on_cron', '1', '-y']);
     }
 
     public function testQueueWorkersOptInAndEachAttemptIsARun(): void
