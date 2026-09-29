@@ -147,6 +147,10 @@ pub struct TestStore {
     /// How many times `running_runs` was called, and a gate it waits on.
     pub running_runs_calls: std::sync::atomic::AtomicUsize,
     pub running_runs_gate: tokio::sync::Mutex<()>,
+    /// The named methods panic when called.
+    pub panicking: Mutex<HashSet<&'static str>>,
+    /// How long `delete_run_if` waits before it answers.
+    pub delete_delay: Option<std::time::Duration>,
 }
 
 impl TestStore {
@@ -166,6 +170,9 @@ impl TestStore {
     }
 
     fn enter(&self, name: &'static str) -> Result<(), BoxError> {
+        if self.panicking.lock().unwrap().contains(name) {
+            panic!("{name} panicked");
+        }
         if self.broken.lock().unwrap().contains(name) {
             return Err(format!("{name} failed").into());
         }
@@ -268,8 +275,14 @@ impl Store for TestStore {
         job: &'a str,
         status: &'a RunStatus,
     ) -> BoxFuture<'a, Result<bool, BoxError>> {
+        let delay = self.delete_delay;
         if self.no_delete {
-            return Box::pin(async { Err(cronwatch::Unsupported.into()) });
+            return Box::pin(async move {
+                if let Some(delay) = delay {
+                    tokio::time::sleep(delay).await;
+                }
+                Err(cronwatch::Unsupported.into())
+            });
         }
         guarded!(self, "delete_run_if", self.inner.delete_run_if(id, job, status))
     }

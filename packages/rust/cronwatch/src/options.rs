@@ -96,8 +96,6 @@ impl From<i32> for DurationSpec {
 pub struct JobOptions {
     pub(crate) fields: Object,
     pub(crate) expect: Option<ExpectRule>,
-    /// The option names given, for `ClientBuilder::defaults` to refuse others.
-    pub(crate) set: Vec<&'static str>,
 }
 
 impl JobOptions {
@@ -108,7 +106,6 @@ impl JobOptions {
 
     fn put(mut self, key: &'static str, value: impl Into<Value>) -> Self {
         self.fields.set(key, value);
-        self.set.push(key);
         self
     }
 
@@ -159,7 +156,6 @@ impl JobOptions {
         let mut budget = self.fields.get("budget").and_then(Value::as_object).cloned().unwrap_or_default();
         budget.set(metric.into(), ceiling);
         self.fields.set("budget", budget);
-        self.set.push("budget");
         self
     }
 
@@ -167,14 +163,12 @@ impl JobOptions {
     /// Catches the job that exits cleanly and did nothing.
     pub fn expect(mut self, text: impl Into<String>) -> Self {
         self.expect = Some(ExpectRule::Contains(text.into()));
-        self.set.push("expect");
         self
     }
 
     /// Makes a successful run fail unless the pattern matches its output.
     pub fn expect_match(mut self, matcher: impl Matcher + 'static) -> Self {
         self.expect = Some(ExpectRule::Matches(Arc::new(matcher)));
-        self.set.push("expect");
         self
     }
 
@@ -182,7 +176,6 @@ impl JobOptions {
     /// output. A panic in `check` fails the run with what it panicked with.
     pub fn expect_fn(mut self, check: impl Fn(&str) -> bool + Send + Sync + 'static) -> Self {
         self.expect = Some(ExpectRule::Func(Arc::new(check)));
-        self.set.push("expect");
         self
     }
 
@@ -225,7 +218,6 @@ impl JobOptions {
         if other.expect.is_some() {
             self.expect = other.expect;
         }
-        self.set.extend(other.set);
         self
     }
 }

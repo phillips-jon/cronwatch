@@ -43,7 +43,15 @@ impl ExpectRule {
             ExpectRule::Contains(text) => {
                 (!output.contains(text.as_str())).then(|| format!("Output did not contain {}", js::quote(text)))
             }
-            ExpectRule::Matches(m) => (!m.is_match(output)).then(|| format!("Output did not match {}", m.source())),
+            // An app's own Matcher can panic; that fails the run as a
+            // panicking expect function does, rather than the recording.
+            ExpectRule::Matches(m) => {
+                match catch_unwind(AssertUnwindSafe(|| (!m.is_match(output)).then(|| m.source()))) {
+                    Ok(None) => None,
+                    Ok(Some(source)) => Some(format!("Output did not match {source}")),
+                    Err(panic) => Some(format!("Output check threw: {}", crate::panics::panic_text(&*panic))),
+                }
+            }
             ExpectRule::Func(f) => match catch_unwind(AssertUnwindSafe(|| f(output))) {
                 Ok(true) => None,
                 Ok(false) => Some("Output did not pass the expect() check".into()),

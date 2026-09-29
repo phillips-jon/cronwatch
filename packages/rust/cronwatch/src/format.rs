@@ -209,7 +209,7 @@ pub(crate) fn compose_alert(draft: AlertDraft, def: &Definition, now: i64) -> Al
         }
         (AlertType::Stuck, _) => {
             if let Some(run) = run {
-                let ran = run.duration_ms.map_or((now - run.started_at) as f64, |d| d as f64);
+                let ran = run.duration_ms.map_or(now.saturating_sub(run.started_at) as f64, |d| d as f64);
                 lines.push(format!(
                     "Started {} and never reported finishing. Marked as timed out after {}.",
                     when_int(run.started_at, now),

@@ -229,7 +229,7 @@ pub(crate) fn fires_between(p: &Parsed, from: i64, to: i64, limit: usize) -> Opt
 /// fires again.
 pub(crate) fn next_fire(p: &Parsed, from: i64, last_run_at: Option<i64>) -> Option<i64> {
     if p.is_interval() {
-        return Some(last_run_at.unwrap_or(from) + p.every_ms);
+        return Some(last_run_at.unwrap_or(from).saturating_add(p.every_ms));
     }
     fire_after(p, from)
 }
@@ -253,10 +253,10 @@ pub(crate) struct Expectation {
 /// it works for a cron that fires once a year or less.
 pub(crate) fn expect(p: &Parsed, last_run_at: Option<i64>, registered_at: i64, grace_ms: f64) -> Option<Expectation> {
     let due = if p.is_interval() {
-        last_run_at.unwrap_or(registered_at) + p.every_ms
+        last_run_at.unwrap_or(registered_at).saturating_add(p.every_ms)
     } else {
         match last_run_at {
-            None => fire_after(p, registered_at - 1)?,
+            None => fire_after(p, registered_at.saturating_sub(1))?,
             Some(last) => due_after_run(p, last)?,
         }
     };

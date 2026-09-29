@@ -299,6 +299,11 @@ fn error_names_are_the_last_segment_of_the_type() {
         ("alloc::string::String", "Error"),
         ("&str", "Error"),
         ("my_app::lower_case", "Error"),
+        // A pointer is named for what it points to (the audit).
+        ("alloc::boxed::Box<my_app::ReportError>", "ReportError"),
+        ("alloc::sync::Arc<dyn core::error::Error + core::marker::Send + core::marker::Sync>", "Error"),
+        ("alloc::rc::Rc<my_app::Wrapper<my_app::Inner>>", "Wrapper"),
+        ("&alloc::boxed::Box<alloc::sync::Arc<my_app::ReportError>>", "ReportError"),
     ];
     for (name, want) in cases {
         assert_eq!(error_name(name), want, "{name}");

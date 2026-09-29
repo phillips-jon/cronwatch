@@ -72,6 +72,13 @@ pub(crate) fn value_message(value: &js::Value) -> String {
 /// nothing to a reader.
 pub(crate) fn error_name(type_name: &str) -> &str {
     let t = type_name.trim_start_matches('&').trim_start_matches("mut ");
+    // A pointer is named for what it points to: `Box<ReportError>` is a
+    // `ReportError`.
+    for pointer in ["alloc::boxed::Box<", "alloc::sync::Arc<", "alloc::rc::Rc<"] {
+        if let Some(inner) = t.strip_prefix(pointer).and_then(|rest| rest.strip_suffix('>')) {
+            return error_name(inner);
+        }
+    }
     if t.starts_with("dyn ") || t == "str" || t == "alloc::string::String" || t.starts_with("alloc::boxed::Box<dyn ") {
         return "Error";
     }

@@ -125,7 +125,9 @@ fn due_times(job: &JobSummary, parsed: Option<&Parsed>, runs: &[Run], from: i64,
         let next = starts.last().map(|s| s.saturating_add(every)).or(job.next_expected_at);
         if let Some(mut t) = next {
             if t < from {
-                t += ((from - t) as f64 / every as f64).ceil() as i64 * every;
+                // Saturating: a foreign row's start can be anywhere.
+                let steps = (from.saturating_sub(t) as f64 / every as f64).ceil() as i64;
+                t = t.saturating_add(steps.saturating_mul(every));
             }
             while t <= to {
                 set.insert(t);
@@ -184,7 +186,10 @@ fn describe_run(run: &Run, tone: &str, job: &JobSummary, now: i64) -> String {
     let at = format!("{} UTC", when_utc(run.started_at, now));
     match tone {
         "running" => {
-            return format!("running since {at}, {} so far", format_duration((now - run.started_at) as f64));
+            return format!(
+                "running since {at}, {} so far",
+                format_duration(now.saturating_sub(run.started_at) as f64)
+            );
         }
         "stuck" => return format!("running since {at}, past its {} timeout", timeout_text(job)),
         _ => {}
