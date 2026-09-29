@@ -132,32 +132,63 @@ type JobContext struct {
 type contextKey struct{}
 
 // Current is the job context of the run ctx belongs to, or nil outside one.
+// A nil *JobContext is safe to use: it logs and reports nothing, and has
+// no name, run or start, so code shared with work run outside a job (a
+// gocron task, say) may call Current(ctx).Log without a check.
 func Current(ctx context.Context) *JobContext {
 	jc, _ := ctx.Value(contextKey{}).(*JobContext)
 	return jc
 }
 
 // Name is the job's name.
-func (j *JobContext) Name() string { return j.name }
+func (j *JobContext) Name() string {
+	if j == nil {
+		return ""
+	}
+	return j.name
+}
 
 // RunID is the run's id.
-func (j *JobContext) RunID() string { return j.runID }
+func (j *JobContext) RunID() string {
+	if j == nil {
+		return ""
+	}
+	return j.runID
+}
 
 // StartedAt is when the run started, in epoch milliseconds.
-func (j *JobContext) StartedAt() int64 { return j.startedAt }
+func (j *JobContext) StartedAt() int64 {
+	if j == nil {
+		return 0
+	}
+	return j.startedAt
+}
 
 // Log appends a line of output: the parts joined by spaces, strings as they
 // are, errors as "Name: message", anything else as JSON. Kept with the run
 // (the last 16 KB), shown in alerts and on the dashboard.
-func (j *JobContext) Log(parts ...any) { j.rec.Log(parts...) }
+func (j *JobContext) Log(parts ...any) {
+	if j == nil {
+		return
+	}
+	j.rec.Log(parts...)
+}
 
 // Metric reports a number for this run: tokens, cost, rows, anything.
 // Watched against budgets and baselines. A later value for the same name
 // replaces an earlier one.
-func (j *JobContext) Metric(name string, value float64) error { return j.rec.Metric(name, value) }
+func (j *JobContext) Metric(name string, value float64) error {
+	if j == nil {
+		return nil
+	}
+	return j.rec.Metric(name, value)
+}
 
 // Metrics reports several numbers at once.
 func (j *JobContext) Metrics(values Metrics) error {
+	if j == nil {
+		return nil
+	}
 	for _, m := range values {
 		if err := j.rec.Metric(m.Name, m.Value); err != nil {
 			return err
@@ -230,7 +261,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	jc := &JobContext{name: name, runID: run.ID, startedAt: startedAt, rec: rec}
 	timeout, _ := timeoutMs(def.stored)
 	jobCtx, cancel := context.WithTimeoutCause(context.WithValue(ctx, contextKey{}, jc), msDuration(timeout),
-		fmt.Errorf("job %s passed its timeout of %s", js.Quote(name), schedule.FormatDuration(timeout)))
+		timeoutCause{fmt.Sprintf("job %s passed its timeout of %s", js.Quote(name), schedule.FormatDuration(timeout))})
 	out := executed{}
 	var panicText string
 	func() {
@@ -244,7 +275,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	}()
 	cancel()
 
-	if discard != nil && !out.panicked && out.err != nil && discard(out.err) {
+	if discard != nil && !out.panicked && out.err != nil && c.givenBack(name, discard, out.err) {
 		if !recorded || c.discardRun(sctx, run) {
 			out.discarded = true
 			out.run = run
@@ -287,6 +318,27 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	}
 	out.run = run
 	return out
+}
+
+// timeoutCause is why a job's context ended at its timeout. It is a
+// context.DeadlineExceeded for errors.Is, as the context's own error is,
+// so a job that returns the cause keeps the standard sentinel.
+type timeoutCause struct{ text string }
+
+func (e timeoutCause) Error() string { return e.text }
+
+func (timeoutCause) Unwrap() error { return context.DeadlineExceeded }
+
+// givenBack is discard(err), a panic in it reported and the run not given
+// back, so it is recorded rather than left running to be reported stuck.
+func (c *Client) givenBack(name string, discard func(error) bool, err error) (back bool) {
+	defer func() {
+		if p := recover(); p != nil {
+			c.report(fmt.Errorf("panicked: %v", p), "discarding "+name)
+			back = false
+		}
+	}()
+	return discard(err)
 }
 
 // msDuration is ms milliseconds as a time.Duration, held at the longest

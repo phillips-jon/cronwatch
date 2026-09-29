@@ -73,9 +73,21 @@ func DescribeError(v any) string {
 	case string:
 		return js.WellFormed(t)
 	case error:
-		return ErrorName(t) + ": " + js.WellFormed(t.Error())
+		return ErrorName(t) + ": " + js.WellFormed(errorText(t))
 	}
 	return jsonText(v)
+}
+
+// errorText is err.Error(), or what fmt prints for err when that panics
+// (a nil *MyErr returned as an error, whose method reads its receiver):
+// "<nil>", or fmt's "%!v(PANIC=...)", never a panic out of CronWatch.
+func errorText(err error) (text string) {
+	defer func() {
+		if recover() != nil {
+			text = fmt.Sprint(err)
+		}
+	}()
+	return err.Error()
 }
 
 // ErrorMessage is errorMessage: the error described, capped like output.
@@ -160,7 +172,7 @@ func LogText(part any) string {
 	case string:
 		return js.WellFormed(t)
 	case error:
-		return ErrorName(t) + ": " + js.WellFormed(t.Error())
+		return ErrorName(t) + ": " + js.WellFormed(errorText(t))
 	}
 	return jsonText(part)
 }

@@ -579,6 +579,67 @@ func queued(t *testing.T, store cronwatch.Store, c *clockOf, name string) {
 	}
 }
 
+// readsItself is an error whose Error reads its receiver, so a nil one
+// panics there.
+type readsItself struct{ why string }
+
+func (e *readsItself) Error() string { return e.why }
+
+// The audit: a nil *T returned as an error (or logged) panicked inside
+// CronWatch after the job returned, leaving its run running.
+func TestATypedNilErrorIsRecorded(t *testing.T) {
+	k := newKit(t)
+	err := k.cw.Run(bg, "typed", func(_ context.Context, j *cronwatch.JobContext) error {
+		var e *readsItself
+		j.Log(e)
+		return e
+	})
+	if err == nil {
+		t.Fatal("the error was lost")
+	}
+	run := runs(t, k.cw, "typed")[0]
+	eq(t, "failed", run.Status, cronwatch.StatusFailed)
+	eq(t, "error", *run.Error, "Error: <nil>")
+	eq(t, "output", *run.Output, "Error: <nil>")
+}
+
+// The audit: a DiscardWhen predicate that panicked escaped Run after the
+// run was inserted, leaving it running.
+func TestADiscardPredicateThatPanicsIsReported(t *testing.T) {
+	k := newKit(t)
+	job := k.cw.MustJob("given")
+	err := job.Run(bg, fails("later"), cronwatch.DiscardWhen(func(error) bool { panic("predicate broke") }))
+	if err == nil {
+		t.Fatal("the error was lost")
+	}
+	eq(t, "failed", runs(t, k.cw, "given")[0].Status, cronwatch.StatusFailed)
+	eq(t, "reported", strings.Join(k.errors.List(), "\n"), "discarding given: panicked: predicate broke")
+}
+
+// The audit: Current(ctx) is nil outside a run, and its methods panicked.
+func TestANilJobContextDoesNothing(t *testing.T) {
+	jc := cronwatch.Current(bg)
+	jc.Log("nobody hears this")
+	check(t, jc.Metric("rows", 1))
+	check(t, jc.Metrics(cronwatch.Metrics{{Name: "rows", Value: 1}}))
+	eq(t, "name", jc.Name()+jc.RunID(), "")
+	eq(t, "started", jc.StartedAt(), int64(0))
+}
+
+// The audit: a job's timeout cause was not a context.DeadlineExceeded.
+func TestTheTimeoutCauseIsADeadline(t *testing.T) {
+	k := newKit(t)
+	var cause error
+	_ = k.cw.Run(bg, "slow", func(ctx context.Context, _ *cronwatch.JobContext) error {
+		<-ctx.Done()
+		cause = context.Cause(ctx)
+		return cause
+	}, cronwatch.Timeout(20))
+	if !errors.Is(cause, context.DeadlineExceeded) || cause.Error() != `job "slow" passed its timeout of 20ms` {
+		t.Fatalf("cause %v", cause)
+	}
+}
+
 // The audit: a store that panicked in a Start with a run id left that id's
 // start in flight for good, so every later Start of it waited forever.
 func TestAStartThatPanickedEndsForTheNextOne(t *testing.T) {
