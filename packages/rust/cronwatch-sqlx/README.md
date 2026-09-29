@@ -16,11 +16,14 @@ cronwatch-sqlx = { version = "0.6", features = ["postgres"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres"] }
 ```
 
-```rust
+```rust,no_run
 use cronwatch_sqlx::SqlStore;
+# async fn doc() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL")?).await?;
 let cw = cronwatch::Client::builder().store(SqlStore::postgres(pool).prefix("cronwatch_")?).build()?;
+# Ok(())
+# }
 ```
 
 `SqlStore::sqlite(pool)` and `SqlStore::mysql(pool)` are the same for the other two. The tables are made at the client's first use: on Postgres under an advisory lock, so many processes can start at once.
@@ -34,10 +37,13 @@ let cw = cronwatch::Client::builder().store(SqlStore::postgres(pool).prefix("cro
 ```rust
 use std::sync::Arc;
 use cronwatch_sqlx::{PgCron, PgCronOptions, SqlStore};
+# fn doc(pool: sqlx::PgPool) -> Result<(), cronwatch::Error> {
 
 let source = PgCron::new(pool.clone(), PgCronOptions { prefix: "db:".into(), ..Default::default() });
 let cw = cronwatch::Client::builder().store(SqlStore::postgres(pool)).source(Arc::new(source)).build()?;
 cw.start(std::time::Duration::from_secs(60));
+# Ok(())
+# }
 ```
 
 On every check the source reads `cron.job`, declares each job with its schedule (in `cron.timezone`, read from `pg_settings`, else UTC), and copies new rows of `cron.job_run_details` in as runs, so missed, failed, stuck and slow runs alert as any other job's do. The first time it sees a job it copies the twenty newest runs without alerting. A job renamed, unscheduled or no longer picked keeps its history under its old name, declared again without a schedule. `PgCronOptions` picks jobs (`jobs`, `job_ids` or `pick`), names them (`prefix`, `job_name`) and gives them options (`options`, `options_for`). The pool must be on the database pg_cron runs in (its `cron.database_name`); pg_cron's row level security shows a role only its own jobs.

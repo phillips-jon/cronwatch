@@ -18,6 +18,7 @@ use apalis_cron::Tick;
 use cronwatch::{Client, JobOptions};
 use cronwatch_apalis::{Options, Watcher};
 use std::time::Duration;
+# async fn doc(store: cronwatch::MemoryStore) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 async fn nightly_report(_: Tick) -> Result<(), BoxDynError> {
     if let Some(job) = cronwatch::current() {
@@ -35,6 +36,8 @@ let worker = WorkerBuilder::new("nightly-report")
     .build(nightly_report);
 tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start(...)
 worker.run().await?;
+# Ok(())
+# }
 ```
 
 - **Schedules.** `watcher.cron(name, expr, zone, options)` declares the job and gives apalis-cron a schedule that is CronWatch's own reading of it (the port of croner the SDK uses), so the worker runs exactly when CronWatch expects. `cronwatch_apalis::schedule(expr, zone)` is the same schedule without a declaration. With the `cron` feature, `watcher.cron_schedule(name, schedule, tz, options)` takes a `cron::Schedule`, which apalis-cron runs itself, and declares its source text once it is checked against the `cron` crate's own fire times; one that differs (the `cron` crate counts the days of the week from 1, Sunday) is reported once and watched without a schedule.

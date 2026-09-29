@@ -450,3 +450,8 @@ impl<Args> tower_service::Service<Task<Args>> for CheckService {
 
 #[cfg(test)]
 mod tests;
+
+// The README's examples, compiled as doc tests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct Readme;

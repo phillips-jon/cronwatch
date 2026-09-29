@@ -35,3 +35,14 @@ pub use pgcron::{PgCron, PgCronJob, PgCronOptions};
 pub use sql::{DEFAULT_PREFIX, Dialect};
 #[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 pub use store::SqlStore;
+
+// The READMEs' examples, compiled (and those that can, run) as doc tests.
+// The workspace's README is the core's, but its examples use this crate, so
+// they are tested here.
+#[cfg(doctest)]
+#[doc = include_str!("../../README.md")]
+struct WorkspaceReadme;
+
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct Readme;

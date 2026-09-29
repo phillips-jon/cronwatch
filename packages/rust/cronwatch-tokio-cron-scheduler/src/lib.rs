@@ -589,3 +589,8 @@ fn runs(cron: Cron, offset: FixedOffset) -> impl Fn(i64, Option<i64>) -> Result<
 
 #[cfg(test)]
 mod tests;
+
+// The README's examples, compiled as doc tests.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct Readme;
