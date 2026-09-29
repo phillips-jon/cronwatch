@@ -74,6 +74,15 @@ await quietly(sync.run(() => {
 }));
 
 cw.job("never-ran", { schedule: "0 * * * *" });
+
+// A run as a foreign or damaged row could hold it: started before the year 1,
+// so the pages write it in words rather than as a date. It fails on its
+// expect rather than by throwing, whose stack would name this file's path.
+const farBack = cw.job("far-back", { timeout: "5m", expect: "far" });
+now = -62_135_596_800_001;
+await quietly(farBack.run(() => {
+  now += 1000;
+}));
 now = T0;
 
 const routes = cw.routes({ token: "tok", basePath: "/cronwatch" });
@@ -94,6 +103,8 @@ const requests = [
   ["GET", "/cronwatch/jobs/nightly-report", bearer],
   ["GET", "/cronwatch/jobs/broken", bearer],
   ["GET", "/cronwatch/jobs/never-ran", bearer],
+  ["GET", "/cronwatch/jobs/far-back", bearer],
+  ["GET", "/cronwatch/api/jobs/far-back", bearer],
   ["GET", "/cronwatch/jobs/missing", bearer],
   ["POST", "/cronwatch/api/check", bearer],
   ["GET", "/cronwatch/api/check", cookie],

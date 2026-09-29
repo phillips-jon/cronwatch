@@ -6,12 +6,12 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import Database from "better-sqlite3";
 import pg from "pg";
-import { cronwatch } from "../src/index.js";
+import { cronwatch, custom } from "../src/index.js";
 import { retryBusy } from "../src/stores/busy.js";
 import { memory } from "../src/stores/memory.js";
 import { postgres } from "../src/stores/postgres.js";
 import { sqlite } from "../src/stores/sqlite.js";
-import type { JobState, Store } from "../src/types.js";
+import type { Alert, JobState, Store } from "../src/types.js";
 import { conformance, run } from "./store-conformance.js";
 
 const PG = process.env.CRONWATCH_TEST_PG;
@@ -113,21 +113,24 @@ async function replayForeignVersions(store: Store, writeRaw: (text: string) => P
   }
 }
 
-// The job is silenced: an alert's text shows the start as a date, and no
-// date is that far back.
+// The stuck alert is sent: its text writes a start before the year 1 as
+// words, not as a date.
 async function checkOverForeignRows(store: Store, exec: (sql: string) => Promise<void>, p = "cronwatch_") {
-  const cw = cronwatch({ store, alerts: [], cronSecret: null, onError: (e) => { throw e; } });
+  const sent: Alert[] = [];
+  const cw = cronwatch({ store, alerts: [custom("capture", (alert) => void sent.push(alert))], cronSecret: null, onError: (e) => { throw e; } });
   await store.init!();
   await store.upsertJob({ name: "far", timeout: "5m" }, 1);
   await exec(`INSERT INTO ${p}runs (id, job, status, started_at, metrics, trigger) VALUES ('far1', 'far', 'running', -9223372036854775808, '{}', 'run')`);
-  await exec(`INSERT INTO ${p}state (job, state) VALUES ('far', '{"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":4102444800000,"lastAlertAt":null,"version":1.5}')`);
+  await exec(`INSERT INTO ${p}state (job, state) VALUES ('far', '{"job":"far","open":{},"consecutiveFailures":0,"silencedUntil":null,"lastAlertAt":null,"version":1.5}')`);
   for (let i = 0; i < 2; i++) await cw.check();
   const run = (await store.getRun("far1"))!;
   assert.equal(run.status, "timeout");
   assert.equal(run.durationMs, Number.MAX_SAFE_INTEGER, "the duration is held at 2^53 - 1");
   const state = (await store.getState("far"))!;
-  assert.equal(state.version, 1, "the state's 1.5 counted as 0 and was written over");
+  assert.equal(state.version, 2, "the state's 1.5 counted as 0, then the timeout and the alert each wrote it");
   assert.equal(state.consecutiveFailures, 1);
+  assert.deepEqual(sent.map((a) => a.type), ["stuck"]);
+  assert.equal(sent[0]!.message.split("\n")[0], "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h.");
 }
 
 await test("sqlite: a foreign state's version counts as stateVersion() reads it (store.json foreignVersion)", async () => {

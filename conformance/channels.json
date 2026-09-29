@@ -402,6 +402,68 @@
         "message": "Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.",
         "at": 1767605460000
       }
+    },
+    {
+      "name": "a stuck run from a foreign row, before the year 1",
+      "alert": {
+        "type": "stuck",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "timeout",
+          "startedAt": -9007199254740991,
+          "finishedAt": 1767605401500,
+          "durationMs": 9007199254740991,
+          "error": null,
+          "output": "started",
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly is stuck",
+        "message": "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h.\nOutput so far (tail):\nstarted\nIf the process was killed mid-run (a serverless timeout, a deploy), this is what that looks like.",
+        "at": 1767605400000
+      }
+    },
+    {
+      "name": "a failure from a foreign row, after 9999",
+      "alert": {
+        "type": "failed",
+        "run": {
+          "id": "r1",
+          "job": "nightly",
+          "status": "failed",
+          "startedAt": 253402300800000,
+          "finishedAt": 1767605401500,
+          "durationMs": 1500,
+          "error": "Error: far",
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        },
+        "details": {
+          "consecutiveFailures": 1,
+          "threshold": 1
+        },
+        "job": "nightly",
+        "definition": {
+          "name": "nightly",
+          "schedule": "0 2 * * *",
+          "grace": "15m"
+        },
+        "title": "nightly failed",
+        "message": "Started after 9999-12-31 23:59:59 UTC, ran 2s.\nError: far",
+        "at": 1767605400000
+      }
     }
   ],
   "sends": [
@@ -596,6 +658,35 @@
       "body": {
         "length": 459,
         "sha256": "6d36a9d162221a13f42acd7b69387fe93c170d16f93bcaaba3a5cbcef5642b62"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 663,
+        "sha256": "83b0c34112001c86ad97a33da17b7b946b1286366e80e31525898d687db3d141"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"text\":\"nightly failed\\nStarted after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\":x: *nightly failed*\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"```Started after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far```\"}}]}"
       }
     },
     {
@@ -806,6 +897,37 @@
       }
     },
     {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 715,
+        "sha256": "dfa73db2961cd50cbbd66f063a8fbf3f8a14016adbdfc2eab1ba8f3aeaa613a1"
+      }
+    },
+    {
+      "channel": "slack",
+      "options": {
+        "webhookUrl": "https://hooks.slack.example/T/B/secret",
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "url": "https://hooks.slack.example/T/B/secret",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"text\":\"nightly failed\\nStarted after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far\",\"blocks\":[{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\":x: *nightly failed* (<https://app.example/cronwatch/jobs/nightly|open>)\"}},{\"type\":\"section\",\"text\":{\"type\":\"mrkdwn\",\"text\":\"```Started after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far```\"}}]}"
+      }
+    },
+    {
       "channel": "discord",
       "options": {
         "webhookUrl": "https://discord.example/api/webhooks/1/x"
@@ -991,6 +1113,35 @@
       },
       "body": {
         "text": "{\"content\":\"nightly is no longer scheduled\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly is no longer scheduled\",\"description\":\"```\\nMissed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\\n```\",\"color\":2067020,\"timestamp\":\"2026-01-05T09:31:00.000Z\"}]}"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 425,
+        "sha256": "8b556cde3e768ba98a1d63cef26e087880f5f6e3dc89e399ca05008b62457936"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly failed\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly failed\",\"description\":\"```\\nStarted after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far\\n```\",\"color\":12986408,\"timestamp\":\"2026-01-05T09:30:00.000Z\"}]}"
       }
     },
     {
@@ -1198,6 +1349,37 @@
       }
     },
     {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "length": 476,
+        "sha256": "3681e01ee4d19babb7e5ee87fe0cd03fcd976e0306f7ec9bb3bedbde91bdbe60"
+      }
+    },
+    {
+      "channel": "discord",
+      "options": {
+        "webhookUrl": "https://discord.example/api/webhooks/1/x",
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "url": "https://discord.example/api/webhooks/1/x",
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "{\"content\":\"nightly failed\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[{\"title\":\"nightly failed\",\"url\":\"https://app.example/cronwatch/jobs/nightly\",\"description\":\"```\\nStarted after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far\\n```\",\"color\":12986408,\"timestamp\":\"2026-01-05T09:30:00.000Z\"}]}"
+      }
+    },
+    {
       "channel": "webhook",
       "options": {
         "url": "https://hooks.example.com/cronwatch?key=secret"
@@ -1402,6 +1584,38 @@
       },
       "body": {
         "text": "{\"type\":\"recovered\",\"run\":null,\"details\":{\"after\":[\"missed\"],\"reason\":\"unscheduled\",\"since\":1767594600000},\"job\":\"nightly\",\"definition\":{\"name\":\"nightly\",\"grace\":\"15m\"},\"title\":\"nightly is no longer scheduled\",\"message\":\"Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\",\"at\":1767605460000}"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 651,
+        "sha256": "75ac74e9b207356a6d43121af9c1f78d25654c373532a098aadb9ed08c5ba9d9"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com/cronwatch?key=secret"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "url": "https://hooks.example.com/cronwatch?key=secret",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch"
+      },
+      "body": {
+        "length": 456,
+        "sha256": "cff6f8ac7b7020db0fc081ee1ddd840aa43c1e6ec33b4381a4d77f73e2a69284"
       }
     },
     {
@@ -1687,6 +1901,50 @@
       },
       "body": {
         "text": "{\"type\":\"recovered\",\"run\":null,\"details\":{\"after\":[\"missed\"],\"reason\":\"unscheduled\",\"since\":1767594600000},\"job\":\"nightly\",\"definition\":{\"name\":\"nightly\",\"grace\":\"15m\"},\"title\":\"nightly is no longer scheduled\",\"message\":\"Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\",\"at\":1767605460000}"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=56f483afcc99dae798ae0badc9b861aa9920841bdd6e4c86eda4f08bf1ed368b"
+      },
+      "body": {
+        "length": 651,
+        "sha256": "75ac74e9b207356a6d43121af9c1f78d25654c373532a098aadb9ed08c5ba9d9"
+      }
+    },
+    {
+      "channel": "webhook",
+      "options": {
+        "url": "https://hooks.example.com:8443/in",
+        "secret": "s3cret",
+        "headers": {
+          "authorization": "Bearer abc"
+        }
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "url": "https://hooks.example.com:8443/in",
+      "headers": {
+        "content-type": "application/json",
+        "user-agent": "cronwatch",
+        "authorization": "Bearer abc",
+        "x-cronwatch-signature": "sha256=26d8b4ae930d819a4b3d7de7823548ef6981acb206d58a40e8d8a5701e7b31d9"
+      },
+      "body": {
+        "length": 456,
+        "sha256": "cff6f8ac7b7020db0fc081ee1ddd840aa43c1e6ec33b4381a4d77f73e2a69284"
       }
     }
   ],
@@ -2241,6 +2499,62 @@
       "channel": "resend",
       "options": {
         "apiKey": "re_secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "subjectPrefix": "[prod]",
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-ed16bf3ac9741add5f263b949476743e"
+          },
+          "body": {
+            "length": 1164,
+            "sha256": "4f9891b1d01dcdd84c2ea1159ad95708da7e0d284e3678db86efc23d41b61464"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": "re_secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "subjectPrefix": "[prod]",
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-7ed8f7c945800b09c4d6661b6940adfa"
+          },
+          "body": {
+            "length": 794,
+            "sha256": "c1e93c70027c7ca5d54876b05b4b0c47b2d22895c429f96552b9ae439e78032d"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": "re_secret",
         "from": "alerts@example.com",
         "to": "ops@example.com"
       },
@@ -2532,6 +2846,52 @@
           "body": {
             "length": 778,
             "sha256": "ee89f147b9fba051d143932b73ecc809d922a674a6ab796f72c47c38f9a2cbca"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": "re_secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-ed16bf3ac9741add5f263b949476743e"
+          },
+          "body": {
+            "length": 976,
+            "sha256": "9378a9e7f6c14be97978aeacd6207c6a870f7a11cc49798f07f6d69254c62639"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": "re_secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-7ed8f7c945800b09c4d6661b6940adfa"
+          },
+          "body": {
+            "length": 606,
+            "sha256": "0eaf9f82df466a10bf721a9c9774d4cb0d7a9e16fddeef549b0999368be68aa6"
           }
         }
       ]
@@ -2891,6 +3251,60 @@
       "channel": "postmark",
       "options": {
         "serverToken": "pm-secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.postmarkapp.com/email",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-postmark-server-token": "pm-secret"
+          },
+          "body": {
+            "length": 1207,
+            "sha256": "4a72a5807d0a128a1ea77d1ddb0e1dd1b1200e66e6833e7d8e0b50c1a270d890"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "postmark",
+      "options": {
+        "serverToken": "pm-secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.postmarkapp.com/email",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-postmark-server-token": "pm-secret"
+          },
+          "body": {
+            "length": 837,
+            "sha256": "36aa732078e9f63ec718571aca7657c00bbca17d43c0d282193b3586713a47e6"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "postmark",
+      "options": {
+        "serverToken": "pm-secret",
         "from": "alerts@example.com",
         "to": "ops@example.com",
         "messageStream": "alerts",
@@ -3208,6 +3622,56 @@
           "body": {
             "length": 834,
             "sha256": "d170242cf782f32758713cb7ca21c16b6cdde1eacf896231a19a5e8af8e1412d"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "postmark",
+      "options": {
+        "serverToken": "pm-secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "messageStream": "alerts",
+        "subjectPrefix": "[prod]"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.postmarkapp.com/email",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-postmark-server-token": "pm-secret"
+          },
+          "body": {
+            "length": 1032,
+            "sha256": "a8a0424e66a4e00c3779f066529f9f0dbe8f2c9e2cac3797172c8bdc8d63c319"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "postmark",
+      "options": {
+        "serverToken": "pm-secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "messageStream": "alerts",
+        "subjectPrefix": "[prod]"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.postmarkapp.com/email",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-postmark-server-token": "pm-secret"
+          },
+          "body": {
+            "length": 662,
+            "sha256": "8eff0b0cb6302d1e8da8bdf2fb7f49f9da0ed685887ed8e3a42ad2d730fa9cbe"
           }
         }
       ]
@@ -3554,6 +4018,58 @@
       "channel": "sendgrid",
       "options": {
         "apiKey": "SG.secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "Ops <ops@example.com>",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.sendgrid.com/v3/mail/send",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer SG.secret"
+          },
+          "body": {
+            "length": 1314,
+            "sha256": "21e93c68a88d4e01a5553cd8259cd459d307f07bf2bc67759b45947cd522246c"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sendgrid",
+      "options": {
+        "apiKey": "SG.secret",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "Ops <ops@example.com>",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.sendgrid.com/v3/mail/send",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer SG.secret"
+          },
+          "body": {
+            "length": 944,
+            "sha256": "9b5fd6c35818038f200b76e8674a093f49bb2059c376ed1f327c76e21a7ccaf5"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sendgrid",
+      "options": {
+        "apiKey": "SG.secret",
         "from": "alerts@example.com",
         "to": "ops@example.com",
         "region": "eu"
@@ -3845,6 +4361,52 @@
           "body": {
             "length": 905,
             "sha256": "59921800528b455e05e9f4e444849296c8a3e5e56a8af76dd1714484d69b456f"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sendgrid",
+      "options": {
+        "apiKey": "SG.secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "region": "eu"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.eu.sendgrid.com/v3/mail/send",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer SG.secret"
+          },
+          "body": {
+            "length": 1103,
+            "sha256": "64d78baefbd7f7af25ea4b5366e3dee3c50199cfe883efa87fd4fbd0967fe40f"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sendgrid",
+      "options": {
+        "apiKey": "SG.secret",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "region": "eu"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.eu.sendgrid.com/v3/mail/send",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer SG.secret"
+          },
+          "body": {
+            "length": 733,
+            "sha256": "26b5c55b8758f6b237f5213a6c1f998fe252d7b4eab19ceb4c8bba33264be33d"
           }
         }
       ]
@@ -4205,6 +4767,60 @@
       "options": {
         "apiKey": "key-secret",
         "domain": "mg.example.com",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.mailgun.net/v3/mg.example.com/messages",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
+          },
+          "body": {
+            "length": 1397,
+            "sha256": "7b5450c62114f6a9b1343eb49d682697a5dfde2ea96da37b1706855673fcceb8"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mailgun",
+      "options": {
+        "apiKey": "key-secret",
+        "domain": "mg.example.com",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.mailgun.net/v3/mg.example.com/messages",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
+          },
+          "body": {
+            "length": 1003,
+            "sha256": "23f98240f024b2e3c7c8ddb09fc7ad2b3db905e8f648bbe6961d0de8e216e3d9"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mailgun",
+      "options": {
+        "apiKey": "key-secret",
+        "domain": "mg.example.com",
         "from": "alerts@example.com",
         "to": "ops@example.com",
         "region": "eu"
@@ -4508,6 +5124,54 @@
           "body": {
             "length": 934,
             "sha256": "3ed1861c5c5f3bf3a5c7b3e271b54155875ed775c81fc0eb4f30036fa8fb094c"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mailgun",
+      "options": {
+        "apiKey": "key-secret",
+        "domain": "mg.example.com",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "region": "eu"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.eu.mailgun.net/v3/mg.example.com/messages",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
+          },
+          "body": {
+            "length": 1150,
+            "sha256": "4ed9735391f466ce50cc0c9a65a793b5a2db6537f1e2dfd9d992f48b5959f85e"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "mailgun",
+      "options": {
+        "apiKey": "key-secret",
+        "domain": "mg.example.com",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "region": "eu"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.eu.mailgun.net/v3/mg.example.com/messages",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic YXBpOmtleS1zZWNyZXQ="
+          },
+          "body": {
+            "length": 756,
+            "sha256": "2d0f4c9ec1926a3e138eac500621566a6316d8d061d419d8fb8bb4f13443d7f6"
           }
         }
       ]
@@ -4905,6 +5569,66 @@
     {
       "channel": "ses",
       "options": {
+        "region": "us-east-1",
+        "accessKeyId": "AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "now": 1767605400000,
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=5d9dae0d31ac2b9b0ee926d7a8b483c47e9f255dec6dfd05961ddc6d8843ade6"
+          },
+          "body": {
+            "length": 1359,
+            "sha256": "79c2e77d9a456b61a529c155335b9993b12bc5ee5285be814a90681a8ef3c838"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": "AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "from": "CronWatch <alerts@example.com>",
+        "to": [
+          "ops@example.com",
+          "dev@example.com"
+        ],
+        "now": 1767605400000,
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=0eda72a5d9d6e913fcedfe962d027d404b218c73d3115979c7848a10bb75496c"
+          },
+          "body": {
+            "length": 989,
+            "sha256": "bd013de3578b8abdd11a54a047d393e864e7b744e9397a66c4ec65a917c65e99"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
         "region": "eu-west-1",
         "accessKeyId": "AKIDEXAMPLE",
         "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
@@ -5275,6 +5999,64 @@
           "body": {
             "length": 1012,
             "sha256": "a6921ecb7f7a9f8b979162e730c72d88c6fddef21eb6978daeeeb7d45697eb8e"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "eu-west-1",
+        "accessKeyId": "AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "sessionToken": "session-token",
+        "configurationSetName": "alerts",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767609000000
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://email.eu-west-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T103000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/eu-west-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=d6d0c7b17bfe2e4d1ff92c89803549d809aaf1f339565e6a8c93c5dad9b00a04"
+          },
+          "body": {
+            "length": 1210,
+            "sha256": "5eaefe680e1e05a9f62b815423b8c8a323b5f5ef6ec5b00f6796a5a4a360ccd1"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "eu-west-1",
+        "accessKeyId": "AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        "sessionToken": "session-token",
+        "configurationSetName": "alerts",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767609000000
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://email.eu-west-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T103000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/eu-west-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=d670cc69067a4579b76243720ae3a38cb2687f6de9eaa6ceabce2635ea482e2f"
+          },
+          "body": {
+            "length": 840,
+            "sha256": "167b0a8beb04e9f27e98daf8d279dc2145daafb900ea84cb4fd018e03fa5c31d"
           }
         }
       ]
@@ -5713,6 +6495,78 @@
       "channel": "twilio",
       "options": {
         "accountSid": "AC00000000000000000000000000000000",
+        "authToken": "tw-secret",
+        "from": "+15005550006",
+        "to": [
+          "+15551110000",
+          "+15552220000"
+        ],
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+is+stuck%0AStarted+before+0001-01-01+00%3A00%3A00+UTC+and+never+reported+finishing.+Marked+as+timed+out+after+104249991d+8h.%0AOutput+so+far+%28tail%29%3A%0Astarted%0AIf+the+process+was+killed+mid-run+%28a+serverless+timeout%2C+a+deploy%29%2C+this+is+what+that+looks+like.%0Ahttps%3A%2F%2Fapp.example%2Fcronwatch%2Fjobs%2Fnightly"
+          }
+        },
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15552220000&From=%2B15005550006&Body=nightly+is+stuck%0AStarted+before+0001-01-01+00%3A00%3A00+UTC+and+never+reported+finishing.+Marked+as+timed+out+after+104249991d+8h.%0AOutput+so+far+%28tail%29%3A%0Astarted%0AIf+the+process+was+killed+mid-run+%28a+serverless+timeout%2C+a+deploy%29%2C+this+is+what+that+looks+like.%0Ahttps%3A%2F%2Fapp.example%2Fcronwatch%2Fjobs%2Fnightly"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": "AC00000000000000000000000000000000",
+        "authToken": "tw-secret",
+        "from": "+15005550006",
+        "to": [
+          "+15551110000",
+          "+15552220000"
+        ],
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+failed%0AStarted+after+9999-12-31+23%3A59%3A59+UTC%2C+ran+2s.%0AError%3A+far%0Ahttps%3A%2F%2Fapp.example%2Fcronwatch%2Fjobs%2Fnightly"
+          }
+        },
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15552220000&From=%2B15005550006&Body=nightly+failed%0AStarted+after+9999-12-31+23%3A59%3A59+UTC%2C+ran+2s.%0AError%3A+far%0Ahttps%3A%2F%2Fapp.example%2Fcronwatch%2Fjobs%2Fnightly"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": "AC00000000000000000000000000000000",
         "apiKeySid": "SK00000000000000000000000000000000",
         "apiKeySecret": "sk-secret",
         "messagingServiceSid": "MG00000000000000000000000000000000",
@@ -6036,6 +6890,56 @@
       ]
     },
     {
+      "channel": "twilio",
+      "options": {
+        "accountSid": "AC00000000000000000000000000000000",
+        "apiKeySid": "SK00000000000000000000000000000000",
+        "apiKeySecret": "sk-secret",
+        "messagingServiceSid": "MG00000000000000000000000000000000",
+        "to": "+15551110000",
+        "recovered": true,
+        "segments": 1
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic U0swMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDpzay1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&MessagingServiceSid=MG00000000000000000000000000000000&Body=nightly+is+stuck%0AStarted+before+0001-01-01+00%3A00%3A00+UTC+and+never+reported+finishing.+Marked+as+timed+out+after+104249991d+8h.%0AOutput+so+far+%28tail%29%3A%0Astarted"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": "AC00000000000000000000000000000000",
+        "apiKeySid": "SK00000000000000000000000000000000",
+        "apiKeySecret": "sk-secret",
+        "messagingServiceSid": "MG00000000000000000000000000000000",
+        "to": "+15551110000",
+        "recovered": true,
+        "segments": 1
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic U0swMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDpzay1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&MessagingServiceSid=MG00000000000000000000000000000000&Body=nightly+failed%0AStarted+after+9999-12-31+23%3A59%3A59+UTC%2C+ran+2s.%0AError%3A+far"
+          }
+        }
+      ]
+    },
+    {
       "channel": "sentry",
       "options": {
         "dsn": "https://pubkey@o1.ingest.sentry.io/42",
@@ -6304,6 +7208,48 @@
           "body": {
             "length": 714,
             "sha256": "0579bcf4e0d5e07ac32779c934114593b58e7f2381bb9941e5e0d55bf06091d7"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": "https://pubkey@o1.ingest.sentry.io/42",
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 876,
+            "sha256": "270920638f5310780cb002770e84421493c81ae19d5458fa9754b9f208122789"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": "https://pubkey@o1.ingest.sentry.io/42",
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 681,
+            "sha256": "3912becbe4c9a9dceb95659a3466520f13a8b55160477bf8bd317f480a2ced00"
           }
         }
       ]
@@ -6584,6 +7530,52 @@
       "requests": []
     },
     {
+      "channel": "sentry",
+      "options": {
+        "dsn": "https://pubkey@sentry.example.com/prefix/7",
+        "environment": "staging",
+        "release": "app@1.2.3",
+        "recovered": false
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://sentry.example.com/prefix/api/7/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 843,
+            "sha256": "52f315910b3538c8fa706504fd90cd7ecccfc93e9cb8bdea68ca1cea87964621"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": "https://pubkey@sentry.example.com/prefix/7",
+        "environment": "staging",
+        "release": "app@1.2.3",
+        "recovered": false
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://sentry.example.com/prefix/api/7/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 648,
+            "sha256": "71b8efb1d59e3c92fe1343c2393a06e4a48fb5128b6593e7f373c552a5ed0b86"
+          }
+        }
+      ]
+    },
+    {
       "channel": "honeybadger",
       "options": {
         "apiKey": "hb-secret",
@@ -6842,6 +7834,50 @@
       },
       "alert": "no longer scheduled",
       "requests": []
+    },
+    {
+      "channel": "honeybadger",
+      "options": {
+        "apiKey": "hb-secret",
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.honeybadger.io/v1/notices",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-api-key": "hb-secret"
+          },
+          "body": {
+            "length": 855,
+            "sha256": "74b765463d895cf9b43aeef6809f678f53592529cee99c18e274c597eb0678e6"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "honeybadger",
+      "options": {
+        "apiKey": "hb-secret",
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.honeybadger.io/v1/notices",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-api-key": "hb-secret"
+          },
+          "body": {
+            "length": 663,
+            "sha256": "0d790e3f0cc58dfab2039e72153632aff2a34b15ac751f5a197f36633c2c5d25"
+          }
+        }
+      ]
     },
     {
       "channel": "honeybadger",
@@ -7156,6 +8192,54 @@
       ]
     },
     {
+      "channel": "honeybadger",
+      "options": {
+        "apiKey": "hb-secret",
+        "environment": "staging",
+        "endpoint": "https://eu-api.honeybadger.io",
+        "recovered": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://eu-api.honeybadger.io/v1/notices",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-api-key": "hb-secret"
+          },
+          "body": {
+            "length": 801,
+            "sha256": "1e0b2255ceb6b0f62386236da015e1161d85e0261cfe25eee951c3d7ecf292bb"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "honeybadger",
+      "options": {
+        "apiKey": "hb-secret",
+        "environment": "staging",
+        "endpoint": "https://eu-api.honeybadger.io",
+        "recovered": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://eu-api.honeybadger.io/v1/notices",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "x-api-key": "hb-secret"
+          },
+          "body": {
+            "length": 609,
+            "sha256": "06b782a5ffc424dde3c771246ce42dd7ae8d3e20183167609a4787606561c25f"
+          }
+        }
+      ]
+    },
+    {
       "channel": "datadog",
       "options": {
         "apiKey": "dd-secret",
@@ -7434,6 +8518,49 @@
           "body": {
             "length": 429,
             "sha256": "1c675226fedd0010c88a01d55e8f9dd98ffb5e5e7afc2be6bec504b169dceddf"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "datadog",
+      "options": {
+        "apiKey": "dd-secret",
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.datadoghq.com/api/v1/events",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "dd-api-key": "dd-secret"
+          },
+          "body": {
+            "length": 511,
+            "sha256": "9c95e8b2d284941e6d5f70f3342728ac5ea88e28012b2dee3f3a0960991840db"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "datadog",
+      "options": {
+        "apiKey": "dd-secret",
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.datadoghq.com/api/v1/events",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "dd-api-key": "dd-secret"
+          },
+          "body": {
+            "text": "{\"title\":\"nightly failed\",\"text\":\"nightly failed\\n\\nStarted after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far\\n\\nOpen: https://app.example/cronwatch/jobs/nightly\",\"alert_type\":\"error\",\"aggregation_key\":\"cronwatch:nightly:failed\",\"date_happened\":1767605400,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:failed\"]}"
           }
         }
       ]
@@ -7774,6 +8901,57 @@
       ]
     },
     {
+      "channel": "datadog",
+      "options": {
+        "apiKey": "dd-secret",
+        "site": "datadoghq.eu",
+        "tags": [
+          "env:prod"
+        ],
+        "host": "worker-1"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.datadoghq.eu/api/v1/events",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "dd-api-key": "dd-secret"
+          },
+          "body": {
+            "length": 488,
+            "sha256": "2395594e0cfc88435b8395a30f62b6fee9dd9442c187938528d37acd2e81c289"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "datadog",
+      "options": {
+        "apiKey": "dd-secret",
+        "site": "datadoghq.eu",
+        "tags": [
+          "env:prod"
+        ],
+        "host": "worker-1"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.datadoghq.eu/api/v1/events",
+          "headers": {
+            "content-type": "application/json",
+            "accept": "application/json",
+            "dd-api-key": "dd-secret"
+          },
+          "body": {
+            "text": "{\"title\":\"nightly failed\",\"text\":\"nightly failed\\n\\nStarted after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far\",\"alert_type\":\"error\",\"aggregation_key\":\"cronwatch:nightly:failed\",\"date_happened\":1767605400,\"priority\":\"normal\",\"tags\":[\"cronwatch\",\"job:nightly\",\"alert:failed\",\"env:prod\"],\"host\":\"worker-1\"}"
+          }
+        }
+      ]
+    },
+    {
       "channel": "rollbar",
       "options": {
         "accessToken": "rb-secret",
@@ -8050,6 +9228,48 @@
       "channel": "rollbar",
       "options": {
         "accessToken": "rb-secret",
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.rollbar.com/api/1/item/",
+          "headers": {
+            "content-type": "application/json",
+            "x-rollbar-access-token": "rb-secret"
+          },
+          "body": {
+            "length": 736,
+            "sha256": "509538613f1bc97ae05b476b63697d21d3d7f84a05fb88090025ff936db503d9"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "rollbar",
+      "options": {
+        "accessToken": "rb-secret",
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.rollbar.com/api/1/item/",
+          "headers": {
+            "content-type": "application/json",
+            "x-rollbar-access-token": "rb-secret"
+          },
+          "body": {
+            "length": 541,
+            "sha256": "d35a5722ed2de53b4a2a74ea3b3e95f50d9ed99faf933b03239df1133518bd08"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "rollbar",
+      "options": {
+        "accessToken": "rb-secret",
         "environment": "staging",
         "recovered": false
       },
@@ -8307,6 +9527,50 @@
       },
       "alert": "no longer scheduled",
       "requests": []
+    },
+    {
+      "channel": "rollbar",
+      "options": {
+        "accessToken": "rb-secret",
+        "environment": "staging",
+        "recovered": false
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.rollbar.com/api/1/item/",
+          "headers": {
+            "content-type": "application/json",
+            "x-rollbar-access-token": "rb-secret"
+          },
+          "body": {
+            "length": 681,
+            "sha256": "33d2bcf4f5c8c41cb401e25e869bf8adc3d35660ff32e535df8a2765b36e66fb"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "rollbar",
+      "options": {
+        "accessToken": "rb-secret",
+        "environment": "staging",
+        "recovered": false
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.rollbar.com/api/1/item/",
+          "headers": {
+            "content-type": "application/json",
+            "x-rollbar-access-token": "rb-secret"
+          },
+          "body": {
+            "length": 486,
+            "sha256": "f5f2d3724983edea99dd97fdf429425806a89f650f1e25aa1659aac13ab99353"
+          }
+        }
+      ]
     },
     {
       "channel": "bugsnag",
@@ -8591,6 +9855,54 @@
       },
       "alert": "no longer scheduled",
       "requests": []
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "bs-secret",
+        "now": 1767605400000,
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 971,
+            "sha256": "fcbc78d76cb1371c823a19d367746390b80edcda7672ad0c71a88b78b89a71c9"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "bs-secret",
+        "now": 1767605400000,
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 777,
+            "sha256": "f7b80b1cefdf2f378c5c59b09304363dd18b1f56bb82c140af03a935b6fb502f"
+          }
+        }
+      ]
     },
     {
       "channel": "bugsnag",
@@ -8931,6 +10243,58 @@
       ]
     },
     {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "bs-secret",
+        "releaseStage": "staging",
+        "endpoint": "https://notify.bugsnag.example.com/",
+        "recovered": true,
+        "now": 1767605400000
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.example.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 916,
+            "sha256": "dd3000c2857aec5479129bcec58df33ade11563633ab4d8847d9afe03b7c90fd"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "bs-secret",
+        "releaseStage": "staging",
+        "endpoint": "https://notify.bugsnag.example.com/",
+        "recovered": true,
+        "now": 1767605400000
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.example.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 722,
+            "sha256": "61ea55f3c6a77177562180622a7d74dad8a5d938330b9e22bcc6863984fe3012"
+          }
+        }
+      ]
+    },
+    {
       "channel": "newrelic",
       "options": {
         "accountId": "12345",
@@ -9207,6 +10571,49 @@
           },
           "body": {
             "text": "[{\"eventType\":\"CronWatchAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly is no longer scheduled\",\"message\":\"Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\",\"link\":\"https://app.example/cronwatch/jobs/nightly\"}]"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "newrelic",
+      "options": {
+        "accountId": "12345",
+        "apiKey": "nr-secret",
+        "link": true
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://insights-collector.newrelic.com/v1/accounts/12345/events",
+          "headers": {
+            "content-type": "application/json",
+            "api-key": "nr-secret"
+          },
+          "body": {
+            "length": 510,
+            "sha256": "a8e32376500821ad48afa7ac8907845e977b562d0920b2777df29f08b35de537"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "newrelic",
+      "options": {
+        "accountId": "12345",
+        "apiKey": "nr-secret",
+        "link": true
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://insights-collector.newrelic.com/v1/accounts/12345/events",
+          "headers": {
+            "content-type": "application/json",
+            "api-key": "nr-secret"
+          },
+          "body": {
+            "text": "[{\"eventType\":\"CronWatchAlert\",\"timestamp\":1767605400000,\"job\":\"nightly\",\"alertType\":\"failed\",\"severity\":\"error\",\"title\":\"nightly failed\",\"message\":\"Started after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far\",\"link\":\"https://app.example/cronwatch/jobs/nightly\",\"runId\":\"r1\",\"runStatus\":\"failed\",\"durationMs\":1500}]"
           }
         }
       ]
@@ -9499,6 +10906,51 @@
           },
           "body": {
             "text": "[{\"eventType\":\"CronJobAlert\",\"timestamp\":1767605460000,\"job\":\"nightly\",\"alertType\":\"recovered\",\"severity\":\"info\",\"title\":\"nightly is no longer scheduled\",\"message\":\"Missed since 2026-01-05 06:30:00 UTC (3h 1m ago). It has no schedule now, so nothing is due; the missed alert is closed.\"}]"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "newrelic",
+      "options": {
+        "accountId": 12345,
+        "apiKey": "nr-secret",
+        "region": "eu",
+        "eventType": "CronJobAlert"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://insights-collector.eu01.nr-data.net/v1/accounts/12345/events",
+          "headers": {
+            "content-type": "application/json",
+            "api-key": "nr-secret"
+          },
+          "body": {
+            "length": 456,
+            "sha256": "4f954f306729953442373f25139c2d65dcb4a0e85777cfb200f35b9efc5c30cb"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "newrelic",
+      "options": {
+        "accountId": 12345,
+        "apiKey": "nr-secret",
+        "region": "eu",
+        "eventType": "CronJobAlert"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://insights-collector.eu01.nr-data.net/v1/accounts/12345/events",
+          "headers": {
+            "content-type": "application/json",
+            "api-key": "nr-secret"
+          },
+          "body": {
+            "text": "[{\"eventType\":\"CronJobAlert\",\"timestamp\":1767605400000,\"job\":\"nightly\",\"alertType\":\"failed\",\"severity\":\"error\",\"title\":\"nightly failed\",\"message\":\"Started after 9999-12-31 23:59:59 UTC, ran 2s.\\nError: far\",\"runId\":\"r1\",\"runStatus\":\"failed\",\"durationMs\":1500}]"
           }
         }
       ]
@@ -9798,6 +11250,52 @@
           "body": {
             "length": 778,
             "sha256": "ee89f147b9fba051d143932b73ecc809d922a674a6ab796f72c47c38f9a2cbca"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-ed16bf3ac9741add5f263b949476743e"
+          },
+          "body": {
+            "length": 976,
+            "sha256": "9378a9e7f6c14be97978aeacd6207c6a870f7a11cc49798f07f6d69254c62639"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "resend",
+      "options": {
+        "apiKey": " re_secret\n",
+        "from": "alerts@example.com",
+        "to": "ops@example.com"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.resend.com/emails",
+          "headers": {
+            "content-type": "application/json",
+            "authorization": "Bearer re_secret",
+            "idempotency-key": "cronwatch-7ed8f7c945800b09c4d6661b6940adfa"
+          },
+          "body": {
+            "length": 606,
+            "sha256": "0eaf9f82df466a10bf721a9c9774d4cb0d7a9e16fddeef549b0999368be68aa6"
           }
         }
       ]
@@ -10167,6 +11665,62 @@
       ]
     },
     {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=f1b767c7457a57723f171e4797151b24d65505ac788e23ebce763e7adda0b892"
+          },
+          "body": {
+            "length": 1178,
+            "sha256": "3bea0a32e7835bdb9e1439e8481b7d426a2cfbb7d02a5c116ddfc9bc998f5198"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "ses",
+      "options": {
+        "region": "us-east-1",
+        "accessKeyId": " AKIDEXAMPLE",
+        "secretAccessKey": "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY\n",
+        "sessionToken": " session-token ",
+        "from": "alerts@example.com",
+        "to": "ops@example.com",
+        "now": 1767605400000
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://email.us-east-1.amazonaws.com/v2/email/outbound-emails",
+          "headers": {
+            "content-type": "application/json",
+            "x-amz-date": "20260105T093000Z",
+            "x-amz-security-token": "session-token",
+            "authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260105/us-east-1/ses/aws4_request, SignedHeaders=content-type;host;x-amz-date;x-amz-security-token, Signature=ff69b9386df18755ce61756354b1f82ae7efe72112256d7a246f37612455fa5a"
+          },
+          "body": {
+            "length": 808,
+            "sha256": "512de83ece03b53972d464025b66b5e2a3dff63e5ad5326e05b2aacdc95157a6"
+          }
+        }
+      ]
+    },
+    {
       "channel": "twilio",
       "options": {
         "accountSid": " AC00000000000000000000000000000000 ",
@@ -10431,6 +11985,50 @@
       },
       "alert": "no longer scheduled",
       "requests": []
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+is+stuck%0AStarted+before+0001-01-01+00%3A00%3A00+UTC+and+never+reported+finishing.+Marked+as+timed+out+after+104249991d+8h.%0AOutput+so+far+%28tail%29%3A%0Astarted%0AIf+the+process+was+killed+mid-run+%28a+serverless+timeout%2C+a+deploy%29%2C+this+is+what+that+looks+like."
+          }
+        }
+      ]
+    },
+    {
+      "channel": "twilio",
+      "options": {
+        "accountSid": " AC00000000000000000000000000000000 ",
+        "authToken": "tw-secret\n",
+        "from": "+15005550006",
+        "to": "+15551110000"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://api.twilio.com/2010-04-01/Accounts/AC00000000000000000000000000000000/Messages.json",
+          "headers": {
+            "content-type": "application/x-www-form-urlencoded",
+            "authorization": "Basic QUMwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDp0dy1zZWNyZXQ="
+          },
+          "body": {
+            "text": "To=%2B15551110000&From=%2B15005550006&Body=nightly+failed%0AStarted+after+9999-12-31+23%3A59%3A59+UTC%2C+ran+2s.%0AError%3A+far"
+          }
+        }
+      ]
     },
     {
       "channel": "bugsnag",
@@ -10704,6 +12302,52 @@
       "requests": []
     },
     {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 919,
+            "sha256": "b7c8b32c1dcbd56810d53b7f969565daae3fc993ed72f782dcc1c2bcb3d42d03"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "bugsnag",
+      "options": {
+        "apiKey": "\tbs-secret ",
+        "now": 1767605400000
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://notify.bugsnag.com/",
+          "headers": {
+            "content-type": "application/json",
+            "bugsnag-api-key": "bs-secret",
+            "bugsnag-payload-version": "5",
+            "bugsnag-sent-at": "2026-01-05T09:30:00.000Z"
+          },
+          "body": {
+            "length": 725,
+            "sha256": "3d344d6045d789f9eec400fa5191d0f9c2e5a88a5e9cb4e30db715ebca9ec25e"
+          }
+        }
+      ]
+    },
+    {
       "channel": "sentry",
       "options": {
         "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
@@ -10959,6 +12603,46 @@
           "body": {
             "length": 662,
             "sha256": "cfbed1e0c70e3fe160d6e0497f9f5456f971fa38ae7e6ff67a5438b9596745ba"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "a stuck run from a foreign row, before the year 1",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 824,
+            "sha256": "337757fe49400b0eb01112f51cb39799da6a30da6f43dd97f516d8a9170f8b61"
+          }
+        }
+      ]
+    },
+    {
+      "channel": "sentry",
+      "options": {
+        "dsn": " https://pubkey@o1.ingest.sentry.io/42\n"
+      },
+      "alert": "a failure from a foreign row, after 9999",
+      "requests": [
+        {
+          "url": "https://o1.ingest.sentry.io/api/42/envelope/",
+          "headers": {
+            "content-type": "application/x-sentry-envelope",
+            "x-sentry-auth": "Sentry sentry_version=7, sentry_key=pubkey, sentry_client=cronwatch"
+          },
+          "body": {
+            "length": 629,
+            "sha256": "0d58790feb81756cd4ac3d73c88cc25ee4cf7eb20964d43f7085779caa6d97f1"
           }
         }
       ]

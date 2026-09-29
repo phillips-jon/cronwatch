@@ -1,4 +1,4 @@
-import { formatDuration, formatRelative } from "../duration.js";
+import { beyondDates, formatDuration, formatRelative, isoTime } from "../duration.js";
 import type { JobSummary, Run } from "../types.js";
 import { escapeHtml, escapeName } from "./escape.js";
 import { THEME_COLOR, THEME_COLOR_DARK } from "./pwa.js";
@@ -261,7 +261,8 @@ function sparkline(runs: Run[]): string {
 
 function stamp(at: number | null, now: number): string {
   if (at === null) return `<span class="muted">never</span>`;
-  const iso = new Date(at).toISOString();
+  const iso = isoTime(at);
+  if (iso === null) return `<span class="nowrap">${beyondDates(at)}</span>`;
   return `<time class="nowrap" datetime="${iso}" title="${iso.replace("T", " ").slice(0, 19)} UTC">${h(formatRelative(at, now))}</time>`;
 }
 

@@ -1,10 +1,12 @@
-import { formatDuration, formatRelative } from "./duration.js";
+import { beyondDates, formatDuration, formatRelative, isoTime } from "./duration.js";
 import { formatNumber } from "./evaluate.js";
 import type { Alert, AlertDraft, StoredJobDefinition } from "./types.js";
 
 function when(at: number | null | undefined, now: number): string {
   if (at === null || at === undefined) return "never";
-  return `${new Date(at).toISOString().replace("T", " ").slice(0, 19)} UTC (${formatRelative(at, now)})`;
+  const iso = isoTime(at);
+  if (iso === null) return beyondDates(at);
+  return `${iso.replace("T", " ").slice(0, 19)} UTC (${formatRelative(at, now)})`;
 }
 
 function firstLines(text: string | null, n: number): string {
