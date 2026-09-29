@@ -51,7 +51,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
     target = evil.url <> "/steal"
     provider = HTTPServer.start(fn _ -> {307, [{"location", target}], ""} end)
     channels = EveryChannel.started(provider.url <> "/in", RewriteTransport.spec(provider))
-    assert length(channels) >= 3
+    assert length(channels) == 15
 
     for {module, state} <- channels do
       err = message(module.send(state, sample(), quiet()))
