@@ -66,10 +66,38 @@ fn not_a_duration(label: &str, value: &str) -> String {
     format!("{label} \"{value}\" is not a duration like \"15m\", \"1h30m\" or \"90s\"")
 }
 
+/// The longest duration string read, in characters (code points). No real
+/// duration comes near it, and the scan below is quadratic on a long run of
+/// digits, as the SDK's pattern is, so a longer string is refused before it
+/// is read.
+const MAX_LENGTH: usize = 64;
+/// How much of a refused, overlong string its error quotes.
+const QUOTED: usize = 32;
+
+/// The error for `value` when it is over `MAX_LENGTH` characters.
+fn too_long(value: &str, label: &str) -> Result<(), String> {
+    let mut head = 0;
+    for (count, (i, _)) in value.char_indices().enumerate() {
+        if count == QUOTED {
+            head = i;
+        }
+        if count == MAX_LENGTH {
+            let quoted = &value[..head];
+            return Err(format!(
+                "{label} \"{quoted}...\" is too long for a duration (more than {MAX_LENGTH} characters)"
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Reads a duration string as `duration.ts` does: the text trimmed and
 /// lowercased, every `/(\d+(?:\.\d+)?)\s*(ms|s|m|h|d|w)/g` match summed, and
 /// the whole refused unless the matches, spaces aside, are all of it.
 fn parse_text(value: &str, label: &str) -> Result<f64, String> {
+    if value.len() > MAX_LENGTH {
+        too_long(value, label)?;
+    }
     let text = trim(value).to_lowercase();
     if text.is_empty() {
         return Err(format!("{label} is empty"));

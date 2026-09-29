@@ -281,6 +281,33 @@ fn parse_duration_text_and_numbers() {
 }
 
 #[test]
+fn a_duration_over_64_characters_is_refused_quoting_its_first_32() {
+    // The audit: the scan is quadratic on a long run of digits, and the
+    // error quoted the whole value. The conformance cases replay the cap.
+    let too_long = "is too long for a duration (more than 64 characters)";
+    let text = |s: &str, label: &str| parse_duration(&Value::String(s.into()), label);
+    assert_eq!(text(&"1m".repeat(32), ""), Ok(32.0 * 60_000.0));
+    let long = format!(" {}", "1m".repeat(32));
+    assert_eq!(text(&long, "grace").unwrap_err(), format!("grace \"{}...\" {too_long}", &long[..32]));
+    // Characters are code points: forty emoji are eighty UTF-16 units but under the cap.
+    let forty = "\u{1f600}".repeat(40);
+    assert_eq!(
+        text(&forty, "").unwrap_err(),
+        format!(r#"duration "{forty}" is not a duration like "15m", "1h30m" or "90s""#)
+    );
+    assert_eq!(
+        text(&"\u{1f600}".repeat(65), "").unwrap_err(),
+        format!("duration \"{}...\" {too_long}", "\u{1f600}".repeat(32))
+    );
+    let started = std::time::Instant::now();
+    assert_eq!(
+        text(&"1".repeat(1 << 20), "silence duration").unwrap_err(),
+        format!("silence duration \"{}...\" {too_long}", "1".repeat(32))
+    );
+    assert!(started.elapsed() < std::time::Duration::from_secs(1));
+}
+
+#[test]
 fn format_duration_and_relative() {
     for (ms, want) in
         [(500.0, "500ms"), (1_000.0, "1s"), (90_000.0, "1m 30s"), ((HOUR * 26 + MINUTE * 5) as f64, "1d 2h")]
