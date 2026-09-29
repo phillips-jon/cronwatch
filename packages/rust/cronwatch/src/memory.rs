@@ -182,7 +182,7 @@ impl Store for MemoryStore {
         expected: i64,
     ) -> BoxFuture<'a, Result<bool, BoxError>> {
         let mut inner = self.lock();
-        let current = inner.states.get(&state.job).map_or(0, JobState::version_or_zero);
+        let current = inner.states.get(&state.job).map_or(0, JobState::counted_version);
         if current != expected {
             return ready(false);
         }

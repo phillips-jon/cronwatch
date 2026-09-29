@@ -193,12 +193,22 @@ impl Statements {
         // same millisecond, and byte order for names on both, whatever the
         // database's collation.
         let (seq, by_name) = if pg { ("seq", "name COLLATE \"C\"") } else { ("rowid", "name") };
-        // The version inside a state's JSON, 0 when it has none.
+        // The version inside a state's JSON, as cronwatch::state_version
+        // reads it: a whole number from 0 to 2^53 - 1, else 0 (none, or a
+        // foreign row's 1.5 or "x", which must neither fail the statement
+        // nor refuse every write for good). Each CASE tests the JSON type
+        // before any cast. The SDK's text, byte for byte.
         let version = |column: &str| {
             if pg {
-                format!("COALESCE(({column}->>'version')::bigint, 0)")
+                let v = format!("({column}->>'version')::numeric");
+                format!(
+                    "CASE WHEN jsonb_typeof({column}->'version') <> 'number' THEN 0 WHEN {v} % 1 = 0 AND {v} BETWEEN 0 AND 9007199254740991 THEN {v}::bigint ELSE 0 END"
+                )
             } else {
-                format!("COALESCE(json_extract({column}, '$.version'), 0)")
+                let v = format!("json_extract({column}, '$.version')");
+                format!(
+                    "CASE WHEN json_type({column}, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN {v} = CAST({v} AS INTEGER) AND {v} BETWEEN 0 AND 9007199254740991 THEN CAST({v} AS INTEGER) ELSE 0 END"
+                )
             }
         };
         let s = |text: String| -> Arc<str> { Arc::from(if pg { number(&text) } else { text }) };
@@ -252,11 +262,16 @@ impl Statements {
 
     /// MySQL's statements, the PHP and Go ports' text.
     fn mysql(p: &str) -> Statements {
-        // The version inside a state's JSON text, 0 when it has none. MySQL's
-        // JSON_EXTRACT answers JSON and MariaDB's text; unquoted and cast,
-        // both are a number.
-        let version =
-            |column: &str| format!("COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT({column}, '$.version')) AS SIGNED), 0)");
+        // The version inside a state's JSON text, as cronwatch::state_version
+        // reads it: a whole number from 0 to 2^53 - 1, else 0. JSON_TYPE is
+        // tested before any arithmetic; MySQL's JSON_EXTRACT answers JSON and
+        // MariaDB's text, and `+ 0` makes either a number.
+        let version = |column: &str| {
+            let v = format!("JSON_EXTRACT({column}, '$.version')");
+            format!(
+                "CASE WHEN JSON_TYPE({v}) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN {v} + 0 = FLOOR({v} + 0) AND {v} + 0 BETWEEN 0 AND 9007199254740991 THEN CAST({v} + 0 AS SIGNED) ELSE 0 END"
+            )
+        };
         let s = |text: String| -> Arc<str> { Arc::from(text) };
         Statements {
             upsert_job: s(format!(
@@ -353,8 +368,18 @@ mod tests {
         assert_eq!(&*q.list_jobs, "SELECT * FROM cw_jobs ORDER BY name COLLATE \"C\"");
         assert_eq!(
             &*q.cas_update,
-            "UPDATE cw_state SET state = $1 WHERE job = $2 AND COALESCE((state->>'version')::bigint, 0) = $3"
+            "UPDATE cw_state SET state = $1 WHERE job = $2 AND CASE WHEN jsonb_typeof(state->'version') <> 'number' THEN 0 WHEN (state->>'version')::numeric % 1 = 0 AND (state->>'version')::numeric BETWEEN 0 AND 9007199254740991 THEN (state->>'version')::numeric::bigint ELSE 0 END = $3"
         );
+        assert_eq!(
+            &*q.cas_insert,
+            "INSERT INTO cw_state (job, state) VALUES ($1, $2)\n      ON CONFLICT (job) DO UPDATE SET state = excluded.state WHERE CASE WHEN jsonb_typeof(cw_state.state->'version') <> 'number' THEN 0 WHEN (cw_state.state->>'version')::numeric % 1 = 0 AND (cw_state.state->>'version')::numeric BETWEEN 0 AND 9007199254740991 THEN (cw_state.state->>'version')::numeric::bigint ELSE 0 END = 0"
+        );
+        let q = Statements::new(Dialect::Sqlite, "cw_");
+        assert_eq!(
+            &*q.cas_update,
+            "UPDATE cw_state SET state = ? WHERE job = ? AND CASE WHEN json_type(state, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN json_extract(state, '$.version') = CAST(json_extract(state, '$.version') AS INTEGER) AND json_extract(state, '$.version') BETWEEN 0 AND 9007199254740991 THEN CAST(json_extract(state, '$.version') AS INTEGER) ELSE 0 END = ?"
+        );
+        let q = Statements::new(Dialect::Postgres, "cw_");
         assert_eq!(&*q.list_runs, "SELECT * FROM cw_runs WHERE job = $1 ORDER BY started_at DESC, seq DESC LIMIT $2");
         assert!(q.update_run_if(2).ends_with("WHERE id = $7 AND status IN ($8, $9)"));
     }
@@ -371,7 +396,7 @@ mod tests {
         assert!(q.insert_run.contains("metrics, `trigger`)"));
         assert_eq!(
             &*q.cas_from_zero,
-            "UPDATE cw_state SET state = ? WHERE job = ? AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(state, '$.version')) AS SIGNED), 0) = 0"
+            "UPDATE cw_state SET state = ? WHERE job = ? AND CASE WHEN JSON_TYPE(JSON_EXTRACT(state, '$.version')) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN JSON_EXTRACT(state, '$.version') + 0 = FLOOR(JSON_EXTRACT(state, '$.version') + 0) AND JSON_EXTRACT(state, '$.version') + 0 BETWEEN 0 AND 9007199254740991 THEN CAST(JSON_EXTRACT(state, '$.version') + 0 AS SIGNED) ELSE 0 END = 0"
         );
         assert!(q.update_run_if(1).ends_with("status IN (?)"));
     }

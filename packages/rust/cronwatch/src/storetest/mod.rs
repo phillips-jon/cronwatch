@@ -402,6 +402,78 @@ pub async fn replay_fixture<S: Store>(fixture: &str, mut make: impl FnMut() -> S
     cases
 }
 
+/// Replays the `foreignVersion` cases of `conformance/store.json` (its text)
+/// against `store`, which holds its states as JSON text: for each, job `v`
+/// is deleted, `write_raw` puts the case's state text in the state table as
+/// it is (a state another process wrote, its version `1.5`, `"x"` or
+/// `2.0`), and each compare-and-set step must be refused or written as the
+/// SDK's was: the version counts as [`state_version`](crate::state_version)
+/// reads it. Returns how many cases were replayed.
+pub async fn replay_foreign_versions<S, F, Fut>(fixture: &str, store: &S, mut write_raw: F) -> usize
+where
+    S: Store,
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    let root = must(js::parse(fixture));
+    let fix = root.as_object().expect("the fixture is an object");
+    must(store.init().await);
+    let mut cases = 0;
+    for c in objects(field(fix, "foreignVersion")) {
+        let stored = field(c, "stored").as_str().expect("the stored text").to_string();
+        must(store.delete_job("v").await);
+        write_raw(stored.clone()).await;
+        for step in objects(field(c, "steps")) {
+            let st = must(JobState::from_value(field(step, "cas")));
+            let expected = field(step, "expected").as_f64().unwrap_or(0.0) as i64;
+            let wrote = must(store.compare_and_set_state(&st, expected).await);
+            eq(&format!("{stored} expecting {expected}: wrote"), Some(wrote), field(step, "written").as_bool());
+            if let Some(want) = step.get("state") {
+                let got = json_of(&must(store.get_state("v").await), JobState::to_json);
+                same_json(&format!("{stored} expecting {expected}"), &got, &want.to_json());
+            }
+        }
+        cases += 1;
+    }
+    assert!(cases > 0, "no foreignVersion cases");
+    cases
+}
+
+/// A check over rows another process wrote, which `exec` inserts (each a
+/// statement over the tables of `prefix`, which `store` uses): a running
+/// run that started at the lowest BIGINT, and a state whose version is
+/// `1.5`. The run is marked as timed out with a duration of 2^53 - 1, and
+/// the state is written over with version 1. The job is silenced, as an
+/// alert's text would show a start no date reaches.
+pub async fn check_over_foreign_rows<S, F, Fut>(store: S, prefix: &str, mut exec: F)
+where
+    S: Store + 'static,
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    must(store.init().await);
+    must(store.upsert_job(&definition(r#"{"name":"far","timeout":"5m"}"#), 1).await);
+    exec(format!(
+        "INSERT INTO {prefix}runs (id, job, status, started_at) VALUES ('far1', 'far', 'running', -9223372036854775808)"
+    ))
+    .await;
+    exec(format!(
+        r#"INSERT INTO {prefix}state (job, state) VALUES ('far', '{{"job":"far","open":{{}},"consecutiveFailures":0,"silencedUntil":4102444800000,"lastAlertAt":null,"version":1.5}}')"#
+    ))
+    .await;
+    let cw = must(Client::builder().store(store).alerts([]).no_cron_secret().build());
+    let store = cw.store().clone();
+    for _ in 0..2 {
+        must(cw.check().await);
+    }
+    let run = must(store.get_run("far1").await).expect("the run");
+    eq("the run's status", run.status, RunStatus::Timeout);
+    eq("the duration, held at 2^53 - 1", run.duration_ms, Some(crate::MAX_DURATION_MS));
+    let state = must(store.get_state("far").await).expect("the state");
+    eq("the state's 1.5 counted as 0 and was written over", state.version, Some(1));
+    eq("the timeout counted", state.consecutive_failures, 1);
+}
+
 /// A settable clock for a client, in epoch milliseconds.
 #[derive(Clone, Debug)]
 pub struct Clock(Arc<std::sync::atomic::AtomicI64>);

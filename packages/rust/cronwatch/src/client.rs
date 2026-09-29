@@ -532,7 +532,7 @@ impl Client {
             if next.to_json() == current.to_json() {
                 return Ok((current, result));
             }
-            let version = current.version_or_zero();
+            let version = current.counted_version();
             next.version = Some(version + 1);
             if self.write_state(&next, version).await? {
                 return Ok((next, result));

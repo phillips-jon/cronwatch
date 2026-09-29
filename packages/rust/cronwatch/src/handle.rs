@@ -14,7 +14,7 @@ use crate::evaluate::on_run_start;
 use crate::js::{self, Value};
 use crate::output::{self, OUTPUT_CAP, Recorder};
 use crate::run::{Job, StartOptions, error_text, text_of};
-use crate::types::{Metrics, Run, RunStatus};
+use crate::types::{Metrics, Run, RunStatus, run_duration};
 
 /// Starts the run ids of the pg_cron source, so no other run may use it.
 pub const RESERVED_RUN_ID_PREFIX: &str = "pgcron:";
@@ -524,7 +524,7 @@ impl RunHandle {
         let mut run = from.clone();
         run.status = RunStatus::Running;
         run.finished_at = Some(finished_at);
-        run.duration_ms = Some(finished_at.saturating_sub(from.started_at).max(0));
+        run.duration_ms = Some(run_duration(from.started_at, finished_at));
         run.error = None;
         run.output = join_output(from.output.as_deref(), added);
         run.metrics = from.metrics.merged(&recorder_metrics(&rec));

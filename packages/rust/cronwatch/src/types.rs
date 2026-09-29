@@ -246,6 +246,34 @@ impl<K: Into<String>> FromIterator<(K, f64)> for Metrics {
     }
 }
 
+/// The longest duration written: 2^53 - 1, the largest integer JavaScript
+/// holds exactly, which every port and store reads back unchanged.
+pub const MAX_DURATION_MS: i64 = 9_007_199_254_740_991;
+
+/// How long a run took, from `started_at` to `finished_at`: 0 when it
+/// started later, and never more than [`MAX_DURATION_MS`]. A foreign row's
+/// start near a 64-bit limit must not make a duration no store can write.
+pub fn run_duration(started_at: i64, finished_at: i64) -> i64 {
+    finished_at.saturating_sub(started_at).clamp(0, MAX_DURATION_MS)
+}
+
+/// The version a stored state's `version` value counts as for
+/// [`Store::compare_and_set_state`](crate::Store::compare_and_set_state):
+/// a JSON number that is a whole number from 0 to 2^53 - 1, else 0 (absent,
+/// or a foreign row's `1.5`, `"x"` or `-1`). The SQL stores read it the same
+/// way, so such a row is written over by the next update instead of refusing
+/// every compare-and-set of its job for good.
+pub fn state_version(version: Option<&Value>) -> i64 {
+    version.and_then(whole_version).unwrap_or(0)
+}
+
+fn whole_version(v: &Value) -> Option<i64> {
+    match v {
+        Value::Number(n) if n.fract() == 0.0 && (0.0..=MAX_DURATION_MS as f64).contains(n) => Some(*n as i64),
+        _ => None,
+    }
+}
+
 /// One execution of a job, as a store keeps it. Times are epoch milliseconds.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Run {
@@ -446,8 +474,10 @@ impl JobState {
         self.open.iter().find(|o| &o.condition == condition).map(|o| o.since)
     }
 
-    pub(crate) fn version_or_zero(&self) -> i64 {
-        self.version.unwrap_or(0)
+    /// The version this state counts as: see [`state_version`]. A version
+    /// set out of that range counts as 0 too.
+    pub fn counted_version(&self) -> i64 {
+        self.version.filter(|v| (0..=MAX_DURATION_MS).contains(v)).unwrap_or(0)
     }
 
     /// The state as the SDK writes it.
@@ -522,7 +552,13 @@ impl JobState {
                 continue;
             }
             if k == "version" {
-                s.version = nullable_int(o, "version");
+                // A version that is not a whole number (1.5, "x") reads as
+                // none; one out of range is kept, so the state writes back
+                // as it was read. Either counts as 0 (counted_version).
+                s.version = match v {
+                    Value::Number(n) if n.fract() == 0.0 => Some(js::to_i64(*n)),
+                    _ => None,
+                };
             }
             s.tail.push((k.to_string(), v.clone()));
         }
@@ -852,6 +888,40 @@ pub(crate) fn nullable_str(o: &Object, key: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_duration_is_held_between_0_and_2_to_the_53_minus_1() {
+        assert_eq!(run_duration(1000, 2500), 1500);
+        assert_eq!(run_duration(i64::MIN, 1_767_605_400_000), MAX_DURATION_MS);
+        assert_eq!(run_duration(i64::MAX, 1_767_605_400_000), 0);
+        assert_eq!(run_duration(i64::MIN, i64::MAX), MAX_DURATION_MS);
+        assert_eq!(run_duration(i64::MAX, i64::MIN), 0);
+    }
+
+    #[test]
+    fn a_foreign_version_that_is_not_a_whole_number_counts_as_0() {
+        for (text, want) in
+            [("1.5", None), (r#""x""#, None), ("true", None), ("-1", Some(-1)), ("2.0", Some(2)), ("1e3", Some(1000))]
+        {
+            let s = JobState::from_json(&format!(r#"{{"job":"j","version":{text}}}"#)).unwrap();
+            assert_eq!(s.version, want, "{text}");
+            assert_eq!(s.counted_version(), want.filter(|v| *v >= 0).unwrap_or(0), "{text}");
+        }
+        let set = JobState { version: Some(-3), ..JobState::new("j") };
+        assert_eq!(set.counted_version(), 0);
+        let set = JobState { version: Some(MAX_DURATION_MS + 1), ..JobState::new("j") };
+        assert_eq!(set.counted_version(), 0);
+    }
+
+    #[tokio::test]
+    async fn the_memory_store_counts_a_foreign_version_as_0() {
+        use crate::Store;
+        let store = crate::MemoryStore::new();
+        store.set_state(&JobState::from_json(r#"{"job":"j","version":1.5}"#).unwrap()).await.unwrap();
+        let next = JobState { version: Some(1), ..JobState::new("j") };
+        assert!(!store.compare_and_set_state(&next, 1).await.unwrap());
+        assert!(store.compare_and_set_state(&next, 0).await.unwrap());
+    }
 
     #[test]
     fn a_state_round_trips_with_unknown_keys_in_place() {

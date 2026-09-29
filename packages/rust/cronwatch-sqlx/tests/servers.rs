@@ -39,6 +39,39 @@ async fn each_server_replays_store_json() {
     }
 }
 
+#[tokio::test]
+async fn each_server_counts_a_foreign_states_version_as_the_sdk_does() {
+    let fixture = std::fs::read_to_string(repo().join("conformance/store.json")).expect("conformance/store.json");
+    for s in servers() {
+        let store = s.store("fv");
+        let p = store.table_prefix().to_string();
+        let cast = if s.dialect == Dialect::Postgres { "::jsonb" } else { "" };
+        let db = Arc::new(s.db());
+        let cases = storetest::replay_foreign_versions(&fixture, &store, |text| {
+            let (db, p) = (db.clone(), p.clone());
+            async move { db.exec(&format!("INSERT INTO {p}state (job, state) VALUES ('v', '{text}'{cast})")).await }
+        })
+        .await;
+        assert!(cases >= 10, "{}: {cases} cases", s.name);
+        s.cleanup().await;
+    }
+}
+
+#[tokio::test]
+async fn a_check_over_a_run_that_started_at_the_lowest_bigint_on_each_server() {
+    for s in servers() {
+        let store = s.store("far");
+        let p = store.table_prefix().to_string();
+        let db = Arc::new(s.db());
+        storetest::check_over_foreign_rows(store, &p, |sql| {
+            let db = db.clone();
+            async move { db.exec(&sql).await }
+        })
+        .await;
+        s.cleanup().await;
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_run_is_finished_once_across_stores_on_each_server() {
     for s in servers() {

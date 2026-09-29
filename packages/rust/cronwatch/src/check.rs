@@ -15,7 +15,7 @@ use crate::options::DurationSpec;
 use crate::panics::panic_text;
 use crate::run::{later_by, timeout_text};
 use crate::schedule;
-use crate::types::{Alert, CheckResult, JobState, JobSummary, Run, RunStatus, StoredJob};
+use crate::types::{Alert, CheckResult, JobState, JobSummary, Run, RunStatus, StoredJob, run_duration};
 
 /// How often a check prunes old runs.
 const PRUNE_INTERVAL: i64 = 60 * 60_000;
@@ -146,7 +146,7 @@ impl Client {
         }
         run.status = RunStatus::Timeout;
         run.finished_at = Some(now);
-        run.duration_ms = Some(now.saturating_sub(run.started_at));
+        run.duration_ms = Some(run_duration(run.started_at, now));
         run.error = Some(format!("Still running after {}; marked as timed out", timeout_text(&def)));
         // Only over a row still running: a finish that landed meanwhile wins.
         if self.write_run_if(&run, &[RunStatus::Running]).await? {

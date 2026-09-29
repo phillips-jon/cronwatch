@@ -88,7 +88,7 @@ pub use serialize::Matcher;
 pub use store::{BoxError, BoxFuture, Store, Unsupported, is_unsupported};
 pub use types::{
     Alert, AlertDetails, AlertType, BudgetBreach, CheckResult, Condition, Definition, JobHealth, JobState, JobSummary,
-    JsonError, Metrics, OpenCondition, Run, RunStatus, Stats, StoredJob,
+    JsonError, MAX_DURATION_MS, Metrics, OpenCondition, Run, RunStatus, Stats, StoredJob, run_duration, state_version,
 };
 
 /// The default redaction: it blanks values that look like secrets

@@ -23,7 +23,7 @@ use crate::output::{self, Recorder};
 use crate::panics::{panic_text, take_frames};
 use crate::schedule::{MAX_INTERVAL_MS, format_duration};
 use crate::serialize::check_expectation;
-use crate::types::{Alert, Definition, Metrics, Run, RunStatus};
+use crate::types::{Alert, Definition, Metrics, Run, RunStatus, run_duration};
 
 /// Runs read for a baseline, and the most read when failures crowd out the
 /// successes.
@@ -713,7 +713,7 @@ impl Client {
         let name = def.name.clone();
         let finished_at = self.now();
         run.finished_at = Some(finished_at);
-        run.duration_ms = Some((finished_at - run.started_at).max(0));
+        run.duration_ms = Some(run_duration(run.started_at, finished_at));
         run.metrics = Metrics::lenient(&js::Value::Object(rec.metrics()));
         run.output = rec.output();
         if run.output.is_none() && failure.is_none() {

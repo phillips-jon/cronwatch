@@ -242,7 +242,7 @@ pub fn run_of(row: &PgCronRow, job: &str, id_prefix: &str, fallback_at: i64) -> 
         status,
         started_at,
         finished_at: end,
-        duration_ms: end.map(|e| e - started_at),
+        duration_ms: end.map(|e| cronwatch::run_duration(started_at, e)),
         metrics: Metrics::new(),
         trigger: "pg_cron".into(),
     })

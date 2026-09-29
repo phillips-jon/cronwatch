@@ -127,6 +127,20 @@ fn conformance_health() {
         let got = crate::evaluate::stale_alert(&alert, &state(field(c, "state")));
         fails.same(&format!("staleAlert {i}"), &got.into(), field(c, "stale"));
     }
+    for (i, c) in objects(&f, "runDuration").into_iter().enumerate() {
+        cases += 1;
+        let got = crate::types::run_duration(int(c, "startedAt"), int(c, "finishedAt"));
+        fails.same(&format!("runDuration {i}"), &got.into(), field(c, "durationMs"));
+    }
+    for (i, c) in objects(&f, "stateVersion").into_iter().enumerate() {
+        cases += 1;
+        let text = field(c, "state").as_str().expect("a state's text");
+        let parsed = crate::js::parse(text).expect("JSON");
+        let from_value = crate::types::state_version(parsed.as_object().and_then(|o| o.get("version")));
+        let read = JobState::from_json(text).expect("a state").counted_version();
+        fails.same(&format!("stateVersion {i}"), &from_value.into(), field(c, "version"));
+        fails.same(&format!("stateVersion {i}, read as a state"), &read.into(), field(c, "version"));
+    }
     assert!(cases > 0, "health.json has no cases");
     fails.check("health");
 }

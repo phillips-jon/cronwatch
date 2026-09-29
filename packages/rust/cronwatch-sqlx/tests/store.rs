@@ -29,6 +29,40 @@ async fn the_sqlite_store_replays_store_json() {
     assert!(cases >= 20, "{cases} cases");
 }
 
+#[tokio::test]
+async fn the_sqlite_store_counts_a_foreign_states_version_as_the_sdk_does() {
+    let dir = TempDir::new();
+    let file = dir.file("foreign-version.db");
+    let fixture = std::fs::read_to_string(repo().join("conformance/store.json")).expect("conformance/store.json");
+    let p = pool(&file);
+    let cases = storetest::replay_foreign_versions(&fixture, &store(&file, "cronwatch_"), |text| {
+        let p = p.clone();
+        async move {
+            sqlx::query("INSERT INTO cronwatch_state (job, state) VALUES ('v', ?)")
+                .bind(text)
+                .execute(&p)
+                .await
+                .unwrap();
+        }
+    })
+    .await;
+    assert!(cases >= 10, "{cases} cases");
+}
+
+#[tokio::test]
+async fn a_check_over_a_run_that_started_at_the_lowest_bigint_on_sqlite() {
+    let dir = TempDir::new();
+    let file = dir.file("far.db");
+    let p = pool(&file);
+    storetest::check_over_foreign_rows(store(&file, "cronwatch_"), "cronwatch_", |sql| {
+        let p = p.clone();
+        async move {
+            sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&p).await.unwrap();
+        }
+    })
+    .await;
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_run_is_finished_once_across_stores_on_one_file() {
     let dir = Arc::new(TempDir::new());

@@ -13,7 +13,7 @@ use crate::evaluate::{
 use crate::format::compose_alert;
 use crate::js::{Object, Value};
 use crate::schedule::format_duration;
-use crate::types::{Definition, JobState, Metrics, Run, RunStatus, StoredJob};
+use crate::types::{Definition, JobState, Metrics, Run, RunStatus, StoredJob, run_duration};
 
 /// `scripts/conformance.mjs`'s `Sim`: one job, its runs and its state.
 struct Sim {
@@ -94,7 +94,7 @@ impl Sim {
                 }
                 let marked = run.status == RunStatus::Timeout;
                 run.finished_at = Some(at);
-                run.duration_ms = Some((at - run.started_at).max(0));
+                run.duration_ms = Some(run_duration(run.started_at, at));
                 run.status = RunStatus::parse(field(ev, "status").as_str().unwrap_or(""));
                 run.metrics = match ev.get("metrics") {
                     Some(m) => Metrics::from_value(m).map_err(|e| e.to_string())?,
@@ -129,7 +129,7 @@ impl Sim {
                     let timeout = timeout_ms(&self.def)?;
                     r.status = RunStatus::Timeout;
                     r.finished_at = Some(now);
-                    r.duration_ms = Some(now - r.started_at);
+                    r.duration_ms = Some(run_duration(r.started_at, now));
                     r.error = Some(format!("Still running after {}; marked as timed out", format_duration(timeout)));
                     self.runs[i].0 = r.clone();
                     alerts.extend(self.finish_run(&r, now)?);
