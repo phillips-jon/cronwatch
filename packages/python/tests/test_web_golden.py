@@ -77,6 +77,12 @@ def seed() -> Cronwatch:
     quietly(lambda: sync.run(lambda job: clock.advance(12_345) and None))
 
     cw.job("never-ran", schedule="0 * * * *")
+
+    # A run as a foreign or damaged row could hold it: started before the
+    # year 1, so the pages write it in words rather than as a date.
+    far_back = cw.job("far-back", timeout="5m", expect="far")
+    clock.set(-62_135_596_800_001)
+    quietly(lambda: far_back.run(lambda job: clock.advance(1000) and None))
     clock.set(T0)
     return cw
 
@@ -106,7 +112,7 @@ def through_handle(web: Web, method: str, path: str, headers: dict[str, str], bo
 def test_the_json_api_and_pages_match_the_sdk_routes(deliver: Any) -> None:
     data = golden()
     assert data["t0"] == T0
-    assert len(data["captures"]) == 57
+    assert len(data["captures"]) == 59
     cw = seed()
     web = cw.routes(token="tok", base_path="/cronwatch")
     ids: dict[str, str] = {}

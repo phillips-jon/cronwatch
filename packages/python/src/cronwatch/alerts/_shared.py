@@ -13,6 +13,7 @@ from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 from .. import _js
+from ..duration import iso_time
 from ..types import Alert
 from ._http import HTTP, Response
 from ._http import default as default_http
@@ -178,11 +179,11 @@ def floor_div(at: float, by: int) -> int:
 
 
 def run_summary(alert: Alert) -> dict[str, Any] | None:
-    """The run fields worth attaching to a tracker event."""
+    """The run fields worth attaching to a tracker event. A start before the year 1 or after 9999 is None."""
     run = alert.run
     if run is None:
         return None
-    return {"id": run.id, "status": str(run.status), "startedAt": iso(run.started_at), "durationMs": run.duration_ms, "trigger": run.trigger}
+    return {"id": run.id, "status": str(run.status), "startedAt": iso_time(run.started_at), "durationMs": run.duration_ms, "trigger": run.trigger}
 
 
 def plain_text(alert: Alert, link: str | None) -> str:

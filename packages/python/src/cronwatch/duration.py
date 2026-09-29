@@ -76,3 +76,21 @@ def format_relative(at: float, now: float) -> str:
         return "now"
     text = format_duration(abs(diff))
     return f"{text} ago" if diff < 0 else f"in {text}"
+
+
+# The first millisecond written as a date: 0001-01-01T00:00:00.000Z.
+FIRST_DATE_MS = -62_135_596_800_000
+# The last millisecond written as a date: 9999-12-31T23:59:59.999Z.
+LAST_DATE_MS = 253_402_300_799_999
+
+
+def iso_time(at: float) -> str | None:
+    """ "2026-01-05T09:30:00.000Z", or None for a time before the year 1 or
+    after 9999. A start read from another process's row, or a damaged one,
+    can be any number; outside those years it is not written as a date."""
+    return _js.iso(at) if FIRST_DATE_MS <= at <= LAST_DATE_MS else None
+
+
+def beyond_dates(at: float) -> str:
+    """The words that stand in for a time iso_time() does not write."""
+    return "after 9999-12-31 23:59:59 UTC" if at > LAST_DATE_MS else "before 0001-01-01 00:00:00 UTC"

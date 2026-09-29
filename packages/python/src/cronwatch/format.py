@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from . import _js
-from .duration import format_duration, format_relative
+from .duration import beyond_dates, format_duration, format_relative, iso_time
 from .evaluate import format_number
 from .types import Alert, AlertDraft, AlertType, JobDefinition
 
@@ -15,7 +15,10 @@ _NAMED = re.compile(r"[A-Za-z_$][A-Za-z0-9_$]*: ", re.ASCII)
 def _when(at: int | None, now: int) -> str:
     if at is None:
         return "never"
-    return f"{_js.iso(at).replace('T', ' ', 1)[:19]} UTC ({format_relative(at, now)})"
+    iso = iso_time(at)
+    if iso is None:
+        return beyond_dates(at)
+    return f"{iso.replace('T', ' ', 1)[:19]} UTC ({format_relative(at, now)})"
 
 
 def _first_lines(text: str | None, n: int) -> str:

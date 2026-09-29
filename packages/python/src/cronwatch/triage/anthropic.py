@@ -21,7 +21,7 @@ except ImportError as error:  # pragma: no cover, the message is tested in a sub
     raise ImportError(f'cronwatch.triage.anthropic needs the anthropic package: pip install "cronwatch-sdk[anthropic]" ({error})') from error
 
 from .. import _js
-from ..duration import format_duration
+from ..duration import beyond_dates, format_duration, iso_time
 
 DEFAULT_MODEL = "claude-opus-5"
 DEFAULT_MAX_TOKENS = 800
@@ -49,6 +49,11 @@ def _duration(run: Any) -> str:
     return "unknown" if run.duration_ms is None else format_duration(run.duration_ms)
 
 
+def _stamp(at: int) -> str:
+    """ "2026-01-05T09:30:00.000Z", or the words for a time before the year 1 or after 9999."""
+    return iso_time(at) or beyond_dates(at)
+
+
 def describe(context: Any) -> str:
     """The prompt: the alert, the definition, the triggering run and up to five earlier ones."""
     alert = context.alert
@@ -61,7 +66,7 @@ def describe(context: Any) -> str:
     lines.append(f"Job definition: {_js.dumps(definition)}")
     if run is not None:
         lines.append("")
-        lines.append(f"Triggering run: status {run.status}, started {_js.iso(run.started_at)}, duration {_duration(run)}, trigger {run.trigger}")
+        lines.append(f"Triggering run: status {run.status}, started {_stamp(run.started_at)}, duration {_duration(run)}, trigger {run.trigger}")
         if run.metrics:
             lines.append(f"Metrics: {_js.dumps(run.metrics)}")
         if run.error:
@@ -75,7 +80,7 @@ def describe(context: Any) -> str:
         for r in earlier:
             error = f", error: {data(_js.head16(r.error.split(chr(10))[0], 160))}" if r.error else ""
             metrics = f", metrics {_js.dumps(r.metrics)}" if r.metrics else ""
-            lines.append(f"- {r.status}, {_js.iso(r.started_at)}, {_duration(r)}{error}{metrics}")
+            lines.append(f"- {r.status}, {_stamp(r.started_at)}, {_duration(r)}{error}{metrics}")
     return "\n".join(lines)
 
 

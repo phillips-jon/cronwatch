@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from .. import _js
-from ..duration import format_duration
+from ..duration import FIRST_DATE_MS, LAST_DATE_MS, format_duration
 from ..evaluate import grace_ms, is_stuck, timeout_ms
 from ..schedule import ParsedSchedule, expectation, fires_between, parse_schedule
 from ..types import JobSummary, Run
@@ -125,7 +125,13 @@ def day_label(t: float) -> str:
 
 
 def when(t: float, now: float) -> str:
-    """ "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42"."""
+    """ "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
+    before the year 1 or after 9999 (a start read from a foreign or damaged
+    row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59"."""
+    if t > LAST_DATE_MS:
+        return "after 31 Dec 9999 23:59"
+    if not t >= FIRST_DATE_MS:
+        return "before 1 Jan 0001 00:00"
     if math.floor(t / DAY) == math.floor(now / DAY):
         return clock(t)
     _, month, day, _ = _date(t)
