@@ -51,7 +51,7 @@ defmodule Cronwatch do
   alias Cronwatch.RunHandle
   alias Cronwatch.Runs
 
-  @run_options [:trigger, :isolate, :kill_at_timeout, :instance]
+  @run_options [:trigger, :isolate, :kill_at_timeout, :discard_when, :instance]
 
   ## The instance
 
@@ -139,7 +139,11 @@ defmodule Cronwatch do
   options among `opts`, declared again). Options: `trigger` (default
   `"run"`), `isolate` (run the function in a task of the instance, so a
   crash does not take the caller down), `kill_at_timeout` (with `isolate`,
-  kill it at the job's timeout and record the run as timed out), `instance`.
+  kill it at the job's timeout and record the run as timed out),
+  `discard_when` (a function of a failure's reason: when it answers true for
+  a returned `{:error, reason}` or a raised exception, the run is taken back
+  rather than judged, for an attempt a queue gives back without failing; the
+  failure is still handed back), `instance`.
   """
   @spec run(Job.t() | String.t(), (Context.t() -> result), keyword()) :: result when result: term()
   def run(job, fun, opts \\ []) when is_function(fun, 1) do
