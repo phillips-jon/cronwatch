@@ -150,6 +150,8 @@ For `wrangler dev`, put the same names in `.dev.vars` (and keep it out of git).
 
 On Workers, pass every value from `env` yourself, as above. The defaults that read `process.env` (`CRONWATCH_TOKEN` for the routes, `CRON_SECRET` for `cronSecret`, `NODE_ENV` for the development token) find nothing without `nodejs_compat`, so the routes answer 503 until a token is passed, and there is no development token: set `CRONWATCH_TOKEN` in `.dev.vars` for local work too. `CRON_SECRET` matters only if you also run jobs over HTTP with `job.handler()`; then pass `cronSecret: env.CRON_SECRET`.
 
+With `nodejs_compat` on, the Worker has a `process.env`, and Cloudflare fills it with the Worker's vars and secrets when the `nodejs_compat_populate_process_env` flag is set, which it is by default for a compatibility date of 2025-04-01 or later (see [Cloudflare's notes on `process`](https://developers.cloudflare.com/workers/runtime-apis/nodejs/process/)). Then those defaults find `CRONWATCH_TOKEN` and `CRON_SECRET` on their own, and a `NODE_ENV` var of `development` turns on the development token. Passing the values from `env`, as above, works either way, so the Worker does not depend on the flag.
+
 ## Trying it locally
 
 ```bash

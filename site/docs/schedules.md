@@ -6,7 +6,7 @@ order: 4
 
 # Schedules, grace and timeouts
 
-The rules here are the same in the TypeScript SDK and the Ruby gem; the examples use the TypeScript names (`cw.check()` is `client.check` in Ruby, `timezone:` and `grace:` are spelled the same). In Rails, a job can take its schedule and timezone from Solid Queue or sidekiq-cron instead; see [Schedule the job](/docs/rails/#schedule-the-job).
+Every port applies these rules the same way: TypeScript, Ruby, Python, PHP, Go and Rust. The examples use the TypeScript names; each language's page has its own spelling (`cw.check()` is `client.check` in Ruby, for one). In Rails, a job can take its schedule and timezone from Solid Queue or sidekiq-cron instead; see [Schedule the job](/docs/rails/#schedule-the-job).
 
 ## Schedule syntax
 
@@ -14,8 +14,8 @@ The rules here are the same in the TypeScript SDK and the Ruby gem; the examples
 |---|---|---|
 | Cron, five fields | `0 2 * * *` | minute hour day month weekday, standard syntax with `*/n`, ranges and lists |
 | Cron, six fields | `0 */30 * * * *` | a leading seconds field |
-| Nickname | `@hourly`, `@daily`, `@weekly`, `@monthly` | |
-| Interval | `every 15m`, `every 6h`, `every 2d` | counted from the last run's start, or from registration before the first run |
+| Nickname | `@yearly` (or `@annually`), `@monthly`, `@weekly`, `@daily` (or `@midnight`), `@hourly` | each fires at the start of its period: `@weekly` is Sunday at 00:00, `@yearly` January 1st. `@reboot` is not a schedule and is refused |
+| Interval | `every 15m`, `every 6h`, `every 2d` | at least one second (`every 500ms` throws); counted from the last run's start, or from registration before the first run |
 | None | | watched for failures, duration and budgets; never missed |
 
 Durations everywhere use the same units: `ms`, `s`, `m`, `h`, `d`, `w`, and compounds like `1h30m`. A number is milliseconds. A duration string is at most 64 characters; a longer one is refused.

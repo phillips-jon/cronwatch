@@ -6,7 +6,7 @@ order: 11
 
 # AI triage
 
-When an alert is about to be sent, CronWatch can hand the alert, the job definition, the triggering run's error, output tail and metrics, and the last few runs to Claude, and attach two to four sentences: the likely cause and the first thing to check. The diagnosis appears in the Slack or Discord message, the webhook payload, and the console.
+When an alert is about to be sent, CronWatch can hand the alert, the job definition, the triggering run's error, output tail and metrics, and the last few runs to Claude, and attach two to four sentences: the likely cause and the first thing to check. The diagnosis appears in every built-in channel: the Slack and Discord messages, the webhook payload, every email, SMS and error tracker channel, and the console. It is the alert's `triage` field, so a custom channel can show it too.
 
 ```ts
 import { anthropic } from "@cronwatch/sdk/anthropic";
@@ -42,7 +42,7 @@ Triage runs once per alert, whatever happens to it. When it gives nothing (it th
 
 ## What is sent
 
-The alert title and message, the job's stored definition, the triggering run (status, timing, metrics, up to 3 KB of error and 3 KB of output tail), and one line each for up to four earlier runs. Values that look like secrets are redacted before a run is stored, so they never reach triage, but the patterns cannot catch everything; log less or leave triage off for jobs that handle secrets.
+The alert title and message, the job's stored definition, the triggering run (status, timing, metrics, up to 3 KB of error and 3 KB of output tail), and one line each for up to five earlier runs (the job's five newest, less the triggering run when it is one of them). Values that look like secrets are redacted before a run is stored, so they never reach triage, but the patterns cannot catch everything; log less or leave triage off for jobs that handle secrets.
 
 Output and errors are sent inside `<job_data>` tags, and the model is told that anything inside them is evidence, never instructions. A job that logs text from outside (scraped pages, user input, upstream error bodies) cannot talk the model into putting its own advice or links in your alerts.
 

@@ -24,7 +24,7 @@ order: 12
 
 ## cw.job(name, options)
 
-Names are 1 to 120 characters, starting with a letter or digit, of letters, digits, `.`, `_`, `:` and `-`. Declaring the same name twice replaces the options. Options are checked when the job is declared: an unknown timezone, a zero `timeout` or `maxDuration`, a `failuresBeforeAlert` that is not a whole number of 1 or more, or a budget that is not a finite number of 0 or more all throw, rather than quietly turning a check off.
+Names are 1 to 120 characters, starting with a letter or digit, of letters, digits, `.`, `_`, `:` and `-`. Declaring the same name twice replaces the options. Options are checked when the job is declared: an unknown timezone, a schedule that does not parse or an interval under one second, a `grace`, `timeout` or `maxDuration` that is not a duration, a zero `timeout` or `maxDuration`, a `failuresBeforeAlert` that is not a whole number of 1 or more, or a budget that is not a finite number of 0 or more all throw, rather than quietly turning a check off. A duration string longer than 64 characters throws too, wherever one is read (these options, the interval in `every`, `retention`, `start()` and `silence()`); no real duration comes near it.
 
 | Option | Default | |
 |---|---|---|
@@ -45,7 +45,7 @@ Returns a handle:
 | `run(fn, { trigger? })` | runs `fn(job)`, records the run, returns its result, rethrows its error |
 | `handler(fn, { secret? })` | a `(request) => Promise<Response>` that checks the bearer secret, runs `fn(job, request)` and answers with JSON, or with the `Response` `fn` returned. `secret` defaults to the client's `cronSecret`; `null` accepts anyone, and then the JSON leaves out the error text |
 | `start({ trigger?, id? })` | records a running run now and returns a [run handle](#the-run-handle) to finish it later, perhaps in another process. `trigger` defaults to `"start"`. `id` (1 to 200 characters) is your own stable id, such as an Inngest run id: a start with an id already recorded returns a handle on that run instead of recording another. A store that fails is reported to `onError`, never thrown, and the run is written when it finishes |
-| `resume(runId)` | a run handle on a run started elsewhere, read from the store. One that already finished, or is not in the store, gives a handle whose `finish()` records nothing and reports why to `onError`. Throws only for a run of another job |
+| `resume(runId)` | a run handle on a run started elsewhere, read from the store. One that already finished, or is not in the store, gives a handle whose `finish()` records nothing and reports why to `onError`. Throws only for a run of another job, or for an id that is empty, longer than 200 characters or starts with `pgcron:` (the same rules as `start({ id })`) |
 
 ## The job context
 
@@ -56,7 +56,7 @@ Passed to your function.
 | `name`, `runId`, `startedAt` | |
 | `signal` | an `AbortSignal` that fires when `timeout` elapses |
 | `log(...parts)` | append a line of output (objects are JSON) |
-| `metric(name, value)` | report a number |
+| `metric(name, value)` | report a number; throws for a value that is not a finite number (`NaN`, `Infinity`, a string) |
 | `metrics({ ... })` | several at once |
 
 ## The run handle
@@ -69,8 +69,16 @@ What `start()` and `resume()` return, for a run that spans several calls or proc
 | `active` | false once finished, and from the start when a resumed run has already finished or was not found |
 | `log(...parts)`, `metric(name, value)`, `metrics({ ... })` | as on the job context; kept in the handle until `flush()` or `finish()` |
 | `flush()` | appends the lines and metrics so far to the stored run, which must still be running. Output is redacted as it is written. This reads, changes and writes the run's row, so when two processes append to one run at the same moment the last write wins and the other's lines are lost |
-| `finish(outcome?)` | finishes the run and judges it like any other. `finish()` or `finish({ status: "ok" })` is a success; `finish({ error })` a failure, recorded like an error `run()` caught; `finish("text")` or `finish({ result })` treats the value like `run()`'s return (a string is the output when nothing was logged and is checked by `expect`; a `Response` of 400 or above fails). Lines and metrics from the handle are added to those already stored, then `expect`, redaction and the 16 KB cap apply. Resolves to the recorded run, or null when nothing was recorded |
+| `finish(outcome?)` | finishes the run and judges it like any other; see [below](#finish) |
 | `fail(error)` | `finish({ error })` |
+
+### finish()
+
+- `finish()` or `finish({ status: "ok" })` is a success.
+- `finish({ error })` is a failure, recorded like an error `run()` caught.
+- `finish("text")` or `finish({ result })` treats the value like `run()`'s return: a string is the output when nothing was logged and is checked by `expect`, and a `Response` of 400 or above fails.
+- Lines and metrics from the handle are added to those already stored, then `expect`, redaction and the 16 KB cap apply.
+- It resolves to the recorded run, or null when nothing was recorded.
 
 A second `finish()` on a handle, or on a run another process has finished, records nothing: it resolves to null and is reported to `onError`, never thrown. When two processes finish one run at the same moment, only one records and judges it. If the store fails during `finish()`, the handle stays active so `finish()` can be called again. An id belongs to one job: `start()` or `resume()` with an id another job's run already has throws, and ids starting with `pgcron:` are reserved for the pg_cron source. A run that is never finished is marked stuck by the first check after the job's `timeout`; one finished after that follows the same rule as a late `run()`: a late failure is not counted again, and a late success closes stuck and recovers.
 
@@ -80,8 +88,8 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 |---|---|
 | `run(name, options?, fn)` | run without keeping a handle; declares the job on first use |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune. Returns `{ checkedAt, jobs, alerts, pruned }`. Concurrent calls share one check. A job that cannot be evaluated is reported to `onError` and listed as `failing`; the rest are checked as usual |
-| `start(every = "1m")`, `stop()` | check on an interval. With `deliver: "check"`, `start()` warns once on the console that these checks send nothing and another process must |
-| `routes({ token?, basePath?, origin?, trustProxy? })` | the [dashboard and API](/docs/dashboard/) handlers. `origin` (such as `"https://app.example.com"`) replaces the request URL's origin for the cross-site check, the sign-in redirect and cookie, and the development sign-in line; `trustProxy: true` takes it from the first `X-Forwarded-Proto` and `X-Forwarded-Host` instead, when present (see [behind a proxy](/docs/dashboard/#behind-a-proxy)); with neither, forwarded headers are ignored. `token` defaults to `CRONWATCH_TOKEN` (empty counts as unset); with none, while `NODE_ENV` is `development` or `test` the routes make a random token and print a sign-in link to the server log on their first request, and otherwise answer 503. `token: null` opts out to serve them open. Cross-site writes are refused, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400 |
+| `start(every = "1m")`, `stop()` | check on an interval, starting about a second after `start()`. The interval is held between 5 seconds and about 24.8 days (the longest delay a timer keeps), so a shorter one checks every 5 seconds and a longer one about every 24.8 days. With `deliver: "check"`, `start()` warns once on the console that these checks send nothing and another process must |
+| `routes(options?)` | the [dashboard and API](/docs/dashboard/) handlers; see [below](#routes) |
 | `jobs()` | every job's summary, without alerting |
 | `jobsWithRuns(limit = 20)` | every job's summary with its newest `limit` runs, read together: `{ job, runs }[]` |
 | `jobSummary(name)`, `getRun(id)` | |
@@ -91,7 +99,30 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 | `definedJobs()` | the definitions declared in this process |
 | `close()` | stop the interval and close the store |
 | `resumeRun(name, runId)` | `job(name).resume(runId)` for a job declared in this process; rejects for one that is not |
-| `recordRun(run, { evaluate? })` | record a run that happened outside this process, for a source. Its job must be declared first. Runs are keyed by id: a new one is inserted, a stored one still running is updated when this one is not, and anything else is left alone, so recording the same run twice changes nothing. A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets) and redacted the same way. `evaluate: false` stores it without judging it, for history imported on first sight. Resolves to the alerts it sent |
+| `recordRun(run, { evaluate? })` | record a run that happened outside this process, for a source; see [below](#recordrun) |
+
+### routes()
+
+`cw.routes(options?)` returns `{ handler, GET, POST, DELETE }`, one fetch-style handler under four names, serving the [dashboard and API](/docs/dashboard/).
+
+| Option | Default | |
+|---|---|---|
+| `token` | `CRONWATCH_TOKEN` | the bearer the routes require, and what the sign-in cookie holds a digest of. Empty counts as unset. With none, while `NODE_ENV` is `development` or `test`, the routes make a random token and print a sign-in link to the server log on their first request; otherwise they answer 503. `null` opts out and serves them open |
+| `basePath` | `"/cronwatch"` | where the routes are mounted: it routes requests, builds links and scopes the cookie |
+| `origin` | the request URL's | the public origin, such as `"https://app.example.com"`, used for the cross-site check, the sign-in redirect and cookie, and the development sign-in line. Must be an `http` or `https` URL, or the call throws |
+| `trustProxy` | `false` | take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host` instead, when present (see [behind a proxy](/docs/dashboard/#behind-a-proxy)). With neither this nor `origin`, forwarded headers are ignored |
+
+The development sign-in line names the host only when `origin` is set or the first request's host is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`); for any other host it prints the path alone, since a client controls the `Host` header. Cross-site writes are refused, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400.
+
+### recordRun()
+
+`cw.recordRun(run, { evaluate? })` records a run that happened outside this process, for a [source](#exports).
+
+- Its job must be declared first.
+- Runs are keyed by id: a new one is inserted, a stored one still running is updated when this one is not, and anything else is left alone, so recording the same run twice changes nothing.
+- A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets) and redacted the same way.
+- `evaluate: false` stores it without judging it, for history imported on first sight.
+- It resolves to the alerts it sent.
 
 ## Exports
 
