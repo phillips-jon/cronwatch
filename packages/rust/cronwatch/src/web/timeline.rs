@@ -70,9 +70,10 @@ fn day_label(t: i64) -> String {
     format!("{} {} {}", WEEKDAY_NAMES[wd], d, MONTH_NAMES[m - 1])
 }
 
-/// "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
-/// before the year 1 or after 9999 (a start read from a foreign or damaged
-/// row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
+/// "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42", and
+/// "1 Jan 0001 02:00" in another UTC year. A time before the year 1 or after
+/// 9999 (a start read from a foreign or damaged row) is "before 1 Jan 0001
+/// 00:00" or "after 31 Dec 9999 23:59".
 pub(crate) fn when_utc(t: i64, now: i64) -> String {
     if t > js::LAST_DATE_MS {
         return "after 31 Dec 9999 23:59".into();
@@ -84,7 +85,10 @@ pub(crate) fn when_utc(t: i64, now: i64) -> String {
         return clock_utc(t);
     }
     let (m, d, _) = civil(t);
-    format!("{d} {} {}", MONTH_NAMES[m - 1], clock_utc(t))
+    let (year, _, _) = js::civil_from_days(js::floor_div(t, DAY_MS));
+    let (now_year, _, _) = js::civil_from_days(js::floor_div(now, DAY_MS));
+    let other = if year == now_year { String::new() } else { format!(" {year:04}") };
+    format!("{d} {}{other} {}", MONTH_NAMES[m - 1], clock_utc(t))
 }
 
 /// The stretch of time a timeline draws, and the moment it was drawn.

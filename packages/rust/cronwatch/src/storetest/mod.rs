@@ -494,6 +494,69 @@ where
     );
 }
 
+/// The starts a foreign or damaged row could give a cron job's last run, as
+/// SQL literals: before the year 1, after 9999, and the BIGINT extremes.
+pub const FAR_STARTS: [&str; 4] = ["-62135596800001", "253402300800000", "-9223372036854775808", "9223372036854775807"];
+
+/// A check and the dashboard over a cron job ("0 2 * * *" in UTC, grace
+/// 10m) whose last run, inserted by `exec` over the tables of `prefix`,
+/// started at `started_at` (one of [`FAR_STARTS`]). Nothing reports an
+/// error and the pages answer 200. A cron counts from a start before the
+/// year 1 as from the year's first millisecond, so the first fire of the
+/// year 1 was missed; after 9999 nothing is due again.
+pub async fn cron_over_foreign_row<S, F, Fut>(store: S, prefix: &str, started_at: &str, mut exec: F)
+where
+    S: Store + 'static,
+    F: FnMut(String) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    must(store.init().await);
+    must(
+        store
+            .upsert_job(&definition(r#"{"name":"far","schedule":"0 2 * * *","timezone":"UTC","grace":"10m"}"#), 1)
+            .await,
+    );
+    exec(format!(
+        "INSERT INTO {prefix}runs (id, job, status, started_at, finished_at, duration_ms) \
+         VALUES ('far1', 'far', 'ok', {started_at}, {started_at}, 0)"
+    ))
+    .await;
+    let sent = Capture::default();
+    let errors = Errors::default();
+    let errs = errors.clone();
+    let cw = must(
+        Client::builder()
+            .store(store)
+            .alerts([Arc::new(sent.clone()) as Arc<dyn Channel>])
+            .no_cron_secret()
+            .on_error(move |err, where_| errs.add(err, where_))
+            .build(),
+    );
+    must(cw.check().await);
+    let routes = must(cw.routes(crate::web::RoutesOptions::new().token("tok")));
+    for path in ["/cronwatch", "/cronwatch/jobs/far", "/cronwatch/api/jobs/far"] {
+        let res = routes
+            .handle(
+                crate::web::Request::new("GET", path)
+                    .with_header("host", "app.test")
+                    .with_header("authorization", "Bearer tok"),
+            )
+            .await;
+        eq(&format!("GET {path} from {started_at}"), res.status, 200);
+    }
+    eq(&format!("nothing reported from {started_at}"), errors.list(), Vec::<String>::new());
+    let missed = started_at.starts_with('-');
+    eq(
+        &format!("the alerts sent from {started_at}"),
+        sent.types(),
+        if missed { vec!["missed".to_string()] } else { vec![] },
+    );
+    if missed {
+        let message = sent.list()[0].message.clone();
+        assert!(message.starts_with("Due 0001-01-01 02:00:00 UTC "), "the missed alert from {started_at}: {message}");
+    }
+}
+
 /// A settable clock for a client, in epoch milliseconds.
 #[derive(Clone, Debug)]
 pub struct Clock(Arc<std::sync::atomic::AtomicI64>);

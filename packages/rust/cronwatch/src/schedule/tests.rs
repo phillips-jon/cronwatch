@@ -181,6 +181,36 @@ fn a_date_no_month_has_never_fires() {
 }
 
 #[test]
+fn a_far_start_counts_from_the_year_1_or_has_no_fire_after_it() {
+    // A foreign or damaged row's start can be any i64: before the year 1 it
+    // counts from the year's first millisecond, and after 9999 nothing is
+    // due. Nothing overflows, in any zone, and no fire is after 9999.
+    let first = crate::js::FIRST_DATE_MS;
+    for zone in ["UTC", "America/New_York", "Asia/Kolkata", ""] {
+        for schedule in ["0 2 * * *", "*/5 * * * *", "0 0 29 2 *", "0 0 30 2 *"] {
+            let p = must(schedule, zone);
+            for t in [i64::MIN, i64::MIN + 1, -8_640_000_000_000_001, first - 1, i64::MAX, i64::MAX - 1] {
+                if let Some(f) = next_fire(&p, t, None) {
+                    assert!(
+                        t < first && (first..=crate::js::LAST_DATE_MS).contains(&f),
+                        "{schedule} {zone} from {t}: {f}"
+                    );
+                }
+                let _ = expect(&p, Some(t), t, f64::MAX);
+                let _ = expect(&p, None, t, 0.0);
+                let _ = fires_between(&p, t, i64::MAX, 50);
+            }
+        }
+    }
+    let p = must("0 2 * * *", "UTC");
+    assert_eq!(due(&p, Some(i64::MIN), 0, 0.0), utc(1, 0, 1, 2, 0, 0));
+    assert_eq!(expect(&p, Some(i64::MAX), 0, 0.0), None);
+    assert_eq!(next_fire(&p, utc(9999, 11, 30, 12, 0, 0), None), Some(utc(9999, 11, 31, 2, 0, 0)));
+    assert_eq!(next_fire(&p, utc(9999, 11, 31, 2, 0, 0), None), None);
+    assert_eq!(next_fire(&p, utc(5000, 0, 1, 0, 0, 0), None), Some(utc(5000, 0, 1, 2, 0, 0)));
+}
+
+#[test]
 fn one_time_dates_are_refused() {
     for (text, want) in [
         ("2026-12-01T00:00:00", "CronPattern: a one-time date is not supported by the Rust port"),

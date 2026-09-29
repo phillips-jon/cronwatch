@@ -64,7 +64,7 @@ fn read_golden() -> Vec<Capture> {
             }
         })
         .collect();
-    assert_eq!(captures.len(), 59, "golden.json's captures");
+    assert_eq!(captures.len(), 63, "golden.json's captures");
     captures
 }
 
@@ -129,6 +129,19 @@ async fn seed() -> Kit {
             async { Ok::<_, std::io::Error>(()) }
         })
         .await;
+    // Cron jobs whose last run is as far off: counted from the first
+    // millisecond of the year 1, the first is due then (and is missed at
+    // the check); after 9999 the other is never due again.
+    for (name, start) in [("far-cron-back", -62_135_596_800_001), ("far-cron-ahead", 253_402_300_800_000)] {
+        let job = k.cw.job(name, JobOptions::new().schedule("0 2 * * *").timezone("UTC").grace("10m")).unwrap();
+        k.set(start);
+        job.run(|_| {
+            k.advance(1000);
+            async { Ok::<_, std::io::Error>(()) }
+        })
+        .await
+        .unwrap();
+    }
     k.set(T0);
     k
 }
@@ -254,6 +267,9 @@ async fn routes_match_the_sdk_golden_straight_into_handle() {
         let res = routes.handle(req).await;
         compare(c, res.status, res.headers, &res.body, &mut ids, &[]);
     }
+    // As golden.mjs: nothing in the seed or the requests reports an error,
+    // however far off a run's start is.
+    assert_eq!(k.messages(), Vec::<String>::new());
 }
 
 fn http_request(c: &Capture, path: &str) -> http::Request<Full<Bytes>> {

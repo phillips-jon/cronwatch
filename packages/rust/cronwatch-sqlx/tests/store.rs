@@ -63,6 +63,20 @@ async fn a_check_over_a_run_that_started_at_the_lowest_bigint_on_sqlite() {
     .await;
 }
 
+#[tokio::test]
+async fn a_check_and_the_dashboard_over_a_cron_job_whose_last_run_started_far_off_on_sqlite() {
+    for started_at in storetest::FAR_STARTS {
+        let p = memory_pool();
+        storetest::cron_over_foreign_row(SqlStore::sqlite(p.clone()), "cronwatch_", started_at, |sql| {
+            let p = p.clone();
+            async move {
+                sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&p).await.unwrap();
+            }
+        })
+        .await;
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_run_is_finished_once_across_stores_on_one_file() {
     let dir = Arc::new(TempDir::new());

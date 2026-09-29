@@ -16,7 +16,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use jiff::tz::TimeZone;
 
-use crate::js::{Object, Value, floor_div, is_space, trim};
+use crate::js::{FIRST_DATE_MS, LAST_DATE_MS, Object, Value, floor_div, is_space, trim};
 pub(crate) use duration::format_relative;
 use duration::parse_duration_text;
 pub(crate) use duration::{format_duration, parse_duration};
@@ -83,10 +83,56 @@ impl Parsed {
         Value::Object(o)
     }
 
-    /// Croner's `nextRuns` for a cron; nothing for an interval.
+    /// The SDK's `runsAfter`: croner's `nextRuns` for a cron, from a `start`
+    /// within the years 1 to 9999, dropping any fire after 9999; nothing for
+    /// an interval. A time croner cannot answer for (it misreads a year
+    /// below 100 and finds no fire past 3000) is moved by whole 400-year
+    /// cycles into the years it can, and its fires moved back: a time before
+    /// 400 goes forward, into the same local mean time every zone kept then,
+    /// and one from 2800 goes back, to where the zone's present rules
+    /// already hold. The SDK does the same, so the two agree on every fire.
     fn next_runs(&self, count: usize, start: i64) -> Vec<i64> {
-        self.cron.as_ref().map_or_else(Vec::new, |c| c.next_runs(count, start))
+        let Some(c) = self.cron.as_ref() else {
+            return Vec::new();
+        };
+        let shift = if start < CRONER_FIRST_MS {
+            (CRONER_FIRST_MS - start + CYCLE_MS - 1) / CYCLE_MS * CYCLE_MS
+        } else if start >= CRONER_LAST_MS {
+            -((start - CRONER_LAST_MS) / CYCLE_MS + 1) * CYCLE_MS
+        } else {
+            0
+        };
+        let mut out = Vec::with_capacity(count);
+        for t in c.next_runs(count, start + shift) {
+            let t = t - shift;
+            if t > LAST_DATE_MS {
+                break;
+            }
+            out.push(t);
+        }
+        out
     }
+}
+
+/// Four hundred Gregorian years: 146,097 days, a whole number of weeks,
+/// after which the calendar repeats date for date and weekday for weekday.
+const CYCLE_MS: i64 = 146_097 * 86_400_000;
+/// 0400-01-01T00:00:00Z: an earlier time is asked a cycle or more later.
+const CRONER_FIRST_MS: i64 = -49_544_438_400_000;
+/// 2800-01-01T00:00:00Z: a later time is asked a cycle or more earlier.
+const CRONER_LAST_MS: i64 = 26_192_246_400_000;
+
+/// The SDK's `countFrom`: a stored time as a cron's fires are counted from
+/// it. A start read from a foreign or damaged row can be any number: one
+/// before the year 1 counts from just before its first millisecond, so the
+/// first fire of the year 1 is the next one, and one at or after the last
+/// millisecond of 9999 has no fire after it at all (None). No fire is ever
+/// after 9999.
+fn count_from(from: i64) -> Option<i64> {
+    if from >= LAST_DATE_MS {
+        return None;
+    }
+    Some(from.max(FIRST_DATE_MS - 1))
 }
 
 static CACHE: LazyLock<Mutex<HashMap<String, Arc<Parsed>>>> = LazyLock::new(Default::default);
@@ -180,13 +226,14 @@ fn every(text: &str) -> Option<&str> {
 /// hour that repeats when clocks go back, so its answers are filtered, and
 /// a stretch of nothing but past times is stepped over an hour at a time.
 pub(crate) fn fire_after(p: &Parsed, from: i64) -> Option<i64> {
-    let mut probe = from;
+    let start = count_from(from)?;
+    let mut probe = start;
     for _ in 0..4 {
         let runs = p.next_runs(8, probe);
         if runs.is_empty() {
             return None;
         }
-        if let Some(&t) = runs.iter().find(|&&t| t > from) {
+        if let Some(&t) = runs.iter().find(|&&t| t > start) {
             return Some(t);
         }
         probe += 3_600_000;
@@ -200,7 +247,10 @@ pub(crate) fn fire_after(p: &Parsed, from: i64) -> Option<i64> {
 /// not move forward (see `fire_after`).
 pub(crate) fn fires_between(p: &Parsed, from: i64, to: i64, limit: usize) -> Option<Vec<i64>> {
     let mut out = Vec::new();
-    let (mut probe, mut last) = (from, from);
+    let Some(start) = count_from(from) else {
+        return Some(out);
+    };
+    let (mut probe, mut last) = (start, start);
     for _ in 0..1000 {
         let batch = p.next_runs((limit + 1 - out.len()).min(24), probe);
         let Some(&end) = batch.last() else {
@@ -264,7 +314,9 @@ pub(crate) fn expect(p: &Parsed, last_run_at: Option<i64>, registered_at: i64, g
 }
 
 /// The first fire of a cron that a run starting at `started_at` does not
-/// cover, or None when there is none.
+/// cover, or None when there is none. A start before the year 1 covers none
+/// of them, so the first fire of the year 1 is due; after 9999 there is none
+/// (see `count_from`).
 pub(crate) fn due_after_run(p: &Parsed, started_at: i64) -> Option<i64> {
     // A fire at or before the start is covered by the run itself.
     let next = fire_after(p, started_at)?;
@@ -301,6 +353,10 @@ fn in_spring_forward_gap(p: &Parsed, started_at: i64, fire_at: i64) -> bool {
     let Some(c) = &p.cron else {
         return false;
     };
+    // Every zone kept its local mean time, with no clock change, in the year 1.
+    if fire_at - LOOKBACK < FIRST_DATE_MS {
+        return false;
+    }
     let tz = c.zone();
     let after = utc_offset(fire_at, tz);
     let before = utc_offset(fire_at - LOOKBACK, tz);

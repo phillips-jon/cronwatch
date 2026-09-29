@@ -73,6 +73,23 @@ async fn a_check_over_a_run_that_started_at_the_lowest_bigint_on_each_server() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_check_and_the_dashboard_over_a_cron_job_whose_last_run_started_far_off_on_each_server() {
+    for s in servers() {
+        for (i, started_at) in storetest::FAR_STARTS.into_iter().enumerate() {
+            let store = s.store(&format!("farcron{i}"));
+            let p = store.table_prefix().to_string();
+            let db = Arc::new(s.db());
+            storetest::cron_over_foreign_row(store, &p, started_at, |sql| {
+                let db = db.clone();
+                async move { db.exec(&sql).await }
+            })
+            .await;
+        }
+        s.cleanup().await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_run_is_finished_once_across_stores_on_each_server() {
     for s in servers() {
         let server = s.clone();
