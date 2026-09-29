@@ -42,7 +42,9 @@ if Code.ensure_loaded?(Oban) do
 
     Handlers on `[:oban, :job, :start]`, `:stop` and `:exception` run in the
     worker's own process: each attempt is a run (trigger `oban`, id
-    `oban:<job id>:<attempt>`), with its context in the worker's process, so
+    `oban:<app>:<job id>:<attempt>`, with the jobs table's prefix before the
+    job's id when it is not `public`, since a job's id is unique only within
+    its table), with its context in the worker's process, so
     `Cronwatch.log/1` and `Cronwatch.metric/2` work inside `perform/1`. A
     retry is a new attempt and a new run: failing attempts open one failed
     alert and the one that succeeds closes it, and `failures_before_alert`
@@ -82,6 +84,7 @@ if Code.ensure_loaded?(Oban) do
     alias Cronwatch.Error
     alias Cronwatch.JS
     alias Cronwatch.Run.Exec
+    alias Cronwatch.Runs
     alias Cronwatch.Zone
     alias Oban.Cron.Expression
 
@@ -136,7 +139,7 @@ if Code.ensure_loaded?(Oban) do
       server = server(instance, Keyword.get(opts, :oban, Oban))
 
       task =
-        Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(instance), fn ->
+        Watch.bounded_task(instance, fn ->
           watch = GenServer.call(server, :declare, :infinity)
           Watch.settle(watch)
 
@@ -180,11 +183,16 @@ if Code.ensure_loaded?(Oban) do
           oban: oban,
           server: self(),
           watch: watch,
+          app_tag: Watch.app_tag(watch),
           defaults: Keyword.get(opts, :defaults, []),
           workers: workers
         }
 
         id = {__MODULE__, instance, oban}
+
+        # A process killed before its terminate/2 ran left its handlers
+        # attached, holding its dead watch; these replace them.
+        :telemetry.detach(id)
 
         :telemetry.attach_many(
           id,
@@ -503,17 +511,18 @@ if Code.ensure_loaded?(Oban) do
     ## The telemetry handlers
 
     @doc false
-    def handle_event([:oban, kind, :init], _measurements, %{conf: conf} = meta, cfg)
+    # Matched rather than read, since a handler that raises is detached, and
+    # with it every event of this integration.
+    def handle_event([:oban, kind, :init], _measurements, %{conf: %{name: name}} = meta, %{oban: name} = cfg)
         when kind in [:plugin, :supervisor] do
-      if conf.name == cfg.oban and (kind == :supervisor or meta[:plugin] in @cron_plugins),
-        do: send(cfg.server, :declare)
+      if kind == :supervisor or meta[:plugin] in @cron_plugins, do: send(cfg.server, :declare)
 
       :ok
     end
 
     def handle_event([:oban, :job, event], _measurements, %{conf: %{name: name}} = meta, %{oban: name} = cfg) do
       case event do
-        :start -> started(cfg, meta.job)
+        :start -> started(cfg, meta)
         :stop -> stopped(cfg, meta)
         :exception -> failed(cfg, meta)
       end
@@ -550,7 +559,7 @@ if Code.ensure_loaded?(Oban) do
       end
     end
 
-    defp started(cfg, job) do
+    defp started(cfg, %{job: job} = meta) do
       opened =
         try do
           case job_for(cfg, job) do
@@ -558,8 +567,8 @@ if Code.ensure_loaded?(Oban) do
               :none
 
             cw_job ->
-              close_rescued(cfg, cw_job, job)
-              id = if is_integer(job.id), do: "oban:#{job.id}:#{job.attempt}"
+              close_rescued(cfg, cw_job, job, meta[:conf])
+              id = if is_integer(job.id), do: run_id(cfg, meta[:conf], job.id, job.attempt)
               Exec.open(cw_job, trigger: @trigger, id: id, defer: true)
           end
         rescue
@@ -629,6 +638,13 @@ if Code.ensure_loaded?(Oban) do
         name == @check_worker ->
           nil
 
+        # Every job the app's queues run passes through here: one not
+        # declared in the instance, not inserted by the Cron plugin and not
+        # named is let go with a table read, never a call to the watch, so a
+        # busy queue does not wait in line on one process.
+        Runs.job(cfg.instance, name) == nil and not cron?(job) and not Map.has_key?(cfg.workers, name) ->
+          nil
+
         found = Watch.job(cfg.watch, name) ->
           found
 
@@ -646,8 +662,8 @@ if Code.ensure_loaded?(Oban) do
     # An earlier attempt still running (its node died before its monitor
     # could record it, and Lifeline rescued the job) is failed as this one
     # starts.
-    defp close_rescued(cfg, cw_job, %{id: id, attempt: attempt}) when is_integer(id) and attempt > 1 do
-      prior = "oban:#{id}:#{attempt - 1}"
+    defp close_rescued(cfg, cw_job, %{id: id, attempt: attempt}, conf) when is_integer(id) and attempt > 1 do
+      prior = run_id(cfg, conf, id, attempt - 1)
 
       case Cronwatch.get_run(prior, instance: cfg.instance) do
         {:ok, %{status: "running", job: job_name}} when job_name == cw_job.name ->
@@ -658,7 +674,25 @@ if Code.ensure_loaded?(Oban) do
       end
     end
 
-    defp close_rescued(_cfg, _cw_job, _job), do: :ok
+    defp close_rescued(_cfg, _cw_job, _job, _conf), do: :ok
+
+    @doc false
+    # An attempt's run id: the app's tag, the job's id and the attempt
+    # (`oban:billing:42:1`), with the jobs table's prefix before the id when
+    # it is not the default (`oban:billing:jobs2:42:1`). A job's id is unique
+    # only within its table, so two apps sharing a store with an Oban
+    # database each, or two Oban instances on different prefixes, would
+    # otherwise give two runs one id: the second insert refused, its run
+    # unrecorded, and a rescue able to fail the other's run.
+    def run_id(cfg, conf, id, attempt) do
+      prefix =
+        case conf do
+          %{prefix: prefix} when is_binary(prefix) and prefix not in ["", "public"] -> prefix <> ":"
+          _ -> ""
+        end
+
+      "#{cfg.app_tag}:#{prefix}#{id}:#{attempt}"
+    end
   end
 
   defmodule Cronwatch.Oban.CheckWorker do
@@ -713,6 +747,9 @@ if Code.ensure_loaded?(Oban) do
             nil -> {:error, "no Cronwatch instance named #{name}"}
             atom -> {:ok, atom}
           end
+
+        other ->
+          {:error, "the instance is named by a string, not #{inspect(other)}"}
       end
     end
 

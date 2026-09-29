@@ -243,12 +243,7 @@ defmodule Cronwatch.Bridge.Watch do
   """
   @spec write(atom(), String.t()) :: {:ok, boolean()} | {:error, term()}
   def write(instance, name) do
-    task =
-      Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(instance), Cronwatch, :sync_job, [
-        name,
-        [instance: instance]
-      ])
-
+    task = bounded_task(instance, fn -> Cronwatch.sync_job(name, instance: instance) end)
     timeout = save_timeout()
 
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
@@ -264,6 +259,29 @@ defmodule Cronwatch.Bridge.Watch do
            "writing the declaration of #{JS.quote(name)} took longer than #{JS.format_number(timeout / 1000)} seconds; gave up"
          )}
     end
+  end
+
+  @doc false
+  # A task of the instance, not linked to the caller (a raise in it is the
+  # caller's answer, not its crash), that is killed when the caller ends:
+  # the caller holds it to a deadline, and a caller killed first (a sync
+  # given up on, a worker at its timeout) would otherwise leave it waiting
+  # on a store that hangs, one more with every check.
+  def bounded_task(instance, fun) do
+    task = Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(instance), fun)
+    caller = self()
+
+    spawn(fn ->
+      caller_ref = Process.monitor(caller)
+      task_ref = Process.monitor(task.pid)
+
+      receive do
+        {:DOWN, ^caller_ref, :process, _, _} -> Process.exit(task.pid, :kill)
+        {:DOWN, ^task_ref, :process, _, _} -> :ok
+      end
+    end)
+
+    task
   end
 
   defp defined(instance), do: instance |> Runs.jobs() |> MapSet.new(& &1.name)

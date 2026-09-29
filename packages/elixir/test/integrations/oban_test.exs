@@ -153,13 +153,17 @@ defmodule Cronwatch.ObanTest do
         oban = TestOban.start(engine)
 
         %{cw: cw, alerts: alerts} =
-          make(integrations: [{Cronwatch.Oban, oban: oban, workers: [{Workers.Nightly, failures_before_alert: 1}]}])
+          make(
+            integrations: [
+              {Cronwatch.Oban, oban: oban, app: "billing", workers: [{Workers.Nightly, failures_before_alert: 1}]}
+            ]
+          )
 
         {:ok, job} = Oban.insert(oban, cron_job(Workers.Nightly))
         drain(oban)
 
         list = runs(cw, "Cronwatch.Test.Workers.Nightly")
-        assert Enum.map(list, & &1.id) == for(n <- 1..3, do: "oban:#{job.id}:#{n}")
+        assert Enum.map(list, & &1.id) == for(n <- 1..3, do: "oban:billing:#{job.id}:#{n}")
         assert Enum.map(list, & &1.status) == ["failed", "failed", "ok"]
         assert Enum.map(list, & &1.trigger) == ["oban", "oban", "oban"]
 
@@ -231,12 +235,12 @@ defmodule Cronwatch.ObanTest do
 
       test "an attempt its node never finished is closed when Lifeline's rescue runs again", %{engine: engine} do
         oban = TestOban.start(engine)
-        %{cw: cw} = make(alerts: [], integrations: [{Cronwatch.Oban, oban: oban}])
+        %{cw: cw} = make(alerts: [], integrations: [{Cronwatch.Oban, oban: oban, app: "billing"}])
         {:ok, job} = Oban.insert(oban, cron_job(Workers.Email))
         cw_job = Cronwatch.job!("Cronwatch.Test.Workers.Email", instance: cw)
 
         # The first attempt's run, left running by a node that died.
-        task = Task.async(fn -> Cronwatch.start(cw_job, id: "oban:#{job.id}:1", trigger: "oban") end)
+        task = Task.async(fn -> Cronwatch.start(cw_job, id: "oban:billing:#{job.id}:1", trigger: "oban") end)
         {:ok, _} = Task.await(task)
         repo = Oban.config(oban).repo
         repo.query!("UPDATE oban_jobs SET attempt = 1 WHERE id = #{job.id}", [])
@@ -245,9 +249,61 @@ defmodule Cronwatch.ObanTest do
         [first, second] = runs(cw, "Cronwatch.Test.Workers.Email")
 
         assert {first.id, first.status, first.error} ==
-                 {"oban:#{job.id}:1", "failed", "Oban rescued the job after its node stopped"}
+                 {"oban:billing:#{job.id}:1", "failed", "Oban rescued the job after its node stopped"}
 
-        assert {second.id, second.status} == {"oban:#{job.id}:2", "ok"}
+        assert {second.id, second.status} == {"oban:billing:#{job.id}:2", "ok"}
+      end
+
+      test "two apps on one store give one job id's attempts runs of their own", %{engine: engine} do
+        # Each app's jobs table numbers its jobs from 1, so the same id and
+        # attempt reach one store from two apps; here, two instances watch
+        # one Oban, which gives the same numbers to both.
+        oban = TestOban.start(engine)
+        %{cw: billing, errors: billing_errors} = make(integrations: [{Cronwatch.Oban, oban: oban, app: "billing"}])
+        store = Cronwatch.Config.get(billing).store
+
+        %{cw: shop, errors: shop_errors} =
+          make(store: Stores.option(store), integrations: [{Cronwatch.Oban, oban: oban, app: "shop"}])
+
+        {:ok, job} = Oban.insert(oban, cron_job(Workers.Email))
+        drain(oban)
+
+        ids = runs(billing, "Cronwatch.Test.Workers.Email") |> Enum.map(&{&1.id, &1.status}) |> Enum.sort()
+        assert ids == [{"oban:billing:#{job.id}:1", "ok"}, {"oban:shop:#{job.id}:1", "ok"}]
+        assert runs(shop, "Cronwatch.Test.Workers.Email") |> length() == 2
+        assert messages(billing_errors) ++ messages(shop_errors) == []
+      end
+
+      test "a job not watched starts without waiting on the integration's processes", %{engine: engine} do
+        oban = TestOban.start(engine)
+        %{cw: cw} = make(alerts: [], integrations: [{Cronwatch.Oban, oban: oban}])
+        watch = GenServer.call(Cronwatch.Oban.server(cw, oban), :watch)
+        :sys.suspend(watch)
+
+        try do
+          {:ok, _} = Oban.insert(oban, Workers.Email.new(%{}))
+          task = Task.async(fn -> drain(oban) end)
+          assert %{success: 1} = Task.await(task, 5000)
+        after
+          :sys.resume(watch)
+        end
+      end
+
+      test "an integration killed before it could detach is replaced by its restart", %{engine: engine} do
+        oban = TestOban.start(engine)
+        %{cw: cw, errors: errors} = make(alerts: [], integrations: [{Cronwatch.Oban, oban: oban, app: "billing"}])
+        server = Cronwatch.Oban.server(cw, oban)
+        old = Process.whereis(server)
+        Process.exit(old, :kill)
+        eventually(fn -> (pid = Process.whereis(server)) && pid != old end)
+        Cronwatch.Oban.settle(instance: cw, oban: oban)
+
+        {:ok, job} = Oban.insert(oban, cron_job(Workers.Email))
+        drain(oban)
+
+        assert [%{id: id, status: "ok"}] = runs(cw, "Cronwatch.Test.Workers.Email")
+        assert id == "oban:billing:#{job.id}:1"
+        assert messages(errors) == []
       end
 
       test "the check worker syncs and checks, and is never a job", %{engine: engine} do
@@ -289,6 +345,20 @@ defmodule Cronwatch.ObanTest do
              Cronwatch.start_link(name: :cw_refused, integrations: [{Cronwatch.Missing, []}])
 
     assert message =~ "Cronwatch.Missing is not available"
+  end
+
+  test "the check worker answers an instance named by anything but a string or atom with an error" do
+    assert {:error, message} = CheckWorker.perform(%Oban.Job{args: %{"instance" => 5}})
+    assert message =~ "not 5"
+
+    assert {:error, "no Cronwatch instance named Nowhere.Cronwatch"} =
+             CheckWorker.perform(%Oban.Job{args: %{"instance" => "Nowhere.Cronwatch"}})
+  end
+
+  test "an init event of another shape is let go, never raised, so the handlers stay attached" do
+    for meta <- [%{conf: nil}, %{conf: %{}}, %{}] do
+      assert Cronwatch.Oban.handle_event([:oban, :plugin, :init], %{}, meta, %{oban: Oban, server: self()}) == :ok
+    end
   end
 
   describe "Oban's reading" do

@@ -104,7 +104,7 @@ if Code.ensure_loaded?(Quantum) do
       server = server(instance, Keyword.fetch!(opts, :scheduler))
 
       task =
-        Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(instance), fn ->
+        Watch.bounded_task(instance, fn ->
           watch = GenServer.call(server, :declare, :infinity)
           Watch.settle(watch)
 
@@ -167,10 +167,16 @@ if Code.ensure_loaded?(Quantum) do
             server: self(),
             watch: watch,
             defaults: Keyword.get(opts, :defaults, []),
-            jobs: Map.new(Keyword.get(opts, :jobs, []), fn {name, options} -> {to_string(name), options} end)
+            # Keyed as name_of/1 names a job, so a job named by a module
+            # (`MyApp.Nightly`) finds its options.
+            jobs: Map.new(Keyword.get(opts, :jobs, []), fn {name, options} -> {option_key(name), options} end)
           }
 
           id = {__MODULE__, instance, scheduler}
+
+          # A process killed before its terminate/2 ran left its handlers
+          # attached, holding its dead watch; these replace them.
+          :telemetry.detach(id)
 
           :telemetry.attach_many(
             id,
@@ -289,6 +295,13 @@ if Code.ensure_loaded?(Quantum) do
       do:
         {:error,
          "cronwatch: a Quantum job with no name whose task is an anonymous function cannot be watched; give it a name"}
+
+    defp option_key(name) do
+      case name_of(%{name: name}) do
+        {:ok, key} -> key
+        {:error, _} -> to_string(name)
+      end
+    end
 
     defp convert_cached(s, job, label) do
       key = {job.schedule, job.timezone}

@@ -320,6 +320,27 @@ defmodule Cronwatch.BridgeTest do
            ]
   end
 
+  # The audit: a write whose caller was killed first (a sync given up on at
+  # its deadline) was left waiting on a store that hangs, one more with
+  # every check.
+  test "a write whose caller ends is stopped with it" do
+    {hooked, agent} = Stores.hooked(Stores.memory())
+    %{cw: cw} = make(store: Stores.option(hooked), alerts: [])
+    Cronwatch.job!("first", schedule: "0 1 * * *", instance: cw)
+    test = self()
+
+    Stores.hook(agent, :get_job, fn _args, _call ->
+      send(test, {:hung, self()})
+      Process.sleep(:infinity)
+    end)
+
+    caller = spawn(fn -> Watch.write(cw, "first") end)
+    assert_receive {:hung, writer}, 1000
+    ref = Process.monitor(writer)
+    Process.exit(caller, :kill)
+    assert_receive {:DOWN, ^ref, :process, _, :killed}, 1000
+  end
+
   # The Go audit: an entry declared while unschedule read the store was taken
   # for gone, and its job lost its schedule for the life of the process.
   test "unschedule keeps an entry declared meanwhile" do

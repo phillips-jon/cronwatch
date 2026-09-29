@@ -156,6 +156,31 @@ defmodule Cronwatch.QuantumTest do
     end)
   end
 
+  test "a job named by a module finds its options under that name" do
+    start_scheduler([{Cronwatch.Test.QJobs, [schedule: "0 2 1 7 *", task: {QJobs, :nightly, []}]}])
+
+    %{cw: cw} =
+      make(alerts: [], integrations: [integration(jobs: [{Cronwatch.Test.QJobs, [timeout: "1h"]}])])
+
+    Cronwatch.Quantum.settle(instance: cw, scheduler: QScheduler)
+    assert stored(cw, "Cronwatch.Test.QJobs") =~ ~s("timeout":"1h")
+  end
+
+  test "an integration killed before it could detach is replaced by its restart" do
+    start_scheduler(report: [schedule: "0 2 1 7 *", task: {QJobs, :report, []}])
+    %{cw: cw, errors: errors} = make(alerts: [], integrations: [integration()])
+    server = Cronwatch.Quantum.server(cw, QScheduler)
+    old = Process.whereis(server)
+    Process.exit(old, :kill)
+    eventually(fn -> (pid = Process.whereis(server)) && pid != old end)
+    Cronwatch.Quantum.settle(instance: cw, scheduler: QScheduler)
+
+    QScheduler.run_job(:report)
+    [run] = eventually(fn -> match_runs(cw, "report") end)
+    assert run.status == "ok"
+    assert messages(errors) == []
+  end
+
   test "check/1 syncs and checks, and is never a job" do
     %{cw: earlier} = make(alerts: [])
     store = Cronwatch.Config.get(earlier).store
