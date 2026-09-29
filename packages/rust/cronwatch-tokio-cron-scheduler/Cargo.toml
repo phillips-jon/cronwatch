@@ -1,0 +1,32 @@
+[package]
+name = "cronwatch-tokio-cron-scheduler"
+description = "CronWatch for tokio-cron-scheduler: its jobs declared with their schedules and every run recorded"
+readme = "README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["cron", "monitoring", "scheduler", "tokio", "jobs"]
+categories.workspace = true
+include = ["src/**/*", "!src/**/tests.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+cronwatch.workspace = true
+tokio-cron-scheduler = "0.15"
+croner = "3"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono-tz = { version = "0.10", features = ["case-insensitive"] }
+uuid = "1"
+tokio = { version = "1.43", default-features = false, features = ["rt", "sync", "time", "macros"] }
+
+[dev-dependencies]
+tokio = { version = "1.43", features = ["full", "test-util"] }
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true
