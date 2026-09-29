@@ -75,9 +75,10 @@ defmodule Cronwatch.JS do
     sign <> body
   end
 
+  @doc false
   # The shortest round-tripping digits of a positive float and ECMAScript's n:
   # the value is 0.d1d2...dk * 10^n.
-  defp shortest(x) do
+  def shortest(x) do
     text = :erlang.float_to_binary(x, [:short])
 
     {mantissa, exp} =

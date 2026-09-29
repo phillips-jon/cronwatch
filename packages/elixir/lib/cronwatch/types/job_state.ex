@@ -1,0 +1,146 @@
+defmodule Cronwatch.JobState do
+  @moduledoc """
+  What the checks remember about a job between runs.
+
+  `open` holds the conditions currently open, in the order they opened, as
+  `{condition, since}` pairs. `pending_recovery` holds the conditions that
+  alerted and have since closed, waiting for the recovered alert the next
+  successful run sends; `undelivered` the alerts no channel accepted. Both are
+  `nil` for a state written before the fields existed. `version` goes up by
+  one on every write (see `c:Cronwatch.Store.compare_and_set_state/3`), `nil`
+  for a state written before versions, which counts as 0. `extra` keeps the
+  keys after the known ones, in stored order (`version` and any a newer
+  writer added), so a state is written back as the SDK's spread writes it.
+  """
+
+  alias Cronwatch.Alert
+  alias Cronwatch.JS
+  alias Cronwatch.JS.Object
+  alias Cronwatch.Types.Read
+
+  defstruct job: "",
+            open: [],
+            consecutive_failures: 0,
+            silenced_until: nil,
+            last_alert_at: nil,
+            pending_recovery: [],
+            undelivered: nil,
+            version: nil,
+            extra: []
+
+  @type t :: %__MODULE__{
+          job: String.t(),
+          open: [{String.t(), integer()}],
+          consecutive_failures: integer(),
+          silenced_until: integer() | nil,
+          last_alert_at: integer() | nil,
+          pending_recovery: [String.t()] | nil,
+          undelivered: [Alert.t()] | nil,
+          version: integer() | nil,
+          extra: [{String.t(), JS.value()}]
+        }
+
+  @known ["job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered"]
+
+  @doc "A new state for a job: nothing open, no failures."
+  @spec new(String.t()) :: t()
+  def new(job), do: %__MODULE__{job: job}
+
+  @doc "When `condition` opened, or nil when it is not open."
+  @spec open_at(t(), String.t()) :: integer() | nil
+  def open_at(%__MODULE__{open: open}, condition) do
+    case List.keyfind(open, condition, 0) do
+      {_, since} -> since
+      nil -> nil
+    end
+  end
+
+  @doc false
+  def version_or_zero(%__MODULE__{version: v}), do: v || 0
+
+  @doc "The state as the SDK writes it."
+  @spec to_value(t()) :: Object.t()
+  def to_value(%__MODULE__{} = s) do
+    head = [
+      {"job", s.job},
+      {"open", Object.new(s.open)},
+      {"consecutiveFailures", s.consecutive_failures},
+      {"silencedUntil", s.silenced_until},
+      {"lastAlertAt", s.last_alert_at}
+    ]
+
+    head = if s.pending_recovery, do: head ++ [{"pendingRecovery", s.pending_recovery}], else: head
+    head = if s.undelivered, do: head ++ [{"undelivered", Enum.map(s.undelivered, &Alert.to_value/1)}], else: head
+    o = %Object{pairs: head}
+
+    {o, wrote} =
+      Enum.reduce(s.extra, {o, false}, fn
+        {"version", _}, {o, wrote} ->
+          if s.version, do: {Object.put(o, "version", s.version), true}, else: {o, wrote}
+
+        {k, v}, {o, wrote} ->
+          {Object.put(o, k, v), wrote}
+      end)
+
+    if s.version != nil and not wrote, do: Object.put(o, "version", s.version), else: o
+  end
+
+  @doc "The SDK's JSON."
+  @spec to_json(t()) :: String.t()
+  def to_json(s), do: s |> to_value() |> JS.stringify()
+
+  @doc "Reads the SDK's JSON."
+  @spec from_json(String.t()) :: {:ok, t()} | {:error, String.t()}
+  def from_json(text) do
+    with {:ok, v} <- JS.parse(text), do: from_value(v)
+  end
+
+  @doc "Reads the SDK's JSON value."
+  @spec from_value(term()) :: {:ok, t()} | {:error, String.t()}
+  def from_value(%Object{} = o) do
+    open =
+      case Object.get(o, "open") do
+        %Object{pairs: pairs} -> Enum.map(pairs, fn {k, at} -> {k, if(Read.number?(at), do: JS.to_int(at), else: 0)} end)
+        _ -> []
+      end
+
+    pending =
+      case Object.get(o, "pendingRecovery") do
+        list when is_list(list) -> Enum.filter(list, &is_binary/1)
+        _ -> nil
+      end
+
+    # An entry that is not an alert is dropped rather than fail every read of
+    # the state: it could never be delivered.
+    undelivered =
+      case Object.get(o, "undelivered") do
+        list when is_list(list) ->
+          Enum.flat_map(list, fn a ->
+            case Alert.from_value(a) do
+              {:ok, alert} -> [alert]
+              {:error, _} -> []
+            end
+          end)
+
+        _ ->
+          nil
+      end
+
+    extra = Enum.reject(o.pairs, fn {k, _} -> k in @known end)
+
+    {:ok,
+     %__MODULE__{
+       job: Read.str(o, "job"),
+       open: open,
+       consecutive_failures: Read.int(o, "consecutiveFailures"),
+       silenced_until: Read.nullable_int(o, "silencedUntil"),
+       last_alert_at: Read.nullable_int(o, "lastAlertAt"),
+       pending_recovery: pending,
+       undelivered: undelivered,
+       version: if(List.keymember?(extra, "version", 0), do: Read.nullable_int(o, "version")),
+       extra: extra
+     }}
+  end
+
+  def from_value(v), do: {:error, "a job state must be an object, not #{Read.kind(v)}"}
+end
