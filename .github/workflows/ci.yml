@@ -990,6 +990,33 @@ jobs:
         include:
           - { elixir: "1.18.5", otp: "27.3", newest: false }
           - { elixir: "1.20", otp: "29", newest: true }
+    # The databases for the Ecto store's server tests, as the go and rust
+    # jobs have them.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+          MARIADB_DATABASE: cw
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -1000,6 +1027,22 @@ jobs:
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
+      # A second Postgres with pg_cron, for the pg_cron source's tests against
+      # the real extension, as the other jobs start it, on the newest entry.
+      - name: Start Postgres with pg_cron
+        if: matrix.newest
+        run: |
+          docker run -d --name pgcron -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 5433:5432 postgres:16 \
+            bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-cron > /dev/null && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw'
+          for _ in $(seq 1 90); do
+            if [ "$(docker exec pgcron psql postgres://postgres:pw@127.0.0.1:5432/cw -tAc 'show shared_preload_libraries' 2>/dev/null)" = "pg_cron" ]; then
+              echo "CRONWATCH_TEST_PGCRON=postgres://postgres:pw@127.0.0.1:5433/cw" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs pgcron
+          exit 1
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         id: beam
         with:
@@ -1030,6 +1073,10 @@ jobs:
       # The test alias sets TZ=UTC, as the fixtures are made.
       - name: mix test
         working-directory: packages/elixir
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+          CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
+          CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
         run: mix test
       - name: mix credo
         if: matrix.newest
