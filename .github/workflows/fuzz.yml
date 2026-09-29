@@ -32,11 +32,6 @@ jobs:
         working-directory: packages/rust/fuzz
         env:
           TARGET: ${{ matrix.target }}
-        run: |
-          # jsre backtracks as JavaScript's engine does, so a pattern of
-          # stars back to back over a long output is slow there as it is in
-          # the SDK (see DESIGN.md); its slow inputs are let go, and only a
-          # crash fails it.
-          extra=""
-          if [ "$TARGET" = jsre ]; then extra="-fork=1 -ignore_timeouts=1"; fi
-          cargo +nightly fuzz run "$TARGET" -- -max_total_time=60 -timeout=10 $extra
+        # jsre runs each pattern within its step budget (see DESIGN.md), so
+        # a slow input fails it as it fails every other target.
+        run: cargo +nightly fuzz run "$TARGET" -- -max_total_time=60 -timeout=10

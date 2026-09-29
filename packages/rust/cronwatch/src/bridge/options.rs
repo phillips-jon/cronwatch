@@ -116,7 +116,10 @@ fn expect_of(options: JobOptions, text: &str) -> JobOptions {
 
 /// A pattern as another process stored it, `/source/flags`: matched with
 /// the JavaScript engine when it can read it, and passing every output when
-/// it cannot, so the definition written back is the one stored.
+/// it cannot, so the definition written back is the one stored. A match
+/// that gives up (past `jsre`'s step budget or its 512 frames) counts as
+/// not matching, so the run fails as it would on an engine that finished:
+/// what makes a pattern slow is searching an output it does not match.
 struct StoredPattern {
     source: String,
     regexp: Option<Regexp>,
@@ -134,7 +137,7 @@ impl StoredPattern {
 
 impl Matcher for StoredPattern {
     fn is_match(&self, text: &str) -> bool {
-        self.regexp.as_ref().is_none_or(|r| r.try_is_match(text).unwrap_or(true))
+        self.regexp.as_ref().is_none_or(|r| r.try_is_match(text).unwrap_or(false))
     }
 
     fn source(&self) -> String {

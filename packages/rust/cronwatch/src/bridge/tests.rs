@@ -460,7 +460,7 @@ fn options_of_rebuilds_an_expect_pattern_and_a_custom_function() {
 }
 
 #[test]
-fn a_stored_pattern_too_deep_to_match_passes_rather_than_aborting() {
+fn a_stored_pattern_too_deep_to_match_fails_rather_than_aborting() {
     // The audit: `(?:ab)*` over a long output overflowed a worker's stack.
     let def = Definition::from_json(r#"{"name":"x","expect":"matches /(?:ab)*done/"}"#).unwrap();
     let passed = std::thread::Builder::new()
@@ -472,7 +472,30 @@ fn a_stored_pattern_too_deep_to_match_passes_rather_than_aborting() {
         .unwrap()
         .join()
         .unwrap();
-    assert_eq!(passed.0, None, "it cannot tell, so it passes, as a pattern it cannot read does");
+    assert_eq!(passed.0.as_deref(), Some("Output did not match /(?:ab)*done/"), "it gave up, so it does not match");
     assert_eq!(passed.1, None);
     assert!(passed.2.is_some());
+}
+
+#[test]
+fn a_stored_pattern_that_backtracks_without_end_fails_quickly() {
+    // The fuzzer: stars back to back, or a dot star, over a long output
+    // they do not match backtrack polynomially; the step budget stops them
+    // and the run fails with the ordinary message.
+    for (source, text, good) in [
+        (r"/\n*\n*\n*\n*\n*x/", "\n".repeat(32_000), "\n\nx"),
+        ("/.*x/", "a".repeat(32_000), "aax"),
+        (r"/(?:\s*,)*\s*;/", " ".repeat(32_000), "  ,  ;"),
+    ] {
+        let def =
+            Definition::from_json(&format!(r#"{{"name":"x","expect":"matches {}"}}"#, source.replace('\\', "\\\\")))
+                .unwrap();
+        let rule = options_of(&def).expect.unwrap();
+        let started = std::time::Instant::now();
+        let got = rule.check(&text);
+        let took = started.elapsed();
+        assert_eq!(got, Some(format!("Output did not match {source}")));
+        assert!(took < std::time::Duration::from_secs(5), "{source} took {took:?}");
+        assert_eq!(rule.check(good), None, "{source} still matches");
+    }
 }

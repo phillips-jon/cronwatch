@@ -4,11 +4,11 @@
 
 /// A pattern as a stored `matches /source/flags` rule hands it to the
 /// JavaScript regular expression engine: read, then run over `text`, as a
-/// test and as a replacement.
+/// test and as a replacement, each within the step budget.
 pub fn regexp(source: &str, flags: &str, text: &str) {
     if let Ok(re) = crate::jsre::Regexp::new(source, flags) {
         let _ = re.try_is_match(text);
-        let _ = re.replace_units(&crate::js::units(text), |m| m.group(1).unwrap_or_default().to_vec());
+        let _ = re.try_replace_units(&crate::js::units(text), |m| m.group(1).unwrap_or_default().to_vec());
     }
 }
 

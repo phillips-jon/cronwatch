@@ -106,12 +106,13 @@ impl Failures {
     }
 }
 
-/// A JavaScript RegExp from a fixture, matched with the port's own engine.
+/// A JavaScript RegExp from a fixture, matched with the port's own engine;
+/// a match that gives up does not match, as a stored pattern's does.
 struct JsRegExp(Regexp);
 
 impl Matcher for JsRegExp {
     fn is_match(&self, text: &str) -> bool {
-        self.0.try_is_match(text).unwrap_or(true)
+        self.0.try_is_match(text).unwrap_or(false)
     }
 
     fn source(&self) -> String {

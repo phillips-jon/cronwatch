@@ -117,6 +117,26 @@ fn deep_matches_give_up_rather_than_overflow_the_stack() {
 }
 
 #[test]
+fn a_match_that_backtracks_without_end_gives_up_within_its_steps() {
+    // `\n*\n*\n*\n*\n*x` over newlines is some n^5 / 120 attempts; V8
+    // takes seconds over 100. Past `MAX_STEPS` the match gives up, while
+    // a pattern with work to do over a long output answers in full.
+    let newlines = "\n".repeat(32_000);
+    let started = std::time::Instant::now();
+    assert_eq!(Regexp::must(r"\n*\n*\n*\n*\n*x", "").try_is_match(&newlines), None);
+    assert_eq!(Regexp::must(".*x", "").try_is_match(&"a".repeat(32_000)), None);
+    let took = started.elapsed();
+    eprintln!("two budgets ran out in {took:?}");
+    assert!(took < std::time::Duration::from_secs(5), "took {took:?}");
+    assert_eq!(Regexp::must(r"\n*\n*\n*\n*\n*x", "").try_is_match(&"\n".repeat(20)), Some(false));
+    assert_eq!(Regexp::must(r"\n*\n*\n*\n*\n*x", "").try_is_match(&format!("{newlines}x")), Some(true));
+    assert_eq!(Regexp::must(".*done", "").try_is_match(&format!("{}done", "a".repeat(32_000))), Some(true));
+    // Redaction has no budget: its patterns are the SDK's own, bounded.
+    let units = crate::js::units(&"a".repeat(4_000));
+    assert_eq!(Regexp::must(".*x", "g").replace_units(&units, |_| Vec::new()), units);
+}
+
+#[test]
 fn a_character_outside_the_bmp_is_its_two_units_in_turn() {
     // /a😀b/.test("a😀b"), and "x😀😀y".replace(/😀{2}/g, "-"): the quantifier
     // takes the second unit alone, as V8 reads a pattern without `u`.

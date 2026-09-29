@@ -45,6 +45,16 @@ const MAX_SOURCE: usize = 4096;
 /// throws past its limit; the SDK's redaction patterns never come near it.
 const MAX_DEPTH: usize = 512;
 
+/// How much work `try_is_match` does before it gives up: each attempt at a
+/// node (a call to `run`) is a step, and so is each code unit a repeat
+/// scans. A stored pattern of stars back to back (`\n*\n*\n*\n*\n*x`) or a
+/// dot star (`.*x`) backtracks polynomially over an output it does not
+/// match, as V8 does; past this, a tenth of a second in a release build,
+/// the match gives up, where a pattern that does not backtrack so takes a
+/// small part of it over the 32 KB an expect rule sees. Replacement
+/// (redaction) runs only the SDK's own bounded patterns and has no budget.
+const MAX_STEPS: u64 = 50_000_000;
+
 /// A compiled pattern. It is read-only once compiled, so one may be shared
 /// by every thread; each match keeps its own state.
 #[derive(Debug)]
@@ -475,7 +485,7 @@ impl Regexp {
         false
     }
 
-    fn matcher<'a>(&'a self, input: &'a [u16]) -> Matcher<'a> {
+    fn matcher<'a>(&'a self, input: &'a [u16], budget: u64) -> Matcher<'a> {
         Matcher {
             re: self,
             input,
@@ -484,16 +494,17 @@ impl Regexp {
             end: -1,
             target: 0,
             depth: 0,
+            steps: budget,
             gave_up: false,
         }
     }
 
     /// Whether the pattern matches anywhere in `s` (a stored expect pattern
     /// read back by `bridge::options_of`), or `None` when the match gave up
-    /// (see `MAX_DEPTH`).
+    /// (see `MAX_DEPTH` and `MAX_STEPS`).
     pub(crate) fn try_is_match(&self, s: &str) -> Option<bool> {
         let units = crate::js::units(s);
-        let mut m = self.matcher(&units);
+        let mut m = self.matcher(&units, MAX_STEPS);
         let found = self.exec(&mut m, 0);
         (!m.gave_up).then_some(found)
     }
@@ -502,8 +513,27 @@ impl Regexp {
     /// with the `g` flag, else the first) is replaced by what `f` returns,
     /// and the search goes on after it (one unit further after an empty
     /// match).
-    pub(crate) fn replace_units(&self, input: &[u16], mut f: impl FnMut(&Match<'_>) -> Vec<u16>) -> Vec<u16> {
-        let mut m = self.matcher(input);
+    pub(crate) fn replace_units(&self, input: &[u16], f: impl FnMut(&Match<'_>) -> Vec<u16>) -> Vec<u16> {
+        self.replace_within(input, u64::MAX, f).0
+    }
+
+    /// `replace_units` within `MAX_STEPS`, or `None` when it gave up: an
+    /// arbitrary pattern's replacement, for the fuzz target.
+    #[cfg(fuzzing)]
+    pub(crate) fn try_replace_units(&self, input: &[u16], f: impl FnMut(&Match<'_>) -> Vec<u16>) -> Option<Vec<u16>> {
+        let (out, gave_up) = self.replace_within(input, MAX_STEPS, f);
+        (!gave_up).then_some(out)
+    }
+
+    /// The replacement, and whether a match gave up part way (what follows
+    /// it is then left as it was).
+    fn replace_within(
+        &self,
+        input: &[u16],
+        budget: u64,
+        mut f: impl FnMut(&Match<'_>) -> Vec<u16>,
+    ) -> (Vec<u16>, bool) {
+        let mut m = self.matcher(input, budget);
         let mut out: Vec<u16> = Vec::new();
         let (mut last, mut pos) = (0, 0);
         let mut replaced = false;
@@ -522,10 +552,10 @@ impl Regexp {
             }
         }
         if !replaced {
-            return input.to_vec();
+            return (input.to_vec(), m.gave_up);
         }
         out.extend_from_slice(&input[last..]);
-        out
+        (out, m.gave_up)
     }
 
     /// `replace` with a replacement string: `$1` to `$99` are the groups
@@ -606,8 +636,10 @@ struct Matcher<'a> {
     loops: Vec<LoopState>,
     end: isize,
     target: usize,
-    /// How deep `run` is, and whether it went past `MAX_DEPTH`.
+    /// How deep `run` is, the steps it has left (see `MAX_STEPS`), and
+    /// whether it went past either.
     depth: usize,
+    steps: u64,
     gave_up: bool,
 }
 
@@ -634,17 +666,19 @@ impl Matcher<'_> {
     }
 
     /// Whether the chain from `n` matches at `pos`, leaving captures and
-    /// `end` set when it does. Past `MAX_DEPTH` the match gives up: this
-    /// and every call after it answers false, and `gave_up` is set.
+    /// `end` set when it does. Past `MAX_DEPTH`, or out of steps, the match
+    /// gives up: this and every call after it answers false, and `gave_up`
+    /// is set.
     fn run(&mut self, n: usize, pos: usize) -> bool {
         if self.gave_up {
             return false;
         }
-        if self.depth >= MAX_DEPTH {
+        if self.depth >= MAX_DEPTH || self.steps == 0 {
             self.gave_up = true;
             return false;
         }
         self.depth += 1;
+        self.steps -= 1;
         let matched = self.run_chain(n, pos);
         self.depth -= 1;
         matched
@@ -665,6 +699,7 @@ impl Matcher<'_> {
                     while k < limit && set.has(self.input[pos + k]) {
                         k += 1;
                     }
+                    self.steps = self.steps.saturating_sub(k as u64);
                     if k < node.min {
                         return false;
                     }
