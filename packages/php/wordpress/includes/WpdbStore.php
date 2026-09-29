@@ -23,9 +23,9 @@ use Cronwatch\StoredJob;
  * wp_cronwatch_state), with the same statements, parameters and JSON as
  * MysqlStore, so the stored bytes are the same whichever wrote them.
  *
- * $wpdb has no prepared statements with types, so each value is written
- * into the statement: a string through $wpdb->prepare('%s'), a number as
- * its digits, null as NULL. It shares WordPress's connection.
+ * Each statement's values go through $wpdb->prepare() with placeholders,
+ * %s for a string and %d for an integer (placeholders()). It shares
+ * WordPress's connection.
  */
 final class WpdbStore implements Store, UpdatesRunIf, ComparesAndSetsState
 {
@@ -129,56 +129,86 @@ final class WpdbStore implements Store, UpdatesRunIf, ComparesAndSetsState
 
     // ------------------------------------------------------------ running statements
 
-    /** A statement with each ? replaced by its value written out. */
-    private function render(string $text, array $params): string
+    /**
+     * A statement's text for $wpdb->prepare(), with its arguments: each ?
+     * becomes %s (a string) or %d (an integer or a boolean) and its value an
+     * argument, as $wpdb->prepare() takes them. A null is written as NULL, and
+     * a number that is not a safe integer as its digits (Js::number, the
+     * number MysqlStore binds), since prepare() has no placeholder for either
+     * that keeps the value: its %f would round to six places.
+     *
+     * The text is the library's (Sql::statements: fixed text naming this
+     * site's cronwatch_ tables, whose prefix the constructor checked). Table
+     * names are not placeholders: %i needs WordPress 6.2, and the plugin
+     * supports 6.1.
+     *
+     * @return array{string, list<int|string>}
+     */
+    private static function placeholders(string $text, array $params): array
     {
         $values = array_values($params);
+        $args = [];
         $i = 0;
-        return (string) preg_replace_callback('/\?/', function () use (&$i, $values): string {
+        $template = (string) preg_replace_callback('/\?/', function () use (&$i, &$args, $values): string {
             $value = $values[$i++] ?? null;
             if (is_float($value) && Js::isInteger($value) && abs($value) <= Js::MAX_SAFE_INTEGER) {
                 $value = (int) $value;
             }
-            return match (true) {
-                $value === null => 'NULL',
-                is_bool($value) => $value ? '1' : '0',
-                is_int($value) => (string) $value,
-                is_float($value) && is_finite($value) => Js::number($value),
-                default => (string) $this->wpdb->prepare('%s', (string) $value),
-            };
+            if ($value === null) {
+                return 'NULL';
+            }
+            if (is_bool($value) || is_int($value)) {
+                $args[] = (int) $value;
+                return '%d';
+            }
+            if (is_float($value) && is_finite($value)) {
+                $digits = Js::number($value);
+                if (preg_match('/^-?[0-9]+(\.[0-9]+)?(e[+-]?[0-9]+)?$/D', $digits) !== 1) {
+                    throw new \InvalidArgumentException(esc_html("CronWatch cannot store the number {$digits}"));
+                }
+                return $digits;
+            }
+            $args[] = (string) $value;
+            return '%s';
         }, $text);
+        return [$template, $args];
     }
 
     /**
      * Runs a statement; returns the rows it read, or the rows it changed.
      * Throws with $wpdb's error, which it keeps off the page.
      *
-     * The statements are the library's own (Sql::statements, fixed text on
-     * this site's cronwatch_ tables, whose prefix the constructor checked),
-     * and render() writes every value in: each string through
-     * $wpdb->prepare('%s'), each number as its digits, null as NULL. They
-     * are on the plugin's own tables, so there is no WordPress API to use
-     * instead, and nothing to cache: a run or a state is read to be changed.
+     * Every value goes through $wpdb->prepare(), called here with the
+     * statement's placeholders (see placeholders()); a statement with no
+     * values (a list, the schema, a transaction) is the library's fixed text.
+     * They are on the plugin's own tables, so there is no WordPress API to
+     * use instead, and nothing to cache: a run or a state is read to be
+     * changed.
      */
     private function query(string $text, array $params = [], bool $select = false): array|int
     {
-        $sql = $this->render($text, $params);
-        $suppressed = $this->wpdb->suppress_errors(true);
+        [$template, $args] = self::placeholders($text, $params);
+        $wpdb = $this->wpdb;
+        $suppressed = $wpdb->suppress_errors(true);
         try {
-            // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery, PluginCheck.Security.DirectDB.UnescapedDBParameter -- see above: every value is escaped by render(), through $wpdb->prepare().
+            // phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery, PluginCheck.Security.DirectDB.UnescapedDBParameter -- the library's statements on the plugin's own tables (see above); every value is a placeholder of $wpdb->prepare().
             if ($select) {
-                $rows = $this->wpdb->get_results($sql, ARRAY_A);
+                $rows = $args === []
+                    ? $wpdb->get_results($template, ARRAY_A)
+                    : $wpdb->get_results($wpdb->prepare($template, ...$args), ARRAY_A);
                 $result = is_array($rows) ? $rows : [];
             } else {
-                $result = $this->wpdb->query($sql);
+                $result = $args === []
+                    ? $wpdb->query($template)
+                    : $wpdb->query($wpdb->prepare($template, ...$args));
             }
             // phpcs:enable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery, PluginCheck.Security.DirectDB.UnescapedDBParameter
-            if ($this->wpdb->last_error !== '') {
-                throw new \RuntimeException(esc_html('WordPress database error: ' . $this->wpdb->last_error));
+            if ($wpdb->last_error !== '') {
+                throw new \RuntimeException(esc_html('WordPress database error: ' . $wpdb->last_error));
             }
             return $select ? $result : (int) $result;
         } finally {
-            $this->wpdb->suppress_errors($suppressed);
+            $wpdb->suppress_errors($suppressed);
         }
     }
 

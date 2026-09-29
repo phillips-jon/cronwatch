@@ -7,9 +7,7 @@ namespace Cronwatch\WordPress;
 \defined('ABSPATH') || exit;
 
 use Cronwatch\Alert;
-use Cronwatch\Alerts\AlertChannel;
 use Cronwatch\Alerts\ChannelContext;
-use Cronwatch\Alerts\Custom;
 use Cronwatch\Duration;
 use Cronwatch\JobDefinition;
 
@@ -78,9 +76,10 @@ final class Admin
 
     /**
      * Sanitizes and saves the posted settings. Returns the notice to show:
-     * "saved", "grace" when the grace did not parse, or "token" when a token
-     * typed in was too short (the rest is saved either way). A token the
-     * plugin makes is kept for the page to show once.
+     * "saved", "grace" when the grace did not parse, "token" when a token
+     * typed in was refused, or "grace-token" when both were (the rest is
+     * saved either way). A token the plugin makes is kept for the page to
+     * show once.
      *
      * @param array<string, mixed> $posted
      */
@@ -99,7 +98,7 @@ final class Admin
             'api_enabled' => !empty($posted['api_enabled']) ? '1' : '',
             'api_token' => $old['api_token'],
         ];
-        $notice = 'saved';
+        $refused = [];
         // The API's token: one typed in (never shown again), a new one made on request, or one made when the API is first turned on.
         $token = preg_replace('/\s+/', '', $text('api_token')) ?? '';
         if ($token !== '') {
@@ -108,7 +107,7 @@ final class Admin
             if (preg_match(self::TOKEN_PATTERN, $token) === 1) {
                 $new['api_token'] = $token;
             } else {
-                $notice = 'token';
+                $refused[] = 'token';
             }
         } elseif (!empty($posted['api_token_new']) || ($new['api_enabled'] === '1' && $new['api_token'] === '')) {
             $new['api_token'] = wp_generate_password(40, false);
@@ -120,12 +119,12 @@ final class Admin
                 Duration::parse($grace, 'grace');
                 $new['grace'] = $grace;
             } catch (\Throwable) {
-                $notice = 'grace';
+                array_unshift($refused, 'grace');
             }
         }
         update_option(Plugin::SETTINGS, $new, false);
         Plugin::reset();
-        return $notice;
+        return $refused === [] ? 'saved' : implode('-', $refused);
     }
 
     /** admin-post.php?action=cronwatch_test */
@@ -139,7 +138,8 @@ final class Admin
     }
 
     /**
-     * Sends a test alert to every configured channel.
+     * Sends a test alert where a real one would go: every channel the client
+     * has, which with none set is the library's default, PHP's error log.
      *
      * @return list<array{channel: string, ok: bool, message: string}>
      */
@@ -157,8 +157,7 @@ final class Admin
             at: $now,
         );
         $results = [];
-        foreach (Plugin::channels() as $channel) {
-            $channel = $channel instanceof AlertChannel ? $channel : new Custom('custom', $channel);
+        foreach (Plugin::client()->alerts as $channel) {
             $problems = [];
             try {
                 $channel->send($alert, new ChannelContext(function (\Throwable $e) use (&$problems): void {
@@ -180,24 +179,33 @@ final class Admin
         $settings = Plugin::settings();
         $notice = isset($_GET['cronwatch_notice']) ? sanitize_key(wp_unslash($_GET['cronwatch_notice'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only picks which notice to show.
         echo '<div class="wrap"><h1>' . esc_html__('CronWatch', 'cronwatch') . '</h1>';
+        // A save that refused more than one field names each: "grace-token".
+        $refused = array_intersect(explode('-', $notice), ['grace', 'token']);
         if ($notice === 'saved') {
             echo '<div class="notice notice-success"><p>' . esc_html__('Settings saved.', 'cronwatch') . '</p></div>';
-        } elseif ($notice === 'grace') {
-            echo '<div class="notice notice-error"><p>' . esc_html__('The grace was not a duration such as 10m or 1h30m, so it was left as it was. The rest was saved.', 'cronwatch') . '</p></div>';
-        } elseif ($notice === 'token') {
-            /* translators: %d: the least number of characters an API token may have. */
-            echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was not saved: it needs at least %d characters, each a letter, a digit or one of . _ ~ + / = -. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
+        } elseif ($refused !== []) {
+            if (in_array('grace', $refused, true)) {
+                echo '<div class="notice notice-error"><p>' . esc_html__('The grace was not a duration such as 10m or 1h30m, so it was left as it was. The rest was saved.', 'cronwatch') . '</p></div>';
+            }
+            if (in_array('token', $refused, true)) {
+                /* translators: %d: the least number of characters an API token may have. */
+                echo '<div class="notice notice-error"><p>' . esc_html(sprintf(__('The API token was not saved: it needs at least %d characters, each a letter, a digit or one of . _ ~ + / = -. The rest was saved.', 'cronwatch'), self::TOKEN_MIN)) . '</p></div>';
+            }
         } elseif ($notice === 'tested') {
             $results = get_transient('cronwatch_test_' . get_current_user_id());
             delete_transient('cronwatch_test_' . get_current_user_id());
             if (!is_array($results) || $results === []) {
-                echo '<div class="notice notice-warning"><p>' . esc_html__('No alert channel is set, so the test alert went to the PHP error log only.', 'cronwatch') . '</p></div>';
+                echo '<div class="notice notice-warning"><p>' . esc_html__('The test alert went nowhere: no alert channel is set up.', 'cronwatch') . '</p></div>';
+            } elseif (count($results) === 1 && $results[0]['channel'] === 'console' && $results[0]['ok']) {
+                echo '<div class="notice notice-warning"><p>' . esc_html__('No alert channel is set, so the test alert was written to the PHP error log, where alerts go until you set one up below.', 'cronwatch') . '</p></div>';
             } else {
                 foreach ($results as $r) {
                     $class = $r['ok'] ? 'notice-success' : 'notice-error';
                     $line = $r['ok']
-                        /* translators: %s: an alert channel's name, such as email or slack. */
-                        ? sprintf(__('Sent through %s.', 'cronwatch'), $r['channel'])
+                        ? ($r['channel'] === 'console'
+                            ? __('Written to the PHP error log.', 'cronwatch')
+                            /* translators: %s: an alert channel's name, such as email or slack. */
+                            : sprintf(__('Sent through %s.', 'cronwatch'), $r['channel']))
                         /* translators: 1: an alert channel's name, such as email or slack; 2: why sending failed. */
                         : sprintf(__('%1$s failed: %2$s', 'cronwatch'), $r['channel'], $r['message']);
                     echo '<div class="notice ' . esc_attr($class) . '"><p>' . esc_html($line) . '</p></div>';

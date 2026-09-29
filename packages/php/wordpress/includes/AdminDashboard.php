@@ -100,8 +100,22 @@ final class AdminDashboard
             // The plugin's check: WP-Cron's events declared as jobs first.
             Plugin::prepare();
         }
-        $dashboard = new Dashboard(Plugin::client(), token: false, basePath: self::MARKER, origin: self::origin(admin_url()), head: [self::class, 'head']);
+        $dashboard = new Dashboard(Plugin::client(), token: false, basePath: self::MARKER, origin: self::origin(admin_url()), empty: self::emptyBoard(), head: [self::class, 'head']);
         return self::rewrite($dashboard->handle($request));
+    }
+
+    /**
+     * What the board says before anything is recorded, in place of the
+     * library's line for developers (how to declare a job in code): the
+     * site's WP-Cron events appear once the check has run.
+     */
+    public static function emptyBoard(): string
+    {
+        return sprintf(
+            /* translators: %s: the WP-CLI command that runs the check, wp cronwatch check. */
+            esc_html__('WP-Cron\'s events appear here after the first check, which runs every five minutes, and their runs as WP-Cron runs them. To see them now, press Run check now above, or run %s.', 'cronwatch'),
+            '<code>wp cronwatch check</code>'
+        );
     }
 
     /**

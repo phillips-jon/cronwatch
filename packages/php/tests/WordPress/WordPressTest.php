@@ -547,6 +547,14 @@ final class WordPressTest extends TestCase
             $_POST = $_REQUEST = ['_wpnonce' => wp_create_nonce('cronwatch_save'), 'cronwatch' => ['email_to' => '', 'webhook_url' => 'https://hooks.example.com/in', 'webhook_secret' => '', 'grace' => 'soon']];
             $out['keep'] = $attempt([Admin::class, 'save']);
             $out['kept'] = get_option('cronwatch_settings');
+            // Both refused in one save: both notices.
+            $out['both'] = Admin::saveSettings(['grace' => 'soon', 'api_token' => 'too-short']);
+            $_GET = ['cronwatch_notice' => $out['both']];
+            ob_start();
+            Admin::render();
+            $notices = ob_get_clean();
+            $out['bothNotices'] = [str_contains($notices, 'The grace was not a duration'), str_contains($notices, 'The API token was not saved')];
+            $_GET = [];
             ob_start();
             Admin::render();
             $page = ob_get_clean();
@@ -573,6 +581,8 @@ final class WordPressTest extends TestCase
         ], $result['after'], 'the JSON API stays off unless asked for');
         $this->assertStringContainsString('cronwatch_notice=grace', $result['keep']);
         $this->assertSame('shh-its-a-secret', $result['kept']['webhook_secret'], 'a blank secret keeps the saved one');
+        $this->assertSame('grace-token', $result['both']);
+        $this->assertSame([true, true], $result['bothNotices'], 'a grace and a token refused together are both named');
         $this->assertSame('1h30m', $result['kept']['grace'], 'a grace that does not parse is not saved');
         $this->assertFalse($result['pageHasSecret'], 'the secret is never shown');
         $this->assertTrue($result['pageHasNonce']);
@@ -596,8 +606,22 @@ final class WordPressTest extends TestCase
             remove_all_filters('pre_wp_mail');
             add_filter('pre_wp_mail', function ($return, $atts) use (&$sent) { $sent = $atts; return true; }, 10, 2);
             $mail->send(new Cronwatch\Alert('failed', null, [], 'j', new Cronwatch\JobDefinition(['name' => 'j']), "j\nfailed", 'the message', 0), new Cronwatch\Alerts\ChannelContext(fn () => null));
-            echo json_encode(['results' => $results, 'seen' => get_option('cwt_alerts'), 'failure' => $failure, 'sent' => $sent]);
+            // With no channel, the test goes where a real alert would: the library's default, the error log (standard error here).
+            remove_all_filters('cronwatch_alerts');
+            Cronwatch\WordPress\Plugin::reset();
+            $none = Cronwatch\WordPress\Admin::sendTest();
+            wp_set_current_user(1);
+            set_transient('cronwatch_test_1', $none, 120);
+            $_GET = ['cronwatch_notice' => 'tested'];
+            ob_start();
+            Cronwatch\WordPress\Admin::render();
+            $page = ob_get_clean();
+            Cronwatch\WordPress\Plugin::reset();
+            echo json_encode(['results' => $results, 'seen' => get_option('cwt_alerts'), 'failure' => $failure, 'sent' => $sent, 'none' => $none,
+                'noneNotice' => str_contains($page, 'No alert channel is set, so the test alert was written to the PHP error log')]);
             PHP);
+        $this->assertSame([['channel' => 'console', 'ok' => true, 'message' => '']], $result['none']);
+        $this->assertTrue($result['noneNotice']);
         $this->assertSame([['channel' => 'custom', 'ok' => true, 'message' => '']], $result['results']);
         $this->assertSame('CronWatch test alert', $result['seen'][0]['title']);
         $this->assertSame('wp_mail could not send the alert', $result['failure']);
@@ -694,6 +718,15 @@ final class WordPressTest extends TestCase
         $this->assertMatchesRegularExpression('#href="[^"]*/wp-admin/admin\.php\?page=cronwatch&\#038;cw=%2Fjobs%2Fwp%253Acwt_ok"#', $page);
 
         // A job's page, through the link the board gives it.
+        // Before anything is recorded the board speaks of WP-Cron and the check, not of declaring a job in code.
+        $empty = self::inWp(<<<'PHP'
+            $dashboard = new Cronwatch\Web\Dashboard(new Cronwatch\Cronwatch(store: new Cronwatch\Store\MemoryStore(), alerts: []), token: false, basePath: '/x', empty: Cronwatch\WordPress\AdminDashboard::emptyBoard(), head: fn () => '');
+            echo json_encode($dashboard->handle(new Cronwatch\Web\Request('GET', '/x/'))->body);
+            PHP);
+        $this->assertStringContainsString('<p class="empty">WP-Cron&#039;s events appear here after the first check', $empty);
+        $this->assertStringContainsString('<code>wp cronwatch check</code>.</p>', $empty);
+        $this->assertStringNotContainsString('$cw-&gt;job(', $empty);
+
         [$status, , $job] = self::http('GET', '/wp-admin/admin.php?page=cronwatch&cw=%2Fjobs%2Fwp%253Acwt_ok', $admin);
         $this->assertSame(200, $status);
         $this->assertStringContainsString('<h1 class="jobname">wp:<wbr>cwt_<wbr>ok</h1>', $job);

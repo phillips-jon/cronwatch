@@ -150,7 +150,7 @@ final class PluginTest extends TestCase
             // inline stylesheet and script), no PDO stores, no pg_cron, no PSR adapters, no Laravel or Symfony.
             $leftOut = ['Alerts/NativeHttp.php', 'Cli.php', 'Sources/PgCron.php', 'Sources/PgCronPdo.php', 'Store/MysqlStore.php', 'Store/PdoStore.php',
                 'Store/PostgresStore.php', 'Store/SqliteStore.php', 'Web/PsrHandler.php', 'Web/PsrMiddleware.php', 'Web/PsrJobHandler.php',
-                'Store/Migrated.php', 'Watch.php', 'Web/StandaloneHead.php', 'Alerts/SigV4.php'];
+                'Store/Migrated.php', 'Watch.php', 'Web/StandaloneHead.php', 'Web/DevelopmentToken.php', 'Alerts/SigV4.php'];
             foreach (['Bugsnag', 'Datadog', 'Discord', 'Honeybadger', 'Mailgun', 'NewRelic', 'Postmark', 'Resend', 'Rollbar', 'Sendgrid', 'Sentry', 'Ses', 'Twilio'] as $channel) {
                 $leftOut[] = "Alerts/{$channel}.php";
             }
@@ -186,6 +186,10 @@ final class PluginTest extends TestCase
                     $original = (string) file_get_contents(dirname(__DIR__, 2) . '/src/' . substr($name, strlen('cronwatch/lib/src/')));
                     $this->assertSame($original, (string) preg_replace('#\n// phpcs:disable WordPress\.Security\.EscapeOutput\.ExceptionNotEscaped -- [^\n]*#', '', $source, 1), "{$name} is the library's file");
                 }
+                if ($name === 'cronwatch/lib/src/Web/Dashboard.php') {
+                    // The development token's file handling is left out, so reaching for it must not fail without it.
+                    $this->assertStringContainsString('class_exists(DevelopmentToken::class)', $code);
+                }
                 $this->assertDoesNotMatchRegularExpression('/\bcurl_[a-z_]+\s*\(/', $code, "{$name} calls curl directly");
                 $this->assertDoesNotMatchRegularExpression('/\bnew\s+\\\\?PDO\b|\bfsockopen\s*\(/', $code, "{$name} opens its own connection");
                 // No script or style element anywhere: the dashboard's stylesheet is enqueued, and there is no script.
@@ -195,9 +199,10 @@ final class PluginTest extends TestCase
                     $short = basename($file, '.php');
                     $this->assertStringNotContainsString("Cronwatch\\{$class}", $code, "{$name} names a class the zip leaves out");
                     // Within the library a class of the same namespace is named by its short name.
-                    if (str_starts_with($name, 'cronwatch/lib/') && !in_array("{$name}:{$short}", ['cronwatch/lib/src/Alerts/Transport.php:NativeHttp', 'cronwatch/lib/src/Web/Html.php:StandaloneHead'], true)) {
+                    if (str_starts_with($name, 'cronwatch/lib/') && !in_array("{$name}:{$short}", ['cronwatch/lib/src/Alerts/Transport.php:NativeHttp', 'cronwatch/lib/src/Web/Html.php:StandaloneHead', 'cronwatch/lib/src/Web/Dashboard.php:DevelopmentToken'], true)) {
                         // Transport makes a NativeHttp only when nothing was set; the plugin sets WpHttp when it boots.
                         // Html uses StandaloneHead only for a Dashboard given no head; the plugin gives each one its own.
+                        // Dashboard uses DevelopmentToken only when given no token, and only when the class is there (below).
                         $this->assertDoesNotMatchRegularExpression('/\bnew\s+(?:\\\\?Cronwatch\\\\[A-Za-z\\\\]+\\\\)?' . $short . '\s*\(|\b' . $short . '::/', $code, "{$name} uses {$short}");
                     }
                 }
