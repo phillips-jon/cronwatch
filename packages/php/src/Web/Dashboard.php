@@ -296,12 +296,44 @@ final class Dashboard
 
     /**
      * The line a development token is announced with, written once to the
-     * server log when the token is made. `origin` is that request's public
-     * origin, `base` the base path without a trailing slash ("" when mounted at the root).
+     * server log when the token is made. `origin` is the `origin` option when
+     * set, otherwise that request's public origin when its host is loopback,
+     * and null for any other host: the request's host is the client's to
+     * choose, so the line then leaves it out rather than point the link,
+     * token and all, somewhere else. `base` is the base path without a
+     * trailing slash ("" when mounted at the root).
      */
-    public static function developmentSignInLine(string $origin, string $base, string $token): string
+    public static function developmentSignInLine(?string $origin, string $base, string $token): string
     {
-        return "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: {$origin}{$base}/?token={$token}";
+        $intro = '[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: ';
+        if ($origin === null) {
+            return "{$intro}{$base}/?token={$token} on this server (the first request's host is not local, so the link leaves it out)";
+        }
+        return "{$intro}{$origin}{$base}/?token={$token}";
+    }
+
+    /**
+     * Whether an origin's host is loopback: "localhost", a name ending in
+     * ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1.
+     */
+    public static function isLoopbackOrigin(string $origin): bool
+    {
+        $at = strpos($origin, '://');
+        $authority = $at === false ? $origin : substr($origin, $at + 3);
+        if (str_starts_with($authority, '[')) {
+            $end = strpos($authority, ']');
+            $host = $end === false ? $authority : substr($authority, 0, $end + 1);
+        } else {
+            $host = explode(':', $authority, 2)[0];
+        }
+        $host = strtolower($host);
+        if ($host === 'localhost' || $host === '[::1]' || str_ends_with($host, '.localhost')) {
+            return true;
+        }
+        if (preg_match('/^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/D', $host, $octets) !== 1) {
+            return false;
+        }
+        return (int) $octets[1] <= 255 && (int) $octets[2] <= 255 && (int) $octets[3] <= 255;
     }
 
     private function serveRequest(Request $request, string $path, bool $wantsHtml, string $base): Response
@@ -312,7 +344,8 @@ final class Dashboard
         if ($this->generated && $this->token === null) {
             [$this->token, $made] = $this->developmentToken($base);
             if ($made) {
-                $line = self::developmentSignInLine($publicOrigin, $base, $this->token);
+                $shown = $this->origin ?? (self::isLoopbackOrigin($publicOrigin) ? $publicOrigin : null);
+                $line = self::developmentSignInLine($shown, $base, $this->token);
                 $this->log !== null ? ($this->log)($line) : error_log($line); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- a development server's sign-in line; never reached in the WordPress plugin, which gives a token.
             }
         }
