@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your PHP app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
 
-This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process and a Node process can share one SQLite file, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, a job handler for crons that call a URL, the Laravel and Symfony integrations, a WordPress plugin, a Drupal module and a Craft plugin ([DESIGN.md](DESIGN.md) has how each works). It is not on Packagist yet.
+This is the PHP port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text, the same requests to every alert channel and the same stored rows, so a PHP process and a Node process can share one SQLite file, and every port reads the tables the others write. It has the core, the stores (memory, SQLite, MySQL, MariaDB and Postgres), every alert channel, Claude triage, the pg_cron source, a `vendor/bin/cronwatch check` command, the dashboard and JSON API, a job handler for crons that call a URL, the Laravel and Symfony integrations, a WordPress plugin, a Drupal module and a Craft CMS plugin ([DESIGN.md](DESIGN.md) has how each works). It is not on Packagist yet.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
@@ -229,7 +229,7 @@ The Drupal module (`drupal/`, `drupal/cronwatch` once it is on drupal.org; Drupa
 
 ### Craft CMS
 
-The Craft plugin (`craft/`, `cronwatch/craft`; Craft 5.3 and newer) watches the console commands a crontab runs and the queue jobs `config/cronwatch.php` lists (or `#[Cronwatch\Watch]` marks), each attempt a run, with `craft cronwatch/check` for the crontab. The tables are in Craft's database through a connection of CronWatch's own; the dashboard is a Control Panel section behind the plugin's permissions. See [craft/README.md](craft/README.md).
+The Craft CMS plugin (`craft/`, `cronwatch/craft`; Craft CMS 5.3 and newer) watches the console commands a crontab runs and the queue jobs `config/cronwatch.php` lists (or `#[Cronwatch\Watch]` marks), each attempt a run, with `craft cronwatch/check` for the crontab. The tables are in Craft's database through a connection of CronWatch's own; the dashboard is a Control Panel section behind the plugin's permissions. See [craft/README.md](craft/README.md).
 
 ## Testing
 
@@ -256,7 +256,7 @@ CRONWATCH_TEST_MYSQL=mysql://root:pw@127.0.0.1:33061/cw CRONWATCH_TEST_MARIADB=m
 
 `tests/FinishOnceTest.php` starts PHP worker processes that finish the same runs at the same moment, on SQLite and on each server. `tests/NodeCompatTest.php` shares a SQLite file with the built SDK, and `tests/ScheduleFuzzTest.php` checks thousands of generated cron expressions against croner itself; both need Node and the SDK built first (`npm ci && npm run build` at the repository root), and skip with the reason otherwise. `npm run check:php` at the root runs the suite.
 
-`tests/Drupal/DrupalTest.php` makes a Drupal project with Composer, installs a site with Drush and drives the module in it, when `CRONWATCH_TEST_DRUPAL` is a `drupal/core` constraint (`^11.4`, `~10.6.0`); `CRONWATCH_TEST_DRUPAL_DB` is a `mysql://` or `postgres://` URL for the site's database (default a SQLite file). `tests/Craft/CraftTest.php` does the same for Craft when `CRONWATCH_TEST_CRAFT` is a `craftcms/cms` constraint (`^5.3`) and `CRONWATCH_TEST_CRAFT_DB` a `mysql://` or `postgres://` URL. Each needs Composer on the PATH (or `CRONWATCH_TEST_COMPOSER`), and keeps its project in the system's temporary directory between runs:
+`tests/Drupal/DrupalTest.php` makes a Drupal project with Composer, installs a site with Drush and drives the module in it, when `CRONWATCH_TEST_DRUPAL` is a `drupal/core` constraint (`^11.4`, `~10.6.0`); `CRONWATCH_TEST_DRUPAL_DB` is a `mysql://` or `postgres://` URL for the site's database (default a SQLite file). `tests/Craft/CraftTest.php` does the same for Craft CMS when `CRONWATCH_TEST_CRAFT` is a `craftcms/cms` constraint (`^5.3`) and `CRONWATCH_TEST_CRAFT_DB` a `mysql://` or `postgres://` URL. Each needs Composer on the PATH (or `CRONWATCH_TEST_COMPOSER`), and keeps its project in the system's temporary directory between runs:
 
 ```bash
 CRONWATCH_TEST_DRUPAL='^11.4' vendor/bin/phpunit tests/Drupal

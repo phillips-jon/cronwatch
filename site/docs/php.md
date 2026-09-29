@@ -114,7 +114,7 @@ A PHP process does not stay up between runs, so nothing inside a crontab script 
 cronwatch: checked 3 jobs, sent 0 alerts
 ```
 
-`--quiet` prints nothing. Anything that goes wrong is one line on standard error and exit status 1, so cron mails it. In a Laravel or Craft app, `config/cronwatch.php` is the framework's settings file rather than a client, so use `php artisan cronwatch:check` or `php craft cronwatch/check` there.
+`--quiet` prints nothing. Anything that goes wrong is one line on standard error and exit status 1, so cron mails it. In a Laravel or Craft CMS app, `config/cronwatch.php` is the framework's settings file rather than a client, so use `php artisan cronwatch:check` or `php craft cronwatch/check` there.
 
 The bootstrap file must declare every job, so a job that never ran at all is known and reported missed. Every job already in the store is checked from its stored definition too.
 

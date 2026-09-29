@@ -1,8 +1,8 @@
 # CronWatch for Craft CMS
 
-Monitoring for the work a Craft site does in the background: its queue jobs and the console commands its crontab runs. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. No server to run, no account to make.
+Monitoring for the work a Craft CMS site does in the background: its queue jobs and the console commands its crontab runs. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. No server to run, no account to make.
 
-This is the Craft plugin of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in Node, Ruby, Python, Laravel, Symfony, WordPress and Drupal apps and keeps the same tables in every language.
+This is the Craft CMS plugin of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in Node, Ruby, Python, Laravel, Symfony, WordPress and Drupal apps and keeps the same tables in every language.
 
 ## Requirements
 
@@ -19,7 +19,7 @@ Installing makes three tables in Craft's database (`cronwatch_jobs`, `cronwatch_
 
 ## What is watched
 
-Craft has no scheduler of its own: scheduled work is console commands the server's crontab runs, and queue jobs. Both are watched when you say so, in `config/cronwatch.php`:
+Craft CMS has no scheduler of its own: scheduled work is console commands the server's crontab runs, and queue jobs. Both are watched when you say so, in `config/cronwatch.php`:
 
 ```php
 <?php

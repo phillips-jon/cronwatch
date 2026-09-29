@@ -6,7 +6,7 @@ order: 3.274
 
 # Craft CMS
 
-The CronWatch plugin watches the work a Craft site does in the background: the console commands its crontab runs and the queue jobs you choose. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. It is the Craft plugin of the PHP library, [`cronwatch/cronwatch`](/docs/php/), with the same rules, alert text and stored rows. It needs Craft CMS 5.3 or newer, PHP 8.2 or newer, and Craft's own database (MySQL, MariaDB or Postgres).
+The CronWatch plugin watches the work a Craft CMS site does in the background: the console commands its crontab runs and the queue jobs you choose. Every run is recorded in the site's own database, and you are told when a run is missed, fails, gets stuck or runs much slower than usual, and again when it recovers. It is the Craft CMS plugin of the PHP library, [`cronwatch/cronwatch`](/docs/php/), with the same rules, alert text and stored rows. It needs Craft CMS 5.3 or newer, PHP 8.2 or newer, and Craft's own database (MySQL, MariaDB or Postgres).
 
 ## Install
 
@@ -19,7 +19,7 @@ Or from the Plugin Store in the Control Panel. Installing makes three tables in 
 
 ## What is watched
 
-Craft has no scheduler of its own: scheduled work is console commands the server's crontab runs (`craft resave/entries`, a module's own commands) and queue jobs. Both are watched when you say so, in `config/cronwatch.php`:
+Craft CMS has no scheduler of its own: scheduled work is console commands the server's crontab runs (`craft resave/entries`, a module's own commands) and queue jobs. Both are watched when you say so, in `config/cronwatch.php`:
 
 ```php
 <?php
@@ -87,7 +87,7 @@ A command or job taken out of `config/cronwatch.php` keeps its history and is de
 
 ## The check
 
-Missed and stuck runs are found by a check. Craft has nothing to run it on a timer (a check queued as a job would stop with the queue it watches), so run it from the crontab every five minutes, beside the commands it watches:
+Missed and stuck runs are found by a check. Craft CMS has nothing to run it on a timer (a check queued as a job would stop with the queue it watches), so run it from the crontab every five minutes, beside the commands it watches:
 
 ```
 0 3 * * *    cd /var/www/site && php craft resave/entries

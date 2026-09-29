@@ -4,7 +4,7 @@ told when one is missed, fails, gets stuck, runs slow or goes over budget.
 CronWatch is an open source library: @cronwatch/sdk for TypeScript (Node,
 Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails,
 cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch
-for PHP (Laravel, Symfony, WordPress, Drupal, Craft), and cronwatch.dev/go for
+for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), and cronwatch.dev/go for
 Go (robfig/cron, gocron, River, Asynq). It runs inside my app and writes to
 my own database. There is no hosted service, no account and no API key.
 
@@ -16,7 +16,7 @@ means the Ruby steps (a Rails app follows them as written; plain Ruby, see
 https://cronwatch.dev/docs/ruby/). A pyproject.toml, requirements.txt or
 manage.py means the Python steps. A composer.json or wp-config.php means the
 PHP steps (artisan is Laravel, bin/console Symfony, wp-config.php WordPress,
-drupal/core-recommended in composer.json Drupal, craftcms/cms Craft). A go.mod
+drupal/core-recommended in composer.json Drupal, craftcms/cms Craft CMS). A go.mod
 means the Go steps (github.com/robfig/cron/v3, github.com/go-co-op/gocron/v2,
 github.com/riverqueue/river or github.com/hibiken/asynq in it names the
 scheduler). If the scheduled jobs live in more than one,
@@ -247,7 +247,7 @@ PHP (PHP 8.2 or newer)
    - Drupal: composer require drupal/cronwatch, drush pm:install cronwatch.
      Every cron run and each module's hook_cron is watched. Set the alert
      channel and the cron schedule under Configuration, System, CronWatch.
-   - Craft: composer require cronwatch/craft,
+   - Craft CMS: composer require cronwatch/craft,
      php craft plugin/install cronwatch. List the console commands the
      crontab runs, with their schedules, and the queue job classes to watch,
      in config/cronwatch.php ('commands' => ['resave/entries' =>
@@ -282,7 +282,7 @@ PHP (PHP 8.2 or newer)
      workers handle opt in with the same attribute.
    - Drupal: queue workers opt in under the settings or with
      #[Cronwatch\Watch] on the worker class.
-   - Craft: the commands and queueJobs lists above.
+   - Craft CMS: the commands and queueJobs lists above.
    - A crontab script: $cw = require 'cronwatch.php'; then
      $cw->job('nightly-report', [...])->run(function ($job) { ...
      $job->log('Report written'); }).
@@ -294,7 +294,7 @@ PHP (PHP 8.2 or newer)
 4. Run the check every 5 minutes so missed and stuck runs are noticed:
    Laravel schedules php artisan cronwatch:check itself, Symfony adds it to
    the default schedule, Drupal runs it after each cron run (add
-   drush cronwatch:check to the crontab too), Craft needs a crontab line
+   drush cronwatch:check to the crontab too), Craft CMS needs a crontab line
    running php craft cronwatch/check, and a plain app a crontab line running
    vendor/bin/cronwatch check (which loads cronwatch.php). One checker per
    store.
@@ -302,7 +302,7 @@ PHP (PHP 8.2 or newer)
 5. The dashboard: Laravel serves it at /cronwatch behind the viewCronwatch
    gate (define it for your admins); Symfony imports
    '@CronwatchBundle/config/routes.php' under /cronwatch in
-   config/routes/cronwatch.yaml behind access_control; Drupal and Craft put
+   config/routes/cronwatch.yaml behind access_control; Drupal and Craft CMS put
    it in their admin. In a plain app, a public/cronwatch.php requiring
    cronwatch.php and calling $cw->routes()->serve(). Outside development it
    needs CRONWATCH_TOKEN; behind the app's own admin auth, pass
