@@ -1,7 +1,7 @@
 [package]
 name = "cronwatch"
 description = "Know when your cron jobs fail, run late or never run: the library behind cronwatch.dev, for Rust"
-readme = "README.md"
+readme = "../README.md"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -15,7 +15,7 @@ include = ["src/**/*", "Cargo.toml", "README.md", "LICENSE"]
 
 [features]
 # A blocking client for programs with no runtime of their own.
-blocking = ["tokio/rt"]
+blocking = ["tokio/net"]
 # The store contract test, the store.json replay and the finish-once
 # scenarios, for stores of the app's own.
 storetest = []
@@ -27,6 +27,10 @@ jiff = "0.2.15"
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full", "test-util"] }
+
+[[test]]
+name = "store"
+required-features = ["storetest"]
 
 [package.metadata.docs.rs]
 all-features = true
