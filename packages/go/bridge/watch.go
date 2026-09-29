@@ -404,7 +404,6 @@ func (w *Watch) Unschedule(ctx context.Context) ([]string, error) {
 	// again: a job declared since the first read (a scheduler entry added
 	// while the store was read) must keep its schedule.
 	w.declaring.Lock()
-	defer w.declaring.Unlock()
 	clear(defined)
 	for _, def := range w.cw.DefinedJobs() {
 		defined[def.Name()] = true
@@ -419,10 +418,19 @@ func (w *Watch) Unschedule(ctx context.Context) ([]string, error) {
 			failed = append(failed, fmt.Errorf("declaring %s: %w", job.Name, err))
 			continue
 		}
-		// Written now, as Declare's are: a process that never checks
-		// would otherwise leave the schedule in the store.
-		w.save(job.Name)
 		names = append(names, job.Name)
+	}
+	w.declaring.Unlock()
+	// Written before returning, and in order with this call's other
+	// writes: a process that never checks would otherwise leave the
+	// schedule in the store, and a write left to run behind could land
+	// after another process has put the schedule back. SyncJob writes
+	// what is declared at the time, so a job declared again since keeps
+	// its schedule.
+	for _, name := range names {
+		if _, err := w.cw.SyncJob(ctx, name); err != nil {
+			failed = append(failed, fmt.Errorf("declaring %s: %w", name, err))
+		}
 	}
 	return names, errors.Join(failed...)
 }
