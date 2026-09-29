@@ -297,7 +297,7 @@ defmodule Cronwatch.OutputTest do
       Cronwatch.check_metric!("cost", Process.get(:no_such_key, :infinity))
     end
 
-    assert_raise Cronwatch.Error, fn -> Cronwatch.check_metric!("cost", "1") end
+    assert_raise Cronwatch.Error, fn -> Cronwatch.check_metric!("cost", Process.get(:no_such_key, "1")) end
 
     t = lines_table()
     Lines.open(t, :run)
