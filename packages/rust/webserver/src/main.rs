@@ -9,6 +9,7 @@
 //! ```
 //!
 //! Alerts are printed as `alert <job> <type>` lines.
+#![forbid(unsafe_code)]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};

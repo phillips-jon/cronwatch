@@ -60,12 +60,29 @@ const SECURITY_HEADERS: [(&str, &str); 3] =
 
 /// How [`Client::routes`] serves the dashboard: the SDK's `RoutesOptions`,
 /// with Rust's three ways for the token.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct RoutesOptions {
     token: Option<Option<String>>,
     base_path: Option<String>,
     origin: Option<String>,
     trust_proxy: bool,
+}
+
+/// Says whether a token is set, never the token.
+impl fmt::Debug for RoutesOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let token = match &self.token {
+            None => "CRONWATCH_TOKEN",
+            Some(None) => "none",
+            Some(Some(_)) => "set",
+        };
+        f.debug_struct("RoutesOptions")
+            .field("token", &token)
+            .field("base_path", &self.base_path)
+            .field("origin", &self.origin)
+            .field("trust_proxy", &self.trust_proxy)
+            .finish()
+    }
 }
 
 impl RoutesOptions {
