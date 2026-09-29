@@ -54,6 +54,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	cronwatch "cronwatch.dev/go"
@@ -284,6 +285,14 @@ func (w *Watcher) jobFor(name string) *cronwatch.Job {
 	if job := w.watch.Job(name); job != nil {
 		return job
 	}
+	// A cron not watched has nothing to sync (and Sync would report so at
+	// each run of a Func in it).
+	w.mu.Lock()
+	watched := w.cron != nil
+	w.mu.Unlock()
+	if !watched {
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
 	defer cancel()
 	if err := w.Sync(ctx); err != nil {
@@ -299,8 +308,11 @@ type funcJob struct {
 	fn      cronwatch.JobFunc
 	options []cronwatch.JobOption
 
-	// own is the job declared for a Func outside the cron's entries.
+	// own is the job declared for a Func outside the cron's entries; after
+	// it, a run looks for a declared entry without syncing again, which
+	// the first run's sync already did.
 	once   sync.Once
+	owned  atomic.Bool
 	own    *cronwatch.Job
 	ownErr error
 }
@@ -319,12 +331,18 @@ func (w *Watcher) Func(name string, fn cronwatch.JobFunc, options ...cronwatch.J
 }
 
 func (f *funcJob) Run() {
-	job := f.w.jobFor(f.name)
+	var job *cronwatch.Job
+	if f.owned.Load() {
+		job = f.w.watch.Job(f.name)
+	} else {
+		job = f.w.jobFor(f.name)
+	}
 	if job == nil {
 		// Not an entry of the watched cron, or left out by Exclude: declared
 		// on its own, without a schedule, so its runs are still recorded.
 		f.once.Do(func() {
 			f.own, f.ownErr = f.w.cw.Job(f.name, slices.Concat(f.w.options.Defaults, f.w.options.Jobs[f.name], f.options)...)
+			f.owned.Store(true)
 		})
 		made, err := f.own, f.ownErr
 		if err != nil {

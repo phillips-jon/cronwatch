@@ -93,7 +93,7 @@ s.Start()
 cw.Start(time.Minute) // checks for missed and stuck runs
 ```
 
-The package is also called `gocron`, so import it under a name of its own. `Watch` is a `gocron.SchedulerOption` that adds gocron's event listeners to every job (`BeforeJobRuns`, `AfterJobRuns`, `AfterJobRunsWithError` and `AfterJobRunsWithPanic`): a run starts when gocron is about to run the job and ends with its outcome, an error failing it. A job added or updated later is declared at once, and one removed is unscheduled at the next sync (the next run of any job, or the watcher's `Sync`).
+The package is also called `gocron`, so import it under a name of its own. `Watch` is a `gocron.SchedulerOption` that adds gocron's event listeners to every job (`BeforeJobRuns`, `AfterJobRuns`, `AfterJobRunsWithError` and `AfterJobRunsWithPanic`): a run starts when gocron is about to run the job and ends with its outcome, an error failing it. A job added or updated later is declared at once, and one removed is unscheduled at the next sync (the next run of a job not declared yet, or the watcher's `Sync`).
 
 **Names.** A job is named by `gocron.WithName`, else after its function without the package's path (`jobs.NightlyReport`). A function literal is not watched until it is named, and is reported once.
 

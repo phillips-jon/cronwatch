@@ -281,6 +281,19 @@ func TestAScheduleThatCannotMatchIsWatchedWithoutOne(t *testing.T) {
 	contains(t, "the collision", strings.Join(errs, "\n"), `"twice" is run by 2 robfig/cron entries on different schedules`)
 }
 
+// The audit: a Func in a cron the watcher was not given to recorded its
+// runs but reported the watcher unattached at every one.
+func TestAFuncOutsideAWatchedCronReportsNothing(t *testing.T) {
+	k := newKit(t, nil)
+	w := robfigcron.New(k.cw, robfigcron.Options{})
+	job := w.Func("loose", func(context.Context, *cronwatch.JobContext) error { return nil })
+	for range 3 {
+		job.Run()
+	}
+	eq(t, "runs", len(k.runs(t, "loose")), 3)
+	eq(t, "reported", strings.Join(k.errors.List(), "\n"), "")
+}
+
 func check(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {

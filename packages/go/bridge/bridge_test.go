@@ -146,6 +146,10 @@ func TestUnscheduleTakesOnlyThisAppsJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 	eq(t, "names", strings.Join(names, ","), "dunning")
+	// Written without a check (the audit: a process that never checks
+	// left the schedule in the store).
+	w.Settle()
+	eq(t, "written", strings.Contains(stored(t, store, "dunning"), "no longer scheduled"), true)
 	check(t, cw)
 	eq(t, "dunning", stored(t, store, "dunning"), `{"description":"Bills (no longer scheduled)","tags":["gocron","gocron:billing"],"timeout":"2h","name":"dunning"}`)
 	eq(t, "reindex is search's", strings.Contains(stored(t, store, "reindex"), `"schedule":"0 1 * * *"`), true)

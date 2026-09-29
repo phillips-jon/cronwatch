@@ -419,6 +419,9 @@ func (w *Watch) Unschedule(ctx context.Context) ([]string, error) {
 			failed = append(failed, fmt.Errorf("declaring %s: %w", job.Name, err))
 			continue
 		}
+		// Written now, as Declare's are: a process that never checks
+		// would otherwise leave the schedule in the store.
+		w.save(job.Name)
 		names = append(names, job.Name)
 	}
 	return names, errors.Join(failed...)
