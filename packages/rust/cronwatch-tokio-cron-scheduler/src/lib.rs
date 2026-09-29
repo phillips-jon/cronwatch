@@ -201,9 +201,10 @@ impl Watcher {
     /// recorded: an `Err` from `f` fails it, a `String` it returns is its
     /// output when nothing was logged, and a panic is recorded as a failed
     /// run before it goes on to tokio. The returned job is the app's to give
-    /// to `JobScheduler::add`. A name or option CronWatch refuses is an error, as is a
-    /// schedule or zone the scheduler refuses; one CronWatch reads
-    /// differently is reported once and the job watched without it.
+    /// to `JobScheduler::add`. A name or option CronWatch refuses is an
+    /// error, as is a schedule or zone the scheduler refuses; a schedule
+    /// CronWatch reads differently is reported once and the job watched
+    /// without it.
     pub fn job<F, Fut, T, E>(
         &self,
         name: &str,
