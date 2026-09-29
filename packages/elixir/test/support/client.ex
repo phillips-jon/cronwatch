@@ -165,12 +165,14 @@ defmodule Cronwatch.Test.Stores do
 
   import ExUnit.Callbacks
 
+  alias Cronwatch.Store.Memory
+
   @doc "A memory store started under the running test, as `{module, handle}`."
   def memory do
     name = :"cw_memory_#{System.unique_integer([:positive])}"
-    start_supervised!({Cronwatch.Store.Memory, name: name}, id: name)
-    {:ok, handle} = Cronwatch.Store.Memory.new([server: name], name)
-    {Cronwatch.Store.Memory, handle}
+    start_supervised!({Memory, name: name}, id: name)
+    {:ok, handle} = Memory.new([server: name], name)
+    {Memory, handle}
   end
 
   @doc "The store as an instance's `store:` option."

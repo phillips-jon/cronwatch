@@ -2,7 +2,7 @@
 
 `packages/elixir` is to be `cronwatch` on Hex: the same library as `@cronwatch/sdk`, for Elixir and Erlang services, from a script a crontab runs to a Phoenix app with Oban or Quantum inside it. It is a port, not a new design, made the way the Ruby gem and the Python, PHP, Go and Rust ports were (see their `DESIGN.md`), and like the last four it is made in phases. The Rust port is the nearest model for how the work is laid out and audited, and much of what Go and Rust wrote for themselves (the croner port, the JavaScript regular expression engine, the JSON writer, the store dialects, the origin reader, the POST hardening) is carried over nearly line for line; Python and Ruby are the nearer models for a dynamic language's API. The TypeScript SDK is the source of truth for every behaviour, message and stored byte; when the two disagree, the Elixir side is wrong.
 
-This is the draft, written before any code: no phase has started. The Open questions at the end are for the owner to settle before phase 1; each has a recommendation, and the rest of the file is written as if each recommendation were taken.
+Phase 1 is done (see Phases): the core, the memory store, and the SQL store over Ecto on SQLite, with `Cronwatch.StoreCase`. The owner took every recommendation of the draft's open questions, which are now the Decisions at the end, with those phase 1 settled; the rest of this file is the design the phases are built from, updated by each as the Rust port's phases updated that port's.
 
 ## Rules
 

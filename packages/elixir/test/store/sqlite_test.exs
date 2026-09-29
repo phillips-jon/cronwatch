@@ -1,8 +1,11 @@
 defmodule Cronwatch.Store.SQLiteTest do
+  alias Cronwatch.Test.Conformance
+  alias Cronwatch.Test.Repo
+
   use Cronwatch.StoreCase,
     async: true,
-    store: fn -> Cronwatch.Test.Repo.store(Path.join(Cronwatch.Test.Repo.tmp_dir(), "store.db")) end,
-    fixture: File.read!(Path.join(Cronwatch.Test.Conformance.dir(), "store.json"))
+    store: fn -> Repo.store(Path.join(Repo.tmp_dir(), "store.db")) end,
+    fixture: File.read!(Path.join(Conformance.dir(), "store.json"))
 
   alias Cronwatch.JobState
   alias Cronwatch.JS

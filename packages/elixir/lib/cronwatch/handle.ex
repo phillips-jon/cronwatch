@@ -24,6 +24,7 @@ defmodule Cronwatch.RunHandle do
   alias Cronwatch.Locks
   alias Cronwatch.Output
   alias Cronwatch.Run
+  alias Cronwatch.Run.Exec
   alias Cronwatch.Runs
 
   @enforce_keys [:instance, :id, :job, :ref]
@@ -98,7 +99,7 @@ defmodule Cronwatch.RunHandle do
                 end
               end
 
-            if again, do: {:existing, again}, else: Core.report(c, e, "recording #{job.name}") && false
+            if again, do: {:existing, again}, else: reported(c, e, "recording #{job.name}")
         end
 
       case recorded do
@@ -136,6 +137,12 @@ defmodule Cronwatch.RunHandle do
         stored -> existing(c, job, stored)
       end
     end
+  end
+
+  # Reports an error and answers false: nothing was recorded.
+  defp reported(c, error, where) do
+    Core.report(c, error, where)
+    false
   end
 
   # A handle on a stored run. One still running, or marked timeout by a
@@ -363,8 +370,8 @@ defmodule Cronwatch.RunHandle do
           {failure, result} =
             case outcome do
               {:error, reason} -> {Output.describe_exception(:returned, reason, []), nil}
-              {:ok, value} -> {Cronwatch.Run.Exec.http_failure(value), value}
-              value -> {Cronwatch.Run.Exec.http_failure(value), value}
+              {:ok, value} -> {Exec.http_failure(value), value}
+              value -> {Exec.http_failure(value), value}
             end
 
           text =

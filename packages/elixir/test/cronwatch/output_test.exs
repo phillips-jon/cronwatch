@@ -10,8 +10,8 @@ defmodule Cronwatch.OutputTest do
 
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
-  alias Cronwatch.Output
   alias Cronwatch.Lines
+  alias Cronwatch.Output
 
   # The fixture's recipe for long text: a string, or {parts: [[piece, times], ...]} joined.
   defp expand(s) when is_binary(s), do: s

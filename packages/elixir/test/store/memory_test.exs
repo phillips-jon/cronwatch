@@ -1,10 +1,11 @@
 defmodule Cronwatch.Store.MemoryTest do
+  alias Cronwatch.Store.Memory
+  alias Cronwatch.Test.Conformance
+
   use Cronwatch.StoreCase,
     async: true,
-    store: {Cronwatch.Store.Memory, []},
-    fixture: File.read!(Path.join(Cronwatch.Test.Conformance.dir(), "store.json"))
-
-  alias Cronwatch.Store.Memory
+    store: {Memory, []},
+    fixture: File.read!(Path.join(Conformance.dir(), "store.json"))
 
   test "a store started on its own can be shared by name" do
     name = :"cronwatch_shared_#{System.unique_integer([:positive])}"

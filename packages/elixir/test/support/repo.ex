@@ -6,6 +6,8 @@ defmodule Cronwatch.Test.Repo do
   """
   use Ecto.Repo, otp_app: :cronwatch, adapter: Ecto.Adapters.SQLite3
 
+  alias Cronwatch.Store.Ecto, as: EctoStore
+
   @doc "A directory of its own under the system's temporary directory, removed when the test ends."
   def tmp_dir do
     dir = Path.join(System.tmp_dir!(), "cronwatch-ex-#{System.unique_integer([:positive])}")
@@ -27,8 +29,8 @@ defmodule Cronwatch.Test.Repo do
   @doc "A `Cronwatch.Store.Ecto` store over a repo started on `path`."
   def store(path, prefix \\ "cronwatch_") do
     pid = start(path)
-    {:ok, handle} = Cronwatch.Store.Ecto.new(repo: __MODULE__, prefix: prefix, dynamic_repo: pid)
-    {Cronwatch.Store.Ecto, handle}
+    {:ok, handle} = EctoStore.new(repo: __MODULE__, prefix: prefix, dynamic_repo: pid)
+    {EctoStore, handle}
   end
 
   @doc "Runs raw SQL on the repo `pid`."

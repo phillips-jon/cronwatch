@@ -149,7 +149,11 @@ defmodule Cronwatch.Run.Exec do
         send(parent, {:cronwatch_registered, ctx.run_id})
         Context.push(ctx)
         Logger.metadata(cronwatch_job: ctx.job, cronwatch_run: ctx.run_id)
-        invoke(fun, ctx)
+        outcome = invoke(fun, ctx)
+        # Closed here, before the task ends, so the monitor never takes a
+        # normal end for a death.
+        Runs.close(c.name, ctx.run_id)
+        outcome
       end)
 
     receive do
@@ -158,9 +162,8 @@ defmodule Cronwatch.Run.Exec do
 
     wait = if kill, do: max(Cronwatch.JS.to_int(timeout), 0), else: :infinity
 
-    case Task.yield(task, wait) || Task.shutdown(task, :brutal_kill) do
+    case Task.yield(task, wait) do
       {:ok, outcome} ->
-        Runs.close(c.name, ctx.run_id)
         outcome
 
       {:exit, reason} ->
@@ -170,7 +173,16 @@ defmodule Cronwatch.Run.Exec do
           else: {:recorded_elsewhere, reason}
 
       nil ->
-        if Runs.close(c.name, ctx.run_id), do: {:timed_out, timeout}, else: {:recorded_elsewhere, :killed}
+        # Past the timeout: closed first, so the monitor does not record the
+        # kill as a failure; a function that returned meanwhile is recorded
+        # as it ended.
+        closed = Runs.close(c.name, ctx.run_id)
+
+        case Task.shutdown(task, :brutal_kill) do
+          {:ok, outcome} -> outcome
+          _ when closed -> {:timed_out, timeout}
+          _ -> {:recorded_elsewhere, :killed}
+        end
     end
   end
 
@@ -268,6 +280,8 @@ defmodule Cronwatch.Run.Exec do
 
   defp reason_phrase(status) do
     if Code.ensure_loaded?(Plug.Conn.Status) do
+      # Plug is optional, so the call is made at run time, once it is loaded.
+      # credo:disable-for-next-line Credo.Check.Refactor.Apply
       " " <> apply(Plug.Conn.Status, :reason_phrase, [status])
     else
       ""

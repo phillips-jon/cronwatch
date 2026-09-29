@@ -15,6 +15,7 @@ defmodule Cronwatch.Runs do
 
   alias Cronwatch.Config
   alias Cronwatch.Lines
+  alias Cronwatch.Run.Exec
 
   @max_timer 4_294_967_295
 
@@ -255,7 +256,7 @@ defmodule Cronwatch.Runs do
 
   defp record_dead(instance, id, info, reason) do
     Task.Supervisor.start_child(Cronwatch.Supervisor.tasks(instance), fn ->
-      Cronwatch.Run.Exec.record_dead(instance, id, info, reason)
+      Exec.record_dead(instance, id, info, reason)
     end)
   end
 end

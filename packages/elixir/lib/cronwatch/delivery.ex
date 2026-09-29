@@ -9,6 +9,7 @@ defmodule Cronwatch.Delivery do
   alias Cronwatch.Core
   alias Cronwatch.Evaluate
   alias Cronwatch.Format
+  alias Cronwatch.JS.Object
   alias Cronwatch.Telemetry
 
   # How long one channel may take to send one alert.
@@ -20,7 +21,13 @@ defmodule Cronwatch.Delivery do
   # every job.
   @retry_budget 20_000
 
-  def retry_budget, do: @retry_budget
+  # The three limits, read when used; the tests shorten them through the
+  # application environment (:channel_timeout, :triage_timeout,
+  # :retry_budget), which apps leave alone.
+  defp limit(key, default), do: Application.get_env(:cronwatch, key, default)
+  defp channel_timeout, do: limit(:channel_timeout, @channel_timeout)
+  defp triage_timeout, do: limit(:triage_timeout, @triage_timeout)
+  defp retry_budget, do: limit(:retry_budget, @retry_budget)
 
   @doc """
   Composes, triages and sends each draft. The state was saved before this, so
@@ -38,7 +45,7 @@ defmodule Cronwatch.Delivery do
           Telemetry.alert(:queued, meta(c, alert, nil))
           {composed ++ [alert], delivered, failed ++ [alert]}
         else
-          alert = if c.triage && alert.type != "recovered", do: add_triage(c, alert, @triage_timeout), else: alert
+          alert = if c.triage && alert.type != "recovered", do: add_triage(c, alert, triage_timeout()), else: alert
 
           if deliver(c, alert) do
             {composed ++ [alert], delivered ++ [alert], failed}
@@ -49,7 +56,7 @@ defmodule Cronwatch.Delivery do
         end
       end)
 
-    record_delivery(c, Cronwatch.JS.Object.get(definition, "name"), delivered, failed, [], now)
+    record_delivery(c, Object.get(definition, "name"), delivered, failed, [], now)
     composed
   end
 
@@ -72,7 +79,7 @@ defmodule Cronwatch.Delivery do
         pending
         |> Enum.reject(&(&1 in dropped))
         |> Enum.reduce_while({[], [], spent}, fn alert, {delivered, failed, spent} ->
-          left = @retry_budget - spent
+          left = retry_budget() - spent
 
           if left <= 0 do
             {:halt, {delivered, failed, spent}}
@@ -83,7 +90,7 @@ defmodule Cronwatch.Delivery do
             # never triaged. One that was tried is not tried again.
             alert =
               if c.triage && alert.type != "recovered" && not alert.triage_tried,
-                do: add_triage(c, alert, min(@triage_timeout, left)),
+                do: add_triage(c, alert, min(triage_timeout(), left)),
                 else: alert
 
             {delivered, failed} =
@@ -156,7 +163,7 @@ defmodule Cronwatch.Delivery do
         {task, name}
       end)
 
-    results = Task.yield_many(Enum.map(tasks, &elem(&1, 0)), @channel_timeout)
+    results = Task.yield_many(Enum.map(tasks, &elem(&1, 0)), channel_timeout())
 
     tasks
     |> Enum.zip(results)
@@ -177,7 +184,7 @@ defmodule Cronwatch.Delivery do
 
           nil ->
             Task.shutdown(task, :brutal_kill)
-            {:error, Cronwatch.Error.other("timed out after #{@channel_timeout}ms")}
+            {:error, Cronwatch.Error.other("timed out after #{channel_timeout()}ms")}
         end
 
       case outcome do
