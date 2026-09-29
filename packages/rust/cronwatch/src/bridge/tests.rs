@@ -295,6 +295,8 @@ async fn a_job_another_process_unscheduled_is_put_back() {
 struct Odd {
     inner: MemoryStore,
     failing: AtomicBool,
+    /// `get_job` panics once while this is set.
+    panics: AtomicBool,
     meanwhile: Mutex<Option<Box<dyn FnOnce() + Send>>>,
 }
 
@@ -308,6 +310,9 @@ impl Store for Odd {
     fn get_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<Option<StoredJob>, BoxError>> {
         if self.failing.load(Ordering::SeqCst) {
             return Box::pin(async { Err("the store blinked".into()) });
+        }
+        if self.panics.swap(false, Ordering::SeqCst) {
+            panic!("the store fell over");
         }
         self.inner.get_job(name)
     }
@@ -386,6 +391,23 @@ async fn a_fallback_does_not_declare_over_a_store_it_could_not_read() {
     let job = w.fallback("report", JobOptions::new()).await.expect("a job once the store answers");
     job.run(|_| async { Ok::<_, std::io::Error>(()) }).await.unwrap();
     assert_eq!(stored(&*store, "report").await, before, "the schedule is kept");
+}
+
+// The audit: a store that panicked while a declaration was written left the
+// writing task marked busy, so nothing was written again and settle waited
+// for good.
+#[tokio::test]
+async fn a_declaration_whose_store_panics_does_not_stop_the_next() {
+    let store = Arc::new(Odd::default());
+    let (cw, errors) = client(store.clone());
+    let w = Watch::new(&cw, "river", Some("billing"), "River");
+    store.panics.store(true, Ordering::SeqCst);
+    w.declare(&[entry("first", "x", "0 1 * * *")]);
+    tokio::time::timeout(Duration::from_secs(5), w.settle()).await.expect("settled");
+    assert_eq!(errors.lock().unwrap().clone(), ["declaring first: panicked: the store fell over"]);
+    w.declare(&[entry("first", "x", "0 1 * * *"), entry("second", "y", "0 2 * * *")]);
+    tokio::time::timeout(Duration::from_secs(5), w.settle()).await.expect("settled");
+    assert!(stored(&*store, "second").await.contains("0 2 * * *"));
 }
 
 // The Go audit: an entry declared while unschedule read the store was taken

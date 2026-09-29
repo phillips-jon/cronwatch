@@ -131,7 +131,7 @@ async fn a_job_removed_loses_its_schedule_at_once() {
     let gone = watcher
         .job("gone", "0 0 4 * * *", "", |_| async { Ok::<_, Failed>(()) }, JobOptions::new().timeout("2h"))
         .unwrap();
-    watcher.follow(&scheduler);
+    let following = watcher.follow(&scheduler);
     scheduler.add(keep).await.unwrap();
     let uuid = scheduler.add(gone).await.unwrap();
     watcher.wait().await;
@@ -144,6 +144,12 @@ async fn a_job_removed_loses_its_schedule_at_once() {
     .await;
     assert!(stored(&*store, "kept").await.contains(r#""schedule":"0 0 3 * * *""#));
     assert!(errors.lock().unwrap().is_empty(), "{:?}", errors.lock().unwrap());
+    // The audit: the task outlives a shutdown, so the app is given its handle.
+    let mut scheduler = scheduler;
+    scheduler.shutdown().await.unwrap();
+    assert!(!following.is_finished(), "a shutdown does not end it");
+    following.abort();
+    assert!(following.await.unwrap_err().is_cancelled());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -235,4 +241,39 @@ async fn a_repeated_job_is_every_whole_seconds() {
         stored(&*store, "poll").await,
         r#"{"schedule":"every 1m30s","tags":["tokio-cron-scheduler","tokio-cron-scheduler:billing"],"name":"poll"}"#
     );
+}
+
+// The audit: two jobs made at once could declare their lists in the wrong
+// order, the older list taking the newer job for gone and stripping its
+// schedule.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn jobs_made_at_once_all_keep_their_schedules() {
+    let (cw, errors) = client(Arc::new(MemoryStore::new()));
+    let watcher = Watcher::new(&cw, options("billing"));
+    for round in 0..20 {
+        let barrier = Arc::new(std::sync::Barrier::new(8));
+        let threads: Vec<_> = (0..8)
+            .map(|i| {
+                let (watcher, barrier) = (watcher.clone(), barrier.clone());
+                let handle = tokio::runtime::Handle::current();
+                std::thread::spawn(move || {
+                    let _entered = handle.enter();
+                    barrier.wait();
+                    let name = format!("job-{round}-{i}");
+                    let ok = |_| async { Ok::<_, Failed>(()) };
+                    watcher.job(&name, "0 0 2 * * *", "", ok, JobOptions::new()).unwrap();
+                })
+            })
+            .collect();
+        for t in threads {
+            t.join().unwrap();
+        }
+    }
+    watcher.wait().await;
+    let defined = cw.defined_jobs();
+    assert_eq!(defined.len(), 160);
+    for def in defined {
+        assert_eq!(def.schedule(), "0 0 2 * * *", "{}", def.to_json());
+    }
+    assert!(errors.lock().unwrap().is_empty(), "{:?}", errors.lock().unwrap());
 }
