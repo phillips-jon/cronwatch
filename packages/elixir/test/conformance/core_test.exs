@@ -94,7 +94,12 @@ defmodule Cronwatch.Conformance.CoreTest do
       |> Enum.with_index()
       |> Enum.reduce(failures(), fn {c, i}, acc ->
         got =
-          Evaluate.job_health(field(c, "definition"), run(field(c, "lastRun")), state(field(c, "state")), field(c, "now"))
+          Evaluate.job_health(
+            field(c, "definition"),
+            run(field(c, "lastRun")),
+            state(field(c, "state")),
+            field(c, "now")
+          )
 
         same(acc, "jobHealth #{i}", result(got, & &1), field(c, "health"))
       end)

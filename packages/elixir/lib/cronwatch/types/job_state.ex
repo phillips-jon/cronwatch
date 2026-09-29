@@ -100,8 +100,11 @@ defmodule Cronwatch.JobState do
   def from_value(%Object{} = o) do
     open =
       case Object.get(o, "open") do
-        %Object{pairs: pairs} -> Enum.map(pairs, fn {k, at} -> {k, if(Read.number?(at), do: JS.to_int(at), else: 0)} end)
-        _ -> []
+        %Object{pairs: pairs} ->
+          Enum.map(pairs, fn {k, at} -> {k, if(Read.number?(at), do: JS.to_int(at), else: 0)} end)
+
+        _ ->
+          []
       end
 
     pending =

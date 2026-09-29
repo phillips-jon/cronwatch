@@ -260,7 +260,9 @@ defmodule Cronwatch.JS do
   end
 
   defp fail(what, text, rest), do: {:error, "#{what} at position #{byte_size(text) - byte_size(rest)}"}
-  defp throw_fail(what, text, rest), do: throw({:json_error, "#{what} at position #{byte_size(text) - byte_size(rest)}"})
+
+  defp throw_fail(what, text, rest),
+    do: throw({:json_error, "#{what} at position #{byte_size(text) - byte_size(rest)}"})
 
   defp skip_space(<<c, rest::binary>>) when c in [?\s, ?\t, ?\n, ?\r], do: skip_space(rest)
   defp skip_space(rest), do: rest

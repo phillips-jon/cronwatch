@@ -41,7 +41,12 @@ defmodule Cronwatch.Evaluate do
   def normalize_state(nil, job), do: empty_state(job)
 
   def normalize_state(%JobState{} = s, job) do
-    %{s | job: if(s.job == "", do: job, else: s.job), pending_recovery: s.pending_recovery || [], undelivered: s.undelivered || []}
+    %{
+      s
+      | job: if(s.job == "", do: job, else: s.job),
+        pending_recovery: s.pending_recovery || [],
+        undelivered: s.undelivered || []
+    }
   end
 
   defp clone(%JobState{} = s), do: normalize_state(s, s.job)
@@ -263,8 +268,7 @@ defmodule Cronwatch.Evaluate do
               if run.duration_ms > threshold do
                 case open_condition(next, "slow", now) do
                   {next, true} ->
-                    {next,
-                     [{"slow", run, %{duration_ms: run.duration_ms, threshold_ms: threshold, basis: basis}}]}
+                    {next, [{"slow", run, %{duration_ms: run.duration_ms, threshold_ms: threshold, basis: basis}}]}
 
                   {next, false} ->
                     {next, []}

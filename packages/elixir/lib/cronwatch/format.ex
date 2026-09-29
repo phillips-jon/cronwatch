@@ -209,7 +209,9 @@ defmodule Cronwatch.Format do
 
   defp compose("recovered", _run, %{reason: "unscheduled"} = d, _def, name, now) do
     missed = if d.since != nil, do: "Missed since #{when_at(d.since, now)}. ", else: ""
-    {"#{name} is no longer scheduled", ["#{missed}It has no schedule now, so nothing is due; the missed alert is closed."]}
+
+    {"#{name} is no longer scheduled",
+     ["#{missed}It has no schedule now, so nothing is due; the missed alert is closed."]}
   end
 
   defp compose("recovered", run, d, _def, name, now) do
