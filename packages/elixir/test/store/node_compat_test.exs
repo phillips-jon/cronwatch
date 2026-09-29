@@ -5,7 +5,8 @@ defmodule Cronwatch.Store.NodeCompatTest do
   the same store calls (test/testdata/shared_store.json, the Ruby, Python, Go
   and Rust ports' fixture), and each must read what the other wrote exactly
   as it reads its own, down to the bytes and SQLite type of every column.
-  Then the two take turns on one job's state version.
+  Then the two take turns on one job's state version, and a Node client
+  and an Elixir client carry on from each other on one file.
 
   Needs node on the PATH, the SDK built and its SQLite driver installed
   (`npm ci && npm run build` at the repository root); skipped, with the
@@ -231,8 +232,48 @@ defmodule Cronwatch.Store.NodeCompatTest do
     assert c(s, :get_state, ["old"]).version == 1
   end
 
-  # Pending, for the client: a Node client and an Elixir client take turns on
-  # one file (the Elixir client runs a job Node declared and checks every
-  # job; then `node_store.mjs run` runs every-5 from Node, and each reads the
-  # other's run and state), as Rust's node_carries_on_from_rust_and_rust_from_node.
+  test "a Node client carries on from an Elixir client, and an Elixir client from Node" do
+    f = fixture()
+    file = Path.join(Repo.tmp_dir(), "turns.db")
+    node("write", file, "cw_", [@fixture])
+    s = store(file, "cw_")
+
+    # An Elixir client finishes a run of a job Node wrote, and checks every job.
+    clock = :atomics.new(1, signed: true)
+    :atomics.put(clock, 1, 1_767_606_100_000)
+    {:ok, errors} = Agent.start_link(fn -> [] end)
+    name = :"cw_turns_#{System.unique_integer([:positive])}"
+
+    start_supervised!(
+      {Cronwatch,
+       name: name,
+       store: {Cronwatch.StoreCase.Shared, store: s},
+       clock: fn -> :atomics.get(clock, 1) end,
+       alerts: [],
+       cron_secret: false,
+       on_error: fn e, where -> Agent.update(errors, &(&1 ++ [{where, e}])) end},
+      id: name
+    )
+
+    job = Cronwatch.job!("every-5", schedule: "every 5m", timeout: "2m", max_duration: "90s", instance: name)
+    Cronwatch.run(job, fn ctx -> Cronwatch.log(ctx, "from elixir") end)
+    :atomics.add(clock, 1, 10 * 60_000)
+    result = Cronwatch.check!(instance: name)
+    assert Enum.any?(result.jobs, &(&1.name == "nightly-report")), "checked #{length(result.jobs)}"
+    assert c(s, :last_run, ["every-5"]).output == "from elixir"
+    raw = node("read", file, "cw_", [@fixture])
+    view = JS.parse!(raw)
+    assert view |> Object.get("last") |> Object.get("every-5") |> Object.get("output") == "from elixir"
+    assert elixir_read(s, f) == raw, "after Elixir's turn, Elixir and Node read the file differently"
+
+    # And Node takes a turn on the same file: Elixir reads its run and state.
+    now = :atomics.add_get(clock, 1, 10 * 60_000)
+    node_run = node("run", file, "cw_", [Integer.to_string(now)])
+    assert node_run =~ ~s("every-5"), "node run #{node_run}"
+    assert c(s, :last_run, ["every-5"]).output == "from node"
+    assert elixir_read(s, f) == node("read", file, "cw_", [@fixture]), "after Node's turn"
+    again = Cronwatch.check!(instance: name)
+    assert again.jobs != []
+    assert Agent.get(errors, & &1) == []
+  end
 end

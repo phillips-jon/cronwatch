@@ -65,11 +65,167 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     @doc """
     Where the scenarios over several instances sharing one store go (the
     SDK's finish-once tests, a client end to end): a list of `{name, fun}`,
-    each `fun` given the zero-arity function that makes a store. Empty until
-    the client lands.
+    each `fun` given the zero-arity function that makes a store. Each
+    scenario makes one store and runs several instances over it (through
+    `Cronwatch.StoreCase.Shared`), as several processes share one database.
     """
     @spec scenarios() :: [{String.t(), ((-> Store.t()) -> term())}]
-    def scenarios, do: []
+    def scenarios do
+      [
+        {"two instances finishing one run: one records and judges it, the other reports it already finished",
+         &two_finishing_one_run/1},
+        {"two instances recording one finished run from a source: it is judged once", &two_recording_one_run/1},
+        {"many instances starting and finishing one id: exactly one finish is recorded", &many_starting_one_id/1},
+        {"a client end to end", &end_to_end/1}
+      ]
+    end
+
+    @t0 1_767_605_400_000
+    @min 60_000
+
+    # An instance over `store`, with a clock, a channel keeping its alerts and
+    # an error handler keeping the errors' text.
+    defp instance(store, clock) do
+      name = Module.concat(__MODULE__, "I#{System.unique_integer([:positive])}")
+      {:ok, alerts} = Agent.start_link(fn -> [] end)
+      {:ok, errors} = Agent.start_link(fn -> [] end)
+      channel = Cronwatch.Alerts.fun("capture", fn a -> Agent.update(alerts, &(&1 ++ [a.type])) end)
+
+      opts = [
+        name: name,
+        store: {Cronwatch.StoreCase.Shared, store: store},
+        clock: fn -> :atomics.get(clock, 1) end,
+        alerts: [channel],
+        cron_secret: false,
+        on_error: fn e, _where -> Agent.update(errors, &(&1 ++ [Cronwatch.Config.describe(e)])) end
+      ]
+
+      ExUnit.Callbacks.start_supervised!({Cronwatch, opts}, id: name)
+      %{cw: name, alerts: alerts, errors: errors}
+    end
+
+    defp clock do
+      ref = :atomics.new(1, signed: true)
+      :atomics.put(ref, 1, @t0)
+      ref
+    end
+
+    defp types(ps), do: Enum.flat_map(ps, &Agent.get(&1.alerts, fn a -> a end))
+    defp errors(ps), do: Enum.flat_map(ps, &Agent.get(&1.errors, fn e -> e end))
+
+    defp failed_run(id, job, started_at) do
+      %Run{
+        id: id,
+        job: job,
+        status: "failed",
+        started_at: started_at,
+        finished_at: started_at + 1000,
+        duration_ms: 1000,
+        error: "ERROR: deadlock detected",
+        trigger: "pg_cron"
+      }
+    end
+
+    defp two_finishing_one_run(make) do
+      store = make.()
+      clock = clock()
+      [one, two] = ps = [instance(store, clock), instance(store, clock)]
+      for p <- ps, do: Cronwatch.job!("webhook-ingest", failures_before_alert: 2, instance: p.cw)
+      {:ok, _} = Cronwatch.start("webhook-ingest", id: "delivery-1", instance: one.cw)
+      {:ok, h1} = Cronwatch.resume_run("webhook-ingest", "delivery-1", instance: one.cw)
+      {:ok, h2} = Cronwatch.resume_run("webhook-ingest", "delivery-1", instance: two.cw)
+      :atomics.add(clock, 1, @min)
+
+      results =
+        [h1, h2]
+        |> Enum.map(fn h -> Task.async(fn -> Cronwatch.fail(h, %RuntimeError{message: "upstream 502"}) end) end)
+        |> Task.await_many(:infinity)
+
+      assert Enum.count(results, & &1) == 1, "one finish recorded"
+      assert Enum.any?(errors(ps), &(&1 =~ "already finished as failed; ignored")), inspect(errors(ps))
+      assert length(Cronwatch.runs!("webhook-ingest", 50, instance: one.cw)) == 1
+      assert must(c(store, :get_state, ["webhook-ingest"])).consecutive_failures == 1, "the failure counted once"
+      assert types(ps) == [], "one failure is below failures_before_alert 2"
+    end
+
+    defp two_recording_one_run(make) do
+      store = make.()
+      clock = clock()
+      [one, two] = ps = [instance(store, clock), instance(store, clock)]
+      for p <- ps, do: Cronwatch.job!("db:rollup", failures_before_alert: 2, instance: p.cw)
+      done = failed_run("pgcron:9", "db:rollup", @t0 - @min)
+      running = %{done | status: "running", finished_at: nil, duration_ms: nil, error: nil}
+      {:ok, _} = Cronwatch.record_run(running, instance: one.cw)
+      {:ok, _} = Cronwatch.jobs(instance: two.cw)
+
+      [one, two]
+      |> Enum.map(fn p -> Task.async(fn -> Cronwatch.record_run(done, instance: p.cw) end) end)
+      |> Task.await_many(:infinity)
+
+      assert must(c(store, :get_state, ["db:rollup"])).consecutive_failures == 1
+      assert types(ps) == []
+
+      # The one that lost the race reports it, when both read the run still
+      # running; one that read it finished leaves it alone in silence.
+      for e <- errors(ps), do: assert(e =~ "pgcron:9 of db:rollup was already finished as failed; ignored", e)
+    end
+
+    defp many_starting_one_id(make) do
+      store = make.()
+      clock = clock()
+      ps = for _ <- 1..6, do: instance(store, clock)
+      for p <- ps, do: Cronwatch.job!("ingest", instance: p.cw)
+      {:ok, _} = Cronwatch.check(instance: hd(ps).cw)
+
+      for k <- 0..4 do
+        id = "evt_#{k}"
+
+        finished =
+          ps
+          |> Enum.with_index()
+          |> Enum.map(fn {p, i} ->
+            Task.async(fn ->
+              {:ok, h} = Cronwatch.start("ingest", id: id, instance: p.cw)
+              Cronwatch.finish(h, "worker #{i}")
+            end)
+          end)
+          |> Task.await_many(:infinity)
+
+        assert Enum.count(finished, & &1) == 1, "#{id}: one finish recorded"
+      end
+
+      runs = Cronwatch.runs!("ingest", 500, instance: hd(ps).cw)
+      assert length(runs) == 5
+      assert runs |> Enum.map(& &1.status) |> Enum.uniq() == ["ok"]
+      assert Enum.reject(errors(ps), &(&1 =~ "already finished")) == []
+    end
+
+    defp end_to_end(make) do
+      store = make.()
+      clock = clock()
+      p = instance(store, clock)
+      job = Cronwatch.job!("e2e", schedule: "every 1h", grace: "10m", expect: "done", instance: p.cw)
+      {:ok, _} = Cronwatch.check(instance: p.cw)
+      assert Cronwatch.run(job, fn _ -> "done" end) == "done"
+      :atomics.add(clock, 1, @min)
+      assert Cronwatch.run(job, fn _ -> "nothing" end) == "nothing"
+      assert types([p]) == ["failed"]
+      :atomics.add(clock, 1, @min)
+      Cronwatch.run(job, fn ctx -> Cronwatch.log(ctx, "done at last") end)
+      assert types([p]) == ["failed", "recovered"]
+      :atomics.add(clock, 1, 2 * 60 * @min)
+      result = Cronwatch.check!(instance: p.cw)
+      assert Enum.map(result.alerts, & &1.type) == ["missed"]
+      assert [%{name: "e2e", health: "late"}] = result.jobs
+      [last | _] = runs = Cronwatch.runs!("e2e", 50, instance: p.cw)
+      assert length(runs) == 3
+      assert last.output == "done at last"
+      assert must(c(store, :get_state, ["e2e"])).version > 0
+      :ok = Cronwatch.forget("e2e", instance: p.cw)
+      assert must(c(store, :get_job, ["e2e"])) == nil
+      assert must(c(store, :list_runs, ["e2e", 10])) == []
+      assert errors([p]) == []
+    end
 
     @doc false
     def scenario(name, make) do
@@ -491,5 +647,86 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       assert total > 0, "no cases replayed"
       total
     end
+  end
+end
+
+defmodule Cronwatch.StoreCase.Shared do
+  @moduledoc """
+  A store made elsewhere, handed to an instance as it is:
+  `store: {Cronwatch.StoreCase.Shared, store: {module, handle}}`. Several
+  instances given one store share its data, as several processes share one
+  database; `Cronwatch.StoreCase`'s scenarios run that way. Each call goes
+  to the store given, and a conditional write it lacks is answered as the
+  client's fallback expects.
+  """
+  @behaviour Cronwatch.Store
+
+  alias Cronwatch.Store
+
+  @impl true
+  def new(opts, _instance), do: {:ok, Keyword.fetch!(opts, :store)}
+
+  @impl true
+  def init({module, handle}) do
+    Code.ensure_loaded(module)
+    if function_exported?(module, :init, 1), do: module.init(handle), else: :ok
+  end
+
+  @impl true
+  def upsert_job(s, d, now), do: Store.call(s, :upsert_job, [d, now])
+  @impl true
+  def get_job(s, name), do: Store.call(s, :get_job, [name])
+  @impl true
+  def list_jobs(s), do: Store.call(s, :list_jobs, [])
+  @impl true
+  def delete_job(s, name), do: Store.call(s, :delete_job, [name])
+  @impl true
+  def insert_run(s, run), do: Store.call(s, :insert_run, [run])
+  @impl true
+  def update_run(s, run), do: Store.call(s, :update_run, [run])
+  @impl true
+  def get_run(s, id), do: Store.call(s, :get_run, [id])
+  @impl true
+  def list_runs(s, job, limit), do: Store.call(s, :list_runs, [job, limit])
+  @impl true
+  def last_run(s, job), do: Store.call(s, :last_run, [job])
+  @impl true
+  def running_runs(s), do: Store.call(s, :running_runs, [])
+  @impl true
+  def get_state(s, job), do: Store.call(s, :get_state, [job])
+  @impl true
+  def set_state(s, state), do: Store.call(s, :set_state, [state])
+  @impl true
+  def prune(s, before), do: Store.call(s, :prune, [before])
+  @impl true
+  def close(_s), do: :ok
+
+  @impl true
+  def update_run_if(s, run, from) do
+    if Store.has?(s, :update_run_if, 2) do
+      Store.call(s, :update_run_if, [run, from])
+    else
+      with {:ok, stored} <- Store.call(s, :get_run, [run.id]) do
+        if stored && stored.status in from,
+          do: with(:ok <- Store.call(s, :update_run, [run]), do: {:ok, true}),
+          else: {:ok, false}
+      end
+    end
+  end
+
+  @impl true
+  def compare_and_set_state(s, state, expected) do
+    if Store.has?(s, :compare_and_set_state, 2) do
+      Store.call(s, :compare_and_set_state, [state, expected])
+    else
+      with :ok <- Store.call(s, :set_state, [state]), do: {:ok, true}
+    end
+  end
+
+  @impl true
+  def delete_run_if(s, id, job, status) do
+    if Store.has?(s, :delete_run_if, 3),
+      do: Store.call(s, :delete_run_if, [id, job, status]),
+      else: {:ok, false}
   end
 end
