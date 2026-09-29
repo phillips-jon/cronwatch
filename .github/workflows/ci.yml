@@ -975,13 +975,15 @@ jobs:
           cargo +nightly fuzz build
 
   # The Elixir port (packages/elixir), on its floor (Elixir 1.18 on OTP 27,
-  # what Debian 13 ships) and the current release. Phase 1 has the core, the
-  # memory store and the SQL store on SQLite, so no database services yet.
+  # what Debian 13 ships) and the current release. The Oban integration's
+  # tests run Oban on SQLite (its Lite engine) always and on the Postgres
+  # service through CRONWATCH_TEST_PG; Quantum needs no service.
   # The conformance step builds the SDK for the croner parity check and the
   # SQLite file shared with Node. The newest entry also runs the formatter,
   # Credo and Dialyzer (its PLTs cached with the build, by the Elixir and
-  # OTP versions); the floor also compiles without the optional
-  # dependencies, as an app with none of them builds the package.
+  # OTP versions), and the crontab example's release; the floor also
+  # compiles without the optional dependencies, as an app with none of them
+  # builds the package.
   elixir:
     name: elixir (Elixir ${{ matrix.elixir }}, OTP ${{ matrix.otp }})
     runs-on: ubuntu-latest
@@ -990,6 +992,15 @@ jobs:
         include:
           - { elixir: "1.18.5", otp: "27.3", newest: false }
           - { elixir: "1.20", otp: "29", newest: true }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -1030,6 +1041,8 @@ jobs:
       # The test alias sets TZ=UTC, as the fixtures are made.
       - name: mix test
         working-directory: packages/elixir
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
         run: mix test
       - name: mix credo
         if: matrix.newest
@@ -1039,3 +1052,54 @@ jobs:
         if: matrix.newest
         working-directory: packages/elixir
         run: mix dialyzer --format github
+      # A job and its check as two crontab lines, through the built release.
+      - name: the crontab example
+        if: matrix.newest
+        working-directory: packages/elixir/examples/crontab
+        run: |
+          mix deps.get
+          mix format --check-formatted
+          mix test
+
+  # The Elixir integrations against the oldest Oban and Quantum they claim
+  # (Mix has no minimal-versions resolver, so mix.exs pins each to the
+  # release CRONWATCH_PIN_<NAME> names), on the floor toolchain.
+  elixir-oldest:
+    name: elixir-oldest (Oban 2.20.0, Quantum 3.5.0)
+    runs-on: ubuntu-latest
+    env:
+      CRONWATCH_PIN_OBAN: "2.20.0"
+      CRONWATCH_PIN_QUANTUM: "3.5.0"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        id: beam
+        with:
+          elixir-version: "1.18.5"
+          otp-version: "27.3"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            packages/elixir/deps
+            packages/elixir/_build
+          key: elixir-oldest-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('packages/elixir/mix.exs') }}
+          restore-keys: elixir-oldest-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-
+      - name: mix deps.get
+        working-directory: packages/elixir
+        run: mix deps.get
+      - name: mix test (the integrations)
+        working-directory: packages/elixir
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+        run: |
+          MIX_ENV=test mix compile --warnings-as-errors
+          mix test test/integrations test/bridge test/release_test.exs
