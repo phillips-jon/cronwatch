@@ -16,6 +16,7 @@ defmodule Cronwatch.JS do
   """
 
   alias Cronwatch.JS.Object
+  alias Cronwatch.JS.Units
 
   @type number_value :: integer() | float() | :infinity | :neg_infinity | :nan
   @type value :: nil | boolean() | number_value() | String.t() | [value()] | Object.t()
@@ -187,12 +188,33 @@ defmodule Cronwatch.JS do
   defp write([]), do: "[]"
   defp write(list) when is_list(list), do: [?[, Enum.intersperse(Enum.map(list, &write/1), ?,), ?]]
   defp write(%Object{pairs: pairs}), do: write_pairs(pairs)
+  defp write(%Units{} = u), do: quote_units(u)
   defp write(%{} = map) when not is_struct(map), do: write(Object.new(map))
 
   defp write_pairs([]), do: "{}"
 
   defp write_pairs(pairs) do
     [?{, Enum.intersperse(Enum.map(pairs, fn {k, v} -> [quote_iodata(k), ?:, write(v)] end), ?,), ?}]
+  end
+
+  @doc """
+  `JSON.stringify` of a value that may hold text as `Cronwatch.JS.Units`,
+  whose lone surrogates are written `\\udXXX`, as `JSON.stringify` writes
+  them, where a binary could only hold U+FFFD. The two places the SDK sends
+  a lone half on the wire (Slack's and Discord's cut bodies, triage's
+  prompt) write their bodies through it.
+  """
+  @spec stringify_lone(term()) :: String.t()
+  def stringify_lone(v), do: stringify(v)
+
+  defp quote_units(u) do
+    parts =
+      Enum.map(Units.segments(u), fn
+        {:text, s} -> escape(s, s, 0, 0, [])
+        {:lone, unit} -> "\\u" <> String.downcase(Integer.to_string(unit, 16))
+      end)
+
+    [?", parts, ?"]
   end
 
   @doc "`JSON.stringify` of a string."
