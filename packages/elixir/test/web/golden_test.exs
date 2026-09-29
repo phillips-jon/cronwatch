@@ -20,6 +20,7 @@ defmodule Cronwatch.Web.GoldenTest do
   alias Cronwatch.JS.Object
   alias Cronwatch.Test.Capture
   alias Cronwatch.Test.Clock
+  alias Cronwatch.Test.Endpoint
   alias Cronwatch.Test.HTTP
 
   @inst Cronwatch.Test.GoldenWeb
@@ -216,7 +217,7 @@ defmodule Cronwatch.Web.GoldenTest do
   test "the SDK's captures, through a Phoenix endpoint and router" do
     captures = captures()
     seed()
-    port = Cronwatch.Test.Endpoint.serve()
+    port = Endpoint.serve()
 
     Enum.reduce(captures, %{}, fn c, ids ->
       {status, headers, body} =

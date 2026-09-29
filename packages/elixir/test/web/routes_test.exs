@@ -17,6 +17,7 @@ defmodule Cronwatch.Web.RoutesTest do
   alias Cronwatch.Test.Flaky
   alias Cronwatch.Test.Stores
   alias Cronwatch.Test.Wrap
+  alias Cronwatch.Web.Origin
   alias Cronwatch.Web.Request
   alias Cronwatch.Web.Routes
 
@@ -332,7 +333,7 @@ defmodule Cronwatch.Web.RoutesTest do
     assert until.(~s({"for":"60000"})) == 60_000, "a numeric string"
     assert until.(~s({"for":"90m"})) == 90 * @min, "text"
     assert until.("{}") == @hour, "absent"
-    assert until.("﻿{\"for\":\"2h\"}") == 2 * @hour, "a byte order mark"
+    assert until.(~s(\uFEFF{"for":"2h"})) == 2 * @hour, "a byte order mark"
     assert req(w, "POST", "/cronwatch/api/jobs/s/silence?for=forever", [@auth]).status == 400
     query = json(req(w, "POST", "/cronwatch/api/jobs/s/silence?for=3h", [@auth]))
     assert field(query, ["state", "silencedUntil"]) == @t0 + 3 * @hour, "the query when the body has none"
@@ -692,8 +693,8 @@ defmodule Cronwatch.Web.RoutesTest do
     request = %{request | headers: request.headers ++ [{"origin", "http://" <> host}]}
     assert {200, _, _} = Routes.handle(opts, request), "its own origin"
     assert System.monotonic_time(:millisecond) - started < 2_000
-    assert Cronwatch.Web.Origin.bare("http://" <> String.duplicate("é", 600)) == nil
-    assert Cronwatch.Web.Origin.bare("http://" <> String.duplicate("é", 10)) =~ "http://xn--"
+    assert Origin.bare("http://" <> String.duplicate("é", 600)) == nil
+    assert Origin.bare("http://" <> String.duplicate("é", 10)) =~ "http://xn--"
   end
 
   test "the app shell is public and only for reads" do

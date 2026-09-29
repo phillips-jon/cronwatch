@@ -227,6 +227,6 @@ if Code.ensure_loaded?(Plug.Conn) do
     end
 
     defp parsed?(%{body_params: %Plug.Conn.Unfetched{}}), do: false
-    defp parsed?(%{body_params: params}), do: is_map(params) and map_size(params) > 0
+    defp parsed?(%{body_params: params}), do: map_size(params) > 0
   end
 end

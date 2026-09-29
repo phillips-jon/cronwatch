@@ -93,7 +93,7 @@ defmodule Cronwatch.Web.HTML do
     end
   end
 
-  @doc "`c.replace(\"_\", \" \")`: the first underscore only."
+  @doc ~S|`c.replace("_", " ")`: the first underscore only.|
   def condition_text(c), do: String.replace(c, "_", " ", global: false)
 
   # The job's health, with any open condition it does not already say (over
@@ -214,7 +214,7 @@ defmodule Cronwatch.Web.HTML do
 
     rows = Enum.map_join(jobs, "\n", &board_row(&1, runs_by_job, now, base))
 
-    checked = if checked_at not in [nil, 0], do: ", checked #{h(Duration.relative(checked_at, now))}", else: ""
+    checked = if checked_at in [nil, 0], do: "", else: ", checked #{h(Duration.relative(checked_at, now))}"
 
     {health, sections} =
       if jobs == [] do
@@ -322,16 +322,16 @@ defmodule Cronwatch.Web.HTML do
 
   defp run_row(run, now) do
     error =
-      if run.error not in [nil, ""],
-        do: ~s(<details class="out error" open><summary>error</summary><pre>#{h(run.error)}</pre></details>),
-        else: ""
+      if run.error in [nil, ""],
+        do: "",
+        else: ~s(<details class="out error" open><summary>error</summary><pre>#{h(run.error)}</pre></details>)
 
     output =
-      if run.output not in [nil, ""] do
+      if run.output in [nil, ""] do
+        ""
+      else
         open = if run.status == "ok", do: "", else: " open"
         ~s(<details class="out"#{open}><summary>output</summary><pre>#{h(run.output)}</pre></details>)
-      else
-        ""
       end
 
     detail = error <> output

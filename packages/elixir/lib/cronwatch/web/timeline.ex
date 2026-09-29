@@ -70,7 +70,7 @@ defmodule Cronwatch.Web.Timeline do
     "#{elem(@weekday_names, wd)} #{d} #{elem(@month_names, m - 1)}"
   end
 
-  @doc "\"22:42\" on the same UTC day as `now`, otherwise \"25 Sep 22:42\"."
+  @doc ~s("22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42".)
   def when_utc(t, now) do
     if JS.floor_div(t, @day_ms) == JS.floor_div(now, @day_ms) do
       clock_utc(t)

@@ -398,11 +398,13 @@ defmodule Cronwatch.Web.Routes do
 
       true ->
         said = %{method: method, public_origin: public_origin, query: query, bearer: bearer(req)}
-        signed_in(opts, req, said, token, kind, pathname, path, base, wants_html)
+        at = %{pathname: pathname, path: path, base: base, wants_html: wants_html}
+        signed_in(opts, req, said, {kind, token}, at)
     end
   end
 
-  defp signed_in(opts, req, said, token, kind, pathname, path, base, wants_html) do
+  defp signed_in(opts, req, said, {kind, token}, at) do
+    %{pathname: pathname, path: path, base: base, wants_html: wants_html} = at
     query_token = if token && wants_html && said.method == "GET", do: Request.param(said.query, "token")
 
     denied =

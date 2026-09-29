@@ -13,7 +13,9 @@ defmodule Cronwatch.Web.ServerTest do
 
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
+  alias Cronwatch.Test.Client
   alias Cronwatch.Test.Clock
+  alias Cronwatch.Test.Endpoint
   alias Cronwatch.Test.HTTP
 
   @inst Cronwatch.Test.GoldenWeb
@@ -23,7 +25,7 @@ defmodule Cronwatch.Web.ServerTest do
   setup do
     start_supervised!({Cronwatch, name: @inst, clock: Clock.fun(Clock.new(@t0)), alerts: [], cron_secret: false})
     Cronwatch.run("x", fn _ -> :ok end, instance: @inst)
-    %{plug: HTTP.serve(Cronwatch.Test.WebRouter), phoenix: Cronwatch.Test.Endpoint.serve()}
+    %{plug: HTTP.serve(Cronwatch.Test.WebRouter), phoenix: Endpoint.serve()}
   end
 
   defp get(port, path, headers \\ []), do: HTTP.request(port, "GET", path, [{"host", "app.test"} | headers])
@@ -116,7 +118,7 @@ defmodule Cronwatch.Web.ServerTest do
     :gen_tcp.close(socket)
 
     # The default hour, not 7 ms.
-    Cronwatch.Test.Client.eventually(fn ->
+    Client.eventually(fn ->
       Cronwatch.job_summary!("x", instance: @inst).silenced_until == @t0 + @hour
     end)
   end
