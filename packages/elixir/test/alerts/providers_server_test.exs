@@ -149,6 +149,37 @@ defmodule Cronwatch.Alerts.ProvidersServerTest do
     assert header.(11, "authorization") =~ ~r/\AAWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\//
   end
 
+  test "every provider refuses to follow a redirect, so its credentials never go where it points" do
+    elsewhere = HTTPServer.start(fn _ -> {200, [], "{}"} end)
+    server = HTTPServer.start(fn _ -> {307, [{"location", elsewhere.url <> "/stolen"}], ""} end)
+    t = to(server)
+
+    channels = [
+      {Alerts.Resend, [api_key: "re_secret", transport: t] ++ email()},
+      {Alerts.Postmark, [server_token: "pm-secret", transport: t] ++ email()},
+      {Alerts.SendGrid, [api_key: "SG.secret", transport: t] ++ email()},
+      {Alerts.Mailgun, [api_key: "key-secret", domain: "mg.example.com", transport: t] ++ email()},
+      {Alerts.SES,
+       [region: "us-east-1", access_key_id: "AKIDEXAMPLE", secret_access_key: "sekret", transport: t] ++ email()},
+      {Alerts.Twilio, account_sid: "AC1", auth_token: "tok", from: "+1", to: ["+2"], transport: t},
+      {Alerts.Sentry, dsn: "https://pubkey@o1.ingest.sentry.io/42", transport: t},
+      {Alerts.Honeybadger, api_key: "hb-secret", transport: t},
+      {Alerts.Datadog, api_key: "dd-secret", transport: t},
+      {Alerts.Rollbar, access_token: "rb-secret", transport: t},
+      {Alerts.Bugsnag, api_key: "bs-secret", transport: t},
+      {Alerts.NewRelic, account_id: "1", api_key: "nr-secret", transport: t}
+    ]
+
+    for {module, opts} <- channels do
+      {:ok, s} = module.init(opts)
+      assert {:error, e} = module.send(s, sample(), quiet()), inspect(module)
+      assert Cronwatch.Error.describe(e) =~ ~r/ https:\/\/[a-z0-9.-]+ answered 307\z/, inspect(module)
+    end
+
+    assert length(HTTPServer.requests(server)) == length(channels)
+    assert HTTPServer.requests(elsewhere) == []
+  end
+
   test "a secret that straddles the error's cut is still cut out" do
     key = ["key", "0123456789abcdef", "0123456789abcdef"] |> Enum.join("-") |> binary_part(0, 36)
     server = HTTPServer.start(fn _ -> {401, [], String.duplicate("x", 180) <> "invalid key " <> key} end)
