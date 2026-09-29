@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import io
 import json
+import re
 from collections.abc import Iterator
 from typing import Any
 
@@ -167,8 +168,13 @@ def test_debug_is_the_development_environment(capsys: pytest.CaptureFixture[str]
         assert page.status_code == 401
         assert b"The sign-in link is in the server log" in page.content
         line = capsys.readouterr().out.strip()
-        assert line.startswith(f"[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://testserver{BASE}/?token=")
-        token = line.rsplit("=", 1)[1]
+        match = re.fullmatch(
+            rf"\[cronwatch\] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard\. Sign in: {re.escape(BASE)}/\?token=([A-Za-z0-9_-]{{43}})"
+            r" on this server \(the first request's host is not local, so the link leaves it out\)",
+            line,
+        )
+        assert match, "testserver is not a loopback host, so the line leaves it out"
+        token = match.group(1)
         assert Client().get(f"{BASE}/api/jobs", HTTP_AUTHORIZATION=f"Bearer {token}").status_code == 200
         monkeypatch.setenv("CRONWATCH_ENV", "production")
         assert not _env.is_development(), "an environment variable still wins"

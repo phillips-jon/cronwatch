@@ -35,7 +35,7 @@ The client's options are the keys of `CRONWATCH` in upper case: `STORE`, `ALERTS
 
 The client is made from these settings the first time something asks for it, through `cronwatch.configure`, so `cronwatch.django.client()` and `cronwatch.client()` are the same client everywhere in the process. A change to `CRONWATCH` or `DEBUG`, as `override_settings` makes in a test, drops it and makes it again.
 
-`DEBUG` stands in for the environment when none of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` is set: on is development, off is production. In development the dashboard makes a token of its own when there is none and prints its sign-in link to the console; in production, without a token, it answers 503 rather than serve your jobs to anyone.
+`DEBUG` stands in for the environment when none of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` is set: on is development, off is production. In development the dashboard makes a token of its own when there is none and prints its sign-in link to the console (with the host only when `ORIGIN` is set or the request's host is loopback, such as `localhost` or `127.0.0.1`; otherwise the link is a path to open on this server); in production, without a token, it answers 503 rather than serve your jobs to anyone.
 
 ## Declare and run jobs
 

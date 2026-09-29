@@ -235,8 +235,9 @@ def test_without_a_token_in_development_a_made_up_token_is_printed_once_and_requ
     other = make()[0].routes(base_path="/")
     send(other, "GET", "https://dev.example:8443/api/jobs")
     second = capsys.readouterr().out.splitlines()
-    assert re.search(r"Sign in: https://dev\.example:8443/\?token=[A-Za-z0-9_-]{43}$", second[0]), "the origin as requested, and a root mount"
-    assert second[0][-43:] != token, "each routes instance makes its own"
+    assert re.search(r"Sign in: /\?token=[A-Za-z0-9_-]{43} on this server \(the first request's host is not local, so the link leaves it out\)$", second[0]), "no host that is not local, and a root mount"
+    other_token = re.search(r"token=([A-Za-z0-9_-]{43})", second[0])
+    assert other_token and other_token.group(1) != token, "each routes instance makes its own"
 
 
 def test_an_empty_token_counts_as_unset_none_opts_out_explicitly(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -631,18 +632,54 @@ def test_a_mixed_case_host_matches_the_browsers_lowercase_origin() -> None:
     assert go("POST", "/cronwatch/check", {**COOKIE, "origin": "http://app.example.com"}).status == 303
 
 
-def test_the_development_sign_in_line_uses_the_public_origin(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_the_development_sign_in_line_uses_the_public_origin_when_set_or_loopback_and_otherwise_leaves_the_host_out(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setenv("CRONWATCH_ENV", "development")
     cw, _, _ = make()
-    forwarded = {"x-forwarded-proto": "https", "x-forwarded-host": "proxied.example"}
-    send(cw.routes(origin="https://app.example.com", base_path="/cronwatch"), "GET", f"{INTERNAL}/cronwatch/")
-    send(cw.routes(trust_proxy=True, base_path="/cronwatch"), "GET", f"{INTERNAL}/cronwatch/", forwarded)
-    send(cw.routes(base_path="/cronwatch"), "GET", f"{INTERNAL}/cronwatch/", forwarded)
+    spoofed = {"x-forwarded-proto": "https", "x-forwarded-host": "attacker.example"}
+    cases: list[tuple[dict[str, Any], str, dict[str, str]]] = [
+        ({"origin": "https://app.example.com"}, f"{INTERNAL}/cronwatch/", {}),
+        ({"origin": "https://app.example.com", "trust_proxy": True}, f"{INTERNAL}/cronwatch/", spoofed),
+        ({}, "http://localhost:3000/cronwatch/", {}),
+        ({}, "http://app.localhost:3000/cronwatch/", {}),
+        ({}, "http://127.0.0.1:3000/cronwatch/", {}),
+        ({}, "http://127.8.9.10/cronwatch/", {}),
+        ({}, "http://[::1]:3000/cronwatch/", {}),
+        ({"trust_proxy": True}, f"{INTERNAL}/cronwatch/", {"x-forwarded-host": "localhost:5173"}),
+        ({}, f"{INTERNAL}/cronwatch/", {}),
+        ({}, "https://app.example.com/cronwatch/", {}),
+        ({"trust_proxy": True}, "http://localhost:3000/cronwatch/", spoofed),
+        ({}, "http://localhost.example/cronwatch/", {}),
+        ({}, "http://128.0.0.1/cronwatch/", {}),
+        ({"base_path": "/"}, "http://attacker.example/", {}),
+    ]
+    for options, url, headers in cases:
+        send(cw.routes(**{"base_path": "/cronwatch", **options}), "GET", url, headers)
     lines = capsys.readouterr().out.splitlines()
-    assert len(lines) == 3
-    assert re.search(r"Sign in: https://app\.example\.com/cronwatch/\?token=", lines[0])
-    assert re.search(r"Sign in: https://proxied\.example/cronwatch/\?token=", lines[1])
-    assert re.search(r"Sign in: http://10\.0\.0\.5:8080/cronwatch/\?token=", lines[2])
+    intro = "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: "
+    hostless = " on this server (the first request's host is not local, so the link leaves it out)"
+    expected = [
+        ("https://app.example.com/cronwatch", ""),
+        ("https://app.example.com/cronwatch", ""),
+        ("http://localhost:3000/cronwatch", ""),
+        ("http://app.localhost:3000/cronwatch", ""),
+        ("http://127.0.0.1:3000/cronwatch", ""),
+        ("http://127.8.9.10/cronwatch", ""),
+        ("http://[::1]:3000/cronwatch", ""),
+        ("http://localhost:5173/cronwatch", ""),
+        ("/cronwatch", hostless),
+        ("/cronwatch", hostless),
+        ("/cronwatch", hostless),
+        ("/cronwatch", hostless),
+        ("/cronwatch", hostless),
+        ("", hostless),
+    ]
+    assert len(lines) == len(expected)
+    for i, ((link, tail), line) in enumerate(zip(expected, lines)):
+        token = re.search(r"token=([A-Za-z0-9_-]{43})", line)
+        assert token, line
+        assert line == f"{intro}{link}/?token={token.group(1)}{tail}", f"line {i}"
 
 
 # ------------------------------------------------------------ routes-pwa.test.ts

@@ -349,11 +349,37 @@ def development_token() -> str:
     return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
 
 
-def development_sign_in_line(origin: str, base: str, token: str) -> str:
+def development_sign_in_line(origin: str | None, base: str, token: str) -> str:
     """The line a development token is announced with, printed once to stdout
-    on the routes' first request. `origin` is that request's public origin,
-    `base` the base path without a trailing slash ("" when mounted at the root)."""
-    return f"[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: {origin}{base}/?token={token}"
+    on the routes' first request. `origin` is the `origin` option when set,
+    otherwise the first request's public origin when its host is loopback,
+    and None for any other host: the request's host is the client's to
+    choose, so the line then leaves it out rather than point the link, token
+    and all, somewhere else. `base` is the base path without a trailing slash
+    ("" when mounted at the root)."""
+    intro = "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: "
+    if origin is None:
+        return f"{intro}{base}/?token={token} on this server (the first request's host is not local, so the link leaves it out)"
+    return f"{intro}{origin}{base}/?token={token}"
+
+
+_LOOPBACK_V4 = re.compile(r"127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})")
+
+
+def is_loopback_origin(origin: str) -> bool:
+    """Whether an origin's host is loopback: "localhost", a name ending in
+    ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1."""
+    authority = origin.split("://", 1)[1] if "://" in origin else origin
+    if authority.startswith("["):
+        end = authority.find("]")
+        host = authority[: end + 1] if end >= 0 else authority
+    else:
+        host = authority.split(":", 1)[0]
+    host = host.lower()
+    if host in ("localhost", "[::1]") or host.endswith(".localhost"):
+        return True
+    octets = _LOOPBACK_V4.fullmatch(host)
+    return octets is not None and all(int(o) <= 255 for o in octets.groups())
 
 
 def _strip_base(pathname: str, base: str) -> str:
@@ -599,7 +625,8 @@ class Web:
             if self._announced:
                 return
             self._announced = True
-        print(development_sign_in_line(origin, base, self._token or ""), file=sys.stdout, flush=True)
+        shown = self._origin if self._origin is not None else (origin if is_loopback_origin(origin) else None)
+        print(development_sign_in_line(shown, base, self._token or ""), file=sys.stdout, flush=True)
 
     def _serve(self, request: Request, path: str, wants_html: bool, base: str) -> Response:
         method = request.method.upper()
