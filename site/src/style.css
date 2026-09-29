@@ -109,6 +109,26 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .installs .install { margin-top: 0; }
 @media (min-width: 800px) { .installs { display: grid; grid-template-columns: repeat(2, max-content); } .installs .install { display: flex; justify-content: space-between; } }
 @media (min-width: 1160px) { .installs { grid-template-columns: repeat(3, max-content); } }
+/* With site.js the boxes become tabs, one per language, each with its logo:
+   grey until hovered or chosen, then in its own colour (the owner's one
+   exception to colour for states only, like the logo mark's gradient).
+   Without script every box shows, as above. */
+.installs.tabbed { display: block; max-width: 580px; }
+.installs.tabbed .for { display: none; }
+.installs.tabbed .install { display: flex; justify-content: space-between; width: 100%; }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px 4px; margin: 0 0 14px; border-bottom: 1px solid var(--rule); }
+.tabs[hidden] { display: none; }
+.tab { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 -1px; padding: 8px 10px 9px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.tab:hover { color: var(--body); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tab:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.tab .logo { width: 16px; height: 16px; fill: currentColor; flex: none; }
+.tab-ts:hover .logo, .tab-ts[aria-selected="true"] .logo { fill: #3178c6; }
+.tab-rails:hover .logo, .tab-rails[aria-selected="true"] .logo { fill: #d30001; }
+.tab-python:hover .logo, .tab-python[aria-selected="true"] .logo { fill: #3776ab; }
+.tab-php:hover .logo, .tab-php[aria-selected="true"] .logo { fill: #777bb4; }
+.tab-go:hover .logo, .tab-go[aria-selected="true"] .logo { fill: #00add8; }
+@media (max-width: 560px) { .tabs { flex-wrap: nowrap; gap: 0; overflow-x: auto; scrollbar-width: none; } .tabs::-webkit-scrollbar { display: none; } .tab { gap: 5px; padding: 8px 5px 9px; letter-spacing: .03em; white-space: nowrap; } }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 22px; }
 .prompt-btn { display: inline-flex; align-items: center; gap: 9px; font: 500 14px/1 var(--mono); color: var(--sheet); background: var(--ink); border: 1px solid var(--ink); border-radius: 3px; padding: 11px 14px; }
 .prompt-btn:hover { opacity: .85; }
