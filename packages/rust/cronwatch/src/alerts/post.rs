@@ -31,8 +31,10 @@ pub const MAX_BODY: usize = 1 << 20;
 /// How much of an answer's body goes into an error.
 pub(crate) const ERROR_BODY_MAX: usize = 200;
 
-/// One POST, as a [`Transport`] is asked to send it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// One POST, as a [`Transport`] is asked to send it. Its `Debug` shows the
+/// URL's origin and the header names only, since the rest carries the
+/// channel's credentials.
+#[derive(Clone, PartialEq, Eq)]
 pub struct Request {
     /// An http or https URL, as the WHATWG URL parser (and so fetch) writes
     /// it. Its path or query may be a credential: never quote it.
@@ -54,6 +56,16 @@ impl Response {
     /// An answer whose whole body is at hand.
     pub fn new(status: u16, body: impl Into<Vec<u8>>) -> Response {
         Response { status, body: Box::new(Whole(Some(body.into()))) }
+    }
+}
+
+impl fmt::Debug for Request {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Request")
+            .field("origin", &origin(&self.url))
+            .field("headers", &self.headers.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>())
+            .field("body", &format_args!("{} bytes", self.body.len()))
+            .finish()
     }
 }
 

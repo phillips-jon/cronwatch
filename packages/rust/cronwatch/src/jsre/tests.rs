@@ -92,7 +92,34 @@ fn compile_errors() {
 #[test]
 fn matches_and_writes_itself() {
     let re = Regexp::must("b+", "gi");
-    assert!(re.is_match("aBc"));
-    assert!(!re.is_match("ac"));
+    assert_eq!(re.try_is_match("aBc"), Some(true));
+    assert_eq!(re.try_is_match("ac"), Some(false));
     assert_eq!(re.to_string(), "/b+/gi");
+}
+
+#[test]
+fn deep_matches_give_up_rather_than_overflow_the_stack() {
+    // A loop whose passes are two units wide recurses a few frames a pass;
+    // over a long input it gives up (the audit), on a tokio worker's stack.
+    let answers = std::thread::Builder::new()
+        .stack_size(1024 * 1024)
+        .spawn(|| {
+            let long = format!("{}c", "ab".repeat(16_384));
+            let short = format!("{}c", "ab".repeat(100));
+            let re = Regexp::must("(?:ab)*c", "");
+            let counted = Regexp::must("(?:xy){100000}", "");
+            (re.try_is_match(&long), re.try_is_match(&short), counted.try_is_match(&"xy".repeat(100_000)))
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+    assert_eq!(answers, (None, Some(true), None));
+}
+
+#[test]
+fn patterns_too_deep_or_long_are_refused() {
+    let nested = format!("{}a{}", "(".repeat(2000), ")".repeat(2000));
+    assert!(Regexp::new(&nested, "").unwrap_err().contains("nested too deeply"));
+    assert!(Regexp::new(&format!("{}a{}", "(".repeat(100), ")".repeat(100)), "").is_ok());
+    assert!(Regexp::new(&"a".repeat(5000), "").unwrap_err().contains("more than 4096 characters"));
 }

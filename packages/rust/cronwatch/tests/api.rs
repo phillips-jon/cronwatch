@@ -59,6 +59,28 @@ fn debug_never_prints_a_token_or_secret() {
     assert!(request.contains("/cronwatch?..."), "{request}");
 }
 
+#[cfg(feature = "alerts")]
+#[test]
+fn a_channels_request_and_options_never_debug_a_credential() {
+    let key = "not-a-real-key-0123";
+    let request = cronwatch::alerts::Request {
+        url: format!("https://hooks.example.com/services/{key}"),
+        headers: vec![("authorization".into(), format!("Bearer {key}"))],
+        body: key.as_bytes().to_vec(),
+    };
+    let text = format!("{request:?}");
+    assert!(!text.contains(key), "{text}");
+    assert!(text.contains("https://hooks.example.com") && text.contains("authorization"), "{text}");
+    let slack = cronwatch::alerts::SlackOptions {
+        webhook_url: format!("https://hooks.example.com/{key}"),
+        ..Default::default()
+    };
+    let resend = cronwatch::alerts::ResendOptions { api_key: key.into(), ..Default::default() };
+    for text in [format!("{slack:?}"), format!("{resend:?}")] {
+        assert!(!text.contains(key), "{text}");
+    }
+}
+
 #[tokio::test]
 async fn the_futures_are_send() {
     let cw = Client::builder().build().unwrap();

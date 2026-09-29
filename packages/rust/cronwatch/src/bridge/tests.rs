@@ -436,3 +436,21 @@ fn options_of_rebuilds_an_expect_pattern_and_a_custom_function() {
     let custom = crate::describe_job("x", &JobOptions::new().expect_fn(|_| false));
     assert_eq!(crate::describe_job("x", &options_of(&custom)).to_json(), r#"{"name":"x","expect":"custom function"}"#);
 }
+
+#[test]
+fn a_stored_pattern_too_deep_to_match_passes_rather_than_aborting() {
+    // The audit: `(?:ab)*` over a long output overflowed a worker's stack.
+    let def = Definition::from_json(r#"{"name":"x","expect":"matches /(?:ab)*done/"}"#).unwrap();
+    let passed = std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(move || {
+            let rule = options_of(&def).expect.unwrap();
+            (rule.check(&format!("{}done", "ab".repeat(16_000))), rule.check("abdone"), rule.check("nothing"))
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+    assert_eq!(passed.0, None, "it cannot tell, so it passes, as a pattern it cannot read does");
+    assert_eq!(passed.1, None);
+    assert!(passed.2.is_some());
+}

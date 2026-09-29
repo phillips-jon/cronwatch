@@ -33,6 +33,18 @@ use crate::js;
 /// No node: the end of a chain that never continues.
 const NONE: usize = usize::MAX;
 
+/// The longest pattern `Regexp::new` reads, in characters.
+const MAX_SOURCE: usize = 4096;
+
+/// How deep one match may recurse. A loop whose passes are not one code
+/// unit wide (`(?:ab)*`) recurses three frames a pass, so a stored pattern
+/// over a long output could otherwise overflow a thread's stack and abort
+/// the process; past this (some 170 such passes) the match gives up
+/// (`try_is_match` answers `None`). It fits a tokio worker's 2 MiB stack in
+/// a debug build with room to spare. V8 keeps its own backtracking stack and
+/// throws past its limit; the SDK's redaction patterns never come near it.
+const MAX_DEPTH: usize = 512;
+
 /// A compiled pattern. It is read-only once compiled, so one may be shared
 /// by every thread; each match keeps its own state.
 #[derive(Debug)]
@@ -392,6 +404,11 @@ impl Regexp {
     /// Reads a JavaScript pattern's source (what goes between the slashes)
     /// and its flags (`g` and `i`).
     pub(crate) fn new(source: &str, flags: &str) -> Result<Regexp, String> {
+        // Each character of a pattern is a set of 8 KiB until it is
+        // frozen, so a pattern's length bounds what compiling it takes.
+        if source.chars().count() > MAX_SOURCE {
+            return Err(format!("jsre: a pattern of more than {MAX_SOURCE} characters is not supported"));
+        }
         let mut fold = false;
         let mut global = false;
         for f in flags.chars() {
@@ -451,6 +468,9 @@ impl Regexp {
                 m.caps[1] = m.end;
                 return true;
             }
+            if m.gave_up {
+                return false;
+            }
         }
         false
     }
@@ -463,18 +483,19 @@ impl Regexp {
             loops: vec![LoopState::default(); self.loops],
             end: -1,
             target: 0,
+            depth: 0,
+            gave_up: false,
         }
     }
 
-    /// Whether the pattern matches anywhere in the units.
-    pub(crate) fn is_match_units(&self, input: &[u16]) -> bool {
-        self.exec(&mut self.matcher(input), 0)
-    }
-
     /// Whether the pattern matches anywhere in `s` (a stored expect pattern
-    /// read back by `bridge::options_of`).
-    pub(crate) fn is_match(&self, s: &str) -> bool {
-        self.is_match_units(&crate::js::units(s))
+    /// read back by `bridge::options_of`), or `None` when the match gave up
+    /// (see `MAX_DEPTH`).
+    pub(crate) fn try_is_match(&self, s: &str) -> Option<bool> {
+        let units = crate::js::units(s);
+        let mut m = self.matcher(&units);
+        let found = self.exec(&mut m, 0);
+        (!m.gave_up).then_some(found)
     }
 
     /// `String.prototype.replace` with a function: each match (every one
@@ -585,6 +606,9 @@ struct Matcher<'a> {
     loops: Vec<LoopState>,
     end: isize,
     target: usize,
+    /// How deep `run` is, and whether it went past `MAX_DEPTH`.
+    depth: usize,
+    gave_up: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -610,8 +634,23 @@ impl Matcher<'_> {
     }
 
     /// Whether the chain from `n` matches at `pos`, leaving captures and
-    /// `end` set when it does.
-    fn run(&mut self, mut n: usize, mut pos: usize) -> bool {
+    /// `end` set when it does. Past `MAX_DEPTH` the match gives up: this
+    /// and every call after it answers false, and `gave_up` is set.
+    fn run(&mut self, n: usize, pos: usize) -> bool {
+        if self.gave_up {
+            return false;
+        }
+        if self.depth >= MAX_DEPTH {
+            self.gave_up = true;
+            return false;
+        }
+        self.depth += 1;
+        let matched = self.run_chain(n, pos);
+        self.depth -= 1;
+        matched
+    }
+
+    fn run_chain(&mut self, mut n: usize, mut pos: usize) -> bool {
         let re = self.re;
         loop {
             let node = &re.nodes[n];

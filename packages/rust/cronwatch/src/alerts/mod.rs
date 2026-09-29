@@ -102,6 +102,39 @@ pub use {
     webhook::{WebhookOptions, signature, webhook},
 };
 
+/// `Debug` for options that hold credentials: the type's name only, so an
+/// app's own configuration can derive `Debug` without printing them.
+macro_rules! opaque_debug {
+    ($($name:ty),* $(,)?) => {
+        $(impl std::fmt::Debug for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_struct(stringify!($name)).finish_non_exhaustive()
+            }
+        })*
+    };
+}
+pub(crate) use opaque_debug;
+
+#[cfg(feature = "alerts")]
+opaque_debug!(
+    BugsnagOptions,
+    DatadogOptions,
+    DiscordOptions,
+    EmailOptions,
+    HoneybadgerOptions,
+    MailgunOptions,
+    NewRelicOptions,
+    PostmarkOptions,
+    ResendOptions,
+    RollbarOptions,
+    SendgridOptions,
+    SentryOptions,
+    SesOptions,
+    SlackOptions,
+    TwilioOptions,
+    WebhookOptions,
+);
+
 /// For the conformance replay.
 #[cfg(all(test, feature = "alerts"))]
 pub(crate) mod testing {

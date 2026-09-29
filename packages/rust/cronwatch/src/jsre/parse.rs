@@ -57,11 +57,16 @@ struct Parser {
     i: usize,
     fold: bool,
     captures: usize,
+    /// How many groups the parser is inside.
+    depth: usize,
 }
+
+/// How deep groups may nest.
+const MAX_NESTING: usize = 100;
 
 /// Reads a pattern's source into a tree and its number of captures.
 pub(super) fn parse(source: &str, fold: bool) -> Result<(Tree, usize), String> {
-    let mut p = Parser { src: source.chars().collect(), i: 0, fold, captures: 0 };
+    let mut p = Parser { src: source.chars().collect(), i: 0, fold, captures: 0, depth: 0 };
     let t = p.disjunction()?;
     if p.i < p.src.len() {
         return Err(p.fail("unmatched ')'"));
@@ -143,7 +148,14 @@ impl Parser {
                     self.captures += 1;
                     g.capture = self.captures;
                 }
+                // The parser and the compiler recurse into groups, so a
+                // pattern of thousands of '(' would overflow the stack.
+                self.depth += 1;
+                if self.depth > MAX_NESTING {
+                    return Err(self.fail("groups nested too deeply"));
+                }
                 let inner = self.disjunction()?;
+                self.depth -= 1;
                 if !self.more() || self.peek() != ')' {
                     return Err(self.fail("missing ')'"));
                 }
