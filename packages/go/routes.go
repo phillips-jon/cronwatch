@@ -204,8 +204,16 @@ var loopbackV4 = regexp.MustCompile(`^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$`)
 
 // isLoopbackOrigin reports whether an origin's host is loopback:
 // "localhost", a name ending in ".localhost", an IPv4 address in
-// 127.0.0.0/8, or the IPv6 address ::1.
+// 127.0.0.0/8, or the IPv6 address ::1. Only an origin that reads as one
+// counts: a Host header is anyone's to send, and one such as
+// "evil.example/.localhost" or "localhost:1@evil.example" must not put the
+// development token in a link to another host, whether or not the server
+// in front refuses such a header first.
 func isLoopbackOrigin(origin string) bool {
+	origin, ok := bareOrigin(origin)
+	if !ok {
+		return false
+	}
 	authority := origin
 	if i := strings.Index(origin, "://"); i >= 0 {
 		authority = origin[i+3:]

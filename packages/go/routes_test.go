@@ -735,6 +735,10 @@ func TestRoutesOrigin(t *testing.T) {
 			{nil, "http://localhost.example/cronwatch/", nil},
 			{nil, "http://128.0.0.1/cronwatch/", nil},
 			{[]cronwatch.RoutesOption{cronwatch.WithBasePath("/")}, "http://attacker.example/", nil},
+			// A Host that is not a host is read as a URL, whatever net/http lets through.
+			{nil, "http://localhost:1@evil.example/cronwatch/", nil},
+			{[]cronwatch.RoutesOption{cronwatch.WithTrustProxy()}, internal + "/cronwatch/", hdr{"x-forwarded-host": "localhost:1@evil.example"}},
+			{[]cronwatch.RoutesOption{cronwatch.WithTrustProxy()}, internal + "/cronwatch/", hdr{"x-forwarded-host": "evil.example/.localhost"}},
 		} {
 			serve(must[*cronwatch.Routes](t)(cw.Routes(c.options...)), "GET", c.url, c.headers, "")
 		}
@@ -755,6 +759,9 @@ func TestRoutesOrigin(t *testing.T) {
 			{"/cronwatch", hostless},
 			{"/cronwatch", hostless},
 			{"", hostless},
+			{"/cronwatch", hostless},
+			{"/cronwatch", hostless},
+			{"/cronwatch", hostless},
 		}
 		lines := strings.Split(strings.TrimSpace(out.String()), "\n")
 		eq(t, "lines", len(lines), len(expected))
