@@ -10,11 +10,15 @@
 
 mod date;
 mod json;
+#[cfg(any(feature = "alerts", feature = "triage"))]
+mod lone;
 mod number;
 mod text;
 
 pub(crate) use date::*;
 pub use json::{Object, ParseError, Value, parse, stringify};
 pub(crate) use json::{array_index, quote};
+#[cfg(any(feature = "alerts", feature = "triage"))]
+pub(crate) use lone::*;
 pub(crate) use number::*;
 pub(crate) use text::*;

@@ -19,18 +19,47 @@ blocking = ["tokio/net"]
 # The store contract test, the store.json replay and the finish-once
 # scenarios, for stores of the app's own.
 storetest = []
+# The alert channels (Slack, Discord, the webhook, the email providers,
+# Twilio and the error trackers) and the default transport they post with.
+alerts = ["__transport", "dep:sha2", "dep:hmac"]
+# Claude triage over plain HTTP, on the same transport (not the channels).
+triage = ["__transport"]
+# What the channels and triage share: reqwest on rustls with the platform's
+# roots, and the WHATWG URL parser fetch reads URLs with. Not for apps to
+# name: turn on `alerts` or `triage`.
+__transport = ["dep:reqwest", "dep:url", "dep:idna_adapter"]
 
 [dependencies]
 tokio = { version = "1.43", default-features = false, features = ["rt", "time", "sync"] }
 getrandom = "0.3"
 jiff = "0.2.15"
+reqwest = { version = "0.13.1", default-features = false, features = ["rustls", "gzip"], optional = true }
+url = { version = "2.5.4", optional = true }
+# Keeps url's IDNA on its unicode-rs backend (idna_adapter 1.1). The ICU4X
+# backend (1.2) pulls in yoke-derive, whose newest release declares no
+# rust-version and needs Rust 1.87, so the MSRV-aware resolver cannot keep a
+# 1.85 build working with it; this backend is also some fifteen crates
+# lighter.
+idna_adapter = { version = "~1.1", optional = true }
+sha2 = { version = "0.11", optional = true }
+hmac = { version = "0.13", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full", "test-util"] }
+flate2 = "1.0.35"
+sha2 = "0.11"
+# A certificate made at run time and a TLS server, for the test that an
+# untrusted certificate is refused. rcgen 0.14 needs Rust 1.88.
+rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["aws_lc_rs", "tls12"] }
 
 [[test]]
 name = "store"
 required-features = ["storetest"]
+
+[[test]]
+name = "alerts"
+required-features = ["alerts", "triage"]
 
 [package.metadata.docs.rs]
 all-features = true

@@ -1,14 +1,20 @@
 //! Replays `conformance/*.json`, the cases `scripts/conformance.mjs` writes
 //! by running the TypeScript SDK. `evaluate`, `format` and `health` are
-//! replayed here, `duration` and `schedule` by the schedule module, `output`
-//! by the output module, and `store.json` against every store (the
+//! replayed here, `channels` with the `alerts` feature and `triage` with the
+//! `triage` feature, `duration` and `schedule` by the schedule module,
+//! `output` by the output module, `store.json` against every store (the
 //! `storetest` feature's replay, run over the memory store here and over
-//! SQLite in `cronwatch-sqlx`). This module holds what those tests share, and
-//! fails when the SDK writes a fixture this port does not know.
+//! every SQL store in `cronwatch-sqlx`), and `pgcron.json` by
+//! `cronwatch-sqlx`'s pg_cron source. This module holds what those tests
+//! share, and fails when the SDK writes a fixture this port does not know.
 
+#[cfg(feature = "alerts")]
+mod channels;
 mod evaluate;
 mod format;
 mod health;
+#[cfg(feature = "triage")]
+mod triage;
 
 use std::path::PathBuf;
 
@@ -16,13 +22,31 @@ use crate::js::{self, Object, Value};
 use crate::jsre::Regexp;
 use crate::serialize::{ExpectRule, Matcher};
 
-/// The fixtures the workspace replays.
-const REPLAYED: [&str; 7] = ["duration", "evaluate", "format", "health", "output", "schedule", "store"];
+/// The fixtures the workspace replays: every one the SDK writes. A new
+/// fixture fails the test below until it is placed.
+const REPLAYED: [&str; 10] =
+    ["channels", "duration", "evaluate", "format", "health", "output", "pgcron", "schedule", "store", "triage"];
 
-/// The fixtures of later phases, not replayed yet: the alert channels,
-/// triage and the pg_cron source come in phase 2. Named here so the list
-/// stays honest: a new fixture fails the test below until it is placed.
-const NOT_YET: [&str; 3] = ["channels", "pgcron", "triage"];
+/// SHA-256 as lowercase hex, for the fixtures' digests of long texts.
+#[cfg(any(feature = "alerts", feature = "triage"))]
+pub(crate) fn sha256_hex(data: &[u8]) -> String {
+    use sha2::Digest;
+    use std::fmt::Write;
+    sha2::Sha256::digest(data).iter().fold(String::new(), |mut s, b| {
+        let _ = write!(s, "{b:02x}");
+        s
+    })
+}
+
+/// The fixtures' form of a request body: itself up to 400 UTF-16 code
+/// units, else its length and the SHA-256 of its UTF-8.
+#[cfg(any(feature = "alerts", feature = "triage"))]
+pub(crate) fn digest(s: &str) -> Value {
+    if js::len16(s) <= 400 {
+        return Value::Object(Object::new().with("text", s));
+    }
+    Value::Object(Object::new().with("length", js::len16(s)).with("sha256", sha256_hex(s.as_bytes())))
+}
 
 /// The repository's `conformance/` directory.
 pub(crate) fn conformance_dir() -> PathBuf {
@@ -120,7 +144,7 @@ fn conformance_fixtures_are_replayed() {
         .expect("conformance/")
         .filter_map(|e| e.ok()?.file_name().into_string().ok())
         .filter_map(|name| name.strip_suffix(".json").map(str::to_string))
-        .filter(|name| !REPLAYED.contains(&name.as_str()) && !NOT_YET.contains(&name.as_str()))
+        .filter(|name| !REPLAYED.contains(&name.as_str()))
         .collect();
     unknown.sort();
     assert!(unknown.is_empty(), "conformance/ has fixtures this port does not replay: {unknown:?}");

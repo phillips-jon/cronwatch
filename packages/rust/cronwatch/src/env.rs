@@ -25,3 +25,12 @@ pub(crate) fn environment() -> String {
     }
     String::new()
 }
+
+/// Claude triage's API key and base URL, from the variables the official
+/// Anthropic client reads: `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL`,
+/// `""` when unset.
+#[cfg(feature = "triage")]
+pub(crate) fn anthropic() -> (String, String) {
+    let read = |name: &str| std::env::var(name).unwrap_or_default();
+    (read("ANTHROPIC_API_KEY"), read("ANTHROPIC_BASE_URL"))
+}
