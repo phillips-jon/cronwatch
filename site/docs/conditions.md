@@ -50,7 +50,17 @@ All breaching metrics are listed in one alert. Closes when a run's metrics are a
 
 A run succeeded and no condition remains open. The message names everything that alerted and has cleared since the last recovery, for example "after: missed, failed". A condition that closed while another stayed open waits for this message, so every alert is answered by a recovery once the job is healthy again.
 
-One recovery comes from a check rather than a run. When a job with missed open no longer has a schedule (it was declared again without one, or the [pg_cron reader](/docs/supabase/) retired a job that was renamed, unscheduled or paused), nothing is due any more, so the next check closes missed and sends a recovered alert titled "nightly is no longer scheduled", with the message "Missed since 2026-01-05 03:15:00 UTC (6h ago). It has no schedule now, so nothing is due; the missed alert is closed." Its details are `{ after: ["missed"], reason: "unscheduled", since }`, where `since` is when missed opened. It answers missed alone: failed, stuck, slow and over budget stay open until a successful run closes them, and that run's recovery names them but not missed again. Channels treat it like any recovery (Twilio, Honeybadger and Bugsnag send it only with `recovered: true`). While the job is silenced, missed closes without a message.
+One recovery comes from a check rather than a run. When a job with missed open no longer has a schedule (it was declared again without one, or the [pg_cron reader](/docs/supabase/) retired a job that was renamed, unscheduled or paused), nothing is due any more, so the next check closes missed and sends a recovered alert:
+
+```text
+nightly is no longer scheduled
+Missed since 2026-01-05 03:15:00 UTC (6h ago). It has no schedule now, so nothing is due; the missed alert is closed.
+```
+
+- Its details are `{ after: ["missed"], reason: "unscheduled", since }`, where `since` is when missed opened.
+- It answers missed alone. Failed, stuck, slow and over budget stay open until a successful run closes them, and that run's recovery names them but not missed again.
+- Channels treat it like any recovery (Twilio, Honeybadger and Bugsnag send it only with `recovered: true`).
+- While the job is silenced, missed closes without a message.
 
 ## expect rules
 
@@ -62,7 +72,7 @@ cw.job("export", { expect: /wrote \d+ files/ });             // or match the pat
 cw.job("export", { expect: (out) => out.split("\n").length > 3 });   // or pass a function
 ```
 
-In Ruby, `expect:` takes a string, a `Regexp` or a callable in the same way.
+Every port takes the same three forms in its own language: a string, a pattern (a Ruby `Regexp`, a Python `re.Pattern`, and so on) or a function. Each language's page has the spelling.
 
 A pattern runs in your own process, on the platform's engine, and like an `expect` function it has no time limit in Node or Python. Most engines backtrack, so a pattern with several unbounded repeats that can match the same text (`/\n*\n*\n*x/`, `/(a+)+b/`, or even `/.*x/`) can take seconds or longer on an output that almost matches but does not. Anchor a pattern where you can, avoid a repeat next to or inside another over the same characters, and prefer a plain string when a substring will do. The other ports bound it where their engine allows, and a pattern that runs out of its bound counts as not matching, so the run fails with the usual `Output did not match` message: Ruby gives each match a one second timeout, PHP stops at PCRE's backtrack limit (`pcre.backtrack_limit`) and adds its reason, `(Backtrack limit exhausted)`, and Rust stops a pattern it reads back from another process's stored definition after ten million steps. Go's `regexp` and Rust's `regex` crate run in linear time and need no bound.
 
@@ -72,11 +82,11 @@ Baselines use the last twenty successful runs, reading past any failures in betw
 
 ## Silence
 
-`cw.silence(name, "2h")` (in Ruby, `silence(name, for: "2h")`), the dashboard button, or the MCP tool. While silenced, nothing new is recorded as an incident and no alerts are sent; conditions that clear during the silence do clear. When the silence ends, the next problem alerts normally.
+`cw.silence(name, "2h")` (every port has the same call in its own spelling, such as `silence(name, for: "2h")` in Ruby), the dashboard button, or the MCP tool. While silenced, nothing new is recorded as an incident and no alerts are sent; conditions that clear during the silence do clear. When the silence ends, the next problem alerts normally.
 
 ## Output and metrics
 
-Output, whether logged or returned, and errors are capped at 16 KB per run, keeping the tail. Before either is stored, values that look like secrets are replaced with `[redacted]`: `password=`, `api_key:`, `:secret => "..."` and similar pairs (quoted values in full), credentials in URLs, `Bearer`, `Basic` and `Token` authorization values, PEM private keys, JWTs, Slack and Discord webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats. NUL bytes are removed. `expect` rules see the output before redaction. Pass `redact` to `cronwatch()` (or `Cronwatch.new`, or `c.redact` in `Cronwatch.configure`) to use your own function, or `false` to turn it off. Metrics are numbers keyed by name; report as many as you like. Both are stored with the run, shown on the dashboard and in alerts, and handed to the MCP server and to triage.
+Output, whether logged or returned, and errors are capped at 16 KB per run, keeping the tail. Before either is stored, values that look like secrets are replaced with `[redacted]`: `password=`, `api_key:`, `:secret => "..."` and similar pairs (quoted values in full), credentials in URLs, `Bearer`, `Basic` and `Token` authorization values, PEM private keys, JWTs, Slack and Discord webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats. NUL bytes are removed. `expect` rules see the output before redaction. Pass `redact` to `cronwatch()` to use your own function, or `false` to turn it off. Every port blanks the same patterns by default and has the same option in its own spelling (`redact:` in Ruby, `WithRedact` in Go, and so on). Metrics are numbers keyed by name; report as many as you like. Both are stored with the run, shown on the dashboard and in alerts, and handed to the MCP server and to triage.
 
 ## Runs that span calls
 

@@ -6,7 +6,7 @@ order: 11
 
 # AI triage
 
-When an alert is about to be sent, CronWatch can hand the alert, the job definition, the triggering run's error, output tail and metrics, and the last few runs to Claude, and attach two to four sentences: the likely cause and the first thing to check. The diagnosis appears in the Slack or Discord message, the webhook payload, and the console.
+When an alert is about to be sent, CronWatch can hand the alert, the job definition, the triggering run's error, output tail and metrics, and the last few runs to Claude, and attach two to four sentences: the likely cause and the first thing to check. The diagnosis appears in every built-in channel: the Slack and Discord messages, the webhook payload, every email, SMS and error tracker channel, and the console. It is the alert's `triage` field, so a custom channel can show it too.
 
 ```ts
 import { anthropic } from "@cronwatch/sdk/anthropic";

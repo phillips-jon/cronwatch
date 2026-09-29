@@ -57,23 +57,25 @@ For a local app in development without `CRONWATCH_TOKEN`, the app makes a token 
 
 `--url` and `--token` work as flags too, but a flag is visible to anyone who can list processes, so keep the token in the environment.
 
+Use an `https` URL. The server sends the token with every request, so over plain `http` it travels unencrypted; for an `http` URL whose host is not `localhost`, `127.0.0.1` or `[::1]` the server prints a warning to stderr when it starts, and carries on.
+
 ## Tools
 
 | Tool | Does |
 |---|---|
 | `list_jobs` | every job with health, schedule, last run and next due. The place to start. |
-| `get_job` | one job in detail: definition, open conditions, and recent runs with errors, output tails and metrics |
+| `get_job` | one job in detail: definition, open conditions, and recent runs with errors, output tails and metrics. Takes `name` and `runs`, how many recent runs to include: 1 to 100, 10 by default |
 | `run_check` | look for missed and stuck runs now and send due alerts |
-| `silence_job` | stop alerts for a duration, for example during a fix |
-| `unsilence_job` | resume them |
-| `forget_job` | remove a job that no longer exists in the code |
-| `get_setup_guide` | the TypeScript code to add CronWatch to a job, so the agent writes it correctly (for Rails, point it at [Ruby on Rails](/docs/rails/)) |
+| `silence_job` | stop alerts for a while, for example during a fix. Takes `name` and `for`, a duration such as `"30m"`, `"2h"` or `"1d"`; one hour by default |
+| `unsilence_job` | resume them. Takes `name` |
+| `forget_job` | remove a job that no longer exists in the code, with its runs. Takes `name`. A job still declared in code comes back on its next run |
+| `get_setup_guide` | the TypeScript code to add CronWatch to a job, so the agent writes it correctly. For another language, point the agent at that language's page instead: [Rails](/docs/rails/), [Ruby](/docs/ruby/), [Django](/docs/django/), [Python](/docs/python/), [PHP](/docs/php/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Go](/docs/go/) or [Rust](/docs/rust/) |
 
 The tools return prose an agent can act on, not raw JSON. A typical exchange: "why did invoice-run fail last night" becomes `get_job`, a read of the error and the earlier runs, and a suggested fix in your code.
 
 ## Security
 
-The token gives the agent everything the dashboard can do. Give it a dedicated app deployment or accept that an agent can silence and forget jobs. Run history includes whatever your jobs logged; if that is sensitive, log less.
+The token gives the agent everything the dashboard can do, including silencing and forgetting jobs; there is no read-only token. Give the MCP server the token only where you are content for the agent to do those things. Run history includes whatever your jobs logged, so the agent reads that too; if it is sensitive, log less.
 
 ## The agent skill
 
