@@ -1,0 +1,47 @@
+[package]
+name = "cronwatch-apalis"
+description = "CronWatch for apalis: each attempt of a worker's jobs recorded as a run, and apalis-cron on CronWatch's own schedules"
+readme = "README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["cron", "monitoring", "apalis", "queue", "jobs"]
+categories.workspace = true
+include = ["src/**/*", "!src/**/tests.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[features]
+# Schedules of the `cron` crate's, which apalis-cron runs itself, declared
+# once checked against the crate's own fire times.
+cron = ["dep:cron", "dep:chrono", "dep:chrono-tz", "apalis-cron/cron"]
+
+# apalis 1.0 is at release candidates, which change their API between one
+# and the next, so each is pinned exactly: the integration is built and
+# tested against apalis-core 1.0.0-rc.10 and apalis-cron 1.0.0-rc.9.
+[dependencies]
+cronwatch.workspace = true
+apalis-core = { version = "=1.0.0-rc.10", default-features = false }
+apalis-cron = { version = "=1.0.0-rc.9", default-features = false }
+tower-layer = "0.3.3"
+tower-service = "0.3.3"
+tokio = { version = "1.43", default-features = false, features = ["time"] }
+cron = { version = "0.16", optional = true }
+chrono = { version = "0.4.45", default-features = false, features = ["clock"], optional = true }
+chrono-tz = { version = "0.10.4", optional = true }
+
+[dev-dependencies]
+apalis = "=1.0.0-rc.10"
+# apalis's Postgres storage, for the tests that run when CRONWATCH_TEST_PG
+# is set; it brings sqlx 0.9, which needs Rust 1.94.
+apalis-postgres = "=1.0.0-rc.9"
+tokio = { version = "1.43", features = ["full", "test-util"] }
+sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio"] }
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true
