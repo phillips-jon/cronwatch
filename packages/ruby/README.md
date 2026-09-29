@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your Ruby or Rails app. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make.
 
-This is the Ruby port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Ruby process and a Node process can share one database, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against either.
+This is the Ruby port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Ruby process can share one database with a Node, Python, PHP, Go or Rust process, and [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against any of them.
 
 Docs: [cronwatch.dev/docs/rails](https://cronwatch.dev/docs/rails/) and [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/)
 
@@ -20,13 +20,13 @@ Ruby 3.2 or newer; the Rails integration is tested on Rails 7.2, 8.0 and 8.1. Th
 | `cronwatch` | the client, the memory store, and the Slack, Discord, webhook, console, email (Resend, Postmark, SendGrid, Mailgun, SES), Twilio and error tracker (Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, New Relic) channels | |
 | `cronwatch/pg_cron` | `Cronwatch::Sources::PgCron`, which watches pg_cron jobs through an ActiveRecord or pg connection | |
 | `cronwatch/active_record` | the ActiveRecord store | `activerecord` |
-| `cronwatch/rails` | the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, the `cronwatch:check` task, the install generator | `railties`, `activejob` |
+| `cronwatch/rails` | the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, `Cronwatch::Web`, the `cronwatch:check` task, the install generator | `railties`, `activejob` |
 | `cronwatch/sidekiq` | `Cronwatch::Sidekiq` for `Sidekiq::Job` classes, its server middleware, `Cronwatch::Sidekiq::CheckWorker` | `sidekiq` 7 or newer |
 | `cronwatch/scheduler` | schedules read from Solid Queue's or sidekiq-cron's config, `Cronwatch.declare_from_scheduler!` | |
 | `cronwatch/web` | the dashboard and JSON API as a Rack app | `rack` |
 | `cronwatch/triage/anthropic` | Claude triage | `anthropic` |
 
-In a Rails app, `gem "cronwatch"` also loads `cronwatch/rails` and `cronwatch/scheduler` (Bundler requires it after Rails), `cronwatch/sidekiq` when Sidekiq is in the bundle, and the ActiveRecord store on first use. `cronwatch/web` and `cronwatch/triage/anthropic` are always required by hand.
+In a Rails app, `gem "cronwatch"` also loads `cronwatch/rails`, `cronwatch/web` and `cronwatch/scheduler` (Bundler requires it after Rails), `cronwatch/sidekiq` when Sidekiq is in the bundle, and the ActiveRecord store on first use. `cronwatch/triage/anthropic` is always required by hand, and so is `cronwatch/web` outside Rails.
 
 ## Plain Ruby
 
@@ -64,7 +64,7 @@ run.finish                          # or run.fail(error); finish("text") and fin
 
 Neither raises for the store: failures go to `on_error`, and a finish of a run already finished, not found, or of another job records nothing and returns nil. A run is judged once, however many processes finish it at once, and a store that fails during `finish` leaves the handle active to finish again. A run never finished is marked stuck after the job's `timeout`.
 
-Client options: `store`, `alerts`, `triage`, `cron_secret`, `retention` (default `"30d"`), `defaults`, `redact` (default: blank values that look like secrets; `false` keeps output as logged, or pass a callable), `deliver` (`:now` by default; `:check` queues alerts for another process's check to send, for a worker that cannot reach Slack), `on_error` and `now`. Methods: `job`, `run`, `resume_run`, `check`, `start`/`stop`, `silence(name, for: "2h")`/`unsilence`, `forget`, `jobs`, `jobs_with_runs`, `job_summary`, `runs`, `get_run`, `defined_jobs`, `close`. [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/#api) has each one.
+Client options: `store`, `alerts`, `triage`, `cron_secret`, `retention` (default `"30d"`), `defaults`, `sources` (where runs the process does not wrap come from, such as pg_cron), `redact` (default: blank values that look like secrets; `false` keeps output as logged, or pass a callable), `deliver` (`:now` by default; `:check` queues alerts for another process's check to send, for a worker that cannot reach Slack), `on_error` and `now`. Methods: `job`, `run`, `resume_run`, `record_run`, `check`, `start`/`stop`, `silence(name, for: "2h")`/`unsilence`, `forget`, `jobs`, `jobs_with_runs`, `job_summary`, `runs`, `get_run`, `defined_jobs`, `close`. [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/#api) has each one.
 
 ## Rails
 
@@ -130,7 +130,7 @@ reads the class's one entry in Solid Queue's `config/recurring.yml` (the section
 
 ### Scheduling the check
 
-Failures are caught as they happen, but a run that never started or never finished can only be noticed by looking. `Cronwatch::CheckJob` looks: it loads `app/jobs` (and `app/workers`) when the app does not eager load, declares every monitored job and runs the check. Run it every five minutes.
+Failures are caught as they happen, but a run that never started or never finished can only be noticed by looking. `Cronwatch::CheckJob` looks: it loads `app/jobs` (and `app/workers` and `app/sidekiq`) when the app does not eager load, declares every monitored job and runs the check. Run it every five minutes.
 
 Solid Queue:
 
@@ -168,7 +168,7 @@ Rails.application.routes.draw do
 end
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie. Without a token, while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, it makes a token of its own and prints a sign-in link to standard output on its first request (open it once; unless `origin:` is set or the request's host is loopback, the link leaves the host out, since a client chooses it); anywhere else it answers 503. To rely on the app's own sign in, mount it behind that (Devise's `authenticate` block, or a routing constraint) and pass `token: nil`. The URLs, JSON shapes, headers and CSRF rules are the SDK's, so the MCP server reads it unchanged. The request's origin, which the CSRF check compares against, is what Rack reports and so already follows `X-Forwarded-Host` and `X-Forwarded-Proto`; pass `origin: "https://app.example.com"` to pin it instead. `GET /cronwatch/api/check` with a bearer (the token or `CRON_SECRET`) runs the check, for an outside cron.
+Set `CRONWATCH_TOKEN` to a long random string and open `/cronwatch?token=<it>` once; the browser keeps a cookie. Without a token, while the environment (`Rails.env`, else `RAILS_ENV` or `RACK_ENV`) is `development` or `test`, it makes a token of its own and prints a sign-in link to standard output on its first request (open it once; unless `origin:` is set or the request's host is loopback, the link leaves the host out, since a client chooses it); anywhere else it answers 503. To rely on the app's own sign in, mount it behind that (Devise's `authenticate` block, or a routing constraint) and pass `token: nil`. The URLs, JSON shapes, headers and CSRF rules are the SDK's, so the MCP server reads it unchanged. The request's origin, which the CSRF check compares against, is what Rack reports and so already follows `X-Forwarded-Host` and `X-Forwarded-Proto`; pass `origin: "https://app.example.com"` to pin it instead. `GET /cronwatch/api/check` with a bearer (the token or `CRON_SECRET`) runs the check, for an outside cron.
 
 There is no `handler()` as in the TypeScript SDK: for a job triggered over HTTP, wrap the controller action's body in `CW.job(...).run` (declared once, at boot) and check the bearer in the controller.
 
@@ -225,7 +225,7 @@ Adds two to four sentences from Claude (likely cause, first thing to check) to e
 
 ## Sharing a database with a Node app
 
-The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: same names, columns and indexes, epoch milliseconds in the time columns, the SDK's camelCase JSON in the JSON columns. [`test/active_record/node_compat_test.rb`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/active_record/node_compat_test.rb) runs the SDK's stores in Node beside this one, on SQLite and Postgres, and checks that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes. Use the same prefix on both sides and give each job a name only one side uses. Then one dashboard, Rails or Node, shows every job, and one MCP server reads them all.
+The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: same names, columns and indexes, epoch milliseconds in the time columns, the SDK's camelCase JSON in the JSON columns. [`test/active_record/node_compat_test.rb`](https://github.com/phillips-jon/cronwatch/blob/main/packages/ruby/test/active_record/node_compat_test.rb) runs the SDK's stores in Node beside this one, on SQLite and Postgres, and checks that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes. Use the same prefix on both sides and give each job a name only one side uses. Then one dashboard, Rails or Node, shows every job, and one MCP server reads them all. The Python, PHP, Go and Rust ports keep the same tables too, so a process in any of them can share the database the same way.
 
 ## Kept in step with the TypeScript SDK
 
