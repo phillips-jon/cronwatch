@@ -28,7 +28,7 @@ use jiff::tz::TimeZone;
 
 use date::Date;
 pub(crate) use pattern::{Error, Pattern};
-pub(crate) use zone::{load_zone, offset};
+pub(crate) use zone::{load_zone, offset, wall_at};
 
 /// What the schedule uses of croner's Cron: an expression that schedules
 /// nothing and only answers `next_runs`.

@@ -92,12 +92,16 @@ async fn a_run_given_back_is_taken_back() {
     let panicked = tokio::spawn({
         let job = job.clone();
         async move {
-            job.run_or_discard(RunOptions::new(), |_: &Attempt| true, |_| async {
-                if true {
-                    panic!("snoozed");
-                }
-                Ok::<(), Attempt>(())
-            })
+            job.run_or_discard(
+                RunOptions::new(),
+                |_: &Attempt| true,
+                |_| async {
+                    if true {
+                        panic!("snoozed");
+                    }
+                    Ok::<(), Attempt>(())
+                },
+            )
             .await
         }
     })
@@ -149,9 +153,11 @@ async fn a_predicate_that_panics_is_reported_and_the_run_recorded() {
     let k = Kit::new();
     let job = k.cw.job("q", JobOptions::new()).unwrap();
     let err = job
-        .run_or_discard(RunOptions::new(), |_: &Attempt| panic!("predicate broke"), |_| async {
-            Err::<(), _>(Attempt::Down("later"))
-        })
+        .run_or_discard(
+            RunOptions::new(),
+            |_: &Attempt| panic!("predicate broke"),
+            |_| async { Err::<(), _>(Attempt::Down("later")) },
+        )
         .await;
     assert_eq!(err, Err(Attempt::Down("later")));
     assert_eq!(k.runs("q").await[0].status, RunStatus::Failed);

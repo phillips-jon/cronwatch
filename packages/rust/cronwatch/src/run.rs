@@ -401,7 +401,13 @@ impl Client {
     /// is the function's own outcome. `discard`, when given, says which
     /// returned errors take the run back rather than finish it
     /// (`Job::run_or_discard`).
-    async fn execute<F, Fut, T, E, D>(&self, def: Arc<JobDef>, trigger: String, discard: Option<D>, f: F) -> Result<T, E>
+    async fn execute<F, Fut, T, E, D>(
+        &self,
+        def: Arc<JobDef>,
+        trigger: String,
+        discard: Option<D>,
+        f: F,
+    ) -> Result<T, E>
     where
         F: FnOnce(JobContext) -> Fut,
         Fut: Future<Output = Result<T, E>>,
@@ -484,8 +490,7 @@ impl Client {
                     if self.given_back(&def.name, discard, &err) {
                         let client = self.clone();
                         let run = run.clone();
-                        let task =
-                            self.inner.handle.spawn(async move { !recorded || client.discard_run(&run).await });
+                        let task = self.inner.handle.spawn(async move { !recorded || client.discard_run(&run).await });
                         if task.await.unwrap_or(false) {
                             return Err(err);
                         }

@@ -467,15 +467,14 @@ impl Regexp {
     }
 
     /// Whether the pattern matches anywhere in the units.
-    #[cfg(test)]
     pub(crate) fn is_match_units(&self, input: &[u16]) -> bool {
         self.exec(&mut self.matcher(input), 0)
     }
 
-    /// Whether the pattern matches anywhere in `s`.
-    #[cfg(test)]
+    /// Whether the pattern matches anywhere in `s` (a stored expect pattern
+    /// read back by `bridge::options_of`).
     pub(crate) fn is_match(&self, s: &str) -> bool {
-        self.is_match_units(&js::units(s))
+        self.is_match_units(&crate::js::units(s))
     }
 
     /// `String.prototype.replace` with a function: each match (every one

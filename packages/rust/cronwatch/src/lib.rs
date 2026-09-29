@@ -34,6 +34,7 @@
 //! ```
 #![forbid(unsafe_code)]
 
+pub mod bridge;
 mod check;
 mod client;
 #[cfg(test)]
