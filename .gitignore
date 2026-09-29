@@ -12,3 +12,6 @@ data/
 site/dist/
 .release-ok
 *.tgz
+
+# Local notes and keys, never committed
+/files/
