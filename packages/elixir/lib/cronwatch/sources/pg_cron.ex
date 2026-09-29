@@ -356,15 +356,10 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       if String.starts_with?(id, id_prefix) do
         rest = id |> binary_part(byte_size(id_prefix), byte_size(id) - byte_size(id_prefix)) |> JS.trim()
 
-        cond do
-          rest == "" ->
-            0
-
-          true ->
-            case Float.parse(rest) do
-              {n, ""} when n == trunc(n) and abs(n) <= 9_007_199_254_740_991 -> trunc(n)
-              _ -> nil
-            end
+        case {rest, Float.parse(rest)} do
+          {"", _} -> 0
+          {_, {n, ""}} when n == trunc(n) and abs(n) <= 9_007_199_254_740_991 -> trunc(n)
+          _ -> nil
         end
       end
     end
@@ -407,7 +402,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       repo = o[:repo]
 
       cond do
-        not (is_atom(repo) and repo != nil and Code.ensure_loaded?(repo) and function_exported?(repo, :__adapter__, 0)) ->
+        not ecto_repo?(repo) ->
           raise Error.invalid("Cronwatch.Sources.PgCron needs :repo, an Ecto repo over Postgres (got #{inspect(repo)})")
 
         repo.__adapter__() != Ecto.Adapters.Postgres ->
@@ -419,6 +414,9 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
           repo
       end
     end
+
+    defp ecto_repo?(repo),
+      do: is_atom(repo) and repo != nil and Code.ensure_loaded?(repo) and function_exported?(repo, :__adapter__, 0)
 
     # Runs `fun` with the repo put, from a task when the calling process is
     # inside a transaction of the repo, so the source never reads inside (or
@@ -813,7 +811,8 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       end
 
       open = MapSet.new(Map.keys(st().pending) ++ Map.keys(st().held))
-      {alerts, open, complete} = pages(o, c, order, names, id_prefix, now, alerts, open, 0)
+      page = %{o: o, c: c, order: order, names: names, id_prefix: id_prefix, now: now}
+      {alerts, open, complete} = pages(page, alerts, open, 0)
 
       # Every row was read and these were not among them: pg_cron no longer
       # has them.
@@ -826,9 +825,9 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       alerts
     end
 
-    defp pages(_o, _c, _order, _names, _id_prefix, _now, alerts, open, @max_pages), do: {alerts, open, false}
+    defp pages(_p, alerts, open, @max_pages), do: {alerts, open, false}
 
-    defp pages(o, c, order, names, id_prefix, now, alerts, open, page) do
+    defp pages(%{o: o, c: c, order: order, names: names, id_prefix: id_prefix, now: now} = p, alerts, open, page) do
       afters = Enum.map(order, &Map.get(st().cursors, &1, 0))
       params = [array_of(order), array_of(afters), array_of(Enum.sort(MapSet.to_list(open)))]
       found = query!(o, @runs_sql, params)
@@ -851,7 +850,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
       if length(found) < @page,
         do: {alerts, open, true},
-        else: pages(o, c, order, names, id_prefix, now, alerts, open, page + 1)
+        else: pages(p, alerts, open, page + 1)
     end
 
     defp first_sight(o, c, jobid, names, id_prefix, now) do

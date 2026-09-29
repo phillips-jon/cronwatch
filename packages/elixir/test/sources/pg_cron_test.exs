@@ -140,6 +140,7 @@ defmodule Cronwatch.Sources.PgCronTest do
   alias Cronwatch.Test.Clock
   alias Cronwatch.Test.Conformance
   alias Cronwatch.Test.FakeCron
+  alias Cronwatch.Test.Repo
   alias Cronwatch.Test.Stores
 
   @t0 Clock.t0()
@@ -521,11 +522,14 @@ defmodule Cronwatch.Sources.PgCronTest do
     k = kit(cron, clock: Clock.new(), colour: "red")
     check(k)
     assert Enum.join(messages(k.errors), "\n") =~ "Cronwatch.Sources.PgCron: unknown option :colour"
-    assert Cronwatch.Test.Client.wheres(k.errors) == ["source pg_cron"]
+    assert wheres(k.errors) == ["source pg_cron"]
 
-    k = make(sources: [{PgCron, repo: Cronwatch.Test.Repo}])
+    k = make(sources: [{PgCron, repo: Repo}])
     check(k)
-    assert Enum.join(messages(k.errors), "\n") =~ "needs a Postgres repo: Cronwatch.Test.Repo uses Ecto.Adapters.SQLite3"
+
+    assert Enum.join(messages(k.errors), "\n") =~
+             "needs a Postgres repo: Cronwatch.Test.Repo uses Ecto.Adapters.SQLite3"
+
     k = make(sources: [{PgCron, []}])
     check(k)
     assert Enum.join(messages(k.errors), "\n") =~ "needs :repo"
