@@ -113,7 +113,7 @@ const PUBLISH = [
   // need no tag of their own. Published by hand for now (packages/rust/DESIGN.md,
   // Crate name and releases); Cargo 1.90 or newer publishes a workspace's
   // crates in dependency order.
-  { dir: "packages/rust", commands: () => ["(cd packages/rust && cargo publish --workspace)"] },
+  { dir: "packages/rust", commands: (v) => [`# packages/rust: the pushed tag v${v} is published to crates.io by .github/workflows/crates.yml (trusted publishing, once CRATES_ENABLED is true); by hand, (cd packages/rust && cargo publish --workspace --exclude cronwatch-webserver --exclude crontab)`] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */
