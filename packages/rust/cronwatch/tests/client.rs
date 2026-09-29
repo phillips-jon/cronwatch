@@ -98,8 +98,16 @@ async fn run_declares_on_first_use_and_options_are_validated() {
     k.cw.run("adhoc", Some(JobOptions::new().schedule("every 5m")), ok_job).await.unwrap().unwrap();
     assert_eq!(k.cw.jobs().await.unwrap().len(), 1);
     let cases: [(&str, JobOptions, &str); 4] = [
-        ("bad name!", JobOptions::new(), r#"job name "bad name!" must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-""#),
-        ("x", JobOptions::new().schedule("nope"), r#"schedule "nope" is not a cron expression or "every <duration>": "#),
+        (
+            "bad name!",
+            JobOptions::new(),
+            r#"job name "bad name!" must be 1 to 120 characters of letters, digits, ".", "_", ":" or "-""#,
+        ),
+        (
+            "x",
+            JobOptions::new().schedule("nope"),
+            r#"schedule "nope" is not a cron expression or "every <duration>": "#,
+        ),
         ("x", JobOptions::new().grace("soon"), r#"grace "soon" is not a duration like "15m", "1h30m" or "90s""#),
         ("x", JobOptions::new().timezone("Mars/Base"), r#"job "x": timezone "Mars/Base" is not an IANA timezone"#),
     ];
@@ -146,7 +154,10 @@ async fn a_job_declared_again_without_its_schedule_closes_missed() {
         "Missed since 2026-01-05 10:40:00 UTC (1m ago). It has no schedule now, so nothing is due; the missed alert is closed."
     );
     let json = a.to_json();
-    assert!(json.contains(r#""details":{"after":["missed"],"reason":"unscheduled","since":1767609600001},"job""#), "{json}");
+    assert!(
+        json.contains(r#""details":{"after":["missed"],"reason":"unscheduled","since":1767609600001},"job""#),
+        "{json}"
+    );
     assert_eq!(r.jobs[0].health, JobHealth::NeverRan);
     assert!(k.check().await.alerts.is_empty(), "no repeat");
     job.run(ok_job).await.unwrap();

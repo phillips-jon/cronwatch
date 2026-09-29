@@ -430,6 +430,13 @@ impl RunHandle {
         self.finish_inner(None, Some(error_text(err))).await
     }
 
+    /// `fail` for an error already written out, with its type's name: the
+    /// blocking client's.
+    #[cfg(feature = "blocking")]
+    pub(crate) async fn fail_named(&self, type_name: &str, message: &str) -> Option<Run> {
+        self.finish_inner(None, Some(output::error_message(output::error_name(type_name), message, &[]))).await
+    }
+
     async fn finish_inner(&self, result_text: Option<String>, failure: Option<String>) -> Option<Run> {
         let h = &self.inner;
         let was_inactive = {

@@ -323,13 +323,14 @@ impl Job {
     /// an expect rule checks). A panic in `f` is recorded as a failed run and
     /// then resumed. Dropping the returned future while `f` runs records the
     /// run as failed; dropping it after `f` returned leaves the recording to
-    /// finish in a task of its own.
+    /// finish in a task of its own. The returned future is `Send` when `f`'s
+    /// future, `T` and `E` are, so it can be spawned.
     pub async fn run<F, Fut, T, E>(&self, f: F) -> Result<T, E>
     where
         F: FnOnce(JobContext) -> Fut,
-        Fut: Future<Output = Result<T, E>> + Send,
-        T: Send + 'static,
-        E: fmt::Display + Send,
+        Fut: Future<Output = Result<T, E>>,
+        T: 'static,
+        E: fmt::Display,
     {
         self.run_with(RunOptions::new(), f).await
     }
@@ -338,9 +339,9 @@ impl Job {
     pub async fn run_with<F, Fut, T, E>(&self, options: RunOptions, f: F) -> Result<T, E>
     where
         F: FnOnce(JobContext) -> Fut,
-        Fut: Future<Output = Result<T, E>> + Send,
-        T: Send + 'static,
-        E: fmt::Display + Send,
+        Fut: Future<Output = Result<T, E>>,
+        T: 'static,
+        E: fmt::Display,
     {
         let trigger = options.trigger.unwrap_or_else(|| "run".into());
         self.client.execute(self.def.clone(), trigger, f).await
@@ -358,9 +359,9 @@ impl Client {
     ) -> Result<Result<T, E>, Error>
     where
         F: FnOnce(JobContext) -> Fut,
-        Fut: Future<Output = Result<T, E>> + Send,
-        T: Send + 'static,
-        E: fmt::Display + Send,
+        Fut: Future<Output = Result<T, E>>,
+        T: 'static,
+        E: fmt::Display,
     {
         let def = match (options, self.declared(name)) {
             (None, Some(def)) => def,
@@ -375,9 +376,9 @@ impl Client {
     async fn execute<F, Fut, T, E>(&self, def: Arc<JobDef>, trigger: String, f: F) -> Result<T, E>
     where
         F: FnOnce(JobContext) -> Fut,
-        Fut: Future<Output = Result<T, E>> + Send,
-        T: Send + 'static,
-        E: fmt::Display + Send,
+        Fut: Future<Output = Result<T, E>>,
+        T: 'static,
+        E: fmt::Display,
     {
         let started_at = self.now();
         let run = Run {

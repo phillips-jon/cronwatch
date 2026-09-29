@@ -75,7 +75,10 @@ impl Store for SharedStore {
     fn running_runs(&self) -> cronwatch::BoxFuture<'_, Result<Vec<cronwatch::Run>, cronwatch::BoxError>> {
         self.inner.running_runs()
     }
-    fn get_state<'a>(&'a self, job: &'a str) -> cronwatch::BoxFuture<'a, Result<Option<JobState>, cronwatch::BoxError>> {
+    fn get_state<'a>(
+        &'a self,
+        job: &'a str,
+    ) -> cronwatch::BoxFuture<'a, Result<Option<JobState>, cronwatch::BoxError>> {
         Box::pin(async move {
             let state = self.inner.get_state(job).await;
             tokio::time::sleep(Duration::from_millis(25)).await;
@@ -263,10 +266,16 @@ async fn a_check_that_panics_is_that_checks_error() {
         fn delete_job<'a>(&'a self, name: &'a str) -> cronwatch::BoxFuture<'a, Result<(), cronwatch::BoxError>> {
             self.0.delete_job(name)
         }
-        fn insert_run<'a>(&'a self, r: &'a cronwatch::Run) -> cronwatch::BoxFuture<'a, Result<(), cronwatch::BoxError>> {
+        fn insert_run<'a>(
+            &'a self,
+            r: &'a cronwatch::Run,
+        ) -> cronwatch::BoxFuture<'a, Result<(), cronwatch::BoxError>> {
             self.0.insert_run(r)
         }
-        fn update_run<'a>(&'a self, r: &'a cronwatch::Run) -> cronwatch::BoxFuture<'a, Result<(), cronwatch::BoxError>> {
+        fn update_run<'a>(
+            &'a self,
+            r: &'a cronwatch::Run,
+        ) -> cronwatch::BoxFuture<'a, Result<(), cronwatch::BoxError>> {
             self.0.update_run(r)
         }
         fn get_run<'a>(

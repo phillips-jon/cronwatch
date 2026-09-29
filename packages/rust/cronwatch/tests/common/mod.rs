@@ -247,7 +247,11 @@ impl Store for TestStore {
         }
         guarded!(self, "update_run_if", self.inner.update_run_if(run, from))
     }
-    fn compare_and_set_state<'a>(&'a self, state: &'a JobState, expected: i64) -> BoxFuture<'a, Result<bool, BoxError>> {
+    fn compare_and_set_state<'a>(
+        &'a self,
+        state: &'a JobState,
+        expected: i64,
+    ) -> BoxFuture<'a, Result<bool, BoxError>> {
         if self.no_cas {
             return Box::pin(async { Err(cronwatch::Unsupported.into()) });
         }

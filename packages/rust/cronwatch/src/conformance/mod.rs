@@ -125,3 +125,16 @@ fn conformance_fixtures_are_replayed() {
     unknown.sort();
     assert!(unknown.is_empty(), "conformance/ has fixtures this port does not replay: {unknown:?}");
 }
+
+/// The fixtures are made with `TZ=UTC`, and a schedule without a zone is read
+/// in the process's own, so the workspace's `.cargo/config.toml` sets it for
+/// every test run; this fails when something runs the tests without it.
+#[test]
+fn the_tests_run_in_utc() {
+    assert_eq!(
+        std::env::var("TZ").as_deref(),
+        Ok("UTC"),
+        "run the tests with TZ=UTC (packages/rust/.cargo/config.toml)"
+    );
+    assert_eq!(jiff::tz::TimeZone::system().to_offset(jiff::Timestamp::UNIX_EPOCH).seconds(), 0);
+}

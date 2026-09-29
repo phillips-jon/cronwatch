@@ -136,7 +136,10 @@ async fn start_with_an_id_twice_records_one_run() {
     let err = other.start(StartOptions::new().id("01HX-run")).await.unwrap_err();
     assert!(err.to_string().contains(r#"belongs to job "inngest-fn""#), "{err}");
     let err = job.start(StartOptions::new().id("")).await.unwrap_err();
-    assert_eq!(err.to_string(), r#"job "inngest-fn": start() needs a run id of 1 to 200 characters (got 0 characters)"#);
+    assert_eq!(
+        err.to_string(),
+        r#"job "inngest-fn": start() needs a run id of 1 to 200 characters (got 0 characters)"#
+    );
 }
 
 #[tokio::test]
@@ -145,7 +148,8 @@ async fn resume_in_a_second_client_appends_and_finishes() {
     let first = Kit::with(|b| b.store_arc(store.clone()));
     let second = Kit::with(|b| b.store_arc(store.clone()));
     let options = JobOptions::new().expect("sent").budget("emails", 100.0);
-    let started = first.cw.job("digest", options.clone()).unwrap().start(StartOptions::new().id("evt-1")).await.unwrap();
+    let started =
+        first.cw.job("digest", options.clone()).unwrap().start(StartOptions::new().id("evt-1")).await.unwrap();
     started.log("loaded 40 recipients");
     started.log("token=abc123");
     started.metric("recipients", 40.0).unwrap();
