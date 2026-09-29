@@ -5,6 +5,12 @@ module Cronwatch
   module Duration
     UNIT_MS = { "ms" => 1, "s" => 1000, "m" => 60_000, "h" => 3_600_000, "d" => 86_400_000, "w" => 604_800_000 }.freeze
     PART = Regexp.new("(\\d+(?:\\.\\d+)?)[#{JS::WHITESPACE}]*(ms|s|m|h|d|w)")
+    # The longest duration string read, in characters. No real duration
+    # comes near it, and PART is quadratic on a long run of digits, so a
+    # longer string is refused before it is read.
+    MAX_LENGTH = 64
+    # How much of a refused, overlong string its error quotes.
+    QUOTED = 32
 
     module_function
 
@@ -27,6 +33,10 @@ module Cronwatch
       end
       unless value.is_a?(String)
         raise ArgumentError, "#{label} \"#{value}\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+      end
+
+      if value.length > MAX_LENGTH
+        raise ArgumentError, "#{label} \"#{value[0, QUOTED]}...\" is too long for a duration (more than #{MAX_LENGTH} characters)"
       end
 
       text = JS.trim(value).downcase

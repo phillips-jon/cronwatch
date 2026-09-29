@@ -206,6 +206,11 @@ class WebOriginTest < Minitest::Test
         [{}, "http://localhost.example/cronwatch/", {}],
         [{}, "http://128.0.0.1/cronwatch/", {}],
         [{ base_path: "/" }, "http://attacker.example/", {}],
+        # Rack passes a Host header through as sent: it is read as a URL.
+        [{}, "#{INTERNAL}/cronwatch/", { "host" => "localhost:1@evil.example" }],
+        [{}, "#{INTERNAL}/cronwatch/", { "host" => "evil.example/.localhost" }],
+        [{}, "#{INTERNAL}/cronwatch/", { "x-forwarded-host" => "localhost:1@evil.example" }],
+        [{}, "#{INTERNAL}/cronwatch/", { "x-forwarded-host" => "evil.example/.localhost" }],
       ].each do |options, url, headers|
         before = $stdout
         $stdout = StringIO.new
@@ -234,12 +239,30 @@ class WebOriginTest < Minitest::Test
       ["/cronwatch", hostless],
       ["/cronwatch", hostless],
       ["", hostless],
+      ["/cronwatch", hostless],
+      ["/cronwatch", hostless],
+      ["/cronwatch", hostless],
+      ["/cronwatch", hostless],
     ]
     assert_equal expected.length, lines.length
     expected.each_with_index do |(link, tail), i|
       token = lines[i][/token=([A-Za-z0-9_-]{43})/, 1]
       assert token, lines[i]
       assert_equal "#{intro}#{link}/?token=#{token}#{tail}", lines[i], "line #{i}"
+    end
+  end
+
+  def test_only_an_origin_that_reads_as_one_is_loopback
+    %w[http://localhost http://localhost:3000 http://app.localhost https://127.0.0.1 http://127.8.9.10:1 http://[::1]:3000].each do |yes|
+      assert Cronwatch::Web.loopback_origin?(yes), yes
+    end
+    [
+      "http://localhost.example", "http://128.0.0.1", "http://127.0.0.256", "http://10.0.0.5:8080", "http://[::2]",
+      # A Host header that is not a host (the Rust audit).
+      "http://evil.example/.localhost", "http://localhost:1@evil.example", "http://evil.example?.localhost",
+      "http://evil.example#.localhost", "http://localhost:1@evil.example:80",
+    ].each do |no|
+      refute Cronwatch::Web.loopback_origin?(no), no
     end
   end
 end

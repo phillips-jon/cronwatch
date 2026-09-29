@@ -39,6 +39,33 @@ module Cronwatch
         "#{scheme}://#{host}#{port}"
       end
 
+      # scheme://host[:port] for text that is a scheme and a bare host, or nil
+      # when it carries credentials, a path, a query or a fragment, or is not
+      # an http or https URL.
+      def bare(value)
+        return nil unless value.is_a?(String)
+
+        text = value.sub(/\A[\x00-\x20]+/, "").sub(/[\x00-\x20]+\z/, "").delete("\t\n\r")
+        match = text.match(%r{\A[A-Za-z][A-Za-z0-9+.\-]*:[/\\]*([^/\\?#]*)(.*)\z}m)
+        return nil if match.nil?
+
+        userinfo, at, = match[1].rpartition("@")
+        return nil if !at.empty? && !userinfo.empty? && userinfo != ":"
+        return nil if past_host?(match[2])
+
+        parse(text)
+      rescue ArgumentError
+        nil
+      end
+
+      # Whether what follows the host would show in the URL: a path other
+      # than "/", a query or a fragment.
+      def past_host?(after)
+        path, hash, fragment = after.partition("#")
+        path, _, query = path.partition("?")
+        (!path.empty? && path != "/" && path != "\\") || !query.empty? || (!hash.empty? && !fragment.empty?)
+      end
+
       # [host, port] with the scheme's default port when none is given.
       def split_port(authority, value)
         if authority.start_with?("[")

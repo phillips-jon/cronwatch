@@ -107,8 +107,15 @@ module Cronwatch
 
     # Whether an origin's host is loopback: "localhost", a name ending in
     # ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1.
+    # Only an origin that reads as one counts: a Host header is anyone's to
+    # send, and one such as "evil.example/.localhost" or
+    # "localhost:1@evil.example" must not put the development token in a
+    # link to another host.
     def self.loopback_origin?(origin)
-      authority = origin.to_s.sub(%r{\A[A-Za-z][A-Za-z0-9+.-]*://}, "")
+      bare = Origin.bare(origin.to_s)
+      return false if bare.nil?
+
+      authority = bare.sub(%r{\A[a-z]+://}, "")
       host = authority.start_with?("[") ? authority[0..(authority.index("]") || -1)] : authority.split(":", 2).first.to_s
       host = host.downcase
       return true if host == "localhost" || host.end_with?(".localhost") || host == "[::1]"
