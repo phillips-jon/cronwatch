@@ -57,10 +57,14 @@ mod stats;
 mod store;
 mod types;
 
+#[cfg(any(feature = "alerts", feature = "triage"))]
+pub mod alerts;
 #[cfg(feature = "blocking")]
 pub mod blocking;
 #[cfg(feature = "storetest")]
 pub mod storetest;
+#[cfg(feature = "triage")]
+pub mod triage;
 
 pub use check::JobWithRuns;
 pub use client::{Client, ClientBuilder, describe_job};
