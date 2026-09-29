@@ -62,7 +62,9 @@ func WithoutSecret() HandlerOption { return func(c *handlerConfig) { c.secret, c
 // response, as net/http does.
 //
 //	mux.Handle("POST /api/cron/nightly", nightly.Handler(func(ctx context.Context, job *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) error {
-//		return buildReport(ctx)
+//		path, err := buildReport(ctx)
+//		job.Log("Report written:", path)
+//		return err
 //	}))
 func (j *Job) Handler(fn HandlerFunc, options ...HandlerOption) http.Handler {
 	return HandlerValue(j, func(ctx context.Context, job *JobContext, w http.ResponseWriter, r *http.Request) (struct{}, error) {

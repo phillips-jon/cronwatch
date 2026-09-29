@@ -97,7 +97,7 @@ The package is also called `gocron`, so import it under a name of its own. `Watc
 
 **Names.** A job is named by `gocron.WithName`, else after its function without the package's path (`jobs.NightlyReport`). A function literal is not watched until it is named, and is reported once.
 
-**Schedules.** Read from `Job.Schedule()`, which is why gocron 2.21 is the oldest supported. A cron job is converted as robfig/cron's, since gocron runs it with robfig/cron; a duration job is `every <duration>`; daily, weekly and monthly jobs with an interval of 1 become a cron of their times of day, days of the week and days of the month (the last day as `L`). Anything else (a random duration, an interval of more than one day, week or month, other days counted from the end of the month, a one-time job) is watched without a schedule and reported once. The zone is the scheduler's (`gocron.WithLocation`): gocron has no getter for it, so it is read from a job's next run once the scheduler has started, else `Options.Location`, else `time.Local`, gocron's default; set `Options.Location` to the scheduler's for jobs declared before it starts.
+**Schedules.** Read from `Job.Schedule()`, which is why gocron 2.21 is the oldest supported. A cron job is converted as robfig/cron's, since gocron runs it with robfig/cron; a duration job is `every <duration>`, for an interval of one second or more (a shorter one is watched without a schedule and reported once); daily, weekly and monthly jobs with an interval of 1 become a cron of their times of day, days of the week and days of the month (the last day as `L`). Anything else (a random duration, an interval of more than one day, week or month, other days counted from the end of the month, a one-time job) is watched without a schedule and reported once. The zone is the scheduler's (`gocron.WithLocation`): gocron has no getter for it, so it is read from a job's next run once the scheduler has started, else `Options.Location`, else `time.Local`, gocron's default; set `Options.Location` to the scheduler's for jobs declared before it starts.
 
 **Limits.** gocron's listeners are what CronWatch sees, and they leave some things out of reach:
 
@@ -114,6 +114,7 @@ import (
 	cronwatch "cronwatch.dev/go"
 	cwriver "cronwatch.dev/go/river"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivertype"
 	"github.com/robfig/cron/v3"
 )
