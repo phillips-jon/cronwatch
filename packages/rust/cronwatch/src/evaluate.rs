@@ -331,7 +331,7 @@ pub(crate) fn on_run_finish(
 pub(crate) struct CheckOutcome {
     pub evaluation: Evaluation,
     pub next_expected_at: Option<i64>,
-    #[allow(dead_code)] // the dashboard's timelines use it (phase 3)
+    #[allow(dead_code)] // the SDK's shape; nothing reads it yet
     pub due_at: Option<i64>,
 }
 

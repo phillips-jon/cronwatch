@@ -868,3 +868,9 @@ jobs:
           else
             cargo test -p cronwatch -p cronwatch-tokio-cron-scheduler --all-features
           fi
+      # @cronwatch/mcp's tools against the Rust dashboard, served by
+      # packages/rust/webserver (axum) through `cargo run` on this entry's Rust.
+      - name: MCP server against the Rust dashboard
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_RUST: "1"

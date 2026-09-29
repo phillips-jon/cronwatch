@@ -21,9 +21,15 @@ blocking = ["tokio/net"]
 storetest = []
 # The alert channels (Slack, Discord, the webhook, the email providers,
 # Twilio and the error trackers) and the default transport they post with.
-alerts = ["__transport", "dep:sha2", "dep:hmac"]
+alerts = ["__transport", "dep:hmac"]
 # Claude triage over plain HTTP, on the same transport (not the channels).
 triage = ["__transport"]
+# The dashboard and a job's handler as tower services, for hyper, axum,
+# tonic's HTTP stack and lambda_http.
+tower = ["dep:http", "dep:http-body", "dep:http-body-util", "dep:bytes", "dep:tower-service"]
+# tower, and the mount axum records when the dashboard is nested
+# (NestedPath and OriginalUri), and Routes::into_router().
+axum = ["tower", "dep:axum"]
 # What the channels and triage share: reqwest on rustls with the platform's
 # roots, and the WHATWG URL parser fetch reads URLs with. Not for apps to
 # name: turn on `alerts` or `triage`.
@@ -43,13 +49,26 @@ url = { version = "2.5.4", optional = true }
 # 1.85 build working with it; this backend is also some fifteen crates
 # lighter.
 idna_adapter = { version = "~1.1", optional = true }
-sha2 = { version = "0.11", optional = true }
+# The dashboard's cookie, the alert ids and SigV4.
+sha2 = "0.11"
 hmac = { version = "0.13", optional = true }
+http = { version = "1.1", optional = true }
+http-body = { version = "1", optional = true }
+http-body-util = { version = "0.1.2", optional = true }
+bytes = { version = "1.6", optional = true }
+tower-service = { version = "0.3.3", optional = true }
+axum = { version = "0.8.4", default-features = false, features = ["original-uri"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.43", features = ["full", "test-util"] }
 flate2 = "1.0.35"
-sha2 = "0.11"
+# The dashboard's golden replay and the handler behind a real server.
+axum = { version = "0.8.4", default-features = false, features = ["original-uri", "tokio", "http1"] }
+hyper = { version = "1.6", features = ["client", "http1"] }
+hyper-util = { version = "0.1.14", features = ["http1", "tokio"] }
+tower = { version = "0.5.2", default-features = false, features = ["util"] }
+# The job's handler and the dashboard served on AWS Lambda.
+lambda_http = { version = "1", default-features = false, features = ["apigw_http"] }
 # A certificate made at run time and a TLS server, for the test that an
 # untrusted certificate is refused. rcgen 0.14 needs Rust 1.88.
 rcgen = { version = "0.13", default-features = false, features = ["aws_lc_rs", "pem"] }
@@ -67,6 +86,22 @@ required-features = ["storetest"]
 [[test]]
 name = "alerts"
 required-features = ["alerts", "triage"]
+
+[[test]]
+name = "routes_golden"
+required-features = ["axum"]
+
+[[test]]
+name = "routes"
+required-features = ["axum"]
+
+[[test]]
+name = "lambda"
+required-features = ["axum"]
+
+[[test]]
+name = "handler"
+required-features = ["axum"]
 
 [package.metadata.docs.rs]
 all-features = true

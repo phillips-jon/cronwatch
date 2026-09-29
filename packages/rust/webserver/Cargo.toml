@@ -1,0 +1,16 @@
+[package]
+name = "cronwatch-webserver"
+description = "The seeded dashboard @cronwatch/mcp's end-to-end test drives, served by axum"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+cronwatch = { workspace = true, features = ["axum"] }
+axum = { version = "0.8.4", default-features = false, features = ["tokio", "http1"] }
+tokio = { version = "1.43", features = ["rt-multi-thread", "macros", "net"] }
+
+[lints]
+workspace = true

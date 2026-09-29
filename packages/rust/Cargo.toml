@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["cronwatch", "cronwatch-sqlx", "cronwatch-tokio-cron-scheduler", "cronwatch-apalis", "examples/crontab"]
+members = ["cronwatch", "cronwatch-sqlx", "cronwatch-tokio-cron-scheduler", "cronwatch-apalis", "webserver", "examples/crontab"]
 
 [workspace.package]
 version = "0.6.1"
