@@ -1068,7 +1068,7 @@ jobs:
         run: |
           MIX_ENV=test mix compile --warnings-as-errors
           if [ "${{ matrix.newest }}" = "false" ]; then
-            MIX_ENV=dev MIX_BUILD_PATH=_build/no-optional mix compile --no-optional-deps --warnings-as-errors
+            MIX_ENV=dev MIX_BUILD_ROOT=_build/no-optional mix compile --no-optional-deps --warnings-as-errors
           fi
       # The test alias sets TZ=UTC, as the fixtures are made.
       - name: mix test

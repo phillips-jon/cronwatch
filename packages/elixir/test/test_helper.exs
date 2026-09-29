@@ -6,4 +6,7 @@ if System.get_env("TZ") != "UTC" do
   System.halt(1)
 end
 
-ExUnit.start(exclude: [:property_long])
+# assert_receive waits up to two seconds, not ExUnit's 100 ms: a CI runner
+# can take longer than that to start a run's task, and the wait only
+# lengthens a test that is about to fail.
+ExUnit.start(exclude: [:property_long], assert_receive_timeout: 2_000)
