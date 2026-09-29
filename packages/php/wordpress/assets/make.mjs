@@ -16,7 +16,8 @@
  * when it is not resolvable from here.
  *
  * The screenshots (screenshot-1.png to screenshot-4.png) are captures of a
- * real WordPress running the built plugin, not made here.
+ * real WordPress running the built plugin, not made here: screenshots/run.sh
+ * retakes them.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
