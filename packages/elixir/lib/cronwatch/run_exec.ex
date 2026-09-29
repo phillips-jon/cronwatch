@@ -62,7 +62,8 @@ defmodule Cronwatch.Run.Exec do
         exit(reason)
 
       {:timed_out, _} ->
-        record(c, job, info, fn run ->
+        c
+        |> record(job, info, fn run ->
           snap = Lines.snapshot(lines, run.id)
 
           %{
@@ -73,6 +74,7 @@ defmodule Cronwatch.Run.Exec do
               error: Core.clean(c, "Still running after #{Cronwatch.Duration.format(timeout)}; marked as timed out")
           }
         end)
+        |> recorded(opts)
 
         exit(:timeout)
 
@@ -80,7 +82,9 @@ defmodule Cronwatch.Run.Exec do
         if discard && given_back?(c, job, discard, outcome) && take_back(c, job, info) do
           Lines.close(lines, info.key)
         else
-          record_outcome(c, job, info, outcome)
+          c
+          |> record_outcome(job, info, outcome)
+          |> recorded(opts)
         end
 
         hand_back(outcome, isolate)
@@ -258,6 +262,15 @@ defmodule Cronwatch.Run.Exec do
     )
 
     Runs.close(state.config.name, state.info.run.id)
+  end
+
+  # The run as it was recorded, to the caller's own `recorded:` function
+  # (Cronwatch.Handler answers with it), before the outcome is handed back.
+  defp recorded(run, opts) do
+    case Keyword.get(opts, :recorded) do
+      f when is_function(f, 1) -> f.(run)
+      _ -> :ok
+    end
   end
 
   # Inserts the running row and closes missed and stuck beside the job,

@@ -975,10 +975,11 @@ jobs:
           cargo +nightly fuzz build
 
   # The Elixir port (packages/elixir), on its floor (Elixir 1.18 on OTP 27,
-  # what Debian 13 ships) and the current release, with the databases the
-  # store's server tests use. The Oban integration's tests run Oban on
-  # SQLite (its Lite engine) always and on the Postgres service through
-  # CRONWATCH_TEST_PG; Quantum needs no service.
+  # what Debian 13 ships) and the current release, with the database
+  # services for the SQL store and the MCP server's end-to-end test against
+  # its dashboard (packages/elixir/webserver). The Oban integration's tests
+  # run Oban on SQLite (its Lite engine) always and on the Postgres service
+  # through CRONWATCH_TEST_PG; Quantum needs no service.
   # The conformance step builds the SDK for the croner parity check and the
   # SQLite file shared with Node. The newest entry also runs the formatter,
   # Credo and Dialyzer (its PLTs cached with the build, by the Elixir and
@@ -1057,7 +1058,9 @@ jobs:
           path: |
             packages/elixir/deps
             packages/elixir/_build
-          key: elixir-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('packages/elixir/mix.exs') }}
+            packages/elixir/webserver/deps
+            packages/elixir/webserver/_build
+          key: elixir-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('packages/elixir/mix.exs', 'packages/elixir/webserver/mix.exs') }}
           restore-keys: elixir-${{ steps.beam.outputs.elixir-version }}-otp-${{ steps.beam.outputs.otp-version }}-
       - name: mix deps.get
         working-directory: packages/elixir
@@ -1081,6 +1084,13 @@ jobs:
           CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
           CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
         run: mix test
+      # @cronwatch/mcp's tools against the Elixir dashboard, served by
+      # packages/elixir/webserver (Bandit) through `mix run` on this entry's
+      # Elixir and OTP.
+      - name: MCP server against the Elixir dashboard
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_ELIXIR: "1"
       - name: mix credo
         if: matrix.newest
         working-directory: packages/elixir

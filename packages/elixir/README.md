@@ -2,13 +2,13 @@
 
 Cron and scheduled-job monitoring that lives inside your Elixir service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go or Rust process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/elixir/DESIGN.md) has the plan and how each part works). Phases 1 and 2 have the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, telemetry), the memory store, the SQL store over Ecto on SQLite, Postgres, MySQL and MariaDB, the pg_cron source, the SDK's fifteen alert channels and Claude triage; phase 4 has the Oban and Quantum integrations and a crontab's check. The dashboard and a job's handler follow.
+This is the Elixir port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so an Elixir process and a Node, Ruby, Python, PHP, Go or Rust process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/elixir/DESIGN.md) has the plan and how each part works). Phases 1 and 2 have the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, telemetry), the memory store, the SQL store over Ecto on SQLite, Postgres, MySQL and MariaDB, the pg_cron source, the SDK's fifteen alert channels and Claude triage; phase 3 adds the dashboard and a job's handler, as Plugs; phase 4 the Oban and Quantum integrations and a crontab's check.
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
 ## Install
 
-Elixir 1.18 or newer on Erlang/OTP 27 or newer. The package depends on [`tz`](https://hex.pm/packages/tz) (the time zone database, compiled in, so zones work in a release on any image) and `telemetry`, and nothing else; cron expressions are read by a port of [croner](https://github.com/hexagon/croner), the parser the SDK uses, so every port agrees on every fire time. The SQL store needs `ecto_sql` and the adapter your repo uses.
+Elixir 1.18 or newer on Erlang/OTP 27 or newer. The package depends on [`tz`](https://hex.pm/packages/tz) (the time zone database, compiled in, so zones work in a release on any image) and `telemetry`, and nothing else; cron expressions are read by a port of [croner](https://github.com/hexagon/croner), the parser the SDK uses, so every port agrees on every fire time. The SQL store needs `ecto_sql` and the adapter your repo uses; the dashboard and a job's handler need `plug` (every Phoenix app has it).
 
 ```elixir
 def deps do
@@ -104,6 +104,29 @@ Requests go through OTP's own `:httpc`, with one ten second deadline, redirects 
 
 `{Cronwatch.Sources.PgCron, repo: MyApp.Repo}` in the instance's `sources:` records the runs of pg_cron jobs inside a Postgres database, as the SDK's source does; `jobs:`, `job_ids:` or `pick:` choose which.
 
+### The dashboard
+
+`Cronwatch.Web` is the SDK's dashboard and JSON API as a Plug: the same pages, byte for byte, and the same API, so [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against it. In Phoenix, forward to it outside the `:browser` pipeline (it has its own cross-site check and cookie):
+
+```elixir
+# lib/my_app_web/router.ex
+scope "/" do
+  forward "/cronwatch", Cronwatch.Web
+end
+```
+
+It finds its base path from where the router mounted it. The token is `CRONWATCH_TOKEN`, read on each request (`token: "..."`, `token: {:system, "VAR"}`, or `token: false` to serve it open behind your own auth); send it as `Authorization: Bearer <token>`, or open the page once with `?token=<token>` and a cookie keeps you signed in. In development with no token it makes one and prints a sign-in link; elsewhere with none it answers 503. `origin: "https://app.example.com"` or `trust_proxy: true` tell it the public origin behind a proxy. A request body is read only when a route wants one, at most 1 MiB; behind a Phoenix endpoint the fields its `Plug.Parsers` read are used. `/api/check` also takes the instance's cron secret as a bearer.
+
+### A job's handler
+
+`Cronwatch.Handler` runs a job for a platform cron that calls a URL, when the request carries `Authorization: Bearer <CRON_SECRET>`:
+
+```elixir
+forward "/cron/nightly", Cronwatch.Handler, job: "nightly-report", run: {MyApp.Reports, :nightly, []}
+```
+
+`MyApp.Reports.nightly(job, conn)` runs as a recorded run with the trigger `"handler"`, and the request is answered with `{"ok","job","run","status","durationMs"}`, 200 or 500; a `%Plug.Conn{}` it returns is the answer instead, and fails the run at 400 or more. `secret:` sets a secret of its own, and `secret: false` lets anyone in. Without any secret, outside development, it answers 503.
+
 ### Oban
 
 `Cronwatch.Oban` watches Oban 2.20 or newer with no changes to your workers: every worker in the Cron plugin's crontab is a job (named after its module, on the entry's expression in its zone), and each attempt is a run, recorded through Oban's own telemetry in the worker's process, so `Cronwatch.log/1` works inside `perform/1`.
@@ -151,7 +174,7 @@ mix credo --strict
 mix dialyzer
 ```
 
-The tests replay the repository's `conformance/` fixtures, check the croner port against croner itself in Node (3,000 expressions), and share a SQLite file with the SDK; the last two need `npm run build` at the root first, and skip, saying so, without it. The store's server tests and the pg_cron source's run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` hold URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip without them.
+The tests replay the repository's `conformance/` fixtures and the dashboard's (`packages/ruby/test/web/golden.json`, straight into the plug, through a `Plug.Router` under Bandit and through a Phoenix endpoint), check the croner port against croner itself in Node (3,000 expressions), and share a SQLite file with the SDK; the last two need `npm run build` at the root first, and skip, saying so, without it. The store's server tests and the pg_cron source's run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` hold URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip without them. `CRONWATCH_TEST_ELIXIR=1 npm test --workspace packages/mcp`, from the root, drives the MCP server against `webserver/`, a seeded dashboard served by Bandit (`CRONWATCH_MIX` names another `mix`, such as `"$HOME/.local/elixir/floor mix"`).
 
 The Oban tests run Oban on SQLite (its Lite engine), and on Postgres too when `CRONWATCH_TEST_PG` names one (`postgres://postgres:pw@127.0.0.1:5432/cw`); `CRONWATCH_PIN_OBAN` and `CRONWATCH_PIN_QUANTUM` pin the optional dependency to a release, for testing the oldest one claimed. `examples/crontab` has a test of its own (`mix test` there) that builds its release and runs the two crontab lines on one file.
 
