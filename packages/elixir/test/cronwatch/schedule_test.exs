@@ -282,7 +282,7 @@ defmodule Cronwatch.ScheduleTest do
 
     {micros, result} = :timer.tc(fn -> Duration.parse(String.duplicate("1", 1_048_576), "silence duration") end)
     assert result == {:error, ~s(silence duration "#{String.duplicate("1", 32)}..." #{too_long})}
-    assert micros < 1_000_000
+    assert micros < 10_000_000
   end
 
   test "format and relative" do

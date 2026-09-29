@@ -692,7 +692,7 @@ defmodule Cronwatch.Web.RoutesTest do
     assert {200, _, _} = Routes.handle(opts, request)
     request = %{request | headers: request.headers ++ [{"origin", "http://" <> host}]}
     assert {200, _, _} = Routes.handle(opts, request), "its own origin"
-    assert System.monotonic_time(:millisecond) - started < 2_000
+    assert System.monotonic_time(:millisecond) - started < 10_000
     assert Origin.bare("http://" <> String.duplicate("é", 600)) == nil
     assert Origin.bare("http://" <> String.duplicate("é", 10)) =~ "http://xn--"
   end

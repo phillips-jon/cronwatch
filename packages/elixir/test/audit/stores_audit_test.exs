@@ -7,6 +7,8 @@ defmodule Cronwatch.Audit.StoresTest do
   alias Cronwatch.JSRE
   alias Cronwatch.Metrics
 
+  # The time limits here catch a return to quadratic work (tens of seconds
+  # to minutes), not a slow CI runner: Windows has taken five seconds.
   describe "JSON" do
     test "an object of many keys reads in time linear in its keys, in JavaScript's order" do
       n = 100_000
@@ -14,7 +16,7 @@ defmodule Cronwatch.Audit.StoresTest do
       {micros, {:ok, %Object{} = o}} = :timer.tc(fn -> JS.parse(text) end)
       # Setting one key at a time walked every key before it: 40,000 keys
       # took twelve seconds, 100,000 some eighty.
-      assert micros < 5_000_000
+      assert micros < 30_000_000
       assert Object.size(o) == n
       assert Object.get(o, "k77") == 77
       assert hd(Object.keys(o)) == "k1"
@@ -28,7 +30,7 @@ defmodule Cronwatch.Audit.StoresTest do
         "{" <> Enum.map_join(1..n, ",", fn i -> if rem(i, 2) == 0, do: ~s("a":#{i}), else: ~s("k#{i}":0) end) <> "}"
 
       {micros, {:ok, o}} = :timer.tc(fn -> JS.parse(dups) end)
-      assert micros < 5_000_000
+      assert micros < 30_000_000
       assert Object.get(o, "a") == n
       assert Enum.at(Object.keys(o), 1) == "a"
 
@@ -65,7 +67,7 @@ defmodule Cronwatch.Audit.StoresTest do
         assert :erts_debug.flat_size(re) < 1_000_000,
                "#{String.slice(source, 0, 8)}: #{:erts_debug.flat_size(re)} words"
 
-        assert micros < 5_000_000
+        assert micros < 30_000_000
       end
 
       re = JSRE.compile!(String.duplicate("ab", 2048))
