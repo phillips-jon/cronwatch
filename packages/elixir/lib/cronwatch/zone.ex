@@ -6,7 +6,7 @@ defmodule Cronwatch.Zone do
   offset (`"+05:30"`, `"-0800"`, `"+05"`) is a zone too, since `Intl` and
   croner both take one.
 
-  `Tz.TimeZoneDatabase` is called directly, for the offset at an instant;
+  Tz.TimeZoneDatabase is called directly, for the offset at an instant;
   the app's `config :elixir, :time_zone_database` is never read or set.
   Without a name, a zone is the process's own: `$TZ` when it names a zone,
   else the zone `/etc/localtime` links to, else UTC.

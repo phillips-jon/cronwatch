@@ -1099,6 +1099,18 @@ jobs:
         if: matrix.newest
         working-directory: packages/elixir
         run: mix dialyzer --format github
+      # The docs HexDocs will build, with warnings as errors, and the Hex
+      # tarball's file list: lib, the project files, the README and the
+      # licence, and nothing from test, webserver, examples or conformance.
+      - name: mix docs and the package's files
+        if: matrix.newest
+        working-directory: packages/elixir
+        run: |
+          mix docs --warnings-as-errors
+          mix hex.build --unpack -o "$RUNNER_TEMP/cronwatch-hex"
+          files=$(cd "$RUNNER_TEMP/cronwatch-hex" && find . -type f ! -path './lib/*' | LC_ALL=C sort | tr '\n' ' ')
+          test "$files" = "./.formatter.exs ./LICENSE ./README.md ./hex_metadata.config ./mix.exs " || { echo "unexpected files: $files"; exit 1; }
+          test -f "$RUNNER_TEMP/cronwatch-hex/lib/cronwatch.ex"
       # A job and its check as two crontab lines, through the built release.
       - name: the crontab example
         if: matrix.newest

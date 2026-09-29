@@ -57,7 +57,8 @@ defmodule Cronwatch.MixProject do
       {:bandit, "~> 1.5", only: :test},
       {:phoenix, "~> 1.7", only: :test},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.38", only: :dev, runtime: false}
     ]
   end
 

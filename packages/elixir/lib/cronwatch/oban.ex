@@ -23,7 +23,7 @@ if Code.ensure_loaded?(Oban) do
     (`MyApp.Workers.NightlyReport`), on the entry's expression in its zone
     (the entry's `timezone`, else the plugin's, else `Etc/UTC`), Oban's
     nicknames (`@daily`) written out as Oban reads them. Each schedule is
-    checked against Oban's own reading of it (`Oban.Cron.Expression`,
+    checked against Oban's own reading of it (Oban.Cron.Expression's,
     stepping minute by minute as the plugin does): Oban matches a day of the
     month and a day of the week both, where CronWatch (croner, as
     JavaScript) matches either when both are set, so an expression the two

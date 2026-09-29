@@ -24,7 +24,7 @@ defmodule Cronwatch.Transport.HTTP do
       one) and the certificate is checked against the address, because
       `server_name_indication: :disable` would turn `:ssl`'s hostname check
       off, so it is never given.
-    * The host is the one `Cronwatch.Alerts.URL` read, connected to as
+    * The host is the one the channel's URL was read to, connected to as
       read, so what the URL names and what is reached cannot differ.
 
   `Post` holds the whole request to its deadline, killing the process that

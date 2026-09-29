@@ -143,7 +143,23 @@ defmodule Cronwatch.Bridge do
     if out == "", do: "every 0ms", else: "every " <> out
   end
 
+  @doc """
+  `:ok`, or `{:error, message}` for a cron CronWatch would not expect runs
+  of when the scheduler makes them. `runs` is the scheduler's own reading:
+  given `start` and `finish` (epoch milliseconds, `finish` nil for a
+  sample), `{:ok, times}` with the run at or before `start` and every one
+  after it up to the first past `finish`, or a sample of them after that
+  first one when `finish` is nil, ascending; `never_fires/1` for a schedule
+  that never fires again, or `{:error, message}`. `expr` and `zone` are the
+  schedule as CronWatch reads it (`zone` `""` for the process's own),
+  `where` names the job and `scheduler` the scheduler in messages. `daily`
+  is a cron that names no day or month, which meets every clock change of
+  one kind alike, so one of each is walked. `now` is the epoch milliseconds
+  the horizon starts from.
+  """
   defdelegate check_fires(runs, expr, zone, where, scheduler, daily, now), to: Cronwatch.Bridge.Check
+
+  @doc "What a `runs` function given to `check_fires/7` answers for a schedule that never fires again."
   defdelegate never_fires(why), to: Cronwatch.Bridge.Check
 
   # The options a job keeps when it is declared again without its schedule,

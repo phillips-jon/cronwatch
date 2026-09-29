@@ -67,7 +67,7 @@ defmodule Cronwatch.Source do
   database: the SDK's `Source`, as a behaviour. Given to an instance's
   `sources:` as `{module, opts}`. A check calls `c:sync/2` on each source
   first, with the options and the instance's name, so what it records (with
-  `Cronwatch.record_run/3`) is evaluated in the same check; it answers the
+  `Cronwatch.record_run/2`) is evaluated in the same check; it answers the
   alerts recording them sent. One that fails is reported and the check
   carries on.
   """

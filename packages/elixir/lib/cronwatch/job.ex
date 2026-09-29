@@ -1,6 +1,6 @@
 defmodule Cronwatch.Job do
   @moduledoc """
-  A declared job's handle, as `Cronwatch.job/3` answers it: the instance it
+  A declared job's handle, as `Cronwatch.job/2` answers it: the instance it
   belongs to, its name, and its definition. `definition` is the stored JSON
   object (a `Cronwatch.JS.Object`, fields in the order given, `expect`
   described last); `expect` is the rule itself.
