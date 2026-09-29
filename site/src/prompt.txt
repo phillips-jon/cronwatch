@@ -247,7 +247,7 @@ PHP (PHP 8.2 or newer)
 
    - WordPress: the plugin is not in the wordpress.org directory yet; it is
      attached to the GitHub release. Install and activate it with
-     wp plugin install https://github.com/phillips-jon/cronwatch/releases/download/v0.7.0/cronwatch-0.7.0.zip --activate
+     wp plugin install https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip --activate
      or upload that zip under Plugins, Add New Plugin in wp-admin. Every
      WP-Cron event is watched
      with no code. Set the alert channel under CronWatch, Settings. If the
