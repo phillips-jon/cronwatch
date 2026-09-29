@@ -15,7 +15,7 @@ export const { GET, POST, DELETE } = cw.routes({ token: process.env.CRONWATCH_TO
 
 `basePath` defaults to `/cronwatch` and must match where the routes are mounted: it routes requests, builds links and scopes the cookie path. `token` defaults to `CRONWATCH_TOKEN`; an empty string counts as unset.
 
-Every port serves the same pages and API at the same paths, with the same token rules, so everything below holds for them too: see [Rails](/docs/rails/#mount-the-dashboard), [Ruby](/docs/ruby/#the-dashboard-in-any-rack-app), [Django](/docs/django/#mount-the-dashboard), [Python](/docs/python/#the-dashboard), [PHP](/docs/php/#the-dashboard), [Go](/docs/go/#the-dashboard) and [Rust](/docs/rust/#the-dashboard) for how each mounts it.
+Every port serves the same pages and API at the same paths, with the same token rules, so everything below holds for them too: see [Rails](/docs/rails/#mount-the-dashboard), [Ruby](/docs/ruby/#the-dashboard-in-any-rack-app), [Django](/docs/django/#mount-the-dashboard), [Python](/docs/python/#the-dashboard), [PHP](/docs/php/#the-dashboard), [Go](/docs/go/#the-dashboard), [Rust](/docs/rust/#the-dashboard) and [Elixir](/docs/elixir/#the-dashboard) for how each mounts it.
 
 ## Access
 

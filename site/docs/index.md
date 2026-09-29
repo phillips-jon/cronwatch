@@ -15,6 +15,7 @@ This page sets up the TypeScript library. Every other language has a port with t
 - **PHP**: `cronwatch/cronwatch`, and a plugin for WordPress. See [PHP](/docs/php/), [WordPress](/docs/wordpress/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/).
 - **Go**: `cronwatch.dev/go`, with modules for robfig/cron, gocron, River and Asynq. See [Go](/docs/go/) and [Go schedulers](/docs/go-schedulers/).
 - **Rust**: the `cronwatch` crate, with crates for tokio-cron-scheduler and apalis. See [Rust](/docs/rust/) and [Rust schedulers](/docs/rust-schedulers/).
+- **Elixir**: the `cronwatch` package on Hex, with integrations for Oban and Quantum. See [Elixir](/docs/elixir/) and [Elixir schedulers](/docs/elixir-schedulers/).
 
 ## Install
 

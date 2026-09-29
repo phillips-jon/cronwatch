@@ -166,4 +166,4 @@ Failures, durations and output all come from `cron.job_run_details`, so they nee
 - **Stuck is judged by CronWatch.** A run still `running` after the job's `timeout` (default one hour) is marked timed out and alerts as stuck. The reader keeps reading it: when pg_cron later says it succeeded, the run is recorded as it ended and stuck closes with a recovery; a late failure is recorded without counting twice.
 - **Checks read at most 5,000 run details each.** A backlog larger than that (a checker that was down for a long time over a busy job) is worked through over the following checks.
 
-Every port has the same pg_cron reader, with the same rules: see pg_cron in [Ruby](/docs/ruby/#pg-cron), [Python](/docs/python/#pg-cron), [PHP](/docs/php/#pg-cron), [Go](/docs/go/#pg-cron) and [Rust](/docs/rust/#pg-cron).
+Every port has the same pg_cron reader, with the same rules: see pg_cron in [Ruby](/docs/ruby/#pg-cron), [Python](/docs/python/#pg-cron), [PHP](/docs/php/#pg-cron), [Go](/docs/go/#pg-cron), [Rust](/docs/rust/#pg-cron) and [Elixir](/docs/elixir/#pg-cron).

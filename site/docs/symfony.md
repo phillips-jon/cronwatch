@@ -34,7 +34,7 @@ cronwatch:
         mailer: { to: ops@example.com, from: cronwatch@example.com }
 ```
 
-The Scheduler watching needs `symfony/scheduler` and `symfony/messenger`, which an app that schedules anything already has. The three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on first use, in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go and Rust ports.
+The Scheduler watching needs `symfony/scheduler` and `symfony/messenger`, which an app that schedules anything already has. The three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on first use, in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go, Rust and Elixir ports.
 
 ## What is watched
 
