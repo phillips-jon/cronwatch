@@ -208,6 +208,10 @@ final class Admin
                             : sprintf(__('Sent through %s.', 'cronwatch'), $r['channel']))
                         /* translators: 1: an alert channel's name, such as email or slack; 2: why sending failed. */
                         : sprintf(__('%1$s failed: %2$s', 'cronwatch'), $r['channel'], $r['message']);
+                    if ($r['ok'] && $r['message'] !== '') {
+                        // Sent, but a channel reported a partial failure (one recipient of several refused it, say): show it, as Drupal's form does.
+                        $line .= ' ' . $r['message'];
+                    }
                     echo '<div class="notice ' . esc_attr($class) . '"><p>' . esc_html($line) . '</p></div>';
                 }
             }

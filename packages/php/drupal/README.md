@@ -2,7 +2,7 @@
 
 Cron monitoring that lives inside your Drupal site. Every cron run and each module's `hook_cron` in it is recorded in the site's own database, and you are told when cron is missed, when a `hook_cron` fails, gets stuck or runs much slower than usual, and again when it recovers. Queue workers you choose are watched too, each item a run. No server to run, no account to make.
 
-This is the Drupal module of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in Node, Ruby, Python, Laravel, Symfony, WordPress and Craft apps and keeps the same tables in every language.
+This is the Drupal module of [the CronWatch library](https://cronwatch.dev/) (`cronwatch/cronwatch`), which also watches jobs in Node, Ruby, Python, Go and Rust apps, plain PHP, Laravel, Symfony, WordPress and Craft CMS, and keeps the same tables in every language.
 
 ## Requirements
 

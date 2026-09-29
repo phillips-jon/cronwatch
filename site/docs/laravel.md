@@ -15,7 +15,7 @@ composer require cronwatch/cronwatch
 php artisan migrate
 ```
 
-Package discovery registers the service provider, so there is nothing to add to `bootstrap/providers.php`. The migration it loads makes the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) in the app's database, with the SDK's own `CREATE` statements, so a Node, Ruby or Python process can share them.
+Package discovery registers the service provider, so there is nothing to add to `bootstrap/providers.php`. The migration it loads makes the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go and Rust ports.
 
 Then say where alerts go, in `.env`:
 
@@ -85,11 +85,11 @@ Schedule::command('orders:sync')->everyFifteenMinutes()->when(fn () => config('s
 Schedule::command('cache:prune-stale-tags')->hourly()->cronwatch(false);
 ```
 
-It takes `name` and the options of a job declared by hand: `schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `expect`, `failuresBeforeAlert`, `description` and `tags` (see [PHP](/docs/php/#api)). `defaults` in `config/cronwatch.php` applies `grace`, `timeout`, `timezone` and `failuresBeforeAlert` to every job that sets none, and `schedule.exclude` lists job names to leave out.
+It takes `name` and the options of a job declared by hand: `schedule`, `timezone`, `grace`, `timeout`, `maxDuration`, `budget`, `expect`, `failuresBeforeAlert`, `description` and `tags` (see [PHP](/docs/php/#api)). `defaults` in `config/cronwatch.php` applies `grace`, `timeout`, `timezone` and `failuresBeforeAlert` to every job that sets none, and `schedule.exclude` lists job names to leave out. `CRONWATCH_WATCH_SCHEDULE=false` stops watching the schedule altogether; the check is still scheduled unless `CRONWATCH_SCHEDULE_CHECK=false`.
 
 ## Queued jobs
 
-A queued job is watched when it opts in, with the attribute (its options as named arguments) or the interface:
+A queued job is watched when it opts in, with the attribute (its options as named arguments) or the interface (`CRONWATCH_WATCH_QUEUE=false` stops watching queued jobs altogether):
 
 ```php
 use Cronwatch\Watch;
@@ -160,7 +160,7 @@ If the scheduler itself stops (its crontab line is gone, the server is down), th
 
 `CRONWATCH_STORE` picks it:
 
-- `database`, the default: the app's database (MySQL, MariaDB, Postgres or SQLite), the default connection or `CRONWATCH_DB_CONNECTION`. CronWatch reads that connection's settings as Laravel resolved them (a `DB_URL`, the write side of a read and write split, SSL options, Postgres's `sslmode` and `search_path`) and opens a connection of its own with them, so its writes never join a transaction the app has open: a run recorded inside `DB::transaction()` stays recorded when the transaction rolls back. The tables are CronWatch's names (`CRONWATCH_TABLE_PREFIX`, default `cronwatch_`); the connection's own table prefix does not apply, so every port reads the same tables. SQL Server is not supported.
+- `database`, the default: the app's database (MySQL 8.0.13 or newer, MariaDB 10.6 or newer, Postgres or SQLite), the default connection or `CRONWATCH_DB_CONNECTION`. CronWatch reads that connection's settings as Laravel resolved them (a `DB_URL`, the write side of a read and write split, SSL options, Postgres's `sslmode` and `search_path`) and opens a connection of its own with them, so its writes never join a transaction the app has open: a run recorded inside `DB::transaction()` stays recorded when the transaction rolls back. The tables are CronWatch's names (`CRONWATCH_TABLE_PREFIX`, default `cronwatch_`); the connection's own table prefix does not apply, so every port reads the same tables. SQL Server is not supported.
 - `sqlite`: a file of its own, `storage/cronwatch/cronwatch.db` unless `CRONWATCH_SQLITE_PATH` says otherwise.
 - `memory`: forgets when the process ends; for tests.
 

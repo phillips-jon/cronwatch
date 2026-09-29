@@ -616,12 +616,26 @@ final class WordPressTest extends TestCase
             ob_start();
             Cronwatch\WordPress\Admin::render();
             $page = ob_get_clean();
+            // A channel that sent the alert but reports a partial failure: the notice says both.
+            add_filter('cronwatch_alerts', fn () => [function (Cronwatch\Alert $alert, Cronwatch\Alerts\ChannelContext $context): void {
+                $context->onError(new RuntimeException('ops2@example.com refused it'));
+            }]);
+            Cronwatch\WordPress\Plugin::reset();
+            $partial = Cronwatch\WordPress\Admin::sendTest();
+            set_transient('cronwatch_test_1', $partial, 120);
+            ob_start();
+            Cronwatch\WordPress\Admin::render();
+            $partialPage = ob_get_clean();
+            remove_all_filters('cronwatch_alerts');
             Cronwatch\WordPress\Plugin::reset();
             echo json_encode(['results' => $results, 'seen' => get_option('cwt_alerts'), 'failure' => $failure, 'sent' => $sent, 'none' => $none,
-                'noneNotice' => str_contains($page, 'No alert channel is set, so the test alert was written to the PHP error log')]);
+                'noneNotice' => str_contains($page, 'No alert channel is set, so the test alert was written to the PHP error log'),
+                'partial' => $partial, 'partialNotice' => str_contains($partialPage, 'Sent through custom. ops2@example.com refused it')]);
             PHP);
         $this->assertSame([['channel' => 'console', 'ok' => true, 'message' => '']], $result['none']);
         $this->assertTrue($result['noneNotice']);
+        $this->assertSame([['channel' => 'custom', 'ok' => true, 'message' => 'ops2@example.com refused it']], $result['partial']);
+        $this->assertTrue($result['partialNotice'], 'a partial failure is shown beside the success');
         $this->assertSame([['channel' => 'custom', 'ok' => true, 'message' => '']], $result['results']);
         $this->assertSame('CronWatch test alert', $result['seen'][0]['title']);
         $this->assertSame('wp_mail could not send the alert', $result['failure']);

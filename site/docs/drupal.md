@@ -107,7 +107,7 @@ Configuration, System, CronWatch (`/admin/config/system/cronwatch`), for users w
 - **Cron schedule** and **Grace** (10 minutes by default).
 - **Run the check at the end of each cron run**, and the **Watched queues**.
 
-"Send a test alert" sends one to every channel and says what each answered. Nothing leaves the site until a channel is set; with none, alerts go to the site's log (the `cronwatch` channel), as do failures outside jobs. `hook_cronwatch_alerts_alter()` adds channels, any of the library's ([PHP](/docs/php/#email-sms-and-error-trackers)) or a callable taking the `Cronwatch\Alert`:
+"Send a test alert" sends one to every channel the saved settings name and says what each answered, including a partial failure (one address of several refused, say). Nothing leaves the site until a channel is set; with none, alerts go to the site's log (the `cronwatch` channel), as do failures outside jobs, and the test alert sends nothing: it warns that no channel is set and asks you to save one first. `hook_cronwatch_alerts_alter()` adds channels, any of the library's ([PHP](/docs/php/#email-sms-and-error-trackers)) or a callable taking the `Cronwatch\Alert`:
 
 ```php
 function mymodule_cronwatch_alerts_alter(array &$channels): void {

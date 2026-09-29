@@ -18,7 +18,7 @@ The rules here are the same in the TypeScript SDK and the Ruby gem; the examples
 | Interval | `every 15m`, `every 6h`, `every 2d` | counted from the last run's start, or from registration before the first run |
 | None | | watched for failures, duration and budgets; never missed |
 
-Durations everywhere use the same units: `ms`, `s`, `m`, `h`, `d`, `w`, and compounds like `1h30m`. A number is milliseconds.
+Durations everywhere use the same units: `ms`, `s`, `m`, `h`, `d`, `w`, and compounds like `1h30m`. A number is milliseconds. A duration string is at most 64 characters; a longer one is refused.
 
 ## Timezone
 

@@ -33,7 +33,7 @@ cronwatch:
         mailer: { to: ops@example.com, from: cronwatch@example.com }
 ```
 
-The Scheduler watching needs `symfony/scheduler` and `symfony/messenger`, which an app that schedules anything already has. The three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on first use, with the SDK's own `CREATE` statements, so a Node, Ruby or Python process can share them.
+The Scheduler watching needs `symfony/scheduler` and `symfony/messenger`, which an app that schedules anything already has. The three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on first use, in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go and Rust ports.
 
 ## What is watched
 
@@ -67,9 +67,9 @@ A job is named after:
 
 A schedule other than `default` puts its name in front: `reports:App.Message.BuildReport`.
 
-The schedule is the trigger's: a `CronExpressionTrigger`'s expression and zone (a hashed `#` expression as Symfony resolved it), a `PeriodicalTrigger`'s interval as `every <seconds>s`, a `JitterTrigger`'s inner trigger. A trigger that does not fire at fixed times (`ExcludeTimeTrigger`, `CallbackTrigger`, a calendar interval such as `1 month`) leaves the job without a schedule, reported once: its failures, slow runs and stuck runs are still watched, but it is never reported missed. Two messages with one name on different schedules are one job without a schedule.
+The schedule is the trigger's: a `CronExpressionTrigger`'s expression and zone (a hashed `#` expression as Symfony resolved it), a `PeriodicalTrigger`'s interval as `every` and the interval in the largest units that fit (3600 seconds is `every 1h`, 5400 `every 1h30m`, 90 `every 1m30s`), a `JitterTrigger`'s inner trigger. A trigger that does not fire at fixed times (`ExcludeTimeTrigger`, `CallbackTrigger`, a calendar interval such as `1 month`) leaves the job without a schedule, reported once: its failures, slow runs and stuck runs are still watched, but it is never reported missed. Two messages with one name on different schedules are one job without a schedule.
 
-Jobs are declared by every check, so a message that has never run is known. A message taken out of a schedule keeps its history and is declared again without its schedule, so it is never reported missed. Jobs are tagged `symfony-scheduler` and `symfony-scheduler:<app>`, where the app is `app_id`, else a hash of the kernel's secret; two apps sharing one database and table prefix need different ones.
+Jobs are declared by every check, so a message that has never run is known. A message taken out of a schedule keeps its history and is declared again without its schedule, so it is never reported missed. Jobs are tagged `symfony-scheduler` and `symfony-scheduler:<app>`, where the app is `app_id`, else `app-` and a hash of the kernel's secret (`APP_SECRET`), else of the project directory when there is no secret; two apps sharing one database and table prefix need different ones.
 
 ## Options per message
 

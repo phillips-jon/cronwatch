@@ -10,13 +10,13 @@ WordPress runs its scheduled events (WP-Cron) only when someone visits the site.
 
 ## Install
 
-From wp-admin, Plugins, Add New, search for CronWatch, or with WP-CLI:
+The plugin is in review for the wordpress.org plugin directory, and will be there once it is approved. Until it is listed, download `cronwatch-0.7.0.zip` from the [v0.7.0 release on GitHub](https://github.com/phillips-jon/cronwatch/releases/tag/v0.7.0) and upload it in wp-admin under Plugins, Add New, Upload Plugin, or install it with WP-CLI:
 
 ```bash
-wp plugin install cronwatch --activate
+wp plugin install https://github.com/phillips-jon/cronwatch/releases/download/v0.7.0/cronwatch-0.7.0.zip --activate
 ```
 
-It is at [wordpress.org/plugins/cronwatch](https://wordpress.org/plugins/cronwatch/). Activating it makes three tables (`wp_cronwatch_jobs`, `wp_cronwatch_runs` and `wp_cronwatch_state`, with your table prefix) and schedules its check. Then, under CronWatch, Settings, enter where alerts go and send a test alert.
+Activating it makes three tables (`wp_cronwatch_jobs`, `wp_cronwatch_runs` and `wp_cronwatch_state`, with your table prefix) and schedules its check. Then, under CronWatch, Settings, enter where alerts go and send a test alert.
 
 It needs WordPress 6.1 or newer, PHP 8.2 or newer, and MySQL 5.7.8 or MariaDB 10.3 or newer (the versions with the JSON functions it reads state with); activation refuses an older database server with a message.
 
@@ -65,11 +65,18 @@ CronWatch, Settings, for administrators (`manage_options`):
 - **Webhook URL** and **secret**: each alert is posted there as JSON, signed with the secret in `X-CronWatch-Signature` (HMAC-SHA256 of the body) when there is one.
 - **Grace**: how late an event may run before it counts as missed, such as `10m` (the default) or `1h`.
 
-Nothing leaves the site until a channel is set; with none, alerts go to the PHP error log. "Send a test alert" sends one to every channel and says what each answered. Below it, the watched events are listed with their health, last run and next due time. Email and Slack alerts link to the event's page in wp-admin. Slack and the webhook are sent through `wp_remote_post()`, with no redirects followed and a ten second timeout.
+Nothing leaves the site until a channel is set; with none, alerts go to the PHP error log. "Send a test alert" sends one where a real alert would go and says what happened:
+
+- With no channel set, it is written to the PHP error log, and the notice says so.
+- With channels set, it goes to each one, and a notice per channel says it was sent or why it failed. A channel that sent it but reported a partial failure (one address of several refused, say) has that added to its notice.
+
+A save that refuses the grace or the API token names each one it refused and saves the rest. Below the test button, the watched events are listed with their health, last run and next due time. Email and Slack alerts link to the event's page in wp-admin. Slack and the webhook are sent through `wp_remote_post()`, with no redirects followed and a ten second timeout.
 
 ## The dashboard
 
-The CronWatch menu in wp-admin opens the dashboard, for administrators: every event's health, the last 24 hours as a lane per event (when each was due, when it ran and for how long, and the slots nothing ran in), and for each event its last seven days, its runs with their output and errors, and buttons to silence it, forget it or run the check now. These are the library's pages ([Dashboard and API](/docs/dashboard/)), shown inside wp-admin and never at a public URL; WordPress's sign-in stands for the dashboard's token, and every change carries a WordPress nonce.
+The CronWatch menu in wp-admin opens the dashboard, for administrators: every event's health, the last 24 hours as a lane per event (when each was due, when it ran and for how long, and the slots nothing ran in), and for each event its last seven days, its runs with their output and errors, and buttons to silence it, forget it or run the check now. Before anything is recorded, the board says that WP-Cron's events appear after the first check, which runs every five minutes, and that "Run check now" or `wp cronwatch check` runs it at once.
+
+These are the library's pages ([Dashboard and API](/docs/dashboard/)), shown inside wp-admin and never at a public URL; WordPress's sign-in stands for the dashboard's token, and every change carries a WordPress nonce.
 
 ## The JSON API for agents
 
@@ -117,7 +124,11 @@ add_filter( 'cronwatch_client_args', function ( array $args ) {
 } );
 ```
 
-The plugin carries only the channels its settings offer: email through `wp_mail()`, Slack and the webhook. The library's other channels (Discord, Resend, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)) and triage come with the Composer package, `composer require cronwatch/cronwatch`, which has them; they send through `wp_remote_post()` here. `cronwatch_reject_unsafe_urls` decides whether an alert URL may reach a private address or an unusual port (WordPress's `reject_unsafe_urls`): true on a multisite network, where a site's administrators may not be the network's, and false otherwise. Inside a watched event, `\Cronwatch\Cronwatch::current()` is the run's context, for `metric()` as well as `log()`.
+The plugin carries only the channels its settings offer: email through `wp_mail()`, Slack and the webhook. The library's other channels (Discord, Resend, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)) and triage come with the Composer package, `composer require cronwatch/cronwatch`, which has them; they send through `wp_remote_post()` here.
+
+`cronwatch_reject_unsafe_urls` decides whether an alert URL may reach a private address or an unusual port (WordPress's `reject_unsafe_urls`): true on a multisite network, where a site's administrators may not be the network's, and false otherwise.
+
+Inside a watched event, `\Cronwatch\Cronwatch::current()` is the run's context, for `metric()` as well as `log()`.
 
 ## Uninstall
 

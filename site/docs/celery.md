@@ -62,7 +62,7 @@ from cronwatch.celery import cronwatch_task
 def import_orders(batch_id): ...
 ```
 
-`@cronwatch_task(**options)` goes below `@app.task` on the function or above it on the task, and takes a job's options; its own options win over `install`'s, and its `schedule` replaces beat's. `install(app, tasks={"orders.import": {"timeout": "30m"}})` does the same without touching the task, and `exclude=` leaves out beat entries by key or tasks by name. `celery.backend_cleanup` is never a job.
+`@cronwatch_task(**options)` goes below `@app.task` on the function or above it on the task, and takes a job's options and `name=`; its own options win over `install`'s, and its `schedule` replaces beat's. A job is named after its task unless `name=` gives it another name, such as a shorter one for the dashboard: `@cronwatch_task(name="import-orders")`. A job name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. `install(app, tasks={"orders.import": {"timeout": "30m"}})` does the same without touching the task, and `exclude=` leaves out beat entries by key or tasks by name. `celery.backend_cleanup` is never a job.
 
 ## Retries, failures and lost workers
 
@@ -76,11 +76,13 @@ A run whose worker process is lost is failed by the worker's main process, which
 
 When django-celery-beat is installed, its enabled recurring `PeriodicTask` rows are read as schedules too, each in its own zone, and they win over `beat_schedule` entries of the same name, as its scheduler copies those into the table. Clocked and one-off rows are not schedules. `install(app, django_celery_beat=False)` turns this off.
 
-A schedule that cannot be written as cron (a solar schedule, a task scheduled by several entries, one never due) is reported once through `on_error`, and the task is still watched, without a schedule, so its failures still alert.
+A schedule that cannot be read (a solar schedule, one task scheduled by several entries, a time that daylight saving skips) is reported once through `on_error`, and the task is still watched, without a schedule, so its failures still alert.
 
 ## Stores and pools
 
-Every worker process records to the store, so use one they all share: [Postgres](/docs/python/#stores), or SQLite on a disk every worker can reach. The prefork pool is fine: each child opens its own connection. With the in-memory store each process would have its own history, and nothing would notice a missed run.
+Every worker process records to the store, so use one they all share. With workers on more than one machine, that is [Postgres](/docs/python/#stores). With every worker on one machine, a SQLite file on its local disk works too (not on a network share, where SQLite's locking cannot be trusted).
+
+The prefork pool is fine: each child opens its own connection. Do not use the in-memory store: each process would have its own history, and nothing would notice a missed run.
 
 ## Tests
 

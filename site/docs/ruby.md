@@ -1,12 +1,12 @@
 ---
 title: Ruby
-description: The cronwatch gem in plain Ruby, its API, and sharing one database with a Node app.
+description: The cronwatch gem in plain Ruby, its API, and sharing one database with Node, Python, PHP, Go and Rust.
 order: 3.2
 ---
 
 # Ruby
 
-The `cronwatch` gem is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Ruby process and a Node process can share one database and the [MCP server](/docs/mcp/) works against either. For a Rails app, start with [Ruby on Rails](/docs/rails/); this page covers plain Ruby and the API underneath.
+The `cronwatch` gem is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Ruby process can share one database with a Node, Python, PHP, Go or Rust process and the [MCP server](/docs/mcp/) works against any of them. For a Rails app, start with [Ruby on Rails](/docs/rails/); this page covers plain Ruby and the API underneath.
 
 ```ruby
 # Gemfile
@@ -17,7 +17,8 @@ Ruby 3.2 or newer; the Rails integration is tested on Rails 7.2, 8.0 and 8.1. Th
 
 | Require | For | Needs |
 |---|---|---|
-| `cronwatch` | the client, the memory store, and the Slack, Discord, webhook and console channels | |
+| `cronwatch` | the client, the memory store, and every alert channel: Slack, Discord, webhook, console, email, Twilio and the error trackers | |
+| `cronwatch/pg_cron` | `Cronwatch::Sources::PgCron`, which reads pg_cron's jobs and runs through an ActiveRecord or pg connection | |
 | `cronwatch/active_record` | the ActiveRecord store | `activerecord` |
 | `cronwatch/rails` | the Railtie, `Cronwatch::ActiveJob`, `Cronwatch::CheckJob`, `Cronwatch::Web`, the `cronwatch:check` task, the install generator | `railties`, `activejob` |
 | `cronwatch/sidekiq` | `Cronwatch::Sidekiq` for jobs that include `Sidekiq::Job`, its server middleware, `Cronwatch::Sidekiq::CheckWorker` | `sidekiq` 7 or newer |
@@ -66,7 +67,7 @@ end
 
 Logged output, a returned string and an error's message are stored as UTF-8: bytes that are not valid UTF-8 (binary output, a C extension's message) become the replacement character `�`, as they would in a JavaScript string.
 
-Option names are snake_case (`max_duration`, `failures_before_alert`); conditions and alert types are symbols (`:missed`, `:over_budget`, `:recovered`). Durations are strings such as `"15m"` or `"1h30m"`, or milliseconds as an Integer. Anything that leaves the process (store rows, the JSON API, webhook bodies) uses the SDK's camelCase field names and string values.
+Option names are snake_case (`max_duration`, `failures_before_alert`); conditions and alert types are symbols (`:missed`, `:over_budget`, `:recovered`). Durations are strings such as `"15m"` or `"1h30m"`, or milliseconds as an Integer. A duration string is at most 64 characters; a longer one raises `ArgumentError`. Anything that leaves the process (store rows, the JSON API, webhook bodies) uses the SDK's camelCase field names and string values.
 
 ## Run the check
 
@@ -128,16 +129,22 @@ map "/cronwatch" do
 end
 ```
 
-Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules: the board's counts by health, a timeline of the last day with a lane per job (a tick each time it was due, a mark for each run as long as it took, a dashed box for a missed slot) and the table of every job, and for each job its last seven days, runs and definition, all drawn on the server with no script, reading `Rails.env` (when Rails is loaded), `RAILS_ENV` or `RACK_ENV` where the SDK reads `NODE_ENV`. It reads forms through Rack, so it works behind `Rack::MethodOverride` and with a request body that can be read only once. It is installable as a web app like the TypeScript dashboard, with its manifest, icons and service worker under the mount point (from `SCRIPT_NAME` or `base_path:`); see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
+Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules.
+
+The board shows its counts by health, a timeline of the last day with a lane per job (a tick each time it was due, a mark for each run as long as it took, a dashed box for a missed slot) and the table of every job, and for each job its last seven days, runs and definition, all drawn on the server with no script. Where the SDK reads `NODE_ENV`, it reads `Rails.env` (when Rails is loaded), then `RAILS_ENV`, then `RACK_ENV`.
+
+It reads forms through Rack, so it works behind `Rack::MethodOverride` and with a request body that can be read only once. It is installable as a web app like the TypeScript dashboard, with its manifest, icons and service worker under the mount point (from `SCRIPT_NAME` or `base_path:`); see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
 
 `Cronwatch::Web.new(client = nil, token:, base_path:, origin:)`:
 
 - `client`: the client to serve. Leave it out and each request uses `Cronwatch.client`.
-- `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Without a token, while `RAILS_ENV` or `RACK_ENV` is `development` or `test`, the app makes a token of its own and prints a sign-in link to standard output on its first request (see below); anywhere else it answers 503. `nil` opts out and serves it open, for a mount behind your own auth.
+- `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Without a token, while the environment (`Rails.env` when Rails is loaded, else `RAILS_ENV` or `RACK_ENV`) is `development` or `test`, the app makes a token of its own and prints a sign-in link to standard output on its first request (see below); anywhere else it answers 503. `nil` opts out and serves it open, for a mount behind your own auth.
 - `base_path`: where it is mounted. It defaults to `SCRIPT_NAME`, which `map` and Rails' `mount` set, so it is only needed when something strips the prefix without setting it.
 - `origin`: the public origin the dashboard is served from, such as `"https://app.example.com"`. Leave it out and each request's own origin is used, as Rack reads it (see below). Set it to pin the origin: it then replaces the request's for the cross-site check on writes, the sign-in cookie's `Secure` flag, the `Referer` the redirect back after a form follows, and the development sign-in line. It is read as the TypeScript routes read it (with `new URL`): whitespace around it is dropped, the host is lowercased, a host that is not ASCII becomes punycode (through the `simpleidn` gem, or Addressable when the app has it; without either, write it as `xn--...`), and it is reduced to scheme, host and port. Anything that is not an absolute `http` or `https` URL, or has a port outside 1 to 65535, raises `ArgumentError` when the app is made, and an empty string counts as unset.
 
-The development token is 32 random bytes, base64url, made once per `Cronwatch::Web` instance (so a restart, or a reload that builds a new one, signs you out). The first request prints one line:
+### Signing in during development
+
+The development token is 32 random bytes, base64url, made once per `Cronwatch::Web` instance, when it is built (in Rails, when the routes load), so a restart, or a reload that builds a new one, signs you out. The first request prints one line:
 
 ```text
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
@@ -149,13 +156,23 @@ The link is built from `origin:` when it is set, and otherwise from that request
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)
 ```
 
-Open it once and the browser keeps a cookie, as with any token; scripts and the MCP server can send it as a bearer. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a Rack app cannot tell a caller on this machine from one elsewhere (proxies, tunnels and a server bound to every interface all look alike), so the log, which only you can read, is the proof. The request's origin, used to refuse cross-site writes, comes from the host and scheme Rack reports (`Rack::Request#base_url`), which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` the way Rails does, so the TypeScript routes' `trustProxy` has no counterpart here. Behind a proxy, make sure those headers carry the public host and scheme, or pass `origin:` to pin it whatever a request says. Behind more than one proxy, set `origin:`: where a header lists several values, Rack takes the last (the hop nearest the app), not the public one the TypeScript routes' `trustProxy` reads first. The host is compared lowercased, as browsers send it. `/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
+Open it once and the browser keeps a cookie, as with any token; scripts and the MCP server can send it as a bearer. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a Rack app cannot tell a caller on this machine from one elsewhere (proxies, tunnels and a server bound to every interface all look alike), so the log, which only you can read, is the proof.
+
+`/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
+
+### Behind a proxy
+
+The request's origin is what the cross-site check on writes (any method other than `GET` and `HEAD`) compares against. It comes from the host and scheme Rack reports (`Rack::Request#base_url`), which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` the way Rails does, so the TypeScript routes' `trustProxy` has no counterpart here. The host is compared lowercased, as browsers send it.
+
+- No proxy: nothing to set.
+- One proxy: make sure it sends `X-Forwarded-Host` and `X-Forwarded-Proto` (or `Host`) with the public host and scheme, or pass `origin:` to pin it whatever a request says.
+- More than one proxy: set `origin:`. Where a header lists several values, Rack takes the last (the hop nearest the app), not the public one the TypeScript routes' `trustProxy` reads first.
 
 ## Stores
 
 `Cronwatch::Stores::Memory.new` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each process has its own. The client warns when it is used in production (`Rails.env`, or `RAILS_ENV` or `RACK_ENV`, is `production`).
 
-`Cronwatch::Stores::ActiveRecord.new(prefix: "cronwatch_", connection_class: nil)` writes through ActiveRecord, to Postgres or SQLite, in three tables named `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. `prefix` is lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. `connection_class` is the ActiveRecord class whose database it uses (or its name, looked up on first use), `ActiveRecord::Base` by default; pass one that `connects_to` another database to keep the tables there. MySQL is not supported yet: the SDK's statements use `ON CONFLICT` and `TEXT` primary keys, and any adapter other than Postgres and SQLite is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter`.
+`Cronwatch::Stores::ActiveRecord.new(prefix: "cronwatch_", connection_class: nil)` writes through ActiveRecord, to Postgres or SQLite, in three tables named `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. `prefix` is lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. `connection_class` is the ActiveRecord class whose database it uses (or its name, looked up on first use), `ActiveRecord::Base` by default; pass one that `connects_to` another database to keep the tables there. MySQL is not supported: the gem writes only the SDK's Postgres and SQLite statements, not the MySQL tables the PHP, Go and Rust ports use, and any adapter other than Postgres and SQLite is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter`.
 
 The store never creates its tables. In Rails, `bin/rails generate cronwatch:install` writes the migration that does. Elsewhere, create them once:
 
@@ -275,11 +292,24 @@ The first argument is an ActiveRecord class, connection pool or connection (quer
 | `options` | | `grace`, `timeout`, `max_duration`, `expect` (tested against pg_cron's return message, such as `"1 row"`), `failures_before_alert`, `description` and `tags`, as a hash or a callable given the Job. The schedule and timezone always come from pg_cron |
 | `timezone` | `cron.timezone`, or UTC | the zone pg_cron reads its cron expressions in |
 
-It reads the same tables with the same SQL as the SDK's `@cronwatch/sdk/pg-cron`, and maps them the same way: run ids `pgcron:<runid>`, trigger `pg_cron`, `$` for the last day of the month read as `L`, `N seconds` as `every Ns`, fields past the fifth dropped (pg_cron ignores them), a paused job declared without its schedule. The first time it sees a job it copies its twenty newest runs quietly and judges only from the newest finished one; after that it carries on from the newest run in the store, so a restart copies nothing twice. A run pg_cron has queued but not started is waited for, up to ten minutes, and then copied as running from when it was first seen, so one that never starts is marked stuck; it never holds up the runs after it, which are read by their ids until it starts. A run a server restart cut off (`failed`, `server restarted`, with no `start_time`) is a failure starting at its `end_time`, else at the job's newest run before it. A run a check marked stuck is still read, and when pg_cron finishes it the finish is recorded: a success closes stuck with a recovery, a failure is not counted twice.
+It reads the same tables with the same SQL as the SDK's `@cronwatch/sdk/pg-cron`, and maps them the same way: run ids `pgcron:<runid>`, trigger `pg_cron`, `$` for the last day of the month read as `L`, `N seconds` as `every Ns`, fields past the fifth dropped (pg_cron ignores them), a paused job declared without its schedule.
 
-A job renamed, unscheduled or no longer picked by `jobs` keeps its old name's runs, and that name is declared again without a schedule, so it is never reported missed again (if it was missed, the check closes missed with a recovered alert saying it is no longer scheduled, `reason: :unscheduled`), its description saying why (`renamed to <new name>`, `no longer watched`, `no longer in cron.job`). Runs it had open are still finished under the old name. A process that starts after the change notices it too, once, from the job id in the stored description. The settings are read from `pg_settings`, which simply has no row for one the role may not read, so a check inside the app's transaction never aborts it: `cron.timezone` is then taken as UTC and `cron.log_run` as on. It warns once through `on_error` when it cannot read `cron.timezone`, when `cron.log_run` is off, and when `cron.job` shows no jobs (row level security shows a role only the jobs it scheduled). Roles, Supabase and purging are covered in [Supabase and pg_cron](/docs/supabase/).
+How runs are copied, case by case:
 
-A source of your own is any object with `name` and `sync(host)`. Each check calls `sync` first with the client as the host, whose `job`, `record_run`, `store`, `now` and `on_error(error, where)` it may use, and adds the alerts `sync` returns to its result. `client.record_run(run, evaluate: true)` records a run that happened elsewhere, keyed by its id: a new one is inserted, one stored as running (or marked stuck by a check) is finished once this one is not running, and anything else is left alone, so recording a run twice changes nothing. Finishing is a conditional write (`update_run_if`), so when two processes record the same finish only one judges it and the other reports it to `on_error` as already finished; a stored run of another job is left alone and reported (as `"recording <job>"`). A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets), its output and error capped and redacted the same way, and the alerts it sent are returned; one finishing after a check marked it stuck is judged only when it succeeded. `evaluate: false` stores it without judging it, for history. The job must be declared first.
+- A job seen for the first time: its twenty newest runs are copied quietly, and it is judged only from the newest finished one. After that it carries on from the newest run in the store, so a restart copies nothing twice.
+- A run pg_cron has queued but not started: waited for, up to ten minutes, then copied as running from when it was first seen, so one that never starts is marked stuck. It never holds up the runs after it, which are read by their ids until it starts.
+- A run a server restart cut off (`failed`, `server restarted`, with no `start_time`): a failure starting at its `end_time`, else at the job's newest run before it.
+- A run a check marked stuck: still read, and when pg_cron finishes it the finish is recorded. A success closes stuck with a recovery; a failure is not counted twice.
+- A job renamed, unscheduled or no longer picked by `jobs`: it keeps its old name's runs, and that name is declared again without a schedule, so it is never reported missed again (if it was missed, the check closes missed with a recovered alert saying it is no longer scheduled, `reason: :unscheduled`), its description saying why (`renamed to <new name>`, `no longer watched`, `no longer in cron.job`). Runs it had open are still finished under the old name. A process that starts after the change notices it too, once, from the job id in the stored description.
+- A setting the role may not read: the settings come from `pg_settings`, which simply has no row for one, so a check inside the app's transaction never aborts it. `cron.timezone` is then taken as UTC and `cron.log_run` as on.
+
+It warns once through `on_error` when it cannot read `cron.timezone`, when `cron.log_run` is off, and when `cron.job` shows no jobs (row level security shows a role only the jobs it scheduled). Roles, Supabase and purging are covered in [Supabase and pg_cron](/docs/supabase/).
+
+A source of your own is any object with `name` and `sync(host)`. Each check calls `sync` first with the client as the host, whose `job`, `record_run`, `store`, `now` and `on_error(error, where)` it may use, and adds the alerts `sync` returns to its result.
+
+`client.record_run(run, evaluate: true)` records a run that happened elsewhere, keyed by its id: a new one is inserted, one stored as running (or marked stuck by a check) is finished once this one is not running, and anything else is left alone, so recording a run twice changes nothing. Finishing is a conditional write (`update_run_if`), so when two processes record the same finish only one judges it and the other reports it to `on_error` as already finished; a stored run of another job is left alone and reported (as `"recording <job>"`).
+
+A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets), its output and error capped and redacted the same way, and the alerts it sent are returned; one finishing after a check marked it stuck is judged only when it succeeded. `evaluate: false` stores it without judging it, for history. The job must be declared first.
 
 ## Redaction
 
@@ -343,7 +373,7 @@ A triage of your own is any callable that takes the context (`alert`, `recent_ru
 | `on_error` | `Rails.logger`, or a warning on standard error | `->(error, where) { ... }` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a callable returning epoch milliseconds; for tests |
 
-`client.job(name, **options)` takes `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `expect` (a string, a Regexp, matched within one second or it fails, see [expect rules](/docs/conditions/#expect-rules), or a callable), `failures_before_alert`, `description` and `tags`, with the defaults and rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ArgumentError` when the job is declared. It returns a handle whose `run(trigger: "run") { |job| ... }` runs the block, and whose `start` and `resume` handle a run that spans calls (see [Runs that span calls](#runs-that-span-calls)).
+`client.job(name, **options)` takes `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `expect` (a string, a Regexp or a callable; a Regexp that takes longer than one second to match counts as not matching, see [expect rules](/docs/conditions/#expect-rules)), `failures_before_alert`, `description` and `tags`, with the defaults and rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ArgumentError` when the job is declared. It returns a handle whose `run(trigger: "run") { |job| ... }` runs the block, and whose `start` and `resume` handle a run that spans calls (see [Runs that span calls](#runs-that-span-calls)).
 
 The block's `job` has `name`, `run_id`, `started_at`, `log(*parts)`, `metric(name, value)`, `metrics(hash)`, `signal`, and `aborted?`, true once the job's `timeout` has passed. Nothing is interrupted; a loop that can stop early checks it, or calls `job.signal.check!` to raise.
 
@@ -393,9 +423,9 @@ The handle:
 
 A run is judged once, however many times it is finished. The finish is written only while the stored run is still running (or marked stuck by a check), in one step (`update_run_if`), so when two processes finish the same run at once, one records and judges it and the other records nothing. A second `finish` on a handle, on a run another process has finished, or on a run of another job records nothing: it returns nil and is reported to `on_error` (as `"finishing <job>"`, `run <id> of <job> was already finished as ok; ignored`), never raised. When the store fails during `finish`, nothing is recorded, the error goes to `on_error`, and the handle stays active with its lines and metrics: call `finish` again once the store is back. An exception outside `StandardError` (`Interrupt`, a `Timeout`) raised meanwhile is raised again and leaves the handle open the same way. A run that is never finished is marked stuck by the first check after the job's `timeout`, so set `timeout` to cover the whole span; one finished after that follows the rule for a late `run`: a late failure is not counted again, and a late success closes stuck and recovers. For ActiveJob, see [Ruby on Rails](/docs/rails/#runs-that-span-jobs).
 
-## Sharing a database with Node
+## Sharing a database with the other languages
 
-A Rails app and a Node service can watch their jobs in one database. The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The gem's tests run the SDK's own stores in Node beside it, on SQLite and Postgres, and check that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes in every column. Create the tables from either side; the other side's `CREATE TABLE IF NOT EXISTS` finds them and leaves them alone. Use the same prefix on both sides.
+A Rails app and a Node service can watch their jobs in one database. The Python, PHP, Go and Rust ports write the same tables too, so a process in any of them can join; this section describes the Node side, which the gem's tests run beside it. The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The gem's tests run the SDK's own stores in Node beside it, on SQLite and Postgres, and check that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes in every column. Create the tables from either side; the other side's `CREATE TABLE IF NOT EXISTS` finds them and leaves them alone. Use the same prefix on both sides.
 
 Each process alerts on the jobs it runs, and either side's check sees every job in the store. One dashboard, Rails or Node, shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store, on one side.
 
