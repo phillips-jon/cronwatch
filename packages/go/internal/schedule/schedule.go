@@ -136,20 +136,77 @@ func every(text string) (string, bool) {
 	return trimmed, true
 }
 
+// cycleMs is four hundred Gregorian years: 146,097 days, a whole number of
+// weeks, after which the calendar repeats date for date and weekday for
+// weekday.
+const cycleMs int64 = 146_097 * 86_400_000
+
+var (
+	// Croner misreads a year below 100, so the SDK asks it about any time
+	// before the year 400 a cycle or more later.
+	cronerFirstMs = js.DateUTC(400, 0, 1, 0, 0, 0, 0)
+	// Croner finds no fire past the year 3000, so the SDK asks it about any
+	// time from the year 2800 a cycle or more earlier.
+	cronerLastMs = js.DateUTC(2800, 0, 1, 0, 0, 0, 0)
+)
+
+// runsAfter is the SDK's runsAfter: the next n fires of a cron strictly
+// after from, which lies within the years 1 to 9999, dropping any after
+// 9999. A time croner cannot answer for is moved by whole 400-year cycles
+// into the years it can, and its fires moved back, so this port answers
+// as the SDK does.
+func runsAfter(p *Parsed, n int, from int64) []int64 {
+	var shift int64
+	if from < cronerFirstMs {
+		shift = (cronerFirstMs - from + cycleMs - 1) / cycleMs * cycleMs
+	} else if from >= cronerLastMs {
+		shift = -((from-cronerLastMs)/cycleMs + 1) * cycleMs
+	}
+	runs := p.cron.NextRuns(n, from+shift)
+	out := make([]int64, 0, len(runs))
+	for _, t := range runs {
+		t -= shift
+		if t > js.LastDateMs {
+			break
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// countFrom is the SDK's countFrom: a stored time as a cron's fires are
+// counted from it. A start read from a foreign or damaged row can be any
+// number: one before the year 1 counts from just before its first
+// millisecond, so the first fire of the year 1 is the next one, and one at
+// or after the last millisecond of 9999 has no fire after it (false).
+func countFrom(from int64) (int64, bool) {
+	if from >= js.LastDateMs {
+		return 0, false
+	}
+	if from < js.FirstDateMs {
+		return js.FirstDateMs - 1, true
+	}
+	return from, true
+}
+
 // fireAfter is the first fire strictly after from, or false when the cron
 // never fires again. Croner answers with times in the past when asked from
 // inside the hour that repeats when clocks go back, so its answers are
 // filtered, and a stretch of nothing but past times is stepped over an
 // hour at a time.
 func fireAfter(p *Parsed, from int64) (int64, bool) {
-	probe := from
+	start, ok := countFrom(from)
+	if !ok {
+		return 0, false
+	}
+	probe := start
 	for attempt := 0; attempt < 4; attempt++ {
-		runs := p.cron.NextRuns(8, probe)
+		runs := runsAfter(p, 8, probe)
 		if len(runs) == 0 {
 			return 0, false
 		}
 		for _, t := range runs {
-			if t > from {
+			if t > start {
 				return t, true
 			}
 		}
@@ -164,9 +221,13 @@ func fireAfter(p *Parsed, from int64) (int64, bool) {
 // that do not move forward (see fireAfter).
 func FiresBetween(p *Parsed, from, to int64, limit int) ([]int64, bool) {
 	out := []int64{}
-	probe, last := from, from
+	start, ok := countFrom(from)
+	if !ok {
+		return out, true
+	}
+	probe, last := start, start
 	for guard := 0; guard < 1000; guard++ {
-		batch := p.cron.NextRuns(min(limit+1-len(out), 24), probe)
+		batch := runsAfter(p, min(limit+1-len(out), 24), probe)
 		if len(batch) == 0 {
 			return out, true
 		}
@@ -254,7 +315,8 @@ func FireAfter(p *Parsed, from int64) (int64, bool) { return fireAfter(p, from) 
 func DueAfterRun(p *Parsed, startedAt int64) (int64, bool) { return dueAfterRun(p, startedAt) }
 
 // dueAfterRun is the first fire that a run starting at startedAt does not
-// cover.
+// cover. A start before the year 1 covers none of them, so the first fire
+// of the year 1 is due; after 9999 there is none (see countFrom).
 func dueAfterRun(p *Parsed, startedAt int64) (int64, bool) {
 	// A fire at or before the start is covered by the run itself.
 	next, ok := fireAfter(p, startedAt)
@@ -295,6 +357,10 @@ func RunCovers(startedAt, dueAt int64, followingAt *int64) bool {
 // way, which only matters if it also ran early by up to an hour.
 func inSpringForwardGap(p *Parsed, startedAt, fireAt int64) bool {
 	const lookback = 3 * 3_600_000
+	// Every zone kept its local mean time, with no clock change, in the year 1.
+	if fireAt-lookback < js.FirstDateMs {
+		return false
+	}
 	loc := zoneOf(p)
 	after := utcOffset(fireAt, loc)
 	before := utcOffset(fireAt-lookback, loc)

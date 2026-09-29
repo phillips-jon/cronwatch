@@ -2,6 +2,9 @@ package sqltest
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -93,5 +96,71 @@ func TestServerForeignVersions(t *testing.T) {
 func TestServerCheckOverForeignRows(t *testing.T) {
 	eachServer(t, func(t *testing.T, b backend) {
 		checkOverForeignRows(t, b.open(t), b.dialect, prefix("far"))
+	})
+}
+
+// farCronStarts are last-run starts a foreign or damaged row could hold for
+// a cron job: before the year 1 (the first fire of the year 1 was missed),
+// after 9999 (never due again), and the BIGINT extremes.
+var farCronStarts = []string{"-62135596800001", "253402300800000", "-9223372036854775808", "9223372036854775807"}
+
+// cronOverForeignRow: a check, and the dashboard's pages for the job, over
+// a cron job whose last run started at startedAt, answer with no error.
+func cronOverForeignRow(t *testing.T, db *sql.DB, dialect sqlstore.Dialect, p, startedAt string) {
+	store := newStore(t, db, dialect, p)
+	must(t, store.Init(ctx))
+	var def cronwatch.Definition
+	must(t, def.UnmarshalJSON([]byte(`{"name":"far","schedule":"0 2 * * *","timezone":"UTC","grace":"10m"}`)))
+	must(t, store.UpsertJob(ctx, def, 1))
+	trigger := "trigger"
+	if dialect == sqlstore.MySQL {
+		trigger = "`trigger`"
+	}
+	_, err := db.ExecContext(ctx, "INSERT INTO "+p+"runs (id, job, status, started_at, finished_at, duration_ms, metrics, "+trigger+") VALUES ('far1', 'far', 'ok', "+startedAt+", "+startedAt+", 0, '{}', 'run')")
+	must(t, err)
+
+	proc := process(t, store, storetest.NewClock(storetest.T0).Now)
+	_, err = proc.Client.Check(ctx)
+	must(t, err)
+	routes, err := proc.Client.Routes(cronwatch.WithToken("tok"), cronwatch.WithBasePath("/cronwatch"))
+	must(t, err)
+	for _, path := range []string{"/cronwatch/", "/cronwatch/jobs/far", "/cronwatch/api/jobs/far"} {
+		r := httptest.NewRequest(http.MethodGet, "http://app.test"+path, nil)
+		r.Header.Set("Authorization", "Bearer tok")
+		w := httptest.NewRecorder()
+		routes.ServeHTTP(w, r)
+		if w.Code != http.StatusOK {
+			t.Errorf("%s answered %d", path, w.Code)
+		}
+	}
+	if errs := proc.Errors.List(); len(errs) > 0 {
+		t.Fatalf("errors: %v", errs)
+	}
+	types := proc.Alerts.Types()
+	if strings.HasPrefix(startedAt, "-") {
+		if len(types) != 1 || types[0] != "missed" || !strings.HasPrefix(proc.Alerts.List()[0].Message, "Due 0001-01-01 02:00:00 UTC ") {
+			t.Errorf("alerts: %v", types)
+		}
+	} else if len(types) != 0 {
+		t.Errorf("alerts: %v", types)
+	}
+	must(t, proc.Client.Close())
+}
+
+func TestSQLiteCronOverForeignRow(t *testing.T) {
+	for i, startedAt := range farCronStarts {
+		t.Run(startedAt, func(t *testing.T) {
+			cronOverForeignRow(t, sqliteDB(t, tempFile(t, "farcron"+strconv.Itoa(i)+".db")), sqlstore.SQLite, sqlstore.DefaultPrefix, startedAt)
+		})
+	}
+}
+
+func TestServerCronOverForeignRow(t *testing.T) {
+	eachServer(t, func(t *testing.T, b backend) {
+		for _, startedAt := range farCronStarts {
+			t.Run(startedAt, func(t *testing.T) {
+				cronOverForeignRow(t, b.open(t), b.dialect, prefix("farcron"), startedAt)
+			})
+		}
 	})
 }

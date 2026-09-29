@@ -64,8 +64,8 @@ func readGolden(t *testing.T) goldenFile {
 	if g.T0 != T0 {
 		t.Fatalf("golden.json's t0 is %d, not %d", g.T0, T0)
 	}
-	if len(g.Captures) != 59 {
-		t.Fatalf("golden.json has %d captures, not 59", len(g.Captures))
+	if len(g.Captures) != 63 {
+		t.Fatalf("golden.json has %d captures, not 63", len(g.Captures))
 	}
 	return g
 }
@@ -77,7 +77,11 @@ func seedGolden(t *testing.T) *cronwatch.Client {
 	clock := storetest.NewClock(T0)
 	cw, err := cronwatch.New(cronwatch.WithClock(clock.Now), cronwatch.WithStore(cronwatch.NewMemoryStore()),
 		cronwatch.WithAlerts(cronwatch.ChannelFunc("capture", func(context.Context, cronwatch.Alert) error { return nil })),
-		cronwatch.WithoutCronSecret(), cronwatch.WithErrorHandler(func(error, string) {}))
+		cronwatch.WithoutCronSecret(), cronwatch.WithErrorHandler(func(err error, where string) {
+			// Nothing in the seed or the requests may report an error, however
+			// far off a run's start is.
+			t.Errorf("the client reported an error, %s: %v", where, err)
+		}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,6 +131,22 @@ func seedGolden(t *testing.T) *cronwatch.Client {
 		clock.Advance(1000)
 		return nil
 	})
+	// Cron jobs whose last run is as far off: counted from the first
+	// millisecond of the year 1, the first is due then (and is missed at the
+	// check); after 9999 the other is never due again.
+	for _, far := range []struct {
+		name string
+		at   int64
+	}{{"far-cron-back", -62_135_596_800_001}, {"far-cron-ahead", 253_402_300_800_000}} {
+		job := must[*cronwatch.Job](t)(cw.Job(far.name, cronwatch.Schedule("0 2 * * *"), cronwatch.Timezone("UTC"), cronwatch.Grace("10m")))
+		clock.Set(far.at)
+		if err := job.Run(bg, func(context.Context, *cronwatch.JobContext) error {
+			clock.Advance(1000)
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	clock.Set(T0)
 	return cw
 }

@@ -68,7 +68,8 @@ func dayLabel(t int64) string {
 	return weekdayNames[wd] + " " + num(d) + " " + monthNames[m-1]
 }
 
-// whenUTC is "22:42" on the same UTC day as now, otherwise "25 Sep 22:42".
+// whenUTC is "22:42" on the same UTC day as now, otherwise "25 Sep 22:42",
+// and "1 Jan 0001 02:00" in another UTC year.
 // A time before the year 1 or after 9999 (a start read from a foreign or
 // damaged row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
 func whenUTC(t, now int64) string {
@@ -82,7 +83,18 @@ func whenUTC(t, now int64) string {
 		return clockUTC(t)
 	}
 	m, d, _ := civil(t)
-	return num(d) + " " + monthNames[m-1] + " " + clockUTC(t)
+	other := ""
+	if y := yearOf(t); y != yearOf(now) {
+		// From the year 1 through 9999 here: four digits, zero padded.
+		other = " " + strings.Repeat("0", 4-len(num(y))) + num(y)
+	}
+	return num(d) + " " + monthNames[m-1] + other + " " + clockUTC(t)
+}
+
+// yearOf is the UTC year of a time.
+func yearOf(t int64) int64 {
+	y, _, _ := js.CivilFromDays(js.FloorDiv(t, dayMs))
+	return y
 }
 
 // span is the stretch of time a timeline draws, and the moment it was drawn.
