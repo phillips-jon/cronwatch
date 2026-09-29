@@ -19,11 +19,13 @@ defmodule Cronwatch.Alerts.ProvidersServerTest do
     # query, through the default :httpc transport.
     @behaviour Cronwatch.Transport
 
+    alias Cronwatch.Transport.Httpc
+
     @impl true
     def post(base, request) do
       uri = URI.parse(request.url)
       path = (uri.path || "/") <> if(uri.query, do: "?" <> uri.query, else: "")
-      Cronwatch.Transport.Httpc.post([], %{request | url: base <> path})
+      Httpc.post([], %{request | url: base <> path})
     end
   end
 

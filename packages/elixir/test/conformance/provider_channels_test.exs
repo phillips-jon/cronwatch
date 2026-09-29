@@ -40,7 +40,7 @@ defmodule Cronwatch.Conformance.ProviderChannelsTest do
   def digest(s) do
     if JS.len16(s) <= 400,
       do: Object.new([{"text", s}]),
-      else: Object.new([{"length", JS.len16(s)}, {"sha256", Cronwatch.Alerts.Shared.sha256_hex(s)}])
+      else: Object.new([{"length", JS.len16(s)}, {"sha256", Alerts.Shared.sha256_hex(s)}])
   end
 
   # A channel from a fixture's options, as the script's materialize() makes

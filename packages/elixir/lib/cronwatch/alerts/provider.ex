@@ -3,6 +3,9 @@ defmodule Cronwatch.Alerts.Provider do
   # Reading the provider channels' options: text options, the link, the
   # recovered switch and the clock, each checked the same way.
 
+  alias Cronwatch.Alerts.Shared
+  alias Cronwatch.Transport
+
   @doc "A text option: the binary given, `\"\"` when it is left out or not text."
   def str(opts, key) do
     case Keyword.get(opts, key) do
@@ -12,7 +15,7 @@ defmodule Cronwatch.Alerts.Provider do
   end
 
   @doc "A credential: trimmed of the spaces and newlines a paste leaves."
-  def secret(opts, key), do: Cronwatch.Alerts.Shared.trimmed(Keyword.get(opts, key))
+  def secret(opts, key), do: Shared.trimmed(Keyword.get(opts, key))
 
   @doc "The `:link` option: nil or a function of the alert."
   def link(module, opts) do
@@ -51,7 +54,7 @@ defmodule Cronwatch.Alerts.Provider do
   """
   def keyword(module, opts) do
     if is_list(opts) and Keyword.keyword?(opts) do
-      with :ok <- Cronwatch.Transport.check(Keyword.get(opts, :transport), inspect(module)), do: {:ok, opts}
+      with :ok <- Transport.check(Keyword.get(opts, :transport), inspect(module)), do: {:ok, opts}
     else
       {:error, "#{inspect(module)} takes a keyword list of options"}
     end

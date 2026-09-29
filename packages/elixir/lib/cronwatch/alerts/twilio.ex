@@ -52,7 +52,8 @@ defmodule Cronwatch.Alerts.Twilio do
   @impl true
   def init(opts) do
     with {:ok, opts} <- Provider.keyword(__MODULE__, opts),
-         # A pasted credential often carries a stray space or newline, which the Authorization header would refuse or send.
+         # A pasted credential often carries a stray space or newline, which the
+         # Authorization header would refuse or send.
          {:sid, sid} when sid != "" <- {:sid, Provider.secret(opts, :account_sid)},
          key_sid = Provider.secret(opts, :api_key_sid),
          {user, password} =

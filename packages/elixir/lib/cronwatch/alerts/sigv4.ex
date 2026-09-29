@@ -5,6 +5,7 @@ defmodule Cronwatch.Alerts.SigV4 do
   # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
   # Checked against the AWS SigV4 test suite (test/alerts/sigv4_test.exs).
 
+  alias Cronwatch.Alerts.Post
   alias Cronwatch.Alerts.Shared
   alias Cronwatch.JS
 
@@ -139,5 +140,5 @@ defmodule Cronwatch.Alerts.SigV4 do
 
   # application/x-www-form-urlencoded decoding: `+` a space, `%XX` a byte,
   # anything else as it is.
-  defp form_decode(text), do: text |> String.replace("+", " ") |> Cronwatch.Alerts.Post.percent_decode()
+  defp form_decode(text), do: text |> String.replace("+", " ") |> Post.percent_decode()
 end
