@@ -110,30 +110,61 @@ test("without trustProxy a spoofed X-Forwarded-Host or Proto changes nothing", a
   assert.doesNotMatch(signIn.headers.get("set-cookie")!, /Secure/);
 });
 
-test("the development sign-in line uses the public origin", async () => {
+test("the development sign-in line uses the public origin when set or loopback, and otherwise leaves the host out", async () => {
   const saved = { NODE_ENV: process.env.NODE_ENV, CRONWATCH_TOKEN: process.env.CRONWATCH_TOKEN };
   process.env.NODE_ENV = "development";
   delete process.env.CRONWATCH_TOKEN;
   const lines: string[] = [];
   const info = console.info;
   console.info = (...parts: unknown[]) => { lines.push(parts.map(String).join(" ")); };
+  const spoofed = { "x-forwarded-proto": "https", "x-forwarded-host": "attacker.example" };
   try {
     const cw = cronwatch({ alerts: [capture()], cronSecret: null });
-    await cw.routes({ origin: "https://app.example.com" }).handler(new Request("http://10.0.0.5:8080/cronwatch/"));
-    await cw.routes({ trustProxy: true }).handler(new Request("http://10.0.0.5:8080/cronwatch/", {
-      headers: { "x-forwarded-proto": "https", "x-forwarded-host": "proxied.example" },
-    }));
-    await cw.routes({}).handler(new Request("http://10.0.0.5:8080/cronwatch/", {
-      headers: { "x-forwarded-proto": "https", "x-forwarded-host": "proxied.example" },
-    }));
+    const first = (options: RoutesOptions, url: string, headers: Record<string, string> = {}) =>
+      cw.routes(options).handler(new Request(url, { headers }));
+    await first({ origin: "https://app.example.com" }, "http://10.0.0.5:8080/cronwatch/");
+    await first({ origin: "https://app.example.com", trustProxy: true }, "http://10.0.0.5:8080/cronwatch/", spoofed);
+    await first({}, "http://localhost:3000/cronwatch/");
+    await first({}, "http://app.localhost:3000/cronwatch/");
+    await first({}, "http://127.0.0.1:3000/cronwatch/");
+    await first({}, "http://127.8.9.10/cronwatch/");
+    await first({}, "http://[::1]:3000/cronwatch/");
+    await first({ trustProxy: true }, "http://10.0.0.5:8080/cronwatch/", { "x-forwarded-host": "localhost:5173" });
+    await first({}, "http://10.0.0.5:8080/cronwatch/");
+    await first({}, "https://app.example.com/cronwatch/");
+    await first({ trustProxy: true }, "http://localhost:3000/cronwatch/", spoofed);
+    await first({}, "http://localhost.example/cronwatch/");
+    await first({}, "http://128.0.0.1/cronwatch/");
+    await first({ basePath: "/" }, "http://attacker.example/");
   } finally {
     console.info = info;
     for (const [k, v] of Object.entries(saved)) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
     }
   }
-  assert.equal(lines.length, 3);
-  assert.match(lines[0]!, /Sign in: https:\/\/app\.example\.com\/cronwatch\/\?token=/);
-  assert.match(lines[1]!, /Sign in: https:\/\/proxied\.example\/cronwatch\/\?token=/);
-  assert.match(lines[2]!, /Sign in: http:\/\/10\.0\.0\.5:8080\/cronwatch\/\?token=/);
+  const intro = "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: ";
+  const hostless = " on this server (the first request's host is not local, so the link leaves it out)";
+  const expected = [
+    ["https://app.example.com/cronwatch", ""],
+    ["https://app.example.com/cronwatch", ""],
+    ["http://localhost:3000/cronwatch", ""],
+    ["http://app.localhost:3000/cronwatch", ""],
+    ["http://127.0.0.1:3000/cronwatch", ""],
+    ["http://127.8.9.10/cronwatch", ""],
+    ["http://[::1]:3000/cronwatch", ""],
+    ["http://localhost:5173/cronwatch", ""],
+    ["/cronwatch", hostless],
+    ["/cronwatch", hostless],
+    ["/cronwatch", hostless],
+    ["/cronwatch", hostless],
+    ["/cronwatch", hostless],
+    ["", hostless],
+  ];
+  assert.equal(lines.length, expected.length);
+  expected.forEach(([link, tail], i) => {
+    const line = lines[i]!;
+    const token = /token=([A-Za-z0-9_-]{43})/.exec(line)?.[1];
+    assert.ok(token, line);
+    assert.equal(line, `${intro}${link}/?token=${token}${tail}`, `line ${i}`);
+  });
 });

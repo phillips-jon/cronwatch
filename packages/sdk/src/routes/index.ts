@@ -32,7 +32,10 @@ export interface RoutesOptions {
    * origin for the cross-site check on writes, the sign-in redirect (its
    * cookie is Secure when this is https, and the redirect back after a form
    * follows a Referer on this origin) and the development sign-in line.
-   * Takes precedence over trustProxy.
+   * Takes precedence over trustProxy. Without it, the development sign-in
+   * line shows the request's origin only when its host is loopback
+   * (localhost, *.localhost, 127.0.0.0/8 or ::1), and otherwise leaves the
+   * host out, since a client controls it.
    */
   origin?: string;
   /**
@@ -113,15 +116,42 @@ function developmentToken(): string {
  *
  *   [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: <origin><base>/?token=<token>
  *
- * <origin> is the first request's public origin (scheme, host and any
- * port): the `origin` option when set, the forwarded one under trustProxy,
- * otherwise the request URL's,
- * <base> the base path without a trailing slash ("" when mounted at the
+ * <origin> is the `origin` option when set. Otherwise it is the first
+ * request's public origin (scheme, host and any port: the forwarded one
+ * under trustProxy, else the request URL's), but only when its host is
+ * loopback ("localhost", a name ending in ".localhost", 127.0.0.0/8 or
+ * ::1). That host comes from the request, which a client controls, so for
+ * any other host the line leaves it out, and a spoofed first request cannot
+ * point the link, token and all, somewhere else:
+ *
+ *   [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: <base>/?token=<token> on this server (the first request's host is not local, so the link leaves it out)
+ *
+ * <base> is the base path without a trailing slash ("" when mounted at the
  * root), and <token> the token as generated (base64url, so nothing needs
  * escaping).
  */
-function developmentSignInLine(origin: string, base: string, token: string): string {
-  return `[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: ${origin}${base}/?token=${token}`;
+function developmentSignInLine(origin: string | null, base: string, token: string): string {
+  const intro = "[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: ";
+  return origin === null
+    ? `${intro}${base}/?token=${token} on this server (the first request's host is not local, so the link leaves it out)`
+    : `${intro}${origin}${base}/?token=${token}`;
+}
+
+/**
+ * Whether an origin's host is loopback: "localhost", a name ending in
+ * ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1.
+ */
+function isLoopbackOrigin(origin: string): boolean {
+  let host: string;
+  try {
+    host = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (host === "[::1]") return true;
+  const octets = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  return octets !== null && octets.slice(1).every((o) => Number(o) <= 255);
 }
 
 function safeDecode(value: string): string | null {
@@ -266,7 +296,8 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
 
     if (generated && !announced) {
       announced = true;
-      console.info(developmentSignInLine(publicOrigin, base, token!));
+      const shown = fixedOrigin ?? (isLoopbackOrigin(publicOrigin) ? publicOrigin : null);
+      console.info(developmentSignInLine(shown, base, token!));
     }
 
     // The app shell: the manifest, icons, service worker, app.js and the

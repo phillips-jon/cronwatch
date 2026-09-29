@@ -26,7 +26,13 @@ With no token configured while `NODE_ENV` is `development` or `test`, the routes
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
 ```
 
-The link is built from the origin of that first request (the [public origin](#behind-a-proxy) when `origin` or `trustProxy` is set) and the base path. Open it and the cookie is set as with any token. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a fetch handler cannot tell a caller on this machine from one elsewhere (Next.js keeps an `X-Forwarded-For` the client sent, `next dev` listens on every interface, and tunnels rewrite `Host`), so the log, which only you can read, is the proof. With no token and `NODE_ENV` anything else, or unset, the routes answer 503.
+The link is built from `origin` when it is set, and otherwise from the origin of that first request (the forwarded one under [`trustProxy`](#behind-a-proxy)), and the base path. That origin comes from the request's `Host` or `X-Forwarded-Host`, which a client controls, so without `origin` the host is printed only when it is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`). For any other host the line leaves it out, and a spoofed first request cannot point the link, token and all, at a host of its choosing:
+
+```text
+[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)
+```
+
+Open it and the cookie is set as with any token. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a fetch handler cannot tell a caller on this machine from one elsewhere (Next.js keeps an `X-Forwarded-For` the client sent, `next dev` listens on every interface, and tunnels rewrite `Host`), so the log, which only you can read, is the proof. With no token and `NODE_ENV` anything else, or unset, the routes answer 503.
 
 Pass `token: null` to serve them open everywhere, for example when the mount already sits behind your own auth:
 
@@ -74,7 +80,7 @@ Behind a proxy or load balancer that terminates TLS, the request URL the app see
 const routes = cw.routes({ basePath: "/cronwatch", origin: "https://app.example.com" });
 ```
 
-`origin` is used instead of the request URL's origin in three places: the cross-site check on `POST` and `DELETE`, the sign-in redirect (the cookie is marked `Secure` when the origin is `https`, and a form's redirect back follows a `Referer` on this origin), and the development sign-in line printed to the log. It must be an `http` or `https` URL; only its origin is kept, and anything else throws when the routes are made.
+`origin` is used instead of the request URL's origin in three places: the cross-site check on `POST` and `DELETE`, the sign-in redirect (the cookie is marked `Secure` when the origin is `https`, and a form's redirect back follows a `Referer` on this origin), and the development sign-in line printed to the log (which, without `origin`, names the host only when it is loopback). It must be an `http` or `https` URL; only its origin is kept, and anything else throws when the routes are made.
 
 When the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`, `trustProxy: true` reads the origin from them instead:
 
