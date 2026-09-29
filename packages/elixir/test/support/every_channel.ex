@@ -46,7 +46,7 @@ defmodule Cronwatch.Test.EveryChannel do
       {Cronwatch.Alerts.Datadog, api_key: "dd-secret-key-123"},
       {Cronwatch.Alerts.Resend, api_key: "re_secret", from: "a@b.c", to: ["d@e.f"]},
       {Cronwatch.Alerts.Postmark, server_token: "pm-secret", from: "a@b.c", to: ["d@e.f"]},
-      {Cronwatch.Alerts.Sendgrid, api_key: "SG.secret", from: "a@b.c", to: ["d@e.f"]},
+      {Cronwatch.Alerts.SendGrid, api_key: "SG.secret", from: "a@b.c", to: ["d@e.f"]},
       {Cronwatch.Alerts.Mailgun, api_key: "key-secret", domain: "mg.example.com", from: "a@b.c", to: ["d@e.f"]},
       {Cronwatch.Alerts.SES,
        region: "us-east-1",

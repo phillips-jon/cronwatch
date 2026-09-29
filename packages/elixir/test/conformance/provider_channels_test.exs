@@ -17,7 +17,7 @@ defmodule Cronwatch.Conformance.ProviderChannelsTest do
   alias Cronwatch.Test.Conformance
   alias Cronwatch.Test.RecordingTransport
 
-  import Conformance, only: [field: 2, list: 2]
+  import Conformance, only: [field: 2, list: 2, digest: 1]
 
   @modules %{
     "resend" => Alerts.Resend,
@@ -33,15 +33,6 @@ defmodule Cronwatch.Conformance.ProviderChannelsTest do
     "bugsnag" => Alerts.Bugsnag,
     "newrelic" => Alerts.NewRelic
   }
-
-  @doc false
-  # The fixture's body: the text itself when short, else its UTF-16 length
-  # and SHA-256.
-  def digest(s) do
-    if JS.len16(s) <= 400,
-      do: Object.new([{"text", s}]),
-      else: Object.new([{"length", JS.len16(s)}, {"sha256", Alerts.Shared.sha256_hex(s)}])
-  end
 
   # A channel from a fixture's options, as the script's materialize() makes
   # it: the SDK's names in snake_case, `link: true` the usual link, `now` a
