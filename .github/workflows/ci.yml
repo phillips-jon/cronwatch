@@ -10,7 +10,9 @@
 # on the two Go releases Go supports, with the race detector, against
 # SQLite, Postgres, MySQL and MariaDB. The Rust workspace's tests run on
 # its rust-version (1.85, the core) and on stable (everything), with
-# rustfmt and clippy. The MCP server is driven against each port's
+# rustfmt and clippy, and on macOS and Windows; each feature alone, the
+# docs, the packages and the lowest versions the manifests allow are
+# checked, and the fuzz targets built. The MCP server is driven against each port's
 # dashboard. One Node, one Ruby, one Python, one PHP and one Go entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
@@ -874,3 +876,93 @@ jobs:
         run: npm test --workspace packages/mcp
         env:
           CRONWATCH_TEST_RUST: "1"
+
+  # The Rust workspace on macOS and Windows, on stable: the zones from the
+  # system's database (macOS) and from jiff's bundle (Windows has none),
+  # paths and line endings. There are no database services there, so the
+  # Postgres, MySQL, MariaDB and pg_cron tests skip, as they say, and so do
+  # the croner parity check and the SQLite file shared with Node, which need
+  # the built SDK; everything else runs.
+  rust-platforms:
+    name: rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    env:
+      # aws-lc-rs (the channels' TLS) takes its prebuilt NASM objects on
+      # Windows rather than ask for NASM.
+      AWS_LC_SYS_PREBUILT_NASM: "1"
+    steps:
+      # The dashboard's assets and the fixtures are compared byte for byte,
+      # so Windows checks them out as committed, without CRLF.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: cargo test
+        working-directory: packages/rust
+        run: cargo test --workspace --all-features
+
+  # What a release rests on beside the tests, on stable: every feature of
+  # every crate builds alone and names what it leans on (cargo hack), the
+  # docs build with warnings denied and every feature on, as docs.rs builds
+  # them, and each publishable crate builds from its own tarball, as
+  # crates.io will build it (cargo package).
+  rust-checks:
+    name: rust (features, docs, package)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Rust stable and cargo-hack
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cargo install cargo-hack --version 0.6.45 --locked
+      - name: Each feature alone
+        working-directory: packages/rust
+        run: cargo hack --workspace --each-feature --no-dev-deps check
+      - name: cargo doc
+        working-directory: packages/rust
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --all-features --no-deps
+      - name: cargo package
+        working-directory: packages/rust
+        run: cargo package --workspace --exclude cronwatch-webserver --exclude cronwatch-example-crontab
+
+  # The manifests' lower bounds, on nightly: each crate's direct
+  # dependencies at the oldest versions their requirements allow, the
+  # dev-dependencies left out (the tests' own need newer ones, and no app
+  # builds them), and the workspace checked on that. Then the fuzz targets
+  # in packages/rust/fuzz build; they run on a schedule (fuzz.yml).
+  rust-minimal:
+    name: rust (minimal versions, fuzz build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Install Rust stable and nightly, cargo-hack and cargo-fuzz
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt
+          rustup toolchain install nightly --profile minimal
+          rustup default stable
+          cargo install cargo-hack --version 0.6.45 --locked
+          cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: Minimal versions
+        working-directory: packages/rust
+        run: |
+          cargo hack --remove-dev-deps --workspace
+          cargo +nightly update -Z direct-minimal-versions
+          cargo check --workspace --all-features
+          git checkout -- .
+      - name: Build the fuzz targets
+        working-directory: packages/rust/fuzz
+        run: |
+          cargo fmt --check
+          cargo +nightly fuzz build
