@@ -467,6 +467,28 @@ final class Js
         return $value;
     }
 
+    /** The first millisecond written as a date: 0001-01-01T00:00:00.000Z. */
+    public const FIRST_DATE_MS = -62_135_596_800_000;
+    /** The last millisecond written as a date: 9999-12-31T23:59:59.999Z. */
+    public const LAST_DATE_MS = 253_402_300_799_999;
+
+    /**
+     * "2026-01-05T09:30:00.000Z", or null for a time before the year 1 or
+     * after 9999, as duration.ts's isoTime(). A start read from another
+     * process's row, or a damaged one, can be any number; outside those years
+     * it is not written as a date at all.
+     */
+    public static function isoTime(int|float $at): ?string
+    {
+        return $at >= self::FIRST_DATE_MS && $at <= self::LAST_DATE_MS ? self::iso($at) : null;
+    }
+
+    /** The words that stand in for a time isoTime() does not write, as duration.ts's beyondDates(). */
+    public static function beyondDates(int|float $at): string
+    {
+        return $at > self::LAST_DATE_MS ? 'after 9999-12-31 23:59:59 UTC' : 'before 0001-01-01 00:00:00 UTC';
+    }
+
     /** Date#toISOString for epoch milliseconds. */
     public static function iso(int|float $at): string
     {

@@ -306,7 +306,10 @@ CSS;
         if ($at === null) {
             return '<span class="muted">never</span>';
         }
-        $iso = Js::iso($at);
+        $iso = Js::isoTime($at);
+        if ($iso === null) {
+            return '<span class="nowrap">' . Js::beyondDates($at) . '</span>';
+        }
         return "<time class=\"nowrap\" datetime=\"{$iso}\" title=\"" . substr(str_replace('T', ' ', $iso), 0, 19) . ' UTC">' . Text::h(Duration::relative($at, $now)) . '</time>';
     }
 
