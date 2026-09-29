@@ -381,12 +381,7 @@ if Code.ensure_loaded?(Quantum) do
       end
     end
 
-    defp previous(_expr, _tz, _at, n) when n > @walk_limit,
-      do: Bridge.never_fires("Quantum finds no valid time it ran it")
-
-    defp previous(expr, tz, at, n) do
-      previous_from(expr, tz, at, naive(at, tz), n)
-    end
+    defp previous(expr, tz, at, n), do: previous_from(expr, tz, at, naive(at, tz), n)
 
     defp previous_from(expr, tz, at, local, n) do
       case Crontab.Scheduler.get_previous_run_date(expr, local) do

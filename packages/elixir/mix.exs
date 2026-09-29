@@ -24,7 +24,7 @@ defmodule Cronwatch.MixProject do
       dialyzer: [
         plt_local_path: "_build/plts",
         plt_core_path: "_build/plts",
-        plt_add_apps: [:ex_unit, :ecto, :ecto_sql, :db_connection]
+        plt_add_apps: [:ex_unit, :mix, :ecto, :ecto_sql, :db_connection]
       ]
     ]
   end
