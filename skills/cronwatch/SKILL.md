@@ -1,12 +1,12 @@
 ---
 name: cronwatch
-description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, the cronwatch gem, cronwatch-sdk (Python), cronwatch/cronwatch (PHP), the CronWatch WordPress plugin, cronwatch.dev/go (Go), the cronwatch crate (Rust), cronwatch.dev or the cronwatch MCP server.
+description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, the cronwatch gem, cronwatch-sdk (Python), cronwatch/cronwatch (PHP), the CronWatch WordPress plugin, cronwatch.dev/go (Go), the cronwatch crate (Rust), the cronwatch package on Hex (Elixir), cronwatch.dev or the cronwatch MCP server.
 version: 0.7.0
 ---
 
 # CronWatch
 
-CronWatch is a library, not a service: `@cronwatch/sdk` (TypeScript on Node, Cloudflare Workers, Deno or Bun), the `cronwatch` gem (Ruby, Rails), `cronwatch-sdk` (Python: Django, Celery, APScheduler), `cronwatch/cronwatch` (PHP: Laravel, Symfony, WordPress, Drupal, Craft CMS), `cronwatch.dev/go` (Go: robfig/cron, gocron, River, Asynq) or the `cronwatch` crate (Rust: tokio-cron-scheduler, apalis) records every run of a scheduled job inside the app that runs it, and alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. The MCP server `@cronwatch/mcp` reads the same data so an agent can ask what failed and why.
+CronWatch is a library, not a service: `@cronwatch/sdk` (TypeScript on Node, Cloudflare Workers, Deno or Bun), the `cronwatch` gem (Ruby, Rails), `cronwatch-sdk` (Python: Django, Celery, APScheduler), `cronwatch/cronwatch` (PHP: Laravel, Symfony, WordPress, Drupal, Craft CMS), `cronwatch.dev/go` (Go: robfig/cron, gocron, River, Asynq), the `cronwatch` crate (Rust: tokio-cron-scheduler, apalis) or the `cronwatch` package on Hex (Elixir: Oban, Quantum) records every run of a scheduled job inside the app that runs it, and alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. The MCP server `@cronwatch/mcp` reads the same data so an agent can ask what failed and why.
 
 ## Adding monitoring to a job
 
@@ -104,6 +104,20 @@ For a Rust app, use the `cronwatch` crate (Rust 1.85 or newer, on tokio); it is 
 - **Channels:** in `cronwatch::alerts`, each from an options struct (`alerts::slack(SlackOptions { webhook_url, ..Default::default() })?`); Claude triage is in `cronwatch::triage` and pg_cron in `cronwatch_sqlx::PgCron`.
 
 The MCP server works against it unchanged. Docs: https://cronwatch.dev/docs/rust/ and https://cronwatch.dev/docs/rust-schedulers/
+
+## Elixir apps
+
+For an Elixir app, use the `cronwatch` package on Hex (Elixir 1.18 or newer on OTP 27 or newer); it is a port with the same conditions and alert text, and options in snake_case kept in the order given (`schedule: "0 2 * * *", timezone: "UTC", grace: "15m"`; durations as text, milliseconds or anything `to_timeout/1` takes).
+
+- **Install:** `{:cronwatch, "~> 0.8"}` in `mix.exs`'s deps. It needs only `tz` and `telemetry`; the SQL store uses the app's own Ecto repo and adapter, and the dashboard and handler use `plug`.
+- **Instance and store:** `{Cronwatch, store: {Cronwatch.Store.Ecto, repo: MyApp.Repo}, alerts: [...], jobs: [{"nightly-report", schedule: "0 2 * * *", timezone: "UTC"}]}` among the application's children, after the repo, over a store every node shares (SQLite, Postgres, MySQL or MariaDB, by the repo's adapter). Its options are checked when it starts; functions answer `{:ok, value}` or `{:error, %Cronwatch.Error{}}`, with `!` variants.
+- **Wrap:** `Cronwatch.run("nightly-report", fn job -> ... end)` in the calling process: a raise, throw, exit, `{:error, reason}` or `:error` fails the run and is handed back as it came, a process killed mid-run records a failed run at once, `Cronwatch.cancelled?(job)` turns true at the timeout, and `Cronwatch.log(job, line)` and `Cronwatch.metric(job, name, value)` record output and numbers (`Cronwatch.current/0`, `log/1` and `metric/2` find the run deeper down, in a `Task` too). Schedulers, each given in the instance's `integrations:` with no change to the workers: `{Cronwatch.Oban, oban: Oban}` (Oban 2.20 or newer; every Cron plugin crontab worker is a job on its entry's schedule, each attempt a run through Oban's telemetry, a snooze given back, other workers only when named in `workers:`) and `{Cronwatch.Quantum, scheduler: MyApp.Scheduler}` (Quantum 3.5; every active job, named after its name). Each schedule is checked against the scheduler's own fire times.
+- **Check:** `Cronwatch.Oban.CheckWorker` in Oban's crontab, a Quantum job whose task is `{Cronwatch.Quantum, :check, [[scheduler: MyApp.Scheduler]]}`, `check_every: :timer.minutes(1)` on the instance, or for a release a crontab runs a second line with `bin/my_app eval "Cronwatch.Release.check(MyApp.Cronwatch)"` (options under `config :my_app, MyApp.Cronwatch`; `mix cronwatch.check` from source).
+- **Dashboard:** `forward "/cronwatch", Cronwatch.Web` in the Phoenix router, outside the `:browser` pipeline (it finds its base path from the mount). It needs `CRONWATCH_TOKEN` outside development, or `token: false` behind the app's own auth.
+- **Handler:** for a platform that calls a URL, `forward "/cron/nightly", Cronwatch.Handler, job: "nightly-report", run: {MyApp.Reports, :nightly, []}` calls `MyApp.Reports.nightly(job, conn)`, checked against `CRON_SECRET`.
+- **Channels:** each `{module, options}` with the SDK's options in snake_case (`{Cronwatch.Alerts.Slack, webhook_url: ...}`), or `Cronwatch.Alerts.fun(name, fn alert -> ... end)`; Claude triage is `triage: {Cronwatch.Triage.Anthropic, []}` and pg_cron `sources: [{Cronwatch.Sources.PgCron, repo: MyApp.Repo}]`.
+
+The MCP server works against it unchanged. Docs: https://cronwatch.dev/docs/elixir/ and https://cronwatch.dev/docs/elixir-schedulers/
 
 ## Investigating a failure
 

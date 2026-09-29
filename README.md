@@ -48,6 +48,7 @@ export const { GET, POST, DELETE } = cw.routes();
 | [`cronwatch/cronwatch` for PHP](packages/php) | the PHP port for PHP apps: the memory, SQLite, MySQL (and MariaDB) and Postgres stores, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, `vendor/bin/cronwatch check`, the dashboard (a bare script or PSR-15), `handler()` for platform crons, Laravel and Symfony integrations, a WordPress plugin, a Drupal module (`drupal/cronwatch`) and a Craft CMS plugin (`cronwatch/craft`) ([its DESIGN.md](packages/php/DESIGN.md)) |
 | [`cronwatch.dev/go`](packages/go) | the Go port for Go apps: jobs, runs and checks with `context` throughout and safe across goroutines, the memory store and a `database/sql` store for SQLite, Postgres, MySQL and MariaDB over the app's own driver, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `job.Handler` as `http.Handler`s, an AWS Lambda adapter, and modules of their own for robfig/cron, gocron, River and Asynq ([its DESIGN.md](packages/go/DESIGN.md)) |
 | [`cronwatch` crate](packages/rust) | the Rust port for Rust services, on tokio: jobs, runs and checks, safe across tasks, the memory store and `cronwatch-sqlx` for SQLite, Postgres, MySQL and MariaDB over the app's own sqlx pool, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `handler()` framework-free with tower and axum adapters (and so AWS Lambda through `lambda_http`), a blocking client, and crates of their own for tokio-cron-scheduler and apalis ([its DESIGN.md](packages/rust/DESIGN.md)) |
+| [`cronwatch` on Hex](packages/elixir) | the Elixir port for Elixir and Erlang services: an instance in the app's supervision tree, jobs run in the calling process and recorded when it dies, the memory store and an Ecto store for SQLite, Postgres, MySQL and MariaDB over the app's own repo, sharing tables with the SDK byte for byte, the same alert channels and Claude triage over OTP's own sockets, pg_cron jobs, the dashboard and a job's handler as Plugs for a Phoenix router, telemetry events, a release's crontab check, and integrations for Oban and Quantum ([its DESIGN.md](packages/elixir/DESIGN.md)) |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
 | [`site`](site) | cronwatch.dev, a static landing page and docs |
@@ -65,6 +66,7 @@ export const { GET, POST, DELETE } = cw.routes();
 | Craft CMS | `composer require cronwatch/craft`, then `php craft plugin/install cronwatch` | [Craft CMS](https://cronwatch.dev/docs/craft/) |
 | Go | `go get cronwatch.dev/go`, and `go get cronwatch.dev/go/robfigcron` (or `/gocron`, `/river`, `/asynq`) for a scheduler | [Go](https://cronwatch.dev/docs/go/), [Go schedulers](https://cronwatch.dev/docs/go-schedulers/), [its README](packages/go/README.md) |
 | Rust | `cargo add cronwatch --features alerts`, `cargo add cronwatch-sqlx --features postgres` (or `sqlite`, `mysql`), `cargo add sqlx --no-default-features --features runtime-tokio,postgres` and `cargo add tokio --features macros,rt-multi-thread`; `cronwatch-tokio-cron-scheduler` or `cronwatch-apalis` for a scheduler | [Rust](https://cronwatch.dev/docs/rust/), [Rust schedulers](https://cronwatch.dev/docs/rust-schedulers/), [its README](packages/rust/README.md) |
+| Elixir | `{:cronwatch, "~> 0.8"}` in `mix.exs`, with the app's Ecto adapter for the SQL store; Oban and Quantum are watched with no other package | [Elixir](https://cronwatch.dev/docs/elixir/), [Elixir schedulers](https://cronwatch.dev/docs/elixir-schedulers/), [its README](packages/elixir/README.md) |
 
 The SDK depends only on `croner`. The core, the D1 store, the pg_cron source and every alert channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun; the SQLite and Postgres stores and `@cronwatch/sdk/node` need Node. Each driver is an optional peer, installed only when you use its entry point:
 
@@ -115,7 +117,7 @@ npm run check          # dash check, typecheck, tests
 npm run build          # every package and the site
 npm run dev --workspace site    # the site on http://localhost:4321, rebuilding on change
 npm run check:packages # pack both packages and use them from a scratch project (after build)
-npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python, PHP, Go and Rust packages
+npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python, PHP, Go, Rust and Elixir packages
 ```
 
 The gem (Ruby 3.2 or newer), after `npm run build` so its Node compatibility tests can run:
@@ -163,11 +165,19 @@ cd packages/rust && cargo test --workspace --all-features
 
 It replays `conformance/` and the dashboard fixture too. The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set ([its README](packages/rust/README.md#testing) has the rest), and `CRONWATCH_TEST_RUST=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard. CI runs the core and `cronwatch-tokio-cron-scheduler` on Rust 1.85, `cronwatch-sqlx` and `cronwatch-apalis` on 1.94, and the whole workspace on stable, on Linux, macOS and Windows.
 
+The Elixir package (Elixir 1.18 or newer on Erlang/OTP 27 or newer), after `npm run build` for the same reason:
+
+```bash
+cd packages/elixir && mix deps.get && mix test
+```
+
+It replays `conformance/` and the dashboard fixture too. The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set ([its README](packages/elixir/README.md#testing-this-package) has the rest), and `CRONWATCH_TEST_ELIXIR=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard.
+
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 
 ## Releasing
 
-Every package shares one version: the SDK, the MCP server, the gem, the Python and PHP packages (the WordPress plugin with them, and the Drupal module and the Craft plugin requiring the library at it), the Go module and its scheduler modules, the Rust crates, and the skill. From a clean `main`:
+Every package shares one version: the SDK, the MCP server, the gem, the Python and PHP packages (the WordPress plugin with them, and the Drupal module and the Craft plugin requiring the library at it), the Go module and its scheduler modules, the Rust crates, the Elixir package, and the skill. From a clean `main`:
 
 ```bash
 npm run release -- 0.8.0 --dry-run   # show every change and command, write nothing

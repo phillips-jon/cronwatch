@@ -5,10 +5,11 @@ CronWatch is an open source library: @cronwatch/sdk for TypeScript (Node,
 Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails,
 cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch
 for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), cronwatch.dev/go for
-Go (robfig/cron, gocron, River, Asynq), and the cronwatch crate for Rust
-(tokio-cron-scheduler, apalis). It runs inside my app and writes to
-my own database. There is no hosted service and no account to make; the only
-key it can use is an Anthropic API key, for triage, which is optional.
+Go (robfig/cron, gocron, River, Asynq), the cronwatch crate for Rust
+(tokio-cron-scheduler, apalis), and the cronwatch package on Hex for Elixir
+(Oban, Quantum). It runs inside my app and writes to my own database. There
+is no hosted service and no account to make; the only key it can use is an
+Anthropic API key, for triage, which is optional.
 
 First decide which steps this project needs:
 - package.json (Node, Next.js or another JavaScript runtime): TypeScript. With
@@ -22,6 +23,8 @@ First decide which steps this project needs:
   in it names the scheduler.
 - Cargo.toml: Rust. tokio-cron-scheduler or apalis among its dependencies names the
   scheduler.
+- mix.exs: Elixir. :oban or :quantum among its deps names the scheduler; :phoenix
+  is a Phoenix app.
 If scheduled jobs live in more than one, set up each side where its jobs run;
 they can share one database.
 
@@ -493,6 +496,76 @@ Rust (Rust 1.85 or newer; 1.94 for the SQL store)
    CRON_SECRET if you added a handler, and whichever alert channel you chose.
    Do not invent other names.
 
+Elixir (Elixir 1.18 or newer on OTP 27 or newer)
+
+1. Add the package to the deps in mix.exs and run mix deps.get:
+
+   {:cronwatch, "~> 0.8"}
+
+   It needs only tz and telemetry. The SQL store uses the project's own Ecto
+   repo and adapter (ecto_sqlite3, postgrex or myxql); the dashboard and a
+   job's handler use plug, which every Phoenix app has.
+
+2. Start one instance in the application's supervision tree, after the repo,
+   with a store every node shares (web, workers and the check must see the
+   same runs), and declare every job in its jobs: option:
+
+   {Cronwatch,
+    store: {Cronwatch.Store.Ecto, repo: MyApp.Repo},
+    alerts: [{Cronwatch.Alerts.Slack, webhook_url: System.fetch_env!("SLACK_WEBHOOK_URL")}],
+    jobs: [{"nightly-report", schedule: "0 2 * * *", timezone: "UTC", grace: "15m"}]}
+
+   Other channels, each {module, options} with the SDK's options in
+   snake_case: Cronwatch.Alerts.Discord, Webhook, Resend, Postmark,
+   SendGrid, Mailgun, SES, Twilio, Sentry, Honeybadger, Datadog, Rollbar,
+   Bugsnag, NewRelic, and Cronwatch.Alerts.fun(name, fn alert -> ... end)
+   for a channel of your own. Their options: https://cronwatch.dev/docs/elixir/
+
+   If the project uses pg_cron, add
+   sources: [{Cronwatch.Sources.PgCron, repo: MyApp.Repo}].
+   Do not declare those jobs yourself.
+
+3. Watch each scheduled job:
+
+   - Oban: add integrations: [{Cronwatch.Oban, oban: Oban}] to the
+     instance. Every worker in the Cron plugin's crontab becomes a job with
+     its schedule, and each attempt a run, with no change to the workers;
+     Cronwatch.log/1 works inside perform/1. Name other workers to watch
+     with workers: [MyApp.Workers.Import]. Add
+     {"* * * * *", Cronwatch.Oban.CheckWorker} to the crontab.
+   - Quantum: add integrations: [{Cronwatch.Quantum, scheduler:
+     MyApp.Scheduler}] to the instance. Every active job becomes a job
+     named after its name, with its schedule. Add a scheduler job
+     cronwatch_check: [schedule: "* * * * *", task: {Cronwatch.Quantum,
+     :check, [[scheduler: MyApp.Scheduler]]}].
+   - Anything else, or a release a crontab runs: wrap the work in
+     Cronwatch.run("nightly-report", fn job -> ...; Cronwatch.log(job,
+     "Report written"); :ok end). A raise, throw, exit, {:error, reason} or
+     :error fails the run and is handed back as it came; in a crontab
+     script, exit non-zero on a failure.
+   - A platform that calls a URL: in the Phoenix router,
+     forward "/cron/nightly", Cronwatch.Handler, job: "nightly-report",
+     run: {MyApp.Reports, :nightly, []}, which calls
+     MyApp.Reports.nightly(job, conn). It needs
+     Authorization: Bearer $CRON_SECRET.
+
+4. Run the check every few minutes so missed and stuck runs are noticed:
+   the Oban check worker or the Quantum check job above,
+   check_every: :timer.minutes(1) on the instance in a long-running app
+   without either, or, for a release a crontab runs, a second crontab line
+   running bin/my_app eval "Cronwatch.Release.check(MyApp.Cronwatch)" with
+   the instance's options, jobs included, under
+   config :my_app, MyApp.Cronwatch in config/runtime.exs.
+
+5. Mount the dashboard in the Phoenix router, outside the :browser
+   pipeline: scope "/" do forward "/cronwatch", Cronwatch.Web end.
+   Outside development it needs CRONWATCH_TOKEN; behind the app's own
+   admin auth, pass token: false instead.
+
+6. Set the environment variables you referenced: CRONWATCH_TOKEN,
+   CRON_SECRET if you added a handler, and whichever alert channel you chose.
+   Do not invent other names.
+
 Rules for you:
 - Declare every existing scheduled job in this project, not just one. Find them
   in cron config, workflow files, queue schedulers and any crontab.
@@ -504,7 +577,8 @@ Rules for you:
 - If this project already has a dashboard route or auth, mount cw.routes()
   or Cronwatch::Web behind that auth with its token set to null (nil in Ruby,
   None in Python, false in PHP, cronwatch.WithoutToken() in Go,
-  RoutesOptions::new().no_token() in Rust) rather than exposing it.
+  RoutesOptions::new().no_token() in Rust, token: false in Elixir) rather
+  than exposing it.
 - Make sure the process that runs the check knows every job it should expect,
   or a job that never starts at all goes unnoticed. If installs differ, declare
   a job there only where that install runs it.
@@ -516,12 +590,14 @@ Rules for you:
   $job->resume($id)->finish() in PHP;
   job.Start(ctx, cronwatch.WithRunID(id)) and job.Resume(ctx, id), then
   Finish(ctx), in Go; job.start(StartOptions::new().id(id)).await? and
-  job.resume(id).await?, then .finish().await, in Rust).
+  job.resume(id).await?, then .finish().await, in Rust;
+  Cronwatch.start(job, id: id) and Cronwatch.resume(job, id), then
+  Cronwatch.finish(run), in Elixir).
 - A job that runs where the network or the app's secrets are unavailable gets
   its own client with deliver: "check" (deliver = :check in Ruby,
   deliver="check" in Python, deliver: 'check' in PHP,
   cronwatch.WithDeliver(cronwatch.DeliverAtCheck) in Go,
-  .deliver(Deliver::AtCheck) in Rust) and the same
+  .deliver(Deliver::AtCheck) in Rust, deliver: :check in Elixir) and the same
   store; the next check sends its alerts.
 
 Docs: https://cronwatch.dev/docs/
@@ -533,4 +609,5 @@ https://cronwatch.dev/docs/symfony/, https://cronwatch.dev/docs/wordpress/,
 https://cronwatch.dev/docs/drupal/ and https://cronwatch.dev/docs/craft/
 Go docs: https://cronwatch.dev/docs/go/ and https://cronwatch.dev/docs/go-schedulers/
 Rust docs: https://cronwatch.dev/docs/rust/ and https://cronwatch.dev/docs/rust-schedulers/
+Elixir docs: https://cronwatch.dev/docs/elixir/ and https://cronwatch.dev/docs/elixir-schedulers/
 MCP server for agents: npx -y @cronwatch/mcp, https://cronwatch.dev/docs/mcp/

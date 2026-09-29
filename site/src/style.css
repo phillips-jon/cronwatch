@@ -91,6 +91,11 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 .install { display: inline-flex; align-items: center; gap: 14px; margin-top: 26px; background: var(--sunk); border: 1px solid var(--rule); border-radius: 3px; padding: 10px 10px 10px 14px; font: 400 14px/1.4 var(--mono); }
 .install code { min-width: 0; overflow-wrap: anywhere; }
 .install code::before { content: "$ "; color: var(--muted); }
+/* A dependency to paste, not a command to run: named by its file, which the
+   copy leaves out as it leaves out the prompt. On a narrow phone the line
+   breaks after the file's name, never inside the tuple. */
+.install code.dep::before { content: "mix.exs: "; }
+.install code.dep span { white-space: nowrap; }
 /* One install box per language, side by side, each under a small label. */
 .installs { display: flex; flex-wrap: wrap; gap: 14px 18px; margin-top: 26px; }
 .installs .for { font: 500 11.5px/1.5 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 7px; }
@@ -104,7 +109,7 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 /* Calluna sets old-style figures; the dashboard's counts and times read as
    figures in a table, so they line up. */
 figure.browser, figure.timeline { font-variant-numeric: lining-nums; }
-.installs.tabbed { display: block; max-width: 580px; }
+.installs.tabbed { display: block; max-width: 640px; }
 .installs.tabbed .for { display: none; }
 .installs.tabbed .install { display: flex; justify-content: space-between; width: 100%; }
 .tabs { display: flex; flex-wrap: wrap; gap: 2px 4px; margin: 0 0 14px; border-bottom: 1px solid var(--rule); }
@@ -120,9 +125,13 @@ figure.browser, figure.timeline { font-variant-numeric: lining-nums; }
 .tab-php:hover .logo, .tab-php[aria-selected="true"] .logo { fill: #777bb4; }
 .tab-go:hover .logo, .tab-go[aria-selected="true"] .logo { fill: #00add8; }
 .tab-rust:hover .logo, .tab-rust[aria-selected="true"] .logo { fill: #ce422b; }
-/* On a phone six names do not fit in a row, so the logos stand alone, each
-   tab a share of the row, and the names stay for screen readers. */
-@media (max-width: 560px) {
+.tab-elixir:hover .logo, .tab-elixir[aria-selected="true"] .logo { fill: #4b275f; }
+/* Elixir's own purple is too dark to see on dark paper; a lighter one of the
+   same hue reads at better than 5:1 there. */
+:root[data-theme="dark"] .tab-elixir:hover .logo, :root[data-theme="dark"] .tab-elixir[aria-selected="true"] .logo { fill: #9e7bc1; }
+/* Below about 680px seven names do not fit in a row, so the logos stand
+   alone, each tab a share of the row, and the names stay for screen readers. */
+@media (max-width: 680px) {
   .tabs { flex-wrap: nowrap; gap: 0; }
   .tab { position: relative; flex: 1 1 0; justify-content: center; padding: 11px 0 12px; }
   .tab .logo { width: 18px; height: 18px; }
