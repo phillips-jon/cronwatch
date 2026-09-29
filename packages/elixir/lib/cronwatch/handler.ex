@@ -173,12 +173,15 @@ if Code.ensure_loaded?(Plug.Conn) do
 
       run = Process.delete(key)
 
+      # A conn answered is halted, as every other answer here is, so a
+      # pipeline the handler is plugged into does not go on to answer it
+      # again.
       case result do
         {:returned, %Plug.Conn{state: state} = answered} when state in [:sent, :chunked, :file, :upgraded] ->
-          answered
+          Plug.Conn.halt(answered)
 
         {:returned, %Plug.Conn{state: :set} = answered} ->
-          Plug.Conn.send_resp(answered)
+          answered |> Plug.Conn.send_resp() |> Plug.Conn.halt()
 
         {:returned, %Plug.Conn{} = answered} ->
           answer(answered, opts, run, secret)

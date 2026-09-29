@@ -252,20 +252,29 @@ defmodule Cronwatch.Web.Request do
   @spec parsed_field(map(), String.t()) :: String.t() | nil
   def parsed_field(params, name) do
     case Map.fetch(params, name) do
-      {:ok, v} -> parsed_text(v)
+      {:ok, v} -> parsed_text(v, 1)
       :error -> nil
     end
+  catch
+    # Nested past what JS.parse reads, as the plug's own read of the same
+    # body would find it: none.
+    :too_deep -> nil
   end
 
-  defp parsed_text(nil), do: "null"
-  defp parsed_text(%{__struct__: Plug.Upload}), do: "[object File]"
-  defp parsed_text(v) when is_binary(v) or is_number(v) or is_boolean(v), do: Format.js_text(v)
-  defp parsed_text(%{} = map) when not is_struct(map), do: "[object Object]"
+  defp parsed_text(v, depth) do
+    # The body's object is the first level, as JS.parse counts.
+    if depth >= JS.max_depth(), do: throw(:too_deep), else: text_at(v, depth)
+  end
 
-  defp parsed_text(list) when is_list(list),
-    do: Enum.map_join(list, ",", fn e -> if e == nil, do: "", else: parsed_text(e) end)
+  defp text_at(nil, _), do: "null"
+  defp text_at(%{__struct__: Plug.Upload}, _), do: "[object File]"
+  defp text_at(v, _) when is_binary(v) or is_number(v) or is_boolean(v), do: Format.js_text(v)
+  defp text_at(%{} = map, _) when not is_struct(map), do: "[object Object]"
 
-  defp parsed_text(other), do: Format.js_text(other)
+  defp text_at(list, depth) when is_list(list),
+    do: Enum.map_join(list, ",", fn e -> if e == nil, do: "", else: parsed_text(e, depth + 1) end)
+
+  defp text_at(other, _), do: Format.js_text(other)
 
   # A media type's parameter, unquoted, its name matched without regard to
   # case.
@@ -393,5 +402,24 @@ defmodule Cronwatch.Web.Request do
           part_headers(data, eol + 1, disposition)
         end
     end
+  end
+end
+
+defimpl Inspect, for: Cronwatch.Web.Request do
+  # A request carries the token as a bearer, a cookie or `?token=`, so its
+  # inspect names the headers without their values and leaves out the query
+  # and the body.
+  import Inspect.Algebra
+
+  def inspect(req, opts) do
+    fields = [
+      method: req.method,
+      path: req.path,
+      headers: Enum.map(req.headers, &elem(&1, 0)),
+      tls: req.tls,
+      mount: req.mount
+    ]
+
+    concat(["#Cronwatch.Web.Request<", to_doc(fields, opts), ">"])
   end
 end
