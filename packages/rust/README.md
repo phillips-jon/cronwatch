@@ -2,19 +2,23 @@
 
 Cron and scheduled-job monitoring that lives inside your Rust service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Rust port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk), under way: the same rules, the same alert text and the same stored rows, so a Rust process and a Node, Ruby, Python, PHP or Go process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, the blocking client, the SQL store in `cronwatch-sqlx` (SQLite, Postgres, MySQL and MariaDB) with the pg_cron source, the alert channels, Claude triage, the dashboard and its JSON API, and a job's HTTP handler for a platform cron, each framework-free with tower and axum adapters, and the scheduler integrations for tokio-cron-scheduler and apalis ([DESIGN.md](DESIGN.md) has the plan and how each part works).
+This is the Rust port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Rust process and a Node, Ruby, Python, PHP or Go process can share one database, and every port reads the tables the others write. It has the core (jobs, runs, runs that span calls, checks, silences, sources, deferred delivery and the triage hook), the memory store, the blocking client, the SQL store in `cronwatch-sqlx` (SQLite, Postgres, MySQL and MariaDB) with the pg_cron source, the alert channels, Claude triage, the dashboard and its JSON API, and a job's HTTP handler for a platform cron, each framework-free with tower and axum adapters, and the scheduler integrations for tokio-cron-scheduler and apalis ([DESIGN.md](https://github.com/phillips-jon/cronwatch/blob/main/packages/rust/DESIGN.md) has how each part works).
 
 Docs: [cronwatch.dev](https://cronwatch.dev/docs/)
 
 ## Install
 
-Rust 1.85 or newer for `cronwatch`, `cronwatch-tokio-cron-scheduler` and `cronwatch-apalis`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 does. The core depends on tokio, `getrandom`, `jiff`, `sha2` (the dashboard's cookie) and `md-5` (the app tag the scheduler integrations share) and nothing else: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses), so every port agrees on every fire time. The `alerts` and `triage` features add reqwest on rustls (whose aws-lc-rs needs a C compiler), `url` and `hmac`; `tower` adds `http`, `http-body`, `http-body-util`, `bytes` and `tower-service`, and `axum` adds axum itself. `regex` lets `expect_match` take a `regex::Regex`, and `serde` gives the public types `Serialize` and `Deserialize` (the SDK's JSON, field for field) for your own use.
+Rust 1.85 or newer for `cronwatch`, `cronwatch-tokio-cron-scheduler` and `cronwatch-apalis`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 does. The core depends on tokio, `getrandom`, `jiff`, `sha2` (the dashboard's cookie) and `md-5` (the app tag the scheduler integrations share) and nothing else: cron expressions are read by a port of [croner](https://github.com/hexagon/croner) (the parser the SDK uses), so every port agrees on every fire time. The `alerts` and `triage` features add reqwest on rustls (whose aws-lc-rs needs a C compiler) and `url`, and `alerts` also `hmac` (the webhook's signature and SES's SigV4); `tower` adds `http`, `http-body`, `http-body-util`, `bytes` and `tower-service`, and `axum` adds axum itself. `regex` lets `expect_match` take a `regex::Regex`, and `serde` gives the public types `Serialize` and `Deserialize` (the SDK's JSON, field for field) for your own use.
 
 ```toml
 [dependencies]
 cronwatch = "0.7"
 cronwatch-sqlx = { version = "0.7", features = ["sqlite"] } # or "postgres", "mysql", "pgcron"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
+
+The crates are released together at one version: `cronwatch-sqlx` and the scheduler crates each require `cronwatch` at exactly their own version, so upgrade them together.
 
 ## Use
 
@@ -101,7 +105,7 @@ let cw = Client::builder()
 # }
 ```
 
-Every request refuses redirects, ends after ten seconds, reads at most 1 MiB of an answer, and names only the URL's origin in an error.
+Every request refuses redirects, reads at most 1 MiB of an answer, and names only the URL's origin in an error. A channel's request ends after ten seconds; triage's has a deadline of its own, 24 seconds, and the alert goes out without a diagnosis rather than wait longer.
 
 ## Dashboard
 
@@ -118,7 +122,7 @@ let app = axum::Router::new().nest_service("/cronwatch", routes); // or routes.i
 # }
 ```
 
-Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. Without a token it answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `RUST_ENV` set to `development`, `test` or `local`), where it makes one and prints a sign-in link on its first request; `RoutesOptions::no_token()` serves it open behind your own auth. Writes from another site are refused. Behind a proxy, `origin("https://app.example.com")` or `trust_proxy()` says what the browser sees. With the `tower` feature `Routes` is a `tower::Service` for hyper, tonic or anything else built on tower; without it, `routes.handle(web::Request)` answers a `web::Response` for a framework of your own.
+Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. Without a token it answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `RUST_ENV` set to `development`, `dev`, `local`, `test` or `testing`), where it makes one and prints a sign-in link on its first request; `RoutesOptions::no_token()` serves it open behind your own auth. Writes from another site are refused. Behind a proxy, `origin("https://app.example.com")` or `trust_proxy()` says what the browser sees. With the `tower` feature `Routes` is a `tower::Service` for hyper, tonic or anything else built on tower; without it, `routes.handle(web::Request)` answers a `web::Response` for a framework of your own.
 
 ## Handler
 
@@ -157,10 +161,10 @@ run.finish().await;
 
 A service that runs its jobs from a scheduler watches them through the scheduler's crate: each job is declared with the scheduler's schedule, every run is recorded, and a job the scheduler no longer has keeps its runs and loses its schedule, so it is never reported missed.
 
-- [`cronwatch-tokio-cron-scheduler`](cronwatch-tokio-cron-scheduler/README.md): `watcher.job(name, "0 0 2 * * *", "UTC", |job| async move { .. }, options)` stands in for `Job::new_async_tz`, each schedule checked against the scheduler's own fire times.
-- [`cronwatch-apalis`](cronwatch-apalis/README.md): a tower layer that records each attempt of a worker's tasks as a run (retries included, one alert for the failures and a recovery for the success), and `watcher.cron(name, "0 2 * * *", "Europe/London", options)`, apalis-cron's backend on CronWatch's own schedule. apalis 1.0 is at release candidates; the crate is pinned to them.
+- [`cronwatch-tokio-cron-scheduler`](https://crates.io/crates/cronwatch-tokio-cron-scheduler): `watcher.job(name, "0 0 2 * * *", "UTC", |job| async move { .. }, options)` stands in for `Job::new_async_tz`, each schedule checked against the scheduler's own fire times.
+- [`cronwatch-apalis`](https://crates.io/crates/cronwatch-apalis): a tower layer that records each attempt of a worker's tasks as a run (retries included, one alert for the failures and a recovery for the success), and `watcher.cron(name, "0 2 * * *", "Europe/London", options)`, apalis-cron's backend on CronWatch's own schedule. apalis 1.0 is at release candidates; the crate is pinned to them.
 
-A program a crontab runs needs neither: [`examples/crontab`](examples/crontab/src/main.rs) is a job and its check from two crontab lines on one SQLite file.
+A program a crontab runs needs neither: [`examples/crontab`](https://github.com/phillips-jon/cronwatch/tree/main/packages/rust/examples/crontab) is a job and its check from two crontab lines on one SQLite file.
 
 ## Testing
 

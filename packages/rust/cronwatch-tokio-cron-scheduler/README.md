@@ -58,7 +58,7 @@ An `Err` fails the run, a `String` returned is its output when nothing was logge
 - **Jobs gone.** A job removed from the scheduler keeps its runs and is declared again without its schedule: at once with `follow`, else at the next `sync`, which the check job runs. A sync also takes the schedule out of each job of this app's that the store holds and no job made here has (one an earlier release scheduled).
 - **Apps.** Jobs are tagged `tokio-cron-scheduler` and `tokio-cron-scheduler:<app>`, the app named by `Options::app`, else `$CRONWATCH_APP_ID`, else the executable's file name, so two apps sharing a store never declare each other's jobs without a schedule.
 
-A name, option, schedule or zone that CronWatch or the scheduler refuses is an error from `job`, and nothing is made.
+A name or option CronWatch refuses, or a schedule or zone tokio-cron-scheduler refuses, is an error from `job`, and nothing is made. A schedule the scheduler takes but CronWatch cannot read is reported once, like one whose fire times differ, and its job watched without a schedule.
 
 ## Tests
 
