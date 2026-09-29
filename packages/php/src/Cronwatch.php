@@ -40,7 +40,7 @@ use Cronwatch\Store\UpdatesRunIf;
  */
 final class Cronwatch
 {
-    public const VERSION = '0.7.0';
+    public const VERSION = '0.8.0';
 
     public const NAME_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/D';
     public const TRIAGE_TIMEOUT_MS = 25_000;

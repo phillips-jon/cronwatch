@@ -1,6 +1,6 @@
 {
   "name": "@cronwatch/sdk",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Cron and scheduled-job monitoring that lives inside your app. Wrap a job, mount a route, get told when it is missed, failed, slow or over budget. No server to run.",
   "license": "MIT",
   "repository": {
