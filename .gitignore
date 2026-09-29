@@ -19,3 +19,11 @@ site/dist/
 # Cargo builds
 target/
 packages/rust/Cargo.lock
+
+# Mix builds
+packages/elixir/**/_build/
+packages/elixir/**/deps/
+packages/elixir/**/mix.lock
+packages/elixir/_build/
+packages/elixir/deps/
+packages/elixir/mix.lock
