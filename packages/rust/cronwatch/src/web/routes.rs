@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::io::Write;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -204,6 +205,9 @@ impl Client {
         // log.
         let generated = configured.is_empty() && !opted_out && environment() == "development";
         let token = if generated { development_token() } else { configured };
+        // Without the system's randomness no token was made, so there is
+        // nothing to announce and the routes stay locked.
+        let generated = generated && !token.is_empty();
         let cookie =
             if token.is_empty() { String::new() } else { hex(&Sha256::digest(format!("cronwatch-cookie:{token}"))) };
         Ok(Routes {
@@ -533,7 +537,10 @@ impl Routes {
                 .origin
                 .clone()
                 .or_else(|| is_loopback_origin(&said.public_origin).then(|| said.public_origin.clone()));
-            println!("{}", development_sign_in_line(shown.as_deref(), base, &rt.token));
+            // Not println!, which panics when standard output is closed; the
+            // SDK's console.info never throws.
+            let line = development_sign_in_line(shown.as_deref(), base, &rt.token);
+            let _ = writeln!(std::io::stdout().lock(), "{line}");
         }
 
         // The app shell: the manifest, icons, service worker, app.js and the
