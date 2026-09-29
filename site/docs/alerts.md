@@ -46,9 +46,12 @@ Verifying on the receiving side:
 ```ts
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const expected = "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
-const ok = timingSafeEqual(Buffer.from(expected), Buffer.from(request.headers.get("x-cronwatch-signature") ?? ""));
+const expected = Buffer.from("sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex"));
+const received = Buffer.from(request.headers.get("x-cronwatch-signature") ?? "");
+const ok = received.length === expected.length && timingSafeEqual(received, expected);
 ```
+
+`timingSafeEqual` throws when the two buffers differ in length, so compare the lengths first: a request with no signature, or a short one, is then refused rather than crashing the handler. Hash the raw body as it arrived, before any JSON parsing.
 
 ## Email, SMS and error trackers
 

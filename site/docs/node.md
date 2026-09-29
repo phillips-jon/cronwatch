@@ -62,10 +62,17 @@ new Worker("scheduled", async (bull) => {
 A script run by crontab starts, does its work and exits, so nothing inside it is around to notice the run that never happened. Two crontab lines solve that: the job, and a check every few minutes.
 
 ```ts
+// lib/jobs.ts: every job, declared once
+import { cw } from "./cronwatch.js";
+
+export const backup = cw.job("nightly-backup", { schedule: "0 3 * * *", grace: "20m", expect: "uploaded" });
+export const digest = cw.job("weekly-digest", { schedule: "0 8 * * 1" });
+```
+
+```ts
 // scripts/nightly-backup.ts
 import { cw } from "../lib/cronwatch.js";
-
-const backup = cw.job("nightly-backup", { schedule: "0 3 * * *", grace: "20m", expect: "uploaded" });
+import { backup } from "../lib/jobs.js";
 
 await backup.run(async (job) => {
   const key = await uploadBackup();
@@ -77,7 +84,7 @@ await cw.close();
 ```ts
 // scripts/cronwatch-check.ts
 import { cw } from "../lib/cronwatch.js";
-import "../scripts/jobs.js";   // a module that declares every job, so never-ran jobs are known
+import "../lib/jobs.js";   // declares every job, so one that has never run can still be missed
 
 const result = await cw.check();
 console.log(`${result.jobs.length} jobs, ${result.alerts.length} alerts`);
@@ -89,7 +96,7 @@ await cw.close();
 */5 * * * *  cd /srv/app && node dist/scripts/cronwatch-check.js
 ```
 
-Keep every `cw.job()` declaration in one module the check script imports. A job is only known to the store once it has been declared in a process that ran a check or a run, so a job that has never run and is not declared in the check process cannot be reported as missing.
+Keep every `cw.job()` declaration in that one module, and import it from the job scripts and the check script alike, so the schedule a script runs under and the one the check expects can never drift apart. A job is only known to the store once it has been declared in a process that ran a check or a run, so a job that has never run and is not declared in the check process cannot be reported as missing.
 
 ## Hono, Bun, Deno and friends
 

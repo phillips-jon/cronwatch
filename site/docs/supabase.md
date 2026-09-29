@@ -101,12 +101,23 @@ const cw = cronwatch({
 });
 
 Deno.serve(async (request) => {
-  if (request.headers.get("authorization") !== `Bearer ${Deno.env.get("CRON_SECRET")}`) {
+  const secret = Deno.env.get("CRON_SECRET");
+  if (!secret) return new Response("CRON_SECRET is not set", { status: 503 });
+  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
     return new Response("Unauthorized", { status: 401 });
   }
   const result = await cw.check();
   return Response.json({ checkedAt: result.checkedAt, alerts: result.alerts.length });
 });
+```
+
+The function refuses every request while `CRON_SECRET` is unset or empty. Without that line, an unset secret would make the expected header `Bearer undefined`, which anyone can send. Set it with `supabase secrets set CRON_SECRET=...`.
+
+By default Supabase lets a request reach an Edge Function only when its `Authorization` header holds a valid Supabase JWT. The scheduler here sends the cron secret in that header instead, so turn the gateway's check off for this function and let the secret do the job: deploy with `supabase functions deploy cronwatch-check --no-verify-jwt`, or set it in `supabase/config.toml`:
+
+```toml
+[functions.cronwatch-check]
+verify_jwt = false
 ```
 
 Call it every few minutes. Supabase's own way to schedule an Edge Function is a pg_cron job that posts to it with `pg_net`, and that works, but think about what it means: if pg_cron itself stops (the database restarted without it, the scheduler worker died), the check that would notice stops with it. Prefer a scheduler outside the database for the check, and let pg_cron run everything else.

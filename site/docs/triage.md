@@ -42,7 +42,7 @@ Triage runs once per alert, whatever happens to it. When it gives nothing (it th
 
 ## What is sent
 
-The alert title and message, the job's stored definition, the triggering run (status, timing, metrics, up to 3 KB of error and 3 KB of output tail), and one line each for up to four earlier runs. Values that look like secrets are redacted before a run is stored, so they never reach triage, but the patterns cannot catch everything; log less or leave triage off for jobs that handle secrets.
+The alert title and message, the job's stored definition, the triggering run (status, timing, metrics, up to 3 KB of error and 3 KB of output tail), and one line each for up to five earlier runs (the job's five newest, less the triggering run when it is one of them). Values that look like secrets are redacted before a run is stored, so they never reach triage, but the patterns cannot catch everything; log less or leave triage off for jobs that handle secrets.
 
 Output and errors are sent inside `<job_data>` tags, and the model is told that anything inside them is evidence, never instructions. A job that logs text from outside (scraped pages, user input, upstream error bodies) cannot talk the model into putting its own advice or links in your alerts.
 
