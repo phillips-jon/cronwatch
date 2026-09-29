@@ -137,6 +137,8 @@ pub struct TestStore {
     /// Whether the conditional writes are offered.
     pub no_run_if: bool,
     pub no_cas: bool,
+    /// Whether `delete_run_if` is offered.
+    pub no_delete: bool,
     /// Whether every compare-and-set is refused, as if another process
     /// wrote between every read and write.
     pub cas_refuses: bool,
@@ -266,6 +268,9 @@ impl Store for TestStore {
         job: &'a str,
         status: &'a RunStatus,
     ) -> BoxFuture<'a, Result<bool, BoxError>> {
+        if self.no_delete {
+            return Box::pin(async { Err(cronwatch::Unsupported.into()) });
+        }
         guarded!(self, "delete_run_if", self.inner.delete_run_if(id, job, status))
     }
 }

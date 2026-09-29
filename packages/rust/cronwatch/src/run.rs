@@ -344,7 +344,33 @@ impl Job {
         E: fmt::Display,
     {
         let trigger = options.trigger.unwrap_or_else(|| "run".into());
-        self.client.execute(self.def.clone(), trigger, f).await
+        self.client.execute(self.def.clone(), trigger, None::<fn(&E) -> bool>, f).await
+    }
+
+    /// [`run_with`](Self::run_with), taking the run back rather than judging
+    /// it when `f` returns an error `discard_when` answers true for: an
+    /// attempt a queue gives back without failing, such as an apalis task
+    /// deferred with `DeferredError`. The running row is deleted (through
+    /// [`Store::delete_run_if`](crate::Store::delete_run_if)), nothing is
+    /// judged or alerted, the job's state is left as it was (the attempt
+    /// closes neither missed nor stuck), and the error is still returned. A
+    /// row a check already marked stuck is left as it is, and a store
+    /// without `delete_run_if` records the run as it ended; both are
+    /// reported to the error handler as `discarding <job>`, as is a
+    /// `discard_when` that panics, whose run is then recorded. A panic in `f`
+    /// is never taken back. The SDK has no counterpart; the Go port's
+    /// `DiscardWhen` and the PHP port's released Laravel job follow the same
+    /// rule.
+    pub async fn run_or_discard<F, Fut, T, E, D>(&self, options: RunOptions, discard_when: D, f: F) -> Result<T, E>
+    where
+        F: FnOnce(JobContext) -> Fut,
+        Fut: Future<Output = Result<T, E>>,
+        T: 'static,
+        E: fmt::Display,
+        D: Fn(&E) -> bool,
+    {
+        let trigger = options.trigger.unwrap_or_else(|| "run".into());
+        self.client.execute(self.def.clone(), trigger, Some(discard_when), f).await
     }
 }
 
@@ -367,18 +393,21 @@ impl Client {
             (None, Some(def)) => def,
             (options, _) => self.job(name, options.unwrap_or_default())?.def,
         };
-        Ok(self.execute(def, "run".into(), f).await)
+        Ok(self.execute(def, "run".into(), None::<fn(&E) -> bool>, f).await)
     }
 
     /// Runs `f` as a recorded run. The function always runs, whatever the
     /// store is doing: store errors go to the error handler, and the result
-    /// is the function's own outcome.
-    async fn execute<F, Fut, T, E>(&self, def: Arc<JobDef>, trigger: String, f: F) -> Result<T, E>
+    /// is the function's own outcome. `discard`, when given, says which
+    /// returned errors take the run back rather than finish it
+    /// (`Job::run_or_discard`).
+    async fn execute<F, Fut, T, E, D>(&self, def: Arc<JobDef>, trigger: String, discard: Option<D>, f: F) -> Result<T, E>
     where
         F: FnOnce(JobContext) -> Fut,
         Fut: Future<Output = Result<T, E>>,
         T: 'static,
         E: fmt::Display,
+        D: Fn(&E) -> bool,
     {
         let started_at = self.now();
         let run = Run {
@@ -395,9 +424,15 @@ impl Client {
         };
         // The start is written in a task of its own, so a caller that drops
         // this future part way leaves a whole row, which the guard finishes.
+        // A run that may be given back closes missed and stuck only once it
+        // is known not to be, as the Go and PHP ports do: one taken back
+        // must leave the state as it was, or an overdue job would have
+        // missed closed by each attempt given back and opened again by the
+        // next check, an alert each time.
+        let close_on_start = discard.is_none();
         let start = {
             let (client, def, run) = (self.clone(), def.clone(), run.clone());
-            self.inner.handle.spawn(async move { client.begin_run(&def, &run).await })
+            self.inner.handle.spawn(async move { client.begin_run(&def, &run, close_on_start).await })
         };
         let rec = Arc::new(Recorder::new());
         let mut guard = DropGuard {
@@ -445,6 +480,17 @@ impl Client {
                 resume_unwind(panic);
             }
             Ok(Err(err)) => {
+                if let Some(discard) = &discard {
+                    if self.given_back(&def.name, discard, &err) {
+                        let client = self.clone();
+                        let run = run.clone();
+                        let task =
+                            self.inner.handle.spawn(async move { !recorded || client.discard_run(&run).await });
+                        if task.await.unwrap_or(false) {
+                            return Err(err);
+                        }
+                    }
+                }
                 let text = error_text(&err);
                 (Err(err), Some(text), None)
             }
@@ -452,6 +498,10 @@ impl Client {
                 let text = text_of(&v);
                 (Ok(v), None, text)
             }
+        };
+        let closing = match closing {
+            None if recorded && !close_on_start => Some(self.close_on_start(&def.name)),
+            closing => closing,
         };
         let client = self.clone();
         let task = self.inner.handle.spawn(async move {
@@ -463,9 +513,67 @@ impl Client {
         value
     }
 
+    /// `discard(err)`, with a panic in it reported and the run not given
+    /// back, so it is recorded rather than left running to be reported
+    /// stuck.
+    fn given_back<E>(&self, name: &str, discard: &impl Fn(&E) -> bool, err: &E) -> bool {
+        match catch_unwind(AssertUnwindSafe(|| discard(err))) {
+            Ok(back) => back,
+            Err(panic) => {
+                self.report(Error::Other(format!("panicked: {}", panic_text(&*panic))), &format!("discarding {name}"));
+                false
+            }
+        }
+    }
+
+    /// Takes back a run still running (`Job::run_or_discard`) and says
+    /// whether the caller is done with it. A store without `delete_run_if`,
+    /// or one that fails, is reported and the run finished as it ended, so
+    /// it is not left running to be reported stuck; a row no longer running
+    /// (a check marked it stuck meanwhile) is reported and left as it is.
+    async fn discard_run(&self, run: &Run) -> bool {
+        let where_ = format!("discarding {}", run.job);
+        match self.inner.store.delete_run_if(&run.id, &run.job, &RunStatus::Running).await {
+            Ok(true) => true,
+            Ok(false) => {
+                self.report(
+                    Error::Other(format!("run {} of {} is no longer running; left as it is", run.id, run.job)),
+                    &where_,
+                );
+                true
+            }
+            Err(err) if crate::store::is_unsupported(&err) => {
+                self.report(
+                    Error::Other(
+                        "the store cannot take back a run (it does not implement Store::delete_run_if); recorded as it ended"
+                            .into(),
+                    ),
+                    &where_,
+                );
+                false
+            }
+            Err(err) => {
+                self.report(Error::store(err), &where_);
+                false
+            }
+        }
+    }
+
+    /// Closes missed and stuck for a run that has started, beside the job.
+    fn close_on_start(&self, name: &str) -> JoinHandle<()> {
+        let client = self.clone();
+        let name = name.to_string();
+        self.inner.handle.spawn(async move {
+            if let Err(err) = client.update_state(&name, async { Ok(()) }, |s, _| Ok((on_run_start(&s), ()))).await {
+                client.report(err, &format!("starting {name}"));
+            }
+        })
+    }
+
     /// The start of a run: the definition synced, the row inserted, and
-    /// missed and stuck closed beside the job, which never waits on it.
-    async fn begin_run(&self, def: &Arc<JobDef>, run: &Run) -> Started {
+    /// (with `close`) missed and stuck closed beside the job, which never
+    /// waits on it.
+    async fn begin_run(&self, def: &Arc<JobDef>, run: &Run, close: bool) -> Started {
         let name = &def.name;
         let inserted = match self.sync(def).await {
             Ok(()) => self.inner.store.insert_run(run).await.map_err(Error::store),
@@ -475,14 +583,7 @@ impl Client {
             self.report(err, &format!("recording {name}"));
             return (false, None);
         }
-        let client = self.clone();
-        let name = name.clone();
-        let closing = self.inner.handle.spawn(async move {
-            if let Err(err) = client.update_state(&name, async { Ok(()) }, |s, _| Ok((on_run_start(&s), ()))).await {
-                client.report(err, &format!("starting {name}"));
-            }
-        });
-        (true, Some(closing))
+        (true, close.then(|| self.close_on_start(name)))
     }
 
     /// The end of a run: its fields set from how it went, judged, written
