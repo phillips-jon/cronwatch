@@ -115,7 +115,7 @@ figure.browser, figure.timeline { font-variant-numeric: lining-nums; }
 .tab:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .tab .logo { width: 16px; height: 16px; fill: currentColor; flex: none; }
 .tab-ts:hover .logo, .tab-ts[aria-selected="true"] .logo { fill: #3178c6; }
-.tab-rails:hover .logo, .tab-rails[aria-selected="true"] .logo { fill: #d30001; }
+.tab-rails:hover .logo, .tab-rails[aria-selected="true"] .logo { fill: #cc342d; }
 .tab-python:hover .logo, .tab-python[aria-selected="true"] .logo { fill: #3776ab; }
 .tab-php:hover .logo, .tab-php[aria-selected="true"] .logo { fill: #777bb4; }
 .tab-go:hover .logo, .tab-go[aria-selected="true"] .logo { fill: #00add8; }
