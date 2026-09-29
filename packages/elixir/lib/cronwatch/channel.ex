@@ -26,11 +26,12 @@ defmodule Cronwatch.ChannelContext do
   @moduledoc """
   What the client hands a channel with each alert: `report/2` passes a
   problem that did not stop the alert going out (one of several recipients
-  refusing it, say) to the instance's error handler.
+  refusing it, say) to the instance's error handler. `transport` is the
+  instance's `transport:` option, for a channel given none of its own.
   """
 
-  defstruct [:on_error]
-  @type t :: %__MODULE__{on_error: (term() -> any())}
+  defstruct [:on_error, transport: nil]
+  @type t :: %__MODULE__{on_error: (term() -> any()), transport: Cronwatch.Transport.spec()}
 
   @doc "Reports a problem that did not stop the alert going out."
   @spec report(t(), term()) :: :ok
@@ -45,13 +46,19 @@ defmodule Cronwatch.Triage do
   Adds a short diagnosis to every alert except recoveries: the SDK's
   `TriageFn`, as a behaviour. Given to an instance as `{module, opts}`, or as
   a function of one argument (the context). `c:triage/2` is given the
-  options and a context map with `:alert` and `:recent_runs` (the job's five
-  newest), and answers `{:ok, text}`, `nil` or `{:error, reason}`. It is
-  tried once per alert and stopped after 25 seconds.
+  options and a context map with `:alert`, `:recent_runs` (the job's five
+  newest) and `:transport` (the instance's `transport:` option), and answers
+  `{:ok, text}`, `nil` or `{:error, reason}`. It is tried once per alert and
+  stopped after 25 seconds. An optional `c:init/1` checks the options once,
+  when the instance starts, and answers what `c:triage/2` is then given.
   """
+
+  @callback init(opts :: term()) :: {:ok, state :: term()} | {:error, String.t()}
 
   @callback triage(opts :: term(), context :: %{alert: Cronwatch.Alert.t(), recent_runs: [Cronwatch.Run.t()]}) ::
               {:ok, String.t()} | nil | {:error, term()}
+
+  @optional_callbacks init: 1
 end
 
 defmodule Cronwatch.Source do
