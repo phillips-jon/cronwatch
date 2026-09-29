@@ -44,8 +44,8 @@ func TestFailingJobIsRecordedAlertsAndReturnsItsError(t *testing.T) {
 	eq(t, "status", run.Status, cronwatch.StatusFailed)
 	eq(t, "error", *run.Error, "Error: db down")
 	sameList(t, "alerts", k.alerts.Types(), []string{"failed"})
-	if !strings.Contains(k.alerts.Alerts[0].Message, "db down") {
-		t.Error(k.alerts.Alerts[0].Message)
+	if !strings.Contains(k.alerts.List()[0].Message, "db down") {
+		t.Error(k.alerts.List()[0].Message)
 	}
 	eq(t, "health", summary(t, k.cw, "nightly").Health, cronwatch.HealthFailing)
 }
@@ -154,8 +154,8 @@ func TestCheckMarksARunThatNeverFinishedAsStuck(t *testing.T) {
 	sameList(t, "stuck", alertTypes(r.Alerts), []string{"stuck"})
 	eq(t, "status", runs(t, k.cw, "long")[0].Status, cronwatch.StatusTimeout)
 	eq(t, "health", r.Jobs[0].Health, cronwatch.HealthStuck)
-	if !strings.Contains(k.alerts.Alerts[0].Message, "never reported finishing") {
-		t.Error(k.alerts.Alerts[0].Message)
+	if !strings.Contains(k.alerts.List()[0].Message, "never reported finishing") {
+		t.Error(k.alerts.List()[0].Message)
 	}
 }
 
@@ -178,7 +178,7 @@ func TestSlowAndOverBudgetFromTheJobsBaseline(t *testing.T) {
 	k.c.Advance(HOUR)
 	run(1000, 5000, 1.2)
 	sameList(t, "over budget", k.alerts.Types(), []string{"slow", "over_budget"})
-	last := k.alerts.Alerts[1]
+	last := k.alerts.List()[1]
 	if !strings.Contains(last.Message, "cost: 1.2, limit 1 (budget)") || !strings.Contains(last.Message, "tokens: 5,000, limit 3,000 (three times the usual 1,000)") {
 		t.Error(last.Message)
 	}
@@ -210,14 +210,14 @@ func TestTriageIsAttachedAndNeverBlocks(t *testing.T) {
 	if k.cw.Run(bg, "t", fails("x")) == nil {
 		t.Fatal("error")
 	}
-	eq(t, "triage", *k.alerts.Alerts[0].Triage, "Probably t's database.")
+	eq(t, "triage", *k.alerts.List()[0].Triage, "Probably t's database.")
 
 	k2 := newKit(t, cronwatch.WithTriage(func(context.Context, cronwatch.TriageContext) (string, error) { return "", errors.New("api down") }))
 	if k2.cw.Run(bg, "t", fails("x")) == nil {
 		t.Fatal("error")
 	}
 	sameList(t, "alerts", k2.alerts.Types(), []string{"failed"})
-	a := k2.alerts.Alerts[0]
+	a := k2.alerts.List()[0]
 	if a.Triage != nil || !a.TriageTried {
 		t.Error("tried, and gave nothing")
 	}

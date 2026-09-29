@@ -121,6 +121,7 @@ type Watcher struct {
 	sources map[any][]bridge.Entry
 	order   []any
 	unknown map[string]time.Time
+	swept   time.Time
 }
 
 // New makes a Watcher.
@@ -353,13 +354,35 @@ func (w *Watcher) jobFor(ctx context.Context, taskType string) *cronwatch.Job {
 		}
 		summary, err := w.cw.JobSummary(ctx, taskType)
 		if err != nil || summary == nil || !slices.Contains(summary.Definition.Tags(), w.watch.AppTag()) {
-			w.mu.Lock()
-			w.unknown[taskType] = time.Now()
-			w.mu.Unlock()
+			w.noteUnknown(taskType, time.Now())
 			return nil
 		}
 	}
 	return w.watch.Fallback(ctx, taskType, options)
+}
+
+// maxUnknown bounds the task types remembered as not jobs: past it the
+// memory is let go, which costs only a lookup more for each type.
+const maxUnknown = 10000
+
+// noteUnknown remembers taskType as not a job, as of now, and lets go of
+// types whose minute has passed, so a server that sees many task types
+// over its life (or types a caller made up) keeps only the last minute's.
+func (w *Watcher) noteUnknown(taskType string, now time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if now.Sub(w.swept) >= lookupEvery || len(w.unknown) >= maxUnknown {
+		for t, checked := range w.unknown {
+			if now.Sub(checked) >= lookupEvery {
+				delete(w.unknown, t)
+			}
+		}
+		if len(w.unknown) >= maxUnknown {
+			clear(w.unknown)
+		}
+		w.swept = now
+	}
+	w.unknown[taskType] = now
 }
 
 // CheckTask is the task that runs a CronWatch check: no retries, since a

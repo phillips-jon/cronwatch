@@ -252,6 +252,18 @@ func TestTriageMakesOneAttemptBoundedInTime(t *testing.T) {
 	}
 }
 
+// MaxTokens of 0 is unset (800); any other value goes as given, as the
+// SDK sends it, for the API to judge.
+func TestMaxTokensZeroIsTheDefault(t *testing.T) {
+	tc := contexts(t, fixture(t))["a missed run with no runs"]
+	for given, want := range map[int]any{0: DefaultMaxTokens, 1: 1, 4096: 4096, -1: -1} {
+		got, _ := AnthropicOptions{MaxTokens: given}.params(tc).Get("max_tokens")
+		if got != want {
+			t.Errorf("%d: sent %v, want %v", given, got, want)
+		}
+	}
+}
+
 func TestTriageNeedsAKey(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "")
 	if _, err := Anthropic(AnthropicOptions{}); err == nil || err.Error() != "triage.Anthropic needs an APIKey (or ANTHROPIC_API_KEY)" {

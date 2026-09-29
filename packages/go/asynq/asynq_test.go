@@ -205,6 +205,25 @@ func TestAServerFindsTheSchedulersJobsInTheStore(t *testing.T) {
 	eq(t, "another app's job is left alone", len(other.runs(t, "report:nightly")), 1)
 }
 
+// The audit: every task type a server saw that was not a job stayed in
+// memory for the life of the process.
+func TestTypesNotJobsAreForgottenAfterTheirMinute(t *testing.T) {
+	w := cwasynq.New(newKit(t, nil).cw, cwasynq.Options{})
+	start := time.Unix(1_700_000_000, 0)
+	for i := range 100 {
+		w.NoteUnknownForTest(fmt.Sprintf("made:up:%d", i), start)
+	}
+	eq(t, "within the minute", w.UnknownForTest(), 100)
+	w.NoteUnknownForTest("later", start.Add(time.Minute))
+	eq(t, "after it", w.UnknownForTest(), 1)
+	for i := range cwasynq.MaxUnknown + 5 {
+		w.NoteUnknownForTest(fmt.Sprintf("flood:%d", i), start.Add(time.Minute+time.Second))
+	}
+	if n := w.UnknownForTest(); n > cwasynq.MaxUnknown {
+		t.Fatalf("%d remembered, past the bound", n)
+	}
+}
+
 // TestAsynqEndToEnd runs a real server, scheduler and periodic task
 // manager on the Redis CRONWATCH_TEST_REDIS names.
 func TestAsynqEndToEnd(t *testing.T) {

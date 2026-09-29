@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,10 +38,20 @@ func (c *Clock) Advance(ms int64) int64 { return c.at.Add(ms) }
 // Set moves the clock to t.
 func (c *Clock) Set(t int64) { c.at.Store(t) }
 
-// Capture is a channel that keeps the alerts it is sent.
+// Capture is a channel that keeps the alerts it is sent. Read them with
+// List (or Types), which take its lock: a client sends from goroutines of
+// its own, so reading Alerts directly is safe only once every send has
+// returned.
 type Capture struct {
 	mu     sync.Mutex
 	Alerts []cronwatch.Alert
+}
+
+// List is a copy of the kept alerts, in order.
+func (c *Capture) List() []cronwatch.Alert {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.Alerts)
 }
 
 // Name is "capture".

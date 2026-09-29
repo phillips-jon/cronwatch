@@ -39,8 +39,8 @@ func TestMissedThenAQuietFailureStillRecoversLater(t *testing.T) {
 	sameList(t, "missed", k.alerts.Types(), []string{"missed"})
 	check(t, job.Run(bg, ok))
 	sameList(t, "recovered", k.alerts.Types(), []string{"missed", "recovered"})
-	if !strings.Contains(k.alerts.Alerts[1].Message, "after: missed") {
-		t.Error(k.alerts.Alerts[1].Message)
+	if !strings.Contains(k.alerts.List()[1].Message, "after: missed") {
+		t.Error(k.alerts.List()[1].Message)
 	}
 }
 
@@ -270,7 +270,7 @@ func TestAnErrorIsNamedOnce(t *testing.T) {
 	k := newKit(t)
 	_ = k.cw.Run(bg, "db", fails("connect ECONNREFUSED 10.0.0.12:5432"))
 	eq(t, "error", *runs(t, k.cw, "db")[0].Error, "Error: connect ECONNREFUSED 10.0.0.12:5432")
-	msg := k.alerts.Alerts[0].Message
+	msg := k.alerts.List()[0].Message
 	if strings.Contains(msg, "Error: Error:") || !strings.Contains(msg, "\nError: connect ECONNREFUSED") {
 		t.Error(msg)
 	}

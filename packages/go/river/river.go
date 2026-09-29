@@ -309,6 +309,10 @@ func (w *Watcher) jobFor(ctx context.Context, row *rivertype.JobRow) *cronwatch.
 	// A job this process did not declare (a worker that makes no periodic
 	// jobs, a kind watched by Kinds): declared from what the store holds
 	// when it is this app's, so the schedule another process stored stays.
+	// The store is read with the job's own context on purpose: River
+	// bounds it by the worker's timeout, and a read cut short declares
+	// nothing (this attempt goes unrecorded and the next asks again)
+	// rather than write over the stored schedule.
 	return w.watch.Fallback(ctx, name, options)
 }
 
@@ -334,7 +338,10 @@ type CheckWorker struct {
 // CheckWorker is the worker for CheckArgs; add it with river.AddWorker.
 func (w *Watcher) CheckWorker() *CheckWorker { return &CheckWorker{w: w} }
 
-// Work syncs and checks.
+// Work syncs and checks, with the job's own context on purpose: River
+// bounds it by the worker's timeout (a minute by default) and cancels it
+// at shutdown, so neither needs a deadline of CronWatch's; the check a
+// cancelled caller shared still runs to its end (see Client.Check).
 func (c *CheckWorker) Work(ctx context.Context, _ *river.Job[CheckArgs]) error {
 	if err := c.w.Sync(ctx); err != nil {
 		c.w.cw.ReportError(err, "river")

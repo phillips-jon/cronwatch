@@ -34,8 +34,8 @@ func TestAPanicIsRecordedAsAFailedRunAndPanicsOn(t *testing.T) {
 		t.Errorf("%d frames", n)
 	}
 	sameList(t, "alerts", k.alerts.Types(), []string{"failed"})
-	if !strings.HasPrefix(k.alerts.Alerts[0].Message, "Started ") || !strings.Contains(k.alerts.Alerts[0].Message, "\npanic: kaboom") {
-		t.Errorf("message %q", k.alerts.Alerts[0].Message)
+	if !strings.HasPrefix(k.alerts.List()[0].Message, "Started ") || !strings.Contains(k.alerts.List()[0].Message, "\npanic: kaboom") {
+		t.Errorf("message %q", k.alerts.List()[0].Message)
 	}
 
 	// An error value panicked is written with its message.

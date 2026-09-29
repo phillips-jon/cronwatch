@@ -295,7 +295,7 @@ func TestPgCronRestartRowsACrowdedJobFirstSightAndARename(t *testing.T) {
 				t.Errorf("the quiet job's failure: %+v", r)
 			}
 			quietAlerted := false
-			for _, a := range alerts.Alerts {
+			for _, a := range alerts.List() {
 				quietAlerted = quietAlerted || a.Type == cronwatch.AlertFailed && a.Job == names.quiet
 			}
 			if !quietAlerted {

@@ -59,7 +59,10 @@ type AnthropicOptions struct {
 	// Effort is how hard the model thinks: "low", "medium" (the default)
 	// or "high". A stack trace rarely needs more.
 	Effort string
-	// MaxTokens defaults to 800. A diagnosis is a paragraph.
+	// MaxTokens defaults to 800. A diagnosis is a paragraph. Zero is
+	// unset, as Go's zero values are, where the SDK's `maxTokens ?? 800`
+	// sends an explicit 0 that the API refuses; any other value is sent as
+	// given, as the SDK sends it, for the API to judge.
 	MaxTokens int
 	// NoFallbacks turns off routing a policy refusal to Anthropic's default
 	// fallback model inside the same request (on by default), for an

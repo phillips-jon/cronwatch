@@ -363,7 +363,7 @@ func TestARunCutOffByARestartIsRecordedAndOneHeldRunNeverStopsTheOthers(t *testi
 	same(t, "placed at the job's newest run before it", cut.StartedAt, T0-60_000)
 	same(t, "the other job's failure is not starved", k.run(t, id(failure)).Status, cronwatch.StatusFailed)
 	found := false
-	for _, a := range k.alerts.Alerts {
+	for _, a := range k.alerts.List() {
 		found = found || a.Type == cronwatch.AlertFailed && a.Job == "other"
 	}
 	same(t, "other failed", found, true)
@@ -437,7 +437,7 @@ func TestARenamedJobLeavesNoScheduledGhost(t *testing.T) {
 	cron.add(1, "succeeded", c.Now()-2000, c.Now()-1000, "1 row")
 	k.check(t)
 	same(t, "finished", k.run(t, runID).Status, cronwatch.StatusOK)
-	for _, a := range k.alerts.Alerts {
+	for _, a := range k.alerts.List() {
 		if a.Job == "rollup" {
 			t.Errorf("the old name alerted: %s", a.Type)
 		}
@@ -458,7 +458,7 @@ func TestARenamedJobLeavesNoScheduledGhost(t *testing.T) {
 	same(t, "runs already copied under an old name are not copied again", len(next.runs(t, "rollup-v3", 20)), 0)
 	c.Advance(HOUR)
 	result := next.check(t)
-	for _, a := range append(k.alerts.Alerts, result.Alerts...) {
+	for _, a := range append(k.alerts.List(), result.Alerts...) {
 		if a.Job != "rollup-v3" {
 			t.Errorf("only the job's current name can be missed: %s %s", a.Type, a.Job)
 		}
@@ -476,7 +476,7 @@ func TestAJobPausedOrRenamedWhileMissedClosesMissedWithARecovery(t *testing.T) {
 	k := newKit(t, cron, c, nil, pgcron.Options{})
 	k.check(t)
 	var got []string
-	for _, a := range k.alerts.Alerts {
+	for _, a := range k.alerts.List() {
 		got = append(got, string(a.Type)+" "+a.Job)
 	}
 	sort.Strings(got)
