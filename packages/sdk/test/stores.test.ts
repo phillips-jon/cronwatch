@@ -133,6 +133,41 @@ async function checkOverForeignRows(store: Store, exec: (sql: string) => Promise
   assert.equal(sent[0]!.message.split("\n")[0], "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h.");
 }
 
+// A cron job's last run as a foreign or damaged row could hold it: before
+// the year 1 (the first fire of the year 1 was missed) or after 9999 (never
+// due again), and past JavaScript's Date range. Neither a check nor the
+// dashboard reports an error.
+const FAR_STARTS = ["-62135596800001", "253402300800000", "-9223372036854775808", "9223372036854775807"];
+async function cronOverForeignRow(store: Store, exec: (sql: string) => Promise<void>, startedAt: string, p = "cronwatch_") {
+  const errors: string[] = [];
+  const sent: Alert[] = [];
+  const cw = cronwatch({
+    store, alerts: [custom("capture", (alert) => void sent.push(alert))], cronSecret: null,
+    onError: (e, context) => void errors.push(`${context}: ${(e as Error).message}`),
+  });
+  await store.init!();
+  await store.upsertJob({ name: "far", schedule: "0 2 * * *", timezone: "UTC", grace: "10m" }, 1);
+  await exec(`INSERT INTO ${p}runs (id, job, status, started_at, finished_at, duration_ms, metrics, trigger) VALUES ('far1', 'far', 'ok', ${startedAt}, ${startedAt}, 0, '{}', 'run')`);
+  await cw.check();
+  const routes = cw.routes({ token: "tok" });
+  for (const url of ["/cronwatch", "/cronwatch/jobs/far", "/cronwatch/api/jobs/far"]) {
+    const res = await routes.GET(new Request(`http://app.test${url}`, { headers: { authorization: "Bearer tok" } }));
+    assert.equal(res.status, 200, url);
+    await res.text();
+  }
+  assert.deepEqual(errors, [], startedAt);
+  assert.deepEqual(sent.map((a) => a.type), startedAt.startsWith("-") ? ["missed"] : [], startedAt);
+  if (sent.length) assert.match(sent[0]!.message, /^Due 0001-01-01 02:00:00 UTC /);
+}
+
+for (const startedAt of FAR_STARTS) {
+  await test(`sqlite: a check and the dashboard over a cron job whose last run started at ${startedAt}`, async () => {
+    const db = new Database(":memory:");
+    await cronOverForeignRow(sqlite({ database: db }), async (sql) => void db.exec(sql), startedAt);
+    db.close();
+  });
+}
+
 await test("sqlite: a foreign state's version counts as stateVersion() reads it (store.json foreignVersion)", async () => {
   const db = new Database(":memory:");
   await replayForeignVersions(sqlite({ database: db }), async (text) => void db.prepare("INSERT INTO cronwatch_state (job, state) VALUES ('v', ?)").run(text));
@@ -229,6 +264,21 @@ await test("postgres: a check over a run that started at the lowest BIGINT, and 
     await drop(prefix);
   }
 });
+
+for (const startedAt of FAR_STARTS) {
+  await test(`postgres: a check and the dashboard over a cron job whose last run started at ${startedAt}`, { skip: NO_PG }, async () => {
+    const prefix = pgPrefix();
+    const store = postgres({ connectionString: PG, prefix });
+    const pool = new pg.Pool({ connectionString: PG });
+    try {
+      await cronOverForeignRow(store, async (sql) => void await pool.query(sql), startedAt, prefix);
+    } finally {
+      await pool.end();
+      await store.close!();
+      await drop(prefix);
+    }
+  });
+}
 
 await test("postgres: many instances can init at once", { skip: NO_PG }, async () => {
   const prefix = pgPrefix();

@@ -34,7 +34,13 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 let now = T0;
-const cw = cronwatch({ now: () => now, store: memory(), alerts: [custom("capture", () => {})], cronSecret: null });
+// Nothing in the seed or the requests may report an error, however far off
+// a run's start is; one that does stops the capture.
+const errors = [];
+const cw = cronwatch({
+  now: () => now, store: memory(), alerts: [custom("capture", () => {})], cronSecret: null,
+  onError: (error, context) => errors.push(`${context}: ${error.message}`),
+});
 
 async function quietly(promise) {
   try {
@@ -83,6 +89,20 @@ now = -62_135_596_800_001;
 await quietly(farBack.run(() => {
   now += 1000;
 }));
+
+// Cron jobs whose last run is as far off: counted from the first millisecond
+// of the year 1, the first is due then (and is missed at the check); after
+// 9999 the other is never due again.
+const farCronBack = cw.job("far-cron-back", { schedule: "0 2 * * *", timezone: "UTC", grace: "10m" });
+now = -62_135_596_800_001;
+await farCronBack.run(() => {
+  now += 1000;
+});
+const farCronAhead = cw.job("far-cron-ahead", { schedule: "0 2 * * *", timezone: "UTC", grace: "10m" });
+now = 253_402_300_800_000;
+await farCronAhead.run(() => {
+  now += 1000;
+});
 now = T0;
 
 const routes = cw.routes({ token: "tok", basePath: "/cronwatch" });
@@ -105,8 +125,12 @@ const requests = [
   ["GET", "/cronwatch/jobs/never-ran", bearer],
   ["GET", "/cronwatch/jobs/far-back", bearer],
   ["GET", "/cronwatch/api/jobs/far-back", bearer],
+  ["GET", "/cronwatch/jobs/far-cron-back", bearer],
+  ["GET", "/cronwatch/jobs/far-cron-ahead", bearer],
   ["GET", "/cronwatch/jobs/missing", bearer],
   ["POST", "/cronwatch/api/check", bearer],
+  ["GET", "/cronwatch/jobs/far-cron-back", bearer],
+  ["GET", "/cronwatch/api/jobs/far-cron-back", bearer],
   ["GET", "/cronwatch/api/check", cookie],
   ["POST", "/cronwatch/api/jobs/sync-users/silence", json, JSON.stringify({ for: "2h" })],
   ["POST", "/cronwatch/api/jobs/sync-users/silence", json, JSON.stringify({ for: "forever" })],
@@ -165,6 +189,11 @@ for (const [method, template, headers = {}, body] of requests) {
     ? `base64:${Buffer.from(await response.arrayBuffer()).toString("base64")}`
     : await response.text();
   captures.push({ method, path: template, headers, body: body ?? null, status: response.status, responseHeaders, responseBody });
+}
+
+if (errors.length) {
+  console.error(`golden: the SDK reported errors:\n  ${errors.join("\n  ")}`);
+  process.exit(1);
 }
 
 async function resolve(template) {

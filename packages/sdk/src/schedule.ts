@@ -1,5 +1,5 @@
 import { Cron } from "croner";
-import { parseDuration } from "./duration.js";
+import { FIRST_DATE_MS, LAST_DATE_MS, parseDuration } from "./duration.js";
 
 export interface ParsedSchedule {
   kind: "cron" | "interval";
@@ -52,6 +52,49 @@ export function parseSchedule(schedule: string, timezone?: string): ParsedSchedu
 }
 
 /**
+ * Four hundred Gregorian years: 146,097 days, a whole number of weeks, after
+ * which the calendar repeats date for date and weekday for weekday.
+ */
+const CYCLE_MS = 146_097 * 86_400_000;
+/** croner misreads a year below 100 as 1900 plus it, so earlier times are asked a cycle or more later. */
+const CRONER_FIRST_MS = Date.UTC(400, 0, 1);
+/** croner finds no fire past the year 3000, so later times are asked a cycle or more earlier. */
+const CRONER_LAST_MS = Date.UTC(2800, 0, 1);
+
+/**
+ * The next `n` fires of a cron strictly after `from`, which lies within the
+ * years 1 to 9999, dropping any after 9999. A time croner cannot answer for
+ * is moved by whole 400-year cycles into the years it can, and its fires
+ * moved back: a time before 400 goes forward, into the same local mean time
+ * every zone kept then, and one from 2800 goes back, to where the zone's
+ * present rules already hold.
+ */
+function runsAfter(cron: Cron, n: number, from: number): number[] {
+  let shift = 0;
+  if (from < CRONER_FIRST_MS) shift = Math.ceil((CRONER_FIRST_MS - from) / CYCLE_MS) * CYCLE_MS;
+  else if (from >= CRONER_LAST_MS) shift = -(Math.floor((from - CRONER_LAST_MS) / CYCLE_MS) + 1) * CYCLE_MS;
+  const out: number[] = [];
+  for (const date of cron.nextRuns(n, new Date(from + shift))) {
+    const t = date.getTime() - shift;
+    if (t > LAST_DATE_MS) break;
+    out.push(t);
+  }
+  return out;
+}
+
+/**
+ * A stored time as a cron's fires are counted from it. A start read from a
+ * foreign or damaged row can be any number: one before the year 1 counts
+ * from just before its first millisecond, so the first fire of the year 1 is
+ * the next one, and one at or after the last millisecond of 9999 has no
+ * fire after it at all (null). No fire is ever after 9999.
+ */
+function countFrom(from: number): number | null {
+  if (from >= LAST_DATE_MS) return null;
+  return from >= FIRST_DATE_MS ? from : FIRST_DATE_MS - 1;
+}
+
+/**
  * The first fire strictly after `from`, or null when the cron never fires
  * again. croner answers with times in the past when asked from inside the
  * hour that repeats when clocks go back, so its answers are filtered, and a
@@ -60,12 +103,14 @@ export function parseSchedule(schedule: string, timezone?: string): ParsedSchedu
 function fireAfter(parsed: ParsedSchedule, from: number): number | null {
   const cron = crons.get(parsed);
   if (!cron) throw new Error(`schedule "${parsed.source}" was not made by parseSchedule`);
-  let probe = from;
+  const start = countFrom(from);
+  if (start === null) return null;
+  let probe = start;
   for (let attempt = 0; attempt < 4; attempt++) {
-    const runs = cron.nextRuns(8, new Date(probe));
+    const runs = runsAfter(cron, 8, probe);
     if (runs.length === 0) return null;
-    const found = runs.find((d) => d.getTime() > from);
-    if (found) return found.getTime();
+    const found = runs.find((t) => t > start);
+    if (found !== undefined) return found;
     probe += 3_600_000;
   }
   return null;
@@ -81,20 +126,21 @@ export function firesBetween(parsed: ParsedSchedule, from: number, to: number, l
   const cron = crons.get(parsed);
   if (!cron) throw new Error(`schedule "${parsed.source}" was not made by parseSchedule`);
   const out: number[] = [];
-  let probe = from;
-  let last = from;
+  const start = countFrom(from);
+  if (start === null) return out;
+  let probe = start;
+  let last = start;
   for (let guard = 0; guard < 1000; guard++) {
-    const batch = cron.nextRuns(Math.min(limit + 1 - out.length, 24), new Date(probe));
+    const batch = runsAfter(cron, Math.min(limit + 1 - out.length, 24), probe);
     if (batch.length === 0) return out;
-    for (const date of batch) {
-      const t = date.getTime();
+    for (const t of batch) {
       if (t <= last) continue;
       if (t > to) return out;
       out.push(t);
       last = t;
       if (out.length > limit) return null;
     }
-    const end = batch[batch.length - 1]!.getTime();
+    const end = batch[batch.length - 1]!;
     probe = end > probe ? end : probe + 3_600_000;
   }
   return out;
@@ -144,7 +190,11 @@ export function expectation(
   return dueAt === null ? null : { dueAt, deadline: dueAt + graceMs };
 }
 
-/** The first fire that a run starting at `startedAt` does not cover. */
+/**
+ * The first fire that a run starting at `startedAt` does not cover. A start
+ * before the year 1 covers none of them, so the first fire of the year 1 is
+ * due; after 9999 there is none (see countFrom).
+ */
 function dueAfterRun(parsed: ParsedSchedule, startedAt: number): number | null {
   // A fire at or before the start is covered by the run itself.
   const next = fireAfter(parsed, startedAt);
@@ -177,6 +227,8 @@ export function runCovers(startedAt: number, dueAt: number, followingAt: number 
  */
 function inSpringForwardGap(parsed: ParsedSchedule, startedAt: number, fireAt: number): boolean {
   const LOOKBACK = 3 * 3_600_000;
+  // Every zone kept its local mean time, with no clock change, in the year 1.
+  if (fireAt - LOOKBACK < FIRST_DATE_MS) return false;
   const after = utcOffset(fireAt, parsed.timezone);
   const before = utcOffset(fireAt - LOOKBACK, parsed.timezone);
   const gap = after - before;
@@ -214,6 +266,9 @@ function utcOffset(at: number, timezone: string | undefined): number {
   for (const part of format.formatToParts(new Date(at))) {
     if (part.type !== "literal") parts[part.type] = Number(part.value);
   }
-  const wall = Date.UTC(parts.year!, parts.month! - 1, parts.day!, parts.hour!, parts.minute!, parts.second!);
-  return wall - Math.floor(at / 1000) * 1000;
+  // Date.UTC would read a year below 100 as 1900 plus it; setUTCFullYear does not.
+  const wall = new Date(0);
+  wall.setUTCFullYear(parts.year!, parts.month! - 1, parts.day!);
+  wall.setUTCHours(parts.hour!, parts.minute!, parts.second!);
+  return wall.getTime() - Math.floor(at / 1000) * 1000;
 }

@@ -198,17 +198,37 @@ function scheduleCases() {
     ["0 0 1 */3 *", "UTC", "2026-01-25T00:00:00Z", 3],
     ["0 0 * * 0#5", "UTC", "2026-01-01T00:00:00Z", 3],
     ["0 0 30 * 5#1", "UTC", "2026-02-01T00:00:00Z", 4],
+    // Far times, as a start read from a foreign or damaged row can be: before
+    // the year 1 the fires count from its first millisecond, and there is no
+    // fire after 9999. croner itself misreads a year below 100 and finds no
+    // fire past 3000; the SDK asks it 400 years (a whole calendar cycle) off.
+    ["0 2 * * *", "UTC", Number.MIN_SAFE_INTEGER, 2],
+    ["0 2 * * *", "UTC", -8_640_000_000_000_001, 1],
+    ["0 2 * * *", "UTC", FIRST_DATE - 1, 2],
+    ["0 0 * * *", "UTC", FIRST_DATE - 1, 2],
+    ["0 0 * * *", "UTC", FIRST_DATE, 1],
+    ["0 2 * * 1", "UTC", "0050-06-01T00:00:00Z", 3],
+    ["0 0 29 2 *", "UTC", "0099-01-01T00:00:00Z", 2],
+    ["0 0 29 2 *", "UTC", "0399-06-01T00:00:00Z", 2],
+    ["0 0 29 2 *", "UTC", "2999-01-01T00:00:00Z", 2],
+    ["30 4 1 * *", "UTC", "5000-11-15T00:00:00Z", 3],
+    ["0 0 * * 5", "UTC", "7777-07-07T00:00:00Z", 2],
+    ["0 2 * * *", "UTC", "9999-12-30T12:00:00Z", 3],
+    ["* * * * * *", "UTC", LAST_DATE - 1500, 3],
+    ["0 2 * * *", "UTC", LAST_DATE, 1],
+    ["0 2 * * *", "UTC", 8_640_000_000_000_001, 1],
+    ["0 2 * * *", "UTC", Number.MAX_SAFE_INTEGER, 1],
   ];
   const fires = fireInputs.map(([schedule, timezone, from, n]) => {
     const parsed = sdk.parseSchedule(schedule, timezone);
     const out = [];
-    let t = at(from);
+    let t = typeof from === "number" ? from : at(from);
     for (let i = 0; i < n; i++) {
       t = sdk.nextFire(parsed, t, null);
       out.push(t);
       if (t === null) break;
     }
-    return { schedule, ...(timezone ? { timezone } : {}), from: at(from), fires: out };
+    return { schedule, ...(timezone ? { timezone } : {}), from: typeof from === "number" ? from : at(from), fires: out };
   });
 
   const intervalInputs = [
@@ -264,6 +284,15 @@ function scheduleCases() {
   expect("0 * * * *", NY, Date.UTC(2026, 2, 8, 7, 0, 2), 0, 0);
   expect("0 0 1 1 *", "UTC", Date.UTC(2026, 0, 1, 0, 0, 3), Date.UTC(2025, 11, 31), 10 * MIN);
   expect("0 0 29 2 *", "UTC", Date.UTC(2024, 1, 29, 0, 0, 1), 0, 0);
+  // A last run, or a registration, from a foreign or damaged row.
+  const far = [
+    Number.MIN_SAFE_INTEGER, -8_640_000_000_000_001, FIRST_DATE - 1, FIRST_DATE, FIRST_DATE + 2 * HOUR,
+    LAST_DATE - DAY, LAST_DATE, LAST_DATE + 1, 8_640_000_000_000_001, Number.MAX_SAFE_INTEGER,
+  ];
+  for (const [schedule, timezone] of [["0 2 * * *", "UTC"], ["0 2 * * *", undefined], ["*/5 * * * *", "UTC"]]) {
+    for (const t of far) expect(schedule, timezone, t, T0 - DAY, 10 * MIN);
+    for (const t of far) expect(schedule, timezone, null, t, 10 * MIN);
+  }
 
   const covers = [
     [0, 0, null], [-59_000, 0, null], [5 * MIN, 0, null], [-61_000, 0, null], [-60_000, 0, null],
@@ -736,6 +765,29 @@ function evaluateCases() {
       definition: { name: "fast", schedule: "every 90s", grace: "30s" },
       createdAt: T0,
       steps: [check(T0 + 2 * MIN), check(T0 + 2 * MIN + 1), run(T0 + 3 * MIN), check(T0 + 4 * MIN), check(T0 + 5 * MIN + 1)],
+    },
+    // Runs as foreign or damaged rows could hold them. A cron counts from a
+    // start before the year 1 as from the year's first millisecond, so its
+    // first fire of the year 1 was missed; after 9999 nothing is due again.
+    {
+      name: "a cron job whose last run started before the year 1 was missed at the first fire of the year 1",
+      definition: { name: "far", schedule: "0 2 * * *", timezone: "UTC", grace: "10m" },
+      steps: [run(FIRST_DATE - 1), check(T0), check(T0 + HOUR), run(T0 + 2 * HOUR), check(T0 + 3 * HOUR)],
+    },
+    {
+      name: "a cron job whose last run started at the lowest safe integer",
+      definition: { name: "far", schedule: "*/5 * * * *", grace: "1m" },
+      steps: [run(Number.MIN_SAFE_INTEGER), check(T0)],
+    },
+    {
+      name: "a cron job whose last run started after 9999 is never due again",
+      definition: { name: "far", schedule: "0 2 * * *", timezone: "UTC", grace: "10m" },
+      steps: [run(T0 - HOUR), run(LAST_DATE + 1), check(T0), check(T0 + 2 * DAY)],
+    },
+    {
+      name: "a cron job whose last run started at the highest safe integer is never due again",
+      definition: { name: "far", schedule: "0 2 * * *", timezone: NY, grace: "10m" },
+      steps: [run(Number.MAX_SAFE_INTEGER - 1000), check(T0)],
     },
   ];
   return { scenarios: scenarios.map(play) };

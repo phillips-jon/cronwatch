@@ -59,16 +59,19 @@ export function dayLabel(t: number): string {
 }
 
 /**
- * "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
- * before the year 1 or after 9999 (a start read from a foreign or damaged
- * row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
+ * "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42", and
+ * "1 Jan 0001 02:00" in another UTC year. A time before the year 1 or after
+ * 9999 (a start read from a foreign or damaged row) is "before 1 Jan 0001
+ * 00:00" or "after 31 Dec 9999 23:59".
  */
 export function when(t: number, now: number): string {
   if (t > LAST_DATE_MS) return "after 31 Dec 9999 23:59";
   if (!(t >= FIRST_DATE_MS)) return "before 1 Jan 0001 00:00";
   if (Math.floor(t / DAY) === Math.floor(now / DAY)) return clock(t);
   const d = new Date(t);
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${clock(t)}`;
+  const year = d.getUTCFullYear();
+  const other = year === new Date(now).getUTCFullYear() ? "" : ` ${String(year).padStart(4, "0")}`;
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${other} ${clock(t)}`;
 }
 
 /** The stretch of time a timeline draws, and the moment it was drawn. */

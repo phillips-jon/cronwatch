@@ -12828,6 +12828,714 @@
           }
         }
       ]
+    },
+    {
+      "name": "a cron job whose last run started before the year 1 was missed at the first fire of the year 1",
+      "definition": {
+        "name": "far",
+        "schedule": "0 2 * * *",
+        "timezone": "UTC",
+        "grace": "10m"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": -62135596800001,
+          "expect": {
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": -62135596799001,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605400000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": {
+                  "id": "r1",
+                  "job": "far",
+                  "status": "ok",
+                  "startedAt": -62135596800001,
+                  "finishedAt": -62135596799001,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "dueAt": -62135589600000,
+                  "deadline": -62135589000000,
+                  "graceMs": 600000,
+                  "lastRunAt": -62135596800001
+                },
+                "job": "far",
+                "definition": {
+                  "name": "far",
+                  "schedule": "0 2 * * *",
+                  "timezone": "UTC",
+                  "grace": "10m"
+                },
+                "title": "far missed its scheduled run",
+                "message": "Due 0001-01-01 02:00:00 UTC (739620d 7h ago), and no run had started by 0001-01-01 02:10:00 UTC (739620d 7h ago) (grace 10m).\nSchedule: 0 2 * * * (UTC).\nLast run: ok before 0001-01-01 00:00:00 UTC.",
+                "at": 1767605400000
+              }
+            ],
+            "state": {
+              "job": "far",
+              "open": {
+                "missed": 1767605400000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767664800000,
+            "dueAt": -62135589600000,
+            "summary": {
+              "name": "far",
+              "definition": {
+                "name": "far",
+                "schedule": "0 2 * * *",
+                "timezone": "UTC",
+                "grace": "10m"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": {
+                "id": "r1",
+                "job": "far",
+                "status": "ok",
+                "startedAt": -62135596800001,
+                "finishedAt": -62135596799001,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767664800000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767609000000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {
+                "missed": 1767605400000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767664800000,
+            "dueAt": -62135589600000,
+            "summary": {
+              "name": "far",
+              "definition": {
+                "name": "far",
+                "schedule": "0 2 * * *",
+                "timezone": "UTC",
+                "grace": "10m"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": {
+                "id": "r1",
+                "job": "far",
+                "status": "ok",
+                "startedAt": -62135596800001,
+                "finishedAt": -62135596799001,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767664800000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 1767612600000,
+          "expect": {
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [
+                "missed"
+              ],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 1767612601000,
+          "status": "ok",
+          "expect": {
+            "alerts": [
+              {
+                "type": "recovered",
+                "run": {
+                  "id": "r2",
+                  "job": "far",
+                  "status": "ok",
+                  "startedAt": 1767612600000,
+                  "finishedAt": 1767612601000,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "after": [
+                    "missed"
+                  ]
+                },
+                "job": "far",
+                "definition": {
+                  "name": "far",
+                  "schedule": "0 2 * * *",
+                  "timezone": "UTC",
+                  "grace": "10m"
+                },
+                "title": "far recovered",
+                "message": "A run 2026-01-05 11:30:00 UTC (now) succeeded after: missed.\nRan 1s.",
+                "at": 1767612601000
+              }
+            ],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767616200000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767664800000,
+            "dueAt": 1767664800000,
+            "summary": {
+              "name": "far",
+              "definition": {
+                "name": "far",
+                "schedule": "0 2 * * *",
+                "timezone": "UTC",
+                "grace": "10m"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "r2",
+                "job": "far",
+                "status": "ok",
+                "startedAt": 1767612600000,
+                "finishedAt": 1767612601000,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767664800000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 2,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a cron job whose last run started at the lowest safe integer",
+      "definition": {
+        "name": "far",
+        "schedule": "*/5 * * * *",
+        "grace": "1m"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": -9007199254740991,
+          "expect": {
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": -9007199254739991,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605400000,
+          "expect": {
+            "alerts": [
+              {
+                "type": "missed",
+                "run": {
+                  "id": "r1",
+                  "job": "far",
+                  "status": "ok",
+                  "startedAt": -9007199254740991,
+                  "finishedAt": -9007199254739991,
+                  "durationMs": 1000,
+                  "error": null,
+                  "output": null,
+                  "metrics": {},
+                  "trigger": "run"
+                },
+                "details": {
+                  "dueAt": -62135596800000,
+                  "deadline": -62135596740000,
+                  "graceMs": 60000,
+                  "lastRunAt": -9007199254740991
+                },
+                "job": "far",
+                "definition": {
+                  "name": "far",
+                  "schedule": "*/5 * * * *",
+                  "grace": "1m"
+                },
+                "title": "far missed its scheduled run",
+                "message": "Due 0001-01-01 00:00:00 UTC (739620d 9h ago), and no run had started by 0001-01-01 00:01:00 UTC (739620d 9h ago) (grace 1m).\nSchedule: */5 * * * *.\nLast run: ok before 0001-01-01 00:00:00 UTC.",
+                "at": 1767605400000
+              }
+            ],
+            "state": {
+              "job": "far",
+              "open": {
+                "missed": 1767605400000
+              },
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767605700000,
+            "dueAt": -62135596800000,
+            "summary": {
+              "name": "far",
+              "definition": {
+                "name": "far",
+                "schedule": "*/5 * * * *",
+                "grace": "1m"
+              },
+              "health": "late",
+              "open": [
+                "missed"
+              ],
+              "lastRun": {
+                "id": "r1",
+                "job": "far",
+                "status": "ok",
+                "startedAt": -9007199254740991,
+                "finishedAt": -9007199254739991,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767605700000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a cron job whose last run started after 9999 is never due again",
+      "definition": {
+        "name": "far",
+        "schedule": "0 2 * * *",
+        "timezone": "UTC",
+        "grace": "10m"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 1767601800000,
+          "expect": {
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 1767601801000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "start",
+          "id": "r2",
+          "at": 253402300800000,
+          "expect": {
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r2",
+          "at": 253402300801000,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605400000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767664800000,
+            "dueAt": null,
+            "summary": {
+              "name": "far",
+              "definition": {
+                "name": "far",
+                "schedule": "0 2 * * *",
+                "timezone": "UTC",
+                "grace": "10m"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "r2",
+                "job": "far",
+                "status": "ok",
+                "startedAt": 253402300800000,
+                "finishedAt": 253402300801000,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767664800000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 2,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767778200000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767837600000,
+            "dueAt": null,
+            "summary": {
+              "name": "far",
+              "definition": {
+                "name": "far",
+                "schedule": "0 2 * * *",
+                "timezone": "UTC",
+                "grace": "10m"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "r2",
+                "job": "far",
+                "status": "ok",
+                "startedAt": 253402300800000,
+                "finishedAt": 253402300801000,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767837600000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 2,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a cron job whose last run started at the highest safe integer is never due again",
+      "definition": {
+        "name": "far",
+        "schedule": "0 2 * * *",
+        "timezone": "America/New_York",
+        "grace": "10m"
+      },
+      "createdAt": 1767519000000,
+      "events": [
+        {
+          "op": "start",
+          "id": "r1",
+          "at": 9007199254739991,
+          "expect": {
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "finish",
+          "id": "r1",
+          "at": 9007199254740991,
+          "status": "ok",
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            }
+          }
+        },
+        {
+          "op": "check",
+          "at": 1767605400000,
+          "expect": {
+            "alerts": [],
+            "state": {
+              "job": "far",
+              "open": {},
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "lastAlertAt": null,
+              "pendingRecovery": [],
+              "undelivered": []
+            },
+            "nextExpectedAt": 1767682800000,
+            "dueAt": null,
+            "summary": {
+              "name": "far",
+              "definition": {
+                "name": "far",
+                "schedule": "0 2 * * *",
+                "timezone": "America/New_York",
+                "grace": "10m"
+              },
+              "health": "healthy",
+              "open": [],
+              "lastRun": {
+                "id": "r1",
+                "job": "far",
+                "status": "ok",
+                "startedAt": 9007199254739991,
+                "finishedAt": 9007199254740991,
+                "durationMs": 1000,
+                "error": null,
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "nextExpectedAt": 1767682800000,
+              "consecutiveFailures": 0,
+              "silencedUntil": null,
+              "stats": {
+                "runs": 1,
+                "okRate": 1,
+                "p50Ms": 1000,
+                "p95Ms": 1000
+              }
+            }
+          }
+        }
+      ]
     }
   ]
 }
