@@ -332,8 +332,9 @@ CSS;
      * @param list<JobSummary> $jobs
      * @param array<string, list<Run>> $runsByJob
      * @param list<array{job: JobSummary, runs: list<Run>, complete: bool}>|null $lanes
+     * @param string|null $empty the HTML shown under the headline when there are no jobs, in place of how to declare one
      */
-    public static function dashboardPage(array $jobs, array $runsByJob, int|float $now, string $base, int|float|null $checkedAt = null, ?array $lanes = null, ?\Closure $head = null): string
+    public static function dashboardPage(array $jobs, array $runsByJob, int|float $now, string $base, int|float|null $checkedAt = null, ?array $lanes = null, ?\Closure $head = null, ?string $empty = null): string
     {
         $lanes ??= array_map(fn (JobSummary $job) => ['job' => $job, 'runs' => $runsByJob[$job->name] ?? [], 'complete' => true], array_slice($jobs, 0, Timeline::BOARD_LANES));
         $total = count($jobs);
@@ -373,7 +374,7 @@ CSS;
         $checked = $checkedAt ? ', checked ' . Text::h(Duration::relative($checkedAt, $now)) : '';
         $figures = $total > 0
             ? self::healthFigures($jobs)
-            : '<p class="empty">Declare one with <code>' . Text::h(self::DECLARE_ONE) . '</code> and run it once, and it shows up here.</p>';
+            : '<p class="empty">' . ($empty ?? 'Declare one with <code>' . Text::h(self::DECLARE_ONE) . '</code> and run it once, and it shows up here.') . '</p>';
         $sections = $total > 0
             ? "<section class=\"sec\" aria-label=\"Last 24 hours\">\n"
                 . "  <h2>Last 24 hours</h2>\n"

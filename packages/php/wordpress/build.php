@@ -15,7 +15,8 @@
  * alert channel but Slack and the webhook, the two the settings offer (email
  * goes through wp_mail), and the AWS signing only SES used; Claude triage;
  * the standalone dashboard's head, with its inline stylesheet and app.js,
- * since the plugin gives the dashboard its own; the PDO stores, since the
+ * since the plugin gives the dashboard its own; the development token's
+ * file, since the plugin always gives the dashboard a token; the PDO stores, since the
  * plugin stores through $wpdb; the pg_cron source; the command-line check;
  * the PSR-15 adapters; the Laravel and Symfony integrations and what only
  * they use). Nothing else goes in: no tests, no Composer files, no build
@@ -67,6 +68,7 @@ const CRONWATCH_LEFT_OUT = [
     'Symfony/',
     'Triage/',
     'Watch.php',
+    'Web/DevelopmentToken.php',
     'Web/PsrHandler.php',
     'Web/PsrJobHandler.php',
     'Web/PsrMiddleware.php',

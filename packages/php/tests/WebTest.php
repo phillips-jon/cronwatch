@@ -1083,6 +1083,15 @@ final class WebTest extends TestCase
         $this->assertStringContainsString('<code>$cw-&gt;job(&#39;name&#39;, [&#39;schedule&#39; =&gt; &#39;0 2 * * *&#39;])</code>', $html);
     }
 
+    public function testAHostCanSayWhatAnEmptyBoardShowsInsteadOfHowToDeclareAJob(): void
+    {
+        $dashboard = new Dashboard($this->client(), false, '/cronwatch', empty: 'Events appear after the <b>first check</b>.');
+        $html = self::send($dashboard, 'GET', '/cronwatch/')->body;
+        $this->assertStringContainsString('No jobs yet.', $html);
+        $this->assertStringContainsString('<p class="empty">Events appear after the <b>first check</b>.</p>', $html);
+        $this->assertStringNotContainsString('$cw-&gt;job(', $html);
+    }
+
     public function testAJobDueMoreOftenThanCanBeDrawnShowsItsCadenceAsALine(): void
     {
         $cw = $this->client();

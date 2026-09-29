@@ -51,6 +51,9 @@ use Cronwatch\Js;
  *             the stylesheet, for the host to serve as a file). The app shell's manifest,
  *             service worker, app.js and offline page are then not served, since no page asks
  *             for them; the icons still are. Default null: the pages are the SDK's.
+ * empty:      HTML the board shows while there are no jobs, in place of how to declare one, for a
+ *             host whose jobs come from elsewhere (the WordPress plugin's, from WP-Cron). Written
+ *             as given, so escape anything in it. Default null: the SDK's text.
  * trustProxy: take the public origin from X-Forwarded-Proto and X-Forwarded-Host (the first
  *             value of each, falling back to the request's scheme or host for whichever is
  *             missing) when a request carries either. Only for an app whose proxy sets or
@@ -92,12 +95,14 @@ final class Dashboard
     private readonly ?string $developmentTokenFile;
     /** @var (\Closure(string): string)|null */
     private readonly ?\Closure $head;
+    private readonly ?string $empty;
 
     /**
      * @param string|false|null $token the dashboard's token; null reads CRONWATCH_TOKEN, "" counts as unset, false serves it open
      * @param callable(string): void|null $log where the development sign-in line goes; default error_log()
-     * @param string|null $developmentTokenFile where a development token is kept between requests; default in sys_get_temp_dir()
+     * @param string|null $developmentTokenFile where a development token is kept between requests; default in the system's temporary directory (DevelopmentToken)
      * @param callable(string): string|null $head the pages' head assets for a host that loads its own (see above)
+     * @param string|null $empty the board's HTML while there are no jobs (see above)
      */
     public function __construct(
         private readonly Cronwatch $cw,
@@ -108,6 +113,7 @@ final class Dashboard
         ?callable $log = null,
         ?string $developmentTokenFile = null,
         ?callable $head = null,
+        ?string $empty = null,
     ) {
         $this->optedOut = $token === false;
         $configured = null;
@@ -120,6 +126,7 @@ final class Dashboard
         $this->log = $log === null ? null : \Closure::fromCallable($log);
         $this->developmentTokenFile = $developmentTokenFile;
         $this->head = $head === null ? null : \Closure::fromCallable($head);
+        $this->empty = $empty;
         // A request handler cannot tell a local caller from a remote one
         // (proxies, tunnels and a server bound to every interface all look
         // alike), so development gets a token too: made on the first request,
@@ -211,90 +218,6 @@ final class Dashboard
     }
 
     /**
-     * The development token, made once and kept in a file so that every PHP
-     * request (each a process of its own under PHP-FPM) asks for the same
-     * one. Returns it and whether this request made it.
-     *
-     * @return array{string, bool}
-     */
-    private function developmentToken(string $base): array
-    {
-        $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
-        // Never reached in the WordPress plugin, which always gives a token (false in wp-admin, the owner's for the API).
-        // phpcs:disable WordPress.WP.AlternativeFunctions -- a development server's token file in the system's temporary directory, outside WordPress.
-        $file = $this->developmentTokenFile;
-        if ($file === null) {
-            // A directory of this user's own, 0700, so another user of a shared
-            // temporary directory can neither plant a token nor read this one.
-            $dir = self::privateDirectory(sys_get_temp_dir() . '/cronwatch-' . self::userId());
-            if ($dir === null) {
-                // Not safe to keep one: a token for this request alone, so nothing is served.
-                return [$token, true];
-            }
-            $file = $dir . '/dev-token-' . substr(hash('sha256', (getcwd() ?: '') . '|' . ($this->basePath ?? $base)), 0, 16);
-        }
-        $existing = self::readToken($file);
-        if ($existing !== null) {
-            return [$existing, false];
-        }
-        $mask = umask(0077);
-        try {
-            $handle = is_link($file) ? false : @fopen($file, 'x');
-        } finally {
-            umask($mask);
-        }
-        if ($handle === false) {
-            // Another request made it first, or the directory is not writable: use its token, or this one.
-            return ($existing = self::readToken($file)) !== null ? [$existing, false] : [$token, true];
-        }
-        @chmod($file, 0600);
-        fwrite($handle, $token);
-        fclose($handle);
-        // phpcs:enable WordPress.WP.AlternativeFunctions
-        return [$token, true];
-    }
-
-    /** A token file's token, when the file is a plain file of this user's, readable by no one else, holding one. */
-    private static function readToken(string $file): ?string
-    {
-        if (!is_file($file) || is_link($file) || !self::private($file)) {
-            return null;
-        }
-        $text = trim((string) @file_get_contents($file)); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- a development server's token file, outside WordPress.
-        return preg_match('/^[A-Za-z0-9_-]{43}$/D', $text) === 1 ? $text : null;
-    }
-
-    /** `dir`, made 0700 when missing; null when it is a link, not this user's, or open to others. */
-    private static function privateDirectory(string $dir): ?string
-    {
-        if (!is_dir($dir) && !is_link($dir)) {
-            $mask = umask(0077);
-            try {
-                // phpcs:disable WordPress.WP.AlternativeFunctions -- a development server's token directory, outside WordPress.
-                @mkdir($dir, 0700);
-                // phpcs:enable WordPress.WP.AlternativeFunctions
-            } finally {
-                umask($mask);
-            }
-        }
-        clearstatcache(true, $dir);
-        return is_dir($dir) && !is_link($dir) && self::private($dir) ? $dir : null;
-    }
-
-    /** Whether a path is this user's and nobody else may read or write it. */
-    private static function private(string $path): bool
-    {
-        $perms = @fileperms($path);
-        $owner = @fileowner($path);
-        return $perms !== false && ($perms & 0077) === 0 && $owner !== false && $owner === self::userId();
-    }
-
-    private static function userId(): int
-    {
-        return function_exists('posix_geteuid') ? posix_geteuid() : (int) getmyuid();
-    }
-
-    /**
      * The line a development token is announced with, written once to the
      * server log when the token is made. `origin` is the `origin` option when
      * set, otherwise that request's public origin when its host is loopback,
@@ -342,7 +265,11 @@ final class Dashboard
         $publicOrigin = $this->publicOrigin($request);
 
         if ($this->generated && $this->token === null) {
-            [$this->token, $made] = $this->developmentToken($base);
+            // DevelopmentToken keeps it in a file between requests. A host that
+            // always gives a token (the WordPress plugin) may leave that class out.
+            [$this->token, $made] = class_exists(DevelopmentToken::class)
+                ? DevelopmentToken::obtain($this->developmentTokenFile, $this->basePath ?? $base)
+                : [rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '='), true];
             if ($made) {
                 $shown = $this->origin ?? (self::isLoopbackOrigin($publicOrigin) ? $publicOrigin : null);
                 $line = self::developmentSignInLine($shown, $base, $this->token);
@@ -440,7 +367,7 @@ final class Dashboard
                 $runsByJob[$entry->job->name] = $entry->runs;
             }
             $jobs = array_map(fn (JobWithRuns $entry) => $entry->job, $entries);
-            return self::html(Html::dashboardPage($jobs, $runsByJob, $now, $base, null, $this->boardLanes($entries, $now), $this->head));
+            return self::html(Html::dashboardPage($jobs, $runsByJob, $now, $base, null, $this->boardLanes($entries, $now), $this->head, $this->empty));
         }
         if ($method === 'GET' && count($parts) === 2 && $parts[0] === 'jobs') {
             $job = $cw->jobSummary($parts[1]);
