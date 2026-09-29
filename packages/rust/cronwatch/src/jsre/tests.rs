@@ -127,7 +127,11 @@ fn a_match_that_backtracks_without_end_gives_up_within_its_steps() {
     assert_eq!(Regexp::must(".*x", "").try_is_match(&"a".repeat(32_000)), None);
     let took = started.elapsed();
     eprintln!("two budgets ran out in {took:?}");
-    assert!(took < std::time::Duration::from_secs(5), "took {took:?}");
+    // The budget is counted in steps, not time; the limit only catches a
+    // match that never stops. A debug build on a slow CI runner takes
+    // several seconds, a release build well under one.
+    let limit = std::time::Duration::from_secs(if cfg!(debug_assertions) { 60 } else { 5 });
+    assert!(took < limit, "took {took:?}");
     assert_eq!(Regexp::must(r"\n*\n*\n*\n*\n*x", "").try_is_match(&"\n".repeat(20)), Some(false));
     assert_eq!(Regexp::must(r"\n*\n*\n*\n*\n*x", "").try_is_match(&format!("{newlines}x")), Some(true));
     assert_eq!(Regexp::must(".*done", "").try_is_match(&format!("{}done", "a".repeat(32_000))), Some(true));

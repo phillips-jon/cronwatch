@@ -495,7 +495,9 @@ fn a_stored_pattern_that_backtracks_without_end_fails_quickly() {
         let got = rule.check(&text);
         let took = started.elapsed();
         assert_eq!(got, Some(format!("Output did not match {source}")));
-        assert!(took < std::time::Duration::from_secs(5), "{source} took {took:?}");
+        // Steps bound it, not time; a debug build on a slow runner is slower.
+        let limit = std::time::Duration::from_secs(if cfg!(debug_assertions) { 60 } else { 5 });
+        assert!(took < limit, "{source} took {took:?}");
         assert_eq!(rule.check(good), None, "{source} still matches");
     }
 }
