@@ -12,12 +12,19 @@ repository.workspace = true
 homepage.workspace = true
 keywords = ["cron", "monitoring", "sqlx", "sqlite", "jobs"]
 categories.workspace = true
-include = ["src/**/*", "Cargo.toml", "README.md", "LICENSE"]
+include = ["src/**/*", "!src/**/tests.rs", "Cargo.toml", "README.md", "LICENSE"]
 
 [features]
 # SQLite, built from source (libsqlite3-sys bundled), so an app needs a C
 # compiler, as every SQLite crate asks.
 sqlite = ["sqlx/sqlite-bundled"]
+# Postgres, with the SDK's SQL text.
+postgres = ["sqlx/postgres"]
+# MySQL 8.0.13 or newer, or MariaDB 10.6 or newer: the PHP and Go ports'
+# dialect.
+mysql = ["sqlx/mysql"]
+# The pg_cron source: pg_cron's jobs and runs as CronWatch jobs and runs.
+pgcron = ["postgres"]
 
 [dependencies]
 cronwatch.workspace = true
@@ -26,6 +33,9 @@ tokio = { version = "1.43", default-features = false, features = ["sync", "time"
 
 [dev-dependencies]
 cronwatch = { workspace = true, features = ["storetest"] }
+# MySQL 8's default sign-in (caching_sha2_password) over a connection without
+# TLS, as the CI and local test servers have it. An app picks its own.
+sqlx = { version = "0.9", default-features = false, features = ["mysql-rsa"] }
 tokio = { version = "1.43", features = ["full"] }
 
 [[test]]
@@ -35,6 +45,14 @@ required-features = ["sqlite"]
 [[test]]
 name = "node_compat"
 required-features = ["sqlite"]
+
+[[test]]
+name = "servers"
+required-features = ["postgres", "mysql"]
+
+[[test]]
+name = "pgcron"
+required-features = ["pgcron"]
 
 [package.metadata.docs.rs]
 all-features = true

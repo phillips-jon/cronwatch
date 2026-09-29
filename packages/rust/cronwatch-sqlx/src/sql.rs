@@ -1,12 +1,13 @@
-//! The schema, statements and parameters: stores/sql.ts's text for text, so
-//! a Node, Ruby, Python, PHP, Go and Rust process can share one database and
-//! `sqlite_master` reads the same whoever made the tables. Only SQLite is
-//! built so far; Postgres (`$n` placeholders, `BIGINT`, `JSONB`, `seq
-//! BIGSERIAL`, names sorted `COLLATE "C"`) and MySQL (the PHP and Go ports'
-//! dialect) are the variants still to come, and every text here is written
-//! from the dialect so each is a case of its own.
+//! The schema, statements and parameters. SQLite's and Postgres's are
+//! stores/sql.ts's text for text, so a Node, Ruby, Python, PHP, Go and Rust
+//! process can share one database and `sqlite_master` reads the same whoever
+//! made the tables. MySQL (and MariaDB) has a dialect of its own, the PHP and
+//! Go ports' (`packages/go/sqlstore/sql.go`), since it has no `ON CONFLICT`,
+//! no partial index and no `TEXT` primary key: the same tables, columns and
+//! values, with the JSON columns as text holding the SDK's JSON byte for
+//! byte, never MySQL's `JSON` type, which would rewrite it.
 
-#![cfg_attr(not(feature = "sqlite"), allow(dead_code))]
+#![cfg_attr(not(any(feature = "sqlite", feature = "postgres", feature = "mysql")), allow(dead_code))]
 
 use std::sync::Arc;
 
@@ -16,6 +17,11 @@ use std::sync::Arc;
 pub enum Dialect {
     /// SQLite, as the SDK's `sqlite()` store writes it.
     Sqlite,
+    /// Postgres, as the SDK's `postgres()` store writes it.
+    Postgres,
+    /// MySQL 8.0.13 or newer, or MariaDB 10.6 or newer, as the PHP and Go
+    /// ports write it.
+    Mysql,
 }
 
 /// Starts every table name unless `SqlStore::prefix` says otherwise.
@@ -53,6 +59,8 @@ fn quote(s: &str) -> String {
 pub(crate) fn schema(dialect: Dialect, p: &str) -> Vec<String> {
     let (integer, json, seq) = match dialect {
         Dialect::Sqlite => ("INTEGER", "TEXT", ""),
+        Dialect::Postgres => ("BIGINT", "JSONB", "\n      seq BIGSERIAL,"),
+        Dialect::Mysql => return mysql_schema(p),
     };
     // sql.ts's template, whitespace and all, cut into its statements.
     let text = format!(
@@ -86,7 +94,69 @@ pub(crate) fn schema(dialect: Dialect, p: &str) -> Vec<String> {
     text.split(';').filter(|s| !s.trim().is_empty()).map(str::to_string).collect()
 }
 
-/// The queries by name, with `?` placeholders.
+/// MySQL's tables (the PHP and Go ports'): `VARCHAR(255)` keys, `BIGINT`
+/// times, `LONGTEXT` JSON, `utf8mb4_bin` so names compare and sort by byte,
+/// `seq` for insertion order, and a plain index where the others have a
+/// partial one.
+fn mysql_schema(p: &str) -> Vec<String> {
+    let table = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin";
+    vec![
+        format!(
+            "CREATE TABLE IF NOT EXISTS {p}jobs (
+      name VARCHAR(255) NOT NULL,
+      definition LONGTEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL,
+      PRIMARY KEY (name)
+    ) {table}"
+        ),
+        format!(
+            "CREATE TABLE IF NOT EXISTS {p}runs (
+      seq BIGINT NOT NULL AUTO_INCREMENT,
+      id VARCHAR(255) NOT NULL,
+      job VARCHAR(255) NOT NULL,
+      status VARCHAR(255) NOT NULL,
+      started_at BIGINT NOT NULL,
+      finished_at BIGINT,
+      duration_ms BIGINT,
+      error MEDIUMTEXT,
+      output MEDIUMTEXT,
+      metrics LONGTEXT NOT NULL DEFAULT ('{{}}'),
+      `trigger` VARCHAR(255) NOT NULL DEFAULT 'run',
+      PRIMARY KEY (id),
+      UNIQUE KEY {p}runs_seq (seq),
+      KEY {p}runs_job_started (job, started_at DESC),
+      KEY {p}runs_running (status)
+    ) {table}"
+        ),
+        format!(
+            "CREATE TABLE IF NOT EXISTS {p}state (
+      job VARCHAR(255) NOT NULL,
+      state LONGTEXT NOT NULL,
+      PRIMARY KEY (job)
+    ) {table}"
+        ),
+    ]
+}
+
+/// Writes `?` placeholders as `$1`, `$2`, ..., as sql.ts does for Postgres.
+fn number(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 8);
+    let mut n = 0;
+    for c in text.chars() {
+        if c == '?' {
+            n += 1;
+            out.push('$');
+            out.push_str(&n.to_string());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// The queries by name, with `?` placeholders (numbered `$1`, `$2` ... for
+/// Postgres, as sql.ts numbers them).
 #[derive(Clone, Debug)]
 pub(crate) struct Statements {
     pub upsert_job: Arc<str>,
@@ -104,23 +174,34 @@ pub(crate) struct Statements {
     pub set_state: Arc<str>,
     pub cas_insert: Arc<str>,
     pub cas_update: Arc<str>,
+    /// MySQL's first step of a compare-and-set from version 0; the others do
+    /// it in one statement, `cas_insert`.
+    pub cas_from_zero: Arc<str>,
     pub prune: Arc<str>,
     pub delete_run_if: Arc<str>,
+    dialect: Dialect,
     prefix: String,
 }
 
 impl Statements {
     pub(crate) fn new(dialect: Dialect, p: &str) -> Statements {
+        if dialect == Dialect::Mysql {
+            return Statements::mysql(p);
+        }
+        let pg = dialect == Dialect::Postgres;
         // Insertion order, to break ties between runs that started in the
-        // same millisecond, and the version inside a state's JSON, 0 when it
-        // has none.
-        let (seq, by_name) = match dialect {
-            Dialect::Sqlite => ("rowid", "name"),
+        // same millisecond, and byte order for names on both, whatever the
+        // database's collation.
+        let (seq, by_name) = if pg { ("seq", "name COLLATE \"C\"") } else { ("rowid", "name") };
+        // The version inside a state's JSON, 0 when it has none.
+        let version = |column: &str| {
+            if pg {
+                format!("COALESCE(({column}->>'version')::bigint, 0)")
+            } else {
+                format!("COALESCE(json_extract({column}, '$.version'), 0)")
+            }
         };
-        let version = |column: &str| match dialect {
-            Dialect::Sqlite => format!("COALESCE(json_extract({column}, '$.version'), 0)"),
-        };
-        let s = |text: String| -> Arc<str> { Arc::from(text) };
+        let s = |text: String| -> Arc<str> { Arc::from(if pg { number(&text) } else { text }) };
         Statements {
             upsert_job: s(format!(
                 "INSERT INTO {p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
@@ -153,6 +234,7 @@ impl Statements {
                 version(&format!("{p}state.state"))
             )),
             cas_update: s(format!("UPDATE {p}state SET state = ? WHERE job = ? AND {} = ?", version("state"))),
+            cas_from_zero: Arc::from(""),
             // Each job's newest run is kept whatever its age: without it, a
             // job that runs less often than the retention looks like it never
             // ran.
@@ -163,6 +245,61 @@ impl Statements {
             // Takes back a run only while it is of one job and in one status
             // (the PHP and Go ports' deleteRunIf).
             delete_run_if: s(format!("DELETE FROM {p}runs WHERE id = ? AND job = ? AND status = ?")),
+            dialect,
+            prefix: p.to_string(),
+        }
+    }
+
+    /// MySQL's statements, the PHP and Go ports' text.
+    fn mysql(p: &str) -> Statements {
+        // The version inside a state's JSON text, 0 when it has none. MySQL's
+        // JSON_EXTRACT answers JSON and MariaDB's text; unquoted and cast,
+        // both are a number.
+        let version =
+            |column: &str| format!("COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT({column}, '$.version')) AS SIGNED), 0)");
+        let s = |text: String| -> Arc<str> { Arc::from(text) };
+        Statements {
+            upsert_job: s(format!(
+                "INSERT INTO {p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE definition = VALUES(definition), updated_at = VALUES(updated_at)"
+            )),
+            get_job: s(format!("SELECT * FROM {p}jobs WHERE name = ?")),
+            list_jobs: s(format!("SELECT * FROM {p}jobs ORDER BY name")),
+            delete_runs: s(format!("DELETE FROM {p}runs WHERE job = ?")),
+            delete_state: s(format!("DELETE FROM {p}state WHERE job = ?")),
+            delete_job: s(format!("DELETE FROM {p}jobs WHERE name = ?")),
+            insert_run: s(format!(
+                "INSERT INTO {p}runs (id, job, status, started_at, finished_at, duration_ms, error, output, metrics, `trigger`)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )),
+            update_run: s(format!(
+                "UPDATE {p}runs SET status = ?, finished_at = ?, duration_ms = ?, error = ?, output = ?, metrics = ? WHERE id = ?"
+            )),
+            get_run: s(format!("SELECT * FROM {p}runs WHERE id = ?")),
+            list_runs: s(format!("SELECT * FROM {p}runs WHERE job = ? ORDER BY started_at DESC, seq DESC LIMIT ?")),
+            running_runs: s(format!("SELECT * FROM {p}runs WHERE status = 'running' ORDER BY started_at, seq")),
+            get_state: s(format!("SELECT state FROM {p}state WHERE job = ?")),
+            set_state: s(format!(
+                "INSERT INTO {p}state (job, state) VALUES (?, ?) ON DUPLICATE KEY UPDATE state = VALUES(state)"
+            )),
+            // compareAndSetState from version 0, in two steps that each
+            // decide alone: a row at version 0 (or without one) is updated,
+            // and failing that the row is inserted, which a row already there
+            // refuses. Neither leans on how the connection counts affected
+            // rows.
+            cas_from_zero: s(format!("UPDATE {p}state SET state = ? WHERE job = ? AND {} = 0", version("state"))),
+            cas_insert: s(format!("INSERT INTO {p}state (job, state) VALUES (?, ?)")),
+            cas_update: s(format!("UPDATE {p}state SET state = ? WHERE job = ? AND {} = ?", version("state"))),
+            // MySQL refuses a subquery on the table a DELETE deletes from, so
+            // the newest start per job is a derived table joined in (grouped,
+            // so it is materialized rather than merged).
+            prune: s(format!(
+                "DELETE r FROM {p}runs r
+      JOIN (SELECT job, MAX(started_at) AS newest FROM {p}runs GROUP BY job) n ON n.job = r.job
+      WHERE r.status <> 'running' AND r.started_at < ? AND r.started_at < n.newest"
+            )),
+            delete_run_if: s(format!("DELETE FROM {p}runs WHERE id = ? AND job = ? AND status = ?")),
+            dialect: Dialect::Mysql,
             prefix: p.to_string(),
         }
     }
@@ -171,10 +308,11 @@ impl Statements {
     /// Built per count, since the list is bound value by value.
     pub(crate) fn update_run_if(&self, count: usize) -> String {
         let marks = vec!["?"; count].join(", ");
-        format!(
+        let text = format!(
             "UPDATE {}runs SET status = ?, finished_at = ?, duration_ms = ?, error = ?, output = ?, metrics = ? WHERE id = ? AND status IN ({marks})",
             self.prefix
-        )
+        );
+        if self.dialect == Dialect::Postgres { number(&text) } else { text }
     }
 }
 
@@ -201,5 +339,40 @@ mod tests {
         let s = schema(Dialect::Sqlite, "cw_");
         assert_eq!(s.len(), 5);
         assert!(s[1].contains("metrics TEXT NOT NULL DEFAULT '{}'"));
+    }
+
+    #[test]
+    fn postgres_is_sql_ts_text_for_text() {
+        let s = schema(Dialect::Postgres, "cw_");
+        assert_eq!(s.len(), 5);
+        assert!(s[1].starts_with(
+            "\n    CREATE TABLE IF NOT EXISTS cw_runs (\n      seq BIGSERIAL,\n      id TEXT PRIMARY KEY,"
+        ));
+        assert!(s[1].contains("started_at BIGINT NOT NULL") && s[1].contains("metrics JSONB NOT NULL DEFAULT '{}'"));
+        let q = Statements::new(Dialect::Postgres, "cw_");
+        assert_eq!(&*q.list_jobs, "SELECT * FROM cw_jobs ORDER BY name COLLATE \"C\"");
+        assert_eq!(
+            &*q.cas_update,
+            "UPDATE cw_state SET state = $1 WHERE job = $2 AND COALESCE((state->>'version')::bigint, 0) = $3"
+        );
+        assert_eq!(&*q.list_runs, "SELECT * FROM cw_runs WHERE job = $1 ORDER BY started_at DESC, seq DESC LIMIT $2");
+        assert!(q.update_run_if(2).ends_with("WHERE id = $7 AND status IN ($8, $9)"));
+    }
+
+    #[test]
+    fn mysql_is_the_php_and_go_ports_dialect() {
+        let s = schema(Dialect::Mysql, "cw_");
+        assert_eq!(s.len(), 3);
+        assert!(s[1].contains(
+            "metrics LONGTEXT NOT NULL DEFAULT ('{}'),\n      `trigger` VARCHAR(255) NOT NULL DEFAULT 'run',"
+        ));
+        assert!(s[2].ends_with(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin"));
+        let q = Statements::new(Dialect::Mysql, "cw_");
+        assert!(q.insert_run.contains("metrics, `trigger`)"));
+        assert_eq!(
+            &*q.cas_from_zero,
+            "UPDATE cw_state SET state = ? WHERE job = ? AND COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(state, '$.version')) AS SIGNED), 0) = 0"
+        );
+        assert!(q.update_run_if(1).ends_with("status IN (?)"));
     }
 }

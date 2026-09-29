@@ -2,6 +2,7 @@
 //! database, with the app's pool.
 //!
 //! ```no_run
+//! # #[cfg(feature = "sqlite")]
 //! # async fn example() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 //! use cronwatch_sqlx::SqlStore;
 //! use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
@@ -14,13 +15,23 @@
 //!
 //! The tables are the SDK's (stores/sql.ts), so a Rust process shares a
 //! database with a Node, Ruby, Python, PHP or Go one. Each database is a
-//! feature of the crate: `sqlite` for now.
+//! feature of the crate: `sqlite`, `postgres` and `mysql` (MySQL 8.0.13 or
+//! newer, or MariaDB 10.6 or newer). `pgcron` adds [`PgCron`], a source that
+//! watches pg_cron's jobs.
 #![forbid(unsafe_code)]
 
+mod rows;
 mod sql;
 #[cfg(feature = "sqlite")]
+mod sqlite;
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 mod store;
 
+#[cfg(feature = "pgcron")]
+pub mod pgcron;
+
+#[cfg(feature = "pgcron")]
+pub use pgcron::{PgCron, PgCronJob, PgCronOptions};
 pub use sql::{DEFAULT_PREFIX, Dialect};
-#[cfg(feature = "sqlite")]
+#[cfg(any(feature = "sqlite", feature = "postgres", feature = "mysql"))]
 pub use store::SqlStore;

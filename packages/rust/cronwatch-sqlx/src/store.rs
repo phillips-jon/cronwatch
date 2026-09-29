@@ -1,20 +1,29 @@
 //! The store over sqlx.
 
 use std::fmt;
-use std::time::Duration;
 
 use cronwatch::js::{self, Value};
 use cronwatch::{BoxError, BoxFuture, Definition, JobState, Metrics, Run, RunStatus, Store, StoredJob};
-use sqlx::pool::PoolConnection;
-use sqlx::sqlite::{Sqlite, SqliteArguments, SqliteRow};
-use sqlx::{AssertSqlSafe, Row, SqlitePool, TypeInfo, ValueRef};
-use tokio::sync::{Mutex, MutexGuard};
+use sqlx::AssertSqlSafe;
+#[cfg(feature = "mysql")]
+use sqlx::MySqlPool;
+#[cfg(feature = "postgres")]
+use sqlx::PgPool;
+#[cfg(feature = "sqlite")]
+use sqlx::SqlitePool;
 
+use crate::rows::{Param, Row};
 use crate::sql::{DEFAULT_PREFIX, Dialect, Statements, schema, table_prefix};
 
-/// How long opening SQLite keeps retrying a busy database before it gives up
-/// (busy.ts).
-const BUSY_RETRY: Duration = Duration::from_secs(2);
+/// The database a store writes to, with what it holds of it.
+enum Backend {
+    #[cfg(feature = "sqlite")]
+    Sqlite(crate::sqlite::Conn),
+    #[cfg(feature = "postgres")]
+    Postgres(PgPool),
+    #[cfg(feature = "mysql")]
+    Mysql(MySqlPool),
+}
 
 /// Keeps CronWatch's jobs, runs and state in the app's own database through
 /// sqlx, with the app's pool: the SDK's tables (stores/sql.ts), the same
@@ -29,13 +38,16 @@ const BUSY_RETRY: Duration = Duration::from_secs(2);
 /// mode (with the SDK's retry of a busy database while switching), with
 /// `busy_timeout` 5000 and `synchronous` NORMAL. So a pool limited to one
 /// connection leaves the app none: give it room for the store too.
+///
+/// On Postgres and MySQL it uses the pool, each statement on its own
+/// (autocommit), so its writes never join a transaction the app has open;
+/// `delete_job` is one transaction of the store's own. A pool with one
+/// connection waits on an app's open transaction, so give it room there too.
 pub struct SqlStore {
     dialect: Dialect,
     prefix: String,
     sql: Statements,
-    pool: SqlitePool,
-    /// SQLite's one connection, in turn.
-    conn: Mutex<Option<PoolConnection<Sqlite>>>,
+    backend: Backend,
 }
 
 impl fmt::Debug for SqlStore {
@@ -45,17 +57,38 @@ impl fmt::Debug for SqlStore {
 }
 
 impl SqlStore {
+    fn new(dialect: Dialect, backend: Backend) -> SqlStore {
+        SqlStore { dialect, prefix: DEFAULT_PREFIX.into(), sql: Statements::new(dialect, DEFAULT_PREFIX), backend }
+    }
+
     /// A store over the app's SQLite pool, with the tables named
     /// `cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`. Nothing is
     /// read or written until the client's first use calls `init`.
+    #[cfg(feature = "sqlite")]
     pub fn sqlite(pool: SqlitePool) -> SqlStore {
-        SqlStore {
-            dialect: Dialect::Sqlite,
-            prefix: DEFAULT_PREFIX.into(),
-            sql: Statements::new(Dialect::Sqlite, DEFAULT_PREFIX),
-            pool,
-            conn: Mutex::new(None),
-        }
+        SqlStore::new(Dialect::Sqlite, Backend::Sqlite(crate::sqlite::Conn::new(pool)))
+    }
+
+    /// A store over the app's Postgres pool, with the SDK's tables and
+    /// statements (`JSONB` for the JSON, `BIGINT` times, names sorted
+    /// `COLLATE "C"`). Many processes can start at once: `init` makes the
+    /// tables under an advisory lock per prefix. Nothing is read or written
+    /// until the client's first use calls `init`.
+    #[cfg(feature = "postgres")]
+    pub fn postgres(pool: PgPool) -> SqlStore {
+        SqlStore::new(Dialect::Postgres, Backend::Postgres(pool))
+    }
+
+    /// A store over the app's MySQL pool, for MySQL 8.0.13 or newer or
+    /// MariaDB 10.6 or newer, in the PHP and Go ports' dialect: the JSON
+    /// columns are `LONGTEXT` holding the SDK's bytes (never MySQL's `JSON`
+    /// type, which rewrites them), names compare by byte (`utf8mb4_bin`), and
+    /// a run's trigger is cut to 255 characters. MySQL commits `CREATE TABLE`
+    /// at once, which is why the tables are made on their own, at the
+    /// client's first use.
+    #[cfg(feature = "mysql")]
+    pub fn mysql(pool: MySqlPool) -> SqlStore {
+        SqlStore::new(Dialect::Mysql, Backend::Mysql(pool))
     }
 
     /// Starts every table name with `prefix`: lowercase letters, digits and
@@ -78,158 +111,88 @@ impl SqlStore {
         &self.prefix
     }
 
-    /// SQLite's one connection, opened (and its pragmas set) on first use and
-    /// held for the caller's statements. A failed open is tried afresh next
-    /// time.
-    async fn conn(&self) -> Result<MutexGuard<'_, Option<PoolConnection<Sqlite>>>, BoxError> {
-        let mut guard = self.conn.lock().await;
-        if guard.is_none() {
-            let mut conn = self.pool.acquire().await?;
-            // No busy handler until WAL is on: switching journal mode can
-            // answer busy at once while another process is doing the same on
-            // a new file, so that is retried. The connection is kept only once
-            // every pragma has gone through.
-            wal(&mut conn).await?;
-            exec(&mut conn, "PRAGMA busy_timeout = 5000").await?;
-            exec(&mut conn, "PRAGMA synchronous = NORMAL").await?;
-            *guard = Some(conn);
-        }
-        Ok(guard)
-    }
-
-    /// Runs a statement, answering how many rows it changed.
+    /// Runs a statement, answering how many rows it changed (or matched, on
+    /// MySQL, whose connections sqlx opens asking for found rows).
     async fn run(&self, text: &str, params: Vec<Param>) -> Result<u64, BoxError> {
-        let mut guard = self.conn().await?;
-        let conn = guard.as_mut().expect("an open connection");
-        let result = sqlx::query_with(AssertSqlSafe(text.to_string()), arguments(params)?).execute(&mut **conn).await;
-        forget_if_broken(&mut guard, &result);
-        Ok(result?.rows_affected())
+        let text = AssertSqlSafe(text.to_string());
+        match &self.backend {
+            #[cfg(feature = "sqlite")]
+            Backend::Sqlite(conn) => conn.run(text, params).await,
+            #[cfg(feature = "postgres")]
+            Backend::Postgres(pool) => {
+                let args = crate::rows::pg_arguments(params)?;
+                Ok(sqlx::query_with(text, args).execute(pool).await?.rows_affected())
+            }
+            #[cfg(feature = "mysql")]
+            Backend::Mysql(pool) => {
+                let args = crate::rows::mysql_arguments(params)?;
+                Ok(sqlx::query_with(text, args).execute(pool).await?.rows_affected())
+            }
+        }
     }
 
     /// Runs a query, answering its rows.
-    async fn query(&self, text: &str, params: Vec<Param>) -> Result<Vec<SqliteRow>, BoxError> {
-        let mut guard = self.conn().await?;
-        let conn = guard.as_mut().expect("an open connection");
-        let result = sqlx::query_with(AssertSqlSafe(text.to_string()), arguments(params)?).fetch_all(&mut **conn).await;
-        forget_if_broken(&mut guard, &result);
-        Ok(result?)
+    async fn query(&self, text: &str, params: Vec<Param>) -> Result<Vec<Row>, BoxError> {
+        let text = AssertSqlSafe(text.to_string());
+        match &self.backend {
+            #[cfg(feature = "sqlite")]
+            Backend::Sqlite(conn) => conn.query(text, params).await,
+            #[cfg(feature = "postgres")]
+            Backend::Postgres(pool) => {
+                let args = crate::rows::pg_arguments(params)?;
+                sqlx::query_with(text, args).fetch_all(pool).await?.iter().map(crate::rows::pg_row).collect()
+            }
+            #[cfg(feature = "mysql")]
+            Backend::Mysql(pool) => {
+                let args = crate::rows::mysql_arguments(params)?;
+                sqlx::query_with(text, args).fetch_all(pool).await?.iter().map(crate::rows::mysql_row).collect()
+            }
+        }
     }
 
     async fn runs(&self, text: &str, params: Vec<Param>) -> Result<Vec<Run>, BoxError> {
         self.query(text, params).await?.iter().map(run_of).collect()
     }
-}
 
-/// A connection that failed as a connection (not as a statement) is given
-/// back, and the next statement opens another.
-fn forget_if_broken<T>(guard: &mut Option<PoolConnection<Sqlite>>, result: &Result<T, sqlx::Error>) {
-    if matches!(result, Err(sqlx::Error::Io(_) | sqlx::Error::PoolClosed | sqlx::Error::WorkerCrashed)) {
-        *guard = None;
-    }
-}
-
-/// Runs a statement whose rows, if any, are not wanted (`PRAGMA
-/// journal_mode` answers one).
-async fn exec(conn: &mut PoolConnection<Sqlite>, text: &'static str) -> Result<(), sqlx::Error> {
-    sqlx::query(text).fetch_all(&mut **conn).await.map(|_| ())
-}
-
-fn is_busy(err: &sqlx::Error) -> bool {
-    let text = err.to_string();
-    let code = match err {
-        sqlx::Error::Database(db) => db.code().map(|c| c.to_string()).unwrap_or_default(),
-        _ => String::new(),
-    };
-    // SQLITE_BUSY is 5 and SQLITE_LOCKED 6, and their extended codes are
-    // those plus a multiple of 256.
-    let busy_code = code.parse::<i64>().is_ok_and(|c| c & 0xff == 5 || c & 0xff == 6);
-    busy_code
-        || text.contains("SQLITE_BUSY")
-        || text.contains("SQLITE_LOCKED")
-        || text.contains("database is locked")
-        || text.contains("database table is locked")
-}
-
-/// Puts the connection in WAL mode, retrying while SQLite answers busy, with
-/// a short growing pause, for up to `BUSY_RETRY` in all (busy.ts
-/// `retryBusy`).
-async fn wal(conn: &mut PoolConnection<Sqlite>) -> Result<(), sqlx::Error> {
-    let mut waited = Duration::ZERO;
-    let mut attempt = 0u32;
-    loop {
-        match exec(conn, "PRAGMA journal_mode = WAL").await {
-            Err(err) if is_busy(&err) && waited < BUSY_RETRY => {
-                let pause = Duration::from_millis(10u64 << attempt.min(10))
-                    .min(Duration::from_millis(200))
-                    .min(BUSY_RETRY - waited);
-                tokio::time::sleep(pause).await;
-                waited += pause;
-                attempt += 1;
+    /// Runs statements, each with `params`, in one transaction of the
+    /// store's own; on Postgres, `lock` first takes an advisory lock for the
+    /// transaction.
+    async fn transaction(&self, statements: &[&str], params: &[Param], lock: Option<String>) -> Result<(), BoxError> {
+        match &self.backend {
+            #[cfg(feature = "sqlite")]
+            Backend::Sqlite(conn) => {
+                let _ = lock;
+                conn.transaction(statements, params).await
             }
-            other => return other,
+            #[cfg(feature = "postgres")]
+            Backend::Postgres(pool) => {
+                let mut tx = pool.begin().await?;
+                if let Some(key) = lock {
+                    sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))").bind(key).execute(&mut *tx).await?;
+                }
+                for statement in statements {
+                    let args = crate::rows::pg_arguments(params.to_vec())?;
+                    sqlx::query_with(AssertSqlSafe(statement.to_string()), args).execute(&mut *tx).await?;
+                }
+                Ok(tx.commit().await?)
+            }
+            #[cfg(feature = "mysql")]
+            Backend::Mysql(pool) => {
+                let _ = lock;
+                let mut tx = pool.begin().await?;
+                for statement in statements {
+                    let args = crate::rows::mysql_arguments(params.to_vec())?;
+                    sqlx::query_with(AssertSqlSafe(statement.to_string()), args).execute(&mut *tx).await?;
+                }
+                Ok(tx.commit().await?)
+            }
         }
     }
 }
 
-/// A statement's parameter, in the types a JavaScript driver binds: text,
-/// integers and null.
-#[derive(Clone, Debug)]
-enum Param {
-    Text(String),
-    OptText(Option<String>),
-    Int(i64),
-    OptInt(Option<i64>),
-}
-
-fn arguments(params: Vec<Param>) -> Result<SqliteArguments, BoxError> {
-    use sqlx::Arguments;
-    let mut args = SqliteArguments::default();
-    for p in params {
-        match p {
-            Param::Text(s) => args.add(s)?,
-            Param::OptText(s) => args.add(s)?,
-            Param::Int(n) => args.add(n)?,
-            Param::OptInt(n) => args.add(n)?,
-        }
-    }
-    Ok(args)
-}
-
-// Columns are read by name, whatever type another writer gave them.
-
-fn column_text(row: &SqliteRow, name: &str) -> Result<Option<String>, BoxError> {
-    let raw = row.try_get_raw(name)?;
-    if raw.is_null() {
-        return Ok(None);
-    }
-    let kind = raw.type_info().name().to_string();
-    Ok(Some(match kind.as_str() {
-        "INTEGER" => row.try_get_unchecked::<i64, _>(name)?.to_string(),
-        "REAL" => js::Value::Number(row.try_get_unchecked::<f64, _>(name)?).to_json(),
-        "BLOB" => String::from_utf8_lossy(&row.try_get_unchecked::<Vec<u8>, _>(name)?).into_owned(),
-        _ => row.try_get_unchecked::<String, _>(name)?,
-    }))
-}
-
-fn column_int(row: &SqliteRow, name: &str) -> Result<Option<i64>, BoxError> {
-    let raw = row.try_get_raw(name)?;
-    if raw.is_null() {
-        return Ok(None);
-    }
-    let kind = raw.type_info().name().to_string();
-    Ok(match kind.as_str() {
-        "INTEGER" => Some(row.try_get_unchecked::<i64, _>(name)?),
-        "REAL" => Some(row.try_get_unchecked::<f64, _>(name)? as i64),
-        _ => column_text(row, name)?.and_then(|t| {
-            let t = t.trim();
-            t.parse::<i64>().ok().or_else(|| t.parse::<f64>().ok().map(|f| f as i64))
-        }),
-    })
-}
-
-fn job_of(row: &SqliteRow) -> Result<StoredJob, BoxError> {
-    let name = column_text(row, "name")?.unwrap_or_default();
-    let text = column_text(row, "definition")?.unwrap_or_default();
+fn job_of(row: &Row) -> Result<StoredJob, BoxError> {
+    let name = row.text("name").unwrap_or_default();
+    let text = row.text("definition").unwrap_or_default();
     // JSON of another shape (another writer's, or a hand edit) is a
     // definition with nothing in it, as the SDK reads it: one such row must
     // not fail every read of the jobs, and with it every check.
@@ -241,15 +204,15 @@ fn job_of(row: &SqliteRow) -> Result<StoredJob, BoxError> {
     Ok(StoredJob {
         name,
         definition,
-        created_at: column_int(row, "created_at")?.unwrap_or(0),
-        updated_at: column_int(row, "updated_at")?.unwrap_or(0),
+        created_at: row.int("created_at").unwrap_or(0),
+        updated_at: row.int("updated_at").unwrap_or(0),
     })
 }
 
-fn run_of(row: &SqliteRow) -> Result<Run, BoxError> {
-    let id = column_text(row, "id")?.unwrap_or_default();
+fn run_of(row: &Row) -> Result<Run, BoxError> {
+    let id = row.text("id").unwrap_or_default();
     let mut metrics = Metrics::new();
-    if let Some(text) = column_text(row, "metrics")? {
+    if let Some(text) = row.text("metrics") {
         metrics = match Metrics::from_json(&text) {
             Ok(m) => m,
             // Metrics another writer stored that are not all numbers keep the
@@ -263,15 +226,15 @@ fn run_of(row: &SqliteRow) -> Result<Run, BoxError> {
         };
     }
     Ok(Run {
-        job: column_text(row, "job")?.unwrap_or_default(),
-        status: RunStatus::parse(&column_text(row, "status")?.unwrap_or_default()),
-        started_at: column_int(row, "started_at")?.unwrap_or(0),
-        finished_at: column_int(row, "finished_at")?,
-        duration_ms: column_int(row, "duration_ms")?,
-        error: column_text(row, "error")?,
-        output: column_text(row, "output")?,
+        job: row.text("job").unwrap_or_default(),
+        status: RunStatus::parse(&row.text("status").unwrap_or_default()),
+        started_at: row.int("started_at").unwrap_or(0),
+        finished_at: row.int("finished_at"),
+        duration_ms: row.int("duration_ms"),
+        error: row.text("error"),
+        output: row.text("output"),
         metrics,
-        trigger: column_text(row, "trigger")?.unwrap_or_default(),
+        trigger: row.text("trigger").unwrap_or_default(),
         id,
     })
 }
@@ -288,7 +251,7 @@ fn insert_run_params(r: &Run) -> Vec<Param> {
         Param::OptInt(r.duration_ms),
         Param::OptText(r.error.clone()),
         Param::OptText(r.output.clone()),
-        Param::Text(r.metrics.to_json()),
+        Param::Json(r.metrics.to_json()),
         Param::Text(r.trigger.clone()),
     ]
 }
@@ -300,16 +263,56 @@ fn update_run_params(r: &Run) -> Vec<Param> {
         Param::OptInt(r.duration_ms),
         Param::OptText(r.error.clone()),
         Param::OptText(r.output.clone()),
-        Param::Text(r.metrics.to_json()),
+        Param::Json(r.metrics.to_json()),
         Param::Text(r.id.clone()),
     ]
 }
 
+/// What an update of a run writes, compared whatever order a JSON column
+/// gave an object's keys back in.
+fn written(r: &Run) -> String {
+    let metrics = js::parse(&r.metrics.to_json()).map(|v| canonical(&v)).unwrap_or_default();
+    format!(
+        "{:?}|{:?}|{:?}|{:?}|{:?}|{metrics}|{}",
+        r.status.as_str(),
+        r.finished_at,
+        r.duration_ms,
+        r.error,
+        r.output,
+        r.id
+    )
+}
+
+/// JSON with every object's keys sorted.
+fn canonical(v: &Value) -> String {
+    match v {
+        Value::Object(o) => {
+            let mut keys: Vec<&str> = o.keys().collect();
+            keys.sort_unstable();
+            let parts: Vec<String> = keys
+                .iter()
+                .map(|k| format!("{}:{}", Value::from(*k).to_json(), canonical(o.get(k).expect("a key"))))
+                .collect();
+            format!("{{{}}}", parts.join(","))
+        }
+        Value::Array(a) => format!("[{}]", a.iter().map(canonical).collect::<Vec<_>>().join(",")),
+        other => other.to_json(),
+    }
+}
+
 impl Store for SqlStore {
-    /// Makes the tables.
+    /// Makes the tables. On Postgres many processes starting at once would
+    /// race `CREATE TABLE IF NOT EXISTS`, which Postgres can reject with a
+    /// unique violation on `pg_type`, so they take turns under an advisory
+    /// lock per prefix.
     fn init(&self) -> BoxFuture<'_, Result<(), BoxError>> {
         Box::pin(async move {
-            for statement in schema(self.dialect, &self.prefix) {
+            let statements = schema(self.dialect, &self.prefix);
+            if self.dialect == Dialect::Postgres {
+                let list: Vec<&str> = statements.iter().map(String::as_str).collect();
+                return self.transaction(&list, &[], Some(format!("cronwatch:{}", self.prefix))).await;
+            }
+            for statement in statements {
                 self.run(&statement, Vec::new()).await?;
             }
             Ok(())
@@ -320,7 +323,7 @@ impl Store for SqlStore {
         Box::pin(async move {
             let params = vec![
                 Param::Text(definition.name().into()),
-                Param::Text(definition.to_json()),
+                Param::Json(definition.to_json()),
                 Param::Int(now),
                 Param::Int(now),
             ];
@@ -342,23 +345,22 @@ impl Store for SqlStore {
     /// Removes the job, its runs and its state in one transaction.
     fn delete_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<(), BoxError>> {
         Box::pin(async move {
-            let mut guard = self.conn().await?;
-            let conn = guard.as_mut().expect("an open connection");
-            let result = async {
-                let mut tx = sqlx::Connection::begin(&mut **conn).await?;
-                for statement in [&self.sql.delete_runs, &self.sql.delete_state, &self.sql.delete_job] {
-                    sqlx::query(AssertSqlSafe(statement.to_string())).bind(name).execute(&mut *tx).await?;
-                }
-                tx.commit().await
-            }
-            .await;
-            forget_if_broken(&mut guard, &result);
-            Ok(result?)
+            let statements = [&*self.sql.delete_runs, &*self.sql.delete_state, &*self.sql.delete_job];
+            self.transaction(&statements, &[Param::Text(name.into())], None).await
         })
     }
 
     fn insert_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>> {
-        Box::pin(async move { self.run(&self.sql.insert_run, insert_run_params(run)).await.map(|_| ()) })
+        Box::pin(async move {
+            let mut params = insert_run_params(run);
+            // MySQL's trigger column is VARCHAR(255), which refuses anything
+            // longer (the others are TEXT): a long trigger is cut to fit
+            // rather than lose the whole run.
+            if self.dialect == Dialect::Mysql && run.trigger.chars().count() > 255 {
+                params[9] = Param::Text(run.trigger.chars().take(255).collect());
+            }
+            self.run(&self.sql.insert_run, params).await.map(|_| ())
+        })
     }
 
     fn update_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>> {
@@ -372,12 +374,24 @@ impl Store for SqlStore {
             }
             let mut params = update_run_params(run);
             params.extend(from.iter().map(|s| Param::Text(s.as_str().into())));
-            Ok(self.run(&self.sql.update_run_if(from.len()), params).await? > 0)
+            let n = self.run(&self.sql.update_run_if(from.len()), params).await?;
+            if n > 0 || self.dialect != Dialect::Mysql {
+                return Ok(n > 0);
+            }
+            // A MySQL connection that counts only the rows an UPDATE changed
+            // answers 0 for a row that already held these values (and
+            // matched): it was written all the same. sqlx asks for found
+            // rows, so this is for a server or proxy that does not honour it.
+            let Some(stored) = self.get_run(&run.id).await? else {
+                return Ok(false);
+            };
+            Ok(from.contains(&stored.status) && written(&stored) == written(run))
         })
     }
 
     /// Deletes a run only while it is of `job` and in `status`, in one
-    /// statement, and says whether it did.
+    /// statement, and says whether it did. A DELETE counts the rows it
+    /// matched on every dialect.
     fn delete_run_if<'a>(
         &'a self,
         id: &'a str,
@@ -419,14 +433,14 @@ impl Store for SqlStore {
             let Some(row) = rows.first() else {
                 return Ok(None);
             };
-            let text = column_text(row, "state")?.unwrap_or_default();
+            let text = row.text("state").unwrap_or_default();
             Ok(Some(JobState::from_json(&text)?))
         })
     }
 
     fn set_state<'a>(&'a self, state: &'a JobState) -> BoxFuture<'a, Result<(), BoxError>> {
         Box::pin(async move {
-            let params = vec![Param::Text(state.job.clone()), Param::Text(state.to_json())];
+            let params = vec![Param::Text(state.job.clone()), Param::Json(state.to_json())];
             self.run(&self.sql.set_state, params).await.map(|_| ())
         })
     }
@@ -438,13 +452,37 @@ impl Store for SqlStore {
     ) -> BoxFuture<'a, Result<bool, BoxError>> {
         Box::pin(async move {
             let body = state.to_json();
-            let n = if expected == 0 {
-                self.run(&self.sql.cas_insert, vec![Param::Text(state.job.clone()), Param::Text(body)]).await?
-            } else {
-                let params = vec![Param::Text(body), Param::Text(state.job.clone()), Param::Int(expected)];
-                self.run(&self.sql.cas_update, params).await?
-            };
-            Ok(n > 0)
+            let job = || Param::Text(state.job.clone());
+            if expected != 0 {
+                let params = vec![Param::Json(body), job(), Param::Int(expected)];
+                return Ok(self.run(&self.sql.cas_update, params).await? > 0);
+            }
+            if self.dialect != Dialect::Mysql {
+                return Ok(self.run(&self.sql.cas_insert, vec![job(), Param::Json(body)]).await? > 0);
+            }
+            // Version 0 on MySQL is a row at version 0 (or with none), or no
+            // row at all.
+            if self.run(&self.sql.cas_from_zero, vec![Param::Json(body.clone()), job()]).await? > 0 {
+                return Ok(true);
+            }
+            match self.run(&self.sql.cas_insert, vec![job(), Param::Json(body.clone())]).await {
+                Ok(_) => Ok(true),
+                Err(err) => {
+                    // A row is there: another process wrote first, unless it
+                    // holds exactly what this write sent, when the write landed
+                    // and only its answer was lost (a row at version 0 that
+                    // already held these values, which a connection counting
+                    // changed rows answers 0 for, or a connection dropped after
+                    // the commit), as the PHP port's stateLanded() reads it.
+                    // Counting that as refused would have the client work the
+                    // change out again over its own write, and the alert the
+                    // first attempt opened would never go out.
+                    match self.get_state(&state.job).await {
+                        Ok(Some(stored)) => Ok(stored.to_json() == body),
+                        _ => Err(err),
+                    }
+                }
+            }
         })
     }
 
@@ -456,7 +494,14 @@ impl Store for SqlStore {
     /// stays open.
     fn close(&self) -> BoxFuture<'_, Result<(), BoxError>> {
         Box::pin(async move {
-            self.conn.lock().await.take();
+            match &self.backend {
+                #[cfg(feature = "sqlite")]
+                Backend::Sqlite(conn) => conn.close().await,
+                #[cfg(feature = "postgres")]
+                Backend::Postgres(_) => {}
+                #[cfg(feature = "mysql")]
+                Backend::Mysql(_) => {}
+            }
             Ok(())
         })
     }
