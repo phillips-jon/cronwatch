@@ -65,7 +65,8 @@ pub(crate) fn as_uuid(id: &str) -> String {
     format!("{}-{}-{}-{}-{}", &id[0..8], &id[8..12], &id[12..16], &id[16..20], &id[20..32])
 }
 
-/// The run fields worth attaching to a tracker event, or `null`.
+/// The run fields worth attaching to a tracker event, or `null`. A start
+/// before the year 1 or after 9999 is `null`.
 pub(crate) fn run_summary(a: &Alert) -> Value {
     let Some(r) = &a.run else {
         return Value::Null;
@@ -74,7 +75,7 @@ pub(crate) fn run_summary(a: &Alert) -> Value {
         Object::new()
             .with("id", r.id.as_str())
             .with("status", r.status.as_str())
-            .with("startedAt", js::iso_string(r.started_at))
+            .with("startedAt", js::iso_time(r.started_at).map_or(Value::Null, Value::from))
             .with("durationMs", r.duration_ms)
             .with("trigger", r.trigger.as_str()),
     )

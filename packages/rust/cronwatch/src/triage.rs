@@ -221,7 +221,7 @@ pub(crate) fn describe(cx: &TriageContext) -> Vec<u16> {
         lines.push(text(&format!(
             "Triggering run: status {}, started {}, duration {}, trigger {}",
             run.status,
-            js::iso_string(run.started_at),
+            js::iso_or_words(run.started_at),
             duration(run),
             run.trigger
         )));
@@ -244,7 +244,7 @@ pub(crate) fn describe(cx: &TriageContext) -> Vec<u16> {
         lines.push(Vec::new());
         lines.push(text("Earlier runs, newest first:"));
         for r in earlier {
-            let mut line = text(&format!("- {}, {}, {}", r.status, js::iso_string(r.started_at), duration(r)));
+            let mut line = text(&format!("- {}, {}, {}", r.status, js::iso_or_words(r.started_at), duration(r)));
             if let Some(error) = r.error.as_deref().filter(|e| !e.is_empty()) {
                 let first = error.split('\n').next().unwrap_or("");
                 line.extend(text(", error: "));

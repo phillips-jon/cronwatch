@@ -64,7 +64,7 @@ fn read_golden() -> Vec<Capture> {
             }
         })
         .collect();
-    assert_eq!(captures.len(), 57, "golden.json's captures");
+    assert_eq!(captures.len(), 59, "golden.json's captures");
     captures
 }
 
@@ -119,6 +119,16 @@ async fn seed() -> Kit {
         })
         .await;
     k.cw.job("never-ran", JobOptions::new().schedule("0 * * * *")).unwrap();
+    // A run as a foreign or damaged row could hold it: started before the
+    // year 1, so the pages write it in words rather than as a date.
+    let far_back = k.cw.job("far-back", JobOptions::new().timeout("5m").expect("far")).unwrap();
+    k.set(-62_135_596_800_001);
+    let _ = far_back
+        .run(|_| {
+            k.advance(1000);
+            async { Ok::<_, std::io::Error>(()) }
+        })
+        .await;
     k.set(T0);
     k
 }

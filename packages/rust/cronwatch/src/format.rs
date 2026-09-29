@@ -95,8 +95,12 @@ fn group(digits: &str) -> String {
     b
 }
 
-/// `2026-01-05 09:30:00 UTC (5m ago)`.
+/// `2026-01-05 09:30:00 UTC (5m ago)`, or `before 0001-01-01 00:00:00 UTC`
+/// (with no relative part) for a time outside the years 1 to 9999.
 fn when(at: f64, now: i64) -> String {
+    if !js::in_date_range(at) {
+        return js::beyond_dates(at).to_string();
+    }
     let iso = js::iso_string(at.trunc() as i64).replacen('T', " ", 1);
     format!("{} UTC ({})", &iso[..19.min(iso.len())], relative(at, now))
 }

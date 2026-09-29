@@ -62,6 +62,34 @@ pub(crate) fn iso_string(ms: i64) -> String {
     )
 }
 
+/// The first millisecond written as a date: 0001-01-01T00:00:00.000Z.
+pub(crate) const FIRST_DATE_MS: i64 = -62_135_596_800_000;
+/// The last millisecond written as a date: 9999-12-31T23:59:59.999Z.
+pub(crate) const LAST_DATE_MS: i64 = 253_402_300_799_999;
+
+/// Whether `ms` falls in the years 1 to 9999, the times written as dates.
+pub(crate) fn in_date_range(ms: f64) -> bool {
+    ms >= FIRST_DATE_MS as f64 && ms <= LAST_DATE_MS as f64
+}
+
+/// `"2026-01-05T09:30:00.000Z"`, or `None` for a time before the year 1 or
+/// after 9999, such as a start read from a foreign or damaged row, which is
+/// not written as a date at all (the SDK's `isoTime`).
+pub(crate) fn iso_time(ms: i64) -> Option<String> {
+    in_date_range(ms as f64).then(|| iso_string(ms))
+}
+
+/// The words that stand in for a time `iso_time` does not write (the SDK's
+/// `beyondDates`).
+pub(crate) fn beyond_dates(ms: f64) -> &'static str {
+    if ms > LAST_DATE_MS as f64 { "after 9999-12-31 23:59:59 UTC" } else { "before 0001-01-01 00:00:00 UTC" }
+}
+
+/// `iso_time`, or the words for a time outside its years.
+pub(crate) fn iso_or_words(ms: i64) -> String {
+    iso_time(ms).unwrap_or_else(|| beyond_dates(ms as f64).to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -72,6 +100,12 @@ mod tests {
         assert_eq!(iso_string(1_767_605_400_000), "2026-01-05T09:30:00.000Z");
         assert_eq!(iso_string(-1), "1969-12-31T23:59:59.999Z");
         assert_eq!(iso_string(253_402_300_800_000), "+010000-01-01T00:00:00.000Z");
+        assert_eq!(iso_time(FIRST_DATE_MS).as_deref(), Some("0001-01-01T00:00:00.000Z"));
+        assert_eq!(iso_time(LAST_DATE_MS).as_deref(), Some("9999-12-31T23:59:59.999Z"));
+        assert_eq!(iso_time(FIRST_DATE_MS - 1), None);
+        assert_eq!(iso_time(LAST_DATE_MS + 1), None);
+        assert_eq!(iso_or_words(i64::MIN), "before 0001-01-01 00:00:00 UTC");
+        assert_eq!(iso_or_words(i64::MAX), "after 9999-12-31 23:59:59 UTC");
         assert_eq!(date_utc(2026, 0, 5, 9, 30, 0, 0), 1_767_605_400_000);
         assert_eq!(date_utc(2025, 12, 5, 9, 30, 0, 0), 1_767_605_400_000);
         assert_eq!(civil_from_days(days_from_civil(2024, 2, 29)), (2024, 2, 29));

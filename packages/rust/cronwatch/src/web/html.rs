@@ -154,7 +154,9 @@ fn stamp(at: Option<i64>, now: i64) -> String {
     let Some(at) = at else {
         return r#"<span class="muted">never</span>"#.into();
     };
-    let iso = js::iso_string(at);
+    let Some(iso) = js::iso_time(at) else {
+        return format!(r#"<span class="nowrap">{}</span>"#, js::beyond_dates(at as f64));
+    };
     let title = iso.replacen('T', " ", 1);
     format!(
         r#"<time class="nowrap" datetime="{iso}" title="{} UTC">{}</time>"#,

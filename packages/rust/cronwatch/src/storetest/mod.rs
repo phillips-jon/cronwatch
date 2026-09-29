@@ -442,9 +442,9 @@ where
 /// A check over rows another process wrote, which `exec` inserts (each a
 /// statement over the tables of `prefix`, which `store` uses): a running
 /// run that started at the lowest BIGINT, and a state whose version is
-/// `1.5`. The run is marked as timed out with a duration of 2^53 - 1, and
-/// the state is written over with version 1. The job is silenced, as an
-/// alert's text would show a start no date reaches.
+/// `1.5`. The run is marked as timed out with a duration of 2^53 - 1, the
+/// state's 1.5 counts as 0, and the stuck alert is sent: its text writes a
+/// start before the year 1 as words, not as a date.
 pub async fn check_over_foreign_rows<S, F, Fut>(store: S, prefix: &str, mut exec: F)
 where
     S: Store + 'static,
@@ -458,20 +458,40 @@ where
     ))
     .await;
     exec(format!(
-        r#"INSERT INTO {prefix}state (job, state) VALUES ('far', '{{"job":"far","open":{{}},"consecutiveFailures":0,"silencedUntil":4102444800000,"lastAlertAt":null,"version":1.5}}')"#
+        r#"INSERT INTO {prefix}state (job, state) VALUES ('far', '{{"job":"far","open":{{}},"consecutiveFailures":0,"silencedUntil":null,"lastAlertAt":null,"version":1.5}}')"#
     ))
     .await;
-    let cw = must(Client::builder().store(store).alerts([]).no_cron_secret().build());
+    let sent = Capture::default();
+    let errors = Errors::default();
+    let errs = errors.clone();
+    let cw = must(
+        Client::builder()
+            .store(store)
+            .alerts([Arc::new(sent.clone()) as Arc<dyn Channel>])
+            .no_cron_secret()
+            .on_error(move |err, where_| errs.add(err, where_))
+            .build(),
+    );
     let store = cw.store().clone();
     for _ in 0..2 {
         must(cw.check().await);
     }
+    eq("nothing reported", errors.list(), Vec::<String>::new());
     let run = must(store.get_run("far1").await).expect("the run");
     eq("the run's status", run.status, RunStatus::Timeout);
     eq("the duration, held at 2^53 - 1", run.duration_ms, Some(crate::MAX_DURATION_MS));
     let state = must(store.get_state("far").await).expect("the state");
-    eq("the state's 1.5 counted as 0 and was written over", state.version, Some(1));
+    eq("the state's 1.5 counted as 0, then the timeout and the alert each wrote it", state.version, Some(2));
     eq("the timeout counted", state.consecutive_failures, 1);
+    eq("the alerts sent", sent.types(), vec!["stuck".to_string()]);
+    let message = sent.list()[0].message.clone();
+    eq(
+        "the stuck alert's first line",
+        message.split('\n').next(),
+        Some(
+            "Started before 0001-01-01 00:00:00 UTC and never reported finishing. Marked as timed out after 104249991d 8h.",
+        ),
+    );
 }
 
 /// A settable clock for a client, in epoch milliseconds.

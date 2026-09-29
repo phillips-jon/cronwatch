@@ -70,8 +70,16 @@ fn day_label(t: i64) -> String {
     format!("{} {} {}", WEEKDAY_NAMES[wd], d, MONTH_NAMES[m - 1])
 }
 
-/// "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42".
+/// "22:42" on the same UTC day as `now`, otherwise "25 Sep 22:42". A time
+/// before the year 1 or after 9999 (a start read from a foreign or damaged
+/// row) is "before 1 Jan 0001 00:00" or "after 31 Dec 9999 23:59".
 pub(crate) fn when_utc(t: i64, now: i64) -> String {
+    if t > js::LAST_DATE_MS {
+        return "after 31 Dec 9999 23:59".into();
+    }
+    if t < js::FIRST_DATE_MS {
+        return "before 1 Jan 0001 00:00".into();
+    }
     if js::floor_div(t, DAY_MS) == js::floor_div(now, DAY_MS) {
         return clock_utc(t);
     }
