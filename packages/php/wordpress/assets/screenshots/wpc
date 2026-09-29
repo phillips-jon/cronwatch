@@ -1,0 +1,8 @@
+#!/bin/sh
+# WP-CLI against the cws-wp container's files, as www-data, with CWS_WORK
+# (run.sh's work directory) at /work. DISABLE_WP_CRON is set here so that no
+# WP-CLI command spawns wp-cron.php while the seed runs.
+exec docker run --rm -i --network cws -v cws_html:/var/www/html -v "$CWS_WORK":/work \
+  -e WORDPRESS_DB_HOST=cws-db -e WORDPRESS_DB_USER=root -e WORDPRESS_DB_PASSWORD=pw -e WORDPRESS_DB_NAME=wp \
+  -e "WORDPRESS_CONFIG_EXTRA=define('DISABLE_WP_CRON', true);" \
+  --user 33:33 wordpress:cli-php8.3 wp "$@"
