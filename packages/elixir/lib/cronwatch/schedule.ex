@@ -17,6 +17,17 @@ defmodule Cronwatch.Schedule do
   alias Cronwatch.Zone
 
   @early_slack_ms 60_000
+  # The first and last milliseconds written as dates: 0001-01-01T00:00:00.000Z and 9999-12-31T23:59:59.999Z.
+  @first_date_ms -62_135_596_800_000
+  @last_date_ms 253_402_300_799_999
+  # Four hundred Gregorian years: 146,097 days, a whole number of weeks,
+  # after which the calendar repeats date for date and weekday for weekday.
+  @cycle_ms 146_097 * 86_400_000
+  # Croner misreads a year below 100 and finds no fire past the year 3000, so
+  # the SDK asks it about a time before the year 400 a cycle or more later,
+  # and one from the year 2800 a cycle or more earlier; so does this port.
+  @croner_first_ms -49_544_438_400_000
+  @croner_last_ms 26_192_246_400_000
   @max_interval_ms 9_007_199_254_740_992
   @hour 3_600_000
 
@@ -149,7 +160,33 @@ defmodule Cronwatch.Schedule do
   def timezone?(name), do: Zone.zone?(name)
 
   defp next_runs(%__MODULE__{cron: nil}, _count, _start), do: []
-  defp next_runs(%__MODULE__{cron: c}, count, start), do: Cron.next_runs(c, count, start)
+
+  # The SDK's runsAfter: the next `count` fires after `start`, which lies
+  # within the years 1 to 9999, found where croner can answer (moved by
+  # whole 400-year cycles) and moved back, dropping any after 9999.
+  defp next_runs(%__MODULE__{cron: c}, count, start) do
+    shift =
+      cond do
+        start < @croner_first_ms -> ceil_div(@croner_first_ms - start, @cycle_ms) * @cycle_ms
+        start >= @croner_last_ms -> -(Integer.floor_div(start - @croner_last_ms, @cycle_ms) + 1) * @cycle_ms
+        true -> 0
+      end
+
+    c
+    |> Cron.next_runs(count, start + shift)
+    |> Enum.map(&(&1 - shift))
+    |> Enum.take_while(&(&1 <= @last_date_ms))
+  end
+
+  defp ceil_div(a, b), do: -Integer.floor_div(-a, b)
+
+  # The SDK's countFrom: a stored time as a cron's fires are counted from it.
+  # A start read from a foreign or damaged row can be any number: one before
+  # the year 1 counts from just before its first millisecond, and one at or
+  # after the last millisecond of 9999 has no fire after it (nil).
+  defp count_from(from) when from >= @last_date_ms, do: nil
+  defp count_from(from) when from >= @first_date_ms, do: from
+  defp count_from(_from), do: @first_date_ms - 1
 
   @doc """
   The first fire strictly after `from`, or nil when the cron never fires
@@ -158,7 +195,12 @@ defmodule Cronwatch.Schedule do
   stretch of nothing but past times is stepped over an hour at a time.
   """
   @spec fire_after(t(), integer()) :: integer() | nil
-  def fire_after(p, from), do: fire_after(p, from, from, 0)
+  def fire_after(p, from) do
+    case count_from(from) do
+      nil -> nil
+      start -> fire_after(p, start, start, 0)
+    end
+  end
 
   defp fire_after(_p, _from, _probe, 4), do: nil
 
@@ -181,7 +223,12 @@ defmodule Cronwatch.Schedule do
   batches, and any that do not move forward are dropped.
   """
   @spec fires_between(t(), integer(), integer(), non_neg_integer()) :: [integer()] | nil
-  def fires_between(p, from, to, limit), do: between(p, to, limit, from, from, [], 0, 0)
+  def fires_between(p, from, to, limit) do
+    case count_from(from) do
+      nil -> []
+      start -> between(p, to, limit, start, start, [], 0, 0)
+    end
+  end
 
   defp between(_p, _to, _limit, _probe, _last, out, _n, 1000), do: Enum.reverse(out)
 
@@ -281,7 +328,14 @@ defmodule Cronwatch.Schedule do
 
   defp in_spring_forward_gap?(%__MODULE__{cron: c} = p, started_at, fire_at) do
     lookback = 3 * @hour
-    zone = c.zone
+
+    # Every zone kept its local mean time, with no clock change, in the year 1.
+    if fire_at - lookback < @first_date_ms,
+      do: false,
+      else: spring_gap?(p, c.zone, lookback, started_at, fire_at)
+  end
+
+  defp spring_gap?(p, zone, lookback, started_at, fire_at) do
     after_offset = utc_offset(fire_at, zone)
     gap = after_offset - utc_offset(fire_at - lookback, zone)
 

@@ -31,6 +31,58 @@ defmodule Cronwatch.Test.ForeignRows do
       test "a check over a run that started at the lowest BIGINT, and a state whose version is 1.5" do
         unquote(__MODULE__).check_over(unquote(store).())
       end
+
+      for started_at <- unquote(__MODULE__).far_starts() do
+        @far_start started_at
+        test "a check and the dashboard over a cron job whose last run started at #{started_at}" do
+          unquote(__MODULE__).cron_over(unquote(store).(), @far_start)
+        end
+      end
+    end
+  end
+
+  @doc "Starts a foreign or damaged row could hold: before the year 1, after 9999, and the BIGINT extremes."
+  def far_starts, do: [-62_135_596_800_001, 253_402_300_800_000, -9_223_372_036_854_775_808, 9_223_372_036_854_775_807]
+
+  @doc """
+  A cron job whose last run started at `started_at`, written as a raw row:
+  a check and the job's dashboard pages report no error. Before the year 1
+  the first fire of the year 1 was missed; after 9999 nothing is due again.
+  stores.test.ts has the same test.
+  """
+  def cron_over({EctoStore, h} = store, started_at) do
+    %{cw: cw, errors: errors, alerts: alerts} = Client.make(store: Stores.option(store))
+    :ok = EctoStore.init(h)
+    definition = ~s({"name":"far","schedule":"0 2 * * *","timezone":"UTC","grace":"10m"})
+    :ok = EctoStore.upsert_job(h, JS.parse!(definition), 1)
+    trigger = if h.dialect == :mysql, do: "`trigger`", else: "trigger"
+
+    sql(
+      h,
+      "INSERT INTO #{h.prefix}runs (id, job, status, started_at, finished_at, duration_ms, metrics, #{trigger}) " <>
+        "VALUES ('far1', 'far', 'ok', #{started_at}, #{started_at}, 0, '{}', 'run')"
+    )
+
+    Cronwatch.check!(instance: cw)
+    opts = Cronwatch.Web.init(instance: cw, token: "tok")
+
+    for path <- ["/cronwatch", "/cronwatch/jobs/far", "/cronwatch/api/jobs/far"] do
+      conn =
+        Plug.Test.conn("GET", path)
+        |> Map.put(:host, "app.test")
+        |> Map.put(:req_headers, [{"authorization", "Bearer tok"}])
+        |> Cronwatch.Web.call(opts)
+
+      assert conn.status == 200, path
+    end
+
+    assert Agent.get(errors, & &1) == [], "#{started_at}"
+    want = if started_at < 0, do: ["missed"], else: []
+    assert Capture.types(alerts) == want, "#{started_at}"
+
+    if started_at < 0 do
+      [sent] = Capture.alerts(alerts)
+      assert String.starts_with?(sent.message, "Due 0001-01-01 02:00:00 UTC ")
     end
   end
 

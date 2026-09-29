@@ -41,7 +41,7 @@ defmodule Cronwatch.Web.GoldenTest do
     golden = JS.parse!(File.read!(@golden))
     assert Object.get(golden, "t0") == @t0, "golden.json's t0"
     captures = Object.get(golden, "captures")
-    assert length(captures) == 59, "golden.json's captures"
+    assert length(captures) == 63, "golden.json's captures"
 
     Enum.map(captures, fn c ->
       %{
@@ -117,6 +117,16 @@ defmodule Cronwatch.Web.GoldenTest do
     far_back = Cronwatch.job!("far-back", [timeout: "5m", expect: "far"] ++ inst)
     Clock.set(clock, -62_135_596_800_001)
     Cronwatch.run(far_back, fn _ -> Clock.advance(clock, 1000) end)
+
+    # Cron jobs whose last run is as far off: counted from the first
+    # millisecond of the year 1, the first is due then (and is missed at the
+    # check); after 9999 the other is never due again.
+    far_cron_back = Cronwatch.job!("far-cron-back", [schedule: "0 2 * * *", timezone: "UTC", grace: "10m"] ++ inst)
+    Clock.set(clock, -62_135_596_800_001)
+    Cronwatch.run(far_cron_back, fn _ -> Clock.advance(clock, 1000) end)
+    far_cron_ahead = Cronwatch.job!("far-cron-ahead", [schedule: "0 2 * * *", timezone: "UTC", grace: "10m"] ++ inst)
+    Clock.set(clock, 253_402_300_800_000)
+    Cronwatch.run(far_cron_ahead, fn _ -> Clock.advance(clock, 1000) end)
     Clock.set(clock, @t0)
   end
 

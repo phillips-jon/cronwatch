@@ -148,6 +148,6 @@ defmodule Cronwatch.ScheduleConformanceTest do
     check!(failures, "schedule")
 
     count = Enum.sum(for s <- ~w(parse fires nextFire expectation runCovers autumn), do: length(list(f, s)))
-    assert count == 647
+    assert count == 723
   end
 end
