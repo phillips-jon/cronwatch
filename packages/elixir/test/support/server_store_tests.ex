@@ -14,6 +14,10 @@ defmodule Cronwatch.Test.ServerStoreTests do
 
   defmacro __using__(opts) do
     kind = Keyword.fetch!(opts, :kind)
+    # Worked out here rather than in the test, where Elixir 1.18's type
+    # checker warns that comparing the one kind with the others is always
+    # false.
+    dialect = if kind in [:pg, :pgcron], do: :postgres, else: :mysql
 
     quote do
       # The tag is set before StoreCase's tests are registered, which read
@@ -41,7 +45,7 @@ defmodule Cronwatch.Test.ServerStoreTests do
 
       test "the store names its dialect" do
         {EctoStore, h} = Servers.store(@kind)
-        assert h.dialect == if(@kind in [:pg, :pgcron], do: :postgres, else: :mysql)
+        assert h.dialect == unquote(dialect)
       end
 
       # A client from end to end: jobs declared, runs that succeed and fail,
