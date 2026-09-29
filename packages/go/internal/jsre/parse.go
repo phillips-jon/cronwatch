@@ -196,6 +196,20 @@ func (p *parser) term() (*tree, error) {
 		return nil, p.fail("unmatched ')'")
 	default:
 		p.i++
+		if c >= 0x10000 {
+			// A character outside the BMP is two code units in turn, as
+			// JavaScript without the u flag reads it: a quantifier after it
+			// takes the second alone (the Rust audit; it was read as either one).
+			hi, lo := utf16.EncodeRune(c)
+			high, low := newSet(), newSet()
+			high.add(hi)
+			low.add(lo)
+			second, err := p.quantifier(&tree{kind: kChar, set: low, min: 1, max: 1})
+			if err != nil {
+				return nil, err
+			}
+			return &tree{kind: kSeq, children: []*tree{{kind: kChar, set: high, min: 1, max: 1}, second}, min: 1, max: 1}, nil
+		}
 		set := newSet()
 		set.add(c)
 		t = &tree{kind: kChar, set: p.folded(set), min: 1, max: 1}
@@ -461,8 +475,8 @@ func newSet() *charSet { return &charSet{} }
 
 func (s *charSet) add(r rune) {
 	if r >= 0x10000 {
-		// A character outside the BMP in a pattern would be two code units;
-		// the redaction patterns hold none.
+		// A character outside the BMP in a class is either of its two code
+		// units, as JavaScript without the u flag reads it.
 		hi, lo := utf16.EncodeRune(r)
 		s.add(hi)
 		s.add(lo)

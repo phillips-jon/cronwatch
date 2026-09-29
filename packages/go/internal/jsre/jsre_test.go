@@ -68,6 +68,24 @@ func TestSemantics(t *testing.T) {
 	}
 }
 
+func TestACharacterOutsideTheBMPIsItsTwoUnitsInTurn(t *testing.T) {
+	// /a😀b/.test("a😀b"), and "x😀😀y".replace(/😀{2}/g, "-"): the quantifier
+	// takes the second unit alone, as V8 reads a pattern without u.
+	re := MustCompile("a\U0001F600b", "")
+	if !re.MatchString("a\U0001F600b") {
+		t.Error("/a\U0001F600b/ should match a\U0001F600b")
+	}
+	if re.MatchString("ab") {
+		t.Error("/a\U0001F600b/ should not match ab")
+	}
+	if got := replace(t, "\U0001F600+", "g", "x\U0001F600\U0001F600y", "-"); got != "x--y" {
+		t.Errorf("+ got %q", got)
+	}
+	if got := replace(t, "\U0001F600{2}", "g", "x\U0001F600\U0001F600y", "-"); got != "x\U0001F600\U0001F600y" {
+		t.Errorf("{2} got %q", got)
+	}
+}
+
 func TestReplaceFunc(t *testing.T) {
 	re := MustCompile(`(k)=(?:(")[^"]*"|(')[^']*'|\w+)`, "g")
 	got := js.FromUnits(re.ReplaceUnits(js.Units(`k="a b" k='c' k=d`), func(m *Match) []uint16 {
