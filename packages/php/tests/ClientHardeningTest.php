@@ -665,4 +665,28 @@ final class ClientHardeningTest extends TestCase
         $this->assertTrue($store->deleteRunIf('gone', 'flaky', 'running'));
         $this->assertSame([], $this->errors);
     }
+
+    public function testAnInsertWhoseAnswerWasLostWithTheConnectionIsStillJudged(): void
+    {
+        // A recorded failure's insert lands, then the connection breaks and the
+        // store sends it again, which hits the row its first send wrote: that
+        // row is its own, so the failure is judged and alerted, not taken for
+        // another process's.
+        $store = new \Cronwatch\Tests\Support\ResendingStore();
+        $cw = $this->make(['store' => $store]);
+        $cw->job('imported');
+        $store->breakAfter = ['insertRun'];
+        $sent = $cw->recordRun(['id' => 'pgcron:7', 'job' => 'imported', 'status' => 'failed', 'startedAt' => self::T0 - 1000, 'finishedAt' => self::T0, 'durationMs' => 1000, 'error' => 'ERROR: boom', 'trigger' => 'pg_cron']);
+        $this->assertSame(1, $store->resends);
+        $this->assertSame(['failed'], array_map(fn (Alert $a) => $a->type, $sent));
+        $this->assertSame(['failed'], $this->capture->types());
+
+        // A run's start the same way: recorded once, and its finish judged.
+        $store->breakAfter = ['insertRun'];
+        $cw->job('nightly')->run(fn () => 'done');
+        $this->assertSame(2, $store->resends);
+        $this->assertSame('ok', $cw->runs('nightly')[0]->status);
+        $this->assertCount(1, $cw->runs('nightly'));
+        $this->assertSame([], $this->errors);
+    }
 }
