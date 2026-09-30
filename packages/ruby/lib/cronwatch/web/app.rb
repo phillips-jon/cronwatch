@@ -20,9 +20,11 @@ module Cronwatch
   #            or open the dashboard once with `?token=<token>` and a cookie is set.
   #            Defaults to ENV["CRONWATCH_TOKEN"]; an empty string counts as unset.
   #            With no token while Cronwatch::Environment is development or
-  #            test, the app makes a random one and prints a sign-in link to
-  #            stdout on its first request; with no token otherwise it answers
-  #            503. Pass `token: nil` to opt out and serve it open everywhere,
+  #            test (Environment.stated_development?: under Puma, Unicorn,
+  #            Thin or rackup, which set RACK_ENV=development by default,
+  #            RACK_ENV alone does not count), the app makes a random one and
+  #            prints a sign-in link to stdout on its first request; with no
+  #            token otherwise it answers 503. Pass `token: nil` to opt out and serve it open everywhere,
   #            for example behind your own auth. /api/check also accepts the
   #            client's cron_secret as a bearer, for a platform cron.
   # base_path: where the app is mounted, so links resolve. Defaults to the
@@ -79,7 +81,7 @@ module Cronwatch
       # (proxies, tunnels and a server bound to every interface all look
       # alike), so development gets a token too: made here, and shown only in
       # the server log.
-      @generated = @token.nil? && !@opted_out && Client.development?
+      @generated = @token.nil? && !@opted_out && Environment.stated_development?
       @token = Web.development_token if @generated
       @announced = false
       @announce_lock = Mutex.new

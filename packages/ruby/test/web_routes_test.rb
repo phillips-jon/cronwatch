@@ -153,6 +153,39 @@ class WebRoutesTest < Minitest::Test
     end
   end
 
+  # Puma, as a server that sets RACK_ENV=development when nothing names an environment, is running this process.
+  def under_puma
+    defined = Object.const_defined?(:Puma, false)
+    Object.const_set(:Puma, Module.new) unless defined
+    Puma.const_set(:Server, Class.new) unless Puma.const_defined?(:Server, false)
+    yield
+  ensure
+    Object.send(:remove_const, :Puma) unless defined
+  end
+
+  def test_under_a_server_that_defaults_rack_env_rack_env_development_alone_makes_no_token
+    under_puma do
+      with_env("RAILS_ENV" => nil, "APP_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
+        get = unconfigured(host: "localhost:3000")
+        lines, = printed do
+          assert_equal 503, get.call("/cronwatch/api/jobs").status
+          assert_equal 503, get.call("/cronwatch").status
+        end
+        assert_empty lines, "no token in the log of what may be production"
+      end
+      [{ "APP_ENV" => "development" }, { "RAILS_ENV" => "development" }, { "RACK_ENV" => "test" }].each do |stated|
+        with_env({ "RAILS_ENV" => nil, "APP_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil }.merge(stated)) do
+          lines, response = printed { unconfigured(host: "localhost:3000").call("/cronwatch/api/jobs") }
+          assert_equal 401, response.status, stated.inspect
+          assert_match SIGN_IN, lines[0], "#{stated.inspect} says development"
+        end
+      end
+      with_env("RAILS_ENV" => nil, "APP_ENV" => "production", "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
+        assert_equal 503, unconfigured.call("/cronwatch/api/jobs").status, "APP_ENV=production"
+      end
+    end
+  end
+
   SIGN_IN = %r{\A\[cronwatch\] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard\. Sign in: http://localhost:3000/cronwatch/\?token=([A-Za-z0-9_-]{43})\z}
 
   def test_without_a_token_in_development_a_made_up_token_is_printed_once_and_required_from_everyone
