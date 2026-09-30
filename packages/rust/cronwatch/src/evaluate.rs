@@ -10,7 +10,7 @@ use crate::schedule::{self, Parsed};
 use crate::stats::{median, percentile};
 use crate::types::{
     Alert, AlertDetails, AlertType, BudgetBreach, Condition, Definition, JobHealth, JobState, JobSummary,
-    OpenCondition, Run, RunStatus, Stats, StoredJob,
+    MAX_DURATION_MS, OpenCondition, Run, RunStatus, Stats, StoredJob,
 };
 
 /// A state worked out, and the alerts it owes.
@@ -52,6 +52,7 @@ pub(crate) fn normalize_state(state: Option<&JobState>, job: &str) -> JobState {
     if s.job.is_empty() {
         s.job = job.to_string();
     }
+    s.consecutive_failures = s.consecutive_failures.clamp(0, MAX_DURATION_MS);
     s.pending_recovery.get_or_insert_with(Vec::new);
     s.undelivered.get_or_insert_with(Vec::new);
     s
@@ -305,7 +306,8 @@ pub(crate) fn on_run_finish(
     }
 
     // failed or timeout
-    next.consecutive_failures += 1;
+    // Held at the top: a count at the limit must not wrap below a threshold.
+    next.consecutive_failures = next.consecutive_failures.clamp(0, MAX_DURATION_MS - 1) + 1;
     close_condition(&mut next, Condition::Missed);
     let threshold = failures_before_alert(def);
     let (condition, alert_type) = if run.status == RunStatus::Timeout {

@@ -287,6 +287,18 @@ fn whole_version(v: &Value) -> Option<i64> {
     }
 }
 
+/// The failures in a row a stored state's `consecutiveFailures` value counts
+/// as, as the SDK's `failureCount` reads it: a JSON number that is a whole
+/// number, held at [`MAX_DURATION_MS`] (2^53 - 1), and 0 when it is negative,
+/// not a whole number, or not a number. A foreign row's count at a 64-bit
+/// limit stays at the top instead of wrapping negative on the next failure.
+pub(crate) fn failure_count(count: Option<&Value>) -> i64 {
+    match count {
+        Some(Value::Number(n)) if n.fract() == 0.0 && *n > 0.0 => n.min(MAX_DURATION_MS as f64) as i64,
+        _ => 0,
+    }
+}
+
 /// One execution of a job, as a store keeps it. Times are epoch milliseconds.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Run {
@@ -594,7 +606,7 @@ impl JobState {
                 s.open.push(OpenCondition { condition: Condition::parse(k), since: to_int(at) });
             }
         }
-        s.consecutive_failures = int_of(o, "consecutiveFailures");
+        s.consecutive_failures = failure_count(o.get("consecutiveFailures"));
         s.silenced_until = nullable_int(o, "silencedUntil");
         s.last_alert_at = nullable_int(o, "lastAlertAt");
         if let Some(Value::Array(list)) = o.get("pendingRecovery") {
@@ -969,6 +981,21 @@ mod tests {
         assert_eq!(set.counted_version(), 0);
         let set = JobState { version: Some(MAX_DURATION_MS + 1), ..JobState::new("j") };
         assert_eq!(set.counted_version(), 0);
+    }
+
+    #[test]
+    fn failures_in_a_row_set_past_the_limit_are_held_there_and_never_wrap() {
+        let failed = Run::from_value(
+            &js::parse(r#"{"id":"f","job":"j","status":"failed","startedAt":1,"finishedAt":2,"durationMs":1}"#)
+                .unwrap(),
+        )
+        .unwrap();
+        let def = Definition::from_object(Object::new().with("name", "j").with("failuresBeforeAlert", 3));
+        for (set, want) in [(i64::MAX, MAX_DURATION_MS), (MAX_DURATION_MS, MAX_DURATION_MS), (i64::MIN, 1), (-1, 1)] {
+            let state = JobState { consecutive_failures: set, ..JobState::new("j") };
+            let next = crate::evaluate::on_run_finish(&def, &failed, &state, &[], 2).unwrap().state;
+            assert_eq!(next.consecutive_failures, want, "{set}");
+        }
     }
 
     #[tokio::test]

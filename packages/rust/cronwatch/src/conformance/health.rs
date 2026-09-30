@@ -141,6 +141,26 @@ fn conformance_health() {
         fails.same(&format!("stateVersion {i}"), &from_value.into(), field(c, "version"));
         fails.same(&format!("stateVersion {i}, read as a state"), &read.into(), field(c, "version"));
     }
+    let failed_def = definition(&crate::js::parse(r#"{"name":"j","failuresBeforeAlert":3}"#).expect("JSON"));
+    let failed_run = Run::from_value(
+        &crate::js::parse(
+            r#"{"id":"f","job":"j","status":"failed","startedAt":1767605340000,"finishedAt":1767605341000,"durationMs":1000,"error":"Error: boom","output":null,"metrics":{},"trigger":"run"}"#,
+        )
+        .expect("JSON"),
+    )
+    .expect("a run");
+    for (i, c) in objects(&f, "failureCount").into_iter().enumerate() {
+        cases += 1;
+        let text = field(c, "state").as_str().expect("a state's text");
+        let read = normalize_state(Some(&JobState::from_json(text).expect("a state")), "j");
+        fails.same(&format!("failureCount {i}"), &read.consecutive_failures.into(), field(c, "consecutiveFailures"));
+        let e = crate::evaluate::on_run_finish(&failed_def, &failed_run, &read, &[], 1_767_605_400_000)
+            .expect("an evaluation");
+        let got = Object::new()
+            .with("state", e.state.to_value())
+            .with("alerts", e.alerts.iter().map(draft_value).collect::<Vec<_>>());
+        fails.same(&format!("failureCount {i}, a failed run"), &got.into(), field(c, "failed"));
+    }
     assert!(cases > 0, "health.json has no cases");
     fails.check("health");
 }
