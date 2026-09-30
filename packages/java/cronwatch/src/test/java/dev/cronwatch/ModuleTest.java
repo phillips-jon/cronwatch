@@ -41,6 +41,7 @@ class ModuleTest {
             "dev.cronwatch.alerts",
             "dev.cronwatch.jdbc",
             "dev.cronwatch.json",
+            "dev.cronwatch.pgcron",
             "dev.cronwatch.store",
             "dev.cronwatch.storetest",
             "dev.cronwatch.triage"),

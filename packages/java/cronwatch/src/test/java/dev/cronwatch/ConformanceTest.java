@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  * fails when the SDK writes a fixture this port does not know, until it is placed.
  */
 class ConformanceTest {
-  /** Replayed in phase 1, and channels and triage in phase 2. */
+  /** Every fixture, each replayed beside the code it holds to the SDK. */
   static final Set<String> REPLAYED =
       Set.of(
           "duration",
@@ -31,10 +31,8 @@ class ConformanceTest {
           "health",
           "store",
           "channels",
-          "triage");
-
-  /** Written by the SDK and replayed by a later phase (packages/java/DESIGN.md, Phases). */
-  static final Set<String> LATER = Set.of("pgcron");
+          "triage",
+          "pgcron");
 
   @Test
   void everyFixtureIsKnown() throws IOException {
@@ -45,7 +43,7 @@ class ConformanceTest {
               .map(p -> p.getFileName().toString())
               .filter(n -> n.endsWith(".json"))
               .map(n -> n.substring(0, n.length() - 5))
-              .filter(n -> !REPLAYED.contains(n) && !LATER.contains(n))
+              .filter(n -> !REPLAYED.contains(n))
               .sorted()
               .toList();
     }

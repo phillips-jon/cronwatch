@@ -13,6 +13,7 @@ import dev.cronwatch.Support.Clock;
 import dev.cronwatch.Support.Errors;
 import dev.cronwatch.Support.Made;
 import dev.cronwatch.Support.Wrapped;
+import dev.cronwatch.jdbc.Servers;
 import dev.cronwatch.jdbc.SqlStore;
 import dev.cronwatch.store.MemoryStore;
 import dev.cronwatch.store.Store;
@@ -30,7 +31,7 @@ import org.sqlite.SQLiteDataSource;
 /**
  * The SDK's {@code start-finish.test.ts}, ported: runs that span calls, started with {@code start},
  * found again with {@code resume}, flushed and finished, perhaps by another client on the same
- * store. The Postgres case waits for phase 2.
+ * store: the memory store, SQLite, and Postgres when {@code CRONWATCH_TEST_PG} is set.
  */
 class StartFinishTest {
   private static String last(List<String> messages) {
@@ -179,7 +180,8 @@ class StartFinishTest {
       Run stored = first.getRun("evt-1");
       assertEquals(RunStatus.OK, stored.status());
       assertEquals("loaded 40 recipients\ntoken=[redacted]\nsent 40 emails", stored.output());
-      assertEquals("{\"recipients\":40,\"emails\":40}", stored.metrics().toJson());
+      // As the SDK compares them (deepEqual): Postgres gives JSONB keys back in its own order.
+      assertEquals(java.util.Map.of("recipients", 40.0, "emails", 40.0), stored.metrics().asMap());
       assertEquals(List.of(), alerts.types());
       assertEquals(List.of(), errors.wheres());
     }
@@ -196,6 +198,18 @@ class StartFinishTest {
     Path file = dir.resolve("cw.db");
     Files.createDirectories(dir);
     resumeInASecondClient(sqlite(file), sqlite(file));
+  }
+
+  @Test
+  void resumeInASecondClientOnTheSamePostgresTables() throws Exception {
+    Servers.assume(Servers.Kind.PG);
+    String prefix = Servers.prefix();
+    try {
+      resumeInASecondClient(
+          Servers.store(Servers.Kind.PG, prefix), Servers.store(Servers.Kind.PG, prefix));
+    } finally {
+      Servers.drop(Servers.Kind.PG, prefix);
+    }
   }
 
   static SqlStore sqlite(Path file) {

@@ -3,9 +3,9 @@ package dev.cronwatch;
 import java.util.List;
 
 /**
- * Where runs this process does not wrap come from, such as pg_cron's jobs (a later release). A
- * check syncs each one first, so what it records is evaluated in the same check; one that throws is
- * reported as {@code source <name>} and the check carries on.
+ * Where runs this process does not wrap come from, such as pg_cron's jobs ({@code
+ * dev.cronwatch.pgcron}). A check syncs each one first, so what it records is evaluated in the same
+ * check; one that throws is reported as {@code source <name>} and the check carries on.
  */
 public interface Source {
   /** Names the source in errors. */
