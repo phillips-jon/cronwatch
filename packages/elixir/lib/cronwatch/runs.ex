@@ -57,15 +57,12 @@ defmodule Cronwatch.Runs do
     match?([{_, _, true}], :ets.lookup(table(instance, :jobs), name))
   end
 
-  @doc "Marks the declared job written, when it is still the same declaration."
-  def mark_synced(instance, job) do
-    t = table(instance, :jobs)
-
-    case :ets.lookup(t, job.name) do
-      [{_, ^job, _}] -> :ets.update_element(t, job.name, {3, true})
-      _ -> false
-    end
-  end
+  @doc """
+  Marks the declared job written, when it is still the same declaration:
+  through this process, as a declaration is, so one made meanwhile is never
+  the one marked.
+  """
+  def mark_synced(instance, job), do: GenServer.call(server(instance), {:synced, job}, :infinity)
 
   ## Flags
 
@@ -158,6 +155,18 @@ defmodule Cronwatch.Runs do
   def handle_call({:undeclare, name}, _from, s) do
     :ets.delete(table(s.instance, :jobs), name)
     {:reply, :ok, s}
+  end
+
+  def handle_call({:synced, job}, _from, s) do
+    t = table(s.instance, :jobs)
+
+    marked =
+      case :ets.lookup(t, job.name) do
+        [{_, ^job, _}] -> :ets.update_element(t, job.name, {3, true})
+        _ -> false
+      end
+
+    {:reply, marked, s}
   end
 
   def handle_call({:register, id, pid, info, timeout_ms}, _from, s) do

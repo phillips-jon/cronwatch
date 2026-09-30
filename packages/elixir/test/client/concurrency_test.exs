@@ -5,9 +5,12 @@ defmodule Cronwatch.ConcurrencyTest do
   import Cronwatch.Test.Client
   import Cronwatch.Test.More
 
+  alias Cronwatch.JS.Object
+  alias Cronwatch.Store
   alias Cronwatch.Test.Capture
   alias Cronwatch.Test.Clock
   alias Cronwatch.Test.Repo
+  alias Cronwatch.Test.Stores
   alias Cronwatch.Test.Wrap
   alias Cronwatch.Test.WrapNoCas
 
@@ -91,5 +94,103 @@ defmodule Cronwatch.ConcurrencyTest do
     assert_raise RuntimeError, "x", fn -> Cronwatch.run("busy", fn _ -> raise "x" end, instance: cw) end
     assert wheres(errors) == ["evaluating busy"]
     assert hd(Cronwatch.runs!("busy", 50, instance: cw)).status == "failed"
+  end
+
+  # A store whose first write of a job's definition waits until it is let
+  # go, so a test can declare the job again, or ask for another write, while
+  # that one is under way. Answers the store and the one under it.
+  defp held_upsert do
+    inner = Stores.memory()
+    {store, hooks} = Stores.hooked(inner)
+    test = self()
+
+    Stores.hook(hooks, :upsert_job, fn _args, real ->
+      Stores.unhook(hooks, :upsert_job)
+      send(test, {:writing, self()})
+
+      receive do
+        :release -> real.()
+      end
+    end)
+
+    {store, inner}
+  end
+
+  defp schedule(store, name) do
+    {:ok, %{definition: definition}} = Store.call(store, :get_job, [name])
+    Object.get(definition, "schedule")
+  end
+
+  # The test is sent every message the instance's locks receive, so it can
+  # wait until a process has asked for its turn at a declaration's write.
+  defp trace_turns(cw) do
+    locks = Process.whereis(Cronwatch.Locks.server(cw))
+    :erlang.trace(locks, true, [:receive])
+    locks
+  end
+
+  test "a handle kept from an earlier declaration writes the one that stands, not its own" do
+    inner = Stores.memory()
+    %{cw: cw} = make(store: Stores.option(inner))
+    earlier = Cronwatch.job!("a", instance: cw)
+    Cronwatch.job!("a", schedule: "every 5m", instance: cw)
+    Cronwatch.run(earlier, fn _ -> nil end)
+    assert schedule(inner, "a") == "every 5m"
+    Cronwatch.check!(instance: cw)
+    assert schedule(inner, "a") == "every 5m"
+  end
+
+  test "a handle whose job was forgotten writes its own definition" do
+    inner = Stores.memory()
+    %{cw: cw} = make(store: Stores.option(inner))
+    handle = Cronwatch.job!("a", schedule: "every 5m", instance: cw)
+    Cronwatch.forget!("a", instance: cw)
+    Cronwatch.run(handle, fn _ -> nil end)
+    assert schedule(inner, "a") == "every 5m"
+  end
+
+  test "a declaration made while the earlier one is being written is still to be written" do
+    {store, inner} = held_upsert()
+    %{cw: cw} = make(store: store)
+    run = Task.async(fn -> Cronwatch.run("a", fn _ -> nil end, instance: cw) end)
+    assert_receive {:writing, writer}, 5_000
+    Cronwatch.job!("a", schedule: "every 5m", instance: cw)
+    send(writer, :release)
+    Task.await(run)
+    Cronwatch.check!(instance: cw)
+    assert schedule(inner, "a") == "every 5m"
+  end
+
+  test "a declaration's write waits for the earlier one's, so the later one stays" do
+    {store, inner} = held_upsert()
+    %{cw: cw} = make(store: store)
+    locks = trace_turns(cw)
+    run = Task.async(fn -> Cronwatch.run("a", fn _ -> nil end, instance: cw) end)
+    assert_receive {:writing, writer}, 5_000
+    Cronwatch.job!("a", schedule: "every 5m", instance: cw)
+    %{pid: asking} = later = Task.async(fn -> Cronwatch.job_summary!("a", instance: cw) end)
+    # Were the later write not to wait its turn, it would land here, under the earlier one.
+    assert_receive {:trace, ^locks, :receive, {:"$gen_call", {^asking, _}, {:acquire, {:sync, "a"}}}}, 5_000
+    send(writer, :release)
+    Task.await(run)
+    assert Object.get(Task.await(later).definition, "schedule") == "every 5m"
+    assert schedule(inner, "a") == "every 5m"
+  end
+
+  test "sync_job takes its turn behind a write under way, and writes the declaration that stands" do
+    {store, inner} = held_upsert()
+    %{cw: cw} = make(store: store)
+    locks = trace_turns(cw)
+    run = Task.async(fn -> Cronwatch.run("a", fn _ -> nil end, instance: cw) end)
+    assert_receive {:writing, writer}, 5_000
+    Cronwatch.job!("a", schedule: "every 5m", instance: cw)
+    %{pid: asking} = later = Task.async(fn -> Cronwatch.sync_job("a", instance: cw) end)
+    assert_receive {:trace, ^locks, :receive, {:"$gen_call", {^asking, _}, {:acquire, {:sync, "a"}}}}, 5_000
+    send(writer, :release)
+    Task.await(run)
+    assert Task.await(later) == {:ok, true}
+    assert schedule(inner, "a") == "every 5m"
+    Cronwatch.check!(instance: cw)
+    assert schedule(inner, "a") == "every 5m"
   end
 end

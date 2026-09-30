@@ -396,19 +396,25 @@ defmodule Cronwatch do
       nil ->
         {:error, Error.invalid("sync_job: job #{Cronwatch.JS.quote(name)} is not declared; call job() first")}
 
-      job ->
+      declared ->
         safely(fn ->
           Core.ensure_ready!(c)
-          stored = Core.store!(c, :get_job, [name])
 
-          if stored && canonical(stored.definition) == canonical(job.definition) do
-            Runs.mark_synced(c.name, job)
-            false
-          else
-            Core.store!(c, :upsert_job, [job.definition, Core.now(c)])
-            Runs.mark_synced(c.name, job)
-            true
-          end
+          Core.declaring(c, name, fn ->
+            # The declaration as it stands once its turn comes: one made
+            # since is the one written.
+            job = Runs.job(c.name, name) || declared
+            stored = Core.store!(c, :get_job, [name])
+
+            if stored && canonical(stored.definition) == canonical(job.definition) do
+              Runs.mark_synced(c.name, job)
+              false
+            else
+              Core.store!(c, :upsert_job, [job.definition, Core.now(c)])
+              Runs.mark_synced(c.name, job)
+              true
+            end
+          end)
         end)
     end
   end

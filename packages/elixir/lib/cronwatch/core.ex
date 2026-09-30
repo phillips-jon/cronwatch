@@ -67,17 +67,34 @@ defmodule Cronwatch.Core do
     :ok
   end
 
-  @doc "Writes the job's definition to the store once per declaration."
+  @doc """
+  Writes the declaration of `job`'s name as it stands, unless the store has
+  it. A handle kept from an earlier declaration writes the one that replaced
+  it, never its own over it, and one forgotten since writes its own. A name
+  declared again while its write was under way is still to be written.
+  """
   def sync!(c, job) do
     ensure_ready!(c)
 
     unless Runs.synced?(c.name, job.name) do
-      store!(c, :upsert_job, [job.definition, now(c)])
-      Runs.mark_synced(c.name, job)
+      declaring(c, job.name, fn ->
+        unless Runs.synced?(c.name, job.name) do
+          standing = Runs.job(c.name, job.name) || job
+          store!(c, :upsert_job, [standing.definition, now(c)])
+          Runs.mark_synced(c.name, standing)
+        end
+      end)
     end
 
     :ok
   end
+
+  @doc """
+  Runs `fun` in its turn among the writes of one name's declaration, which
+  reach the store in the order they were asked for, so one still under way
+  cannot land after a later one. A lock of its own, not the state's.
+  """
+  def declaring(c, name, fun), do: Locks.with_lock(c.name, {:sync, name}, fun)
 
   @doc "The job's stored state, with every field present."
   def read_state!(c, name), do: Evaluate.normalize_state(store!(c, :get_state, [name]), name)

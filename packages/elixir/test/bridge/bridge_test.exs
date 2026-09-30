@@ -283,6 +283,45 @@ defmodule Cronwatch.BridgeTest do
     assert stored(worker, "report") == before, "the schedule is kept"
   end
 
+  # The .NET audit: a job that fired before its scheduler was read was
+  # declared by the fallback, and its run, still writing that declaration
+  # when the entry was declared and written, landed over the schedule.
+  test "a fallback's run does not write over the entry declared while it started" do
+    {hooked, agent} = Stores.hooked(Stores.memory())
+    %{cw: cw, errors: errors} = make(store: Stores.option(hooked), alerts: [])
+    w = watch(cw, "river", "billing", "River")
+    job = Watch.fallback(w, "report", [])
+    locks = Process.whereis(Cronwatch.Locks.server(cw))
+    :erlang.trace(locks, true, [:receive])
+    test = self()
+
+    Stores.hook(agent, :upsert_job, fn _args, call ->
+      Stores.unhook(agent, :upsert_job)
+      send(test, {:writing, self()})
+
+      receive do
+        :release -> call.()
+      end
+    end)
+
+    run = Task.async(fn -> Cronwatch.run(job, fn _ -> :ok end) end)
+    assert_receive {:writing, writer}, 5_000
+    Watch.declare(w, [entry("report", "x", "0 2 * * *")])
+
+    # The entry's write waits its turn behind the run's.
+    assert_receive {:trace, ^locks, :receive, {:"$gen_call", {asking, _}, {:acquire, {:sync, "report"}}}}
+                   when asking != writer,
+                   5_000
+
+    send(writer, :release)
+    Task.await(run)
+    Watch.settle(w)
+    assert stored(cw, "report") == ~s({"schedule":"0 2 * * *","tags":["river","river:billing"],"name":"report"})
+    Cronwatch.check!(instance: cw)
+    assert stored(cw, "report") =~ ~s("schedule":"0 2 * * *"), "and the run's handle does not write it again"
+    assert messages(errors) == []
+  end
+
   # The audit: a store that failed while a declaration was written left the
   # writer marked busy, so nothing was written again and settle waited for
   # good.
