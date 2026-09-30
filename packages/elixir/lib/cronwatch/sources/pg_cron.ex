@@ -775,9 +775,11 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     end
 
     # Declares one job, answering its definition's options, or :error when
-    # it could not be declared. Declared again only when its options changed.
+    # it could not be declared. Declared again only when its options changed,
+    # or when it was forgotten since (the dashboard's forget), though
+    # unchanged: record_run takes runs only of a declared job.
     defp declare_job(c, job, name, options, sched, unscheduled_options) do
-      if Map.get(st().declared, name) == options do
+      if Map.get(st().declared, name) == options and Runs.job(c.name, name) != nil do
         {:ok, options}
       else
         result =

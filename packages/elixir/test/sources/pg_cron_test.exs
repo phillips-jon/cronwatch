@@ -386,6 +386,25 @@ defmodule Cronwatch.Sources.PgCronTest do
     assert length(runs(k, "db:nightly-vacuum")) == 20, "its history is kept"
   end
 
+  test "a job forgotten from the dashboard is declared again and its later runs recorded" do
+    c = Clock.new()
+    cron = FakeCron.new()
+    FakeCron.job(cron, 1, "vacuum", "0 3 * * *")
+    FakeCron.add(cron, 1, "succeeded", @t0 - 5000, @t0 - 4000, "VACUUM")
+    k = kit(cron, clock: c)
+    check(k)
+    :ok = Cronwatch.forget("vacuum", instance: k.cw)
+    FakeCron.add(cron, 1, "succeeded", @t0 - 3000, @t0 - 2000, "VACUUM")
+    FakeCron.add(cron, 1, "failed", @t0 - 1000, @t0, "ERROR:  boom")
+    Clock.advance(c, 1000)
+    result = check(k)
+    assert messages(k.errors) == []
+    assert Enum.map(result.jobs, & &1.name) == ["vacuum"]
+    assert schedule(hd(result.jobs)) == "0 3 * * *"
+    assert Enum.map(runs(k, "vacuum"), & &1.id) == [pid(3), pid(2)], "the runs after the forget"
+    assert Enum.map(Cronwatch.defined_jobs(instance: k.cw), & &1.name) == ["vacuum"]
+  end
+
   test "a job's options apply, and a schedule it cannot read is reported" do
     cron = FakeCron.new()
     FakeCron.job(cron, 1, "odd", "not a schedule")
