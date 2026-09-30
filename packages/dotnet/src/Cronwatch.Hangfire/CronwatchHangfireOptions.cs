@@ -38,8 +38,17 @@ public sealed class CronwatchHangfireOptions
     /// </summary>
     public IDictionary<string, string> Named { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
 
-    /// <summary>How often the recurring jobs are read again. Default a minute.</summary>
-    public TimeSpan ReadEvery { get; init; } = TimeSpan.FromMinutes(1);
+    private readonly TimeSpan _readEvery = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// How often the recurring jobs are read again. Default a minute; longer than zero, and held to
+    /// the longest a timer waits (some 24 days).
+    /// </summary>
+    public TimeSpan ReadEvery
+    {
+        get => _readEvery;
+        init => _readEvery = value > TimeSpan.Zero ? value : throw new ArgumentOutOfRangeException(nameof(value), "ReadEvery must be longer than zero");
+    }
 
     /// <summary>The storage whose recurring jobs are read. Default <see cref="JobStorage.Current"/> when it is read.</summary>
     public JobStorage? Storage { get; init; }

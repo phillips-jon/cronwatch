@@ -393,6 +393,28 @@ public class CronwatchQuartzTests
     }
 
     [Fact]
+    public async Task A_read_interval_past_what_a_timer_holds_still_reads_the_jobs_when_they_change()
+    {
+        await using var m = Client();
+        IScheduler scheduler = await BuildAsync();
+        try
+        {
+            await using CronwatchQuartz q = await CronwatchQuartz.WatchAsync(m.Cw, scheduler, new CronwatchQuartzOptions { ReadEvery = TimeSpan.FromDays(60) });
+            await scheduler.ScheduleJob(JobBuilder.Create<NoopJob>().WithIdentity("added").Build(), Cron("added", "added", "0 0 2 * * ?"), default, default);
+            await Eventually("the job added declared", async () =>
+            {
+                await q.SettleAsync(Settle);
+                return (await Stored(m.Store, "added"))?.Contains("\"schedule\":\"0 0 2 * * *\"", StringComparison.Ordinal) == true;
+            });
+            Assert.Empty(m.Errors);
+        }
+        finally
+        {
+            await scheduler.Shutdown(true, default);
+        }
+    }
+
+    [Fact]
     public async Task Stopping_while_a_firing_runs_still_closes_its_run()
     {
         await using var m = Client();

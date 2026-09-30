@@ -59,6 +59,9 @@ public sealed class CronwatchHangfire : IDisposable
 
     private static CronwatchHangfire? s_active;
 
+    /// <summary>The longest a timer waits at once (2^31 - 1 ms); a longer read interval is held to it.</summary>
+    private static readonly TimeSpan LongestWait = TimeSpan.FromMilliseconds(int.MaxValue);
+
     private readonly CronwatchClient _cw;
     private readonly CronwatchHangfireOptions _options;
     private readonly FireTimeChecks _checks = new();
@@ -225,12 +228,14 @@ public sealed class CronwatchHangfire : IDisposable
 
     private async Task ReadLoopAsync()
     {
-        while (!_stop.IsCancellationRequested)
+        CancellationToken stop = _stop.Token;
+        TimeSpan every = _options.ReadEvery < LongestWait ? _options.ReadEvery : LongestWait;
+        while (!stop.IsCancellationRequested)
         {
             Read();
             try
             {
-                await Task.Delay(_options.ReadEvery, _stop.Token).ConfigureAwait(false);
+                await Task.Delay(every, stop).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

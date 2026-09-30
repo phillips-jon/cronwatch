@@ -63,6 +63,9 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     /// <summary>How far a dead node's run may have started from the firing recovered.</summary>
     private const long RecoverySlackMs = 60_000;
 
+    /// <summary>The longest a timer waits at once (2^31 - 1 ms); a longer read interval is held to it.</summary>
+    private static readonly TimeSpan LongestWait = TimeSpan.FromMilliseconds(int.MaxValue);
+
     /// <summary>The runs open on each firing, by its context: what the middleware and <c>CronwatchRun()</c> read.</summary>
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<IJobExecutionContext, Firing> Firings = new();
 
@@ -500,11 +503,12 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     private async Task ReadLoopAsync()
     {
         CancellationToken stop = _stop.Token;
+        TimeSpan every = _options.ReadEvery < LongestWait ? _options.ReadEvery : LongestWait;
         while (!stop.IsCancellationRequested)
         {
             try
             {
-                await _wake.WaitAsync(_options.ReadEvery, stop).ConfigureAwait(false);
+                await _wake.WaitAsync(every, stop).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {

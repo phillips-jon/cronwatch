@@ -272,6 +272,15 @@ public class HangfireTests
     }
 
     [Fact]
+    public void A_read_interval_of_zero_or_less_is_refused()
+    {
+        // Zero would read the storage in a loop that never waits.
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CronwatchHangfireOptions { ReadEvery = TimeSpan.Zero });
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CronwatchHangfireOptions { ReadEvery = TimeSpan.FromSeconds(-1) });
+        Assert.Equal(TimeSpan.FromDays(60), new CronwatchHangfireOptions { ReadEvery = TimeSpan.FromDays(60) }.ReadEvery);
+    }
+
+    [Fact]
     public void Default_options_merge_as_the_sdk_spreads_them()
     {
         JobOptions merged = CronwatchHangfire.Merge(new JobOptions { Grace = "5m", Budget = { ["cost"] = 2 } }, new JobOptions { Timeout = "1h", Grace = "10m", Expect = "done" });
