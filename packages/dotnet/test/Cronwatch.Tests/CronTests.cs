@@ -75,7 +75,16 @@ public class CronTests
         // Node's. Only a foreign row's far-past start meets it (see DESIGN.md).
         TimeZoneInfo ny = CronZones.Find("America/New_York")!;
         long offset = CronZones.Offset(Js.DateUtc(1800, 0, 1, 0, 0, 0, 0) / 1000, ny);
-        Assert.InRange(offset, -(4 * 3600 + 57 * 60), -(4 * 3600 + 56 * 60));
+        if (OperatingSystem.IsWindows())
+        {
+            // Windows reads the registry's rules for Eastern Standard Time, which have no history
+            // before the first rule: its standard offset, -5:00, stands for every earlier year.
+            Assert.Equal(-5 * 3600, offset);
+        }
+        else
+        {
+            Assert.InRange(offset, -(4 * 3600 + 57 * 60), -(4 * 3600 + 56 * 60));
+        }
     }
 
     [Fact]

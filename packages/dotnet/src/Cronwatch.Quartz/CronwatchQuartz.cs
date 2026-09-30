@@ -84,6 +84,7 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     private string _instancePart = "";
     private Task? _loop;
     private int _closed;
+    private int _opening;
 
     internal CronwatchQuartz(CronwatchClient cw, CronwatchQuartzOptions options, string? hostApp)
     {
@@ -477,11 +478,14 @@ public sealed class CronwatchQuartz : IAsyncDisposable
 
     private static bool IsAny(string field) => field == "*" || field == "?";
 
-    /// <summary>Reads the scheduler's jobs and declares them; a failure is reported.</summary>
+    /// <summary>
+    /// Reads the scheduler's jobs and declares them; a failure is reported, but not one from a
+    /// scheduler that has shut down, which is stopping and not an error.
+    /// </summary>
     private async Task ReadAsync(CancellationToken cancellationToken)
     {
         IScheduler? scheduler = _scheduler;
-        if (scheduler == null || Closed)
+        if (scheduler == null || Closed || IsShutDown(scheduler))
         {
             return;
         }
@@ -493,11 +497,20 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         {
             // Stopping.
         }
+        catch (SchedulerException) when (IsShutDown(scheduler))
+        {
+            // Quartz marks itself shut down before it tells its listeners, so a read the loop
+            // began then is refused ("The Scheduler has been Shutdown."); the shutdown listener
+            // stops this watch next.
+        }
         catch (Exception e)
         {
             _cw.ReportError(e, "quartz");
         }
     }
+
+    /// <summary>Whether the scheduler is shutting down or has shut down, when it refuses to be read.</summary>
+    private static bool IsShutDown(IScheduler scheduler) => scheduler.Status is SchedulerStatus.ShuttingDown or SchedulerStatus.Shutdown;
 
     /// <summary>
     /// Reads the jobs again whenever the scheduler says they changed and every
@@ -573,11 +586,11 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     /// <summary>The run open on a firing, for <see cref="QuartzContextExtensions.CronwatchRun"/> and the middleware.</summary>
     internal static Firing? FiringOf(IJobExecutionContext ctx) => Firings.TryGetValue(ctx, out Firing? f) ? f : null;
 
-    /// <summary>Once stopped and no firing is open, takes the job listener off the scheduler.</summary>
+    /// <summary>Once stopped and no firing is open or opening, takes the job listener off the scheduler.</summary>
     private void LetGo()
     {
         IScheduler? scheduler = _scheduler;
-        if (!Closed || !_open.IsEmpty || scheduler == null)
+        if (!Closed || !_open.IsEmpty || Volatile.Read(ref _opening) != 0 || scheduler == null)
         {
             return;
         }
@@ -594,7 +607,25 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Opens the firing's run. Counted while it opens, so a stop meanwhile keeps the job listener
+    /// until the run is in the open table and Quartz has said the job was executed.
+    /// </summary>
     private async Task ToBeExecutedAsync(IJobExecutionContext ctx)
+    {
+        Interlocked.Increment(ref _opening);
+        try
+        {
+            await OpenFiringAsync(ctx).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _opening);
+            LetGo();
+        }
+    }
+
+    private async Task OpenFiringAsync(IJobExecutionContext ctx)
     {
         if (Closed)
         {
@@ -604,7 +635,6 @@ public sealed class CronwatchQuartz : IAsyncDisposable
                 Firings.Remove(ctx);
                 await earlier.Run.CloseAsync(FailureOf(earlier.Failure) ?? new JobExecutionException("Quartz refired the job")).ConfigureAwait(false);
             }
-            LetGo();
             return;
         }
         if (_scheduler == null)
@@ -649,14 +679,10 @@ public sealed class CronwatchQuartz : IAsyncDisposable
             return;
         }
         Firings.Remove(ctx);
-        try
-        {
-            await firing.Run.CloseAsync(FailureOf(e)).ConfigureAwait(false);
-        }
-        finally
-        {
-            LetGo();
-        }
+        // Quartz has said all it will about this firing, so a stopped watch lets go before the
+        // run is written: whoever sees the run closed sees the listener gone.
+        LetGo();
+        await firing.Run.CloseAsync(FailureOf(e)).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -673,14 +699,8 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         {
             return;
         }
-        try
-        {
-            await firing.Run.TakeBackAsync().ConfigureAwait(false);
-        }
-        finally
-        {
-            LetGo();
-        }
+        LetGo();
+        await firing.Run.TakeBackAsync().ConfigureAwait(false);
     }
 
     /// <summary>
