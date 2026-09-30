@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  dev.cronwatch:cronwatch-jobrunr, the JobRunr integration: a server filter
+  that records every attempt as a run, the recurring jobs declared from the
+  storage provider, and a check job. JobRunr is provided: the app brings it
+  (8.0 or newer), and its version is the one that runs. -Djobrunr.version=
+  picks the one the tests run against.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>dev.cronwatch</groupId>
+    <artifactId>cronwatch-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <artifactId>cronwatch-jobrunr</artifactId>
+  <packaging>jar</packaging>
+
+  <name>CronWatch for JobRunr</name>
+  <description>CronWatch for JobRunr 8: every attempt recorded as a run, the recurring jobs declared with their schedules, and a check job run once per cluster.</description>
+
+  <properties>
+    <jobrunr.version>8.8.2</jobrunr.version>
+    <jackson.version>2.22.3</jackson.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.cronwatch</groupId>
+      <artifactId>cronwatch</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.jobrunr</groupId>
+      <artifactId>jobrunr</artifactId>
+      <version>${jobrunr.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- JobRunr needs a JSON library to store its jobs; the app brings one. -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+      <version>${jackson.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <compilerArgs combine.children="append">
+            <!-- JobRunr is an automatic module (org.jobrunr.core) that the API names. -->
+            <arg>-Xlint:-requires-transitive-automatic</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
