@@ -283,6 +283,46 @@ class SchedulerTest < Minitest::Test
     assert_match(/neither Solid Queue nor sidekiq-cron is loaded; set Cronwatch::Scheduler.sources/, error.message)
   end
 
+  def test_schedule_for_reads_the_file_in_a_process_that_schedules_nothing
+    # One of several bin/jobs, started with SOLID_QUEUE_SKIP_RECURRING: it still performs what the scheduling one enqueues.
+    skipping = SQ.new(File.join(DIR, "recurring.yml"), env: "production", time_zone: "UTC", skip_recurring: true)
+    Cronwatch::Scheduler.sources = [skipping]
+    assert_empty skipping.entries, "declare_from_scheduler! still declares nothing here"
+    assert_equal({ schedule: "12 * * * *", timezone: "UTC" }, Cronwatch::Scheduler.schedule_for("SyncFeedsJob"))
+  end
+
+  def test_schedule_for_a_class_scheduled_only_in_another_environment_is_no_schedule_here
+    # Rails 8's generated recurring.yml has only production:.
+    production_only = { "production" => { "nightly" => { "class" => "NightlyJob", "schedule" => "every day at 3am" } } }
+    %w[development test].each do |env|
+      Cronwatch::Scheduler.sources = [SQ.new(production_only, env: env, time_zone: "UTC")]
+      assert_equal({ schedule: nil }, Cronwatch::Scheduler.schedule_for("NightlyJob"), env)
+      error = assert_raises(Error) { Cronwatch::Scheduler.schedule_for("MissingJob") }
+      assert_match(/no enabled entry/, error.message, "a class no environment schedules is still refused")
+    end
+    # A section for this environment without the class, too.
+    Cronwatch::Scheduler.sources = [recurring(env: "development", time_zone: "UTC")]
+    assert_equal({ schedule: nil }, Cronwatch::Scheduler.schedule_for("NightlyBackupJob"))
+    assert_equal({ schedule: "0,30 * * * *", timezone: "UTC" }, Cronwatch::Scheduler.schedule_for("SyncFeedsJob"))
+    Cronwatch::Scheduler.sources = [SQ.new(production_only, env: "production", time_zone: "UTC")]
+    assert_equal({ schedule: "0 3 * * *", timezone: "UTC" }, Cronwatch::Scheduler.schedule_for("NightlyJob"))
+  end
+
+  def test_a_monitored_class_scheduled_only_in_another_environment_loads_and_is_declared_without_a_schedule
+    Cronwatch::Scheduler.sources = [SQ.new({ "production" => { "nightly" => { "class" => "NightlyJob", "schedule" => "every day at 3am" } } },
+                                           env: "development", time_zone: "UTC")]
+    klass = Class.new do
+      extend Cronwatch::Monitored::ClassMethods
+
+      def self.name = "NightlyJob"
+    end
+    klass.cronwatch(schedule: :from_scheduler)
+    client, handle = klass.cronwatch_registration
+    assert_same Cronwatch.client, client
+    assert_nil handle.definition.schedule
+    assert_equal "nightly", handle.name
+  end
+
   def test_default_sources_follow_what_is_loaded
     expected = defined?(::Sidekiq::Cron::Job) ? [SC] : []
     assert_equal expected, Cronwatch::Scheduler.sources.map(&:class), "Solid Queue is not loaded in this process"

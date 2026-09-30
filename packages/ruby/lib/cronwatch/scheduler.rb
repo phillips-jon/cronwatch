@@ -76,6 +76,18 @@ module Cronwatch
         raise NotImplementedError
       end
 
+      # The entries a class's own schedule (schedule: :from_scheduler) is
+      # looked up in: #entries, unless a source says otherwise.
+      def schedule_entries
+        entries
+      end
+
+      # Entries for other environments than the one read, which say a class
+      # is scheduled, only not here. None, unless a source says otherwise.
+      def elsewhere_entries
+        []
+      end
+
       private
 
       # The config: the Hash or Array given, or the file after ERB, as both
@@ -146,19 +158,32 @@ module Cronwatch
       def entries
         return [] if skip_recurring?
 
-        config = read
+        schedule_entries
+      end
+
+      # The tasks, read even where SOLID_QUEUE_SKIP_RECURRING is set: the
+      # skip means only that this process enqueues none, as when one of
+      # several bin/jobs schedules and the others still perform what it
+      # enqueues, so a class's own schedule is still the file's.
+      def schedule_entries
+        config = parsed
         return [] if config.nil?
-        raise Error, "cronwatch: #{label} is not a map of recurring tasks" unless config.is_a?(Hash)
 
-        config = symbolize(config)
         config = config[env.to_sym] if config[env.to_sym]
-        return [] unless config.is_a?(Hash)
+        tasks(config)
+      end
 
-        config.filter_map do |key, options|
-          next unless options.is_a?(Hash) && options.key?(:schedule)
+      # The tasks of the file's other environments' sections (Rails 8's
+      # recurring.yml has only production:, so development and test read
+      # none), for a class scheduled there and not here.
+      def elsewhere_entries
+        config = parsed
+        return [] if config.nil?
 
-          Entry.new(source: self, key: key.to_s, class_name: present(options[:class]), command: present(options[:command]),
-                    schedule: options[:schedule], description: present(options[:description]), disabled: false)
+        config.flat_map do |key, section|
+          next [] if key == env.to_sym || !section.is_a?(Hash) || section.key?(:schedule)
+
+          tasks(section)
         end
       end
 
@@ -240,6 +265,27 @@ module Cronwatch
 
       def present(value)
         value.nil? || value.to_s.strip.empty? ? nil : value.to_s
+      end
+
+      # The file's map, keys as symbols, or nil when there is no file.
+      def parsed
+        config = read
+        return nil if config.nil?
+        raise Error, "cronwatch: #{label} is not a map of recurring tasks" unless config.is_a?(Hash)
+
+        symbolize(config)
+      end
+
+      # The tasks of one map of them: each with a schedule is an entry.
+      def tasks(config)
+        return [] unless config.is_a?(Hash)
+
+        config.filter_map do |key, options|
+          next unless options.is_a?(Hash) && options.key?(:schedule)
+
+          Entry.new(source: self, key: key.to_s, class_name: present(options[:class]), command: present(options[:command]),
+                    schedule: options[:schedule], description: present(options[:description]), disabled: false)
+        end
       end
     end
 
@@ -370,7 +416,13 @@ module Cronwatch
       end
 
       # { schedule:, timezone: } for the class's one entry in the scheduler's
-      # config. Raises Error when it has none, or more than one.
+      # config, read even in a process told to schedule nothing
+      # (SOLID_QUEUE_SKIP_RECURRING), since another process schedules it.
+      # { schedule: nil } for a class scheduled only in another environment's
+      # section of the file (Rails 8's recurring.yml has only production:), so
+      # it loads in development and test, declared without a schedule, as
+      # nothing schedules it there. Raises Error when no environment has it,
+      # or this one has it more than once.
       def schedule_for(klass)
         name = klass.is_a?(Module) ? klass.name : klass.to_s
         found = sources
@@ -379,8 +431,11 @@ module Cronwatch
                        "set Cronwatch::Scheduler.sources to say where the schedule is"
         end
 
-        matches = found.flat_map(&:entries).select { |entry| !entry.disabled && same_class?(entry.class_name, name) }
+        of_class = ->(entry) { !entry.disabled && same_class?(entry.class_name, name) }
+        matches = found.flat_map { |source| read_entries(source, :schedule_entries) }.select(&of_class)
         if matches.empty?
+          return { schedule: nil } if found.flat_map { |source| read_entries(source, :elsewhere_entries) }.any?(&of_class)
+
           raise Error, "cronwatch: #{name} uses schedule: :from_scheduler, but no enabled entry in " \
                        "#{found.map(&:label).join(" or ")} has class #{name}"
         end
@@ -390,6 +445,14 @@ module Cronwatch
         end
 
         matches.first.convert
+      end
+
+      # A source's entries of that kind, for a source of the app's own that
+      # has only #entries.
+      def read_entries(source, kind)
+        return source.public_send(kind) if source.respond_to?(kind)
+
+        kind == :schedule_entries ? source.entries : []
       end
 
       # Declares a job for every enabled entry once the app has booted, so a
