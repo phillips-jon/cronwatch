@@ -128,19 +128,24 @@ def _client_options(config: dict[str, Any]) -> dict[str, Any]:
 def client() -> cronwatch.Cronwatch:
     """The client the dashboard and cronwatch_check use: CLIENT when set,
     otherwise one made from CRONWATCH's client options on first use (and made
-    the process's client), otherwise cronwatch.client()."""
+    the process's client), otherwise cronwatch.client(). Called on every
+    dashboard request and task, so a client already made is returned before
+    anything else is read: the STORE, ALERTS and SOURCES factories run once,
+    when it is made, never again on a later call."""
     global _client
+    made: cronwatch.Cronwatch | None = _client
+    if made is not None:
+        return made
     config = _settings()
     if config.get("CLIENT") is not None:
         found: cronwatch.Cronwatch = _load(config["CLIENT"])
         return found
-    options = _client_options(config)
-    if not options:
+    if not any(key in config for key in CLIENT_OPTIONS):
         return cronwatch.client()
     with _lock:
         if _client is None:
-            _client = cronwatch.configure(**options)
-        made: cronwatch.Cronwatch = _client
+            _client = cronwatch.configure(**_client_options(config))
+        made = _client
     return made
 
 
