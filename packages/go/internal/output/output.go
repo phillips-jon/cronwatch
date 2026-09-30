@@ -33,6 +33,32 @@ func StripNul(s string) string {
 	return strings.ReplaceAll(s, "\x00", "")
 }
 
+// StripJSONNul removes every U+0000 from JSON text, keys and strings alike,
+// by dropping each \u0000 escape (a NUL can appear in JSON no other way).
+// Escapes are read left to right in pairs, so an escaped backslash followed
+// by "u0000" is left as it is.
+func StripJSONNul(text string) string {
+	if !strings.Contains(text, `\u0000`) {
+		return text
+	}
+	var b strings.Builder
+	b.Grow(len(text))
+	for i := 0; i < len(text); i++ {
+		if text[i] != '\\' || i+1 >= len(text) {
+			b.WriteByte(text[i])
+			continue
+		}
+		if strings.HasPrefix(text[i+1:], "u0000") {
+			i += 5
+			continue
+		}
+		b.WriteByte(text[i])
+		b.WriteByte(text[i+1])
+		i++
+	}
+	return b.String()
+}
+
 // CapOutput removes NULs, then keeps the last OutputCap code units behind
 // a line saying the rest was trimmed. A cut through a surrogate pair
 // leaves U+FFFD, the character JavaScript's lone half becomes once written

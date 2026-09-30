@@ -29,6 +29,7 @@ import (
 
 	cronwatch "cronwatch.dev/go"
 	"cronwatch.dev/go/internal/js"
+	"cronwatch.dev/go/internal/output"
 )
 
 // Dialect is the database's SQL.
@@ -379,18 +380,25 @@ func (r row) state() (cronwatch.JobState, error) {
 	return s, err
 }
 
-// jsonText is the SDK's JSON of a value.
+// Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
+// whole row, so every dialect writes text without it: a run's trigger,
+// output, error and metric names, and every key and string of a definition
+// and a state. Identifiers (a job's name, a run's id) are written as given;
+// the client refuses one with a NUL before it gets here.
+
+// jsonText is the SDK's JSON of a value, without NUL.
 func jsonText(v json.Marshaler) string {
 	b, _ := v.MarshalJSON()
-	return string(b)
+	return output.StripJSONNul(string(b))
 }
 
-// textValue is a TEXT value as a JavaScript driver writes it: valid UTF-8.
+// textValue is a TEXT value as a JavaScript driver writes it: valid UTF-8,
+// without NUL.
 func textValue(p *string) any {
 	if p == nil {
 		return nil
 	}
-	return js.WellFormed(*p)
+	return output.StripNul(js.WellFormed(*p))
 }
 
 func intValue(p *int64) any {
@@ -403,7 +411,7 @@ func intValue(p *int64) any {
 // Parameters in statement order, so every driver binds the same values.
 
 func insertRunArgs(r cronwatch.Run) []any {
-	return []any{r.ID, r.Job, string(r.Status), r.StartedAt, intValue(r.FinishedAt), intValue(r.DurationMs), textValue(r.Error), textValue(r.Output), jsonText(r.Metrics), r.Trigger}
+	return []any{r.ID, r.Job, string(r.Status), r.StartedAt, intValue(r.FinishedAt), intValue(r.DurationMs), textValue(r.Error), textValue(r.Output), jsonText(r.Metrics), output.StripNul(r.Trigger)}
 }
 
 func updateRunArgs(r cronwatch.Run) []any {
