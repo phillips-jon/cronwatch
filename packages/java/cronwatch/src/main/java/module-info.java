@@ -9,7 +9,7 @@
  */
 @org.jspecify.annotations.NullMarked
 module dev.cronwatch {
-  requires static java.sql;
+  requires static transitive java.sql;
   requires static transitive org.jspecify;
   requires static org.slf4j;
   requires static context.propagation;
@@ -17,4 +17,6 @@ module dev.cronwatch {
   exports dev.cronwatch;
   exports dev.cronwatch.json;
   exports dev.cronwatch.store;
+  exports dev.cronwatch.jdbc;
+  exports dev.cronwatch.storetest;
 }
