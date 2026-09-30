@@ -185,7 +185,7 @@ public sealed partial class CronwatchClient
     private async Task<bool> SendOneAsync(IChannel channel, Alert alert)
     {
         string where = "alert channel " + channel.Name;
-        var context = new ChannelContext(e => Report(e, where));
+        var context = new ChannelContext(e => Report(e, where), _transport);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);
         try
         {
@@ -235,7 +235,7 @@ public sealed partial class CronwatchClient
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);
         try
         {
-            var context = new TriageContext(alert, recent);
+            var context = new TriageContext(alert, recent) { Transport = _transport };
             Task<string?> task = Spawn(() => triage.TriageAsync(context, cts.Token));
             string? text = await task.WaitAsync(timeout, _time).ConfigureAwait(false);
             return alert.WithTriage(string.IsNullOrEmpty(text) ? null : text);

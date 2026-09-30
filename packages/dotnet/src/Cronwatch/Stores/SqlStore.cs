@@ -27,7 +27,17 @@ namespace Cronwatch;
 /// database while switching), then <c>busy_timeout</c> 5000 and <c>synchronous</c> NORMAL.
 /// </para>
 /// <para>
-/// On Postgres every statement runs on a connection the store opens for it, in autocommit. Every
+/// On MySQL 8.0.13 or newer and MariaDB 10.6 or newer (MySqlConnector) the dialect is the PHP,
+/// Go, Rust, Elixir and Java ports': the same tables with <c>VARCHAR(255)</c> keys, the JSON
+/// columns as <c>LONGTEXT</c> holding the SDK's JSON byte for byte (never MySQL's <c>JSON</c>
+/// type, which rewrites it), names compared by byte (<c>utf8mb4_bin</c>), and a run's trigger cut
+/// to 255 characters on a code point. A conditional write that answered 0 is read back, so a
+/// connection that counts changed rather than matched rows (<c>UseAffectedRows=true</c>) cannot
+/// make a write that landed read as refused.
+/// </para>
+/// <para>
+/// On Postgres, MySQL and MariaDB every statement runs on a connection the store opens for it, in
+/// autocommit. Every
 /// connection the store opens is opened with the ambient transaction suppressed
 /// (<see cref="TransactionScopeOption.Suppress"/>), so the store's writes never join a
 /// <see cref="TransactionScope"/> the app has open, and a failed run does not vanish with the
@@ -71,9 +81,18 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
     public static SqlStore Postgres(DbDataSource dataSource) => new(dataSource, SqlDialect.Postgres, SqlText.DefaultPrefix);
 
     /// <summary>
+    /// A store over the app's MySQL (8.0.13 or newer) or MariaDB (10.6 or newer) data source, with
+    /// the dialect the other ports share: <c>LONGTEXT</c> holding the SDK's JSON,
+    /// <c>utf8mb4_bin</c>, <c>ON DUPLICATE KEY</c>. MySQL commits <c>CREATE TABLE</c> at once, so
+    /// <see cref="InitAsync"/> is best left to the client's first use. Nothing is read or written
+    /// until <see cref="InitAsync"/>.
+    /// </summary>
+    public static SqlStore MySql(DbDataSource dataSource) => new(dataSource, SqlDialect.MySql, SqlText.DefaultPrefix);
+
+    /// <summary>
     /// A store for whatever database the data source reaches, read from its connection's type name
-    /// (<c>SqliteConnection</c>, <c>NpgsqlConnection</c>) without referencing either. MySQL and
-    /// MariaDB come in a later release.
+    /// (<c>SqliteConnection</c>, <c>NpgsqlConnection</c>, <c>MySqlConnection</c>, which serves
+    /// MariaDB too) without referencing any of them.
     /// </summary>
     /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/> for another database.</exception>
     public static SqlStore For(DbDataSource dataSource)
@@ -89,8 +108,13 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
         {
             return Postgres(dataSource);
         }
+        if (name.Contains("MySql", StringComparison.OrdinalIgnoreCase) || name.Contains("MariaDb", StringComparison.OrdinalIgnoreCase))
+        {
+            return MySql(dataSource);
+        }
+        // The type's name is the driver's, never a credential, but it is not quoted either.
         throw CronwatchException.Invalid(
-            "SqlStore: the data source's database is not one SqlStore knows (SQLite or Postgres; MySQL and MariaDB come in a later release)");
+            "SqlStore: the data source's database is not one SqlStore knows (SQLite, Postgres, MySQL or MariaDB)");
     }
 
     /// <summary>
@@ -114,8 +138,13 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
     /// <summary>The prefix of the store's tables.</summary>
     public string Prefix => _prefix;
 
-    /// <summary>The store's database: <c>sqlite</c> or <c>postgres</c>.</summary>
-    public string Dialect => _dialect == SqlDialect.Sqlite ? "sqlite" : "postgres";
+    /// <summary>The store's database: <c>sqlite</c>, <c>postgres</c> or <c>mysql</c> (MySQL and MariaDB).</summary>
+    public string Dialect => _dialect switch
+    {
+        SqlDialect.Sqlite => "sqlite",
+        SqlDialect.Postgres => "postgres",
+        _ => "mysql",
+    };
 
     /// <summary>Names the dialect and the prefix, never the data source, which may carry credentials.</summary>
     public override string ToString() => "SqlStore(" + Dialect + ", prefix " + _prefix + ")";
@@ -127,7 +156,7 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
 
     /// <summary>
     /// Runs <paramref name="work"/> on SQLite's kept connection, in turn, or on a connection of its
-    /// own from the data source for Postgres; every connection opened outside the app's ambient
+    /// own from the data source for Postgres, MySQL and MariaDB; every connection opened outside the app's ambient
     /// transaction.
     /// </summary>
     private async Task<T> WithAsync<T>(Func<DbConnection, Task<T>> work, CancellationToken ct)
@@ -578,7 +607,31 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
     public Task InsertRunAsync(Run run, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(run);
-        return RunAsync(_sql.InsertRun, InsertRunParams(run), cancellationToken);
+        Run r = run;
+        if (_dialect == SqlDialect.MySql)
+        {
+            // MySQL's trigger column is VARCHAR(255), which refuses anything longer (the others
+            // are TEXT): a long trigger is cut to 255 characters on a code point to fit rather
+            // than lose the whole run.
+            string trigger = NulText.StripNul(r.Trigger);
+            int end = CodePointEnd(trigger, 255);
+            if (end < trigger.Length)
+            {
+                r = r with { Trigger = trigger[..end] };
+            }
+        }
+        return RunAsync(_sql.InsertRun, InsertRunParams(r), cancellationToken);
+    }
+
+    /// <summary>Where the first <paramref name="count"/> code points of the text end.</summary>
+    private static int CodePointEnd(string text, int count)
+    {
+        int i = 0;
+        for (int n = 0; n < count && i < text.Length; n++)
+        {
+            i += char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]) ? 2 : 1;
+        }
+        return i;
     }
 
     /// <inheritdoc/>
@@ -602,7 +655,61 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
         {
             ps.Add(Text(s.Value));
         }
-        return await RunAsync(_sql.UpdateRunIf(from.Count), ps, cancellationToken).ConfigureAwait(false) > 0;
+        if (await RunAsync(_sql.UpdateRunIf(from.Count), ps, cancellationToken).ConfigureAwait(false) > 0)
+        {
+            return true;
+        }
+        return _dialect == SqlDialect.MySql && await LandedAsync(run, from, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Whether an update of a run that MySQL answered 0 for landed all the same: a connection that
+    /// counts only the rows an UPDATE changed answers 0 for a row that already held these values
+    /// (and matched). The stored run is read back and compared with what was written, metrics
+    /// whatever order their keys came back in.
+    /// </summary>
+    private async Task<bool> LandedAsync(Run run, IReadOnlyList<RunStatus> from, CancellationToken ct)
+    {
+        Run? stored = await GetRunAsync(run.Id, ct).ConfigureAwait(false);
+        if (stored == null || !stored.Status.Equals(run.Status))
+        {
+            return false;
+        }
+        bool among = false;
+        foreach (var s in from)
+        {
+            among |= s.Equals(stored.Status);
+        }
+        return among
+            && stored.FinishedAt == run.FinishedAt
+            && stored.DurationMs == run.DurationMs
+            && stored.Error == Written(run.Error)
+            && stored.Output == Written(run.Output)
+            && SameMetrics(stored.Metrics, run.Metrics);
+    }
+
+    /// <summary>Text as the store writes it: well formed, without U+0000.</summary>
+    private static string? Written(string? text) => text == null ? null : NulText.StripNul(Js.WellFormed(text));
+
+    private static bool SameMetrics(Metrics stored, Metrics sent)
+    {
+        var want = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var m in sent)
+        {
+            want[NulText.StripNul(Js.WellFormed(m.Key))] = m.Value;
+        }
+        if (want.Count != stored.Count)
+        {
+            return false;
+        }
+        foreach (var m in stored)
+        {
+            if (!want.TryGetValue(m.Key, out double v) || !v.Equals(m.Value))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>Deletes a run only while it is of <paramref name="job"/> and in <paramref name="status"/>, in one statement.</summary>
@@ -650,11 +757,46 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
     {
         ArgumentNullException.ThrowIfNull(state);
         string body = NulText.StripJsonNul(state.ToJson());
+        if (_dialect == SqlDialect.MySql && expected == 0)
+        {
+            return await CasFromZeroAsync(state.Job, body, cancellationToken).ConfigureAwait(false);
+        }
         if (expected != 0)
         {
             return await RunAsync(_sql.CasUpdate, [JsonParam(body), Text(state.Job), Int(expected)], cancellationToken).ConfigureAwait(false) > 0;
         }
         return await RunAsync(_sql.CasInsert, [Text(state.Job), JsonParam(body)], cancellationToken).ConfigureAwait(false) > 0;
+    }
+
+    /// <summary>
+    /// MySQL's compare-and-set from version 0, in two steps that each decide alone: a row at
+    /// version 0 (or without one) is updated, and failing that the row is inserted, which a row
+    /// already there refuses. A refused insert is another process's write, unless the row holds
+    /// exactly what this write sent, when the write landed and only its answer was lost (a row at
+    /// version 0 that already held these values, which a connection counting changed rows answers
+    /// 0 for, or a connection dropped after the commit), as the PHP port's <c>stateLanded()</c>
+    /// reads it.
+    /// </summary>
+    private async Task<bool> CasFromZeroAsync(string job, string body, CancellationToken ct)
+    {
+        if (await RunAsync(_sql.CasFromZero, [JsonParam(body), Text(job)], ct).ConfigureAwait(false) > 0)
+        {
+            return true;
+        }
+        try
+        {
+            await RunAsync(_sql.CasInsert, [Text(job), JsonParam(body)], ct).ConfigureAwait(false);
+            return true;
+        }
+        catch (DbException)
+        {
+            JobState? stored = await GetStateAsync(job, ct).ConfigureAwait(false);
+            if (stored == null)
+            {
+                throw;
+            }
+            return stored.ToJson() == Js.WellFormed(body);
+        }
     }
 
     /// <inheritdoc/>

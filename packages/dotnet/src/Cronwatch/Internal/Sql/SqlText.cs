@@ -13,6 +13,9 @@ internal enum SqlDialect
 
     /// <summary>Postgres, as the SDK's <c>postgres()</c> store writes it.</summary>
     Postgres,
+
+    /// <summary>MySQL 8.0.13 or newer and MariaDB 10.6 or newer, the PHP, Go, Rust, Elixir and Java ports' dialect.</summary>
+    MySql,
 }
 
 /// <summary>
@@ -73,9 +76,39 @@ internal static class SqlText
             + "state (\n      job TEXT PRIMARY KEY,\n      state " + json + " NOT NULL\n    );\n  ";
     }
 
+    /// <summary>
+    /// MySQL's tables (the PHP, Go, Rust, Elixir and Java ports'): <c>VARCHAR(255)</c> keys,
+    /// <c>BIGINT</c> times, <c>LONGTEXT</c> JSON holding the SDK's bytes (never MySQL's <c>JSON</c>
+    /// type, which would rewrite them), <c>utf8mb4_bin</c> so names compare and sort by byte,
+    /// <c>seq</c> for insertion order, and a plain index where the others have a partial one.
+    /// </summary>
+    private static List<string> MySqlSchema(string p)
+    {
+        const string table = "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin";
+        return
+        [
+            "CREATE TABLE IF NOT EXISTS " + p + "jobs (\n      name VARCHAR(255) NOT NULL,\n      definition LONGTEXT NOT NULL,\n"
+                + "      created_at BIGINT NOT NULL,\n      updated_at BIGINT NOT NULL,\n      PRIMARY KEY (name)\n    ) " + table,
+            "CREATE TABLE IF NOT EXISTS " + p + "runs (\n      seq BIGINT NOT NULL AUTO_INCREMENT,\n      id VARCHAR(255) NOT NULL,\n"
+                + "      job VARCHAR(255) NOT NULL,\n      status VARCHAR(255) NOT NULL,\n"
+                + "      started_at BIGINT NOT NULL,\n      finished_at BIGINT,\n      duration_ms BIGINT,\n"
+                + "      error MEDIUMTEXT,\n      output MEDIUMTEXT,\n"
+                + "      metrics LONGTEXT NOT NULL DEFAULT ('{}'),\n"
+                + "      `trigger` VARCHAR(255) NOT NULL DEFAULT 'run',\n      PRIMARY KEY (id),\n"
+                + "      UNIQUE KEY " + p + "runs_seq (seq),\n      KEY " + p + "runs_job_started (job, started_at DESC),\n      KEY "
+                + p + "runs_running (status)\n    ) " + table,
+            "CREATE TABLE IF NOT EXISTS " + p + "state (\n      job VARCHAR(255) NOT NULL,\n      state LONGTEXT NOT NULL,\n"
+                + "      PRIMARY KEY (job)\n    ) " + table,
+        ];
+    }
+
     /// <summary>The tables and indexes, one statement each: the template cut at its semicolons.</summary>
     public static IReadOnlyList<string> Schema(SqlDialect dialect, string p)
     {
+        if (dialect == SqlDialect.MySql)
+        {
+            return MySqlSchema(p);
+        }
         var output = new List<string>();
         foreach (string s in SchemaText(dialect, p).Split(';'))
         {
@@ -93,6 +126,15 @@ internal static class SqlText
     /// </summary>
     public static string Version(SqlDialect dialect, string column)
     {
+        if (dialect == SqlDialect.MySql)
+        {
+            // MySQL's JSON_EXTRACT answers JSON and MariaDB's text; plus 0, both are a number, and
+            // the CASE tests the JSON type before any arithmetic.
+            string mv = "JSON_EXTRACT(" + column + ", '$.version')";
+            return "CASE WHEN JSON_TYPE(" + mv + ") NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN " + mv
+                + " + 0 = FLOOR(" + mv + " + 0) AND " + mv + " + 0 BETWEEN 0 AND 9007199254740991 THEN CAST(" + mv
+                + " + 0 AS SIGNED) ELSE 0 END";
+        }
         if (dialect == SqlDialect.Postgres)
         {
             string pv = "(" + column + "->>'version')::numeric";
@@ -110,6 +152,11 @@ internal static class SqlText
     /// </summary>
     public static string Number(SqlDialect dialect, string text, params int[] json)
     {
+        if (dialect == SqlDialect.MySql)
+        {
+            // MySqlConnector binds unnamed parameters to ? in order, as sql.ts writes them.
+            return text;
+        }
         var b = new StringBuilder(text.Length + 16);
         int n = 0;
         foreach (char c in text)
@@ -146,6 +193,38 @@ internal static class SqlText
         {
             _dialect = dialect;
             _prefix = p;
+            if (dialect == SqlDialect.MySql)
+            {
+                string v = Version(dialect, "state");
+                UpsertJob = "INSERT INTO " + p + "jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)\n"
+                    + "      ON DUPLICATE KEY UPDATE definition = VALUES(definition), updated_at = VALUES(updated_at)";
+                GetJob = "SELECT * FROM " + p + "jobs WHERE name = ?";
+                ListJobs = "SELECT * FROM " + p + "jobs ORDER BY name";
+                DeleteRuns = "DELETE FROM " + p + "runs WHERE job = ?";
+                DeleteState = "DELETE FROM " + p + "state WHERE job = ?";
+                DeleteJob = "DELETE FROM " + p + "jobs WHERE name = ?";
+                InsertRun = "INSERT INTO " + p + "runs (id, job, status, started_at, finished_at, duration_ms, error, output, metrics, `trigger`)\n"
+                    + "      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                UpdateRun = "UPDATE " + p + "runs SET status = ?, finished_at = ?, duration_ms = ?, error = ?, output = ?, metrics = ? WHERE id = ?";
+                GetRun = "SELECT * FROM " + p + "runs WHERE id = ?";
+                ListRuns = "SELECT * FROM " + p + "runs WHERE job = ? ORDER BY started_at DESC, seq DESC LIMIT ?";
+                RunningRuns = "SELECT * FROM " + p + "runs WHERE status = 'running' ORDER BY started_at, seq";
+                GetState = "SELECT state FROM " + p + "state WHERE job = ?";
+                SetState = "INSERT INTO " + p + "state (job, state) VALUES (?, ?) ON DUPLICATE KEY UPDATE state = VALUES(state)";
+                // A compare-and-set from version 0 is two steps on MySQL, each deciding alone: a row
+                // at version 0 (or without one) is updated, and failing that the row is inserted,
+                // which a row already there refuses.
+                CasFromZero = "UPDATE " + p + "state SET state = ? WHERE job = ? AND " + v + " = 0";
+                CasInsert = "INSERT INTO " + p + "state (job, state) VALUES (?, ?)";
+                CasUpdate = "UPDATE " + p + "state SET state = ? WHERE job = ? AND " + v + " = ?";
+                // MySQL refuses a subquery on the table a DELETE deletes from, so the newest start
+                // per job is a derived table joined in (grouped, so it is materialized rather than
+                // merged).
+                Prune = "DELETE r FROM " + p + "runs r\n      JOIN (SELECT job, MAX(started_at) AS newest FROM " + p
+                    + "runs GROUP BY job) n ON n.job = r.job\n      WHERE r.status <> 'running' AND r.started_at < ? AND r.started_at < n.newest";
+                DeleteRunIf = "DELETE FROM " + p + "runs WHERE id = ? AND job = ? AND status = ?";
+                return;
+            }
             bool pg = dialect == SqlDialect.Postgres;
             // Insertion order, to break ties between runs that started in the same millisecond, and
             // byte order for names on both, whatever the database's collation.
@@ -171,6 +250,7 @@ internal static class SqlText
             CasInsert = Number(dialect, "INSERT INTO " + p + "state (job, state) VALUES (?, ?)\n"
                 + "      ON CONFLICT (job) DO UPDATE SET state = excluded.state WHERE " + Version(dialect, p + "state.state") + " = 0", 2);
             CasUpdate = Number(dialect, "UPDATE " + p + "state SET state = ? WHERE job = ? AND " + Version(dialect, "state") + " = ?", 1);
+            CasFromZero = CasUpdate;
             // Each job's newest run is kept whatever its age: without it, a job that runs less
             // often than the retention looks like it never ran.
             Prune = Number(dialect, "DELETE FROM " + p + "runs WHERE status <> 'running' AND started_at < ?\n"
@@ -207,6 +287,9 @@ internal static class SqlText
         public string CasInsert { get; }
 
         public string CasUpdate { get; }
+
+        /// <summary>MySQL's first step of a compare-and-set from version 0; the other dialects do not use it.</summary>
+        public string CasFromZero { get; }
 
         public string Prune { get; }
 
