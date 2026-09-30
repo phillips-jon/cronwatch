@@ -198,13 +198,13 @@ final class Recorder
     {
         $listed = self::entry($this->settings()->queueJobs[$class] ?? null);
         if ($listed !== null) {
-            return [JobName::ofClass($class), ['description' => "Queue job {$class}"] + $listed, [self::TAG_QUEUE, self::TAG_CONFIG]];
+            return [JobName::ofClass($class), $listed + ['description' => "Queue job {$class}"], [self::TAG_QUEUE, self::TAG_CONFIG]];
         }
         $watch = Watch::of($class);
         if ($watch === null || !$watch->enabled) {
             return null;
         }
-        $options = ['description' => "Queue job {$class}"] + $watch->options();
+        $options = $watch->options() + ['description' => "Queue job {$class}"];
         if ($watch->name !== null) {
             $options['name'] = $watch->name;
         }
@@ -224,12 +224,12 @@ final class Recorder
         }
         $listed = self::entry($this->settings()->commands[$route] ?? null);
         if ($listed !== null) {
-            return [self::commandName($route), ['description' => "craft {$route}"] + $listed, [self::TAG_COMMAND, self::TAG_CONFIG]];
+            return [self::commandName($route), $listed + ['description' => "craft {$route}"], [self::TAG_COMMAND, self::TAG_CONFIG]];
         }
         if (method_exists($controller, 'getBehaviors')) {
             foreach ($controller->getBehaviors() as $behavior) {
                 if ($behavior instanceof WatchCommand && $behavior->watches($actionId)) {
-                    return [self::commandName($route), ['description' => "craft {$route}"] + $behavior->options(), [self::TAG_COMMAND]];
+                    return [self::commandName($route), $behavior->options() + ['description' => "craft {$route}"], [self::TAG_COMMAND]];
                 }
             }
         }
@@ -248,13 +248,13 @@ final class Recorder
         foreach ($settings->commands as $route => $value) {
             $options = self::entry($value);
             if ($options !== null && $route !== 'cronwatch/check') {
-                $this->safely(fn () => $this->declare(self::commandName((string) $route), ['description' => "craft {$route}"] + $options, [self::TAG_COMMAND, self::TAG_CONFIG]), "declaring {$route}");
+                $this->safely(fn () => $this->declare(self::commandName((string) $route), $options + ['description' => "craft {$route}"], [self::TAG_COMMAND, self::TAG_CONFIG]), "declaring {$route}");
             }
         }
         foreach ($settings->queueJobs as $class => $value) {
             $options = self::entry($value);
             if ($options !== null) {
-                $this->safely(fn () => $this->declare(JobName::ofClass((string) $class), ['description' => "Queue job {$class}"] + $options, [self::TAG_QUEUE, self::TAG_CONFIG]), "declaring {$class}");
+                $this->safely(fn () => $this->declare(JobName::ofClass((string) $class), $options + ['description' => "Queue job {$class}"], [self::TAG_QUEUE, self::TAG_CONFIG]), "declaring {$class}");
             }
         }
         Unscheduled::declare($cw, self::TAG_CONFIG, self::appTag(self::TAG_CONFIG), $this->report(...));

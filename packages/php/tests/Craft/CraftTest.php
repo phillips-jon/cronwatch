@@ -198,7 +198,7 @@ final class CraftTest extends TestCase
                 'commands' => [
                     'cwt/task/hello' => ['schedule' => '0 3 * * *', 'timezone' => 'UTC'],
                     'cwt/task/fail' => true,
-                    'cwt/task/boom' => ['name' => 'cwt-boom'],
+                    'cwt/task/boom' => ['name' => 'cwt-boom', 'description' => 'The command that breaks'],
                 ],
                 'queueJobs' => [cwt\jobs\Flaky::class => true],
             ];
@@ -539,6 +539,8 @@ final class CraftTest extends TestCase
         $boom = self::last('cwt-boom');
         $this->assertSame('failed', $boom['status'], 'an exception is recorded from the error handler');
         $this->assertStringStartsWith('RuntimeException: cwt command broke', (string) $boom['error']);
+        $this->assertSame('craft cwt/task/hello', $definition['description'], 'a listed command is described by its route');
+        $this->assertSame('The command that breaks', self::definition('cwt-boom')['description'], 'unless it is given a description');
 
         self::must(['cwt/task/unwatched']);
         $this->assertNull(self::definition('craft:cwt:task:unwatched'), 'a command nobody listed is not a job');
@@ -583,6 +585,8 @@ final class CraftTest extends TestCase
         $this->assertSame(['ok'], array_column($marked, 'status'), '#[Watch] opts a job in');
         $this->assertSame('marked ran', $marked[0]['output']);
         $this->assertSame(2, self::definition('cwt-marked')['failuresBeforeAlert']);
+        $this->assertSame('The marked job', self::definition('cwt-marked')['description'], "the attribute's description wins");
+        $this->assertSame('Queue job cwt\jobs\Flaky', self::definition($name)['description']);
     }
 
     public function testTheCheckCommand(): void

@@ -9,7 +9,7 @@ use Cronwatch\Watch;
 use craft\queue\BaseJob;
 
 /** Watched by its attribute, not the settings. */
-#[Watch(name: 'cwt-marked', grace: '1h', failuresBeforeAlert: 2)]
+#[Watch(name: 'cwt-marked', grace: '1h', failuresBeforeAlert: 2, description: 'The marked job')]
 final class Marked extends BaseJob
 {
     public function execute($queue): void
