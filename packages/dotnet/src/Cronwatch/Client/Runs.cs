@@ -201,9 +201,10 @@ public sealed partial class CronwatchClient
         var recorder = new Recorder();
         Task<bool> begun = Spawn(() => BeginRunAsync(def, run));
         var open = new OpenRun(def, run, recorder, begun);
-        _open[run.Id] = open;
+        // A run id already open in this process keeps its place: this run's insert is refused.
+        bool listed = _open.TryAdd(run.Id, open);
         bool recorded = await begun.ConfigureAwait(false);
-        if (!recorded)
+        if (!recorded && listed)
         {
             // Nothing was written, so the hook has nothing to record.
             _open.TryRemove(new KeyValuePair<string, OpenRun>(run.Id, open));
@@ -321,7 +322,7 @@ public sealed partial class CronwatchClient
         }
         if (back)
         {
-            _open.TryRemove(o.Run.Id, out _);
+            _open.TryRemove(new KeyValuePair<string, OpenRun>(o.Run.Id, o.Open));
         }
         return back;
     }

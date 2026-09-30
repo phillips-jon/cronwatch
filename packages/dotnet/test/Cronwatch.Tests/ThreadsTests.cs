@@ -374,6 +374,41 @@ public class ThreadsTests
         }
     }
 
+    /// <summary>
+    /// A run id given again while its first run is open here: the second's insert is refused, and
+    /// while both functions run the first stays on the list the hook and disposal record, rather
+    /// than being pushed off it.
+    /// </summary>
+    [Fact]
+    public async Task A_run_id_given_again_while_open_leaves_the_first_run_recorded_at_disposal()
+    {
+        var m = Make();
+        var job = m.Cw.Job("dup");
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task first = job.RunAsync(new RunOptions { Id = "same" }, async (j, ct) =>
+        {
+            entered.SetResult();
+            await gate.Task;
+        });
+        await entered.Task;
+        var enteredAgain = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task second = job.RunAsync(new RunOptions { Id = "same" }, async (j, ct) =>
+        {
+            enteredAgain.SetResult();
+            await gate.Task;
+        });
+        await enteredAgain.Task;
+        await m.Cw.DisposeAsync();
+        Run? run = await m.Store.GetRunAsync("same");
+        Assert.NotNull(run);
+        Assert.Equal(RunStatus.Failed, run.Status);
+        Assert.Equal("Shutdown: the process stopped while the run was in progress", run.Error);
+        gate.SetResult();
+        await first;
+        await second;
+    }
+
     private static async Task RunProcessExitChild(string file, string mode)
     {
         string child = Path.Combine(
