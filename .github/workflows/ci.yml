@@ -1514,3 +1514,17 @@ jobs:
             unzip -l "$nupkg" | grep -q " $f\$" || { echo "missing $f"; exit 1; }
           done
           if unzip -l "$nupkg" | grep -Eq ' (test|conformance|examples)/'; then echo "the package carries test files"; exit 1; fi
+      # Cronwatch.Hosting and Cronwatch.AspNetCore: each its assembly, XML
+      # documentation, README and license, and nothing from the tests.
+      - name: dotnet pack, the integration packages' files
+        working-directory: packages/dotnet
+        run: |
+          for p in Cronwatch.Hosting Cronwatch.AspNetCore; do
+            dotnet pack src/$p -c Release --no-build -o artifacts/$p
+            nupkg=$(ls artifacts/$p/$p.*.nupkg)
+            unzip -l "$nupkg"
+            for f in lib/net10.0/$p.dll lib/net10.0/$p.xml README.md LICENSE; do
+              unzip -l "$nupkg" | grep -q " $f\$" || { echo "$p is missing $f"; exit 1; }
+            done
+            if unzip -l "$nupkg" | grep -Eq ' (test|conformance|examples|webserver)/'; then echo "$p carries test files"; exit 1; fi
+          done
