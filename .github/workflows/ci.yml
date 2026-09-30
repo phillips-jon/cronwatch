@@ -1443,3 +1443,68 @@ jobs:
           -Djobrunr.version=${{ matrix.jobrunr }}
           -Dtest='dev/cronwatch/quartz/*Test,dev/cronwatch/jobrunr/*Test,dev/cronwatch/spring/*Test,dev/cronwatch/spring/web/*Test'
           -Dsurefire.failIfNoSpecifiedTests=false
+
+  dotnet:
+    name: dotnet (.NET ${{ matrix.dotnet }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # The floor and, until .NET 11 is released in November 2026, the
+          # newest. The test project gains the newest target when it ships.
+          - { dotnet: "10.0.x" }
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
+      # Builds the SDK (for the croner parity and Node compatibility tests),
+      # then fails if conformance/ or the dashboard fixture is stale.
+      - run: npm run check:conformance
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+      # The NuGet packages, by the pinned versions and the projects.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ matrix.dotnet }}-${{ hashFiles('packages/dotnet/Directory.Packages.props', 'packages/dotnet/**/*.csproj') }}
+          restore-keys: nuget-${{ matrix.dotnet }}-
+      - name: dotnet format --verify-no-changes
+        working-directory: packages/dotnet
+        run: dotnet format --verify-no-changes
+      - name: dotnet build
+        working-directory: packages/dotnet
+        run: dotnet build -c Release
+      - name: dotnet test
+        working-directory: packages/dotnet
+        run: dotnet test -c Release --no-build
+      # The whole suite again under a culture that writes 1,5 and folds I to a
+      # dotless i, so a format or comparison that reads the culture fails.
+      - name: dotnet test, tr-TR
+        working-directory: packages/dotnet
+        env:
+          CRONWATCH_CULTURE: tr-TR
+        run: dotnet test -c Release --no-build
+      # The package's files, and no dependency in its .nuspec: the core
+      # depends on no other package.
+      - name: dotnet pack, and the package's files
+        working-directory: packages/dotnet
+        run: |
+          dotnet pack src/Cronwatch -c Release --no-build -o artifacts
+          nupkg=$(ls artifacts/Cronwatch.*.nupkg)
+          unzip -l "$nupkg"
+          unzip -p "$nupkg" Cronwatch.nuspec > artifacts/Cronwatch.nuspec
+          cat artifacts/Cronwatch.nuspec
+          if grep -q '<dependency ' artifacts/Cronwatch.nuspec; then echo "the core has a dependency"; exit 1; fi
+          for f in lib/net10.0/Cronwatch.dll lib/net10.0/Cronwatch.xml README.md LICENSE; do
+            unzip -l "$nupkg" | grep -q " $f\$" || { echo "missing $f"; exit 1; }
+          done
+          if unzip -l "$nupkg" | grep -Eq ' (test|conformance|examples)/'; then echo "the package carries test files"; exit 1; fi
