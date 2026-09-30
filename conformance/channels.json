@@ -14405,5 +14405,5277 @@
         }
       }
     ]
-  }
+  },
+  "urls": [
+    {
+      "input": "HTTPS://EXAMPLE.com:443/a/./b/../c?x y#f g",
+      "url": "https://example.com/a/c?x%20y#f%20g",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "https:\\\\h.example\\a\\b",
+      "url": "https://h.example/a/b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "https:h.example/x",
+      "url": "https://h.example/x",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http:///x",
+      "url": "http://x/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http:\\\\h\\a",
+      "url": "http://h/a",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://ex%41mple.com/",
+      "url": "http://example.com/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h:80/",
+      "url": "http://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h:0080/",
+      "url": "http://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h:/p",
+      "url": "http://h/p",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h:8080",
+      "url": "http://h:8080/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h:65535/",
+      "url": "http://h:65535/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h:65536/",
+      "invalid": true
+    },
+    {
+      "input": "http://h:8x/",
+      "invalid": true
+    },
+    {
+      "input": "http://h:00000000000000000000080/",
+      "url": "http://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://0x7f.1/",
+      "url": "http://127.0.0.1/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://2130706433/",
+      "url": "http://127.0.0.1/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://0177.0.0.1/",
+      "url": "http://127.0.0.1/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://127.1/",
+      "url": "http://127.0.0.1/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://0x/",
+      "url": "http://0.0.0.0/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://1.2.3.4./",
+      "url": "http://1.2.3.4/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://1.2.3.4.5/",
+      "invalid": true
+    },
+    {
+      "input": "http://256.1.1.1/",
+      "invalid": true
+    },
+    {
+      "input": "http://1.2.3.256/",
+      "invalid": true
+    },
+    {
+      "input": "http://0x100000000/",
+      "invalid": true
+    },
+    {
+      "input": "http://example.1/",
+      "invalid": true
+    },
+    {
+      "input": "http://09.1/",
+      "invalid": true
+    },
+    {
+      "input": "http://1.2.3.09/",
+      "invalid": true
+    },
+    {
+      "input": "http://4294967295/",
+      "url": "http://255.255.255.255/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://4294967296/",
+      "invalid": true
+    },
+    {
+      "input": "http://1.2.3.4../",
+      "url": "http://1.2.3.4../",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://.1.2.3.4/",
+      "invalid": true
+    },
+    {
+      "input": "http://a..b/",
+      "url": "http://a..b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://EXAMPLE.COM./",
+      "url": "http://example.com./",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[0:0:0:0:0:0:0:1]/",
+      "url": "http://[::1]/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[2001:DB8::1:0:0:1]/",
+      "url": "http://[2001:db8::1:0:0:1]/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[::ffff:192.168.0.1]/",
+      "url": "http://[::ffff:c0a8:1]/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[1:0:0:2:0:0:0:3]/",
+      "url": "http://[1:0:0:2::3]/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[1:0:2:0:3:0:4:0]/",
+      "url": "http://[1:0:2:0:3:0:4:0]/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[::1::2]/",
+      "invalid": true
+    },
+    {
+      "input": "http://[1:2:3:4:5:6:7:8:9]/",
+      "invalid": true
+    },
+    {
+      "input": "http://[fe80::1%25eth0]/",
+      "invalid": true
+    },
+    {
+      "input": "http://[::1]:8080/x",
+      "url": "http://[::1]:8080/x",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[::1]x/",
+      "invalid": true
+    },
+    {
+      "input": "http://[::]/",
+      "url": "http://[::]/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[1::]/",
+      "url": "http://[1::]/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[::1.2.3.4]/",
+      "url": "http://[::102:304]/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://[::1.2.3]/",
+      "invalid": true
+    },
+    {
+      "input": "http://[12345::]/",
+      "invalid": true
+    },
+    {
+      "input": "http://[::1/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a/%2e%2E/b/.",
+      "url": "http://h/b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a/..",
+      "url": "http://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a/b/../../../c",
+      "url": "http://h/c",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a/.%2e/b",
+      "url": "http://h/b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/./a/%2E/b/..",
+      "url": "http://h/a/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a/...",
+      "url": "http://h/a/...",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h//a//b/",
+      "url": "http://h//a//b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a/..?q",
+      "url": "http://h/?q",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a/.#f",
+      "url": "http://h/a/#f",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a\\..\\b",
+      "url": "http://h/b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?q='\"<>",
+      "url": "http://h/?q=%27%22%3C%3E",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a|b{c}^`?q={d}|`^#`x",
+      "url": "http://h/a|b%7Bc%7D%5E%60?q={d}|`^#%60x",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/%zz?%zz#%zz",
+      "url": "http://h/%zz?%zz#%zz",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/%2F%2f?%23#%25",
+      "url": "http://h/%2F%2f?%23#%25",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/%?%#%",
+      "url": "http://h/%?%#%",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/é?é#é",
+      "url": "http://h/%C3%A9?%C3%A9#%C3%A9",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/😀?😀#😀",
+      "url": "http://h/%F0%9F%98%80?%F0%9F%98%80#%F0%9F%98%80",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/ ? # ",
+      "url": "http://h/%C2%A0?%C2%A0#%C2%A0",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "  http://h/\t\n  ",
+      "url": "http://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a\tb\nc\rd",
+      "url": "http://h/abcd",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "\u0000http://h/\u001f",
+      "url": "http://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h?",
+      "url": "http://h/?",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h#",
+      "url": "http://h/#",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?#",
+      "url": "http://h/?#",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#?",
+      "url": "http://h/#?",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/??#?#",
+      "url": "http://h/??#?#",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://us%65r:p@h/x",
+      "url": "http://h/x",
+      "username": "us%65r",
+      "password": "p"
+    },
+    {
+      "input": "http://a@b@h/x",
+      "url": "http://h/x",
+      "username": "a%40b",
+      "password": ""
+    },
+    {
+      "input": "http://a:b:c@h/",
+      "url": "http://h/",
+      "username": "a",
+      "password": "b%3Ac"
+    },
+    {
+      "input": "http://:p@h/",
+      "url": "http://h/",
+      "username": "",
+      "password": "p"
+    },
+    {
+      "input": "http://u:@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": ""
+    },
+    {
+      "input": "http://@h/",
+      "url": "http://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://:@h/",
+      "url": "http://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://u@/",
+      "invalid": true
+    },
+    {
+      "input": "ws://h:80/",
+      "url": "ws://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "wss://h:443/",
+      "url": "wss://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "ftp://h:21/",
+      "url": "ftp://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h:443/",
+      "url": "http://h:443/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "https://h:80/",
+      "url": "https://h:80/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "WS://H/",
+      "url": "ws://h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "Ftp://h/x",
+      "url": "ftp://h/x",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a b/",
+      "invalid": true
+    },
+    {
+      "input": "http:///",
+      "invalid": true
+    },
+    {
+      "input": "http://",
+      "invalid": true
+    },
+    {
+      "input": "http:",
+      "invalid": true
+    },
+    {
+      "input": "http://h%00/",
+      "invalid": true
+    },
+    {
+      "input": "http://%41/",
+      "url": "http://a/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h%/",
+      "invalid": true
+    },
+    {
+      "input": "http://h%2/",
+      "invalid": true
+    },
+    {
+      "input": "1http://h/",
+      "invalid": true
+    },
+    {
+      "input": "no scheme",
+      "invalid": true
+    },
+    {
+      "input": "",
+      "invalid": true
+    },
+    {
+      "input": "mailto:a@b.c",
+      "other": "mailto"
+    },
+    {
+      "input": "JavaScript:alert(1)",
+      "other": "javascript"
+    },
+    {
+      "input": "file:///etc/passwd",
+      "other": "file"
+    },
+    {
+      "input": "data:text/plain,x",
+      "other": "data"
+    },
+    {
+      "input": "h+t.p-s://h/",
+      "other": "h+t.p-s"
+    },
+    {
+      "input": "ht~tp://h/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0000b",
+      "url": "http://h/a%00b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0000b",
+      "url": "http://h/?a%00b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0000b",
+      "url": "http://h/#a%00b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0000b@h/",
+      "url": "http://h/",
+      "username": "a%00b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0000b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%00b"
+    },
+    {
+      "input": "http://a\u0000b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0001b",
+      "url": "http://h/a%01b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0001b",
+      "url": "http://h/?a%01b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0001b",
+      "url": "http://h/#a%01b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0001b@h/",
+      "url": "http://h/",
+      "username": "a%01b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0001b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%01b"
+    },
+    {
+      "input": "http://a\u0001b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0002b",
+      "url": "http://h/a%02b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0002b",
+      "url": "http://h/?a%02b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0002b",
+      "url": "http://h/#a%02b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0002b@h/",
+      "url": "http://h/",
+      "username": "a%02b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0002b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%02b"
+    },
+    {
+      "input": "http://a\u0002b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0003b",
+      "url": "http://h/a%03b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0003b",
+      "url": "http://h/?a%03b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0003b",
+      "url": "http://h/#a%03b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0003b@h/",
+      "url": "http://h/",
+      "username": "a%03b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0003b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%03b"
+    },
+    {
+      "input": "http://a\u0003b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0004b",
+      "url": "http://h/a%04b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0004b",
+      "url": "http://h/?a%04b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0004b",
+      "url": "http://h/#a%04b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0004b@h/",
+      "url": "http://h/",
+      "username": "a%04b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0004b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%04b"
+    },
+    {
+      "input": "http://a\u0004b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0005b",
+      "url": "http://h/a%05b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0005b",
+      "url": "http://h/?a%05b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0005b",
+      "url": "http://h/#a%05b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0005b@h/",
+      "url": "http://h/",
+      "username": "a%05b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0005b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%05b"
+    },
+    {
+      "input": "http://a\u0005b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0006b",
+      "url": "http://h/a%06b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0006b",
+      "url": "http://h/?a%06b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0006b",
+      "url": "http://h/#a%06b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0006b@h/",
+      "url": "http://h/",
+      "username": "a%06b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0006b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%06b"
+    },
+    {
+      "input": "http://a\u0006b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0007b",
+      "url": "http://h/a%07b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0007b",
+      "url": "http://h/?a%07b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0007b",
+      "url": "http://h/#a%07b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0007b@h/",
+      "url": "http://h/",
+      "username": "a%07b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0007b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%07b"
+    },
+    {
+      "input": "http://a\u0007b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\bb",
+      "url": "http://h/a%08b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\bb",
+      "url": "http://h/?a%08b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\bb",
+      "url": "http://h/#a%08b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\bb@h/",
+      "url": "http://h/",
+      "username": "a%08b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\bb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%08b"
+    },
+    {
+      "input": "http://a\bb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\tb",
+      "url": "http://h/ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\tb",
+      "url": "http://h/?ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\tb",
+      "url": "http://h/#ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\tb@h/",
+      "url": "http://h/",
+      "username": "ab",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\tb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "ab"
+    },
+    {
+      "input": "http://a\tb/",
+      "url": "http://ab/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a\nb",
+      "url": "http://h/ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\nb",
+      "url": "http://h/?ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\nb",
+      "url": "http://h/#ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\nb@h/",
+      "url": "http://h/",
+      "username": "ab",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\nb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "ab"
+    },
+    {
+      "input": "http://a\nb/",
+      "url": "http://ab/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a\u000bb",
+      "url": "http://h/a%0Bb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u000bb",
+      "url": "http://h/?a%0Bb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u000bb",
+      "url": "http://h/#a%0Bb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u000bb@h/",
+      "url": "http://h/",
+      "username": "a%0Bb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u000bb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%0Bb"
+    },
+    {
+      "input": "http://a\u000bb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\fb",
+      "url": "http://h/a%0Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\fb",
+      "url": "http://h/?a%0Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\fb",
+      "url": "http://h/#a%0Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\fb@h/",
+      "url": "http://h/",
+      "username": "a%0Cb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\fb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%0Cb"
+    },
+    {
+      "input": "http://a\fb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\rb",
+      "url": "http://h/ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\rb",
+      "url": "http://h/?ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\rb",
+      "url": "http://h/#ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\rb@h/",
+      "url": "http://h/",
+      "username": "ab",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\rb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "ab"
+    },
+    {
+      "input": "http://a\rb/",
+      "url": "http://ab/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a\u000eb",
+      "url": "http://h/a%0Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u000eb",
+      "url": "http://h/?a%0Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u000eb",
+      "url": "http://h/#a%0Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u000eb@h/",
+      "url": "http://h/",
+      "username": "a%0Eb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u000eb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%0Eb"
+    },
+    {
+      "input": "http://a\u000eb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u000fb",
+      "url": "http://h/a%0Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u000fb",
+      "url": "http://h/?a%0Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u000fb",
+      "url": "http://h/#a%0Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u000fb@h/",
+      "url": "http://h/",
+      "username": "a%0Fb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u000fb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%0Fb"
+    },
+    {
+      "input": "http://a\u000fb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0010b",
+      "url": "http://h/a%10b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0010b",
+      "url": "http://h/?a%10b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0010b",
+      "url": "http://h/#a%10b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0010b@h/",
+      "url": "http://h/",
+      "username": "a%10b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0010b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%10b"
+    },
+    {
+      "input": "http://a\u0010b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0011b",
+      "url": "http://h/a%11b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0011b",
+      "url": "http://h/?a%11b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0011b",
+      "url": "http://h/#a%11b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0011b@h/",
+      "url": "http://h/",
+      "username": "a%11b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0011b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%11b"
+    },
+    {
+      "input": "http://a\u0011b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0012b",
+      "url": "http://h/a%12b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0012b",
+      "url": "http://h/?a%12b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0012b",
+      "url": "http://h/#a%12b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0012b@h/",
+      "url": "http://h/",
+      "username": "a%12b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0012b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%12b"
+    },
+    {
+      "input": "http://a\u0012b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0013b",
+      "url": "http://h/a%13b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0013b",
+      "url": "http://h/?a%13b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0013b",
+      "url": "http://h/#a%13b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0013b@h/",
+      "url": "http://h/",
+      "username": "a%13b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0013b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%13b"
+    },
+    {
+      "input": "http://a\u0013b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0014b",
+      "url": "http://h/a%14b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0014b",
+      "url": "http://h/?a%14b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0014b",
+      "url": "http://h/#a%14b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0014b@h/",
+      "url": "http://h/",
+      "username": "a%14b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0014b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%14b"
+    },
+    {
+      "input": "http://a\u0014b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0015b",
+      "url": "http://h/a%15b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0015b",
+      "url": "http://h/?a%15b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0015b",
+      "url": "http://h/#a%15b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0015b@h/",
+      "url": "http://h/",
+      "username": "a%15b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0015b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%15b"
+    },
+    {
+      "input": "http://a\u0015b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0016b",
+      "url": "http://h/a%16b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0016b",
+      "url": "http://h/?a%16b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0016b",
+      "url": "http://h/#a%16b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0016b@h/",
+      "url": "http://h/",
+      "username": "a%16b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0016b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%16b"
+    },
+    {
+      "input": "http://a\u0016b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0017b",
+      "url": "http://h/a%17b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0017b",
+      "url": "http://h/?a%17b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0017b",
+      "url": "http://h/#a%17b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0017b@h/",
+      "url": "http://h/",
+      "username": "a%17b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0017b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%17b"
+    },
+    {
+      "input": "http://a\u0017b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0018b",
+      "url": "http://h/a%18b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0018b",
+      "url": "http://h/?a%18b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0018b",
+      "url": "http://h/#a%18b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0018b@h/",
+      "url": "http://h/",
+      "username": "a%18b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0018b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%18b"
+    },
+    {
+      "input": "http://a\u0018b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u0019b",
+      "url": "http://h/a%19b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u0019b",
+      "url": "http://h/?a%19b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u0019b",
+      "url": "http://h/#a%19b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u0019b@h/",
+      "url": "http://h/",
+      "username": "a%19b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u0019b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%19b"
+    },
+    {
+      "input": "http://a\u0019b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u001ab",
+      "url": "http://h/a%1Ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u001ab",
+      "url": "http://h/?a%1Ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u001ab",
+      "url": "http://h/#a%1Ab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u001ab@h/",
+      "url": "http://h/",
+      "username": "a%1Ab",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u001ab@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%1Ab"
+    },
+    {
+      "input": "http://a\u001ab/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u001bb",
+      "url": "http://h/a%1Bb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u001bb",
+      "url": "http://h/?a%1Bb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u001bb",
+      "url": "http://h/#a%1Bb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u001bb@h/",
+      "url": "http://h/",
+      "username": "a%1Bb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u001bb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%1Bb"
+    },
+    {
+      "input": "http://a\u001bb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u001cb",
+      "url": "http://h/a%1Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u001cb",
+      "url": "http://h/?a%1Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u001cb",
+      "url": "http://h/#a%1Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u001cb@h/",
+      "url": "http://h/",
+      "username": "a%1Cb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u001cb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%1Cb"
+    },
+    {
+      "input": "http://a\u001cb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u001db",
+      "url": "http://h/a%1Db",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u001db",
+      "url": "http://h/?a%1Db",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u001db",
+      "url": "http://h/#a%1Db",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u001db@h/",
+      "url": "http://h/",
+      "username": "a%1Db",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u001db@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%1Db"
+    },
+    {
+      "input": "http://a\u001db/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u001eb",
+      "url": "http://h/a%1Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u001eb",
+      "url": "http://h/?a%1Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u001eb",
+      "url": "http://h/#a%1Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u001eb@h/",
+      "url": "http://h/",
+      "username": "a%1Eb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u001eb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%1Eb"
+    },
+    {
+      "input": "http://a\u001eb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\u001fb",
+      "url": "http://h/a%1Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\u001fb",
+      "url": "http://h/?a%1Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\u001fb",
+      "url": "http://h/#a%1Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\u001fb@h/",
+      "url": "http://h/",
+      "username": "a%1Fb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\u001fb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%1Fb"
+    },
+    {
+      "input": "http://a\u001fb/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a b",
+      "url": "http://h/a%20b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a b",
+      "url": "http://h/?a%20b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a b",
+      "url": "http://h/#a%20b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a b@h/",
+      "url": "http://h/",
+      "username": "a%20b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%20b"
+    },
+    {
+      "input": "http://h/a!b",
+      "url": "http://h/a!b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a!b",
+      "url": "http://h/?a!b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a!b",
+      "url": "http://h/#a!b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a!b@h/",
+      "url": "http://h/",
+      "username": "a!b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a!b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a!b"
+    },
+    {
+      "input": "http://a!b/",
+      "url": "http://a!b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a\"b",
+      "url": "http://h/a%22b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\"b",
+      "url": "http://h/?a%22b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\"b",
+      "url": "http://h/#a%22b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\"b@h/",
+      "url": "http://h/",
+      "username": "a%22b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\"b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%22b"
+    },
+    {
+      "input": "http://a\"b/",
+      "url": "http://a\"b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a#b",
+      "url": "http://h/a#b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a#b",
+      "url": "http://h/?a#b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a#b",
+      "url": "http://h/#a#b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a#b@h/",
+      "url": "http://a/#b@h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://u:a#b@h/",
+      "invalid": true
+    },
+    {
+      "input": "http://a#b/",
+      "url": "http://a/#b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a$b",
+      "url": "http://h/a$b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a$b",
+      "url": "http://h/?a$b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a$b",
+      "url": "http://h/#a$b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a$b@h/",
+      "url": "http://h/",
+      "username": "a$b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a$b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a$b"
+    },
+    {
+      "input": "http://a$b/",
+      "url": "http://a$b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a%b",
+      "url": "http://h/a%b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a%b",
+      "url": "http://h/?a%b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a%b",
+      "url": "http://h/#a%b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a%b@h/",
+      "url": "http://h/",
+      "username": "a%b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a%b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%b"
+    },
+    {
+      "input": "http://a%b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a&b",
+      "url": "http://h/a&b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a&b",
+      "url": "http://h/?a&b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a&b",
+      "url": "http://h/#a&b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a&b@h/",
+      "url": "http://h/",
+      "username": "a&b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a&b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a&b"
+    },
+    {
+      "input": "http://a&b/",
+      "url": "http://a&b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a'b",
+      "url": "http://h/a'b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a'b",
+      "url": "http://h/?a%27b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a'b",
+      "url": "http://h/#a'b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a'b@h/",
+      "url": "http://h/",
+      "username": "a'b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a'b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a'b"
+    },
+    {
+      "input": "http://a'b/",
+      "url": "http://a'b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a(b",
+      "url": "http://h/a(b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a(b",
+      "url": "http://h/?a(b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a(b",
+      "url": "http://h/#a(b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a(b@h/",
+      "url": "http://h/",
+      "username": "a(b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a(b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a(b"
+    },
+    {
+      "input": "http://a(b/",
+      "url": "http://a(b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a)b",
+      "url": "http://h/a)b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a)b",
+      "url": "http://h/?a)b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a)b",
+      "url": "http://h/#a)b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a)b@h/",
+      "url": "http://h/",
+      "username": "a)b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a)b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a)b"
+    },
+    {
+      "input": "http://a)b/",
+      "url": "http://a)b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a*b",
+      "url": "http://h/a*b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a*b",
+      "url": "http://h/?a*b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a*b",
+      "url": "http://h/#a*b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a*b@h/",
+      "url": "http://h/",
+      "username": "a*b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a*b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a*b"
+    },
+    {
+      "input": "http://a*b/",
+      "url": "http://a*b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a+b",
+      "url": "http://h/a+b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a+b",
+      "url": "http://h/?a+b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a+b",
+      "url": "http://h/#a+b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a+b@h/",
+      "url": "http://h/",
+      "username": "a+b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a+b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a+b"
+    },
+    {
+      "input": "http://a+b/",
+      "url": "http://a+b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a,b",
+      "url": "http://h/a,b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a,b",
+      "url": "http://h/?a,b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a,b",
+      "url": "http://h/#a,b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a,b@h/",
+      "url": "http://h/",
+      "username": "a,b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a,b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a,b"
+    },
+    {
+      "input": "http://a,b/",
+      "url": "http://a,b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a-b",
+      "url": "http://h/a-b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a-b",
+      "url": "http://h/?a-b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a-b",
+      "url": "http://h/#a-b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a-b@h/",
+      "url": "http://h/",
+      "username": "a-b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a-b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a-b"
+    },
+    {
+      "input": "http://a-b/",
+      "url": "http://a-b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a.b",
+      "url": "http://h/a.b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a.b",
+      "url": "http://h/?a.b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a.b",
+      "url": "http://h/#a.b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a.b@h/",
+      "url": "http://h/",
+      "username": "a.b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a.b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a.b"
+    },
+    {
+      "input": "http://a.b/",
+      "url": "http://a.b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a/b",
+      "url": "http://h/a/b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a/b",
+      "url": "http://h/?a/b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a/b",
+      "url": "http://h/#a/b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a/b@h/",
+      "url": "http://a/b@h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://u:a/b@h/",
+      "invalid": true
+    },
+    {
+      "input": "http://a/b/",
+      "url": "http://a/b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a0b",
+      "url": "http://h/a0b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a0b",
+      "url": "http://h/?a0b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a0b",
+      "url": "http://h/#a0b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a0b@h/",
+      "url": "http://h/",
+      "username": "a0b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a0b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a0b"
+    },
+    {
+      "input": "http://a0b/",
+      "url": "http://a0b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a1b",
+      "url": "http://h/a1b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a1b",
+      "url": "http://h/?a1b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a1b",
+      "url": "http://h/#a1b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a1b@h/",
+      "url": "http://h/",
+      "username": "a1b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a1b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a1b"
+    },
+    {
+      "input": "http://a1b/",
+      "url": "http://a1b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a2b",
+      "url": "http://h/a2b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a2b",
+      "url": "http://h/?a2b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a2b",
+      "url": "http://h/#a2b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a2b@h/",
+      "url": "http://h/",
+      "username": "a2b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a2b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a2b"
+    },
+    {
+      "input": "http://a2b/",
+      "url": "http://a2b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a3b",
+      "url": "http://h/a3b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a3b",
+      "url": "http://h/?a3b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a3b",
+      "url": "http://h/#a3b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a3b@h/",
+      "url": "http://h/",
+      "username": "a3b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a3b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a3b"
+    },
+    {
+      "input": "http://a3b/",
+      "url": "http://a3b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a4b",
+      "url": "http://h/a4b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a4b",
+      "url": "http://h/?a4b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a4b",
+      "url": "http://h/#a4b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a4b@h/",
+      "url": "http://h/",
+      "username": "a4b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a4b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a4b"
+    },
+    {
+      "input": "http://a4b/",
+      "url": "http://a4b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a5b",
+      "url": "http://h/a5b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a5b",
+      "url": "http://h/?a5b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a5b",
+      "url": "http://h/#a5b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a5b@h/",
+      "url": "http://h/",
+      "username": "a5b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a5b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a5b"
+    },
+    {
+      "input": "http://a5b/",
+      "url": "http://a5b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a6b",
+      "url": "http://h/a6b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a6b",
+      "url": "http://h/?a6b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a6b",
+      "url": "http://h/#a6b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a6b@h/",
+      "url": "http://h/",
+      "username": "a6b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a6b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a6b"
+    },
+    {
+      "input": "http://a6b/",
+      "url": "http://a6b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a7b",
+      "url": "http://h/a7b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a7b",
+      "url": "http://h/?a7b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a7b",
+      "url": "http://h/#a7b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a7b@h/",
+      "url": "http://h/",
+      "username": "a7b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a7b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a7b"
+    },
+    {
+      "input": "http://a7b/",
+      "url": "http://a7b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a8b",
+      "url": "http://h/a8b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a8b",
+      "url": "http://h/?a8b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a8b",
+      "url": "http://h/#a8b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a8b@h/",
+      "url": "http://h/",
+      "username": "a8b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a8b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a8b"
+    },
+    {
+      "input": "http://a8b/",
+      "url": "http://a8b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a9b",
+      "url": "http://h/a9b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a9b",
+      "url": "http://h/?a9b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a9b",
+      "url": "http://h/#a9b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a9b@h/",
+      "url": "http://h/",
+      "username": "a9b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a9b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a9b"
+    },
+    {
+      "input": "http://a9b/",
+      "url": "http://a9b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a:b",
+      "url": "http://h/a:b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a:b",
+      "url": "http://h/?a:b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a:b",
+      "url": "http://h/#a:b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a:b@h/",
+      "url": "http://h/",
+      "username": "a",
+      "password": "b"
+    },
+    {
+      "input": "http://u:a:b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%3Ab"
+    },
+    {
+      "input": "http://a:b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a;b",
+      "url": "http://h/a;b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a;b",
+      "url": "http://h/?a;b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a;b",
+      "url": "http://h/#a;b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a;b@h/",
+      "url": "http://h/",
+      "username": "a%3Bb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a;b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%3Bb"
+    },
+    {
+      "input": "http://a;b/",
+      "url": "http://a;b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a<b",
+      "url": "http://h/a%3Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a<b",
+      "url": "http://h/?a%3Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a<b",
+      "url": "http://h/#a%3Cb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a<b@h/",
+      "url": "http://h/",
+      "username": "a%3Cb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a<b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%3Cb"
+    },
+    {
+      "input": "http://a<b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a=b",
+      "url": "http://h/a=b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a=b",
+      "url": "http://h/?a=b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a=b",
+      "url": "http://h/#a=b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a=b@h/",
+      "url": "http://h/",
+      "username": "a%3Db",
+      "password": ""
+    },
+    {
+      "input": "http://u:a=b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%3Db"
+    },
+    {
+      "input": "http://a=b/",
+      "url": "http://a=b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a>b",
+      "url": "http://h/a%3Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a>b",
+      "url": "http://h/?a%3Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a>b",
+      "url": "http://h/#a%3Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a>b@h/",
+      "url": "http://h/",
+      "username": "a%3Eb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a>b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%3Eb"
+    },
+    {
+      "input": "http://a>b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a?b",
+      "url": "http://h/a?b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a?b",
+      "url": "http://h/?a?b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a?b",
+      "url": "http://h/#a?b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a?b@h/",
+      "url": "http://a/?b@h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://u:a?b@h/",
+      "invalid": true
+    },
+    {
+      "input": "http://a?b/",
+      "url": "http://a/?b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a@b",
+      "url": "http://h/a@b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a@b",
+      "url": "http://h/?a@b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a@b",
+      "url": "http://h/#a@b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a@b@h/",
+      "url": "http://h/",
+      "username": "a%40b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a@b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%40b"
+    },
+    {
+      "input": "http://a@b/",
+      "url": "http://b/",
+      "username": "a",
+      "password": ""
+    },
+    {
+      "input": "http://h/aAb",
+      "url": "http://h/aAb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aAb",
+      "url": "http://h/?aAb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aAb",
+      "url": "http://h/#aAb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aAb@h/",
+      "url": "http://h/",
+      "username": "aAb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aAb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aAb"
+    },
+    {
+      "input": "http://aAb/",
+      "url": "http://aab/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aBb",
+      "url": "http://h/aBb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aBb",
+      "url": "http://h/?aBb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aBb",
+      "url": "http://h/#aBb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aBb@h/",
+      "url": "http://h/",
+      "username": "aBb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aBb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aBb"
+    },
+    {
+      "input": "http://aBb/",
+      "url": "http://abb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aCb",
+      "url": "http://h/aCb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aCb",
+      "url": "http://h/?aCb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aCb",
+      "url": "http://h/#aCb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aCb@h/",
+      "url": "http://h/",
+      "username": "aCb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aCb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aCb"
+    },
+    {
+      "input": "http://aCb/",
+      "url": "http://acb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aDb",
+      "url": "http://h/aDb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aDb",
+      "url": "http://h/?aDb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aDb",
+      "url": "http://h/#aDb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aDb@h/",
+      "url": "http://h/",
+      "username": "aDb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aDb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aDb"
+    },
+    {
+      "input": "http://aDb/",
+      "url": "http://adb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aEb",
+      "url": "http://h/aEb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aEb",
+      "url": "http://h/?aEb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aEb",
+      "url": "http://h/#aEb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aEb@h/",
+      "url": "http://h/",
+      "username": "aEb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aEb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aEb"
+    },
+    {
+      "input": "http://aEb/",
+      "url": "http://aeb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aFb",
+      "url": "http://h/aFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aFb",
+      "url": "http://h/?aFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aFb",
+      "url": "http://h/#aFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aFb@h/",
+      "url": "http://h/",
+      "username": "aFb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aFb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aFb"
+    },
+    {
+      "input": "http://aFb/",
+      "url": "http://afb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aGb",
+      "url": "http://h/aGb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aGb",
+      "url": "http://h/?aGb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aGb",
+      "url": "http://h/#aGb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aGb@h/",
+      "url": "http://h/",
+      "username": "aGb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aGb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aGb"
+    },
+    {
+      "input": "http://aGb/",
+      "url": "http://agb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aHb",
+      "url": "http://h/aHb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aHb",
+      "url": "http://h/?aHb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aHb",
+      "url": "http://h/#aHb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aHb@h/",
+      "url": "http://h/",
+      "username": "aHb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aHb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aHb"
+    },
+    {
+      "input": "http://aHb/",
+      "url": "http://ahb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aIb",
+      "url": "http://h/aIb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aIb",
+      "url": "http://h/?aIb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aIb",
+      "url": "http://h/#aIb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aIb@h/",
+      "url": "http://h/",
+      "username": "aIb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aIb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aIb"
+    },
+    {
+      "input": "http://aIb/",
+      "url": "http://aib/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aJb",
+      "url": "http://h/aJb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aJb",
+      "url": "http://h/?aJb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aJb",
+      "url": "http://h/#aJb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aJb@h/",
+      "url": "http://h/",
+      "username": "aJb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aJb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aJb"
+    },
+    {
+      "input": "http://aJb/",
+      "url": "http://ajb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aKb",
+      "url": "http://h/aKb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aKb",
+      "url": "http://h/?aKb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aKb",
+      "url": "http://h/#aKb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aKb@h/",
+      "url": "http://h/",
+      "username": "aKb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aKb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aKb"
+    },
+    {
+      "input": "http://aKb/",
+      "url": "http://akb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aLb",
+      "url": "http://h/aLb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aLb",
+      "url": "http://h/?aLb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aLb",
+      "url": "http://h/#aLb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aLb@h/",
+      "url": "http://h/",
+      "username": "aLb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aLb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aLb"
+    },
+    {
+      "input": "http://aLb/",
+      "url": "http://alb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aMb",
+      "url": "http://h/aMb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aMb",
+      "url": "http://h/?aMb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aMb",
+      "url": "http://h/#aMb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aMb@h/",
+      "url": "http://h/",
+      "username": "aMb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aMb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aMb"
+    },
+    {
+      "input": "http://aMb/",
+      "url": "http://amb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aNb",
+      "url": "http://h/aNb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aNb",
+      "url": "http://h/?aNb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aNb",
+      "url": "http://h/#aNb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aNb@h/",
+      "url": "http://h/",
+      "username": "aNb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aNb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aNb"
+    },
+    {
+      "input": "http://aNb/",
+      "url": "http://anb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aOb",
+      "url": "http://h/aOb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aOb",
+      "url": "http://h/?aOb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aOb",
+      "url": "http://h/#aOb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aOb@h/",
+      "url": "http://h/",
+      "username": "aOb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aOb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aOb"
+    },
+    {
+      "input": "http://aOb/",
+      "url": "http://aob/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aPb",
+      "url": "http://h/aPb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aPb",
+      "url": "http://h/?aPb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aPb",
+      "url": "http://h/#aPb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aPb@h/",
+      "url": "http://h/",
+      "username": "aPb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aPb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aPb"
+    },
+    {
+      "input": "http://aPb/",
+      "url": "http://apb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aQb",
+      "url": "http://h/aQb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aQb",
+      "url": "http://h/?aQb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aQb",
+      "url": "http://h/#aQb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aQb@h/",
+      "url": "http://h/",
+      "username": "aQb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aQb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aQb"
+    },
+    {
+      "input": "http://aQb/",
+      "url": "http://aqb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aRb",
+      "url": "http://h/aRb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aRb",
+      "url": "http://h/?aRb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aRb",
+      "url": "http://h/#aRb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aRb@h/",
+      "url": "http://h/",
+      "username": "aRb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aRb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aRb"
+    },
+    {
+      "input": "http://aRb/",
+      "url": "http://arb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aSb",
+      "url": "http://h/aSb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aSb",
+      "url": "http://h/?aSb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aSb",
+      "url": "http://h/#aSb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aSb@h/",
+      "url": "http://h/",
+      "username": "aSb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aSb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aSb"
+    },
+    {
+      "input": "http://aSb/",
+      "url": "http://asb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aTb",
+      "url": "http://h/aTb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aTb",
+      "url": "http://h/?aTb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aTb",
+      "url": "http://h/#aTb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aTb@h/",
+      "url": "http://h/",
+      "username": "aTb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aTb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aTb"
+    },
+    {
+      "input": "http://aTb/",
+      "url": "http://atb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aUb",
+      "url": "http://h/aUb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aUb",
+      "url": "http://h/?aUb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aUb",
+      "url": "http://h/#aUb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aUb@h/",
+      "url": "http://h/",
+      "username": "aUb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aUb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aUb"
+    },
+    {
+      "input": "http://aUb/",
+      "url": "http://aub/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aVb",
+      "url": "http://h/aVb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aVb",
+      "url": "http://h/?aVb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aVb",
+      "url": "http://h/#aVb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aVb@h/",
+      "url": "http://h/",
+      "username": "aVb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aVb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aVb"
+    },
+    {
+      "input": "http://aVb/",
+      "url": "http://avb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aWb",
+      "url": "http://h/aWb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aWb",
+      "url": "http://h/?aWb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aWb",
+      "url": "http://h/#aWb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aWb@h/",
+      "url": "http://h/",
+      "username": "aWb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aWb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aWb"
+    },
+    {
+      "input": "http://aWb/",
+      "url": "http://awb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aXb",
+      "url": "http://h/aXb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aXb",
+      "url": "http://h/?aXb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aXb",
+      "url": "http://h/#aXb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aXb@h/",
+      "url": "http://h/",
+      "username": "aXb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aXb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aXb"
+    },
+    {
+      "input": "http://aXb/",
+      "url": "http://axb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aYb",
+      "url": "http://h/aYb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aYb",
+      "url": "http://h/?aYb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aYb",
+      "url": "http://h/#aYb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aYb@h/",
+      "url": "http://h/",
+      "username": "aYb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aYb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aYb"
+    },
+    {
+      "input": "http://aYb/",
+      "url": "http://ayb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aZb",
+      "url": "http://h/aZb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aZb",
+      "url": "http://h/?aZb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aZb",
+      "url": "http://h/#aZb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aZb@h/",
+      "url": "http://h/",
+      "username": "aZb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aZb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aZb"
+    },
+    {
+      "input": "http://aZb/",
+      "url": "http://azb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a[b",
+      "url": "http://h/a[b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a[b",
+      "url": "http://h/?a[b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a[b",
+      "url": "http://h/#a[b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a[b@h/",
+      "url": "http://h/",
+      "username": "a%5Bb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a[b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%5Bb"
+    },
+    {
+      "input": "http://a[b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a\\b",
+      "url": "http://h/a/b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a\\b",
+      "url": "http://h/?a\\b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a\\b",
+      "url": "http://h/#a\\b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a\\b@h/",
+      "url": "http://a/b@h/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://u:a\\b@h/",
+      "invalid": true
+    },
+    {
+      "input": "http://a\\b/",
+      "url": "http://a/b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a]b",
+      "url": "http://h/a]b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a]b",
+      "url": "http://h/?a]b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a]b",
+      "url": "http://h/#a]b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a]b@h/",
+      "url": "http://h/",
+      "username": "a%5Db",
+      "password": ""
+    },
+    {
+      "input": "http://u:a]b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%5Db"
+    },
+    {
+      "input": "http://a]b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a^b",
+      "url": "http://h/a%5Eb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a^b",
+      "url": "http://h/?a^b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a^b",
+      "url": "http://h/#a^b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a^b@h/",
+      "url": "http://h/",
+      "username": "a%5Eb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a^b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%5Eb"
+    },
+    {
+      "input": "http://a^b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a_b",
+      "url": "http://h/a_b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a_b",
+      "url": "http://h/?a_b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a_b",
+      "url": "http://h/#a_b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a_b@h/",
+      "url": "http://h/",
+      "username": "a_b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a_b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a_b"
+    },
+    {
+      "input": "http://a_b/",
+      "url": "http://a_b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a`b",
+      "url": "http://h/a%60b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a`b",
+      "url": "http://h/?a`b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a`b",
+      "url": "http://h/#a%60b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a`b@h/",
+      "url": "http://h/",
+      "username": "a%60b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a`b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%60b"
+    },
+    {
+      "input": "http://a`b/",
+      "url": "http://a`b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aab",
+      "url": "http://h/aab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aab",
+      "url": "http://h/?aab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aab",
+      "url": "http://h/#aab",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aab@h/",
+      "url": "http://h/",
+      "username": "aab",
+      "password": ""
+    },
+    {
+      "input": "http://u:aab@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aab"
+    },
+    {
+      "input": "http://aab/",
+      "url": "http://aab/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/abb",
+      "url": "http://h/abb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?abb",
+      "url": "http://h/?abb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#abb",
+      "url": "http://h/#abb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://abb@h/",
+      "url": "http://h/",
+      "username": "abb",
+      "password": ""
+    },
+    {
+      "input": "http://u:abb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "abb"
+    },
+    {
+      "input": "http://abb/",
+      "url": "http://abb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/acb",
+      "url": "http://h/acb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?acb",
+      "url": "http://h/?acb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#acb",
+      "url": "http://h/#acb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://acb@h/",
+      "url": "http://h/",
+      "username": "acb",
+      "password": ""
+    },
+    {
+      "input": "http://u:acb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "acb"
+    },
+    {
+      "input": "http://acb/",
+      "url": "http://acb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/adb",
+      "url": "http://h/adb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?adb",
+      "url": "http://h/?adb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#adb",
+      "url": "http://h/#adb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://adb@h/",
+      "url": "http://h/",
+      "username": "adb",
+      "password": ""
+    },
+    {
+      "input": "http://u:adb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "adb"
+    },
+    {
+      "input": "http://adb/",
+      "url": "http://adb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aeb",
+      "url": "http://h/aeb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aeb",
+      "url": "http://h/?aeb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aeb",
+      "url": "http://h/#aeb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aeb@h/",
+      "url": "http://h/",
+      "username": "aeb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aeb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aeb"
+    },
+    {
+      "input": "http://aeb/",
+      "url": "http://aeb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/afb",
+      "url": "http://h/afb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?afb",
+      "url": "http://h/?afb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#afb",
+      "url": "http://h/#afb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://afb@h/",
+      "url": "http://h/",
+      "username": "afb",
+      "password": ""
+    },
+    {
+      "input": "http://u:afb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "afb"
+    },
+    {
+      "input": "http://afb/",
+      "url": "http://afb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/agb",
+      "url": "http://h/agb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?agb",
+      "url": "http://h/?agb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#agb",
+      "url": "http://h/#agb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://agb@h/",
+      "url": "http://h/",
+      "username": "agb",
+      "password": ""
+    },
+    {
+      "input": "http://u:agb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "agb"
+    },
+    {
+      "input": "http://agb/",
+      "url": "http://agb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/ahb",
+      "url": "http://h/ahb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?ahb",
+      "url": "http://h/?ahb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#ahb",
+      "url": "http://h/#ahb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://ahb@h/",
+      "url": "http://h/",
+      "username": "ahb",
+      "password": ""
+    },
+    {
+      "input": "http://u:ahb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "ahb"
+    },
+    {
+      "input": "http://ahb/",
+      "url": "http://ahb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aib",
+      "url": "http://h/aib",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aib",
+      "url": "http://h/?aib",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aib",
+      "url": "http://h/#aib",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aib@h/",
+      "url": "http://h/",
+      "username": "aib",
+      "password": ""
+    },
+    {
+      "input": "http://u:aib@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aib"
+    },
+    {
+      "input": "http://aib/",
+      "url": "http://aib/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/ajb",
+      "url": "http://h/ajb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?ajb",
+      "url": "http://h/?ajb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#ajb",
+      "url": "http://h/#ajb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://ajb@h/",
+      "url": "http://h/",
+      "username": "ajb",
+      "password": ""
+    },
+    {
+      "input": "http://u:ajb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "ajb"
+    },
+    {
+      "input": "http://ajb/",
+      "url": "http://ajb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/akb",
+      "url": "http://h/akb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?akb",
+      "url": "http://h/?akb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#akb",
+      "url": "http://h/#akb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://akb@h/",
+      "url": "http://h/",
+      "username": "akb",
+      "password": ""
+    },
+    {
+      "input": "http://u:akb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "akb"
+    },
+    {
+      "input": "http://akb/",
+      "url": "http://akb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/alb",
+      "url": "http://h/alb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?alb",
+      "url": "http://h/?alb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#alb",
+      "url": "http://h/#alb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://alb@h/",
+      "url": "http://h/",
+      "username": "alb",
+      "password": ""
+    },
+    {
+      "input": "http://u:alb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "alb"
+    },
+    {
+      "input": "http://alb/",
+      "url": "http://alb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/amb",
+      "url": "http://h/amb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?amb",
+      "url": "http://h/?amb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#amb",
+      "url": "http://h/#amb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://amb@h/",
+      "url": "http://h/",
+      "username": "amb",
+      "password": ""
+    },
+    {
+      "input": "http://u:amb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "amb"
+    },
+    {
+      "input": "http://amb/",
+      "url": "http://amb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/anb",
+      "url": "http://h/anb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?anb",
+      "url": "http://h/?anb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#anb",
+      "url": "http://h/#anb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://anb@h/",
+      "url": "http://h/",
+      "username": "anb",
+      "password": ""
+    },
+    {
+      "input": "http://u:anb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "anb"
+    },
+    {
+      "input": "http://anb/",
+      "url": "http://anb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aob",
+      "url": "http://h/aob",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aob",
+      "url": "http://h/?aob",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aob",
+      "url": "http://h/#aob",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aob@h/",
+      "url": "http://h/",
+      "username": "aob",
+      "password": ""
+    },
+    {
+      "input": "http://u:aob@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aob"
+    },
+    {
+      "input": "http://aob/",
+      "url": "http://aob/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/apb",
+      "url": "http://h/apb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?apb",
+      "url": "http://h/?apb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#apb",
+      "url": "http://h/#apb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://apb@h/",
+      "url": "http://h/",
+      "username": "apb",
+      "password": ""
+    },
+    {
+      "input": "http://u:apb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "apb"
+    },
+    {
+      "input": "http://apb/",
+      "url": "http://apb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aqb",
+      "url": "http://h/aqb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aqb",
+      "url": "http://h/?aqb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aqb",
+      "url": "http://h/#aqb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aqb@h/",
+      "url": "http://h/",
+      "username": "aqb",
+      "password": ""
+    },
+    {
+      "input": "http://u:aqb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aqb"
+    },
+    {
+      "input": "http://aqb/",
+      "url": "http://aqb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/arb",
+      "url": "http://h/arb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?arb",
+      "url": "http://h/?arb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#arb",
+      "url": "http://h/#arb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://arb@h/",
+      "url": "http://h/",
+      "username": "arb",
+      "password": ""
+    },
+    {
+      "input": "http://u:arb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "arb"
+    },
+    {
+      "input": "http://arb/",
+      "url": "http://arb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/asb",
+      "url": "http://h/asb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?asb",
+      "url": "http://h/?asb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#asb",
+      "url": "http://h/#asb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://asb@h/",
+      "url": "http://h/",
+      "username": "asb",
+      "password": ""
+    },
+    {
+      "input": "http://u:asb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "asb"
+    },
+    {
+      "input": "http://asb/",
+      "url": "http://asb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/atb",
+      "url": "http://h/atb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?atb",
+      "url": "http://h/?atb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#atb",
+      "url": "http://h/#atb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://atb@h/",
+      "url": "http://h/",
+      "username": "atb",
+      "password": ""
+    },
+    {
+      "input": "http://u:atb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "atb"
+    },
+    {
+      "input": "http://atb/",
+      "url": "http://atb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/aub",
+      "url": "http://h/aub",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aub",
+      "url": "http://h/?aub",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aub",
+      "url": "http://h/#aub",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aub@h/",
+      "url": "http://h/",
+      "username": "aub",
+      "password": ""
+    },
+    {
+      "input": "http://u:aub@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "aub"
+    },
+    {
+      "input": "http://aub/",
+      "url": "http://aub/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/avb",
+      "url": "http://h/avb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?avb",
+      "url": "http://h/?avb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#avb",
+      "url": "http://h/#avb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://avb@h/",
+      "url": "http://h/",
+      "username": "avb",
+      "password": ""
+    },
+    {
+      "input": "http://u:avb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "avb"
+    },
+    {
+      "input": "http://avb/",
+      "url": "http://avb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/awb",
+      "url": "http://h/awb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?awb",
+      "url": "http://h/?awb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#awb",
+      "url": "http://h/#awb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://awb@h/",
+      "url": "http://h/",
+      "username": "awb",
+      "password": ""
+    },
+    {
+      "input": "http://u:awb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "awb"
+    },
+    {
+      "input": "http://awb/",
+      "url": "http://awb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/axb",
+      "url": "http://h/axb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?axb",
+      "url": "http://h/?axb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#axb",
+      "url": "http://h/#axb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://axb@h/",
+      "url": "http://h/",
+      "username": "axb",
+      "password": ""
+    },
+    {
+      "input": "http://u:axb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "axb"
+    },
+    {
+      "input": "http://axb/",
+      "url": "http://axb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/ayb",
+      "url": "http://h/ayb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?ayb",
+      "url": "http://h/?ayb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#ayb",
+      "url": "http://h/#ayb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://ayb@h/",
+      "url": "http://h/",
+      "username": "ayb",
+      "password": ""
+    },
+    {
+      "input": "http://u:ayb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "ayb"
+    },
+    {
+      "input": "http://ayb/",
+      "url": "http://ayb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/azb",
+      "url": "http://h/azb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?azb",
+      "url": "http://h/?azb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#azb",
+      "url": "http://h/#azb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://azb@h/",
+      "url": "http://h/",
+      "username": "azb",
+      "password": ""
+    },
+    {
+      "input": "http://u:azb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "azb"
+    },
+    {
+      "input": "http://azb/",
+      "url": "http://azb/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a{b",
+      "url": "http://h/a%7Bb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a{b",
+      "url": "http://h/?a{b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a{b",
+      "url": "http://h/#a{b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a{b@h/",
+      "url": "http://h/",
+      "username": "a%7Bb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a{b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%7Bb"
+    },
+    {
+      "input": "http://a{b/",
+      "url": "http://a{b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a|b",
+      "url": "http://h/a|b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a|b",
+      "url": "http://h/?a|b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a|b",
+      "url": "http://h/#a|b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a|b@h/",
+      "url": "http://h/",
+      "username": "a%7Cb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a|b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%7Cb"
+    },
+    {
+      "input": "http://a|b/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/a}b",
+      "url": "http://h/a%7Db",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a}b",
+      "url": "http://h/?a}b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a}b",
+      "url": "http://h/#a}b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a}b@h/",
+      "url": "http://h/",
+      "username": "a%7Db",
+      "password": ""
+    },
+    {
+      "input": "http://u:a}b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%7Db"
+    },
+    {
+      "input": "http://a}b/",
+      "url": "http://a}b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/a~b",
+      "url": "http://h/a~b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a~b",
+      "url": "http://h/?a~b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a~b",
+      "url": "http://h/#a~b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a~b@h/",
+      "url": "http://h/",
+      "username": "a~b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a~b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a~b"
+    },
+    {
+      "input": "http://a~b/",
+      "url": "http://a~b/",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/ab",
+      "url": "http://h/a%7Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?ab",
+      "url": "http://h/?a%7Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#ab",
+      "url": "http://h/#a%7Fb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://ab@h/",
+      "url": "http://h/",
+      "username": "a%7Fb",
+      "password": ""
+    },
+    {
+      "input": "http://u:ab@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%7Fb"
+    },
+    {
+      "input": "http://ab/",
+      "invalid": true
+    },
+    {
+      "input": "http://h/ab",
+      "url": "http://h/a%C2%80b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?ab",
+      "url": "http://h/?a%C2%80b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#ab",
+      "url": "http://h/#a%C2%80b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://ab@h/",
+      "url": "http://h/",
+      "username": "a%C2%80b",
+      "password": ""
+    },
+    {
+      "input": "http://u:ab@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%C2%80b"
+    },
+    {
+      "input": "http://h/aéb",
+      "url": "http://h/a%C3%A9b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?aéb",
+      "url": "http://h/?a%C3%A9b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#aéb",
+      "url": "http://h/#a%C3%A9b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://aéb@h/",
+      "url": "http://h/",
+      "username": "a%C3%A9b",
+      "password": ""
+    },
+    {
+      "input": "http://u:aéb@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%C3%A9b"
+    },
+    {
+      "input": "http://h/a b",
+      "url": "http://h/a%E2%80%A8b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a b",
+      "url": "http://h/?a%E2%80%A8b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a b",
+      "url": "http://h/#a%E2%80%A8b",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a b@h/",
+      "url": "http://h/",
+      "username": "a%E2%80%A8b",
+      "password": ""
+    },
+    {
+      "input": "http://u:a b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%E2%80%A8b"
+    },
+    {
+      "input": "http://h/a﻿b",
+      "url": "http://h/a%EF%BB%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a﻿b",
+      "url": "http://h/?a%EF%BB%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a﻿b",
+      "url": "http://h/#a%EF%BB%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a﻿b@h/",
+      "url": "http://h/",
+      "username": "a%EF%BB%BFb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a﻿b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%EF%BB%BFb"
+    },
+    {
+      "input": "http://h/a￿b",
+      "url": "http://h/a%EF%BF%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a￿b",
+      "url": "http://h/?a%EF%BF%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a￿b",
+      "url": "http://h/#a%EF%BF%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a￿b@h/",
+      "url": "http://h/",
+      "username": "a%EF%BF%BFb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a￿b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%EF%BF%BFb"
+    },
+    {
+      "input": "http://h/a􏿿b",
+      "url": "http://h/a%F4%8F%BF%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/?a􏿿b",
+      "url": "http://h/?a%F4%8F%BF%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://h/#a􏿿b",
+      "url": "http://h/#a%F4%8F%BF%BFb",
+      "username": "",
+      "password": ""
+    },
+    {
+      "input": "http://a􏿿b@h/",
+      "url": "http://h/",
+      "username": "a%F4%8F%BF%BFb",
+      "password": ""
+    },
+    {
+      "input": "http://u:a􏿿b@h/",
+      "url": "http://h/",
+      "username": "u",
+      "password": "a%F4%8F%BF%BFb"
+    }
+  ]
 }

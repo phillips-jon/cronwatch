@@ -1449,7 +1449,59 @@ async function channelCases() {
   } finally {
     globalThis.fetch = realFetch;
   }
-  return { alerts, sends, failures, ...(await providerCases(alerts)), ...(await twilioPartialCases(alerts)), ...textCutCases(alerts) };
+  return { alerts, sends, failures, ...(await providerCases(alerts)), ...(await twilioPartialCases(alerts)), ...textCutCases(alerts), urls: urlCases() };
+}
+
+// A channel posts to its URL as fetch reads it, and the ports that carry
+// their own WHATWG URL reader replay these through it, with Node's new URL
+// as the oracle. Every ASCII code point, and a few past it, is put in the
+// user name, the password, the host, the path, the query and the fragment,
+// beside the host, port and dot-segment forms fetch reads its own way. A
+// special URL is `url` (the href without its user name and password), with
+// `username` and `password` as WHATWG encodes them; `other` is the scheme of
+// any other URL; `invalid` is text that is no URL. No host outside ASCII is
+// here: the ports refuse one rather than write its punycode.
+function urlCases() {
+  const inputs = [
+    "HTTPS://EXAMPLE.com:443/a/./b/../c?x y#f g", "https:\\\\h.example\\a\\b", "https:h.example/x", "http:///x", "http:\\\\h\\a",
+    "http://ex%41mple.com/", "http://h:80/", "http://h:0080/", "http://h:/p", "http://h:8080", "http://h:65535/", "http://h:65536/", "http://h:8x/",
+    "http://h:00000000000000000000080/", "http://0x7f.1/", "http://2130706433/", "http://0177.0.0.1/", "http://127.1/", "http://0x/", "http://1.2.3.4./",
+    "http://1.2.3.4.5/", "http://256.1.1.1/", "http://1.2.3.256/", "http://0x100000000/", "http://example.1/", "http://09.1/", "http://1.2.3.09/",
+    "http://4294967295/", "http://4294967296/", "http://1.2.3.4../", "http://.1.2.3.4/", "http://a..b/", "http://EXAMPLE.COM./",
+    "http://[0:0:0:0:0:0:0:1]/", "http://[2001:DB8::1:0:0:1]/", "http://[::ffff:192.168.0.1]/", "http://[1:0:0:2:0:0:0:3]/",
+    "http://[1:0:2:0:3:0:4:0]/", "http://[::1::2]/", "http://[1:2:3:4:5:6:7:8:9]/", "http://[fe80::1%25eth0]/", "http://[::1]:8080/x", "http://[::1]x/",
+    "http://[::]/", "http://[1::]/", "http://[::1.2.3.4]/", "http://[::1.2.3]/", "http://[12345::]/", "http://[::1/",
+    "http://h/a/%2e%2E/b/.", "http://h/a/..", "http://h/a/b/../../../c", "http://h/a/.%2e/b", "http://h/./a/%2E/b/..", "http://h/a/...", "http://h//a//b/",
+    "http://h/a/..?q", "http://h/a/.#f", "http://h/a\\..\\b",
+    "http://h/?q='\"<>", "http://h/a|b{c}^`?q={d}|`^#`x", "http://h/%zz?%zz#%zz", "http://h/%2F%2f?%23#%25", "http://h/%?%#%",
+    "http://h/\u00e9?\u00e9#\u00e9", "http://h/\u{1F600}?\u{1F600}#\u{1F600}", "http://h/\u00a0?\u00a0#\u00a0",
+    "  http://h/\t\n  ", "http://h/a\tb\nc\rd", "\u0000http://h/\u001f", "http://h?", "http://h#", "http://h/?#", "http://h/#?", "http://h/??#?#",
+    "http://us%65r:p@h/x", "http://a@b@h/x", "http://a:b:c@h/", "http://:p@h/", "http://u:@h/", "http://@h/", "http://:@h/", "http://u@/",
+    "ws://h:80/", "wss://h:443/", "ftp://h:21/", "http://h:443/", "https://h:80/", "WS://H/", "Ftp://h/x",
+    "http://a b/", "http:///", "http://", "http:", "http://h%00/", "http://%41/", "http://h%/", "http://h%2/", "1http://h/", "no scheme", "",
+    "mailto:a@b.c", "JavaScript:alert(1)", "file:///etc/passwd", "data:text/plain,x", "h+t.p-s://h/", "ht~tp://h/",
+  ];
+  const chars = [];
+  for (let c = 0; c < 0x80; c++) chars.push(String.fromCharCode(c));
+  chars.push("\u0080", "\u00e9", "\u2028", "\ufeff", "\uffff", "\u{10FFFF}");
+  for (const c of chars) {
+    inputs.push(`http://h/a${c}b`, `http://h/?a${c}b`, `http://h/#a${c}b`, `http://a${c}b@h/`, `http://u:a${c}b@h/`);
+    if (c < "\u0080") inputs.push(`http://a${c}b/`);
+  }
+  return [...new Set(inputs)].map((input) => {
+    let url;
+    try {
+      url = new URL(input);
+    } catch {
+      return { input, invalid: true };
+    }
+    const scheme = url.protocol.slice(0, -1);
+    if (!["http", "https", "ws", "wss", "ftp"].includes(scheme)) return { input, other: scheme };
+    const { username, password } = url;
+    url.username = "";
+    url.password = "";
+    return { input, url: url.href, username, password };
+  });
 }
 
 // The provider channels (email, SMS, error trackers). Kept apart from `sends`

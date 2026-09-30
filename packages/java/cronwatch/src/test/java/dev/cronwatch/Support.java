@@ -226,6 +226,9 @@ final class Support {
     /** Waited on inside {@code updateRunIf}, when set. */
     volatile @Nullable CountDownLatch gate;
 
+    /** Run once {@code insertRun} has written the row, before it returns, when set. */
+    volatile @Nullable Runnable afterInsert;
+
     Wrapped(Store inner) {
       this.inner = inner;
     }
@@ -277,6 +280,10 @@ final class Support {
     public void insertRun(Run run) throws Exception {
       check("insertRun");
       inner.insertRun(run);
+      Runnable after = afterInsert;
+      if (after != null) {
+        after.run();
+      }
     }
 
     @Override

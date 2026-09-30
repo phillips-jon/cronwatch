@@ -33,7 +33,7 @@ pub(crate) struct SigningRequest<'a> {
 /// `x-amz-date`, the session token when there is one, and `authorization`.
 /// Host is signed but not returned, because the HTTP client sets it.
 pub(crate) fn sign(r: &SigningRequest<'_>, c: &Credentials) -> Result<Vec<(String, String)>, String> {
-    let url = Url::parse(r.url).map_err(|_| "cannot sign a request to an invalid URL".to_string())?;
+    let url = super::post::parse(r.url).map_err(|_| "cannot sign a request to an invalid URL".to_string())?;
     let iso = js::iso_string(r.now);
     let amz_date = format!("{}Z", iso[..19].replace(['-', ':'], ""));
     let day = &amz_date[..8];

@@ -6,8 +6,6 @@
 
 use std::sync::Arc;
 
-use url::Url;
-
 use super::post::{Transport, cut, percent_decode};
 use super::shared::{LinkFn, alert_id, details, invalid, link_for, run_summary, send, severity, triage, trimmed};
 use super::sigv4::host;
@@ -42,7 +40,7 @@ struct Sentry {
 
 /// The envelope endpoint and the public key of a DSN.
 fn parse_dsn(dsn: &str) -> Result<(String, String), Error> {
-    let url = Url::parse(dsn).map_err(|_| invalid("alerts::sentry needs a valid dsn"))?;
+    let url = super::post::parse(dsn).map_err(|_| invalid("alerts::sentry needs a valid dsn"))?;
     let mut segments: Vec<&str> = url.path().split('/').filter(|s| !s.is_empty()).collect();
     let project = segments.pop().unwrap_or("");
     if url.username().is_empty() || project.is_empty() || !project.bytes().all(|c| c.is_ascii_digit()) {

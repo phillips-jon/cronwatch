@@ -242,6 +242,18 @@ impl Answer {
     }
 }
 
+/// A URL as the WHATWG URL parser (and so fetch) reads it: `Url::parse`,
+/// with a `^` in a special URL's path percent-encoded, as WHATWG's path
+/// percent-encode set has it and the url crate does not.
+pub(crate) fn parse(raw: &str) -> Result<Url, url::ParseError> {
+    let mut url = Url::parse(raw)?;
+    if url.is_special() && url.path().contains('^') {
+        let path = url.path().replace('^', "%5E");
+        url.set_path(&path);
+    }
+    Ok(url)
+}
+
 /// The URL as fetch reads it, once it is one a channel can post to: http or
 /// https with a host. Refused without quoting it, since a webhook URL's path
 /// is its credential: "not ftp:" for another scheme, "not this URL" for
@@ -249,7 +261,7 @@ impl Answer {
 /// fetch refuses to send).
 pub(crate) fn postable(raw: &str) -> Result<Url, BoxError> {
     let refused = || fail("only http and https URLs can be posted to, not this URL");
-    let url = Url::parse(raw).map_err(|_| refused())?;
+    let url = parse(raw).map_err(|_| refused())?;
     match url.scheme() {
         "http" | "https" => {}
         other => return Err(fail(format!("only http and https URLs can be posted to, not {other}:"))),
@@ -264,7 +276,7 @@ pub(crate) fn postable(raw: &str) -> Result<Url, BoxError> {
 /// scheme's own left out. A URL's path or query can hold a credential, so an
 /// error names only this.
 pub fn origin(raw: &str) -> String {
-    match Url::parse(raw) {
+    match parse(raw) {
         Ok(url) => url.origin().ascii_serialization(),
         Err(_) => "(invalid URL)".to_string(),
     }
