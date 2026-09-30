@@ -1087,11 +1087,15 @@ export class CronWatch {
 
     // Runs that never reported back. One that cannot be judged (its job's
     // stored timeout no longer parses, say) is reported and skipped.
-    for (const run of await this.store.runningRuns()) {
+    for (const listed of await this.store.runningRuns()) {
       try {
-        const declared = this.definitions.get(run.job);
-        const definition = declared ? toStored(declared) : (await this.store.getJob(run.job))?.definition;
-        if (!definition || !isStuck(definition, run, now)) continue;
+        const declared = this.definitions.get(listed.job);
+        const definition = declared ? toStored(declared) : (await this.store.getJob(listed.job))?.definition;
+        if (!definition || !isStuck(definition, listed, now)) continue;
+        // Read again just before the write: lines and metrics flushed since the
+        // list was read (while earlier stuck runs were sent, say) are kept.
+        const run = await this.store.getRun(listed.id);
+        if (!run || run.status !== "running" || run.job !== listed.job) continue;
         const timeout = timeoutMs(definition);
         run.status = "timeout";
         run.finishedAt = now;
@@ -1101,7 +1105,7 @@ export class CronWatch {
         if (!(await this.writeRunIf(run, ["running"]))) continue;
         alerts.push(...(await this.finishRun(definition, run, now)));
       } catch (e) {
-        this.onError(e, `checking ${run.job}`);
+        this.onError(e, `checking ${listed.job}`);
       }
     }
 
