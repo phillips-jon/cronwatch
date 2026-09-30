@@ -12,6 +12,7 @@ import dev.cronwatch.ChannelContext;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.CronwatchException;
 import dev.cronwatch.JobOptions;
+import dev.cronwatch.alerts.Transport.Request;
 import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import java.util.ArrayList;

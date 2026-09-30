@@ -6,6 +6,7 @@ import dev.cronwatch.Alert;
 import dev.cronwatch.Channel;
 import dev.cronwatch.ChannelContext;
 import dev.cronwatch.Fixtures;
+import dev.cronwatch.alerts.Transport.Request;
 import dev.cronwatch.internal.post.Post;
 import dev.cronwatch.internal.post.WhatwgUrl;
 import dev.cronwatch.json.JsObject;

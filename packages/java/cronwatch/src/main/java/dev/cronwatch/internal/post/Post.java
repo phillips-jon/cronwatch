@@ -1,9 +1,9 @@
 package dev.cronwatch.internal.post;
 
 import dev.cronwatch.CronwatchException;
-import dev.cronwatch.alerts.Request;
-import dev.cronwatch.alerts.Response;
 import dev.cronwatch.alerts.Transport;
+import dev.cronwatch.alerts.Transport.Request;
+import dev.cronwatch.alerts.Transport.Response;
 import dev.cronwatch.internal.js.Js;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;

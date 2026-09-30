@@ -11,6 +11,8 @@ import dev.cronwatch.Alert;
 import dev.cronwatch.Channel;
 import dev.cronwatch.ChannelContext;
 import dev.cronwatch.CronwatchException;
+import dev.cronwatch.alerts.Transport.Request;
+import dev.cronwatch.alerts.Transport.Response;
 import dev.cronwatch.internal.post.Post;
 import dev.cronwatch.internal.post.WhatwgUrl;
 import dev.cronwatch.json.Json;

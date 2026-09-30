@@ -1,5 +1,7 @@
 package dev.cronwatch.alerts;
 
+import dev.cronwatch.alerts.Transport.Request;
+import dev.cronwatch.alerts.Transport.Response;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;

@@ -1,9 +1,9 @@
 package dev.cronwatch;
 
 import dev.cronwatch.alerts.JdkTransport;
-import dev.cronwatch.alerts.Request;
-import dev.cronwatch.alerts.Response;
 import dev.cronwatch.alerts.Transport;
+import dev.cronwatch.alerts.Transport.Request;
+import dev.cronwatch.alerts.Transport.Response;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
 
