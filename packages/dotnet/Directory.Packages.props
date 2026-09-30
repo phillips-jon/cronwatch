@@ -38,5 +38,7 @@
   </ItemGroup>
   <ItemGroup Label="Quartz">
     <PackageVersion Include="Quartz" Version="$(QuartzVersion)" />
+    <!-- The recovery test's clustered job store; SQLite refuses clustering. -->
+    <PackageVersion Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
 </Project>

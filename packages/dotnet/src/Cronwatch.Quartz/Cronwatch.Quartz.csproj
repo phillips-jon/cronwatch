@@ -4,13 +4,21 @@
     <AssemblyName>Cronwatch.Quartz</AssemblyName>
     <IsPackable>true</IsPackable>
     <PackageId>Cronwatch.Quartz</PackageId>
+    <Description>CronWatch for Quartz.NET 4: every job a scheduler holds declared with its schedule, and every firing recorded as a run, so a job that fails, runs late, never runs, gets stuck or runs slow is reported.</Description>
+    <PackageTags>$(PackageTags);quartz</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Quartz.NET 4 marks itself trimmable and AOT compatible, and this
+         package uses none of its reflection-based APIs. -->
+    <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
     <None Include="../../LICENSE" Pack="true" PackagePath="/" />
     <InternalsVisibleTo Include="Cronwatch.Quartz.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Quartz" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Cronwatch/Cronwatch.csproj" />
