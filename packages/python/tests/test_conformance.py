@@ -598,6 +598,39 @@ def test_store_foreign_version(kind: str, tmp_path: Path) -> None:
         return None
 
     each_case(STORE["foreignVersion"], check)
+
+
+@pytest.mark.parametrize("kind", STORES)
+def test_store_nul(kind: str, tmp_path: Path) -> None:
+    """Text is written without U+0000, which Postgres refuses."""
+    store = make_store(kind, tmp_path)
+
+    def check(c: dict[str, Any]) -> str | None:
+        written: Any = None
+        if "upsertJob" in c:
+            store.upsert_job(JobDefinition.from_dict(c["upsertJob"]), c["now"])
+            stored: Any = store.get_job("nul")
+        elif "insertRun" in c:
+            store.insert_run(Run.from_dict(c["insertRun"]))
+            stored = store.get_run("n1")
+        elif "updateRun" in c:
+            store.update_run(Run.from_dict(c["updateRun"]))
+            stored = store.get_run("n1")
+        elif "updateRunIf" in c:
+            written = store.update_run_if(Run.from_dict(c["updateRunIf"]), c["from"])
+            stored = store.get_run("n1")
+        elif "setState" in c:
+            store.set_state(JobState.from_dict(c["setState"]))
+            stored = store.get_state("nul")
+        else:
+            written = store.compare_and_set_state(JobState.from_dict(c["compareAndSetState"]), c["expected"])
+            stored = store.get_state("nul")
+        # Postgres hands JSONB back with its keys in its own order.
+        expected = json.dumps([c.get("written"), c["stored"]], sort_keys=True)
+        return differs(expected, json.dumps([written, stored.to_dict() if stored else None], sort_keys=True))
+
+    each_case(STORE["nul"], check)
+    store.close()
     store.close()
 
 

@@ -10,6 +10,7 @@ from typing import Any, TypeVar
 
 from .. import _js
 from ..evaluate import state_version
+from ..output import strip_json_nul, strip_nul
 from ..types import JobDefinition, JobState, Run, RunStatus, StoredJob
 
 T = TypeVar("T")
@@ -19,6 +20,23 @@ def _clone(value: Any, kind: type[T]) -> T:
     """A copy through JSON, as the SDK's memory store makes, so nothing the
     caller holds is shared and values read back as any store returns them."""
     return kind.from_dict(_js.loads(_js.dumps(value.to_dict())))  # type: ignore[attr-defined, no-any-return]
+
+
+def _kept(value: Any, kind: type[T]) -> T:
+    """A copy as the SQL stores write it (see _sql.py), without U+0000 in
+    any key or string, so every store reads back the same."""
+    return kind.from_dict(_js.loads(strip_json_nul(_js.dumps(value.to_dict()))))  # type: ignore[attr-defined, no-any-return]
+
+
+def _kept_run(run: Run) -> Run:
+    """A run as the SQL stores write it: no U+0000 in its trigger, output,
+    error or metric names. Its id and job are identifiers, kept as given."""
+    copy = _clone(run, Run)
+    copy.trigger = strip_nul(copy.trigger)
+    copy.output = None if copy.output is None else strip_nul(copy.output)
+    copy.error = None if copy.error is None else strip_nul(copy.error)
+    copy.metrics = _js.loads(strip_json_nul(_js.dumps(copy.metrics or {})))
+    return copy
 
 
 def _units(name: str) -> bytes:
@@ -41,7 +59,7 @@ class MemoryStore:
             existing = self._jobs.get(definition.name)
             self._jobs[definition.name] = StoredJob(
                 name=definition.name,
-                definition=JobDefinition.from_dict(_js.loads(_js.dumps(definition.to_dict()))),
+                definition=_kept(definition, JobDefinition),
                 created_at=existing.created_at if existing else now,
                 updated_at=now,
             )
@@ -69,7 +87,7 @@ class MemoryStore:
         with self._lock:
             if run.id in self._runs:
                 raise ValueError(f"run {run.id} already exists")
-            self._runs[run.id] = _clone(run, Run)
+            self._runs[run.id] = _kept_run(run)
             self._seq += 1
             self._order[run.id] = self._seq
 
@@ -121,7 +139,7 @@ class MemoryStore:
 
     def set_state(self, state: JobState) -> None:
         with self._lock:
-            self._states[state.job] = _clone(state, JobState)
+            self._states[state.job] = _kept(state, JobState)
 
     def compare_and_set_state(self, state: JobState, expected_version: int) -> bool:
         """Writes `state` only when the stored state's version (absent, or no
@@ -130,7 +148,7 @@ class MemoryStore:
             current = self._states.get(state.job)
             if state_version(current) != expected_version:
                 return False
-            self._states[state.job] = _clone(state, JobState)
+            self._states[state.job] = _kept(state, JobState)
             return True
 
     def prune(self, before: int) -> int:
@@ -156,7 +174,7 @@ class MemoryStore:
 
     @staticmethod
     def _finished_fields(existing: Run, run: Run) -> Run:
-        copy = _clone(run, Run)
+        copy = _kept_run(run)
         updated = _clone(existing, Run)
         updated.status = copy.status
         updated.finished_at = copy.finished_at

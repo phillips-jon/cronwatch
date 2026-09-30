@@ -26,6 +26,19 @@ def strip_nul(text: str) -> str:
     return text.replace("\x00", "") if "\x00" in text else text
 
 
+_JSON_ESCAPE = re.compile(r"\\(u0000|[\s\S])")
+
+
+def strip_json_nul(json: str) -> str:
+    """Removes every U+0000 from JSON text, keys and strings alike, by
+    dropping each \\u0000 escape (a NUL can appear in JSON no other way).
+    Escapes are read left to right in pairs, so an escaped backslash followed
+    by "u0000" is left as it is."""
+    if "\\u0000" not in json:
+        return json
+    return _JSON_ESCAPE.sub(lambda m: "" if m.group(1) == "u0000" else m.group(0), json)
+
+
 def cap_output(text: str) -> str:
     """NUL characters are removed first, since Postgres refuses them in TEXT
     and JSONB and the whole run row would be lost. The cap then applies to

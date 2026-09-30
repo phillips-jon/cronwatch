@@ -506,6 +506,20 @@ def test_start_and_resume_refuse_ids_in_the_pg_cron_sources_namespace() -> None:
     assert job.start(id="pgcron-42").active is True, "only the prefix with its colon is reserved"
 
 
+def test_a_run_id_with_a_nul_is_refused_wherever_one_is_taken() -> None:
+    """No store could hold a NUL (Postgres refuses it)."""
+    cw, _, _ = client(MemoryStore(), Clock().now)
+    job = cw.job("webhook-job")
+    with pytest.raises(ValueError, match=r"start\(\) cannot take a run id containing a NUL character"):
+        job.start(id="run\x00one")
+    with pytest.raises(ValueError, match=r"resume\(\) cannot take a run id containing a NUL character"):
+        job.resume("run\x00one")
+    run = {"id": "x\x00y", "job": "webhook-job", "status": "ok", "startedAt": 1, "finishedAt": 2, "durationMs": 1, "metrics": {}, "trigger": "run"}
+    with pytest.raises(ValueError, match="record_run: run ids cannot contain a NUL character"):
+        cw.record_run(run)
+    assert cw.runs("webhook-job") == []
+
+
 def test_start_with_an_id_another_job_holds_fails_the_same_whether_its_start_is_in_flight_or_done() -> None:
     cw, _, _ = client(MemoryStore(), Clock().now)
     a = cw.job("import-a")

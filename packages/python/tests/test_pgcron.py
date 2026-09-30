@@ -297,6 +297,84 @@ def test_a_run_cut_off_by_a_restart_is_recorded_and_one_held_run_never_stops_the
     assert [e for e in errors if "cron." not in e and "row level" not in e] == []
 
 
+def test_a_jobs_job_name_or_options_callback_that_fails_fails_only_its_job_reported_once() -> None:
+    clock = Clock()
+    cron = FakeCron()
+    for jobid, name in [(1, "one"), (2, "two"), (3, "three"), (4, "four")]:
+        cron.job(jobid, name, "0 * * * *")
+    broken: set[str] = set()
+    errors: list[str] = []
+
+    def pick(j: Any) -> bool:
+        if f"pick:{j.jobid}" in broken:
+            raise RuntimeError("pick broke")
+        return True
+
+    def name_of(j: Any) -> Any:
+        if f"raise:{j.jobid}" in broken:
+            raise RuntimeError("name broke")
+        if f"none:{j.jobid}" in broken:
+            return None
+        if f"number:{j.jobid}" in broken:
+            return 7
+        return f"j-{j.jobname}"
+
+    def options_of(j: Any) -> dict[str, Any]:
+        if f"options:{j.jobid}" in broken:
+            raise RuntimeError("options broke")
+        return {}
+
+    cw = client(cron, clock, errors=errors, jobs=pick, job_name=name_of, options=options_of)
+
+    def notices() -> list[str]:
+        return [e for e in errors if "cron.timezone" not in e and "row level" not in e]
+
+    def names() -> list[str]:
+        return [j.name for j in cw.store.list_jobs()]
+
+    # First sight, with job 1's name callback raising and job 2's giving None: only those two are skipped.
+    broken |= {"raise:1", "none:2"}
+    first = cron.add(3, "succeeded", T0 - 60_000, T0 - 59_000, "ok")
+    cw.check()
+    assert names() == ["j-four", "j-three"]
+    assert cw.get_run(f"pgcron:{first.runid}").job == "j-three"
+    assert notices() == [
+        "pg_cron job 1: job_name raised RuntimeError: name broke; it keeps its last declaration until that works",
+        "pg_cron job 2: job_name returned None, not a name; it keeps its last declaration until that works",
+    ]
+
+    # Once they work, both are declared; then every callback fails in turn for jobs already declared.
+    broken.clear()
+    cw.check()
+    assert names() == ["j-four", "j-one", "j-three", "j-two"]
+    broken |= {"pick:1", "number:2", "options:3", "raise:4"}
+    errors.clear()
+    later = [cron.add(1, "failed", T0 + 1000, T0 + 2000, "ERROR:  one"), cron.add(3, "succeeded", T0 + 1000, T0 + 2000, "ok")]
+    clock.advance(5000)
+    cw.check()
+    cw.check()
+    assert notices() == [
+        "pg_cron job 1: the jobs callback raised RuntimeError: pick broke; it keeps its last declaration until that works",
+        "pg_cron job 2: job_name returned int, not a name; it keeps its last declaration until that works",
+        "pg_cron job 3: the options callback raised RuntimeError: options broke; it keeps its last declaration until that works",
+        "pg_cron job 4: job_name raised RuntimeError: name broke; it keeps its last declaration until that works",
+    ], "each reported once, over two syncs"
+    # Each keeps its name and schedule, is not retired, and its runs are still copied.
+    for stored in cw.store.list_jobs():
+        assert stored.definition.schedule == "0 * * * *", stored.name
+        assert "no longer" not in (stored.definition.description or "") and "renamed" not in (stored.definition.description or ""), stored.name
+    assert cw.get_run(f"pgcron:{later[0].runid}").job == "j-one"
+    assert cw.get_run(f"pgcron:{later[1].runid}").job == "j-three"
+
+    # Working again and then failing again is reported again.
+    broken.clear()
+    cw.check()
+    broken.add("pick:1")
+    cw.check()
+    assert len(notices()) == 5
+    assert notices()[4].startswith("pg_cron job 1: the jobs callback raised")
+
+
 def test_first_sight_never_judges_history_even_with_a_held_or_cut_off_run_among_the_newest() -> None:
     cron = FakeCron()
     cron.job(1, "nightly", "0 3 * * *")
