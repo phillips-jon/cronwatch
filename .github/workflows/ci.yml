@@ -1250,20 +1250,29 @@ jobs:
       - name: ./mvnw verify
         working-directory: packages/java
         run: ./mvnw -B verify
-      # The core's jar holds its classes, module-info, resources and
+      # @cronwatch/mcp's tools against the Java dashboard, served by
+      # packages/java/webserver (the JDK's HttpServer), built with the wrapper
+      # on this entry's JDK.
+      - name: MCP server against the Java dashboard
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_JAVA: "1"
+      # Each published jar holds its classes, module-info, resources and
       # META-INF, and nothing from the tests or conformance/.
-      - name: The jar's files
+      - name: The jars' files
         if: matrix.newest
-        working-directory: packages/java/cronwatch
+        working-directory: packages/java
         run: |
-          jar=$(ls target/cronwatch-*.jar)
-          unzip -Z1 "$jar" | sort > "$RUNNER_TEMP/jar.txt"
-          (cd target/test-classes && find . -type f | sed 's|^\./||' | sort) > "$RUNNER_TEMP/tests.txt"
-          if comm -12 "$RUNNER_TEMP/jar.txt" "$RUNNER_TEMP/tests.txt" | grep .; then
-            echo "$jar holds test files"
-            exit 1
-          fi
-          if grep -v -E '^(META-INF/|module-info\.class$|dev/$|dev/cronwatch/)' "$RUNNER_TEMP/jar.txt"; then
-            echo "$jar holds files it should not"
-            exit 1
-          fi
+          for module in cronwatch cronwatch-servlet cronwatch-spring-boot-starter; do
+            jar=$(ls "$module"/target/"$module"-*.jar | grep -v -E -- '-(tests|sources|javadoc)\.jar$')
+            unzip -Z1 "$jar" | sort > "$RUNNER_TEMP/jar.txt"
+            (cd "$module/target/test-classes" && find . -type f | sed 's|^\./||' | sort) > "$RUNNER_TEMP/tests.txt"
+            if comm -12 "$RUNNER_TEMP/jar.txt" "$RUNNER_TEMP/tests.txt" | grep .; then
+              echo "$jar holds test files"
+              exit 1
+            fi
+            if grep -v -E '^(META-INF/|module-info\.class$|dev/$|dev/cronwatch/)' "$RUNNER_TEMP/jar.txt"; then
+              echo "$jar holds files it should not"
+              exit 1
+            fi
+          done

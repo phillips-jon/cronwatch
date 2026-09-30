@@ -45,6 +45,7 @@
     <module>cronwatch</module>
     <module>cronwatch-servlet</module>
     <module>cronwatch-spring-boot-starter</module>
+    <module>webserver</module>
   </modules>
 
   <properties>
@@ -150,6 +151,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>3.12.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.11.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -389,6 +395,7 @@
               <!-- The flattened POMs stand alone, so the parent is not published. -->
               <excludeArtifacts>
                 <artifact>cronwatch-parent</artifact>
+                <artifact>cronwatch-webserver</artifact>
               </excludeArtifacts>
             </configuration>
           </plugin>
