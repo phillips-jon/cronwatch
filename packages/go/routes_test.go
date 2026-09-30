@@ -270,8 +270,17 @@ func TestRoutesAPIWrites(t *testing.T) {
 	silenced := decode(t, post("/cronwatch/api/jobs/s/silence", `{"for":"2h"}`))
 	eq(t, "until", silenced["state"].(map[string]any)["silencedUntil"].(float64), float64(T0+2*HOUR))
 	eq(t, "health", summary(t, w.cw, "s").Health, cronwatch.HealthSilenced)
+	endless := decode(t, post("/cronwatch/api/jobs/s/silence", `{"for":"99999999999999999999w"}`))
+	eq(t, "held at 2^53 - 1", endless["state"].(map[string]any)["silencedUntil"].(float64), float64(9007199254740991))
 	un := decode(t, post("/cronwatch/api/jobs/s/unsilence", ""))
 	eq(t, "unsilenced", un["state"].(map[string]any)["silencedUntil"], any(nil))
+	// A silence an older SDK wrote past int64 still reads as a silence.
+	var far cronwatch.JobState
+	check(t, far.UnmarshalJSON([]byte(`{"job":"s","open":{},"consecutiveFailures":0,"silencedUntil":6.048e+28,"lastAlertAt":null}`)))
+	eq(t, "read past int64", *far.SilencedUntil, int64(math.MaxInt64))
+	check(t, w.cw.Store().SetState(bg, far))
+	eq(t, "still silenced", summary(t, w.cw, "s").Health, cronwatch.HealthSilenced)
+	check(t, w.cw.Store().SetState(bg, cronwatch.JobState{Job: "s"}))
 	status(t, "ghost", post("/cronwatch/api/jobs/nope/silence", `{"for":"1h"}`), 404)
 	status(t, "delete", w.send("DELETE", "/cronwatch/api/jobs/s", auth, ""), 200)
 	if summary(t, w.cw, "s") != nil {

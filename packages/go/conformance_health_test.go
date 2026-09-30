@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"cronwatch.dev/go/internal/js"
+	"cronwatch.dev/go/internal/schedule"
 )
 
 func fixtureRun(t *testing.T, v any) *Run {
@@ -177,6 +178,19 @@ func TestConformanceHealth(t *testing.T) {
 			alerts = append(alerts, d.JSValue())
 		}
 		sameJSON(t, fmt.Sprintf("applySilence %d", i), js.NewObject("state", out.state.JSValue(), "alerts", alerts), field(c, "result"))
+	}
+	ends := objects(f, "silenceEnd")
+	if len(ends) == 0 {
+		t.Error("no silenceEnd cases")
+	}
+	for i, c := range ends {
+		ms, err := schedule.ParseDuration(field(c, "duration"), "silence duration")
+		if err != nil {
+			t.Fatalf("silenceEnd %d: %v", i, err)
+		}
+		if got, want := silenceEnd(now(c), ms), int64(field(c, "silencedUntil").(float64)); got != want {
+			t.Errorf("silenceEnd %d (%v from %d): %d, want %d", i, field(c, "duration"), now(c), got, want)
+		}
 	}
 	for i, c := range objects(f, "staleAlert") {
 		a, err := alertFrom(field(c, "alert"))

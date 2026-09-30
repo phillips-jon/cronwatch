@@ -523,7 +523,7 @@ func runsLimit(value string, present bool) int {
 // silenceFor silences a job for ms milliseconds, a value the SDK's
 // parseDuration read.
 func (c *Client) silenceFor(ctx context.Context, name string, ms float64) (JobState, error) {
-	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(laterBy(c.now(), ms)) })
+	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(silenceEnd(c.now(), ms)) })
 }
 
 // boardLanes are the board's timeline lanes, the first boardLanes jobs. The

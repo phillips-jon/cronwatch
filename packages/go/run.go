@@ -351,11 +351,6 @@ func msDuration(ms float64) time.Duration {
 	return math.MaxInt64
 }
 
-// laterBy is t plus ms milliseconds, with ms held at schedule.MaxIntervalMs
-// so the sum cannot wrap: a silence "for" any length ends in some 285,000
-// years at most.
-func laterBy(t int64, ms float64) int64 { return t + int64(min(ms, schedule.MaxIntervalMs)) }
-
 // discardRun takes back a run still running (DiscardWhen) and says whether
 // the caller is done with it. A store that is not a RunDeleter, or that
 // fails, is reported and the run is finished as it ended, so it is not left

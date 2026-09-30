@@ -468,6 +468,18 @@ func isStuck(def Definition, run Run, now int64) (bool, error) {
 // unchanged (the SDK's MAX_DURATION_MS).
 const maxDurationMs = 9007199254740991
 
+// silenceEnd is when a silence of ms milliseconds from now ends: a whole
+// millisecond, never past maxDurationMs (2^53 - 1), however long the silence
+// asked for, worked out without wrapping an int64. Every port sharing the
+// store reads it back unchanged.
+func silenceEnd(now int64, ms float64) int64 {
+	d := int64(math.Floor(min(ms, maxDurationMs)))
+	if now >= maxDurationMs-d {
+		return maxDurationMs
+	}
+	return now + d
+}
+
 // runDuration is how long a run took, from startedAt to finishedAt: 0 when
 // it started later, and never more than maxDurationMs (the SDK's
 // runDuration). A foreign row's start near a 64-bit limit must not wrap, or

@@ -877,7 +877,18 @@ func nullableInt(o *js.Object, key string) *int64 {
 	if !ok {
 		return nil
 	}
-	n := int64(v)
+	// Held at int64's ends: a foreign row's 6e28 (a silence an older SDK
+	// wrote) would otherwise convert as the platform likes, to a time long
+	// past on amd64.
+	var n int64
+	switch {
+	case v >= math.MaxInt64:
+		n = math.MaxInt64
+	case v <= math.MinInt64:
+		n = math.MinInt64
+	default:
+		n = int64(v)
+	}
 	return &n
 }
 

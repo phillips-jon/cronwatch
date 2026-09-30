@@ -322,7 +322,7 @@ func (c *Client) Silence(ctx context.Context, name string, d time.Duration) (Job
 	if err != nil {
 		return JobState{}, err
 	}
-	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(laterBy(c.now(), ms)) })
+	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(silenceEnd(c.now(), ms)) })
 }
 
 // Unsilence ends a silence.
