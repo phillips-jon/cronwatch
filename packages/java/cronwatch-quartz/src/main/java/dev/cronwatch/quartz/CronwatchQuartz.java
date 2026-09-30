@@ -11,6 +11,7 @@ import dev.cronwatch.RunOptions;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.bridge.Bridge;
 import dev.cronwatch.bridge.Entry;
+import dev.cronwatch.bridge.FireTimes;
 import dev.cronwatch.bridge.ScheduleException;
 import dev.cronwatch.bridge.Watch;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +29,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
 import org.quartz.CalendarIntervalTrigger;
+import org.quartz.CronExpression;
 import org.quartz.CronTrigger;
 import org.quartz.DailyTimeIntervalTrigger;
 import org.quartz.JobBuilder;
@@ -403,9 +405,10 @@ public final class CronwatchQuartz implements AutoCloseable {
     if (fields.length == 7 && isAny(fields[6])) {
       expr = String.join(" ", List.of(fields).subList(0, 6));
     }
-    QuartzFires fires;
+    CronExpression quartz;
     try {
-      fires = new QuartzFires(QuartzFires.parse(expression, tz));
+      quartz = new CronExpression(expression);
+      quartz.setTimeZone(tz);
     } catch (ParseException e) {
       throw new ScheduleException(
           "cronwatch: "
@@ -421,8 +424,21 @@ public final class CronwatchQuartz implements AutoCloseable {
             && isAny(fields[4])
             && isAny(fields[5])
             && (fields.length < 7 || isAny(fields[6]));
-    Bridge.checkFires(fires, expr, tz.getID(), "cronwatch: " + label, SCHEDULER, daily, now);
+    Bridge.checkFires(
+        FireTimes.walking(at -> nextAfter(quartz, at), SCHEDULER),
+        expr,
+        tz.getID(),
+        "cronwatch: " + label,
+        SCHEDULER,
+        daily,
+        now);
     return expr;
+  }
+
+  @SuppressWarnings("JavaUtilDate") // Quartz's API takes and answers a Date
+  private static @Nullable Long nextAfter(CronExpression cron, long at) {
+    java.util.Date next = cron.getNextValidTimeAfter(new java.util.Date(at));
+    return next == null ? null : next.getTime();
   }
 
   private static boolean isAny(String field) {

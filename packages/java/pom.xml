@@ -44,6 +44,7 @@
   <modules>
     <module>cronwatch</module>
     <module>cronwatch-quartz</module>
+    <module>cronwatch-spring-boot-starter</module>
   </modules>
 
   <properties>
