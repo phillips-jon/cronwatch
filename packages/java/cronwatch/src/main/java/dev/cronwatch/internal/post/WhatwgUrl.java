@@ -525,7 +525,7 @@ public record WhatwgUrl(
   }
 
   private static boolean pathChar(int c) {
-    return !(c0OrHigh(c) || " \"#<>?`{}".indexOf(c) >= 0);
+    return !(c0OrHigh(c) || " \"#<>?^`{}".indexOf(c) >= 0);
   }
 
   private static boolean queryChar(int c) {

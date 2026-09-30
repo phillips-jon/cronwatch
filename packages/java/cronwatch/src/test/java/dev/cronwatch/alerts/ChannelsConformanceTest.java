@@ -435,6 +435,39 @@ class ChannelsConformanceTest {
     System.out.println("channels.json: " + count + " cases replayed");
   }
 
+  /**
+   * The fixture's URLs, each read as Node's {@code new URL} reads it: the href without its user
+   * name and password, those as WHATWG encodes them, another scheme, or no URL.
+   */
+  @Test
+  void urlsAreReadAsNodeReadsThem() {
+    List<JsObject> cases = Fixtures.objects(Fixtures.load("channels"), "urls");
+    List<String> wrong = new ArrayList<>();
+    for (JsObject c : cases) {
+      String input = s(c, "input");
+      String want;
+      if (Boolean.TRUE.equals(c.get("invalid"))) {
+        want = "invalid";
+      } else if (c.get("other") != null) {
+        want = "other " + s(c, "other");
+      } else {
+        want = s(c, "url") + " user " + s(c, "username") + " password " + s(c, "password");
+      }
+      String got =
+          switch (WhatwgUrl.parse(input)) {
+            case WhatwgUrl.Special sp ->
+                sp.url() + " user " + sp.url().username() + " password " + sp.url().password();
+            case WhatwgUrl.Other o -> "other " + o.scheme();
+            case WhatwgUrl.Invalid i -> "invalid";
+          };
+      if (!want.equals(got)) {
+        wrong.add(Json.stringify(input) + ": node " + want + ", java " + got);
+      }
+    }
+    assertEquals(List.of(), wrong);
+    assertEquals(true, cases.size() > 700);
+  }
+
   /** The alert with another title, message and triage. */
   static Alert withText(Alert a, String title, String message, @Nullable String triage) {
     return new Alert(
