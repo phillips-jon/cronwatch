@@ -404,6 +404,24 @@ def test_state_version() -> None:
     each_case(HEALTH["stateVersion"], lambda c: differs(c["version"], evaluate.state_version(JobState.from_dict(json.loads(c["state"])))))
 
 
+def test_failure_count() -> None:
+    minute = 60_000
+    definition = JobDefinition.from_dict({"name": "j", "failuresBeforeAlert": 3})
+    run = Run.from_dict({
+        "id": "f", "job": "j", "status": "failed", "startedAt": T0 - minute, "finishedAt": T0 - minute + 1000, "durationMs": 1000,
+        "error": "Error: boom", "output": None, "metrics": {}, "trigger": "run",
+    })
+
+    def check(c: dict[str, Any]) -> str | None:
+        normalized = evaluate.normalize_state(JobState.from_dict(json.loads(c["state"])), "j")
+        result = evaluate.on_run_finish(definition, run.copy(), normalized, [], T0)
+        return differs(c["consecutiveFailures"], normalized.consecutive_failures) or differs(
+            c["failed"], {"state": result.state.to_dict(), "alerts": [a.to_dict() for a in result.alerts]}
+        )
+
+    each_case(HEALTH["failureCount"], check)
+
+
 def test_stale_alert() -> None:
     each_case(HEALTH["staleAlert"], lambda c: differs(c["stale"], evaluate.stale_alert(Alert.from_dict(c["alert"]), state_from(c["state"]))))  # type: ignore[arg-type]
 

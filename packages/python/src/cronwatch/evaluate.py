@@ -63,6 +63,20 @@ def state_version(state: JobState | None) -> int:
     return int(version) if 0 <= version <= MAX_DURATION_MS else 0
 
 
+def failure_count(state: JobState | None) -> int:
+    """The failures in a row a stored state counts as: its
+    `consecutive_failures` when that is a whole number, held at
+    MAX_DURATION_MS (2^53 - 1), and 0 when it is negative or not a whole
+    number. A foreign row's count past 2^53, or at a 64-bit limit, stays at
+    the top, and a 1.5, "3" or -1 counts as none."""
+    count = None if state is None else state.consecutive_failures
+    if isinstance(count, bool) or not isinstance(count, (int, float)):
+        return 0
+    if isinstance(count, float) and not count.is_integer():
+        return 0
+    return min(int(count), MAX_DURATION_MS) if count > 0 else 0
+
+
 @dataclass
 class Evaluation:
     state: JobState
@@ -84,6 +98,7 @@ def normalize_state(state: JobState | None, job: str) -> JobState:
     if state is None:
         return empty_state(job)
     out = state.copy()
+    out.consecutive_failures = failure_count(state)
     if out.pending_recovery is None:
         out.pending_recovery = []
     if out.undelivered is None:
@@ -249,7 +264,8 @@ def on_run_finish(definition: JobDefinition, run: Run, state: JobState, history:
         return Evaluation(following, alerts)
 
     # failed or timeout
-    following.consecutive_failures += 1
+    # Held at the top: a count at the limit must not pass what the SDK and every store hold exactly.
+    following.consecutive_failures = min(following.consecutive_failures + 1, MAX_DURATION_MS)
     _close_condition(following, Condition.MISSED)
     threshold = max(1, definition.failures_before_alert if definition.failures_before_alert is not None else 1)
     condition = Condition.STUCK if run.status == RunStatus.TIMEOUT else Condition.FAILED
