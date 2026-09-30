@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { cronwatch, memory } from "../src/index.js";
 import { sqlite } from "../src/stores/sqlite.js";
 import type { Store } from "../src/types.js";
-import { capture, clock } from "./helpers.js";
+import { capture, clock, settle } from "./helpers.js";
 
 /**
  * A store whose state reads take a while, as over a network: two processes
@@ -104,4 +104,78 @@ test("an update that keeps losing gives up and reports, and the run still finish
   await assert.rejects(cw.run("busy", async () => { throw new Error("x"); }), /x/);
   assert.deepEqual(errors, ["evaluating busy"]);
   assert.equal((await cw.runs("busy"))[0]!.status, "failed");
+});
+
+/**
+ * A store whose first write of a job's definition waits until it is let go,
+ * so a test can declare the job again, or ask for another write, while that
+ * one is under way.
+ */
+function heldUpsert(store: Store) {
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const waiting = new Promise<void>((r) => { entered = r; });
+  let held = false;
+  const wrapped: Store = {
+    ...store,
+    async upsertJob(definition, now) {
+      if (!held) {
+        held = true;
+        entered();
+        await gate;
+      }
+      await store.upsertJob(definition, now);
+    },
+  };
+  return { store: wrapped, waiting, release };
+}
+
+test("a handle kept from an earlier declaration writes the one that stands, not its own", async () => {
+  const store = memory();
+  const cw = cronwatch({ store, alerts: [capture()], cronSecret: null });
+  const earlier = cw.job("a");
+  cw.job("a", { schedule: "every 5m" });
+  await earlier.run(async () => {});
+  assert.equal((await store.getJob("a"))!.definition.schedule, "every 5m");
+  await cw.check();
+  assert.equal((await store.getJob("a"))!.definition.schedule, "every 5m");
+});
+
+test("a handle whose job was forgotten writes its own definition", async () => {
+  const store = memory();
+  const cw = cronwatch({ store, alerts: [capture()], cronSecret: null });
+  const handle = cw.job("a", { schedule: "every 5m" });
+  await cw.forget("a");
+  await handle.run(async () => {});
+  assert.equal((await store.getJob("a"))!.definition.schedule, "every 5m");
+});
+
+test("a declaration made while the earlier one is being written is still to be written", async () => {
+  const inner = memory();
+  const { store, waiting, release } = heldUpsert(inner);
+  const cw = cronwatch({ store, alerts: [capture()], cronSecret: null });
+  const run = cw.job("a").run(async () => {});
+  await waiting;
+  cw.job("a", { schedule: "every 5m" });
+  release();
+  await run;
+  await cw.check();
+  assert.equal((await inner.getJob("a"))!.definition.schedule, "every 5m");
+});
+
+test("a declaration's write waits for the earlier one's, so the later one stays", async () => {
+  const inner = memory();
+  const { store, waiting, release } = heldUpsert(inner);
+  const cw = cronwatch({ store, alerts: [capture()], cronSecret: null });
+  const run = cw.job("a").run(async () => {});
+  await waiting;
+  cw.job("a", { schedule: "every 5m" });
+  const later = cw.jobSummary("a");
+  // Were the later write not to wait its turn, it would land here, under the earlier one.
+  await settle();
+  release();
+  await Promise.all([run, later]);
+  assert.equal((await inner.getJob("a"))!.definition.schedule, "every 5m");
+  assert.equal((await later)!.definition.schedule, "every 5m");
 });

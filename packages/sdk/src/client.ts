@@ -303,6 +303,8 @@ export class CronWatch {
   private readonly synced = new Set<string>();
   /** The tail of each job's queue of state updates. See serial(). */
   private readonly queues = new Map<string, Promise<void>>();
+  /** The tail of each job's queue of declaration writes. See sync(). */
+  private readonly syncing = new Map<string, Promise<void>>();
   /** start() calls with an id still in flight, so two at once in this process record one run. */
   private readonly starting = new Map<string, Promise<RunHandle>>();
   private ready: Promise<void> | null = null;
@@ -459,25 +461,39 @@ export class CronWatch {
     await this.ready;
   }
 
+  /**
+   * Writes the declaration of `definition`'s name as it stands, unless the
+   * store has it. A handle kept from an earlier declaration writes the one
+   * that replaced it, never its own over it, and one forgotten since writes
+   * its own. The writes of one name take turns, in the order they were asked
+   * for, so one still under way cannot land after a later one; and a name
+   * declared again while its write was under way is still to be written.
+   */
   private async sync(definition: JobDefinition): Promise<void> {
     await this.ensureReady();
-    if (this.synced.has(definition.name)) return;
-    await this.store.upsertJob(toStored(definition), this.now());
-    this.synced.add(definition.name);
+    const name = definition.name;
+    if (this.synced.has(name)) return;
+    await this.serial(name, async () => {
+      if (this.synced.has(name)) return;
+      const standing = this.definitions.get(name) ?? definition;
+      await this.store.upsertJob(toStored(standing), this.now());
+      if ((this.definitions.get(name) ?? standing) === standing) this.synced.add(name);
+    }, this.syncing);
   }
 
   /**
    * Runs `fn` after every earlier state update for the same job has settled,
    * so two runs (or a run and a check) in this process never read and write
    * the job's state over each other. Other processes are coordinated by
-   * updateState() instead.
+   * updateState() instead. sync() queues a job's declaration writes the same
+   * way, in `syncing`.
    */
-  private serial<T>(job: string, fn: () => Promise<T>): Promise<T> {
-    const result = (this.queues.get(job) ?? Promise.resolve()).then(fn);
+  private serial<T>(job: string, fn: () => Promise<T>, queues = this.queues): Promise<T> {
+    const result = (queues.get(job) ?? Promise.resolve()).then(fn);
     const tail = result.then(() => {}, () => {});
-    this.queues.set(job, tail);
+    queues.set(job, tail);
     void tail.then(() => {
-      if (this.queues.get(job) === tail) this.queues.delete(job);
+      if (queues.get(job) === tail) queues.delete(job);
     });
     return result;
   }
