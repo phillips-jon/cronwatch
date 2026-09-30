@@ -120,6 +120,7 @@ The development sign-in line names the host only when `origin` is set or the fir
 `cw.recordRun(run, { evaluate? })` records a run that happened outside this process, for a [source](#exports).
 
 - Its job must be declared first.
+- Every metric must be a finite number, as with `job.metric()`; one that is not (`NaN`, `Infinity`, text) throws and nothing is recorded.
 - Runs are keyed by id: a new one is inserted, a stored one still running is updated when this one is not, and anything else is left alone, so recording the same run twice changes nothing.
 - A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets) and redacted the same way.
 - `evaluate: false` stores it without judging it, for history imported on first sight.

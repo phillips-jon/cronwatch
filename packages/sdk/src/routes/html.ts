@@ -351,7 +351,10 @@ export function jobPage(job: JobSummary, runs: Run[], now: number, base: string,
       run.error ? `<details class="out error" open><summary>error</summary><pre>${h(run.error)}</pre></details>` : "",
       run.output ? `<details class="out"${run.status === "ok" ? "" : " open"}><summary>output</summary><pre>${h(run.output)}</pre></details>` : "",
     ].join("");
-    const metrics = Object.entries(run.metrics).map(([k, v]) => `<span><span class="k">${h(k)}</span> ${h(Number.isInteger(v) ? v : v.toFixed(4))}</span>`).join("");
+    // A foreign row may hold a metric that is no finite number (null, text); it is left out.
+    const metrics = Object.entries(run.metrics ?? {})
+      .filter(([, v]) => typeof v === "number" && Number.isFinite(v))
+      .map(([k, v]) => `<span><span class="k">${h(k)}</span> ${h(Number.isInteger(v) ? v : v.toFixed(4))}</span>`).join("");
     return `<tr${detail ? ` class="has-detail"` : ""}>
 <td class="nowrap">${runState(run)}</td>
 <td class="nowrap">${h(when(run.startedAt, now))} <span class="muted">UTC</span><span class="sub">${stamp(run.startedAt, now)}</span></td>

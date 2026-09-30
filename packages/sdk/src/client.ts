@@ -932,13 +932,20 @@ export class CronWatch {
    * alone and reported. A finished run is judged as if it had been wrapped
    * here (expect, failures, duration, budgets) and its output and error are
    * redacted the same way; one finishing after a check marked it timeout is
-   * judged only when it succeeded, as RunHandle.finish() does. Returns the
-   * alerts it sent.
+   * judged only when it succeeded, as RunHandle.finish() does. A metric that
+   * is not a finite number throws before anything is written, as
+   * job.metric() does. Returns the alerts it sent.
    */
   async recordRun(input: Run, options: RecordRunOptions = {}): Promise<Alert[]> {
     const declared = this.definitions.get(input.job);
     if (!declared) throw new Error(`recordRun: job "${input.job}" is not declared; call job() first`);
     if (input.id.includes("\u0000")) throw new Error(`recordRun: run ids cannot contain a NUL character (job "${input.job}")`);
+    // Refused as job.metric() refuses them: a store keeps NaN and Infinity as null.
+    for (const [metric, value] of Object.entries(input.metrics ?? {})) {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new Error(`recordRun: metric "${metric}" must be a finite number (job "${input.job}", run "${input.id}")`);
+      }
+    }
     await this.sync(declared);
     const run: Run = { ...input, metrics: { ...input.metrics } };
     if (run.status === "ok") {
