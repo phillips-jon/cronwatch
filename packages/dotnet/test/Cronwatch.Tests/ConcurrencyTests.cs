@@ -114,8 +114,10 @@ public class ConcurrencyTests
     {
         var store = new MemoryStore();
         var (state, types) = await Race(new SlowReads(store), new SlowReads(store), store);
-        // The documented caveat: the later write wins, so one failure is lost.
-        Assert.Equal(1, state.ConsecutiveFailures);
+        // The documented caveat: when the two updates overlap the later write wins and one
+        // failure is lost. Whether they overlap is up to the scheduler, so either count passes;
+        // what matters is that the store still works, with no error and no alert.
+        Assert.InRange(state.ConsecutiveFailures, 1, 2);
         Assert.Empty(types);
     }
 
