@@ -32,6 +32,9 @@ export interface PgCronOptions {
    * The CronWatch name for a job. Default its jobname with anything other
    * than letters, digits, ".", "_", ":" and "-" turned into "-", or
    * "pg_cron:<jobid>" when it has none. The prefix goes in front either way.
+   * One that throws or returns no string, like a `jobs` or `options`
+   * function that throws, is reported once and fails only that job, which
+   * keeps its last declaration until the callback works again.
    */
   jobName?: (job: PgCronJob) => string;
   /** Grace, timeout, maxDuration, expect and the rest, for every job or per job. The schedule always comes from pg_cron. */
@@ -183,6 +186,8 @@ export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
   const retired = new Set<string>();
   let scanned = false;
   const warned = new Set<string>();
+  /** Jobids whose callback failed, reported once until it works again. */
+  const failing = new Set<number>();
 
   const warnOnce = (host: SourceHost, key: string, message: string) => {
     if (warned.has(key)) return;
@@ -244,17 +249,63 @@ export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
         warnOnce(host, "empty", "cron.job shows no jobs. pg_cron's row level security shows a role only the jobs it scheduled: connect as that role, or give this one BYPASSRLS.");
       }
       const all = (rows as PgCronJob[]).map((r) => ({ ...r, jobid: Number(r.jobid) }));
-      const jobs = all.filter(picks);
 
       // Declare each job. A paused one (active = false) keeps its failures but loses its schedule, so it is not missed.
       const names = new Map<number, string>();
       const definitions = new Map<number, JobOptions>();
       const used = new Set<string>();
-      for (const job of jobs) {
-        let name = prefix + (options.jobName ? options.jobName(job) : pgCronJobName(job));
+      /**
+       * A callback of the app's (jobs, jobName, options) that threw, or a
+       * jobName that gave no name, fails only its job, as a bad row does:
+       * reported once until it works again, and the job carries on as last
+       * declared (skipped when it never was), so its runs are still copied.
+       */
+      const trouble = (job: PgCronJob, what: string) => {
+        if (!failing.has(job.jobid)) {
+          failing.add(job.jobid);
+          host.onError(new Error(`pg_cron job ${job.jobid}: ${what}; it keeps its last declaration until that works`), "source pg_cron");
+        }
+        const last = known.get(job.jobid);
+        if (!last || used.has(last.name)) return;
+        names.set(job.jobid, last.name);
+        definitions.set(job.jobid, last.definition);
+        used.add(last.name);
+      };
+      const threw = (e: unknown) => (e instanceof Error ? `${e.name}: ${e.message}` : String(e));
+      for (const job of all) {
+        let picked: boolean;
+        try {
+          picked = picks(job);
+        } catch (e) {
+          trouble(job, `the jobs callback threw ${threw(e)}`);
+          continue;
+        }
+        if (!picked) {
+          failing.delete(job.jobid);
+          continue;
+        }
+        let base: unknown;
+        let extra: Omit<JobOptions, "schedule" | "timezone">;
+        try {
+          base = options.jobName ? options.jobName(job) : pgCronJobName(job);
+        } catch (e) {
+          trouble(job, `jobName threw ${threw(e)}`);
+          continue;
+        }
+        if (typeof base !== "string") {
+          trouble(job, `jobName returned ${base === null ? "null" : typeof base}, not a name`);
+          continue;
+        }
+        try {
+          extra = typeof options.options === "function" ? options.options(job) : (options.options ?? {});
+        } catch (e) {
+          trouble(job, `the options callback threw ${threw(e)}`);
+          continue;
+        }
+        failing.delete(job.jobid);
+        let name = prefix + base;
         if (used.has(name)) name = `${name}:${job.jobid}`;
         used.add(name);
-        const extra = typeof options.options === "function" ? options.options(job) : (options.options ?? {});
         const schedule = job.active && recording ? pgCronSchedule(job.schedule) : null;
         let definition: JobOptions = {
           description: `pg_cron job ${job.jobid} in ${job.database} as ${job.username}${job.active ? "" : " (paused)"}`,

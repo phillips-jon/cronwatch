@@ -183,6 +183,12 @@ export interface AlertChannel {
   send(alert: Alert, context?: ChannelContext): Promise<void>;
 }
 
+/**
+ * Where jobs, runs and state are kept. A store holds text without U+0000,
+ * which Postgres refuses: it drops every NUL from a run's trigger, output,
+ * error and metric names, and from every key and string of a definition and
+ * a state, as it writes them. Job names and run ids never hold one.
+ */
 export interface Store {
   /** Called once before first use. Create tables here. */
   init?(): Promise<void>;

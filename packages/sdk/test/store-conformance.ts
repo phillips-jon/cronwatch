@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Alert, JobState, Run, Store } from "../src/types.js";
+import { readFileSync } from "node:fs";
+import type { Alert, JobState, Run, Store, StoredJobDefinition } from "../src/types.js";
 
 /**
  * The test every store passes: memory, SQLite and Postgres in stores.test.ts,
@@ -116,6 +117,36 @@ export async function conformance(name: string, make: () => Store, skip: string 
     assert.deepEqual(await store.listRuns("a", 10), []);
     assert.equal(await store.getState("a"), null);
     assert.equal((await store.getJob("b"))!.name, "b");
+    await store.deleteJob("b");
+
+    // Text is written without U+0000 (conformance/store.json, nul).
+    for (const [i, step] of NUL_STEPS.entries()) {
+      const what = `nul step ${i}`;
+      if (step.upsertJob) {
+        await store.upsertJob(step.upsertJob, step.now!);
+        assert.deepEqual(await store.getJob("nul"), step.stored, what);
+      } else if (step.insertRun || step.updateRun) {
+        if (step.insertRun) await store.insertRun(step.insertRun);
+        else await store.updateRun(step.updateRun!);
+        assert.deepEqual(await store.getRun("n1"), step.stored, what);
+      } else if (step.updateRunIf) {
+        assert.equal(await store.updateRunIf!(step.updateRunIf, step.from!), step.written, what);
+        assert.deepEqual(await store.getRun("n1"), step.stored, what);
+      } else if (step.setState) {
+        await store.setState(step.setState);
+        assert.deepEqual(await store.getState("nul"), step.stored, what);
+      } else {
+        assert.equal(await store.compareAndSetState!(step.compareAndSetState!, step.expected!), step.written, what);
+        assert.deepEqual(await store.getState("nul"), step.stored, what);
+      }
+    }
+    await store.deleteJob("nul");
     await store.close?.();
   });
 }
+
+interface NulStep {
+  upsertJob?: StoredJobDefinition; now?: number; insertRun?: Run; updateRun?: Run; updateRunIf?: Run; from?: Run["status"][];
+  setState?: JobState; compareAndSetState?: JobState; expected?: number; written?: boolean; stored: unknown;
+}
+const NUL_STEPS = (JSON.parse(readFileSync(new URL("../../../conformance/store.json", import.meta.url), "utf8")) as { nul: NulStep[] }).nul;
