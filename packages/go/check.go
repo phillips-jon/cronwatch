@@ -114,6 +114,13 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 			if err != nil || !stuck {
 				return err
 			}
+			// Read again just before the write: lines and metrics flushed since
+			// the list was read (while earlier stuck runs were sent, say) are kept.
+			fresh, err := c.store.GetRun(ctx, run.ID)
+			if err != nil || fresh == nil || fresh.Status != StatusRunning || fresh.Job != run.Job {
+				return err
+			}
+			run := *fresh
 			timeout, _ := timeoutMs(def)
 			run.Status = StatusTimeout
 			run.FinishedAt = ptr(now)

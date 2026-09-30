@@ -235,6 +235,37 @@ func TestARunNeverFinishedIsMarkedStuck(t *testing.T) {
 	sameList(t, "alerts", k.alerts.Types(), []string{"stuck"})
 }
 
+func TestLinesFlushedWhileACheckMarksEarlierRunsStuckAreKept(t *testing.T) {
+	entered, gate := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	held := cronwatch.ChannelFunc("held", func(context.Context, cronwatch.Alert) error {
+		once.Do(func() { close(entered); <-gate })
+		return nil
+	})
+	k := newKit(t, cronwatch.WithAlerts(held))
+	first := must[*cronwatch.RunHandle](t)(k.cw.MustJob("first", cronwatch.Timeout("30m")).Start(bg))
+	k.c.Advance(1000)
+	second := must[*cronwatch.RunHandle](t)(k.cw.MustJob("second", cronwatch.Timeout("30m")).Start(bg))
+	second.Log("early line")
+	check(t, second.Metric("rows", 1))
+	second.Flush(bg)
+	k.c.Advance(31 * MIN)
+	done := make(chan struct{})
+	go func() { defer close(done); _, _ = k.cw.Check(bg) }()
+	// The first stuck run's alert is being sent; the second is still running, and flushes.
+	<-entered
+	second.Log("important progress line")
+	check(t, second.Metric("rows", 2))
+	second.Flush(bg)
+	close(gate)
+	<-done
+	stored := must[*cronwatch.Run](t)(k.cw.GetRun(bg, second.ID()))
+	eq(t, "status", stored.Status, cronwatch.StatusTimeout)
+	eq(t, "output", *stored.Output, "early line\nimportant progress line")
+	eq(t, "metrics", jsonOf(stored.Metrics), `{"rows":2}`)
+	eq(t, "first", must[*cronwatch.Run](t)(k.cw.GetRun(bg, first.ID())).Status, cronwatch.StatusTimeout)
+}
+
 func TestALateSuccessAfterATimeoutMarkRecovers(t *testing.T) {
 	k := newKit(t)
 	job := k.cw.MustJob("slowpoke", cronwatch.Timeout("10m"), cronwatch.FailuresBeforeAlert(2))
