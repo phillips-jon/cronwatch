@@ -431,6 +431,53 @@ async fn a_declaration_whose_store_panics_does_not_stop_the_next() {
     assert!(stored(&*store, "second").await.contains("0 2 * * *"));
 }
 
+// The review: the dashboard's forget took a job out of the client, the
+// watch kept it as unchanged and never declared it again, the next run
+// wrote it back, and unschedule took it for an entry gone, so the job the
+// scheduler still runs lost its schedule until restart.
+#[tokio::test]
+async fn a_job_forgotten_while_the_scheduler_runs_it_keeps_its_schedule() {
+    let entries = [entry("nightly", "x", "0 2 * * *")];
+    let want = r#"{"schedule":"0 2 * * *","tags":["gocron","gocron:billing"],"name":"nightly"}"#;
+    for order in ["a run, then a declare", "a run, then unschedule", "unschedule before any run"] {
+        let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+        let (cw, errors) = client(store.clone());
+        let w = Watch::new(&cw, "gocron", Some("billing"), "gocron");
+        w.declare(&entries);
+        w.settle().await;
+        cw.forget("nightly").await.unwrap();
+        if order.starts_with("a run") {
+            w.job("nightly").unwrap().run(|_| async { Ok::<_, std::io::Error>(()) }).await.unwrap();
+        }
+        if order == "a run, then a declare" {
+            w.declare(&entries);
+        }
+        for _ in 0..2 {
+            assert!(w.unschedule().await.unwrap().is_empty(), "nothing unscheduled ({order})");
+            w.declare(&entries);
+            w.settle().await;
+            cw.check().await.unwrap();
+        }
+        assert_eq!(stored(&*store, "nightly").await, want, "{order}");
+        let defined = cw.defined_jobs();
+        assert_eq!(defined.len(), 1, "{order}");
+        assert_eq!(defined[0].schedule(), "0 2 * * *", "{order}");
+        assert!(errors.lock().unwrap().is_empty(), "{order}: {:?}", errors.lock().unwrap());
+    }
+}
+
+#[tokio::test]
+async fn a_fallback_declares_a_forgotten_job_again() {
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let (cw, _) = client(store.clone());
+    let w = Watch::new(&cw, "river", Some("billing"), "River");
+    let first = w.fallback("report", JobOptions::new().grace("1m")).await.unwrap();
+    cw.forget("report").await.unwrap();
+    let again = w.fallback("report", JobOptions::new().grace("1m")).await.unwrap();
+    assert!(!std::ptr::eq(again.definition(), first.definition()), "made again");
+    assert_eq!(cw.defined_jobs().len(), 1, "declared again");
+}
+
 // The Go audit: an entry declared while unschedule read the store was taken
 // for gone, and its job lost its schedule for the life of the process.
 #[tokio::test]
