@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.cronwatch.Cronwatch;
@@ -148,6 +149,38 @@ class AutoConfigurationTest {
     }
   }
 
+  /** An app whose database cannot be reached when it starts. */
+  @SpringBootConfiguration
+  @EnableAutoConfiguration
+  public static class DatabaseDown {
+    /** A SQLite database in a directory that does not exist, so no connection can be made. */
+    @Bean
+    public DataSource dataSource() {
+      SQLiteDataSource ds = new SQLiteDataSource();
+      ds.setUrl("jdbc:sqlite:/nonexistent-" + UUID.randomUUID() + "/cw.db");
+      return ds;
+    }
+  }
+
+  /**
+   * A database that is down when the app starts is not a database the store refuses: the store is
+   * not quietly the in-memory one for the life of the app (each instance keeping its own runs, and
+   * nothing surviving a restart). The app does not start, as it would not with its own queries.
+   */
+  @Test
+  void aDatabaseDownAtTheStartIsNotTheMemoryStore() {
+    Exception e =
+        assertThrows(
+            Exception.class,
+            () ->
+                Apps.run(DatabaseDown.class, null, new Apps.Errors(), "cronwatch.check-mode=none"));
+    Throwable t = e;
+    while (t.getCause() != null && !(t instanceof dev.cronwatch.CronwatchException)) {
+      t = t.getCause();
+    }
+    assertInstanceOf(dev.cronwatch.CronwatchException.class, t, e.toString());
+  }
+
   /** Does nothing, for the scheduler's jobs. */
   public static final class Nothing implements Job {
     @Override
@@ -189,7 +222,7 @@ class AutoConfigurationTest {
       assertInstanceOf(CronwatchQuartz.class, watched);
       assertTrue(((CronwatchQuartz) watched).settle(Duration.ofSeconds(10)));
       assertEquals(
-          "{\"schedule\":\"0 0 2 * * ?\",\"timezone\":\"UTC\",\"tags\":[\"quartz\",\"quartz:billing\"],"
+          "{\"schedule\":\"0 0 2 * * *\",\"timezone\":\"UTC\",\"tags\":[\"quartz\",\"quartz:billing\"],"
               + "\"name\":\"reports.nightly\"}",
           stored(store, "reports.nightly"));
       CronwatchChecker checker = ctx.getBean(CronwatchChecker.class);

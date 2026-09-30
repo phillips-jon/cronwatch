@@ -163,12 +163,15 @@ public class CronwatchAutoConfiguration {
       }
       return null;
     }
+    SqlStore sql;
     try {
-      SqlStore sql = SqlStore.of(plain(dataSource));
-      String prefix = properties.getTablePrefix();
-      return prefix == null ? sql : sql.prefix(prefix);
+      sql = SqlStore.of(plain(dataSource));
     } catch (CronwatchException e) {
-      if (kind == CronwatchProperties.StoreKind.JDBC) {
+      // Only a database the store does not know falls back: one that cannot be reached now (a
+      // store failure) would leave the app on the in-memory store for its whole life, each
+      // instance keeping runs of its own and nothing kept over a restart.
+      if (kind == CronwatchProperties.StoreKind.JDBC
+          || e.kind() != CronwatchException.Kind.INVALID) {
         throw e;
       }
       LOGGER.log(
@@ -179,6 +182,8 @@ public class CronwatchAutoConfiguration {
               + " Store bean.");
       return null;
     }
+    String prefix = properties.getTablePrefix();
+    return prefix == null ? sql : sql.prefix(prefix);
   }
 
   /**
