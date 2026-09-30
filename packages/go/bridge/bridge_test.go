@@ -201,6 +201,31 @@ func TestDeclaringWritesTheJobsToTheStore(t *testing.T) {
 	eq(t, "nothing reported", len(errs.List()), 0)
 }
 
+// A run that fired before the scheduler's entries were read holds the job
+// Fallback declared for it, without a schedule. Declared since with its
+// schedule, and that written, the run must not write its own over it.
+func TestARunHoldingTheFallbackJobKeepsTheScheduleDeclaredSince(t *testing.T) {
+	store := cronwatch.NewMemoryStore()
+	cw, errs := newClient(t, store)
+	w := bridge.NewWatch(cw, "gocron", "billing", "gocron")
+	job := w.Fallback(context.Background(), "invoices", nil)
+	if job == nil {
+		t.Fatal("no job")
+	}
+	eq(t, "declared without a schedule", job.Definition().Schedule(), "")
+	w.Declare([]bridge.Entry{{Name: "invoices", Where: "x", Schedule: "0 1 * * *"}})
+	w.Settle()
+	const want = `{"schedule":"0 1 * * *","tags":["gocron","gocron:billing"],"name":"invoices"}`
+	eq(t, "stored with its schedule", stored(t, store, "invoices"), want)
+	handle, err := job.Start(context.Background())
+	check2(t, err)
+	eq(t, "after the run started", stored(t, store, "invoices"), want)
+	handle.Finish(context.Background())
+	check2(t, job.Run(context.Background(), func(context.Context, *cronwatch.JobContext) error { return nil }))
+	eq(t, "after a second run", stored(t, store, "invoices"), want)
+	eq(t, "nothing reported", len(errs.List()), 0)
+}
+
 // The audit: a definition was written once per declaration, so a job
 // another process of the app took the schedule out of (an older release
 // still up during a deploy, which does not run the new entry) stayed

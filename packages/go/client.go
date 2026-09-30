@@ -79,6 +79,7 @@ type Client struct {
 	order       []string // declared names, in the order first declared
 	definitions map[string]*jobDef
 	synced      map[string]bool
+	syncTurns   map[string]chan struct{} // see syncTurn
 	jobLocks    map[string]*sync.Mutex
 	starting    map[string]*startCall
 
@@ -120,6 +121,7 @@ func New(options ...Option) (*Client, error) {
 		now:         func() int64 { return time.Now().UnixMilli() },
 		definitions: map[string]*jobDef{},
 		synced:      map[string]bool{},
+		syncTurns:   map[string]chan struct{}{},
 		jobLocks:    map[string]*sync.Mutex{},
 		starting:    map[string]*startCall{},
 		channelBusy: map[int]int{},
@@ -319,26 +321,75 @@ func (c *Client) ensureReady(ctx context.Context) error {
 	return nil
 }
 
-// sync writes a declared definition to the store once per declaration.
+// sync writes the declaration of def's name as it stands to the store, once
+// per declaration. A handle kept from an earlier declaration writes the one
+// that replaced it, never its own over it, and one forgotten since writes
+// its own. A name declared again while its write was under way is still to
+// be written.
 func (c *Client) sync(ctx context.Context, def *jobDef) error {
 	if err := c.ensureReady(ctx); err != nil {
 		return err
 	}
-	c.mu.Lock()
-	done := c.synced[def.name] && c.definitions[def.name] == def
-	c.mu.Unlock()
-	if done {
+	name := def.name
+	if _, done := c.standing(name, def); done {
 		return nil
 	}
-	if err := c.store.UpsertJob(ctx, def.stored.clone(), c.now()); err != nil {
+	end, err := c.syncTurn(ctx, name)
+	if err != nil {
 		return err
 	}
+	defer end()
+	standing, written := c.standing(name, def)
+	if written {
+		return nil
+	}
+	if err := c.store.UpsertJob(ctx, standing.stored.clone(), c.now()); err != nil {
+		return err
+	}
+	c.markSynced(standing)
+	return nil
+}
+
+// standing is the definition declared under name now, or def when the name
+// is declared no longer, and whether the store already has it.
+func (c *Client) standing(name string, def *jobDef) (*jobDef, bool) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
+	if current, ok := c.definitions[name]; ok {
+		return current, c.synced[name]
+	}
+	return def, false
+}
+
+// markSynced notes that the store has def, if def is still what its name
+// declares.
+func (c *Client) markSynced(def *jobDef) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.definitions[def.name] == def {
 		c.synced[def.name] = true
 	}
+}
+
+// syncTurn waits for every earlier write of name's declaration to end, so
+// the writes of one name reach the store one at a time, in the order they
+// were asked for (a channel's senders are taken first come, first served),
+// and one still under way cannot land after a later one. The function
+// returned ends the turn. A context done first gives up the wait.
+func (c *Client) syncTurn(ctx context.Context, name string) (func(), error) {
+	c.mu.Lock()
+	turn, ok := c.syncTurns[name]
+	if !ok {
+		turn = make(chan struct{}, 1)
+		c.syncTurns[name] = turn
+	}
 	c.mu.Unlock()
-	return nil
+	select {
+	case turn <- struct{}{}:
+		return func() { <-turn }, nil
+	case <-ctx.Done():
+		return nil, context.Cause(ctx)
+	}
 }
 
 // SyncJob writes the definition declared in this process under name to
@@ -358,6 +409,13 @@ func (c *Client) SyncJob(ctx context.Context, name string) (bool, error) {
 	if err := c.ensureReady(ctx); err != nil {
 		return false, err
 	}
+	end, err := c.syncTurn(ctx, name)
+	if err != nil {
+		return false, err
+	}
+	defer end()
+	// The declaration as it stands once its turn comes: one made since is the one written.
+	def, _ = c.standing(name, def)
 	stored, err := c.store.GetJob(ctx, name)
 	if err != nil {
 		return false, err
@@ -368,11 +426,7 @@ func (c *Client) SyncJob(ctx context.Context, name string) (bool, error) {
 			return false, err
 		}
 	}
-	c.mu.Lock()
-	if c.definitions[name] == def {
-		c.synced[name] = true
-	}
-	c.mu.Unlock()
+	c.markSynced(def)
 	return write, nil
 }
 
