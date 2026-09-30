@@ -100,6 +100,23 @@ final class Runs {
    * is interrupted meanwhile. What the function threw is thrown again as it came.
    */
   <T> Executed<T> execute(JobDef def, RunOptions options, Body<T> body) {
+    Caught<T> caught = executeCaught(def, options, body);
+    Throwable thrown = caught.thrown();
+    if (thrown != null) {
+      throw Runs.<RuntimeException>sneakyThrow(thrown);
+    }
+    return new Executed<>(caught.run(), caught.value());
+  }
+
+  /** A run once recorded, what its function returned, and what it threw. */
+  record Caught<T>(Run run, @Nullable T value, @Nullable Throwable thrown) {}
+
+  /**
+   * {@link #execute}, handing back what the function threw rather than throwing it, for a job's
+   * handler, which answers a throw with the run. An {@link InterruptedException} leaves the
+   * interrupt status restored.
+   */
+  <T> Caught<T> executeCaught(JobDef def, RunOptions options, Body<T> body) {
     long startedAt = core.now();
     Run run = Run.running(UUID.randomUUID().toString(), def.name(), startedAt, options.trigger);
     // The start is written on the client's thread: an interrupt of the caller cannot cut it.
@@ -201,14 +218,11 @@ final class Runs {
     } finally {
       core.open.remove(run.id());
     }
-    if (thrown != null) {
-      if (thrown instanceof InterruptedException) {
-        // Well-behaved code restores the interrupt status of a thread it was interrupted in.
-        Thread.currentThread().interrupt();
-      }
-      throw Runs.<RuntimeException>sneakyThrow(thrown);
+    if (thrown instanceof InterruptedException) {
+      // Well-behaved code restores the interrupt status of a thread it was interrupted in.
+      Thread.currentThread().interrupt();
     }
-    return new Executed<>(finished, value);
+    return new Caught<>(finished, value, thrown);
   }
 
   /** A throwable as a failed run's error: {@code Name: message} and five frames, capped. */

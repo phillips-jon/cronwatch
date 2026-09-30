@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  dev.cronwatch:cronwatch-servlet, the dashboard and a job's handler as a
+  Jakarta Servlet Filter and Servlet, for Servlet 6.0 or newer (Tomcat 10.1,
+  Jetty 12, Undertow 2.3, any Jakarta EE 10 or 11 server). The servlet API
+  is provided, as the container brings it; Jetty is the tests' alone.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>dev.cronwatch</groupId>
+    <artifactId>cronwatch-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <artifactId>cronwatch-servlet</artifactId>
+  <packaging>jar</packaging>
+
+  <name>CronWatch for servlet containers</name>
+  <description>The CronWatch dashboard and a job's HTTP handler as a Jakarta Servlet filter and servlet, for Tomcat, Jetty, Undertow and any Jakarta EE 10 or 11 server.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.cronwatch</groupId>
+      <artifactId>cronwatch</artifactId>
+      <version>${revision}</version>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>dev.cronwatch</groupId>
+      <artifactId>cronwatch-webtest</artifactId>
+      <version>${revision}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.ee10</groupId>
+      <artifactId>jetty-ee10-servlet</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

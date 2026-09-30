@@ -44,7 +44,8 @@ class ModuleTest {
             "dev.cronwatch.pgcron",
             "dev.cronwatch.store",
             "dev.cronwatch.storetest",
-            "dev.cronwatch.triage"),
+            "dev.cronwatch.triage",
+            "dev.cronwatch.web"),
         exported);
   }
 

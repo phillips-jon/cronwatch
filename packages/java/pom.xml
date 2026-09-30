@@ -43,6 +43,10 @@
 
   <modules>
     <module>cronwatch</module>
+    <module>webtest</module>
+    <module>cronwatch-servlet</module>
+    <module>cronwatch-spring-boot-starter</module>
+    <module>webserver</module>
   </modules>
 
   <properties>
@@ -64,6 +68,9 @@
     <jspecify.version>1.0.1</jspecify.version>
     <slf4j.version>2.0.20</slf4j.version>
     <context-propagation.version>1.2.1</context-propagation.version>
+    <!-- The web adapters: the servlet API they compile against (the floor), and the servers the tests run. -->
+    <jakarta-servlet.version>6.0.0</jakarta-servlet.version>
+    <jetty.version>12.1.13</jetty.version>
   </properties>
 
   <dependencyManagement>
@@ -110,6 +117,16 @@
         <artifactId>mariadb-java-client</artifactId>
         <version>${mariadb-java-client.version}</version>
       </dependency>
+      <dependency>
+        <groupId>jakarta.servlet</groupId>
+        <artifactId>jakarta.servlet-api</artifactId>
+        <version>${jakarta-servlet.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty.ee10</groupId>
+        <artifactId>jetty-ee10-servlet</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -153,6 +170,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>3.12.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.11.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -392,6 +414,8 @@
               <!-- The flattened POMs stand alone, so the parent is not published. -->
               <excludeArtifacts>
                 <artifact>cronwatch-parent</artifact>
+                <artifact>cronwatch-webserver</artifact>
+                <artifact>cronwatch-webtest</artifact>
               </excludeArtifacts>
             </configuration>
           </plugin>

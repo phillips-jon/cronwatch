@@ -7,7 +7,9 @@
  * DataSource}); {@code dev.cronwatch.pgcron} watches pg_cron; {@code dev.cronwatch.storetest} is
  * the store contract test for a store of the app's own. The alert channels are in {@code
  * dev.cronwatch.alerts} and Claude triage in {@code dev.cronwatch.triage}. {@code
- * dev.cronwatch.internal.*} is not exported and may change in any release.
+ * dev.cronwatch.web} is the dashboard and a job's handler, framework-free, with an adapter for the
+ * JDK's own HTTP server. {@code dev.cronwatch.internal.*} is not exported and may change in any
+ * release.
  */
 @org.jspecify.annotations.NullMarked
 module dev.cronwatch {
@@ -16,6 +18,7 @@ module dev.cronwatch {
   requires static org.slf4j;
   requires static context.propagation;
   requires java.net.http;
+  requires static transitive jdk.httpserver;
 
   exports dev.cronwatch;
   exports dev.cronwatch.json;
@@ -25,6 +28,7 @@ module dev.cronwatch {
   exports dev.cronwatch.alerts;
   exports dev.cronwatch.triage;
   exports dev.cronwatch.pgcron;
+  exports dev.cronwatch.web;
 
 // Micrometer's context propagation finds the current run's accessor through
 // META-INF/services on the class path. It is not provided here: a provides

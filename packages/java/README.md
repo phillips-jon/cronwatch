@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your JVM service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Java port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Java process and a Node, Ruby, Python, PHP, Go, Rust or Elixir process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](DESIGN.md) has the plan and how each part works). Phase 1 has the core: jobs, runs in the calling thread, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, the current run across threads, the shutdown hook, the memory store, and the SQL store over JDBC on SQLite. Phase 2 adds the SQL store on Postgres, MySQL and MariaDB, the SDK's fifteen alert channels, Claude triage and the pg_cron source; the dashboard, a job's handler and the servlet and Spring Boot adapters in phase 3; the `@Scheduled`, ShedLock and Quartz integrations in phase 4.
+This is the Java port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Java process and a Node, Ruby, Python, PHP, Go, Rust or Elixir process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](DESIGN.md) has the plan and how each part works). Phase 1 has the core: jobs, runs in the calling thread, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, the current run across threads, the shutdown hook, the memory store, and the SQL store over JDBC on SQLite. Phase 2 adds the SQL store on Postgres, MySQL and MariaDB, the SDK's fifteen alert channels, Claude triage and the pg_cron source. Phase 3 adds the dashboard and its JSON API and a job's handler, framework-free, with adapters for the JDK's own HTTP server, servlet containers (`dev.cronwatch:cronwatch-servlet`) and Spring MVC and WebFlux (`dev.cronwatch:cronwatch-spring-boot-starter`). The `@Scheduled`, ShedLock and Quartz integrations come in phase 4.
 
 It is not on Maven Central yet. The first release will be `dev.cronwatch:cronwatch`.
 
@@ -157,6 +157,51 @@ cw.start();
 
 The pg_cron source watches the jobs that run inside Postgres, where nothing can wrap them: each check reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a missed, failed, stuck or slow pg_cron job is alerted like any other. It needs a data source on the database pg_cron runs in (its `cron.database_name`). Jobs are named from their jobname (`prefix` in front); a paused job loses its schedule, and one renamed or dropped keeps its history without one.
 
+### The dashboard
+
+`cw.routes()` is the SDK's dashboard and small JSON API: the same pages, URLs, JSON, cookie and token rules, so [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mcp) works against a Java app as it does against a Node one. It is framework-free (`Routes.handle` takes a `dev.cronwatch.web.Request` and answers a `Response`), and served by an adapter. On the JDK's own server:
+
+```java
+try (Cronwatch cw = Cronwatch.builder().build()) {
+  HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+  server.setExecutor(Executors.newVirtualThreadPerTaskExecutor()); // the routes read the store
+  WebServer.mount(server, "/cronwatch", cw.routes(RoutesOptions.builder()
+      .token(System.getenv("CRONWATCH_TOKEN"))
+      .build()));
+  server.start();
+}
+```
+
+Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie holds a digest of it. Without a token it is `CRONWATCH_TOKEN`; with none at all it answers 503, except in development (`CRONWATCH_ENV` or `APP_ENV` naming it), where it makes one and prints a sign-in link to standard output, showing the host only when `origin` is set or the request came to a loopback host. `RoutesOptions.noToken()` serves it open behind your own auth; `origin(...)` and `trustProxy()` are for an app behind a proxy. A body past 1 MiB is answered 413.
+
+In a servlet container (Tomcat 10.1, Jetty 12, any Jakarta EE 10 or 11 server), `dev.cronwatch:cronwatch-servlet` has `CronwatchFilter`, which answers the requests under its path (`/cronwatch` by default, within the web app's context) and passes every other one down the chain, so it can sit ahead of your own servlets and security. In a Spring Boot app, `dev.cronwatch:cronwatch-spring-boot-starter` registers it on Spring MVC, or a `WebFilter` on WebFlux, from `cronwatch.web.*`:
+
+```properties
+cronwatch.web.path=/cronwatch
+cronwatch.web.token=${CRONWATCH_TOKEN}
+# cronwatch.web.origin=https://app.example.com, cronwatch.web.open=true, cronwatch.web.order=-110
+```
+
+Tomcat, Jetty and Spring Security refuse an encoded slash (`%2F`) in a path by default, so a job whose name holds a `/` is reached through the dashboard behind them only if the app allows it; the JDK's server passes it through.
+
+### A job's handler
+
+For a platform cron that calls a URL (a Kubernetes CronJob with `curl`, Cloud Run jobs behind a scheduler), `job.handler(fn)` runs the job for each request that carries `Authorization: Bearer <CRON_SECRET>`, and answers with how the run went:
+
+```java
+try (Cronwatch cw = Cronwatch.builder().build()) {
+  Job nightly = cw.job("nightly-report", JobOptions.builder().schedule("0 2 * * *"));
+  Handler handler = nightly.handler((job, request) -> {
+    job.log("Report written");
+    return null;                                           // or a Response of your own
+  });
+  HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+  WebServer.mount(server, "/cron/nightly", handler);
+}
+```
+
+In a servlet container, `new CronwatchServlet(handler)` serves it.
+
 ## Testing this package
 
 ```bash
@@ -164,7 +209,7 @@ npm ci && npm run build        # at the repository root: the SDK, for the croner
 cd packages/java && ./mvnw -B verify
 ```
 
-The tests replay every file in `conformance/` byte for byte, with `TZ=UTC` and `-Duser.timezone=UTC` as the fixtures are made (Surefire sets both). The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set, as URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip, saying why, without them; each test uses tables of a prefix of its own, dropped at the end. The channels' hardening tests run against local servers on raw sockets, TLS with a certificate `keytool` makes at run time. The croner parity check and the SQLite file shared with Node need `node` and the built SDK, and skip, saying why, without them. The build compiles with Error Prone and `-Xlint:all` with warnings as errors, and the Enforcer holds the core to no dependencies and Java 21 bytecode; `./mvnw spotless:apply` formats the code (google-java-format), and CI runs `spotless:check`. CI runs it all on JDK 21 and the newest JDK. The README's examples are compiled by a test.
+The tests replay every file in `conformance/` byte for byte, with `TZ=UTC` and `-Duser.timezone=UTC` as the fixtures are made (Surefire sets both). The Postgres, MySQL, MariaDB and pg_cron tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set, as URLs (`postgres://postgres:pw@127.0.0.1:5432/cw`, `mysql://root:pw@127.0.0.1:3306/cw`), and skip, saying why, without them; each test uses tables of a prefix of its own, dropped at the end. The channels' hardening tests run against local servers on raw sockets, TLS with a certificate `keytool` makes at run time. The croner parity check and the SQLite file shared with Node need `node` and the built SDK, and skip, saying why, without them. The dashboard replays the SDK's recorded answers (`packages/ruby/test/web/golden.json`) straight into the routes, through the JDK's server, through the servlet filter under Jetty, and through the starter on Spring MVC under Tomcat and on WebFlux under Netty; `CRONWATCH_TEST_JAVA=1 npm test --workspace packages/mcp` drives the MCP server against `webserver`, a seeded dashboard. The build compiles with Error Prone and `-Xlint:all` with warnings as errors, and the Enforcer holds the core to no dependencies and Java 21 bytecode; `./mvnw spotless:apply` formats the code (google-java-format), and CI runs `spotless:check`. CI runs it all on JDK 21 and the newest JDK. The README's examples are compiled by a test.
 
 ## License
 
