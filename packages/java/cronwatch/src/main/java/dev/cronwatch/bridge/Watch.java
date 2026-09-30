@@ -6,7 +6,7 @@ import dev.cronwatch.Definition;
 import dev.cronwatch.Job;
 import dev.cronwatch.JobOptions;
 import dev.cronwatch.StoredJob;
-import dev.cronwatch.internal.core.Friends;
+import dev.cronwatch.internal.core.Access;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -269,7 +269,7 @@ public final class Watch {
 
   /** {@code options} with the integration's and the app's tags added to the ones it gives. */
   public JobOptions tagged(String name, JobOptions options) {
-    List<String> tags = Friends.client().tags(options);
+    List<String> tags = Access.client().tags(options);
     for (String t : List.of(tag, appTag)) {
       if (!tags.contains(t)) {
         tags.add(t);
@@ -479,7 +479,7 @@ public final class Watch {
     }
     StoredJob stored;
     try {
-      Friends.client().ensureReady(cw);
+      Access.client().ensureReady(cw);
       stored = cw.store().getJob(name);
     } catch (Exception e) {
       if (e instanceof InterruptedException) {
@@ -560,7 +560,7 @@ public final class Watch {
     }
     List<StoredJob> stored;
     try {
-      Friends.client().ensureReady(cw);
+      Access.client().ensureReady(cw);
       stored = cw.store().listJobs();
     } catch (Exception e) {
       if (e instanceof InterruptedException) {

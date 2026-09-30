@@ -7,7 +7,7 @@ import dev.cronwatch.JobState;
 import dev.cronwatch.JobSummary;
 import dev.cronwatch.JobWithRuns;
 import dev.cronwatch.Run;
-import dev.cronwatch.internal.core.WebAccess;
+import dev.cronwatch.internal.core.Access;
 import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.evaluate.Evaluate;
 import dev.cronwatch.internal.js.Js;
@@ -120,9 +120,7 @@ public final class Routes implements Endpoint {
     // listening on every interface all look alike), so development gets a token too: made here,
     // and shown only in the log.
     boolean generate =
-        configured.isEmpty()
-            && !optedOut
-            && WebAccess.hooks().environment(cw).equals("development");
+        configured.isEmpty() && !optedOut && Access.client().environment(cw).equals("development");
     this.token = generate ? developmentToken() : configured;
     // Without the system's randomness no token was made, so there is nothing to announce and the
     // routes stay locked.
@@ -737,7 +735,7 @@ public final class Routes implements Endpoint {
                   "Not silenced", Objects.requireNonNullElse(e.getMessage(), ""), base, false),
               400);
         }
-        WebAccess.hooks().silence(cw, name, ms);
+        Access.client().silence(cw, name, ms);
       } else {
         cw.unsilence(name);
       }
@@ -832,7 +830,7 @@ public final class Routes implements Endpoint {
         } catch (IllegalArgumentException e) {
           return api(errorBody(Objects.requireNonNullElse(e.getMessage(), "")), 400);
         }
-        JobState state = WebAccess.hooks().silence(cw, name, ms);
+        JobState state = Access.client().silence(cw, name, ms);
         return api(new JsObject().set("ok", true).set("state", state.toValue()), 200);
       }
       if (action.equals("unsilence")) {

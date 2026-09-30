@@ -1,14 +1,41 @@
 package dev.cronwatch;
 
-import dev.cronwatch.internal.core.Friends;
+import dev.cronwatch.internal.core.Access;
 import dev.cronwatch.internal.evaluate.Expect;
 import dev.cronwatch.internal.jsre.Regexp;
 import dev.cronwatch.json.Json;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The client's side of {@link Friends}, for the bridge. */
-final class Friend implements Friends.Client {
+/** The client's side of {@link Access}, for the dashboard, a job's handler and the bridge. */
+final class Friend implements Access.Client {
+  @Override
+  public JobState silence(Cronwatch cw, String name, double ms) {
+    return cw.silenceMs(name, ms);
+  }
+
+  @Override
+  public String environment(Cronwatch cw) {
+    return Env.environment(cw.environmentFallback);
+  }
+
+  @Override
+  public boolean secretOptOut(Cronwatch cw) {
+    return cw.core.secretOptOut;
+  }
+
+  @Override
+  public boolean firstNoSecretRefusal(Cronwatch cw) {
+    return !cw.refusedNoSecret.getAndSet(true);
+  }
+
+  @Override
+  public Access.Caught run(Job job, String trigger, Access.Body body) {
+    Runs.Caught<Object> c =
+        job.cronwatch().runs.executeCaught(job.def(), RunOptions.trigger(trigger), body::call);
+    return new Access.Caught(c.run(), c.value(), c.thrown());
+  }
+
   @Override
   public Definition describe(Cronwatch cw, String name, JobOptions options) {
     return cw.define(name, options).stored();

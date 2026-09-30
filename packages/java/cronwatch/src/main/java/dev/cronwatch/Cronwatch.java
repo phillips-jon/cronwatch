@@ -2,9 +2,8 @@ package dev.cronwatch;
 
 import dev.cronwatch.Core.JobDef;
 import dev.cronwatch.alerts.Transport;
+import dev.cronwatch.internal.core.Access;
 import dev.cronwatch.internal.core.CurrentRun;
-import dev.cronwatch.internal.core.Friends;
-import dev.cronwatch.internal.core.WebAccess;
 import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.duration.Schedules;
 import dev.cronwatch.internal.evaluate.Evaluate;
@@ -68,7 +67,7 @@ public final class Cronwatch implements AutoCloseable {
   public static final String VERSION = readVersion();
 
   static {
-    Friends.set(new Friend());
+    Access.install(new Friend());
   }
 
   private static final Pattern NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:-]{0,119}");
@@ -87,44 +86,10 @@ public final class Cronwatch implements AutoCloseable {
   private final @Nullable Thread shutdownHook;
 
   /** Set the first time a handler of this client refuses a request for want of a secret. */
-  private final AtomicBoolean refusedNoSecret = new AtomicBoolean();
+  final AtomicBoolean refusedNoSecret = new AtomicBoolean();
 
   /** The environment when no variable names one: the builder's, such as the Spring starter's. */
-  private final @Nullable String environmentFallback;
-
-  static {
-    WebAccess.install(
-        new WebAccess.Hooks() {
-          @Override
-          public JobState silence(Cronwatch cw, String name, double ms) {
-            return cw.silenceMs(name, ms);
-          }
-
-          @Override
-          public String environment(Cronwatch cw) {
-            return Env.environment(cw.environmentFallback);
-          }
-
-          @Override
-          public boolean secretOptOut(Cronwatch cw) {
-            return cw.core.secretOptOut;
-          }
-
-          @Override
-          public boolean firstNoSecretRefusal(Cronwatch cw) {
-            return !cw.refusedNoSecret.getAndSet(true);
-          }
-
-          @Override
-          public WebAccess.Caught run(Job job, String trigger, WebAccess.Body body) {
-            Runs.Caught<Object> c =
-                job.cronwatch()
-                    .runs
-                    .executeCaught(job.def(), RunOptions.trigger(trigger), body::call);
-            return new WebAccess.Caught(c.run(), c.value(), c.thrown());
-          }
-        });
-  }
+  final @Nullable String environmentFallback;
 
   private Cronwatch(Core core, boolean shutdownHook, @Nullable String environmentFallback) {
     this.core = core;
@@ -663,7 +628,7 @@ public final class Cronwatch implements AutoCloseable {
     return silenceMs(name, JobOptions.millis(duration, "silence duration"));
   }
 
-  private JobState silenceMs(String name, double ms) {
+  JobState silenceMs(String name, double ms) {
     return Core.awaitUninterruptibly(core.submit(() -> checks.silence(name, ms)));
   }
 

@@ -4,7 +4,7 @@ import dev.cronwatch.Cronwatch;
 import dev.cronwatch.Job;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
-import dev.cronwatch.internal.core.WebAccess;
+import dev.cronwatch.internal.core.Access;
 import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.internal.web.Text;
 import dev.cronwatch.json.JsObject;
@@ -45,7 +45,7 @@ public final class Handler implements Endpoint {
       this.optedOut = false;
     } else {
       this.secret = Objects.requireNonNullElse(cw.cronSecret(), "");
-      this.optedOut = WebAccess.hooks().secretOptOut(cw);
+      this.optedOut = Access.client().secretOptOut(cw);
     }
   }
 
@@ -80,9 +80,9 @@ public final class Handler implements Endpoint {
   @Override
   public Response handle(Request request) {
     Cronwatch cw = job.cronwatch();
-    WebAccess.Hooks hooks = WebAccess.hooks();
-    if (secret.isEmpty() && !optedOut && !hooks.environment(cw).equals("development")) {
-      if (hooks.firstNoSecretRefusal(cw)) {
+    Access.Client access = Access.client();
+    if (secret.isEmpty() && !optedOut && !access.environment(cw).equals("development")) {
+      if (access.firstNoSecretRefusal(cw)) {
         cw.reportError(
             new IllegalStateException(
                 "handler refused a request because no CRON_SECRET is set; pass"
@@ -105,7 +105,7 @@ public final class Handler implements Endpoint {
         return json(new JsObject().set("ok", false).set("error", "Unauthorized"), 401);
       }
     }
-    WebAccess.Caught caught = hooks.run(job, "handler", ctx -> fn.handle(ctx, request));
+    Access.Caught caught = access.run(job, "handler", ctx -> fn.handle(ctx, request));
     if (caught.thrown() instanceof Error e) {
       throw e;
     }

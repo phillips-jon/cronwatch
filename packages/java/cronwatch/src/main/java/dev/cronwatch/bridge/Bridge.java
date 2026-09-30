@@ -4,7 +4,7 @@ import dev.cronwatch.Cronwatch;
 import dev.cronwatch.CronwatchException;
 import dev.cronwatch.Definition;
 import dev.cronwatch.JobOptions;
-import dev.cronwatch.internal.core.Friends;
+import dev.cronwatch.internal.core.Access;
 import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
@@ -180,7 +180,7 @@ public final class Bridge {
    * @throws CronwatchException for a name or an option the SDK refuses, with its message
    */
   public static Definition definition(Cronwatch cw, String name, JobOptions options) {
-    return Friends.client().describe(cw, name, options.copy());
+    return Access.client().describe(cw, name, options.copy());
   }
 
   /**
@@ -246,7 +246,7 @@ public final class Bridge {
         case "expect" -> {
           String expect = def.expect();
           if (expect != null) {
-            Friends.client().withStoredExpect(options, expect);
+            Access.client().withStoredExpect(options, expect);
           }
         }
         default -> withField(options, def, key);
