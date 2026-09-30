@@ -12,4 +12,7 @@
     <Project Path="test/Cronwatch.Quartz.Tests/Cronwatch.Quartz.Tests.csproj" />
     <Project Path="test/ProcessExitChild/ProcessExitChild.csproj" />
   </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/crontab/Crontab.csproj" />
+  </Folder>
 </Solution>

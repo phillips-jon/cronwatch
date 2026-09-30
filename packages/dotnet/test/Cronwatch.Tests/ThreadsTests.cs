@@ -373,7 +373,7 @@ public class ThreadsTests
     }
 
     /// <summary>The <c>dotnet</c> host of the runtime running the tests.</summary>
-    private static string DotnetHost()
+    internal static string DotnetHost()
     {
         string exe = OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet";
         // .../dotnet/shared/Microsoft.NETCore.App/10.0.x/
