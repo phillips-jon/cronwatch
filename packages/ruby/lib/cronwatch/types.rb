@@ -306,11 +306,13 @@ module Cronwatch
     end
 
     # One entry of `sending` as read: its alert parsed when it is a Hash
-    # that parses, anything else kept as it came.
+    # that parses, anything else kept as it came. `until` and `alert` come
+    # first, in the order the SDK writes them, since a store on Postgres
+    # jsonb gives an object's keys back in an order of its own.
     def self.sending_entry(entry)
       return entry unless entry.is_a?(Hash)
 
-      entry.to_h do |key, value|
+      read = entry.to_h do |key, value|
         next [key.to_s, value] unless key.to_s == "alert" && value.is_a?(Hash)
 
         parsed = begin
@@ -320,6 +322,7 @@ module Cronwatch
         end
         ["alert", parsed]
       end
+      %w[until alert].select { |key| read.key?(key) }.to_h { |key| [key, read[key]] }.merge(read)
     end
 
     # pendingRecovery, undelivered and version are left out when unset, as in

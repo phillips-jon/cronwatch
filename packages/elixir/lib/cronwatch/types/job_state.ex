@@ -48,7 +48,7 @@ defmodule Cronwatch.JobState do
           extra: [{String.t(), JS.value()}]
         }
 
-  @typedoc "An alert in the outbox (`sending`), as `Cronwatch.Evaluate.hold_alerts/4` writes it."
+  @typedoc "An alert in the outbox (`sending`), held there while it is sent."
   @type sending :: %{until: term(), alert: Alert.t() | nil, value: JS.value()}
 
   @known [

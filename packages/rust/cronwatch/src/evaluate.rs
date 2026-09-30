@@ -143,7 +143,7 @@ pub(crate) fn hold_alerts(state: &JobState, alerts: &[Alert], until: i64, deferr
 /// alert is dropped; one without a numeric `until` counts as run out.
 pub(crate) fn release_sending(state: &JobState, now: i64) -> (JobState, usize) {
     let sending = state.sending.as_deref().unwrap_or_default();
-    let lapsed = |e: &SendingAlert| !e.until.is_some_and(|until| until > now);
+    let lapsed = |e: &SendingAlert| e.until.is_none_or(|until| until <= now);
     if !sending.iter().any(lapsed) {
         return (state.clone(), 0);
     }

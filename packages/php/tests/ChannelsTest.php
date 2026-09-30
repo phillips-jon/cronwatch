@@ -618,13 +618,25 @@ final class ChannelsTest extends TestCase
         $dir = sys_get_temp_dir() . '/cronwatch-tls-' . getmypid() . '-' . bin2hex(random_bytes(4));
         mkdir($dir);
         try {
-            file_put_contents("{$dir}/openssl.cnf", "[req]\ndistinguished_name = dn\n[dn]\n[san]\nsubjectAltName = IP:127.0.0.1\nbasicConstraints = critical,CA:TRUE\n");
+            // default_bits: PHP 8.2 checks the key length even for an EC key,
+            // and reads 0 from a config that does not set it.
+            file_put_contents("{$dir}/openssl.cnf", "[req]\ndefault_bits = 2048\ndistinguished_name = dn\n[dn]\n[san]\nsubjectAltName = IP:127.0.0.1\nbasicConstraints = critical,CA:TRUE\n");
             $config = ['config' => "{$dir}/openssl.cnf", 'x509_extensions' => 'san', 'digest_alg' => 'sha256'];
-            $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1'] + $config);
-            $csr = openssl_csr_new(['commonName' => '127.0.0.1'], $key, $config);
-            $cert = openssl_csr_sign($csr, null, $key, 1, $config);
-            openssl_x509_export($cert, $pem);
-            openssl_pkey_export($key, $keyPem, null, $config);
+            $made = static function (mixed $value, string $what): mixed {
+                if ($value === false) {
+                    $errors = [];
+                    while (($error = openssl_error_string()) !== false) {
+                        $errors[] = $error;
+                    }
+                    self::fail("openssl could not make the {$what}: " . implode('; ', $errors));
+                }
+                return $value;
+            };
+            $key = $made(openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1'] + $config), 'key');
+            $csr = $made(openssl_csr_new(['commonName' => '127.0.0.1'], $key, $config), 'certificate request');
+            $cert = $made(openssl_csr_sign($csr, null, $key, 1, $config), 'certificate');
+            $made(openssl_x509_export($cert, $pem), 'certificate PEM');
+            $made(openssl_pkey_export($key, $keyPem, null, $config), 'key PEM');
             file_put_contents("{$dir}/cert.pem", $pem . $keyPem);
             file_put_contents("{$dir}/ca.pem", $pem);
             $post = fn (string $url, string $ca) => (string) shell_exec(implode(' ', array_map('escapeshellarg', [PHP_BINARY, '-d', "openssl.cafile={$ca}", __DIR__ . '/workers/post.php', $url])));

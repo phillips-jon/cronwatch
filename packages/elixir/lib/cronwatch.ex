@@ -355,8 +355,7 @@ defmodule Cronwatch do
 
   @doc """
   Stops alerts for a job for a while; its state keeps updating underneath.
-  The end is a whole millisecond, held at 2^53 - 1
-  (`Cronwatch.Evaluate.silence_end/2`).
+  The end is a whole millisecond, held at 2^53 - 1.
   """
   @spec silence(String.t(), term(), keyword()) :: {:ok, Cronwatch.JobState.t()} | {:error, Error.t()}
   def silence(name, duration, opts \\ []) do

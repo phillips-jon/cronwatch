@@ -25,9 +25,12 @@ defmodule Cronwatch.Test.Workers.SnoozeThenFail do
   @moduledoc "Snoozes once, then fails."
   use Oban.Worker, queue: :default, max_attempts: 1
 
+  # Oban before 2.24 keeps no count of snoozes in the meta and moves the
+  # attempt on instead; since 2.24 the meta counts them and the attempt
+  # stays. Either way, the first execution is the one to snooze.
   @impl Oban.Worker
-  def perform(%Oban.Job{meta: meta}) do
-    if (meta["snoozed"] || 0) == 0, do: {:snooze, 1}, else: {:error, "still broken"}
+  def perform(%Oban.Job{meta: meta, attempt: attempt}) do
+    if (meta["snoozed"] || 0) == 0 and attempt == 1, do: {:snooze, 1}, else: {:error, "still broken"}
   end
 end
 
