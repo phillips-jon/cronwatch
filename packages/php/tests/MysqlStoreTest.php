@@ -66,6 +66,22 @@ final class MysqlStoreTest extends TestCase
             [$attribute('SSL_CERT') => '/c.pem', $attribute('SSL_KEY') => '/k.pem', $attribute('SSL_VERIFY_SERVER_CERT') => false],
             MysqlStore::urlOptions('mysql://u@db/app?sslcert=/c.pem&sslkey=/k.pem'),
         );
+        // A CA with no mode checks the server's certificate against it, as PHP and MySQL's own client do.
+        foreach (['ssl-ca', 'sslca', 'sslrootcert'] as $name) {
+            $this->assertSame(
+                [$attribute('SSL_CA') => '/etc/ca.pem', $attribute('SSL_VERIFY_SERVER_CERT') => true],
+                MysqlStore::urlOptions("mysql://u@db/app?{$name}=/etc/ca.pem"),
+                $name,
+            );
+        }
+        // Only a mode that says so turns the check off.
+        foreach (['REQUIRED', 'PREFERRED', 'require', 'prefer'] as $mode) {
+            $this->assertSame(
+                [$attribute('SSL_CA') => '/etc/ca.pem', $attribute('SSL_VERIFY_SERVER_CERT') => false],
+                MysqlStore::urlOptions("mysql://u@db/app?ssl-ca=/etc/ca.pem&ssl-mode={$mode}"),
+                $mode,
+            );
+        }
         $default = openssl_get_cert_locations()['default_cert_file'] ?? '';
         if (is_string($default) && is_readable($default)) {
             $this->assertSame(
