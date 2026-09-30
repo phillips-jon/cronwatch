@@ -131,4 +131,74 @@ final class ConcurrencyTest extends TestCase
         $this->assertNotNull($state->silencedUntil, 'the silence was not overwritten');
         $this->assertSame(1, $state->consecutiveFailures, 'nor was the failure');
     }
+
+    public function testAHandleKeptFromAnEarlierDeclarationWritesTheOneThatStandsNotItsOwn(): void
+    {
+        $store = new MemoryStore();
+        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: false);
+        $earlier = $cw->job('a');
+        $cw->job('a', ['schedule' => 'every 5m']);
+        $earlier->run(fn () => null);
+        $this->assertSame('every 5m', $store->getJob('a')->definition->get('schedule'));
+        $cw->check();
+        $this->assertSame('every 5m', $store->getJob('a')->definition->get('schedule'));
+    }
+
+    public function testAHandleWhoseJobWasForgottenWritesItsOwnDefinition(): void
+    {
+        $store = new MemoryStore();
+        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: false);
+        $handle = $cw->job('a', ['schedule' => 'every 5m']);
+        $cw->forget('a');
+        $handle->run(fn () => null);
+        $this->assertSame('every 5m', $store->getJob('a')->definition->get('schedule'));
+    }
+
+    /**
+     * A client whose store, on the first write of a job's definition, calls
+     * `during` before the write goes through. Nothing else in one PHP process
+     * can declare a job while its definition is being written: a store of the
+     * app's own, or a hook inside one (WordPress's "query" filter, say).
+     *
+     * @param \Closure(Cronwatch): void $during
+     * @return array{Cronwatch, MemoryStore}
+     */
+    private function heldUpsert(\Closure $during): array
+    {
+        $inner = new MemoryStore();
+        $store = new FlakyStore($inner);
+        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: false);
+        $held = false;
+        $store->hooks['upsertJob'] = function (\Closure $next, array $args) use (&$held, $during, $cw) {
+            if (!$held) {
+                $held = true;
+                $during($cw);
+            }
+            return $next(...$args);
+        };
+        return [$cw, $inner];
+    }
+
+    public function testADeclarationMadeWhileTheEarlierOneIsBeingWrittenIsStillToBeWritten(): void
+    {
+        [$cw, $inner] = $this->heldUpsert(function (Cronwatch $cw): void {
+            $cw->job('a', ['schedule' => 'every 5m']);
+        });
+        $cw->job('a')->run(fn () => null);
+        $cw->check();
+        $this->assertSame('every 5m', $inner->getJob('a')->definition->get('schedule'));
+    }
+
+    public function testADeclarationWrittenFromInsideTheEarlierOnesWriteIsWrittenAgainSoItStays(): void
+    {
+        [$cw, $inner] = $this->heldUpsert(function (Cronwatch $cw): void {
+            $cw->job('a', ['schedule' => 'every 5m']);
+            $this->assertSame('every 5m', $cw->jobSummary('a')->definition->get('schedule'));
+        });
+        $cw->job('a')->run(fn () => null);
+        // The earlier write landed after the later one, which no queue can stop in one thread.
+        $this->assertNull($inner->getJob('a')->definition->get('schedule'));
+        $cw->check();
+        $this->assertSame('every 5m', $inner->getJob('a')->definition->get('schedule'));
+    }
 }

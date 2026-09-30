@@ -548,6 +548,16 @@ final class Cronwatch
         $this->ready = true;
     }
 
+    /**
+     * Writes the declaration of `definition`'s name as it stands, unless the
+     * store has it. A handle kept from an earlier declaration writes the one
+     * that replaced it, never its own over it, and one forgotten since writes
+     * its own. One process writes one thing at a time, so only a store that
+     * calls back into the client (a hook inside it, say) can declare the name
+     * again while its write is under way: the name is then still to be
+     * written, whatever was written meanwhile, since this write may have
+     * landed after it.
+     */
     private function sync(JobDefinition $definition): void
     {
         $this->ensureReady();
@@ -555,8 +565,13 @@ final class Cronwatch
         if (isset($this->synced[$name])) {
             return;
         }
-        $this->store->upsertJob(Serialize::toStored($definition), $this->now());
-        $this->synced[$name] = true;
+        $standing = $this->definitions[$name] ?? $definition;
+        $this->store->upsertJob(Serialize::toStored($standing), $this->now());
+        if (($this->definitions[$name] ?? $standing) === $standing) {
+            $this->synced[$name] = true;
+        } else {
+            unset($this->synced[$name]);
+        }
     }
 
     private function readState(string $job): JobState
