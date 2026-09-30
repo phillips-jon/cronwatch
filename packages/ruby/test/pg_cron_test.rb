@@ -180,6 +180,27 @@ class PgCronTest < Minitest::Test
     assert_equal 20, cw.runs("db:nightly-vacuum", 100).length, "its history is kept"
   end
 
+  def test_a_job_forgotten_from_the_dashboard_is_declared_again_and_its_later_runs_recorded
+    clock = Clock.new
+    cron = FakeCron.new
+    cron.job(1, "vacuum", "0 3 * * *")
+    cron.add(1, "succeeded", T0 - 5000, T0 - 4000, "VACUUM")
+    errors = []
+    cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], now: clock.to_proc, cron_secret: nil,
+                       on_error: ->(e, where) { errors << "#{where}: #{e.message}" }, sources: [PgCron.new(cron)])
+    cw.check
+    cw.forget("vacuum")
+    cron.add(1, "succeeded", T0 - 3000, T0 - 2000, "VACUUM")
+    cron.add(1, "failed", T0 - 1000, T0, "ERROR:  boom")
+    clock.advance(1000)
+    result = cw.check
+    assert_empty errors
+    assert_equal ["vacuum"], result.jobs.map(&:name)
+    assert_equal "0 3 * * *", result.jobs[0].definition.schedule
+    assert_equal ["pgcron:3", "pgcron:2"], cw.runs("vacuum").map(&:id), "the runs after the forget"
+    assert_equal ["vacuum"], cw.defined_jobs.map(&:name)
+  end
+
   def test_job_options_apply_and_an_unreadable_schedule_is_reported
     cron = FakeCron.new
     cron.job(1, "odd", "not a schedule")

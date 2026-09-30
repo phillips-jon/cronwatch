@@ -13,8 +13,9 @@ module Cronwatch
   # with `name` and `sync(host)`: on every check the client calls sync with
   # itself as the host, and the source declares jobs (`host.job`), reads the
   # store (`host.store`), records the runs it found (`host.record_run`) and
-  # reports problems (`host.on_error(error, where)`). sync returns the alerts
-  # recording sent, or anything else for none.
+  # reports problems (`host.on_error(error, where)`). A host with
+  # `defined_jobs` lets a source declare again a job forgotten since. sync
+  # returns the alerts recording sent, or anything else for none.
   module Sources
     # Watches pg_cron jobs, which run inside Postgres where nothing can wrap
     # them (the SDK's sources/pgcron.ts). As a source, on every check it
@@ -322,6 +323,9 @@ module Cronwatch
       # Declares each job picked. A paused one (active = false) keeps its failures but loses its schedule, so it
       # is not missed. Returns [{ jobid => name }, { jobid => definition as declared }].
       def declare(host, all, timezone, recording)
+        # One forgotten since it was declared (the dashboard's forget) is declared again, though unchanged:
+        # record_run takes runs only of a declared job.
+        live = host.respond_to?(:defined_jobs) ? host.defined_jobs.to_set(&:name) : nil
         names = {}
         definitions = {}
         used = Set.new
@@ -381,7 +385,7 @@ module Cronwatch
           definition.merge!(schedule: schedule, timezone: timezone) if schedule
           begin
             key = definition_key(definition)
-            if @declared[name] != key
+            if @declared[name] != key || (live && !live.include?(name))
               begin
                 host.job(name, **definition)
               rescue StandardError => e
