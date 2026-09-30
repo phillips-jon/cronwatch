@@ -46,18 +46,69 @@ test("today is the local date", () => {
   assert.equal(today(new Date(2026, 0, 5, 23, 59)), "2026-01-05");
 });
 
+/**
+ * Semantic Versioning's precedence (semver.org, item 11): a release comes
+ * after its prereleases (1.3.0-beta.1 < 1.3.0), and prerelease identifiers
+ * compare numerically when both are numbers, by ASCII otherwise, a number
+ * before a word, a shorter list first.
+ */
+function compareVersions(a, b) {
+  const split = (v) => {
+    const [core, pre] = v.split(/-(.*)/s);
+    return { core: core.split(".").map(Number), pre: pre === undefined ? [] : pre.split(".") };
+  };
+  const [x, y] = [split(a), split(b)];
+  for (let i = 0; i < 3; i++) if (x.core[i] !== y.core[i]) return x.core[i] - y.core[i];
+  if (x.pre.length === 0 || y.pre.length === 0) return y.pre.length - x.pre.length;
+  for (let i = 0; i < Math.min(x.pre.length, y.pre.length); i++) {
+    const [p, q] = [x.pre[i], y.pre[i]];
+    if (p === q) continue;
+    const [pn, qn] = [/^\d+$/.test(p), /^\d+$/.test(q)];
+    if (pn && qn) return Number(p) - Number(q);
+    if (pn !== qn) return pn ? -1 : 1;
+    return p < q ? -1 : 1;
+  }
+  return x.pre.length - y.pre.length;
+}
+
+/** Dated releases (a prerelease among them), newest first, under at most one Unreleased. */
+function checkChangelog(text) {
+  const headings = [...text.matchAll(/^## (.*)$/gm)].map((m) => m[1]);
+  assert.ok(headings.filter((h) => h === "Unreleased").length <= 1);
+  const released = headings.filter((h) => h !== "Unreleased");
+  assert.ok(released.length > 0);
+  for (const h of released) assert.match(h, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)? - \d{4}-\d{2}-\d{2}$/);
+  const versions = released.map((h) => h.split(" ")[0]);
+  for (let i = 1; i < versions.length; i++) assert.ok(compareVersions(versions[i - 1], versions[i]) > 0, `${released[i - 1]} before ${released[i]}`);
+}
+
+test("compareVersions orders by Semantic Versioning's precedence", () => {
+  const sorted = ["0.9.0", "0.10.0-alpha", "0.10.0-alpha.1", "0.10.0-alpha.beta", "0.10.0-beta", "0.10.0-beta.2", "0.10.0-beta.11", "0.10.0-rc.1", "0.10.0", "0.10.1", "1.0.0"];
+  for (let i = 1; i < sorted.length; i++) {
+    assert.ok(compareVersions(sorted[i - 1], sorted[i]) < 0, `${sorted[i - 1]} < ${sorted[i]}`);
+    assert.ok(compareVersions(sorted[i], sorted[i - 1]) > 0, `${sorted[i]} > ${sorted[i - 1]}`);
+  }
+  assert.equal(compareVersions("1.2.3-beta.1", "1.2.3-beta.1"), 0);
+});
+
+test("a prerelease is cut, then its release, and the changelog still checks", () => {
+  const beta =addMarkdownChangelog(MARKDOWN, "1.3.0-beta.1", "2026-10-01");
+  assert.match(beta.text, /^## 1\.3\.0-beta\.1 - 2026-10-01$/m);
+  checkChangelog(beta.text);
+  const beta2 = addMarkdownChangelog(beta.text, "1.3.0-beta.2", "2026-10-02");
+  checkChangelog(beta2.text);
+  const final = addMarkdownChangelog(beta2.text, "1.3.0", "2026-10-03");
+  assert.match(final.text, /^## 1\.3\.0 - 2026-10-03\n[^]*^## 1\.3\.0-beta\.2 - /m);
+  assert.equal(final.written, false, "1.3.0-beta.2's section does not count as 1.3.0's");
+  checkChangelog(final.text);
+  assert.throws(() => checkChangelog(addMarkdownChangelog(final.text, "1.3.0-rc.1", "2026-10-04").text), /1\.3\.0-rc\.1 - 2026-10-04 before 1\.3\.0 -/);
+  const readme = addReadmeChangelog("== Changelog ==\n\n= 1.2.3 =\n\n* Carries version 1.2.3 of the CronWatch library.\n", "1.3.0-beta.1");
+  assert.match(readme.text, /^= 1\.3\.0-beta\.1 =$/m);
+  assert.equal(addReadmeChangelog(readme.text, "1.3.0").written, false);
+});
+
 for (const file of ["packages/php/craft/CHANGELOG.md", "packages/php/drupal/CHANGELOG.md"]) {
   test(`${file} has dated releases, newest first, under at most one Unreleased`, () => {
-    const text = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
-    const headings = [...text.matchAll(/^## (.*)$/gm)].map((m) => m[1]);
-    assert.ok(headings.filter((h) => h === "Unreleased").length <= 1);
-    const released = headings.filter((h) => h !== "Unreleased");
-    assert.ok(released.length > 0);
-    for (const h of released) assert.match(h, /^\d+\.\d+\.\d+ - \d{4}-\d{2}-\d{2}$/);
-    const versions = released.map((h) => h.split(" ")[0].split(".").map(Number));
-    for (let i = 1; i < versions.length; i++) {
-      const [a, b] = [versions[i - 1], versions[i]];
-      assert.ok(a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2]))), `${released[i - 1]} before ${released[i]}`);
-    }
+    checkChangelog(readFileSync(new URL(`../${file}`, import.meta.url), "utf8"));
   });
 }
