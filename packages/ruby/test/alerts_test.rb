@@ -50,6 +50,21 @@ class AlertsTest < Minitest::Test
     assert_equal "application/json", http.calls[0][:headers]["content-type"]
   end
 
+  def test_discord_holds_the_whole_description_to_4096_cutting_the_message_and_keeping_the_triage
+    http = FakeHTTP.new
+    message = "Error: long\n#{"```" * 1200}#{"x" * 400}#{"\u{1F600}" * 200}"
+    triage = "*_`~|[]()<>\\" * 100
+    long = alert(triage: triage).tap { |a| a.message = message }
+    Cronwatch::Alerts::Discord.new(webhook_url: "https://discord.example/api/webhooks/1/secret", http: http).call(long)
+    embed = http.calls[0][:json]["embeds"][0]
+    description = embed["description"]
+    assert_equal 4096, Cronwatch::JS.length16(description)
+    assert description.end_with?("\n**Triage:** #{triage[0, 1000].gsub(/[\\`*_~|\[\]()<>]/) { |c| "\\#{c}" }}"), "the triage is whole"
+    assert description.start_with?("```\nError: long\n")
+    assert_equal 2, description.scan("```").length, "only the block's own fences"
+    assert_operator Cronwatch::JS.length16(embed["title"]) + 4096, :<=, 6000
+  end
+
   def test_discord_adds_the_link_and_reports_a_refusal
     http = FakeHTTP.new(400, "x" * 500)
     channel = Cronwatch::Alerts::Discord.new(webhook_url: "https://discord.example/w", link: ->(a) { "https://app.example/#{a.job}" }, http: http)
