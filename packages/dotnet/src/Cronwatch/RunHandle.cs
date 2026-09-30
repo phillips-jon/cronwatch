@@ -240,11 +240,11 @@ public sealed class RunHandle
         return FinishWithAsync(null, CronwatchClient.ErrorText(error), cancellationToken);
     }
 
-    /// <summary>Finishes the run as failed with this error text.</summary>
+    /// <summary>Finishes the run as failed with this error text, capped as an error is.</summary>
     public Task<Run?> FailAsync(string error, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(error);
-        return FinishWithAsync(null, error, cancellationToken);
+        return FinishWithAsync(null, OutputText.Cap(error), cancellationToken);
     }
 
     private Task<Run?> FinishWithAsync(string? resultText, string? failure, CancellationToken cancellationToken) =>

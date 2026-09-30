@@ -225,6 +225,18 @@ public class AuditCoreTests
         }
     }
 
+    [Fact]
+    public async Task A_handle_failed_with_long_text_stores_it_capped_as_the_sdk_writes_an_error()
+    {
+        await using var m = Make();
+        var handle = await m.Cw.Job("long-failure").StartAsync();
+        string text = "line\n" + new string('x', 100_000);
+        Run? run = await handle.FailAsync(text);
+        Assert.NotNull(run);
+        Assert.Equal(Internal.OutputText.Cap(text), run.Error);
+        Assert.Equal(run.Error, (await m.Cw.GetRunAsync(handle.Id))!.Error);
+    }
+
     private sealed class Registering : ISource
     {
         public string Name => "registering";
