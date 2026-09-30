@@ -41,18 +41,86 @@ public class FormatConformanceTests
         fails.Check("format");
     }
 
-    [Fact(Skip = "format.json capOutput: needs the output cap (OutputText), replayed once merged")]
+    [Fact]
     public void Cap_output()
     {
+        var f = Fixtures.Load("format");
+        var fails = new Fixtures.Failures();
+        var cases = Fixtures.Objects(f, "capOutput");
+        Assert.Equal(14, cases.Count);
+        int i = 0;
+        foreach (var c in cases)
+        {
+            var b = new System.Text.StringBuilder(Fixtures.String(c, "prefix"));
+            string piece = Fixtures.String(c, "piece")!;
+            for (long k = 0; k < Fixtures.Integer(c, "times"); k++)
+            {
+                b.Append(piece);
+            }
+            string capped = OutputText.Cap(b.ToString());
+            fails.Same(
+                "capOutput " + i++,
+                new JsObject().Set("length", capped.Length).Set("sha256", Fixtures.Sha256Hex(capped)),
+                new JsObject().Set("length", c.Get("length")).Set("sha256", c.Get("sha256")));
+        }
+        fails.Check("format");
     }
 
-    [Fact(Skip = "format.json toStored: needs the client's JobOptions and Expect, replayed once merged")]
+    private static Expect? RuleOf(object? spec)
+    {
+        switch (spec)
+        {
+            case null:
+                return null;
+            case string text:
+                return Expect.Contains(text);
+            case JsObject o when o.Get("regex") is JsObject re:
+                return Expect.Matches(Fixtures.String(re, "source")!, Fixtures.String(re, "flags") ?? "");
+            case JsObject o when o.Has("callable"):
+                return Expect.That(_ => true);
+            default:
+                throw new System.ArgumentException("not an expect rule: " + Json.Stringify(spec));
+        }
+    }
+
+    [Fact]
     public void To_stored()
     {
+        var f = Fixtures.Load("format");
+        var fails = new Fixtures.Failures();
+        var cases = Fixtures.Objects(f, "toStored");
+        Assert.Equal(7, cases.Count);
+        int i = 0;
+        foreach (var c in cases)
+        {
+            var def = Fixtures.Object(c, "definition");
+            var options = new JobOptions { Expect = RuleOf(def.Get("expect")) };
+            foreach (var e in def)
+            {
+                if (e.Key != "expect")
+                {
+                    options.Field(e.Key, e.Value);
+                }
+            }
+            fails.Same("toStored " + i++, options.Describe(Fixtures.String(def, "name")!).ToObject(), c.Get("stored"));
+        }
+        fails.Check("format");
     }
 
-    [Fact(Skip = "format.json checkExpectation: needs Expect and the regex engine, replayed once merged")]
+    [Fact]
     public void Check_expectation()
     {
+        var f = Fixtures.Load("format");
+        var fails = new Fixtures.Failures();
+        var cases = Fixtures.Objects(f, "checkExpectation");
+        Assert.Equal(13, cases.Count);
+        int i = 0;
+        foreach (var c in cases)
+        {
+            object? output = c.Get("output");
+            string? text = output == null ? null : Fixtures.Expand(output);
+            fails.Same("checkExpectation " + i++, Expect.CheckExpectation(RuleOf(c.Get("expect")), text), c.Get("result"));
+        }
+        fails.Check("format");
     }
 }
