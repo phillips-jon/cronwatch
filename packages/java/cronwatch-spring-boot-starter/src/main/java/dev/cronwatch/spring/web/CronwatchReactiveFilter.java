@@ -116,6 +116,8 @@ public final class CronwatchReactiveFilter implements WebFilter, Ordered {
     if (answer.bodyLength() == 0) {
       return res.setComplete();
     }
+    // The whole body is at hand: its length, so no server frames it as chunked.
+    res.getHeaders().setContentLength(answer.bodyLength());
     DataBuffer buffer = res.bufferFactory().wrap(answer.body());
     return res.writeWith(Mono.just(buffer));
   }

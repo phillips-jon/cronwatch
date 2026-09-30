@@ -20,6 +20,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.support.GenericApplicationContext;
 
 /**
  * The dashboard through the starter, in a real Spring Boot app: the golden replay on Spring MVC
@@ -42,9 +43,34 @@ class SpringWebTest {
     properties.add("logging.level.root=warn");
     properties.addAll(List.of(more));
     return new SpringApplicationBuilder(App.class)
-        .initializers(c -> c.getBeanFactory().registerSingleton("cronwatch", cw))
+        .initializers(
+            c -> {
+              c.getBeanFactory().registerSingleton("cronwatch", cw);
+              if (type.equals("reactive")) {
+                ((GenericApplicationContext) c).registerBean(nettyFactory());
+              }
+            })
         .properties(properties.toArray(String[]::new))
         .run();
+  }
+
+  /**
+   * Reactor Netty's server factory. With Tomcat on the class path too (the MVC tests need it),
+   * Spring Boot 3.5 serves a reactive app on Tomcat, which writes a content-type back its own way;
+   * Boot 4 has each server in a module of its own, where the factory's package moved.
+   */
+  private static Class<?> nettyFactory() {
+    for (String name :
+        List.of(
+            "org.springframework.boot.reactor.netty.NettyReactiveWebServerFactory",
+            "org.springframework.boot.web.embedded.netty.NettyReactiveWebServerFactory")) {
+      try {
+        return Class.forName(name);
+      } catch (ClassNotFoundException e) {
+        // The other Boot line's.
+      }
+    }
+    throw new IllegalStateException("no NettyReactiveWebServerFactory");
   }
 
   private static int port(ConfigurableApplicationContext context) {

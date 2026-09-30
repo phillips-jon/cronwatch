@@ -1341,8 +1341,9 @@ jobs:
             fi
           done
 
-  # The scheduler integrations' tests (the starter's dev.cronwatch.spring, the
-  # Quartz module's and the JobRunr module's) against the oldest and the newest
+  # The scheduler integrations' tests and the starter's dashboard tests (the
+  # starter's dev.cronwatch.spring and dev.cronwatch.spring.web, the Quartz
+  # module's and the JobRunr module's) against the oldest and the newest
   # release each supports: Maven resolves exactly the version a POM names, and
   # an app's own build decides which one it runs. The Quartz module's recovery
   # test runs on the JDBC job store over Postgres.
@@ -1388,5 +1389,5 @@ jobs:
           -Dshedlock.version=${{ matrix.shedlock }}
           -Dquartz.version=${{ matrix.quartz }}
           -Djobrunr.version=${{ matrix.jobrunr }}
-          -Dtest='dev/cronwatch/quartz/*Test,dev/cronwatch/jobrunr/*Test,dev/cronwatch/spring/*Test'
+          -Dtest='dev/cronwatch/quartz/*Test,dev/cronwatch/jobrunr/*Test,dev/cronwatch/spring/*Test,dev/cronwatch/spring/web/*Test'
           -Dsurefire.failIfNoSpecifiedTests=false
