@@ -192,3 +192,55 @@ def test_an_async_run_whose_store_fails_still_runs_and_reports() -> None:
 
     assert run(cw.job("s").run(work)) == "ran"
     assert errors == ["recording s", "recording s"]
+
+
+class HeldInsert(MemoryStore):
+    """A memory store whose inserts wait for `gate`, saying when one has started and when it has landed."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.entered = threading.Event()
+        self.gate = threading.Event()
+        self.inserted = threading.Event()
+
+    def insert_run(self, run: Any) -> None:
+        self.entered.set()
+        assert self.gate.wait(10)
+        super().insert_run(run)
+        self.inserted.set()
+
+
+@pytest.mark.parametrize("shape", ["function", "block"])
+def test_cancelling_an_async_run_while_its_start_is_recorded_leaves_no_run_open(shape: str) -> None:
+    """The insert lands in its worker thread whatever the task does, so the
+    run is recorded as interrupted before the cancellation goes on, rather
+    than left running for a check to call stuck."""
+    store = HeldInsert()
+    cw, _, alerts = make(store=store)
+    job = cw.job("cancelled", timeout="5m")
+    ran: list[bool] = []
+
+    async def work(ctx: cronwatch.JobContext) -> None:
+        ran.append(True)
+
+    async def block() -> None:
+        async with job.run():
+            ran.append(True)
+
+    async def main() -> None:
+        task = asyncio.ensure_future(job.run(work) if shape == "function" else block())
+        assert await asyncio.to_thread(store.entered.wait, 5)
+        task.cancel()
+        await asyncio.sleep(0)
+        store.gate.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert await asyncio.to_thread(store.inserted.wait, 5)
+
+    run(main())
+    assert ran == [], "the job never started"
+    assert store.running_runs() == []
+    [recorded] = cw.runs("cancelled")
+    assert recorded.status == "failed"
+    assert recorded.error.startswith("Interrupted: CancelledError")
+    assert alerts.types() == ["failed"]

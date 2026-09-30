@@ -379,7 +379,7 @@ class _RunBlock:
 
     async def __aenter__(self) -> JobContext:
         execution = self._fresh()
-        await asyncio.to_thread(execution.record_start)
+        await _arecord_start(execution)
         return execution.enter()
 
     async def __aexit__(self, kind: Any, error: BaseException | None, tb: Any) -> None:
@@ -478,6 +478,40 @@ class _Execution:
                 client._report(RuntimeError(f"run {run.id} of {name} {ignored}; ignored"), f"finishing {name}")
         except Exception as problem:
             client._report(problem, f"recording {name}")
+
+
+async def _arecord_start(execution: _Execution) -> None:
+    """execution.record_start() in a worker thread, for an async run. A
+    cancellation while it is under way cannot stop the thread, whose insert
+    still lands, so the run is not left running (to be called stuck later):
+    the start is waited for, the run recorded as interrupted by the
+    cancellation, and then the cancellation goes on."""
+    started = asyncio.ensure_future(asyncio.to_thread(execution.record_start))
+    try:
+        await asyncio.shield(started)
+    except asyncio.CancelledError as cancelled:
+
+        async def interrupted() -> None:
+            await started
+            execution.enter()
+            execution.leave(None, cancelled, True)
+            await asyncio.to_thread(execution.record_end)
+
+        await _settle(interrupted())
+        raise
+
+
+async def _settle(coroutine: Awaitable[None]) -> None:
+    """Runs `coroutine` to its end, even when the task awaiting it is
+    cancelled again meanwhile (the event loop shutting down still stops it)."""
+    task = asyncio.ensure_future(coroutine)
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            pass
+        except Exception:  # noqa: BLE001, record_end reports what goes wrong itself
+            return
 
 
 class Cronwatch:
@@ -1116,7 +1150,7 @@ class Cronwatch:
 
     async def _aexecute_outcome(self, definition: JobDefinition, trigger: str, fn: Callable[[JobContext], Any]) -> _Outcome:
         execution = _Execution(self, definition, trigger)
-        await asyncio.to_thread(execution.record_start)
+        await _arecord_start(execution)
         context = execution.enter()
         try:
             result = fn(context)
