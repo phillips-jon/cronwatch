@@ -151,6 +151,12 @@ pub struct TestStore {
     pub panicking: Mutex<HashSet<&'static str>>,
     /// How long `delete_run_if` waits before it answers.
     pub delete_delay: Option<std::time::Duration>,
+    /// While set, the next `upsert_job` says it is `upsert_waiting` and
+    /// waits for `upsert_release` before it writes, so a test can declare
+    /// the job again, or ask for another write, while that one is under way.
+    pub holds_upsert: std::sync::atomic::AtomicBool,
+    pub upsert_waiting: tokio::sync::Notify,
+    pub upsert_release: tokio::sync::Notify,
 }
 
 impl TestStore {
@@ -195,7 +201,15 @@ impl Store for TestStore {
         guarded!(self, "init", self.inner.init())
     }
     fn upsert_job<'a>(&'a self, d: &'a Definition, now: i64) -> BoxFuture<'a, Result<(), BoxError>> {
-        guarded!(self, "upsert_job", self.inner.upsert_job(d, now))
+        let entered = self.enter("upsert_job");
+        Box::pin(async move {
+            entered?;
+            if self.holds_upsert.swap(false, Ordering::SeqCst) {
+                self.upsert_waiting.notify_one();
+                self.upsert_release.notified().await;
+            }
+            self.inner.upsert_job(d, now).await
+        })
     }
     fn get_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<Option<StoredJob>, BoxError>> {
         guarded!(self, "get_job", self.inner.get_job(name))

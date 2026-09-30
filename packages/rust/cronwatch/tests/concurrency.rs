@@ -340,3 +340,120 @@ async fn start_checks_after_a_second_then_on_the_interval_until_stop() {
     tokio::time::sleep(Duration::from_secs(60)).await;
     assert_eq!(calls(), 2, "stopped");
 }
+
+/// A client on a store whose first write of a job's definition waits until
+/// it is let go.
+fn held_upsert() -> (Kit, Arc<TestStore>) {
+    let store = Arc::new(TestStore::default());
+    store.holds_upsert.store(true, Ordering::SeqCst);
+    (Kit::with(|b| b.store_arc(store.clone())), store)
+}
+
+/// A run of `job` that does nothing, in a task of its own.
+fn run_in_a_task(job: cronwatch::Job) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move { job.run(|_| async { Ok::<_, Boom>(()) }).await.unwrap() })
+}
+
+/// Lets every task that can run get as far as it can, on the test's one
+/// thread.
+async fn settle() {
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+    }
+}
+
+async fn stored_schedule(store: &dyn Store, name: &str) -> String {
+    store.get_job(name).await.unwrap().expect("a stored job").definition.schedule().to_string()
+}
+
+#[tokio::test]
+async fn a_handle_kept_from_an_earlier_declaration_writes_the_one_that_stands() {
+    let k = Kit::new();
+    let earlier = k.cw.job("a", JobOptions::new()).unwrap();
+    k.cw.job("a", JobOptions::new().schedule("every 5m")).unwrap();
+    earlier.run(|_| async { Ok::<_, Boom>(()) }).await.unwrap();
+    assert_eq!(stored_schedule(&**k.cw.store(), "a").await, "every 5m");
+    k.check().await;
+    assert_eq!(stored_schedule(&**k.cw.store(), "a").await, "every 5m");
+}
+
+#[tokio::test]
+async fn a_handle_kept_from_an_earlier_declaration_leaves_the_written_one_alone() {
+    let k = Kit::new();
+    let earlier = k.cw.job("a", JobOptions::new()).unwrap();
+    k.cw.job("a", JobOptions::new().schedule("every 5m")).unwrap();
+    k.check().await;
+    earlier.run(|_| async { Ok::<_, Boom>(()) }).await.unwrap();
+    assert_eq!(stored_schedule(&**k.cw.store(), "a").await, "every 5m");
+    k.check().await;
+    assert_eq!(stored_schedule(&**k.cw.store(), "a").await, "every 5m");
+}
+
+#[tokio::test]
+async fn a_handle_whose_job_was_forgotten_writes_its_own_definition() {
+    let k = Kit::new();
+    let handle = k.cw.job("a", JobOptions::new().schedule("every 5m")).unwrap();
+    k.cw.forget("a").await.unwrap();
+    handle.run(|_| async { Ok::<_, Boom>(()) }).await.unwrap();
+    assert_eq!(stored_schedule(&**k.cw.store(), "a").await, "every 5m");
+}
+
+#[tokio::test]
+async fn a_declaration_made_while_the_earlier_one_is_being_written_is_still_to_be_written() {
+    let (k, store) = held_upsert();
+    let run = run_in_a_task(k.cw.job("a", JobOptions::new()).unwrap());
+    store.upsert_waiting.notified().await;
+    k.cw.job("a", JobOptions::new().schedule("every 5m")).unwrap();
+    store.upsert_release.notify_one();
+    run.await.unwrap();
+    k.check().await;
+    assert_eq!(stored_schedule(&store.inner, "a").await, "every 5m");
+}
+
+#[tokio::test]
+async fn a_declarations_write_waits_for_the_earlier_ones_so_the_later_one_stays() {
+    let (k, store) = held_upsert();
+    let run = run_in_a_task(k.cw.job("a", JobOptions::new()).unwrap());
+    store.upsert_waiting.notified().await;
+    k.cw.job("a", JobOptions::new().schedule("every 5m")).unwrap();
+    let cw = k.cw.clone();
+    let later = tokio::spawn(async move { cw.job_summary("a").await.unwrap() });
+    // Were the later write not to wait its turn, it would land here, under the earlier one.
+    settle().await;
+    store.upsert_release.notify_one();
+    run.await.unwrap();
+    let later = later.await.unwrap().expect("a summary");
+    assert_eq!(stored_schedule(&store.inner, "a").await, "every 5m");
+    assert_eq!(later.definition.schedule(), "every 5m");
+}
+
+#[tokio::test]
+async fn sync_job_waits_for_an_earlier_write_and_writes_the_declaration_that_stands_then() {
+    let (k, store) = held_upsert();
+    let run = run_in_a_task(k.cw.job("a", JobOptions::new()).unwrap());
+    store.upsert_waiting.notified().await;
+    k.cw.job("a", JobOptions::new().schedule("every 1h")).unwrap();
+    let cw = k.cw.clone();
+    let later = tokio::spawn(async move { cw.sync_job("a").await.unwrap() });
+    settle().await;
+    // Declared again while the call waits its turn: what it writes is this one.
+    k.cw.job("a", JobOptions::new().schedule("every 5m")).unwrap();
+    store.upsert_release.notify_one();
+    run.await.unwrap();
+    assert!(later.await.unwrap(), "it wrote");
+    assert_eq!(stored_schedule(&store.inner, "a").await, "every 5m");
+    assert!(!k.cw.sync_job("a").await.unwrap(), "and the store has it");
+}
+
+#[tokio::test]
+async fn a_write_given_up_part_way_lets_the_next_one_have_its_turn() {
+    let (k, store) = held_upsert();
+    k.cw.job("a", JobOptions::new().schedule("every 5m")).unwrap();
+    let cw = k.cw.clone();
+    let first = tokio::spawn(async move { cw.sync_job("a").await });
+    store.upsert_waiting.notified().await;
+    first.abort();
+    assert!(first.await.unwrap_err().is_cancelled());
+    assert!(k.cw.sync_job("a").await.unwrap(), "the next write was not left waiting");
+    assert_eq!(stored_schedule(&store.inner, "a").await, "every 5m");
+}

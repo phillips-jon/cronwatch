@@ -393,6 +393,27 @@ async fn a_fallback_does_not_declare_over_a_store_it_could_not_read() {
     assert_eq!(stored(&*store, "report").await, before, "the schedule is kept");
 }
 
+// The .NET audit: a run that fired before the scheduler was read held the
+// fallback's job, declared without a schedule, and wrote it over the entry's
+// declaration once that was in the store.
+#[tokio::test]
+async fn a_run_holding_the_fallbacks_job_does_not_write_over_the_entrys_declaration() {
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let (cw, errors) = client(store.clone());
+    let w = Watch::new(&cw, "asynq", Some("billing"), "Asynq");
+    let held = w.fallback("invoices", JobOptions::new()).await.unwrap();
+    assert_eq!(held.definition().schedule(), "");
+    w.declare(&[entry("invoices", "x", "0 1 * * *")]);
+    w.settle().await;
+    let declared = stored(&*store, "invoices").await;
+    assert_eq!(declared, r#"{"schedule":"0 1 * * *","tags":["asynq","asynq:billing"],"name":"invoices"}"#);
+    held.run(|_| async { Ok::<_, std::io::Error>(()) }).await.unwrap();
+    assert_eq!(stored(&*store, "invoices").await, declared, "the schedule is kept");
+    cw.check().await.unwrap();
+    assert_eq!(stored(&*store, "invoices").await, declared, "and after a check");
+    assert!(errors.lock().unwrap().is_empty());
+}
+
 // The audit: a store that panicked while a declaration was written left the
 // writing task marked busy, so nothing was written again and settle waited
 // for good.

@@ -260,6 +260,7 @@ impl ClientBuilder {
                 handle,
                 declared: Mutex::new(Declared::default()),
                 job_locks: Mutex::new(HashMap::new()),
+                sync_locks: Mutex::new(HashMap::new()),
                 ready: tokio::sync::Mutex::new(false),
                 checking: Mutex::new(None),
                 last_prune_at: AtomicI64::new(0),
@@ -310,6 +311,8 @@ pub(crate) struct Inner {
     pub handle: Handle,
     pub declared: Mutex<Declared>,
     job_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
+    /// The turn each write of a job's declaration takes. See `sync`.
+    sync_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     ready: tokio::sync::Mutex<bool>,
     pub checking: Mutex<Option<watch::Receiver<Option<CheckResultShared>>>>,
     pub last_prune_at: AtomicI64,
@@ -452,21 +455,31 @@ impl Client {
         Ok(())
     }
 
-    /// Writes a declared definition to the store once per declaration.
+    /// Writes the declaration of `def`'s name as it stands, unless the store
+    /// has it. A handle kept from an earlier declaration writes the one that
+    /// replaced it, never its own over it, and one forgotten since writes its
+    /// own. The writes of one name take turns, in the order they were asked
+    /// for, so one still under way cannot land after a later one; and a name
+    /// declared again while its write was under way is still to be written.
     pub(crate) async fn sync(&self, def: &Arc<JobDef>) -> Result<(), Error> {
         self.ensure_ready().await?;
-        let done = {
-            let declared = lock(&self.inner.declared);
-            declared.synced.contains(&def.name)
-                && declared.definitions.get(&def.name).is_some_and(|d| Arc::ptr_eq(d, def))
-        };
-        if done {
+        let name = &def.name;
+        if lock(&self.inner.declared).synced.contains(name) {
             return Ok(());
         }
-        self.inner.store.upsert_job(&def.stored, self.now()).await.map_err(Error::store)?;
+        let turn = self.sync_lock(name);
+        let _turn = turn.lock().await;
+        let standing = {
+            let declared = lock(&self.inner.declared);
+            if declared.synced.contains(name) {
+                return Ok(());
+            }
+            declared.definitions.get(name).unwrap_or(def).clone()
+        };
+        self.inner.store.upsert_job(&standing.stored, self.now()).await.map_err(Error::store)?;
         let mut declared = lock(&self.inner.declared);
-        if declared.definitions.get(&def.name).is_some_and(|d| Arc::ptr_eq(d, def)) {
-            declared.synced.insert(def.name.clone());
+        if declared.definitions.get(name).is_some_and(|d| Arc::ptr_eq(d, &standing)) {
+            declared.synced.insert(name.clone());
         }
         Ok(())
     }
@@ -476,13 +489,19 @@ impl Client {
     /// order its keys come back in), and says whether it wrote. A run or a
     /// check writes a declaration anyway, once; a scheduler integration calls
     /// this so a process that only schedules still puts its jobs where the
-    /// processes that run and check them read them. A name not declared here
-    /// is an error.
+    /// processes that run and check them read them. It takes its turn with
+    /// the name's other writes, and writes the declaration that stands when
+    /// its turn comes. A name not declared here is an error.
     pub async fn sync_job(&self, name: &str) -> Result<bool, Error> {
         let Some(def) = self.declared(name) else {
             return Err(Error::Invalid(format!("job {} is not declared in this process", js::quote(name))));
         };
         self.ensure_ready().await?;
+        let turn = self.sync_lock(name);
+        let _turn = turn.lock().await;
+        // The declaration as it stands once its turn comes: one made since is
+        // the one written.
+        let def = self.declared(name).unwrap_or(def);
         let stored = self.inner.store.get_job(name).await.map_err(Error::store)?;
         let write = stored.is_none_or(|s| !equal_json(&s.definition, &def.stored));
         if write {
@@ -493,6 +512,14 @@ impl Client {
             declared.synced.insert(name.to_string());
         }
         Ok(write)
+    }
+
+    /// The lock every write of a job's declaration takes in turn, in the
+    /// order the writes were asked for. Not `job_lock`: a state update never
+    /// waits on a declaration's write. One given up part way (a dropped
+    /// future) lets go of its turn.
+    fn sync_lock(&self, job: &str) -> Arc<tokio::sync::Mutex<()>> {
+        lock(&self.inner.sync_locks).entry(job.to_string()).or_default().clone()
     }
 
     /// The lock every state update of a job in this process takes in turn
