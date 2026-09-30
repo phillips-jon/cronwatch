@@ -163,7 +163,8 @@ public class AuditCoreTests
         await m.Store.SetStateAsync(new JobState { Job = "counted", ConsecutiveFailures = long.MaxValue });
         await Quietly(() => m.Cw.RunAsync("counted", (j, ct) => throw new InvalidOperationException("x")));
         Assert.Equal(["failed"], m.Alerts.Types());
-        Assert.Equal(long.MaxValue, (await m.Store.GetStateAsync("counted"))!.ConsecutiveFailures);
+        // Held at 2^53 - 1, as the SDK's failureCount holds it.
+        Assert.Equal(9_007_199_254_740_991L, (await m.Store.GetStateAsync("counted"))!.ConsecutiveFailures);
     }
 
     [Fact]

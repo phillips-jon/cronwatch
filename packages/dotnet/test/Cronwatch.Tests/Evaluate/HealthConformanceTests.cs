@@ -149,7 +149,26 @@ public class HealthConformanceTests
             fails.Same("stateVersion " + i, fromValue, c.Get("version"));
             fails.Same("stateVersion " + i++ + ", read as a state", JobState.FromJson(text).CountedVersion, c.Get("version"));
         }
-        Assert.Equal(145, cases);
+        // failureCount: a state's failures in a row, read from its JSON text, then a failed run from it.
+        const long t0 = 1_767_605_400_000;
+        var failedDef = EvaluateCases.Definition(Json.Parse("{\"name\":\"j\",\"failuresBeforeAlert\":3}"));
+        var failedRun = Run.FromValue(new JsObject()
+            .Set("id", "f").Set("job", "j").Set("status", "failed").Set("startedAt", (double)(t0 - 60_000))
+            .Set("finishedAt", (double)(t0 - 59_000)).Set("durationMs", 1000.0).Set("error", "Error: boom")
+            .Set("output", null).Set("metrics", new JsObject()).Set("trigger", "run"));
+        i = 0;
+        foreach (var c in Fixtures.Objects(f, "failureCount"))
+        {
+            cases++;
+            string text = Fixtures.String(c, "state")!;
+            var normalized = Evaluate.NormalizeState(JobState.FromJson(text), "j");
+            fails.Same("failureCount " + i, normalized.ConsecutiveFailures, c.Get("consecutiveFailures"));
+            var output = Evaluate.OnRunFinish(failedDef, failedRun, normalized, [], t0);
+            fails.Same("failureCount " + i++ + ", then a failed run",
+                new JsObject().Set("state", output.State.ToValue()).Set("alerts", output.Alerts.Select(d => (object?)d.ToValue()).ToList()),
+                c.Get("failed"));
+        }
+        Assert.Equal(164, cases);
         fails.Check("health");
     }
 }

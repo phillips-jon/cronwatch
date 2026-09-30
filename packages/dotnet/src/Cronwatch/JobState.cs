@@ -195,7 +195,7 @@ public sealed record JobState
         {
             Job = Values.String(o, "job"),
             Open = ValueMap<Condition, long>.Of(open),
-            ConsecutiveFailures = Values.Integer(o, "consecutiveFailures"),
+            ConsecutiveFailures = Evaluate.FailureCount(o.Get("consecutiveFailures")),
             SilencedUntil = Values.NullableInteger(o, "silencedUntil"),
             LastAlertAt = Values.NullableInteger(o, "lastAlertAt"),
             PendingRecovery = pending == null ? null : ValueList<Condition>.Of(pending),

@@ -83,6 +83,17 @@ internal static class Evaluate
         return 0;
     }
 
+    /// <summary>
+    /// The failures in a row a stored state's <c>consecutiveFailures</c> value counts as, as the
+    /// SDK's <c>failureCount</c> reads it: a JSON number that is a whole number, held at 2^53 - 1,
+    /// and 0 when it is negative or not a whole number (1.5, "3", Infinity).
+    /// </summary>
+    public static long FailureCount(object? count) =>
+        Json.TryNumber(count, out double d) && Js.IsInteger(d) && d > 0 ? (d >= MaxDurationMs ? MaxDurationMs : (long)d) : 0;
+
+    /// <summary>A count of failures in a row held from 0 to 2^53 - 1.</summary>
+    public static long FailureCount(long count) => Math.Clamp(count, 0, MaxDurationMs);
+
     /// <summary>a - b, held at the ends of the range.</summary>
     public static long SaturatingSub(long a, long b)
     {
@@ -424,11 +435,8 @@ internal static class Evaluate
         }
 
         // failed or timeout
-        // Held at the top: a foreign row's count at the limit must not wrap to below any threshold.
-        if (next.ConsecutiveFailures < long.MaxValue)
-        {
-            next.ConsecutiveFailures += 1;
-        }
+        // Held at 2^53 - 1: a count at the limit neither loses precision nor wraps below a threshold.
+        next.ConsecutiveFailures = Math.Min(FailureCount(next.ConsecutiveFailures) + 1, MaxDurationMs);
         CloseCondition(next, Condition.Missed);
         double threshold = FailuresBeforeAlert(def);
         bool timedOut = run.Status == RunStatus.Timeout;

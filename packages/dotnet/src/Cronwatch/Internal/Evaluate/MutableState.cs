@@ -26,7 +26,7 @@ internal sealed class MutableState
         {
             Open[e.Key] = e.Value;
         }
-        ConsecutiveFailures = s.ConsecutiveFailures;
+        ConsecutiveFailures = Evaluate.FailureCount(s.ConsecutiveFailures);
         SilencedUntil = s.SilencedUntil;
         LastAlertAt = s.LastAlertAt;
         PendingRecovery = s.PendingRecovery == null ? null : [.. s.PendingRecovery];
