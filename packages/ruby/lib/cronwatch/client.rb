@@ -1129,13 +1129,18 @@ module Cronwatch
 
       # Runs that never reported back. One that cannot be judged (its job's
       # stored timeout no longer parses, say) is reported and skipped.
-      @store.running_runs.each do |run|
-        declared = @registry.synchronize { @definitions[run.job] }
-        definition = declared ? Serialize.to_stored(declared) : @store.get_job(run.job)&.definition
+      @store.running_runs.each do |listed|
+        declared = @registry.synchronize { @definitions[listed.job] }
+        definition = declared ? Serialize.to_stored(declared) : @store.get_job(listed.job)&.definition
         next if definition.nil?
 
-        evaluable(run.job, definition)
-        next unless Evaluate.stuck?(definition, run, at)
+        evaluable(listed.job, definition)
+        next unless Evaluate.stuck?(definition, listed, at)
+
+        # Read again just before the write: lines and metrics flushed since the
+        # list was read (while earlier stuck runs were sent, say) are kept.
+        run = @store.get_run(listed.id)
+        next if run.nil? || run.status != :running || run.job != listed.job
 
         timeout = Evaluate.timeout_ms(definition)
         run.status = :timeout
@@ -1147,7 +1152,7 @@ module Cronwatch
 
         alerts.concat(finish_run(definition, run, at))
       rescue StandardError => e
-        report(e, "checking #{run.job}")
+        report(e, "checking #{listed.job}")
       end
 
       # Each job on its own: one that cannot be evaluated (a stored schedule

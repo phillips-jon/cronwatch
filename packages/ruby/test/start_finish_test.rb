@@ -153,6 +153,37 @@ class StartFinishTest < Minitest::Test
     assert_equal [:stuck], capture.types
   end
 
+  def test_lines_flushed_while_a_check_marks_earlier_runs_stuck_are_kept_on_the_run_it_marks_next
+    sending = Queue.new
+    gate = Queue.new
+    held = Cronwatch::Alerts::Custom.new("held") do |_alert|
+      sending.push(true)
+      gate.pop
+    end
+    cw, clock, = client(alerts: [held])
+    first = cw.job("first", timeout: "30m").start
+    clock.advance(1000)
+    second = cw.job("second", timeout: "30m").start
+    second.log("early line")
+    second.metric(:rows, 1)
+    second.flush
+    clock.advance(31 * MIN)
+    check = Thread.new { cw.check }
+    # The first stuck run's alert is being sent; the second is still running, and flushes.
+    sending.pop
+    second.log("important progress line")
+    second.metric(:rows, 2)
+    second.flush
+    gate.push(true)
+    gate.push(true)
+    check.join
+    stored = cw.get_run(second.id)
+    assert_equal :timeout, stored.status
+    assert_equal "early line\nimportant progress line", stored.output
+    assert_equal({ "rows" => 2 }, stored.metrics)
+    assert_equal :timeout, cw.get_run(first.id).status
+  end
+
   def test_a_late_success_after_a_timeout_mark_closes_stuck_and_recovers_a_late_failure_does_not_count_twice
     cw, clock, capture = client
     job = cw.job("slowpoke", timeout: "10m", failures_before_alert: 2)
