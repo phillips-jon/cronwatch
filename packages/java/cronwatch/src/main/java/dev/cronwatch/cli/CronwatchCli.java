@@ -65,7 +65,7 @@ public final class CronwatchCli {
     Cronwatch cw;
     try {
       cw = Objects.requireNonNull(factory.get(), "the factory answered null");
-    } catch (RuntimeException e) {
+    } catch (Exception e) { // checked too: Kotlin or @SneakyThrows can throw one
       err.println("cronwatch: the client could not be made: " + describe(e));
       return 1;
     }
@@ -83,7 +83,7 @@ public final class CronwatchCli {
               + " alert"
               + plural(alerts));
       return 0;
-    } catch (RuntimeException e) {
+    } catch (Exception e) { // checked too, as above
       err.println("cronwatch: the check failed: " + describe(e));
       return 1;
     }
