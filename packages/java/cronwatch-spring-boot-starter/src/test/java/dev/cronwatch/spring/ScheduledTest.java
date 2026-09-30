@@ -231,6 +231,25 @@ class ScheduledTest {
     }
   }
 
+  /**
+   * The sync before each check walked every cron's fire times beside CronWatch's again: most of a
+   * second each for a cron that fires every second in a zone with daylight saving. A cron unchanged
+   * is walked once.
+   */
+  @Test
+  void anUnchangedCronIsWalkedOnce() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Apps.Errors errors = new Apps.Errors();
+    try (ConfigurableApplicationContext ctx = app(store, errors)) {
+      CronwatchScheduling scheduling = ctx.getBean(CronwatchScheduling.class);
+      int walked = scheduling.walks.get();
+      assertTrue(walked > 0);
+      scheduling.sync();
+      scheduling.sync();
+      assertEquals(walked, scheduling.walks.get());
+    }
+  }
+
   @Test
   void aBeanDestroyedWhileTheAppRunsHasItsJobDeclaredAgainWithoutItsSchedule() throws Exception {
     MemoryStore store = new MemoryStore();

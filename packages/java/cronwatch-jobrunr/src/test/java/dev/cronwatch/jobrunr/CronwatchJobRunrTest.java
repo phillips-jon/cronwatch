@@ -130,6 +130,8 @@ class CronwatchJobRunrTest {
               + tags
               + ",\"name\":\"often\"}",
           stored(store, "often"));
+      // Read when watched and again by the sync, and walked beside JobRunr's fire times once.
+      assertEquals(1, w.walks.get(), "an unchanged cron is walked once");
       CronwatchJobRunr.runCheck();
       assertTrue(errors.isEmpty(), errors.toString());
     }

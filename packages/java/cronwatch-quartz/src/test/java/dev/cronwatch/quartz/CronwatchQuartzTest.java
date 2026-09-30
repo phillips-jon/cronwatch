@@ -479,6 +479,34 @@ class CronwatchQuartzTest {
   }
 
   /**
+   * Each read walked every cron trigger's fire times beside CronWatch's again, every minute: most
+   * of a second each for a cron that fires every second in a zone with daylight saving. A trigger
+   * unchanged is walked once.
+   */
+  @Test
+  void anUnchangedCronIsWalkedOnce() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Scheduler scheduler = Quartzes.ram();
+    List<String> errors = Quartzes.errors();
+    try (Cronwatch cw = Quartzes.client(store, errors)) {
+      scheduler.scheduleJob(
+          detail(Reports.class, "often", "reports", "a"), cron("o", "*/10 * * * * ?", "UTC"));
+      CronwatchQuartz q = CronwatchQuartz.watch(cw, scheduler);
+      try {
+        q.sync();
+        q.sync();
+        assertEquals(1, q.walks.get());
+        String often = stored(store, "reports.often");
+        assertTrue(often.contains("\"schedule\":\"*/10 * * * * *\""), often + errors);
+      } finally {
+        q.close();
+      }
+    } finally {
+      scheduler.shutdown(true);
+    }
+  }
+
+  /**
    * Quartz asks for a {@code ?} in one of the day fields, which croner reads as a day field named
    * (every day, and either day field matching), not as {@code *}: declared as written, a monthly or
    * a weekly trigger was read as daily and watched without a schedule.

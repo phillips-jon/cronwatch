@@ -19,13 +19,19 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
@@ -139,6 +145,20 @@ public final class CronwatchQuartz implements AutoCloseable {
   private final Condition wake = lock.newCondition();
   private boolean dirty;
   private boolean closed;
+
+  /** A cron trigger's reading as it was checked, the schedule to declare or the problem. */
+  private record Checked(@Nullable String schedule, @Nullable String problem) {}
+
+  /**
+   * Each cron trigger's check against Quartz's own fire times, by the job, the expression, the zone
+   * and the year, so the read every minute walks only what changed: a cron that fires each second
+   * in a zone with daylight saving takes most of a second to walk. Only what the last read saw is
+   * kept.
+   */
+  private final Map<String, Checked> checked = new ConcurrentHashMap<>();
+
+  /** How many cron triggers were walked, for the tests. */
+  final AtomicInteger walks = new AtomicInteger();
 
   /** How long a sync the check job starts may take; the tests shorten it. */
   volatile Duration syncTimeout = Bridge.SYNC_TIMEOUT;
@@ -342,6 +362,7 @@ public final class CronwatchQuartz implements AutoCloseable {
   /** Every job the scheduler holds with a trigger, one entry per trigger. */
   List<Entry> entries() throws SchedulerException {
     List<Entry> out = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
     long now = cw.now();
     for (String group : scheduler.getJobGroupNames()) {
       for (JobKey key : scheduler.getJobKeys(GroupMatcher.jobGroupEquals(group))) {
@@ -363,14 +384,15 @@ public final class CronwatchQuartz implements AutoCloseable {
           continue;
         }
         for (Trigger trigger : triggers) {
-          out.add(entryOf(name, trigger, now));
+          out.add(entryOf(name, trigger, now, seen));
         }
       }
     }
+    checked.keySet().retainAll(seen);
     return out;
   }
 
-  private Entry entryOf(String name, Trigger trigger, long now) {
+  private Entry entryOf(String name, Trigger trigger, long now, Set<String> seen) {
     String label = label(name);
     String schedule = "";
     String zone = "";
@@ -388,11 +410,31 @@ public final class CronwatchQuartz implements AutoCloseable {
               + ", which excludes times CronWatch cannot know, so it is watched without a schedule";
     } else if (trigger instanceof CronTrigger cron) {
       TimeZone tz = cron.getTimeZone() == null ? TimeZone.getDefault() : cron.getTimeZone();
-      try {
-        schedule = cronOf(label, cron.getCronExpression(), tz, now);
+      String expression = cron.getCronExpression();
+      String key =
+          label
+              + "\0"
+              + expression
+              + "\0"
+              + tz.getID()
+              + "\0"
+              + LocalDateTime.ofEpochSecond(Math.floorDiv(now, 1000), 0, ZoneOffset.UTC).getYear();
+      seen.add(key);
+      Checked c = checked.get(key);
+      if (c == null) {
+        walks.incrementAndGet();
+        try {
+          c = new Checked(cronOf(label, expression, tz, now), null);
+        } catch (ScheduleException e) {
+          c = new Checked(null, e.getMessage());
+        }
+        checked.put(key, c);
+      }
+      if (c.schedule() != null) {
+        schedule = c.schedule();
         zone = tz.getID();
-      } catch (ScheduleException e) {
-        problem = e.getMessage();
+      } else {
+        problem = c.problem();
       }
     } else if (trigger instanceof SimpleTrigger simple) {
       if (simple.getRepeatCount() == SimpleTrigger.REPEAT_INDEFINITELY) {
