@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Not published: the dashboard's golden replay (the seed of
+  packages/ruby/test/web/golden.mjs, the captures and their comparison) and
+  a raw HTTP/1.1 client, which the core's replay and every adapter's tests
+  share, with the replay through the JDK's own server as its own tests.
+  A module of its own rather than the core's tests jar, so a build that
+  skips the tests, and a release, never need it.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>dev.cronwatch</groupId>
+    <artifactId>cronwatch-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <artifactId>cronwatch-webtest</artifactId>
+  <packaging>jar</packaging>
+
+  <name>CronWatch web tests (not published)</name>
+  <description>The dashboard's golden replay, shared by the adapters' tests.</description>
+
+  <properties>
+    <maven.deploy.skip>true</maven.deploy.skip>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.cronwatch</groupId>
+      <artifactId>cronwatch</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

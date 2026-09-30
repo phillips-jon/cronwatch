@@ -74,7 +74,9 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       - run: npm run check:dashes
       - run: npm run typecheck
       # A second Postgres with pg_cron, for the pg_cron source's tests against
@@ -141,7 +143,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK, then fails if conformance/ or the dashboard fixture
       # (packages/ruby/test/web/golden.json) is stale.
       - run: npm run check:conformance
@@ -244,7 +248,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK, then fails if conformance/, the dashboard fixture
       # (packages/ruby/test/web/golden.json) or the icons are stale.
       - run: npm run check:conformance
@@ -366,7 +372,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK, then fails if conformance/, the dashboard fixture
       # (packages/ruby/test/web/golden.json) or the icons are stale.
       - run: npm run check:conformance
@@ -684,7 +692,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
@@ -823,7 +833,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
@@ -1029,7 +1041,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
@@ -1218,16 +1232,61 @@ jobs:
         include:
           - { java: "21", newest: false }
           - { java: "27", newest: true }
+    # The databases for SqlStore's server tests, as the elixir, go and rust
+    # jobs have them.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+          MARIADB_DATABASE: cw
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
+      # A second Postgres with pg_cron, for the pg_cron source's tests against
+      # the real extension, as the other jobs start it, on the newest entry.
+      - name: Start Postgres with pg_cron
+        if: matrix.newest
+        run: |
+          docker run -d --name pgcron -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 5433:5432 postgres:16 \
+            bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-cron > /dev/null && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw'
+          for _ in $(seq 1 90); do
+            if [ "$(docker exec pgcron psql postgres://postgres:pw@127.0.0.1:5432/cw -tAc 'show shared_preload_libraries' 2>/dev/null)" = "pg_cron" ]; then
+              echo "CRONWATCH_TEST_PGCRON=postgres://postgres:pw@127.0.0.1:5433/cw" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs pgcron
+          exit 1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -1246,37 +1305,32 @@ jobs:
         run: ./mvnw -B spotless:check
       # Error Prone and -Xlint with warnings as errors, the Enforcer rules
       # (no dependency in the core, Java 21 bytecode, one version of each
-      # dependency), and every test, with TZ=UTC as the fixtures are made.
+      # dependency), and every test, with TZ=UTC as the fixtures are made:
+      # SqlStore on the three servers, and pg_cron on the newest entry.
       - name: ./mvnw verify
         working-directory: packages/java
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+          CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
+          CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
         run: ./mvnw -B verify
-      # The core's jar holds its classes, module-info, resources and
+      # @cronwatch/mcp's tools against the Java dashboard, served by
+      # packages/java/webserver (the JDK's HttpServer), built with the wrapper
+      # on this entry's JDK.
+      - name: MCP server against the Java dashboard
+        run: npm test --workspace packages/mcp
+        env:
+          CRONWATCH_TEST_JAVA: "1"
+      # Each published jar holds its classes, module-info, resources and
       # META-INF, and nothing from the tests or conformance/.
-      - name: The jar's files
-        if: matrix.newest
-        working-directory: packages/java/cronwatch
-        run: |
-          jar=$(ls target/cronwatch-*.jar)
-          unzip -Z1 "$jar" | sort > "$RUNNER_TEMP/jar.txt"
-          (cd target/test-classes && find . -type f | sed 's|^\./||' | sort) > "$RUNNER_TEMP/tests.txt"
-          if comm -12 "$RUNNER_TEMP/jar.txt" "$RUNNER_TEMP/tests.txt" | grep .; then
-            echo "$jar holds test files"
-            exit 1
-          fi
-          if grep -v -E '^(META-INF/|module-info\.class$|dev/$|dev/cronwatch/)' "$RUNNER_TEMP/jar.txt"; then
-            echo "$jar holds files it should not"
-            exit 1
-          fi
-      # The integrations' jars hold their own classes, module-info, resources
-      # and META-INF, and nothing from the tests.
-      - name: The integrations' jars
+      - name: The jars' files
         if: matrix.newest
         working-directory: packages/java
         run: |
-          for module in cronwatch-quartz cronwatch-jobrunr cronwatch-spring-boot-starter; do
-            jar=$(ls $module/target/$module-*.jar)
+          for module in cronwatch cronwatch-servlet cronwatch-quartz cronwatch-jobrunr cronwatch-spring-boot-starter; do
+            jar=$(ls "$module"/target/"$module"-*.jar | grep -v -E -- '-(tests|sources|javadoc)\.jar$')
             unzip -Z1 "$jar" | sort > "$RUNNER_TEMP/jar.txt"
-            (cd $module/target/test-classes && find . -type f | sed 's|^\./||' | sort) > "$RUNNER_TEMP/tests.txt"
+            (cd "$module/target/test-classes" && find . -type f | sed 's|^\./||' | sort) > "$RUNNER_TEMP/tests.txt"
             if comm -12 "$RUNNER_TEMP/jar.txt" "$RUNNER_TEMP/tests.txt" | grep .; then
               echo "$jar holds test files"
               exit 1
@@ -1287,11 +1341,11 @@ jobs:
             fi
           done
 
-  # The Spring Boot starter's, the Quartz module's and the JobRunr module's
-  # tests against the oldest and the newest release each supports: Maven
-  # resolves exactly the version a POM names, and an app's own build decides
-  # which one it runs. The Quartz module's recovery test runs on the JDBC job
-  # store over Postgres.
+  # The scheduler integrations' tests (the starter's dev.cronwatch.spring, the
+  # Quartz module's and the JobRunr module's) against the oldest and the newest
+  # release each supports: Maven resolves exactly the version a POM names, and
+  # an app's own build decides which one it runs. The Quartz module's recovery
+  # test runs on the JDBC job store over Postgres.
   java-frameworks:
     name: java-frameworks (${{ matrix.name }})
     runs-on: ubuntu-latest
@@ -1334,5 +1388,5 @@ jobs:
           -Dshedlock.version=${{ matrix.shedlock }}
           -Dquartz.version=${{ matrix.quartz }}
           -Djobrunr.version=${{ matrix.jobrunr }}
-          -Dtest='dev.cronwatch.quartz.*Test,dev.cronwatch.jobrunr.*Test,dev.cronwatch.spring.*Test'
+          -Dtest='dev/cronwatch/quartz/*Test,dev/cronwatch/jobrunr/*Test,dev/cronwatch/spring/*Test'
           -Dsurefire.failIfNoSpecifiedTests=false

@@ -5,6 +5,10 @@
   versions are the ones that run. -Dspring-boot.version=, -Dshedlock.version=
   and -Dquartz.version= pick the ones the tests run against (the
   java-frameworks CI job runs the oldest and the newest).
+
+  The dashboard's registration on Spring MVC and WebFlux is in
+  dev.cronwatch.spring.web, apart from the client bean and the scheduler
+  integrations.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -21,7 +25,7 @@
   <packaging>jar</packaging>
 
   <name>CronWatch Spring Boot starter</name>
-  <description>CronWatch for Spring Boot 3.5 and 4: the client from cronwatch.* properties, every @Scheduled method watched with no code changes, ShedLock and Quartz handled.</description>
+  <description>CronWatch for Spring Boot 3.5 and 4: the client from cronwatch.* properties, the dashboard on Spring MVC or WebFlux, every @Scheduled method watched with no code changes, ShedLock and Quartz handled.</description>
 
   <properties>
     <spring-boot.version>4.1.1</spring-boot.version>
@@ -32,7 +36,7 @@
 
   <dependencyManagement>
     <dependencies>
-      <!-- Spring's modules at one release; what the parent manages (JUnit, SLF4J) stays its own. -->
+      <!-- Spring's modules at one release; what the parent manages (JUnit, SLF4J, the servlet API) stays its own. -->
       <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-dependencies</artifactId>
@@ -49,6 +53,12 @@
       <artifactId>cronwatch</artifactId>
       <version>${project.version}</version>
     </dependency>
+    <!-- The dashboard's filter on a servlet app; it needs the servlet API only when one runs. -->
+    <dependency>
+      <groupId>dev.cronwatch</groupId>
+      <artifactId>cronwatch-servlet</artifactId>
+      <version>${project.version}</version>
+    </dependency>
     <dependency>
       <groupId>dev.cronwatch</groupId>
       <artifactId>cronwatch-quartz</artifactId>
@@ -58,6 +68,16 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-web</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
       <optional>true</optional>
     </dependency>
     <dependency>
@@ -73,11 +93,22 @@
       <optional>true</optional>
     </dependency>
     <dependency>
+      <groupId>jakarta.servlet</groupId>
+      <artifactId>jakarta.servlet-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>org.jspecify</groupId>
       <artifactId>jspecify</artifactId>
       <scope>provided</scope>
     </dependency>
 
+    <dependency>
+      <groupId>dev.cronwatch</groupId>
+      <artifactId>cronwatch-webtest</artifactId>
+      <version>${project.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -86,6 +117,16 @@
     <dependency>
       <groupId>org.junit.platform</groupId>
       <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webflux</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -105,11 +146,6 @@
       <groupId>org.jobrunr</groupId>
       <artifactId>jobrunr</artifactId>
       <version>${jobrunr.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.projectreactor</groupId>
-      <artifactId>reactor-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

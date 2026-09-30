@@ -69,6 +69,14 @@ class AutoConfigurationTest {
   }
 
   @Test
+  void theEnvironmentIsTheActiveProfile() {
+    assertEquals("prod", CronwatchAutoConfiguration.profile(new String[] {"cloud", "prod"}));
+    assertEquals("cloud", CronwatchAutoConfiguration.profile(new String[] {"cloud", "eu"}));
+    assertEquals("dev", CronwatchAutoConfiguration.profile(new String[] {"dev"}));
+    assertEquals(null, CronwatchAutoConfiguration.profile(new String[] {}));
+  }
+
+  @Test
   void cronwatchEnabledFalseMakesNoClient() {
     try (ConfigurableApplicationContext ctx =
         Apps.run(Plain.class, new MemoryStore(), new Apps.Errors(), "cronwatch.enabled=false")) {

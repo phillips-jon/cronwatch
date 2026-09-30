@@ -22,12 +22,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 
 /**
  * The client as a bean, from {@code cronwatch.*} properties and the app's own beans: a {@link
  * Store} bean is the store (else {@code cronwatch.store}), every {@link Channel} bean is a channel
  * (else the console), and a {@link Triage}, {@link Source} beans and an {@link ErrorHandler} are
- * used when the app has them. The client is closed when the context closes. An app's own {@link
+ * used when the app has them. When neither {@code CRONWATCH_ENV} nor {@code APP_ENV} is set, the
+ * environment is the app's active Spring profile ({@code dev} and {@code local} are development,
+ * {@code prod} production). The client is closed when the context closes. An app's own {@link
  * Cronwatch} bean replaces this one, and {@code cronwatch.enabled=false} turns the starter off.
  */
 @AutoConfiguration
@@ -44,6 +47,7 @@ public class CronwatchAutoConfiguration {
   @ConditionalOnMissingBean
   public Cronwatch cronwatch(
       CronwatchProperties properties,
+      Environment environment,
       ObjectProvider<Store> stores,
       ObjectProvider<DataSource> dataSources,
       ObjectProvider<Channel> channels,
@@ -51,6 +55,10 @@ public class CronwatchAutoConfiguration {
       ObjectProvider<Source> sources,
       ObjectProvider<ErrorHandler> onError) {
     Cronwatch.Builder b = Cronwatch.builder();
+    String profile = profile(environment.getActiveProfiles());
+    if (profile != null) {
+      b.environment(profile);
+    }
     Store store = stores.getIfUnique();
     if (store == null) {
       store = store(properties, dataSources.getIfUnique());
@@ -89,6 +97,24 @@ public class CronwatchAutoConfiguration {
       b.defaults(defaults);
     }
     return b.build();
+  }
+
+  /**
+   * The active profile the environment is read from: the first that names development or
+   * production, as the client reads a name, else the first; null when none is active.
+   */
+  static @Nullable String profile(String[] active) {
+    for (String p : active) {
+      switch (p.strip().toLowerCase(Locale.ROOT)) {
+        case "development", "dev", "local", "test", "testing", "production", "prod" -> {
+          return p;
+        }
+        default -> {
+          // Not one the client reads as either; the first is taken below.
+        }
+      }
+    }
+    return active.length == 0 ? null : active[0];
   }
 
   private static Deliver deliver(String text) {

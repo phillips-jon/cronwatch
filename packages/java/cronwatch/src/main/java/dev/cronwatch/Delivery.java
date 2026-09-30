@@ -179,7 +179,8 @@ final class Delivery {
     List<Future<?>> sends = new ArrayList<>();
     for (Channel channel : core.channels) {
       ChannelContext context =
-          new ChannelContext(e -> core.report(e, "alert channel " + channel.name()));
+          new ChannelContext(
+              e -> core.report(e, "alert channel " + channel.name()), core.transport);
       sends.add(
           core.submit(
               () -> {
@@ -241,7 +242,7 @@ final class Delivery {
       core.report(e, where);
       return alert.withTriage(null);
     }
-    Triage.Context context = new Triage.Context(alert, recent);
+    Triage.Context context = new Triage.Context(alert, recent, core.transport);
     Future<String> task = core.submit(() -> triage.triage(context));
     long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
     boolean interrupted = false;

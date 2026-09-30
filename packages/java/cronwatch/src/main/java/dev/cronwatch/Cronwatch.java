@@ -1,8 +1,10 @@
 package dev.cronwatch;
 
 import dev.cronwatch.Core.JobDef;
+import dev.cronwatch.alerts.Transport;
 import dev.cronwatch.internal.core.CurrentRun;
 import dev.cronwatch.internal.core.Friends;
+import dev.cronwatch.internal.core.WebAccess;
 import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.duration.Schedules;
 import dev.cronwatch.internal.evaluate.Evaluate;
@@ -13,6 +15,8 @@ import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import dev.cronwatch.store.MemoryStore;
 import dev.cronwatch.store.Store;
+import dev.cronwatch.web.Routes;
+import dev.cronwatch.web.RoutesOptions;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
@@ -25,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
@@ -81,8 +86,49 @@ public final class Cronwatch implements AutoCloseable {
   final Checks checks;
   private final @Nullable Thread shutdownHook;
 
-  private Cronwatch(Core core, boolean shutdownHook) {
+  /** Set the first time a handler of this client refuses a request for want of a secret. */
+  private final AtomicBoolean refusedNoSecret = new AtomicBoolean();
+
+  /** The environment when no variable names one: the builder's, such as the Spring starter's. */
+  private final @Nullable String environmentFallback;
+
+  static {
+    WebAccess.install(
+        new WebAccess.Hooks() {
+          @Override
+          public JobState silence(Cronwatch cw, String name, double ms) {
+            return cw.silenceMs(name, ms);
+          }
+
+          @Override
+          public String environment(Cronwatch cw) {
+            return Env.environment(cw.environmentFallback);
+          }
+
+          @Override
+          public boolean secretOptOut(Cronwatch cw) {
+            return cw.core.secretOptOut;
+          }
+
+          @Override
+          public boolean firstNoSecretRefusal(Cronwatch cw) {
+            return !cw.refusedNoSecret.getAndSet(true);
+          }
+
+          @Override
+          public WebAccess.Caught run(Job job, String trigger, WebAccess.Body body) {
+            Runs.Caught<Object> c =
+                job.cronwatch()
+                    .runs
+                    .executeCaught(job.def(), RunOptions.trigger(trigger), body::call);
+            return new WebAccess.Caught(c.run(), c.value(), c.thrown());
+          }
+        });
+  }
+
+  private Cronwatch(Core core, boolean shutdownHook, @Nullable String environmentFallback) {
     this.core = core;
+    this.environmentFallback = environmentFallback;
     this.delivery = new Delivery(core);
     this.runs = new Runs(core, delivery);
     this.checks = new Checks(this, core, runs, delivery);
@@ -709,6 +755,27 @@ public final class Cronwatch implements AutoCloseable {
     } catch (Exception e) {
       core.report(e, "closing the store");
     }
+    // The client's own transport only: one the app gave is the app's to close.
+    if (core.transport instanceof LazyTransport own) {
+      own.close();
+    }
+  }
+
+  // ---- the dashboard
+
+  /**
+   * The dashboard and its JSON API, the SDK's {@code cw.routes()}: {@link Routes#handle} answers a
+   * request, and {@code WebServer}, the servlet filter and the Spring Boot starter serve it.
+   *
+   * @throws CronwatchException for an {@code origin} that is not an http or https URL
+   */
+  public Routes routes(RoutesOptions options) {
+    return Routes.of(this, options);
+  }
+
+  /** {@link #routes(RoutesOptions)} with the defaults: the token from {@code CRONWATCH_TOKEN}. */
+  public Routes routes() {
+    return routes(RoutesOptions.defaults());
   }
 
   // ---- what a source uses
@@ -747,6 +814,7 @@ public final class Cronwatch implements AutoCloseable {
     private final List<Channel> channels = new ArrayList<>(List.of(new Console()));
     private boolean defaultChannels = true;
     private @Nullable Triage triage;
+    private @Nullable Transport transport;
     private final List<Source> sources = new ArrayList<>();
     private boolean secretGiven;
     private @Nullable String cronSecret;
@@ -758,9 +826,21 @@ public final class Cronwatch implements AutoCloseable {
     private @Nullable ErrorHandler onError;
     private @Nullable LongSupplier clock;
     private boolean shutdownHook = true;
+    private @Nullable String environment;
     final Core.Timings timings = new Core.Timings();
 
     private Builder() {}
+
+    /**
+     * The environment to read when neither {@code CRONWATCH_ENV} nor {@code APP_ENV} is set, as
+     * they are read ({@code dev}, {@code local}, {@code test} and {@code testing} are development):
+     * the Spring Boot starter gives the app's active profile. In development the dashboard makes a
+     * token of its own and a job's handler runs without a secret.
+     */
+    public Builder environment(String name) {
+      this.environment = Objects.requireNonNull(name, "name");
+      return this;
+    }
 
     /**
      * Where jobs, runs and state live. The default is a {@link MemoryStore}, which forgets on
@@ -792,6 +872,17 @@ public final class Cronwatch implements AutoCloseable {
     /** Adds a short diagnosis to every alert except recoveries. */
     public Builder triage(Triage triage) {
       this.triage = Objects.requireNonNull(triage, "triage");
+      return this;
+    }
+
+    /**
+     * Sends every channel's and triage's requests (those whose options name no transport of their
+     * own) through {@code transport}: an app's own HTTP client, a proxy, a trust store. The default
+     * is a {@link dev.cronwatch.alerts.JdkTransport} the client makes on its first send and closes
+     * with itself; one given here is the app's to close.
+     */
+    public Builder transport(Transport transport) {
+      this.transport = Objects.requireNonNull(transport, "transport");
       return this;
     }
 
@@ -936,6 +1027,7 @@ public final class Cronwatch implements AutoCloseable {
               store == null,
               channels,
               triage,
+              transport == null ? new LazyTransport() : transport,
               sources,
               secret == null || secret.isEmpty() ? null : secret,
               optOut,
@@ -947,7 +1039,7 @@ public final class Cronwatch implements AutoCloseable {
               handler,
               clock == null ? System::currentTimeMillis : clock,
               timings);
-      return new Cronwatch(core, shutdownHook);
+      return new Cronwatch(core, shutdownHook, environment);
     }
 
     /** Names what is set, never a secret's value. */

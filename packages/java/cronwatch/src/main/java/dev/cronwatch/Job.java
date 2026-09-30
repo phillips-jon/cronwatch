@@ -1,6 +1,9 @@
 package dev.cronwatch;
 
 import dev.cronwatch.Core.JobDef;
+import dev.cronwatch.web.Handler;
+import dev.cronwatch.web.HandlerFunction;
+import dev.cronwatch.web.HandlerOptions;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -126,6 +129,22 @@ public final class Job {
    */
   public RunHandle resume(String runId) {
     return cronwatch.resumeHandle(def, runId);
+  }
+
+  /**
+   * The job as an HTTP handler, the SDK's {@code job.handler()}, for a platform cron that calls a
+   * URL: each request that carries the secret ({@code Authorization: Bearer <secret>}) runs {@code
+   * fn} in its thread as a recorded run with the trigger {@code handler}, answered with how it went
+   * (see {@link Handler}). Serve it with {@code WebServer.mount}, the servlet adapter or the Spring
+   * Boot starter.
+   */
+  public Handler handler(HandlerFunction fn, HandlerOptions options) {
+    return Handler.of(this, fn, options);
+  }
+
+  /** {@link #handler(HandlerFunction, HandlerOptions)} with the client's cron secret. */
+  public Handler handler(HandlerFunction fn) {
+    return handler(fn, HandlerOptions.defaults());
   }
 
   @Override

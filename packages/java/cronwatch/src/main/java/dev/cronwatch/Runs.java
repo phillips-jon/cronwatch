@@ -101,6 +101,23 @@ final class Runs {
    * is interrupted meanwhile. What the function threw is thrown again as it came.
    */
   <T> Executed<T> execute(JobDef def, RunOptions options, Body<T> body) {
+    Caught<T> caught = executeCaught(def, options, body);
+    Throwable thrown = caught.thrown();
+    if (thrown != null) {
+      throw Runs.<RuntimeException>sneakyThrow(thrown);
+    }
+    return new Executed<>(caught.run(), caught.value());
+  }
+
+  /** A run once recorded, what its function returned, and what it threw. */
+  record Caught<T>(Run run, @Nullable T value, @Nullable Throwable thrown) {}
+
+  /**
+   * {@link #execute}, handing back what the function threw rather than throwing it, for a job's
+   * handler, which answers a throw with the run. An {@link InterruptedException} leaves the
+   * interrupt status restored.
+   */
+  <T> Caught<T> executeCaught(JobDef def, RunOptions options, Body<T> body) {
     Opened o = open(def, options);
     T value = null;
     Throwable thrown = null;
@@ -112,14 +129,11 @@ final class Runs {
       endFunction(o);
     }
     Run finished = close(o, value, thrown);
-    if (thrown != null) {
-      if (thrown instanceof InterruptedException) {
-        // Well-behaved code restores the interrupt status of a thread it was interrupted in.
-        Thread.currentThread().interrupt();
-      }
-      throw Runs.<RuntimeException>sneakyThrow(thrown);
+    if (thrown instanceof InterruptedException) {
+      // Well-behaved code restores the interrupt status of a thread it was interrupted in.
+      Thread.currentThread().interrupt();
     }
-    return new Executed<>(finished, value);
+    return new Caught<>(finished, value, thrown);
   }
 
   /**

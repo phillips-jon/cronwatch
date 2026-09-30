@@ -1,6 +1,7 @@
 package dev.cronwatch;
 
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The environment, read in one place, when used. The SDK reads {@code NODE_ENV}; Java has no
@@ -22,22 +23,34 @@ final class Env {
    * which is the safe reading.
    */
   static String environment() {
+    return environment(null);
+  }
+
+  /**
+   * {@link #environment()}, or {@code fallback} (read the same way) when no variable names one: the
+   * Spring starter's, from the app's active profiles.
+   */
+  static String environment(@Nullable String fallback) {
     for (String name : VARIABLES) {
       String value = System.getenv(name);
       if (value == null) {
         continue;
       }
-      String v = value.strip().toLowerCase(Locale.ROOT);
-      if (v.isEmpty()) {
-        continue;
+      String v = normalize(value);
+      if (!v.isEmpty()) {
+        return v;
       }
-      return switch (v) {
-        case "prod" -> "production";
-        case "dev", "local", "test", "testing" -> "development";
-        default -> v;
-      };
     }
-    return "";
+    return fallback == null ? "" : normalize(fallback);
+  }
+
+  private static String normalize(String value) {
+    String v = value.strip().toLowerCase(Locale.ROOT);
+    return switch (v) {
+      case "prod" -> "production";
+      case "dev", "local", "test", "testing" -> "development";
+      default -> v;
+    };
   }
 
   /** A variable's value, or null when it is unset. */

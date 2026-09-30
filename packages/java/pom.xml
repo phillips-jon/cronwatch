@@ -43,9 +43,12 @@
 
   <modules>
     <module>cronwatch</module>
+    <module>webtest</module>
+    <module>cronwatch-servlet</module>
     <module>cronwatch-quartz</module>
     <module>cronwatch-jobrunr</module>
     <module>cronwatch-spring-boot-starter</module>
+    <module>webserver</module>
     <module>examples/crontab</module>
   </modules>
 
@@ -62,9 +65,15 @@
     <google-java-format.version>1.36.1</google-java-format.version>
     <junit.version>6.1.3</junit.version>
     <sqlite-jdbc.version>3.53.4.0</sqlite-jdbc.version>
+    <postgresql.version>42.7.13</postgresql.version>
+    <mysql-connector-j.version>26.7.0</mysql-connector-j.version>
+    <mariadb-java-client.version>3.5.10</mariadb-java-client.version>
     <jspecify.version>1.0.1</jspecify.version>
     <slf4j.version>2.0.20</slf4j.version>
     <context-propagation.version>1.2.1</context-propagation.version>
+    <!-- The web adapters: the servlet API they compile against (the floor), and the servers the tests run. -->
+    <jakarta-servlet.version>6.0.0</jakarta-servlet.version>
+    <jetty.version>12.1.13</jetty.version>
   </properties>
 
   <dependencyManagement>
@@ -95,6 +104,31 @@
         <groupId>org.xerial</groupId>
         <artifactId>sqlite-jdbc</artifactId>
         <version>${sqlite-jdbc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.postgresql</groupId>
+        <artifactId>postgresql</artifactId>
+        <version>${postgresql.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.mysql</groupId>
+        <artifactId>mysql-connector-j</artifactId>
+        <version>${mysql-connector-j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.mariadb.jdbc</groupId>
+        <artifactId>mariadb-java-client</artifactId>
+        <version>${mariadb-java-client.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>jakarta.servlet</groupId>
+        <artifactId>jakarta.servlet-api</artifactId>
+        <version>${jakarta-servlet.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty.ee10</groupId>
+        <artifactId>jetty-ee10-servlet</artifactId>
+        <version>${jetty.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -139,6 +173,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>3.12.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.11.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -379,6 +418,8 @@
               <excludeArtifacts>
                 <artifact>cronwatch-parent</artifact>
                 <artifact>cronwatch-example-crontab</artifact>
+                <artifact>cronwatch-webserver</artifact>
+                <artifact>cronwatch-webtest</artifact>
               </excludeArtifacts>
             </configuration>
           </plugin>

@@ -3,3 +3,4 @@ dev.cronwatch.spring.CronwatchSchedulingAutoConfiguration
 dev.cronwatch.spring.CronwatchShedLockAutoConfiguration
 dev.cronwatch.spring.CronwatchQuartzAutoConfiguration
 dev.cronwatch.spring.CronwatchCheckAutoConfiguration
+dev.cronwatch.spring.web.CronwatchWebAutoConfiguration
