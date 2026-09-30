@@ -389,7 +389,7 @@ The client:
 | `jobs`, `jobs_with_runs(limit = 20)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit = 50)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath. The end is a whole millisecond, held at 2^53 - 1 however long the silence. Each returns the job's stored state, `version` included |
-| `forget(name)` | remove a job and its runs |
+| `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resume_run(name, run_id)` | `job(name).resume(run_id)` for a job declared in this process; raises `ArgumentError` for one that is not |
 | `record_run(run, evaluate: true)` | record a run that happened elsewhere, for a source; see [pg_cron](#pg-cron). Returns the alerts it sent |
 | `defined_jobs` | the definitions declared in this process |

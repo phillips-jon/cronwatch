@@ -198,7 +198,7 @@ module Cronwatch
                     duration_ms: nil, error: nil, output: nil, metrics: {}, trigger: trigger)
       recorded = false
       begin
-        sync(definition)
+        sync(definition, confirm: true)
         @store.insert_run(run.dup)
         recorded = true
       rescue StandardError => e
@@ -425,16 +425,18 @@ module Cronwatch
     def jobs_with_runs(limit = 20)
       after_fork_check
       ensure_ready
-      defined_jobs.each { |definition| sync(definition) }
+      jobs = stored_jobs
       at = now
       count = clamp_limit(limit, 20, 0)
-      @store.list_jobs.map { |stored| snapshot(stored, at, count) }
+      jobs.map { |stored| snapshot(stored, at, count) }
     end
 
+    # A job's summary, or nil for one the store does not have. One declared
+    # here and forgotten elsewhere is written again, as stored_jobs does.
     def job_summary(name)
       ensure_ready
       definition = @registry.synchronize { @definitions[name] }
-      sync(definition) if definition
+      sync(definition, confirm: true) if definition
       stored = @store.get_job(name)
       return nil unless stored
 
@@ -469,7 +471,10 @@ module Cronwatch
       patch_state(name) { |state| state.silenced_until = nil }
     end
 
-    # Remove a job and its runs from the store. A job still declared in code comes back on its next run.
+    # Remove a job and its runs from the store. A job still declared in code
+    # comes back: here on its next run, and in any other process that
+    # declares it on its next run there, or at that process's next check or
+    # dashboard read.
     def forget(name)
       ensure_ready
       @registry.synchronize do
@@ -665,11 +670,22 @@ module Cronwatch
     # its own. The writes of one name take turns (the name's lock in
     # @syncing, held across the write), so one still under way cannot land
     # after a later one; and a name declared again while its write was under
-    # way is still to be written.
-    def sync(definition)
+    # way is still to be written. A name is marked as written only while
+    # that same declaration stands, so a forget that lands during the write
+    # (deleting the row after it) leaves the name to be written again, as
+    # does one forgotten before it.
+    #
+    # With `confirm`, as a run starts, a name already written is read back:
+    # another process may have forgotten the job since, and a job still
+    # declared here comes back on its next run.
+    def sync(definition, confirm: false)
       ensure_ready
       name = definition.name
-      return if @registry.synchronize { @synced.include?(name) }
+      if @registry.synchronize { @synced.include?(name) }
+        return if !confirm || @store.get_job(name)
+
+        @registry.synchronize { @synced.delete(name) }
+      end
 
       after_fork_check
       turn = @registry.synchronize { @syncing[name] ||= Mutex.new }
@@ -678,8 +694,28 @@ module Cronwatch
         next if standing.nil?
 
         @store.upsert_job(Serialize.to_stored(standing), now)
-        @registry.synchronize { @synced << name if @definitions.fetch(name, standing).equal?(standing) }
+        @registry.synchronize { @synced << name if @definitions[name].equal?(standing) }
       end
+    end
+
+    # Every stored job, once each declaration has been written. A job
+    # declared here that the store no longer has was forgotten by another
+    # process after this one wrote it: it is written again, as its next run
+    # would, so it is checked and shown while any process still declares it.
+    def stored_jobs
+      defined_jobs.each { |definition| sync(definition) }
+      jobs = @store.list_jobs
+      listed = jobs.to_set(&:name)
+      missing = defined_jobs.reject { |definition| listed.include?(definition.name) }
+      return jobs if missing.empty?
+
+      missing.each do |definition|
+        name = definition.name
+        # Not one forgotten here meanwhile.
+        standing = @registry.synchronize { @definitions[name].equal?(definition) && @synced.delete(name) }
+        sync(definition) if standing
+      end
+      @store.list_jobs
     end
 
     # Runs the block while holding the job's lock, so two runs (or a run and a
@@ -882,7 +918,7 @@ module Cronwatch
                     duration_ms: nil, error: nil, output: nil, metrics: {}, trigger: trigger)
       recorded = false
       begin
-        sync(definition)
+        sync(definition, confirm: true)
         @store.insert_run(run.dup)
         recorded = true
       rescue StandardError => e
@@ -1120,7 +1156,7 @@ module Cronwatch
       # the others.
       jobs = []
       retries = RetryBudget.new(0)
-      @store.list_jobs.each do |stored|
+      stored_jobs.each do |stored|
         evaluable(stored.name, stored.definition)
         recent = @store.list_runs(stored.name, Evaluate::BASELINE_WINDOW)
         next_expected_at = nil

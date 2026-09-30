@@ -332,8 +332,10 @@ class ClientHardeningTest < Minitest::Test
   # go, so a test can declare the job again, or ask for another write, while
   # that one is under way.
   class HeldUpsert
-    def initialize(store)
+    # `after_write`: the first write lands, then waits.
+    def initialize(store, after_write: false)
       @store = store
+      @after_write = after_write
       @entered = Queue.new
       @gate = Queue.new
       @lock = Mutex.new
@@ -347,11 +349,12 @@ class ClientHardeningTest < Minitest::Test
 
     def upsert_job(definition, now)
       first = @lock.synchronize { @held ? false : (@held = true) }
+      @store.upsert_job(definition, now) if @after_write
       if first
         @entered.push(true)
         @gate.pop
       end
-      @store.upsert_job(definition, now)
+      @store.upsert_job(definition, now) unless @after_write
     end
 
     def respond_to_missing?(name, include_private = false)
@@ -383,6 +386,59 @@ class ClientHardeningTest < Minitest::Test
     cw.forget("a")
     handle.run { nil }
     assert_equal "every 5m", store.get_job("a").definition.schedule
+  end
+
+  def test_a_forget_that_lands_while_a_jobs_first_write_is_under_way_leaves_it_to_be_written_on_its_next_run
+    inner = Cronwatch::Stores::Memory.new
+    # The write lands, then waits: the forget deletes the row it wrote.
+    store = HeldUpsert.new(inner, after_write: true)
+    cw = Cronwatch.new(store: store, alerts: [Capture.new], cron_secret: nil)
+    handle = cw.job("nightly", schedule: "every 5m")
+    first = Thread.new { handle.run { nil } }
+    store.wait
+    cw.forget("nightly")
+    store.release
+    first.join
+    assert_nil inner.get_job("nightly"), "forgotten after it was written"
+    handle.run { nil }
+    assert_equal "every 5m", inner.get_job("nightly").definition.schedule, "its next run brings it back"
+    assert_equal ["nightly"], cw.jobs.map(&:name)
+  end
+
+  def test_a_job_forgotten_by_another_process_comes_back_in_a_long_lived_one_that_still_declares_it
+    store = Cronwatch::Stores::Memory.new
+    worker = Cronwatch.new(store: store, alerts: [Capture.new], cron_secret: nil)
+    web = Cronwatch.new(store: store, alerts: [Capture.new], cron_secret: nil)
+    nightly = worker.job("nightly", schedule: "every 5m")
+    nightly.run { nil }
+    forgotten = lambda do
+      web.forget("nightly")
+      assert_nil store.get_job("nightly")
+    end
+
+    # Its next run writes it again, so the run is not left without its job.
+    forgotten.call
+    nightly.run { nil }
+    assert_equal "every 5m", store.get_job("nightly").definition.schedule
+    assert_equal 1, web.runs("nightly").length
+
+    # So does a started run, a check, the board and the job's page in the process that declares it.
+    forgotten.call
+    handle = nightly.start
+    assert store.get_job("nightly")
+    handle.finish
+    forgotten.call
+    worker.check
+    assert store.get_job("nightly")
+    forgotten.call
+    assert_equal ["nightly"], worker.jobs.map(&:name)
+    forgotten.call
+    assert_equal "every 5m", worker.job_summary("nightly").definition.schedule
+
+    # A process that never declared it does not bring it back.
+    forgotten.call
+    web.check
+    assert_equal [], web.jobs
   end
 
   def test_a_declaration_made_while_the_earlier_one_is_being_written_is_still_to_be_written
