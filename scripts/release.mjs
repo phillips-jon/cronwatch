@@ -67,6 +67,8 @@ const VERSIONED = [
   // the POMs that are published, and Cronwatch.VERSION is read from a
   // resource Maven filters with it.
   { file: "packages/java/pom.xml", pattern: /^(\s*<revision>)([^<]+)(<\/revision>)/m },
+  // The README's dependency snippet names the release.
+  { file: "packages/java/README.md", pattern: /^( {2}<version>)([^<]+)(<\/version>)/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
