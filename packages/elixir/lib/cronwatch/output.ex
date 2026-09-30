@@ -14,6 +14,7 @@ defmodule Cronwatch.Output do
 
   @output_cap 16 * 1024
   @redacted "[redacted]"
+  @trimmed "[earlier output trimmed]\n"
 
   @doc "How much output a run keeps: 16 KB of UTF-16 code units, the tail."
   @spec output_cap() :: pos_integer()
@@ -57,7 +58,43 @@ defmodule Cronwatch.Output do
     if byte_size(clean) <= @output_cap or JS.len16(clean) <= @output_cap do
       clean
     else
-      "[earlier output trimmed]\n" <> JS.tail16(clean, @output_cap)
+      @trimmed <> JS.tail16(clean, @output_cap)
+    end
+  end
+
+  @redact_edge 3 * (@output_cap + 1024)
+
+  @doc """
+  How much text before the kept tail redaction reads, and never keeps: three
+  times the longest secret a default pattern can match (a PEM key's 16 KB
+  body with its header and footer, under the cap plus 1024), since a
+  replacement grows what it replaces at most threefold (the SDK's
+  `REDACT_EDGE`).
+  """
+  @spec redact_edge() :: pos_integer()
+  def redact_edge, do: @redact_edge
+
+  @doc """
+  Output or an error as it is stored: redacted with `redact`, then capped
+  like `cap/1`, so the cut cannot fall inside a secret and keep what follows
+  its label (the SDK's `redactAndCap`). Text of at most the cap plus
+  `redact_edge/0` code units is redacted whole. Longer text is cut to that
+  many units from its end first, and after redacting, the first
+  `redact_edge/0` units are never kept: a secret whose label fell before
+  that cut is left out with them. NULs go before and after `redact`.
+  """
+  @spec redact_and_cap(String.t(), (String.t() -> String.t())) :: String.t()
+  def redact_and_cap(text, redact) do
+    clean = strip_nul(text)
+    window = @output_cap + @redact_edge
+
+    # Each byte is at most one code unit, so a short text needs no count.
+    if byte_size(clean) <= window or JS.len16(clean) <= window do
+      cap(redact.(clean))
+    else
+      redacted = strip_nul(redact.(JS.tail16(clean, window)))
+      n = JS.len16(redacted)
+      @trimmed <> JS.slice16(redacted, max(n - @output_cap, @redact_edge), n)
     end
   end
 
@@ -101,6 +138,13 @@ defmodule Cronwatch.Output do
   """
   @spec describe_exception(:error | :throw | :exit | :returned, term(), Exception.stacktrace()) :: String.t()
   def describe_exception(kind, reason, stacktrace \\ []), do: cap(describe_raw(kind, reason, stacktrace))
+
+  @doc """
+  `describe_exception/3` not capped (the SDK's `describeError`): a run's
+  error is redacted first and capped after, by `redact_and_cap/2`.
+  """
+  @spec describe_uncapped(:error | :throw | :exit | :returned, term(), Exception.stacktrace()) :: String.t()
+  def describe_uncapped(kind, reason, stacktrace \\ []), do: describe_raw(kind, reason, stacktrace)
 
   defp describe_raw(:error, reason, stacktrace) do
     exception = Exception.normalize(:error, reason, stacktrace)

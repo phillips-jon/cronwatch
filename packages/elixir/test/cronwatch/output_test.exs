@@ -57,6 +57,31 @@ defmodule Cronwatch.OutputTest do
     |> check!("output")
   end
 
+  test "conformance: redacted, then capped" do
+    f = fixture("output")
+    assert field(f, "redactEdge") == Output.redact_edge()
+    cases = list(f, "redactAndCap")
+    assert length(cases) == 15
+
+    cases
+    |> Enum.with_index()
+    |> Enum.reduce(failures(), fn {c, i}, f ->
+      input = expand(field(c, "input"))
+      got = Output.redact_and_cap(input, &Output.redact_secrets/1)
+      same(f, "redactAndCap case #{i} #{inspect(JS.head16(input, 60))}", digest(got), field(c, "result"))
+    end)
+    |> check!("output")
+  end
+
+  test "a secret whose label the cap would have cut off is still redacted" do
+    token = "opaque" <> "TOKENvalue1234567890"
+    text = "Authorization: Bearer " <> token <> "\n" <> String.duplicate("y", Output.output_cap() - 30)
+    stored = Output.redact_and_cap(text, &Output.redact_secrets/1)
+    refute String.contains?(stored, "TOKENvalue")
+    # Capping first, as before, kept the rest of the token without its label.
+    assert String.contains?(Output.redact_secrets(Output.cap(text)), "TOKENvalue")
+  end
+
   test "conformance: error messages" do
     cases = list(fixture("output"), "errorMessage")
     assert length(cases) == 16
@@ -319,7 +344,10 @@ defmodule Cronwatch.OutputTest do
     snap = Lines.snapshot(t, :run)
     assert snap.dropped
     assert String.starts_with?(Lines.expect_text(snap), "done early\n")
-    assert JS.len16(Lines.output(snap)) == 16 * 1024 + JS.len16("[earlier output trimmed]\n")
+    # The window as held, not capped: the run redacts it, then caps it.
+    assert JS.len16(Lines.output(snap)) == 65 * 1001 - 1
+    capped = Output.redact_and_cap(Lines.output(snap), &Output.redact_secrets/1)
+    assert JS.len16(capped) == 16 * 1024 + JS.len16("[earlier output trimmed]\n")
   end
 
   defp lines_table, do: :ets.new(:lines, [:ordered_set, :public])

@@ -84,7 +84,7 @@ defmodule Cronwatch.RunHandle do
 
       recorded =
         try do
-          Core.sync!(c, job)
+          Core.sync!(c, job, true)
           Core.store!(c, :insert_run, [run])
           true
         rescue
@@ -384,7 +384,7 @@ defmodule Cronwatch.RunHandle do
         true ->
           {failure, result} =
             case outcome do
-              {:error, reason} -> {Output.describe_exception(:returned, reason, []), nil}
+              {:error, reason} -> {Output.describe_uncapped(:returned, reason, []), nil}
               {:ok, value} -> {Exec.http_failure(value), value}
               value -> {Exec.http_failure(value), value}
             end
@@ -398,7 +398,7 @@ defmodule Cronwatch.RunHandle do
 
           snap = Lines.snapshot(t, key)
           finished_at = Core.now(c)
-          added = Lines.output(snap) || (text && Output.cap(text))
+          added = Lines.output(snap) || text
 
           run = %{
             from
@@ -406,7 +406,8 @@ defmodule Cronwatch.RunHandle do
               finished_at: finished_at,
               duration_ms: Evaluate.run_duration(from.started_at, finished_at),
               error: nil,
-              output: join_output(from.output, added),
+              # Capped by Core.conclude, after it is redacted.
+              output: join_lines(from.output, added),
               metrics: Object.merge(from.metrics, snap.metrics)
           }
 

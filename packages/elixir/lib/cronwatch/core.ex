@@ -71,10 +71,21 @@ defmodule Cronwatch.Core do
   Writes the declaration of `job`'s name as it stands, unless the store has
   it. A handle kept from an earlier declaration writes the one that replaced
   it, never its own over it, and one forgotten since writes its own. A name
-  declared again while its write was under way is still to be written.
+  declared again while its write was under way is still to be written. A
+  name is marked as written only while that same declaration stands, so a
+  forget that lands during the write (deleting the row after it) leaves the
+  name to be written again, as does one forgotten before it.
+
+  With `confirm`, as a run starts, a name already written is read back:
+  another process may have forgotten the job since, and a job still declared
+  here comes back on its next run.
   """
-  def sync!(c, job) do
+  def sync!(c, job, confirm \\ false) do
     ensure_ready!(c)
+
+    if confirm and Runs.synced?(c.name, job.name) and store!(c, :get_job, [job.name]) == nil do
+      Runs.unmark_synced(c.name, job.name)
+    end
 
     unless Runs.synced?(c.name, job.name) do
       declaring(c, job.name, fn ->
@@ -245,23 +256,25 @@ defmodule Cronwatch.Core do
 
   @doc """
   Evaluates a finished run, already written, against the job's state and
-  sends what that produces. Never raises; answers the alerts.
+  sends what that produces. The alerts are written with that state (see
+  `Cronwatch.Delivery.outbox/5`). Never raises; answers the alerts.
   """
   def finish_run(c, definition, run, now) do
     # The history is read once per finish, on the first attempt, even when
     # the state update is tried again.
     key = {__MODULE__, :history, make_ref()}
 
-    drafts =
+    held =
       try do
-        {_, drafts} =
+        {_, held} =
           update_state!(c, run.job, fn previous ->
             history = Process.get(key) || Process.put(key, history!(c, run)) || Process.get(key)
             {:ok, e} = ok_or_raise(Evaluate.on_run_finish(definition, run, previous, history, now))
-            Evaluate.apply_silence(previous, e, now)
+            {state, drafts} = Evaluate.apply_silence(previous, e, now)
+            Delivery.outbox(c, state, drafts, definition, now)
           end)
 
-        {:ok, drafts}
+        {:ok, held}
       rescue
         e ->
           report(c, e, "evaluating #{run.job}")
@@ -270,9 +283,13 @@ defmodule Cronwatch.Core do
         Process.delete(key)
       end
 
-    case drafts do
-      {:ok, drafts} -> Delivery.dispatch(c, drafts, definition, now)
-      :error -> []
+    case held do
+      {:ok, {alerts, dropped}} ->
+        Delivery.report_dropped(c, run.job, dropped)
+        Delivery.dispatch(c, run.job, alerts, now)
+
+      :error ->
+        []
     end
   end
 
@@ -298,8 +315,8 @@ defmodule Cronwatch.Core do
 
   @doc """
   Sets a finished run's status and error from how it ended, then redacts
-  its output and error. `failure` is nil or the error's text; the expect
-  rule is checked only when the run did not fail.
+  its output and error and caps them, in that order. `failure` is nil or the
+  error's text; the expect rule is checked only when the run did not fail.
   """
   def conclude(c, rule, run, failure, expect_text) do
     run =
@@ -315,13 +332,14 @@ defmodule Cronwatch.Core do
       end
 
     # Redacted after the expect check, so a rule can still match what was
-    # logged. NULs go last, so not even a custom redact can store one.
+    # logged, and before the cap, so the cut cannot keep half a secret. NULs
+    # go last, so not even a custom redact can store one.
     %{run | output: clean(c, run.output), error: clean(c, run.error)}
   end
 
-  @doc "Redacts text as stored, NULs removed last."
+  @doc "Redacts text as stored, then caps it, NULs removed before and after."
   def clean(_c, nil), do: nil
-  def clean(c, text), do: Output.strip_nul(Config.redact(c, text))
+  def clean(c, text), do: Output.redact_and_cap(text, &Config.redact(c, &1))
 
   @doc "A random run id, as crypto.randomUUID() makes one."
   def uuid do

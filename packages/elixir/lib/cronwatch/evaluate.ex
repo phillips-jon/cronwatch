@@ -10,6 +10,7 @@ defmodule Cronwatch.Evaluate do
   # hold anything another writer put there, so a field is read as JavaScript
   # would read it and a bad one is an {:error, message}.
 
+  alias Cronwatch.Alert
   alias Cronwatch.Duration
   alias Cronwatch.Format
   alias Cronwatch.JobState
@@ -46,8 +47,118 @@ defmodule Cronwatch.Evaluate do
       | job: if(s.job == "", do: job, else: s.job),
         consecutive_failures: JobState.failure_count(s.consecutive_failures),
         pending_recovery: s.pending_recovery || [],
-        undelivered: s.undelivered || []
+        undelivered: s.undelivered || [],
+        sending: if(s.sending in [nil, []], do: nil, else: s.sending)
     }
+  end
+
+  ## Delivery: the outbox
+
+  @max_undelivered 20
+  @send_lease_ms 5 * 60_000
+
+  @doc "Alerts kept per job for retry, and per job being sent; past it the oldest go."
+  @spec max_undelivered() :: pos_integer()
+  def max_undelivered, do: @max_undelivered
+
+  @doc """
+  How long an alert in `sending` is left to the process sending it. Longer
+  than any send takes: at most three alerts go out together, each with 25
+  seconds of triage and 15 of channels.
+  """
+  @spec send_lease_ms() :: pos_integer()
+  def send_lease_ms, do: @send_lease_ms
+
+  @doc "Identifies an alert across retries, and in `sending`: `type|at|run id`."
+  @spec alert_key(Alert.t()) :: String.t()
+  def alert_key(%Alert{} = a), do: "#{a.type}|#{JS.format_number(a.at)}|#{if a.run, do: a.run.id, else: ""}"
+
+  # The newest `max` of `list`, and how many went.
+  defp newest(list, max) do
+    n = length(list)
+    {Enum.drop(list, max(0, n - max)), max(0, n - max)}
+  end
+
+  @doc """
+  `alerts` added to the undelivered queue: one with the same key as a queued
+  alert replaces it where it stands, the rest go at the end, and only the
+  newest #{@max_undelivered} stay. Answers the state and how many were let go.
+  """
+  @spec queue_undelivered(JobState.t(), [Alert.t()]) :: {JobState.t(), non_neg_integer()}
+  def queue_undelivered(%JobState{} = state, alerts) do
+    next = clone(state)
+    by_key = Map.new(alerts, &{alert_key(&1), &1})
+    queue = Enum.map(next.undelivered, &Map.get(by_key, alert_key(&1), &1))
+    known = MapSet.new(queue, &alert_key/1)
+    queue = queue ++ Enum.reject(alerts, &MapSet.member?(known, alert_key(&1)))
+    {kept, dropped} = newest(queue, @max_undelivered)
+    {%{next | undelivered: kept}, dropped}
+  end
+
+  @doc """
+  The outbox. Alerts just composed are written with the state that opens
+  their condition, before any is sent, so a process that stops part way does
+  not lose them: into `sending`, each with its lease ending at `until`, when
+  this process sends them, or (`deliver: :check`) straight into the
+  undelivered queue for a check elsewhere. Answers the state and how many
+  alerts were let go past #{@max_undelivered}.
+  """
+  @spec hold_alerts(JobState.t(), [Alert.t()], integer(), boolean()) :: {JobState.t(), non_neg_integer()}
+  def hold_alerts(state, [], _until, _deferred), do: {state, 0}
+  def hold_alerts(state, alerts, _until, true), do: queue_undelivered(state, alerts)
+
+  def hold_alerts(%JobState{} = state, alerts, until, false) do
+    next = clone(state)
+    {kept, dropped} = newest((next.sending || []) ++ Enum.map(alerts, &JobState.sending(&1, until)), @max_undelivered)
+    {%{next | sending: kept}, dropped}
+  end
+
+  @doc """
+  Alerts in `sending` whose lease ran out by `now`: the process sending them
+  stopped before it recorded how the send went. They go to the undelivered
+  queue, where the retry sends them (with triage, which is never stored with
+  them here) or drops them as stale. An entry that holds no alert is
+  dropped; one without a numeric `until` counts as run out.
+  """
+  @spec release_sending(JobState.t(), integer()) :: {JobState.t(), non_neg_integer()}
+  def release_sending(%JobState{} = state, now) do
+    {held, lapsed} = Enum.split_with(state.sending || [], &(is_number(&1.until) and &1.until > now))
+
+    if lapsed == [] do
+      {state, 0}
+    else
+      queue_undelivered(%{state | sending: held}, for(%{alert: %Alert{} = a} <- lapsed, do: a))
+    end
+  end
+
+  @doc """
+  How a send went. Delivered and stale alerts leave the queue; failed ones
+  replace their queued copy, so a triage made on this attempt is kept, or
+  join the queue. Every one of them leaves `sending`. `last_alert_at` moves
+  only on a delivery. Answers the state and how many alerts were let go past
+  #{@max_undelivered}.
+  """
+  @spec record_sent(JobState.t(), [Alert.t()], [Alert.t()], [Alert.t()], integer()) ::
+          {JobState.t(), non_neg_integer()}
+  def record_sent(%JobState{} = state, delivered, failed, stale, now) do
+    next = clone(state)
+    done = MapSet.new(delivered ++ stale, &alert_key/1)
+    sent = MapSet.new(delivered ++ failed ++ stale, &alert_key/1)
+
+    held =
+      Enum.reject(next.sending || [], fn
+        %{alert: %Alert{} = a} -> MapSet.member?(sent, alert_key(a))
+        _ -> false
+      end)
+
+    next = %{
+      next
+      | undelivered: Enum.reject(next.undelivered, &MapSet.member?(done, alert_key(&1))),
+        sending: if(held == [], do: nil, else: held),
+        last_alert_at: if(delivered != [], do: now, else: next.last_alert_at)
+    }
+
+    queue_undelivered(next, failed)
   end
 
   defp clone(%JobState{} = s), do: normalize_state(s, s.job)
@@ -441,6 +552,20 @@ defmodule Cronwatch.Evaluate do
     ms = finished_at - started_at
     if ms > 0, do: min(ms, @max_duration_ms), else: 0
   end
+
+  @doc """
+  When a silence of `ms` from `now` ends: a whole millisecond, never past
+  2^53 - 1, however long the silence asked for (the SDK's `silenceEnd`).
+  Every port sharing the store reads it back unchanged, where a larger number
+  could wrap to a time long past and send alerts during the silence.
+  """
+  @spec silence_end(integer(), number()) :: integer()
+  def silence_end(now, ms) do
+    min(now + whole(min(ms, @max_duration_ms)), @max_duration_ms)
+  end
+
+  defp whole(ms) when is_integer(ms), do: ms
+  defp whole(ms) when is_float(ms), do: floor(ms)
 
   @doc "Whether a running run has gone on longer than the job's timeout."
   def stuck?(def, %Run{} = run, now) do

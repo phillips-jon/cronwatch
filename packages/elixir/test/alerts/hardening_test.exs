@@ -292,15 +292,16 @@ defmodule Cronwatch.Alerts.HardeningTest do
     assert {:ok, %JS.Object{}} = JS.parse(body)
 
     Rec.answer_with(rec, 204, "")
-    a = %{a | message: String.duplicate("c", 3799) <> "😀", triage: String.duplicate("d", 999) <> "😀"}
-
-    assert send!(
-             {Discord, webhook_url: "https://discord.example/api/webhooks/1/x", transport: Rec.spec(rec)},
-             a
-           ) == :ok
-
+    # The message's block and a full triage do not both fit in Discord's
+    # 4096, so each half is sent on its own.
+    discord = {Discord, webhook_url: "https://discord.example/api/webhooks/1/x", transport: Rec.spec(rec)}
+    assert send!(discord, %{a | message: String.duplicate("c", 3799) <> "😀", triage: nil}) == :ok
     [%{body: body}] = Rec.taken(rec)
     assert body =~ String.duplicate("c", 3799) <> "\\ud83d\\n```"
+
+    Rec.answer_with(rec, 204, "")
+    assert send!(discord, %{a | message: "c", triage: String.duplicate("d", 999) <> "😀"}) == :ok
+    [%{body: body}] = Rec.taken(rec)
     assert body =~ String.duplicate("d", 999) <> "\\ud83d\""
   end
 

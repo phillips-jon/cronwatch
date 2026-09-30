@@ -10,6 +10,7 @@ defmodule Cronwatch.StartFinishTest do
   alias Cronwatch.Test.Flaky
   alias Cronwatch.Test.Repo
   alias Cronwatch.Test.Stores
+  alias Cronwatch.Test.Wrap
 
   @min 60_000
   @hour 3_600_000
@@ -198,6 +199,90 @@ defmodule Cronwatch.StartFinishTest do
     assert stored.status == "timeout"
     assert stored.error =~ "Still running after 30m"
     assert Capture.types(alerts) == ["stuck"]
+  end
+
+  # A channel whose sends wait for :release, telling the test when one starts.
+  defp held(test) do
+    Cronwatch.Alerts.fun("held", fn alert ->
+      send(test, {:sending, self(), alert.job})
+
+      receive do
+        :release -> :ok
+      end
+    end)
+  end
+
+  test "stopping the instance waits for a check under way before the store and the rest stop" do
+    name = :"store#{System.unique_integer([:positive])}"
+    start_supervised!({Cronwatch.Store.Memory, name: name}, id: name)
+    shared = Wrap.memory(name)
+    clock = Clock.new()
+    cw = :"cw#{System.unique_integer([:positive])}"
+
+    # Started here rather than under the test's supervisor, so it can be
+    # stopped from another process while the test watches.
+    {:ok, sup} =
+      Cronwatch.start_link(
+        name: cw,
+        clock: Clock.fun(clock),
+        alerts: [held(self())],
+        cron_secret: false,
+        store: Wrap.spec(inner: shared)
+      )
+
+    Process.unlink(sup)
+    {:ok, _} = Cronwatch.start(Cronwatch.job!("callback", timeout: "30m", instance: cw))
+    Clock.advance(clock, 31 * @min)
+    check = Task.async(fn -> Cronwatch.check(instance: cw) end)
+    assert_receive {:sending, sender, "callback"}, 5_000
+
+    checker = Process.whereis(Cronwatch.Checker.server(cw))
+    runs = Process.whereis(Cronwatch.Runs.server(cw))
+    :erlang.trace(checker, true, [:receive])
+    stopping = Task.async(fn -> Supervisor.stop(sup) end)
+    assert_receive {:trace, ^checker, :receive, {:EXIT, ^sup, :shutdown}}, 5_000
+
+    # The check is waited for: nothing after it in the instance has stopped.
+    assert Process.alive?(runs)
+    assert Task.yield(stopping, 0) == nil
+    send(sender, :release)
+    assert Task.await(stopping) == :ok
+    refute Process.alive?(runs)
+
+    assert {:ok, result} = Task.await(check)
+    assert Enum.map(result.alerts, & &1.type) == ["stuck"]
+    # Its delivery was recorded before the store went: nothing left to send.
+    {:ok, s} = Cronwatch.Store.call(shared, :get_state, ["callback"])
+    assert s.sending == nil
+    assert s.last_alert_at == Clock.now(clock)
+  end
+
+  test "lines flushed while a check marks earlier runs stuck are kept on the run it marks next" do
+    %{cw: cw, clock: c} = make(alerts: [held(self())])
+    {:ok, first} = Cronwatch.start(Cronwatch.job!("first", timeout: "30m", instance: cw))
+    Clock.advance(c, 1000)
+    {:ok, second} = Cronwatch.start(Cronwatch.job!("second", timeout: "30m", instance: cw))
+    Cronwatch.log(second, "early line")
+    Cronwatch.metric(second, "rows", 1)
+    Cronwatch.flush(second)
+    Clock.advance(c, 31 * @min)
+    check = Task.async(fn -> Cronwatch.check!(instance: cw) end)
+
+    # The first stuck run's alert is being sent; the second is still running, and flushes.
+    assert_receive {:sending, sender, "first"}, 5_000
+    Cronwatch.log(second, "important progress line")
+    Cronwatch.metric(second, "rows", 2)
+    Cronwatch.flush(second)
+    send(sender, :release)
+    assert_receive {:sending, sender, "second"}, 5_000
+    send(sender, :release)
+    Task.await(check)
+
+    stored = Cronwatch.get_run!(second.id, instance: cw)
+    assert stored.status == "timeout"
+    assert stored.output == "early line\nimportant progress line"
+    assert JS.stringify(stored.metrics) == ~s({"rows":2})
+    assert Cronwatch.get_run!(first.id, instance: cw).status == "timeout"
   end
 
   test "a late success after a timeout mark closes stuck and recovers; a late failure does not count twice" do

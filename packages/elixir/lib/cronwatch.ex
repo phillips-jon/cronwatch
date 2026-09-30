@@ -286,9 +286,11 @@ defmodule Cronwatch do
 
   @doc """
   Records a run that happened outside this process, for a source: the SDK's
-  `recordRun()`. Its job must be declared first. Runs are keyed by id: a new
-  one is inserted, a stored one still running (or marked timeout by a check)
-  is finished when this one is not running, and anything else is left alone.
+  `recordRun()`. Its job must be declared first, and every metric must be a
+  finite number, as with `metric/3` (else nothing is recorded). Runs are
+  keyed by id: a new one is inserted, a stored one still running (or marked
+  timeout by a check) is finished when this one is not running, and anything
+  else is left alone.
   `evaluate: false` stores it without evaluating it. Answers the alerts it
   sent.
   """
@@ -351,13 +353,17 @@ defmodule Cronwatch do
   @doc "`get_run/2`, raising."
   def get_run!(id, opts \\ []), do: unwrap(get_run(id, opts))
 
-  @doc "Stops alerts for a job for a while; its state keeps updating underneath."
+  @doc """
+  Stops alerts for a job for a while; its state keeps updating underneath.
+  The end is a whole millisecond, held at 2^53 - 1
+  (`Cronwatch.Evaluate.silence_end/2`).
+  """
   @spec silence(String.t(), term(), keyword()) :: {:ok, Cronwatch.JobState.t()} | {:error, Error.t()}
   def silence(name, duration, opts \\ []) do
     c = config(opts)
 
     with {:ok, ms} <- Options.duration_ms(duration, "silence duration") do
-      until = Cronwatch.JS.to_int(Core.now(c) + ms)
+      until = Cronwatch.Evaluate.silence_end(Core.now(c), ms)
       safely(fn -> Check.patch_state!(c, name, &%{&1 | silenced_until: until}) end)
     end
   end
@@ -374,7 +380,11 @@ defmodule Cronwatch do
   @doc "`unsilence/2`, raising."
   def unsilence!(name, opts \\ []), do: unwrap(unsilence(name, opts))
 
-  @doc "Removes a job and its runs from the store. A job still declared in code comes back on its next run."
+  @doc """
+  Removes a job and its runs from the store. A job still declared in code
+  comes back: on its next run, or at the next check or dashboard read of a
+  process that declares it.
+  """
   @spec forget(String.t(), keyword()) :: :ok | {:error, Error.t()}
   def forget(name, opts \\ []) do
     with {:ok, _} <- safely(fn -> Check.forget!(config(opts), name) end), do: :ok

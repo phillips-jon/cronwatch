@@ -149,6 +149,75 @@ defmodule Cronwatch.ConcurrencyTest do
     assert schedule(inner, "a") == "every 5m"
   end
 
+  test "a forget that lands while a job's first write is under way leaves it to be written on its next run" do
+    inner = Stores.memory()
+    {store, hooks} = Stores.hooked(inner)
+    test = self()
+
+    # The write lands, then waits: the forget deletes the row it wrote.
+    Stores.hook(hooks, :upsert_job, fn _args, real ->
+      Stores.unhook(hooks, :upsert_job)
+      result = real.()
+      send(test, {:writing, self()})
+
+      receive do
+        :release -> result
+      end
+    end)
+
+    %{cw: cw} = make(store: store)
+    handle = Cronwatch.job!("nightly", schedule: "every 5m", instance: cw)
+    first = Task.async(fn -> Cronwatch.run(handle, fn _ -> nil end) end)
+    assert_receive {:writing, writer}, 5_000
+    Cronwatch.forget!("nightly", instance: cw)
+    send(writer, :release)
+    Task.await(first)
+    assert Store.call(inner, :get_job, ["nightly"]) == {:ok, nil}, "forgotten after it was written"
+    Cronwatch.run(handle, fn _ -> nil end)
+    assert schedule(inner, "nightly") == "every 5m", "its next run brings it back"
+    assert Enum.map(Cronwatch.jobs!(instance: cw), & &1.name) == ["nightly"]
+  end
+
+  test "a job forgotten by another process comes back in a long-lived one that still declares it" do
+    name = shared_memory()
+    clock = Clock.new()
+    worker = make(store: Wrap.spec(inner: Wrap.memory(name)), clock_ref: clock)
+    web = make(store: Wrap.spec(inner: Wrap.memory(name)), clock_ref: clock)
+    store = Wrap.memory(name)
+    nightly = Cronwatch.job!("nightly", schedule: "every 5m", instance: worker.cw)
+    Cronwatch.run(nightly, fn _ -> nil end)
+
+    forgotten = fn ->
+      Cronwatch.forget!("nightly", instance: web.cw)
+      assert Store.call(store, :get_job, ["nightly"]) == {:ok, nil}
+    end
+
+    # Its next run writes it again, so the run is not left without its job.
+    forgotten.()
+    Cronwatch.run(nightly, fn _ -> nil end)
+    assert schedule(store, "nightly") == "every 5m"
+    assert length(Cronwatch.runs!("nightly", 50, instance: web.cw)) == 1
+
+    # So does a started run, a check, the board and the job's page in the
+    # process that declares it.
+    forgotten.()
+    {:ok, handle} = Cronwatch.start(nightly)
+    assert schedule(store, "nightly") == "every 5m"
+    Cronwatch.finish(handle)
+    forgotten.()
+    Cronwatch.check!(instance: worker.cw)
+    assert schedule(store, "nightly") == "every 5m"
+    forgotten.()
+    assert Enum.map(Cronwatch.jobs!(instance: worker.cw), & &1.name) == ["nightly"]
+    forgotten.()
+    assert Object.get(Cronwatch.job_summary!("nightly", instance: worker.cw).definition, "schedule") == "every 5m"
+
+    # A process that never declared it does not bring it back.
+    forgotten.()
+    Cronwatch.check!(instance: web.cw)
+    assert Cronwatch.jobs!(instance: web.cw) == []
+  end
+
   test "a declaration made while the earlier one is being written is still to be written" do
     {store, inner} = held_upsert()
     %{cw: cw} = make(store: store)

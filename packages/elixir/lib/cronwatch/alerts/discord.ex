@@ -15,8 +15,9 @@ defmodule Cronwatch.Alerts.Discord do
       instance's, else `Cronwatch.Transport.HTTP`.
 
   The message goes in a code block cut to 3,800 characters, a triage after
-  it cut to 1,000 with Discord's markdown escaped, and the request pings no
-  one, whatever the output says (`@everyone` included).
+  it cut to 1,000 with Discord's markdown escaped, the block cut again so
+  the whole description stays within Discord's 4,096, and the request pings
+  no one, whatever the output says (`@everyone` included).
   """
 
   @behaviour Cronwatch.Channel
@@ -49,15 +50,7 @@ defmodule Cronwatch.Alerts.Discord do
   @impl true
   def send(%__MODULE__{} = o, %Alert{} = alert, ctx) do
     link = Shared.link_for(o.link, alert)
-    # codeBlockSafe after the cut, as the SDK does it: it works on code
-    # units, so a lone half at the end passes through.
-    message = Units.head(alert.message, 3800)
-    triage = Shared.triage(alert)
-
-    triage_part =
-      if triage != "", do: ["\n**Triage:** ", escape_markdown(Units.head(triage, 1000))], else: []
-
-    description = Units.concat(["```\n", code_block_safe(message), "\n```" | triage_part])
+    description = embed_description(alert)
 
     embed =
       Object.new(
@@ -82,6 +75,42 @@ defmodule Cronwatch.Alerts.Discord do
       if Post.ok?(answer),
         do: :ok,
         else: {:error, Post.fail("Discord webhook answered #{answer.status}: #{JS.head16(answer.body, 200)}")}
+    end
+  end
+
+  @description_max 4096
+
+  @doc """
+  The embed's description (discord.ts's `embedDescription`): the message in
+  a code block, then the triage. Each part has its own cap, and escaping can
+  grow both, so the whole is held to 4096 UTF-16 units, the most Discord
+  takes, by cutting the message's block, never the triage: Discord refuses
+  a longer one on every retry.
+  """
+  @spec embed_description(Alert.t()) :: Units.t()
+  def embed_description(%Alert{} = alert) do
+    # codeBlockSafe after the cut, as the SDK does it: it works on code
+    # units, so a lone half at the end passes through.
+    message = Units.head(alert.message, 3800)
+    triage = Shared.triage(alert)
+
+    triage_part =
+      if triage != "",
+        do: Units.concat(["\n**Triage:** ", escape_markdown(Units.head(triage, 1000))]),
+        else: Units.new("")
+
+    room = @description_max - 8 - Units.length(triage_part)
+    Units.concat(["```\n", cut(code_block_safe(message), room), "\n```", triage_part])
+  end
+
+  # shared.ts's cut over code units: at most `max`, one fewer when the last
+  # kept unit would be a high surrogate.
+  defp cut(%Units{units: u} = text, max) do
+    if byte_size(u) <= 2 * max do
+      text
+    else
+      stop = if match?(<<hi::16>> when hi in 0xD800..0xDBFF, binary_part(u, 2 * max - 2, 2)), do: max - 1, else: max
+      Units.head(text, stop)
     end
   end
 

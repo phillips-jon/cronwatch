@@ -825,6 +825,37 @@ defmodule Cronwatch.Web.RoutesTest do
     end
   end
 
+  test "a run whose metrics hold something other than a finite number still shows its job's page" do
+    w = web(token: false)
+    Cronwatch.job!("imported", instance: w.cw)
+    now = Clock.now(w.clock)
+
+    run = %Cronwatch.Run{
+      id: "nan",
+      job: "imported",
+      status: "ok",
+      started_at: now,
+      finished_at: now,
+      duration_ms: 0,
+      metrics: JS.Object.new([{"rows", :nan}]),
+      trigger: "source"
+    }
+
+    assert {:error, e} = Cronwatch.record_run(run, instance: w.cw)
+    assert Exception.message(e) =~ ~s(record_run: metric "rows" must be a finite number)
+    assert Cronwatch.get_run!("nan", instance: w.cw) == nil, "nothing is written"
+
+    # As a foreign row, or a store that kept NaN as null, may hold them.
+    {m, h} = Cronwatch.Config.get(w.cw).store
+    odd = JS.Object.new([{"rows", nil}, {"label", "abc"}, {"cost", 1.25}, {"n", 3}])
+    :ok = m.insert_run(h, %{run | id: "odd", metrics: odd})
+
+    res = get(w, "/cronwatch/jobs/imported")
+    assert res.status == 200
+    assert res.body =~ ~s(<span class="k">cost</span> 1.2500</span><span><span class="k">n</span> 3<)
+    refute res.body =~ ~r/class="k">(rows|label)</
+  end
+
   test "text helpers keep JavaScript's answers" do
     alias Cronwatch.Web.Text
 

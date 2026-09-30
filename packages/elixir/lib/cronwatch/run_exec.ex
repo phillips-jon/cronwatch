@@ -104,7 +104,7 @@ defmodule Cronwatch.Run.Exec do
     record(c, job, info, fn run ->
       snap = Lines.snapshot(lines, info.key)
       text = returned_text(result)
-      run = %{run | metrics: snap.metrics, output: Lines.output(snap) || (text && Output.cap(text))}
+      run = %{run | metrics: snap.metrics, output: Lines.output(snap) || text}
       Core.conclude(c, job.expect, run, failure, Lines.expect_text(snap) || text)
     end)
   end
@@ -285,7 +285,7 @@ defmodule Cronwatch.Run.Exec do
 
     recorded =
       try do
-        Core.sync!(c, job)
+        Core.sync!(c, job, true)
         Core.store!(c, :insert_run, [run])
         true
       rescue
@@ -519,17 +519,17 @@ defmodule Cronwatch.Run.Exec do
     record(c, info.job, info, fn run ->
       snap = Lines.snapshot(Runs.table(c.name, :lines), run.id)
       run = %{run | metrics: snap.metrics, output: Lines.output(snap)}
-      Core.conclude(c, nil, run, Output.describe_exception(:exit, reason, []), nil)
+      Core.conclude(c, nil, run, Output.describe_uncapped(:exit, reason, []), nil)
     end)
   end
 
   # What counts as failed: a raise, a throw, an exit, {:error, reason} and
   # :error; and an HTTP answer of 400 or more.
-  defp failure_text({:error, e, st}), do: Output.describe_exception(:error, e, st)
-  defp failure_text({:throw, v, st}), do: Output.describe_exception(:throw, v, st)
-  defp failure_text({:exit, r, st}), do: Output.describe_exception(:exit, r, st)
-  defp failure_text({:returned, {:error, reason}}), do: Output.describe_exception(:returned, reason, [])
-  defp failure_text({:returned, :error}), do: Output.describe_exception(:returned, :error, [])
+  defp failure_text({:error, e, st}), do: Output.describe_uncapped(:error, e, st)
+  defp failure_text({:throw, v, st}), do: Output.describe_uncapped(:throw, v, st)
+  defp failure_text({:exit, r, st}), do: Output.describe_uncapped(:exit, r, st)
+  defp failure_text({:returned, {:error, reason}}), do: Output.describe_uncapped(:returned, reason, [])
+  defp failure_text({:returned, :error}), do: Output.describe_uncapped(:returned, :error, [])
   defp failure_text({:returned, value}), do: http_failure(value)
 
   defp status_of({:returned, {:error, _}}), do: "failed"
