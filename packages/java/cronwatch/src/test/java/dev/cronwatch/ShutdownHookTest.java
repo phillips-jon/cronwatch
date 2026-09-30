@@ -56,6 +56,18 @@ class ShutdownHookTest {
   }
 
   /**
+   * The JVM begins to stop the moment the run's row is written, before the client has gone on to
+   * the function: the hook already knows of the run, waits for its row, and records it failed.
+   */
+  @Test
+  void theHookRecordsARunWhoseRowWasJustWrittenAsFailed(@TempDir Path dir) throws Exception {
+    List<Run> runs = runInChild(dir, "atstart");
+    assertEquals(1, runs.size());
+    assertEquals(RunStatus.FAILED, runs.get(0).status());
+    assertEquals("Shutdown: the JVM stopped while the run was in progress", runs.get(0).error());
+  }
+
+  /**
    * A Spring context closing at shutdown closes the client and then its pool, beside the client's
    * own hook: the client's close fails the runs still open before it lets the store go.
    */

@@ -1,6 +1,7 @@
 package dev.cronwatch;
 
 import dev.cronwatch.jdbc.SqlStore;
+import dev.cronwatch.store.Store;
 import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -13,9 +14,9 @@ import org.sqlite.SQLiteDataSource;
 /**
  * The child JVM {@link ShutdownHookTest} starts: a client over a SQLite file, a run that sleeps,
  * and {@code System.exit} while it sleeps. Its arguments are the file and {@code hook}, {@code
- * nohook} or {@code context}, which also closes the client and then the pool from a shutdown hook
- * of its own, as a Spring context closing at shutdown destroys the client's bean before the {@code
- * DataSource}'s.
+ * nohook}, {@code atstart}, which stops the JVM the moment the run's row is written, or {@code
+ * context}, which also closes the client and then the pool from a shutdown hook of its own, as a
+ * Spring context closing at shutdown destroys the client's bean before the {@code DataSource}'s.
  */
 final class ShutdownChild {
   private ShutdownChild() {}
@@ -91,8 +92,22 @@ final class ShutdownChild {
     SQLiteDataSource ds = new SQLiteDataSource();
     ds.setUrl("jdbc:sqlite:" + args[0]);
     Pool pool = new Pool(ds);
-    Cronwatch.Builder builder =
-        Cronwatch.builder().store(SqlStore.sqlite(pool)).alerts(List.of()).noCronSecret();
+    Store store = SqlStore.sqlite(pool);
+    if (args[1].equals("atstart")) {
+      // The JVM begins to stop the moment the run's row is written, before the client has gone on.
+      Support.Wrapped wrapped = new Support.Wrapped(store);
+      store = wrapped;
+      wrapped.afterInsert =
+          () -> {
+            Thread.ofPlatform().start(() -> System.exit(3));
+            try {
+              Thread.sleep(500);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          };
+    }
+    Cronwatch.Builder builder = Cronwatch.builder().store(store).alerts(List.of()).noCronSecret();
     if (args[1].equals("nohook")) {
       builder.noShutdownHook();
     }
@@ -115,6 +130,9 @@ final class ShutdownChild {
                 Thread.currentThread().interrupt();
               }
             });
+    if (args[1].equals("atstart")) {
+      Thread.sleep(60_000);
+    }
     long deadline = System.nanoTime() + 30_000_000_000L;
     while (cw.runs("interrupted-by-exit", 1).isEmpty() && System.nanoTime() < deadline) {
       Thread.sleep(10);
