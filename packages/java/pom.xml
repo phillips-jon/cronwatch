@@ -251,7 +251,8 @@
           <showWarnings>true</showWarnings>
           <failOnWarning>true</failOnWarning>
           <compilerArgs>
-            <arg>-Xlint:all,-processing,-requires-automatic</arg>
+            <!-- Not try: a Store (and AutoCloseable itself) may throw any exception from close(). -->
+            <arg>-Xlint:all,-processing,-requires-automatic,-try</arg>
             <arg>-Werror</arg>
             <arg>-XDcompilePolicy=simple</arg>
             <arg>-XDaddTypeAnnotationsToSymbol=true</arg>

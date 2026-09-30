@@ -14,5 +14,7 @@ module dev.cronwatch {
   requires static org.slf4j;
   requires static context.propagation;
 
+  exports dev.cronwatch;
   exports dev.cronwatch.json;
+  exports dev.cronwatch.store;
 }

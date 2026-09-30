@@ -145,6 +145,9 @@ public final class Fixtures {
   public static final class Failures {
     private final List<String> failures = new ArrayList<>();
 
+    /** An empty collector. */
+    public Failures() {}
+
     /** Records a difference when the two values' JSON differ. */
     public void same(String what, @Nullable Object got, @Nullable Object want) {
       String g = Json.stringify(got);

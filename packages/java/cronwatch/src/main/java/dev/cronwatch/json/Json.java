@@ -105,6 +105,11 @@ public final class Json {
     }
   }
 
+  /** A deep copy of a JSON value: nested objects and lists are copied, the rest is immutable. */
+  public static @Nullable Object copy(@Nullable Object value) {
+    return JsObject.copyValue(value);
+  }
+
   /** {@code JSON.stringify} of a string. */
   public static String quote(String s) {
     StringBuilder b = new StringBuilder(s.length() + 2);
