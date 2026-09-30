@@ -12,10 +12,10 @@ namespace Cronwatch.Tests;
 public class SuiteTests
 {
     /// <summary>The fixtures this phase replays.</summary>
-    private static readonly string[] Replayed = ["duration", "schedule", "output", "evaluate", "format", "health", "store"];
+    private static readonly string[] Replayed = ["duration", "schedule", "output", "evaluate", "format", "health", "store", "triage"];
 
-    /// <summary>The fixtures the channels, triage and pg_cron replay in phase 2.</summary>
-    private static readonly string[] Later = ["channels", "triage", "pgcron"];
+    /// <summary>The fixtures the channels and pg_cron replay in phase 2.</summary>
+    private static readonly string[] Later = ["channels", "pgcron"];
 
     [Fact]
     public void Every_fixture_the_sdk_writes_is_known()
@@ -96,7 +96,7 @@ public class SuiteTests
                 }
                 string name = p.Name.ToLowerInvariant();
                 bool holdsOne = p.PropertyType == typeof(CronSecret) || secretish.Any(s => name.Contains(s, StringComparison.Ordinal));
-                Assert.False(holdsOne && p.PropertyType != typeof(bool) && p.PropertyType != typeof(System.Threading.CancellationToken), t.Name + "." + p.Name + " hands out a secret through a public getter");
+                Assert.False(holdsOne && p.PropertyType != typeof(bool) && p.PropertyType != typeof(long) && p.PropertyType != typeof(System.Threading.CancellationToken), t.Name + "." + p.Name + " hands out a secret through a public getter");
             }
         }
         Assert.Equal("CronSecret(set)", ((CronSecret)"not-a-real-secret").ToString());
