@@ -118,7 +118,8 @@ public class ConcurrencyTests
         // failure is lost. Whether they overlap is up to the scheduler, so either count passes;
         // what matters is that the store still works, with no error and no alert.
         Assert.InRange(state.ConsecutiveFailures, 1, 2);
-        Assert.Empty(types);
+        // Two failures counted reach the job's threshold of two and alert once; one lost does not.
+        Assert.Equal(state.ConsecutiveFailures == 2 ? ["failed"] : [], types);
     }
 
     [Fact]
