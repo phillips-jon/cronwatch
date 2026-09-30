@@ -1546,36 +1546,15 @@ jobs:
         env:
           CRONWATCH_TEST_DOTNET: "1"
         run: npm test --workspace packages/mcp
-      # The package's files, and no dependency in its .nuspec: the core
-      # depends on no other package.
-      - name: dotnet pack, and the package's files
+      # The five packages as nuget.yml packs them, and its check of them by
+      # the same script: each its assembly, XML documentation, README,
+      # license and icon and nothing from the tests, and no dependency in
+      # the core's .nuspec, since the core depends on no other package.
+      - name: dotnet pack, and the packages' files
         working-directory: packages/dotnet
         run: |
-          dotnet pack src/Cronwatch -c Release --no-build -o artifacts
-          nupkg=$(ls artifacts/Cronwatch.*.nupkg)
-          unzip -l "$nupkg"
-          unzip -p "$nupkg" Cronwatch.nuspec > artifacts/Cronwatch.nuspec
-          cat artifacts/Cronwatch.nuspec
-          if grep -q '<dependency ' artifacts/Cronwatch.nuspec; then echo "the core has a dependency"; exit 1; fi
-          for f in lib/net10.0/Cronwatch.dll lib/net10.0/Cronwatch.xml README.md LICENSE icon.png; do
-            unzip -l "$nupkg" | grep -q " $f\$" || { echo "missing $f"; exit 1; }
-          done
-          if unzip -l "$nupkg" | grep -Eq ' (test|conformance|examples)/'; then echo "the package carries test files"; exit 1; fi
-      # Cronwatch.Hosting, Cronwatch.AspNetCore, Cronwatch.Hangfire and
-      # Cronwatch.Quartz: each its assembly, XML documentation, README and
-      # license, and nothing from the tests.
-      - name: dotnet pack, the integration packages' files
-        working-directory: packages/dotnet
-        run: |
-          for p in Cronwatch.Hosting Cronwatch.AspNetCore Cronwatch.Hangfire Cronwatch.Quartz; do
-            dotnet pack src/$p -c Release --no-build -o artifacts/$p
-            nupkg=$(ls artifacts/$p/$p.*.nupkg)
-            unzip -l "$nupkg"
-            for f in lib/net10.0/$p.dll lib/net10.0/$p.xml README.md LICENSE icon.png; do
-              unzip -l "$nupkg" | grep -q " $f\$" || { echo "$p is missing $f"; exit 1; }
-            done
-            if unzip -l "$nupkg" | grep -Eq ' (test|conformance|examples|webserver)/'; then echo "$p carries test files"; exit 1; fi
-          done
+          dotnet pack -c Release --no-build -o artifacts/packages
+          bash scripts/check-packages.sh artifacts/packages
       # A job, a hosted job, a check and the dashboard on SQLite, published
       # with Native AOT (every trimming and AOT warning an error), then run.
       - name: dotnet publish examples/aot, and run it

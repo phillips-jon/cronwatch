@@ -1,0 +1,131 @@
+# A release tag -> the five .NET packages in packages/dotnet (Cronwatch,
+# Cronwatch.Hosting, Cronwatch.AspNetCore, Cronwatch.Hangfire and
+# Cronwatch.Quartz) packed and published to nuget.org, with nuget.org's
+# trusted publishing: nuget.org trusts this workflow's OIDC token and hands
+# back an API key that lives one hour, so no API key is stored anywhere. Can
+# also be started by hand for a tag.
+#
+# Two jobs, so what will be published is seen before it is: "pack" holds no
+# secret and no environment, and uploads the packages as the run's artifact
+# "nuget-packages"; "publish" waits in the environment "nuget" for its
+# reviewer, who opens the artifact, looks, and approves. A version pushed to
+# nuget.org cannot be deleted or replaced, only unlisted or deprecated.
+#
+# Stays off until the repository variable NUGET_ENABLED is "true". Before
+# that, on nuget.org (the account menu, Trusted Publishing): add a policy
+# with repository owner phillips-jon, repository cronwatch, workflow file
+# nuget.yml (the file name only) and environment nuget, whose scope allows
+# pushing new packages and new versions of packages matching Cronwatch and
+# Cronwatch.*; and here, create the environment "nuget" (Settings,
+# Environments) with required reviewers, and give it the environment variable
+# NUGET_USER: the nuget.org profile name (never the email address) of the
+# account that created the policy. Then set the repository variable
+# NUGET_ENABLED to true. packages/dotnet/DESIGN.md, Releasing, has the rest.
+name: NuGet
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to publish (v0.9.0, say)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  pack:
+    if: vars.NUGET_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          persist-credentials: false
+      - name: Check the tag is the solution's version
+        working-directory: packages/dotnet
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          # The packages' version must be the tag's, or nuget.org would list
+          # a release the tag does not name.
+          version="$(sed -n 's/^ *<Version>\(.*\)<\/Version>$/\1/p' Directory.Build.props)"
+          if [ "v$version" != "$TAG" ]; then echo "packages/dotnet is $version, the tag is $TAG"; exit 1; fi
+      # The SDK ci.yml builds and packs with; global.json pins its floor.
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "10.0.x"
+      # The solution: only the five projects under src are packable.
+      - name: dotnet pack
+        working-directory: packages/dotnet
+        run: dotnet pack -c Release -o artifacts/packages
+      # The checks ci.yml runs on every push, by the same script: exactly
+      # the five packages, each with its assembly, XML documentation, README,
+      # license and icon and nothing from the tests, and no dependency in
+      # the core's .nuspec.
+      - name: The packages' files
+        working-directory: packages/dotnet
+        run: bash scripts/check-packages.sh artifacts/packages
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nuget-packages
+          path: packages/dotnet/artifacts/packages/*.nupkg
+          if-no-files-found: error
+
+  publish:
+    if: vars.NUGET_ENABLED == 'true'
+    needs: pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: nuget
+    # Nothing is checked out here: the job pushes what "pack" built and the
+    # reviewer saw, and nothing else.
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nuget-packages
+          path: packages
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "10.0.x"
+      # The job's OIDC token for an API key that lives one hour, so this is
+      # the last step before the push. NUGET_USER is the environment's
+      # variable.
+      - name: Get a nuget.org key for this job
+        id: login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ vars.NUGET_USER }}
+      # NuGet has no atomic publish of several packages: each is pushed on
+      # its own and listed once nuget.org has validated it. The core goes
+      # first, then Cronwatch.Hosting, then the rest, so no package is listed
+      # before one it needs. --skip-duplicate makes a run started again
+      # after a partial failure push only what is missing.
+      - name: Publish
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          version="${TAG#v}"
+          ls -l packages
+          for p in Cronwatch Cronwatch.Hosting Cronwatch.AspNetCore Cronwatch.Hangfire Cronwatch.Quartz; do
+            dotnet nuget push "packages/$p.$version.nupkg" \
+              --source https://api.nuget.org/v3/index.json \
+              --api-key "$NUGET_API_KEY" \
+              --skip-duplicate
+          done
