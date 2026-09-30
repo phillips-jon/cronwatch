@@ -625,6 +625,9 @@ final class CraftTest extends TestCase
         $this->assertSame(200, $status);
         $this->assertSame(1, preg_match('#<iframe[^>]*>#', $page, $frame), 'the page frames the dashboard');
         $this->assertMatchesRegularExpression('#src="http://127\.0\.0\.1:\d+/admin/cronwatch/view\?cw=(?:%2F|/)"#', $frame[0]);
+        $mask = (string) file_get_contents(dirname(__DIR__, 2) . '/craft/src/icon-mask.svg');
+        $this->assertSame(1, preg_match('# d="([^"]+)"#', $mask, $shape));
+        $this->assertStringContainsString($shape[1], $page, "the navigation shows the plugin's icon (src/icon-mask.svg)");
 
         [$status, $headers, $page] = self::http('GET', '/admin/cronwatch/view?cw=%2F', 'admin');
         $this->assertSame(200, $status);
