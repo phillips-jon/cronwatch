@@ -46,6 +46,7 @@ public sealed partial class CronwatchClient
     private readonly Dictionary<string, JobDef> _definitions = new(StringComparer.Ordinal);
     private readonly List<string> _declarationOrder = [];
     private readonly HashSet<string> _synced = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Task> _syncTurns = new(StringComparer.Ordinal);
 
     private readonly ConcurrentDictionary<string, Task<RunHandle>> _starting = new(StringComparer.Ordinal);
     internal readonly JobQueues Queues = new();
@@ -262,18 +263,71 @@ public sealed partial class CronwatchClient
         }
     }
 
+    /// <summary>
+    /// Writes the declaration of <paramref name="def"/>'s name as it stands, unless the store has
+    /// it: a handle kept from an earlier declaration writes the one that replaced it, never its
+    /// own over it, and one forgotten since writes its own.
+    /// </summary>
     internal async Task SyncAsync(JobDef def)
     {
         await EnsureReadyAsync().ConfigureAwait(false);
         lock (_declaredLock)
         {
-            if (_synced.Contains(def.Name) && _definitions.TryGetValue(def.Name, out var current) && ReferenceEquals(current, def))
+            if (_synced.Contains(def.Name))
             {
                 return;
             }
         }
-        await CallAsync(() => _store.UpsertJobAsync(def.Stored, Now())).ConfigureAwait(false);
-        MarkSynced(def);
+        await InTurnAsync(def.Name, async () =>
+        {
+            JobDef standing;
+            lock (_declaredLock)
+            {
+                if (_synced.Contains(def.Name))
+                {
+                    return false;
+                }
+                standing = _definitions.TryGetValue(def.Name, out var current) ? current : def;
+            }
+            await CallAsync(() => _store.UpsertJobAsync(standing.Stored, Now())).ConfigureAwait(false);
+            MarkSynced(standing);
+            return true;
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="write"/> after every earlier write of <paramref name="name"/>'s
+    /// declaration has ended, so two declarations of one name reach the store in the order they
+    /// were made and the later one stays.
+    /// </summary>
+    internal async Task<T> InTurnAsync<T>(string name, Func<Task<T>> write)
+    {
+        var mine = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task? earlier;
+        lock (_declaredLock)
+        {
+            _syncTurns.TryGetValue(name, out earlier);
+            _syncTurns[name] = mine.Task;
+        }
+        try
+        {
+            if (earlier != null)
+            {
+                await earlier.ConfigureAwait(false);
+            }
+            return await write().ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_declaredLock)
+            {
+                if (_syncTurns.TryGetValue(name, out Task? last) && ReferenceEquals(last, mine.Task))
+                {
+                    _syncTurns.Remove(name);
+                }
+            }
+            mine.SetResult();
+        }
     }
 
     internal void MarkSynced(JobDef def)

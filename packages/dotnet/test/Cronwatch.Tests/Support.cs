@@ -244,10 +244,17 @@ internal static class Support
             return Inner.InitAsync(cancellationToken);
         }
 
-        public Task UpsertJobAsync(Definition definition, long now, CancellationToken cancellationToken = default)
+        /// <summary>Awaited before a definition is written, when set.</summary>
+        public Func<Definition, Task>? BeforeUpsert { get; set; }
+
+        public async Task UpsertJobAsync(Definition definition, long now, CancellationToken cancellationToken = default)
         {
             Check("upsertJob");
-            return Inner.UpsertJobAsync(definition, now, cancellationToken);
+            if (BeforeUpsert is { } before)
+            {
+                await before(definition);
+            }
+            await Inner.UpsertJobAsync(definition, now, cancellationToken);
         }
 
         public Task<StoredJob?> GetJobAsync(string name, CancellationToken cancellationToken = default)

@@ -244,18 +244,23 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     /// <exception cref="CronwatchException">When the job is not declared, or the store fails.</exception>
     public Task<bool> SyncJobAsync(string name, CancellationToken cancellationToken = default)
     {
-        JobDef def = Declared(name) ?? throw CronwatchException.Invalid("job " + Json.Quote(name) + " is not declared in this process");
+        JobDef declared = Declared(name) ?? throw CronwatchException.Invalid("job " + Json.Quote(name) + " is not declared in this process");
         return Spawn(async () =>
         {
             await EnsureReadyAsync().ConfigureAwait(false);
-            StoredJob? stored = await CallAsync(() => _store.GetJobAsync(name)).ConfigureAwait(false);
-            bool write = stored == null || !SameJson(stored.Definition.ToObject(), def.Stored.ToObject());
-            if (write)
+            return await InTurnAsync(name, async () =>
             {
-                await CallAsync(() => _store.UpsertJobAsync(def.Stored, Now())).ConfigureAwait(false);
-            }
-            MarkSynced(def);
-            return write;
+                // The declaration as it stands once its turn comes: one made since is the one written.
+                JobDef def = Declared(name) ?? declared;
+                StoredJob? stored = await CallAsync(() => _store.GetJobAsync(name)).ConfigureAwait(false);
+                bool write = stored == null || !SameJson(stored.Definition.ToObject(), def.Stored.ToObject());
+                if (write)
+                {
+                    await CallAsync(() => _store.UpsertJobAsync(def.Stored, Now())).ConfigureAwait(false);
+                }
+                MarkSynced(def);
+                return write;
+            }).ConfigureAwait(false);
         }).WaitAsync(cancellationToken);
     }
 

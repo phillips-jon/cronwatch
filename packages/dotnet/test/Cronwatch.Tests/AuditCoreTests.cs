@@ -129,6 +129,38 @@ public class AuditCoreTests
     }
 
     [Fact]
+    public async Task A_handle_kept_from_an_earlier_declaration_does_not_write_over_the_one_that_stands()
+    {
+        var store = new Wrapped();
+        await using var m = Make(store: store);
+        Job earlier = m.Cw.Job("a");
+        m.Cw.Job("a", new JobOptions { Schedule = "every 5m" });
+        await m.Cw.SyncJobAsync("a");
+        await earlier.RunAsync((j, ct) => Task.CompletedTask);
+        Assert.Equal("every 5m", (await store.GetJobAsync("a"))!.Definition.Schedule);
+    }
+
+    [Fact]
+    public async Task A_declaration_made_while_the_earlier_one_is_being_written_is_written_after_it()
+    {
+        var store = new Wrapped();
+        await using var m = Make(store: store);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        store.BeforeUpsert = d => d.Schedule == null && entered.TrySetResult() ? gate.Task : Task.CompletedTask;
+        Task run = m.Cw.Job("a").RunAsync((j, ct) => Task.CompletedTask);
+        await entered.Task.WaitAsync(TimeSpan.FromMinutes(1));
+        m.Cw.Job("a", new JobOptions { Schedule = "every 5m" });
+        Task<bool> sync = m.Cw.SyncJobAsync("a");
+        // The later write waits its turn; were it not to, it would land here, under the earlier one.
+        await Task.WhenAny(sync, Task.Delay(200));
+        gate.SetResult();
+        await run;
+        Assert.True(await sync);
+        Assert.Equal("every 5m", (await store.GetJobAsync("a"))!.Definition.Schedule);
+    }
+
+    [Fact]
     public async Task A_handlers_run_is_inside_the_run_scope_as_a_run_is()
     {
         var scopes = new List<string>();
