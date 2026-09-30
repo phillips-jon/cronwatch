@@ -393,6 +393,53 @@ public class CronwatchQuartzTests
     }
 
     [Fact]
+    public async Task Stopping_while_a_firing_runs_still_closes_its_run()
+    {
+        await using var m = Client();
+        IScheduler scheduler = await BuildAsync();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            CronwatchQuartz q = await CronwatchQuartz.WatchAsync(m.Cw, scheduler);
+            await scheduler.Start(default);
+            await scheduler.ScheduleJob(Job("long", async _ => await release.Task), Once("long"), default, default);
+            await Eventually("the run open", async () => (await Runs(m.Cw, "long")) is [{ Status.Value: "running" }]);
+            await q.DisposeAsync();
+            release.SetResult();
+            await Eventually("the run closed", async () => (await Runs(m.Cw, "long")) is [{ Status.Value: "ok" }]);
+            Assert.DoesNotContain(scheduler.ListenerManager.GetJobListeners(), l => l.Name == CronwatchQuartz.ListenerName);
+            Assert.Empty(m.Errors);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await scheduler.Shutdown(true, default);
+        }
+    }
+
+    [Fact]
+    public async Task A_scheduler_shut_down_without_waiting_still_closes_the_runs_of_its_jobs()
+    {
+        await using var m = Client();
+        IScheduler scheduler = await BuildAsync(q => q.UseCronwatch(m.Cw));
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            await scheduler.Start(default);
+            await scheduler.ScheduleJob(Job("long", async _ => await release.Task), Once("long"), default, default);
+            await Eventually("the run open", async () => (await Runs(m.Cw, "long")) is [{ Status.Value: "running" }]);
+            await scheduler.Shutdown(false, default);
+            release.SetResult();
+            await Eventually("the run closed", async () => (await Runs(m.Cw, "long")) is [{ Status.Value: "ok" }]);
+            Assert.Empty(m.Errors);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    [Fact]
     public async Task A_scheduler_shutting_down_stops_the_watch_cleanly()
     {
         await using var m = Client();

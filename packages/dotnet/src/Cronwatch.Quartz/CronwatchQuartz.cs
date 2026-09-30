@@ -255,9 +255,10 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     }
 
     /// <summary>
-    /// Stops watching: the listeners are taken off the scheduler, so no firing is recorded from now
-    /// on, and its jobs are no longer read. A run open now is still closed when its job ends.
-    /// Leaves the client and the scheduler running.
+    /// Stops watching: no firing is recorded from now on, its jobs are no longer read, and the
+    /// listeners are taken off the scheduler, the job listener once the firings open now have
+    /// ended, so their runs are still closed when their jobs end. Leaves the client and the
+    /// scheduler running.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -275,7 +276,8 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         {
             try
             {
-                scheduler.ListenerManager.RemoveJobListener(ListenerName);
+                // The job listener stays until the firings open now have ended, since Quartz tells
+                // only the listeners it holds then that a job was executed.
                 scheduler.ListenerManager.RemoveSchedulerListener(ListenerName);
                 if (scheduler.Context.TryGetValue(ContextKey, out object? mine) && ReferenceEquals(mine, this))
                 {
@@ -286,6 +288,7 @@ public sealed class CronwatchQuartz : IAsyncDisposable
             {
                 _cw.ReportError(e, "quartz");
             }
+            LetGo();
         }
         if (_loop is { } loop)
         {
@@ -562,10 +565,35 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     /// <summary>The run open on a firing, for <see cref="QuartzContextExtensions.CronwatchRun"/> and the middleware.</summary>
     internal static Firing? FiringOf(IJobExecutionContext ctx) => Firings.TryGetValue(ctx, out Firing? f) ? f : null;
 
+    /// <summary>Once stopped and no firing is open, takes the job listener off the scheduler.</summary>
+    private void LetGo()
+    {
+        IScheduler? scheduler = _scheduler;
+        if (!Closed || !_open.IsEmpty || scheduler == null)
+        {
+            return;
+        }
+        try
+        {
+            scheduler.ListenerManager.RemoveJobListener(ListenerName);
+        }
+        catch (Exception e)
+        {
+            _cw.ReportError(e, "quartz");
+        }
+    }
+
     private async Task ToBeExecutedAsync(IJobExecutionContext ctx)
     {
         if (Closed)
         {
+            // Stopped: nothing new is opened, but a refire still ends the attempt before it.
+            if (_open.TryRemove(ctx.FireInstanceId, out Firing? earlier))
+            {
+                Firings.Remove(ctx);
+                await earlier.Run.CloseAsync(FailureOf(earlier.Failure) ?? new JobExecutionException("Quartz refired the job")).ConfigureAwait(false);
+            }
+            LetGo();
             return;
         }
         if (_scheduler == null)
@@ -610,7 +638,14 @@ public sealed class CronwatchQuartz : IAsyncDisposable
             return;
         }
         Firings.Remove(ctx);
-        await firing.Run.CloseAsync(FailureOf(e)).ConfigureAwait(false);
+        try
+        {
+            await firing.Run.CloseAsync(FailureOf(e)).ConfigureAwait(false);
+        }
+        finally
+        {
+            LetGo();
+        }
     }
 
     /// <summary>
@@ -627,7 +662,14 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         {
             return;
         }
-        await firing.Run.TakeBackAsync().ConfigureAwait(false);
+        try
+        {
+            await firing.Run.TakeBackAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            LetGo();
+        }
     }
 
     /// <summary>
