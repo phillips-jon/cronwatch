@@ -326,6 +326,96 @@ class ClientHardeningTest < Minitest::Test
     assert_equal :failed, cw.runs("busy").first.status
   end
 
+  # ---------------------------------------------------------------- a job declared again
+
+  # A store whose first write of a job's definition waits until it is let
+  # go, so a test can declare the job again, or ask for another write, while
+  # that one is under way.
+  class HeldUpsert
+    def initialize(store)
+      @store = store
+      @entered = Queue.new
+      @gate = Queue.new
+      @lock = Mutex.new
+      @held = false
+    end
+
+    # Returns once the first write is under way.
+    def wait = @entered.pop
+
+    def release = @gate.push(true)
+
+    def upsert_job(definition, now)
+      first = @lock.synchronize { @held ? false : (@held = true) }
+      if first
+        @entered.push(true)
+        @gate.pop
+      end
+      @store.upsert_job(definition, now)
+    end
+
+    def respond_to_missing?(name, include_private = false)
+      @store.respond_to?(name, include_private)
+    end
+
+    def method_missing(name, *args, &block)
+      return super unless @store.respond_to?(name)
+
+      @store.public_send(name, *args, &block)
+    end
+  end
+
+  def test_a_handle_kept_from_an_earlier_declaration_writes_the_one_that_stands_not_its_own
+    store = Cronwatch::Stores::Memory.new
+    cw = Cronwatch.new(store: store, alerts: [Capture.new], cron_secret: nil)
+    earlier = cw.job("a")
+    cw.job("a", schedule: "every 5m")
+    earlier.run { nil }
+    assert_equal "every 5m", store.get_job("a").definition.schedule
+    cw.check
+    assert_equal "every 5m", store.get_job("a").definition.schedule
+  end
+
+  def test_a_handle_whose_job_was_forgotten_writes_its_own_definition
+    store = Cronwatch::Stores::Memory.new
+    cw = Cronwatch.new(store: store, alerts: [Capture.new], cron_secret: nil)
+    handle = cw.job("a", schedule: "every 5m")
+    cw.forget("a")
+    handle.run { nil }
+    assert_equal "every 5m", store.get_job("a").definition.schedule
+  end
+
+  def test_a_declaration_made_while_the_earlier_one_is_being_written_is_still_to_be_written
+    inner = Cronwatch::Stores::Memory.new
+    store = HeldUpsert.new(inner)
+    cw = Cronwatch.new(store: store, alerts: [Capture.new], cron_secret: nil)
+    earlier = cw.job("a")
+    run = Thread.new { earlier.run { nil } }
+    store.wait
+    cw.job("a", schedule: "every 5m")
+    store.release
+    run.join
+    cw.check
+    assert_equal "every 5m", inner.get_job("a").definition.schedule
+  end
+
+  def test_a_declarations_write_waits_for_the_earlier_ones_so_the_later_one_stays
+    inner = Cronwatch::Stores::Memory.new
+    store = HeldUpsert.new(inner)
+    cw = Cronwatch.new(store: store, alerts: [Capture.new], cron_secret: nil)
+    earlier = cw.job("a")
+    run = Thread.new { earlier.run { nil } }
+    store.wait
+    cw.job("a", schedule: "every 5m")
+    later = Thread.new { cw.job_summary("a") }
+    # Were the later write not to wait its turn, it would land here, under the earlier one.
+    Thread.pass until later.status == "sleep" || !later.alive?
+    store.release
+    [run, later].each(&:join)
+    assert_equal "every 5m", inner.get_job("a").definition.schedule
+    assert_equal "every 5m", later.value.definition.schedule
+  end
+
   def test_the_silence_endpoints_return_the_state_with_its_version
     cw, = make
     cw.run("v") { nil }

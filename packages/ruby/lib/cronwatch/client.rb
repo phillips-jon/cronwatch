@@ -540,6 +540,8 @@ module Cronwatch
     def reset_process_state
       @pid = Process.pid
       @locks = {}
+      # Each job's turn to write its declaration. See sync.
+      @syncing = {}
       @check_lock = Mutex.new
       @checking = nil
       @ticker_lock = Mutex.new
@@ -645,18 +647,34 @@ module Cronwatch
       end
     end
 
+    # Writes the declaration of `definition`'s name as it stands, unless the
+    # store has it. A handle kept from an earlier declaration writes the one
+    # that replaced it, never its own over it, and one forgotten since writes
+    # its own. The writes of one name take turns (the name's lock in
+    # @syncing, held across the write), so one still under way cannot land
+    # after a later one; and a name declared again while its write was under
+    # way is still to be written.
     def sync(definition)
       ensure_ready
-      return if @registry.synchronize { @synced.include?(definition.name) }
+      name = definition.name
+      return if @registry.synchronize { @synced.include?(name) }
 
-      @store.upsert_job(Serialize.to_stored(definition), now)
-      @registry.synchronize { @synced << definition.name }
+      after_fork_check
+      turn = @registry.synchronize { @syncing[name] ||= Mutex.new }
+      turn.synchronize do
+        standing = @registry.synchronize { @synced.include?(name) ? nil : @definitions.fetch(name, definition) }
+        next if standing.nil?
+
+        @store.upsert_job(Serialize.to_stored(standing), now)
+        @registry.synchronize { @synced << name if @definitions.fetch(name, standing).equal?(standing) }
+      end
     end
 
     # Runs the block while holding the job's lock, so two runs (or a run and a
     # check) in this process never read and write the job's state over each
     # other. Other processes are coordinated by update_state instead. Only
-    # store reads and writes happen inside; alerts are sent outside it.
+    # store reads and writes happen inside; alerts are sent outside it. sync
+    # gives a job's declaration writes turns the same way, on a lock of their own.
     def serial(job, &block)
       after_fork_check
       lock = @registry.synchronize { @locks[job] ||= Monitor.new }
