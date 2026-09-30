@@ -350,6 +350,21 @@ final class ChannelsTest extends TestCase
         $this->assertSame('https://app.example/j', Js::parse($http->requests[0]['body'])->embeds[0]->url);
     }
 
+    public function testDiscordHoldsTheWholeDescriptionTo4096CuttingTheMessageAndNeverTheTriage(): void
+    {
+        $alert = self::failed(str_repeat('```', 1266) . '``');
+        $triage = substr(str_repeat('*_\\`~|[]()<>\\', 100), 0, 1000);
+        $alert->setTriage($triage);
+        $http = new FakeHttp();
+        (new Alerts\Discord('https://discord.example/w', http: $http))->send($alert, self::context());
+        $description = Js::parse($http->requests[0]['body'])->embeds[0]->description;
+        $escaped = "\n**Triage:** " . Alerts\Discord::escapeMarkdown($triage);
+        $this->assertSame(4096, Js::length16($description));
+        $this->assertStringStartsWith("```\n", $description);
+        $this->assertStringEndsWith("\n```" . $escaped, $description);
+        $this->assertSame(2, substr_count($description, '```'), 'only the block\'s own fences');
+    }
+
     public function testACutThroughAnEmojiIsWrittenAsJsonStringifyWritesIt(): void
     {
         $http = new FakeHttp();
