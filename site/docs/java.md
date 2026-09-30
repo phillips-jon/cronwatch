@@ -50,7 +50,7 @@ Cronwatch cw = Cronwatch.builder()
 cw.start();                                          // check every minute, in a long-running service
 ```
 
-Every option has the SDK's default, and `build()` checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to standard error. `close()` stops the check, waits up to five seconds for sends in flight, and closes the store; a servlet container or a Spring context calls it when the app stops, so no thread of the client's holds the app's class loader.
+Every option has the SDK's default, and `build()` checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to standard error. `close()` stops the check, waits up to five seconds for a check and sends in flight, and closes the store; a servlet container or a Spring context calls it when the app stops, so no thread of the client's holds the app's class loader.
 
 The client's own work (recording a run, sending alerts, checking) runs on virtual threads of its own, so an interrupt of your thread never cuts a write in half. Everything on `Cronwatch`, `Job` and a run's context is safe to use from any thread.
 
@@ -317,7 +317,7 @@ It reads through a data source on the database pg_cron runs in (its `cron.databa
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. Redaction runs before the 16 KB cap, so the cut never keeps the rest of a secret whose label it cut off. An `expect` rule is checked before redaction, so it still sees what was logged.
 
 ```java
 Cronwatch.builder().noRedaction();                                   // keep output as logged

@@ -48,7 +48,7 @@ public final class Recorder {
       }
       lines.addLast(line);
       size += line.length() + 1;
-      // Drop from the front once well past the cap; the cap trims exactly at the end.
+      // Drop from the front once well past the cap; redactAndCap trims exactly at the end.
       while (size > WINDOW && lines.size() > 1) {
         size -= lines.removeFirst().length() + 1;
         dropped = true;
@@ -58,11 +58,14 @@ public final class Recorder {
     }
   }
 
-  /** What the run stores as its output: the lines kept, capped; null when nothing was logged. */
+  /**
+   * The lines still held (past 64 KB the oldest are let go), joined and not yet capped: the client
+   * redacts them first, then caps them ({@link Output#redactAndCap}). Null when nothing was logged.
+   */
   public @Nullable String output() {
     lock.lock();
     try {
-      return lines.isEmpty() ? null : Output.cap(String.join("\n", lines));
+      return lines.isEmpty() ? null : String.join("\n", lines);
     } finally {
       lock.unlock();
     }

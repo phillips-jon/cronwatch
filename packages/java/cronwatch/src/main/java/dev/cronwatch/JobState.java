@@ -28,9 +28,12 @@ import org.jspecify.annotations.Nullable;
  * @param version goes up by one on every write (see {@code Store.compareAndSetState}); null for a
  *     state written before versions, or one whose stored version is not a whole number, which
  *     counts as 0 ({@link #countedVersion})
- * @param extra the keys after the SDK's seven, in stored order: {@code version} where it was stored
+ * @param extra the keys after the SDK's eight, in stored order: {@code version} where it was stored
  *     (the {@code version} component is what is written there) and any a newer writer added, so a
  *     state is written back as the SDK's spread would write it
+ * @param sending the outbox: alerts written with the state that opened their condition while the
+ *     process that wrote them sends them (see {@link SendingAlert}); null when there are none, as
+ *     the key is absent then, and an empty list is made null
  */
 public record JobState(
     String job,
@@ -41,7 +44,8 @@ public record JobState(
     @Nullable List<Condition> pendingRecovery,
     @Nullable List<Alert> undelivered,
     @Nullable Long version,
-    JsObject extra) {
+    JsObject extra,
+    @Nullable List<SendingAlert> sending) {
 
   private static final Set<String> KEYS =
       Set.of(
@@ -51,7 +55,8 @@ public record JobState(
           "silencedUntil",
           "lastAlertAt",
           "pendingRecovery",
-          "undelivered");
+          "undelivered",
+          "sending");
 
   /** Keeps unmodifiable copies. */
   public JobState {
@@ -60,6 +65,31 @@ public record JobState(
     pendingRecovery = pendingRecovery == null ? null : List.copyOf(pendingRecovery);
     undelivered = undelivered == null ? null : List.copyOf(undelivered);
     extra = extra.copy();
+    sending = sending == null || sending.isEmpty() ? null : List.copyOf(sending);
+  }
+
+  /** A state with no alert in {@link #sending}, as states were made before it existed. */
+  public JobState(
+      String job,
+      Map<Condition, Long> open,
+      long consecutiveFailures,
+      @Nullable Long silencedUntil,
+      @Nullable Long lastAlertAt,
+      @Nullable List<Condition> pendingRecovery,
+      @Nullable List<Alert> undelivered,
+      @Nullable Long version,
+      JsObject extra) {
+    this(
+        job,
+        open,
+        consecutiveFailures,
+        silencedUntil,
+        lastAlertAt,
+        pendingRecovery,
+        undelivered,
+        version,
+        extra,
+        null);
   }
 
   /** A new state for a job: nothing open, no failures, empty lists. */
@@ -67,7 +97,7 @@ public record JobState(
     return new JobState(job, Map.of(), 0, null, null, List.of(), List.of(), null, new JsObject());
   }
 
-  /** The keys after the SDK's seven, as a copy. */
+  /** The keys after the SDK's eight, as a copy. */
   @Override
   public JsObject extra() {
     return extra.copy();
@@ -98,7 +128,8 @@ public record JobState(
         pendingRecovery,
         undelivered,
         version,
-        extra);
+        extra,
+        sending);
   }
 
   /** The state as the SDK writes it. */
@@ -127,6 +158,13 @@ public record JobState(
         list.add(a.toValue());
       }
       o.set("undelivered", list);
+    }
+    if (sending != null) {
+      List<Object> list = new ArrayList<>();
+      for (SendingAlert s : sending) {
+        list.add(s.toValue());
+      }
+      o.set("sending", list);
     }
     boolean wroteVersion = false;
     for (Map.Entry<String, @Nullable Object> e : extra.entries()) {
@@ -161,7 +199,8 @@ public record JobState(
 
   /**
    * Reads the SDK's JSON value. A queued entry that is not an alert is dropped rather than fail
-   * every read of the state, since it could never be delivered.
+   * every read of the state, since it could never be delivered, and so is an entry of {@code
+   * sending} that is not an object ({@link SendingAlert} reads the rest leniently).
    *
    * @throws Json.JsonException when it is not an object
    */
@@ -197,6 +236,16 @@ public record JobState(
         }
       }
     }
+    List<SendingAlert> sending = null;
+    if (o.get("sending") instanceof List<?> list) {
+      sending = new ArrayList<>();
+      for (Object entry : list) {
+        SendingAlert s = SendingAlert.fromValue(entry);
+        if (s != null) {
+          sending.add(s);
+        }
+      }
+    }
     Long version = null;
     JsObject extra = new JsObject();
     for (Map.Entry<String, @Nullable Object> e : o.entries()) {
@@ -222,6 +271,7 @@ public record JobState(
         pending,
         undelivered,
         version,
-        extra);
+        extra,
+        sending);
   }
 }

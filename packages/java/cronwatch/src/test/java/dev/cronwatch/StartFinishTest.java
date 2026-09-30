@@ -21,6 +21,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -376,5 +378,99 @@ class StartFinishTest {
     assertEquals("working", finished.output(), "the lines logged before the failures are kept");
     assertFalse(run.isActive());
     assertNull(run.finish(), "finished once only");
+  }
+
+  /** A channel whose first send waits at {@code gate}, saying so at {@code sending}. */
+  private static Channel held(
+      CountDownLatch sending, CountDownLatch gate, List<String> sent, String record) {
+    return new Channel() {
+      @Override
+      public String name() {
+        return "held";
+      }
+
+      @Override
+      public void send(Alert alert, ChannelContext context) throws InterruptedException {
+        sending.countDown();
+        gate.await();
+        sent.add(record.isEmpty() ? alert.job() : record);
+      }
+    };
+  }
+
+  @Test
+  void linesFlushedWhileACheckMarksEarlierRunsStuckAreKeptOnTheRunItMarksNext() throws Exception {
+    CountDownLatch sending = new CountDownLatch(1);
+    CountDownLatch gate = new CountDownLatch(1);
+    List<String> sent = new CopyOnWriteArrayList<>();
+    Made m = Support.make(b -> b.alerts(List.of(held(sending, gate, sent, ""))));
+    RunHandle a = m.cw().job("a", JobOptions.builder().timeout("10m")).start();
+    RunHandle b = m.cw().job("b", JobOptions.builder().timeout("10m")).start();
+    for (RunHandle h : List.of(a, b)) {
+      h.log(h.job() + " earlier");
+      h.metric("n", 1);
+      h.flush();
+    }
+    m.clock().advance(11 * MIN);
+    Thread check = Support.background(() -> m.cw().check());
+    // The first run's stuck alert is being sent; the other run logs, reports and flushes.
+    sending.await();
+    RunHandle other = m.cw().getRun(a.id()).status().equals(RunStatus.TIMEOUT) ? b : a;
+    other.log(other.job() + " flushed");
+    other.metric("n", 2);
+    other.flush();
+    gate.countDown();
+    check.join();
+    Run stored = m.cw().getRun(other.id());
+    assertEquals(RunStatus.TIMEOUT, stored.status());
+    assertEquals(other.job() + " earlier\n" + other.job() + " flushed", stored.output());
+    assertEquals("{\"n\":2}", stored.metrics().toJson());
+    assertEquals(2, sent.size());
+  }
+
+  @Test
+  void closeWaitsForACheckUnderWayBeforeItClosesTheStore() throws Exception {
+    CountDownLatch sending = new CountDownLatch(1);
+    CountDownLatch gate = new CountDownLatch(1);
+    List<String> order = new CopyOnWriteArrayList<>();
+    MemoryStore inner = new MemoryStore();
+    Store store =
+        (Store)
+            java.lang.reflect.Proxy.newProxyInstance(
+                Store.class.getClassLoader(),
+                new Class<?>[] {Store.class},
+                (proxy, method, args) -> {
+                  if (method.getName().equals("close")) {
+                    order.add("close");
+                  }
+                  try {
+                    return method.invoke(inner, args);
+                  } catch (java.lang.reflect.InvocationTargetException e) {
+                    throw e.getCause();
+                  }
+                });
+    Clock clock = new Clock();
+    Cronwatch.Builder builder =
+        Support.builder(clock, new Capture(), new Errors())
+            .alerts(List.of(held(sending, gate, order, "send")))
+            .store(store);
+    // The wait is the check's, not a timer's that could run out first.
+    builder.timings.closeWaitMs = HOUR;
+    Cronwatch cw = builder.build();
+    cw.job("callback", JobOptions.builder().timeout("30m")).start();
+    clock.advance(31 * MIN);
+    Thread check = Support.background(cw::check);
+    sending.await();
+    Thread closing = Thread.ofVirtual().start(cw::close);
+    Support.await(
+        "close to wait for the check",
+        () ->
+            closing.getState() == Thread.State.WAITING
+                || closing.getState() == Thread.State.TIMED_WAITING);
+    assertEquals(List.of(), order, "the store is not closed while the check is under way");
+    gate.countDown();
+    closing.join();
+    check.join();
+    assertEquals(List.of("send", "close"), order);
   }
 }

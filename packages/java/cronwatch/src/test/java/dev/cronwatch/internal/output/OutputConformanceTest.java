@@ -38,6 +38,20 @@ class OutputConformanceTest {
   }
 
   @Test
+  void redactAndCap() {
+    assertEquals(Output.REDACT_EDGE, Fixtures.integer(FIXTURE, "redactEdge"));
+    List<JsObject> cases = Fixtures.objects(FIXTURE, "redactAndCap");
+    assertEquals(15, cases.size(), "redactAndCap cases");
+    Fixtures.Failures failures = new Fixtures.Failures();
+    for (int i = 0; i < cases.size(); i++) {
+      JsObject c = cases.get(i);
+      String got = Output.redactAndCap(Fixtures.expand(c.get("input")), Output::redactSecrets);
+      failures.same("redactAndCap case " + i, Fixtures.digest(got), c.get("result"));
+    }
+    failures.check("output");
+  }
+
+  @Test
   void errorMessage() {
     List<JsObject> cases = Fixtures.objects(FIXTURE, "errorMessage");
     assertEquals(16, cases.size(), "errorMessage cases");

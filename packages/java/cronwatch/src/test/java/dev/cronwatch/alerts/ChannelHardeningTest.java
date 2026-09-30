@@ -690,12 +690,10 @@ class ChannelHardeningTest {
     assertInstanceOf(dev.cronwatch.json.JsObject.class, Json.parse(body));
 
     rec.answerWith(204, "");
+    // Each part apart, since a whole triage leaves the message less room than its own cap.
     Alert d =
         ChannelsConformanceTest.withText(
-            sample,
-            sample.title(),
-            "c".repeat(3799) + "\ud83d\ude00",
-            "d".repeat(999) + "\ud83d\ude00");
+            sample, sample.title(), "c".repeat(3799) + "\ud83d\ude00", null);
     Channel discord =
         Discord.channel(
             DiscordOptions.builder()
@@ -705,7 +703,29 @@ class ChannelHardeningTest {
     discord.send(d, QUIET);
     body = Recorder.body(rec.taken().get(0));
     assertTrue(body.contains("c".repeat(3799) + "\\ud83d\\n```"), body);
-    assertTrue(body.contains("d".repeat(999) + "\\ud83d\""));
+    discord.send(
+        ChannelsConformanceTest.withText(
+            sample, sample.title(), "short", "d".repeat(999) + "\ud83d\ude00"),
+        QUIET);
+    body = Recorder.body(rec.taken().get(1));
+    assertTrue(body.contains("d".repeat(999) + "\\ud83d\""), body);
+  }
+
+  /**
+   * The SDK's case: a full-length message of fences and a triage full of markdown come to exactly
+   * Discord's 4096, the triage whole and the message's block cut, with only its own two fences.
+   */
+  @Test
+  void discordHoldsTheWholeDescriptionTo4096() {
+    Alert sample = ChannelsConformanceTest.sample();
+    String triage = "*_\\`~|[]()<>".repeat(84).substring(0, 1000);
+    Alert a = ChannelsConformanceTest.withText(sample, sample.title(), "```".repeat(1267), triage);
+    String description = Discord.embedDescription(a);
+    assertEquals(4096, description.length());
+    assertTrue(description.endsWith("\n**Triage:** " + Discord.escapeMarkdown(triage)));
+    assertTrue(description.startsWith("```\n"));
+    int fences = description.split("```", -1).length - 1;
+    assertEquals(2, fences, "only the block's own two fences");
   }
 
   @Test

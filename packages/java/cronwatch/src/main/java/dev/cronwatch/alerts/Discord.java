@@ -22,6 +22,12 @@ public final class Discord implements Channel {
           "over_budget", 0xb7791f,
           "recovered", 0x1f8a4c);
 
+  /**
+   * The longest embed description Discord takes. The title (under 256) and it stay well inside the
+   * embed's 6000.
+   */
+  static final int DESCRIPTION_MAX = 4096;
+
   private final DiscordOptions options;
 
   private Discord(DiscordOptions options) {
@@ -50,17 +56,11 @@ public final class Discord implements Channel {
   @Override
   public void send(Alert alert, ChannelContext context) throws Exception {
     String url = Shared.link(options.link, alert);
-    String triage = Shared.triage(alert);
     JsObject embed = new JsObject().set("title", alert.title());
     if (!url.isEmpty()) {
       embed.set("url", url);
     }
-    embed.set(
-        "description",
-        "```\n"
-            + Slack.codeBlockSafe(Js.head(alert.message(), 3800))
-            + "\n```"
-            + (triage.isEmpty() ? "" : "\n**Triage:** " + escapeMarkdown(Js.head(triage, 1000))));
+    embed.set("description", embedDescription(alert));
     // An unknown type has no colour, which JSON.stringify leaves out.
     Integer color = COLOR.get(alert.type().value());
     if (color != null) {
@@ -85,6 +85,23 @@ public final class Discord implements Channel {
       throw Post.fail(
           "Discord webhook answered " + answer.status() + ": " + Js.head(answer.body(), 200));
     }
+  }
+
+  /**
+   * The message in a code block, then the triage. Each part has its own cap, and escaping can grow
+   * both, so the whole is held to {@link #DESCRIPTION_MAX} UTF-16 units by cutting the message's
+   * block, never the triage: Discord refuses a longer one on every retry.
+   */
+  static String embedDescription(Alert alert) {
+    String t = Shared.triage(alert);
+    String triage = t.isEmpty() ? "" : "\n**Triage:** " + escapeMarkdown(Js.head(t, 1000));
+    int fences = "```\n".length() + "\n```".length();
+    return "```\n"
+        + Post.cut(
+            Slack.codeBlockSafe(Js.head(alert.message(), 3800)),
+            DESCRIPTION_MAX - fences - triage.length())
+        + "\n```"
+        + triage;
   }
 
   /** Escapes the characters Discord reads as markdown, links included. */

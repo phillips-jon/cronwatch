@@ -318,13 +318,27 @@ final class Core {
   /**
    * Writes the declaration of {@code def}'s name as it stands, unless the store has it, once per
    * declaration: a handle kept from an earlier declaration writes the one that replaced it, never
-   * its own over it, and one forgotten since writes its own.
+   * its own over it, and one forgotten since writes its own. A name is marked as written only while
+   * that same declaration stands, so a forget that lands during the write (deleting the row after
+   * it) leaves the name to be written again, as does one forgotten before it.
    */
   void sync(JobDef def) {
+    sync(def, false);
+  }
+
+  /**
+   * {@link #sync(JobDef)}, and with {@code confirm}, as a run starts, a name already written is
+   * read back: another process may have forgotten the job since, and a job still declared here
+   * comes back on its next run.
+   */
+  void sync(JobDef def, boolean confirm) {
     ensureReady();
     String name = def.name();
     if (standing(name, def) == null) {
-      return;
+      if (!confirm || call(() -> store.getJob(name)) != null) {
+        return;
+      }
+      unmark(name);
     }
     inTurn(
         name,
@@ -375,6 +389,16 @@ final class Core {
       if (definitions.get(def.name()) == def) {
         synced.add(def.name());
       }
+    } finally {
+      declaredLock.unlock();
+    }
+  }
+
+  /** Leaves {@code name} to be written again, its row found gone. */
+  void unmark(String name) {
+    declaredLock.lock();
+    try {
+      synced.remove(name);
     } finally {
       declaredLock.unlock();
     }

@@ -5,6 +5,7 @@ import dev.cronwatch.json.Json;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -60,6 +61,15 @@ public final class Output {
     return out.toString();
   }
 
+  private static final String TRIMMED = "[earlier output trimmed]\n";
+
+  /**
+   * How much text before the kept tail redaction reads, and never keeps: three times the longest
+   * secret a default pattern can match (a PEM key's 16 KB body with its header and footer, under
+   * {@code OUTPUT_CAP + 1024}), since a replacement grows what it replaces at most threefold.
+   */
+  public static final int REDACT_EDGE = 3 * (OUTPUT_CAP + 1024);
+
   /**
    * Removes NULs, then keeps the last {@link #OUTPUT_CAP} code units behind a line saying the rest
    * was trimmed. A cut through a surrogate pair keeps the lone half, as JavaScript does; it becomes
@@ -70,7 +80,32 @@ public final class Output {
     if (clean.length() <= OUTPUT_CAP) {
       return clean;
     }
-    return "[earlier output trimmed]\n" + clean.substring(clean.length() - OUTPUT_CAP);
+    return TRIMMED + clean.substring(clean.length() - OUTPUT_CAP);
+  }
+
+  /**
+   * Output or an error as it is stored: redacted, then capped like {@link #cap}, so the cut cannot
+   * fall inside a secret and keep what follows its label. Text of at most {@code OUTPUT_CAP +
+   * REDACT_EDGE} units is redacted whole. Longer text is cut to that many units from its end first,
+   * and after redacting, the first {@link #REDACT_EDGE} units are never kept: a secret whose label
+   * fell before that cut is left out with them. NULs go before and after {@code redact}.
+   */
+  public static String redactAndCap(String text, UnaryOperator<String> redact) {
+    String clean = stripNul(text);
+    int from = clean.length() - (OUTPUT_CAP + REDACT_EDGE);
+    if (from <= 0) {
+      return cap(redact.apply(clean));
+    }
+    String redacted = stripNul(redact.apply(clean.substring(from)));
+    return TRIMMED
+        + redacted.substring(
+            Math.min(redacted.length(), Math.max(redacted.length() - OUTPUT_CAP, REDACT_EDGE)));
+  }
+
+  /** {@link #redactAndCap} for a text that may be null. */
+  public static @Nullable String redactAndCapOrNull(
+      @Nullable String text, UnaryOperator<String> redact) {
+    return text == null ? null : redactAndCap(text, redact);
   }
 
   /**
@@ -78,11 +113,16 @@ public final class Output {
    * five frames, each {@code " at <frame>"}.
    */
   public static String errorMessage(String name, String message, List<String> frames) {
+    return cap(describeError(name, message, frames));
+  }
+
+  /** {@link #errorMessage(String, String, List)} not capped: see {@link #redactAndCap}. */
+  public static String describeError(String name, String message, List<String> frames) {
     StringBuilder b = new StringBuilder(name).append(": ").append(message);
     for (int k = 0; k < Math.min(5, frames.size()); k++) {
       b.append("\n    at ").append(frames.get(k));
     }
-    return cap(b.toString());
+    return b.toString();
   }
 
   /**
@@ -93,6 +133,11 @@ public final class Output {
    * (Reports.java:42)}. Causes are not written, as the SDK writes only the error's own stack.
    */
   public static String errorMessage(Throwable error) {
+    return cap(describeError(error));
+  }
+
+  /** {@link #errorMessage(Throwable)} not capped: see {@link #redactAndCap}. */
+  public static String describeError(Throwable error) {
     Class<?> type = error.getClass();
     String name = type.getSimpleName().isEmpty() ? type.getName() : type.getSimpleName();
     String message = error.getMessage();
@@ -101,7 +146,7 @@ public final class Output {
     for (int k = 0; k < Math.min(5, trace.length); k++) {
       frames.add(frame(trace[k]));
     }
-    return errorMessage(name, message == null ? "" : message, frames);
+    return describeError(name, message == null ? "" : message, frames);
   }
 
   /**
@@ -110,19 +155,22 @@ public final class Output {
    * like output.
    */
   public static String errorMessage(@Nullable Object error) {
+    return cap(describeError(error));
+  }
+
+  /** {@link #errorMessage(Object)} not capped: see {@link #redactAndCap}. */
+  public static String describeError(@Nullable Object error) {
     if (error instanceof Throwable t) {
-      return errorMessage(t);
+      return describeError(t);
     }
     if (error instanceof String s) {
-      return cap(s);
+      return s;
     }
-    String text;
     try {
-      text = Json.stringify(error);
+      return Json.stringify(error);
     } catch (IllegalArgumentException e) {
-      text = String.valueOf(error);
+      return String.valueOf(error);
     }
-    return cap(text);
   }
 
   /** A frame as a JavaScript stack writes one: the class and method, then where, in parentheses. */
