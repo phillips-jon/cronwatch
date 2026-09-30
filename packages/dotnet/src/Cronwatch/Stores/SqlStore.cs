@@ -234,13 +234,32 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
         }
     }
 
-    /// <summary>Whether SQLite answered SQLITE_BUSY or SQLITE_LOCKED (5 and 6, or an extended code of them).</summary>
+    /// <summary>
+    /// Whether SQLite answered SQLITE_BUSY or SQLITE_LOCKED (5 and 6, or an extended code of
+    /// them). Microsoft.Data.Sqlite names the code in its message (<c>SQLite Error 5: ...</c>);
+    /// <see cref="System.Runtime.InteropServices.ExternalException.ErrorCode"/> is the exception's
+    /// HRESULT, E_FAIL (0x80004005), whose low byte would read as 5 for every error.
+    /// </summary>
     internal static bool Busy(DbException e)
     {
-        int code = e.ErrorCode & 0xff;
         string text = e.Message;
-        return code == 5 || code == 6
-            || text.Contains("SQLITE_BUSY", StringComparison.Ordinal)
+        const string marker = "SQLite Error ";
+        int at = text.IndexOf(marker, StringComparison.Ordinal);
+        if (at >= 0)
+        {
+            int i = at + marker.Length;
+            int code = 0;
+            while (i < text.Length && text[i] >= '0' && text[i] <= '9' && code < 1_000_000)
+            {
+                code = code * 10 + (text[i] - '0');
+                i++;
+            }
+            if ((code & 0xff) is 5 or 6)
+            {
+                return true;
+            }
+        }
+        return text.Contains("SQLITE_BUSY", StringComparison.Ordinal)
             || text.Contains("SQLITE_LOCKED", StringComparison.Ordinal)
             || text.Contains("database is locked", StringComparison.Ordinal)
             || text.Contains("database table is locked", StringComparison.Ordinal);
