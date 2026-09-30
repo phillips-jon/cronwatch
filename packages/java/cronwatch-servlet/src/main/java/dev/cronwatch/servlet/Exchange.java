@@ -47,8 +47,15 @@ final class Exchange {
    * query, which the servlet specification puts first.
    */
   private static byte[] read(HttpServletRequest req, int limit) throws IOException {
-    InputStream in = req.getInputStream();
-    byte[] data = in.readNBytes(limit + 1);
+    byte[] data;
+    try {
+      InputStream in = req.getInputStream();
+      data = in.readNBytes(limit + 1);
+    } catch (IllegalStateException e) {
+      // A filter ahead called getReader(), after which the specification refuses the stream: the
+      // body was read already, as a form's is below.
+      data = new byte[0];
+    }
     if (data.length > 0) {
       return data;
     }
