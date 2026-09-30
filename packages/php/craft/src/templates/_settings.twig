@@ -51,4 +51,7 @@
   disabled: 'grace' in overrides,
 }) }}
 
-<p>{{ 'The console commands and queue jobs to watch, with their schedules, are set in config/cronwatch.php (see the plugin’s README). Run `php craft cronwatch/check` from the server’s crontab every five minutes.'|t('cronwatch') }}</p>
+<p>{{ 'The console commands and queue jobs to watch, with their schedules, are set in {file} (see the plugin’s README). Run {command} from the server’s crontab every five minutes.'|t('cronwatch', {
+  file: tag('code', {text: 'config/cronwatch.php'}),
+  command: tag('code', {text: 'php craft cronwatch/check'}),
+})|raw }}</p>

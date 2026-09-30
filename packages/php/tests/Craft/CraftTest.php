@@ -659,6 +659,8 @@ final class CraftTest extends TestCase
         $this->assertSame(200, $status);
         $this->assertStringContainsString('Email alerts to', $form);
         $this->assertStringContainsString('Slack incoming webhook URL', $form);
+        $this->assertStringContainsString('Run <code>php craft cronwatch/check</code> from', $form, 'the command is set as code');
+        $this->assertStringNotContainsString('`', $form);
     }
 
     public function testTheJsonApiNeedsAToken(): void
