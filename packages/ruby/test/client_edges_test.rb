@@ -46,6 +46,23 @@ class ClientEdgesTest < Minitest::Test
     assert_equal [], cw.store.running_runs
   end
 
+  def test_a_channel_or_triage_that_raises_outside_standard_error_is_a_failed_send_not_the_jobs_error
+    errors = []
+    broken = Cronwatch::Alerts::Custom.new("broken") { |_alert| raise SystemStackError, "stack level too deep" }
+    exiting = Cronwatch::Alerts::Custom.new("exiting") { |_alert| exit 1 }
+    triage = ->(_context) { raise NoMemoryError, "failed to allocate memory" }
+    cw = Cronwatch.new(alerts: [broken, exiting], triage: triage, cron_secret: nil, now: -> { T0 },
+                       on_error: ->(e, where) { errors << [where, e.class] })
+    raised = assert_raises(RuntimeError) { cw.job("x").run { raise "boom" } }
+    assert_equal "boom", raised.message, "the job's own error"
+    assert_includes errors, ["triage for x", NoMemoryError]
+    assert_includes errors, ["alert channel broken", SystemStackError]
+    assert_includes errors, ["alert channel exiting", SystemExit]
+    state = cw.store.get_state("x")
+    assert_equal [:failed], state.undelivered.map(&:type), "queued for a later check, not lost"
+    assert_nil state.sending
+  end
+
   def test_a_check_stopped_by_a_timeout_does_not_leave_its_waiters_hanging
     store = Cronwatch::Stores::Memory.new
     entered = Queue.new

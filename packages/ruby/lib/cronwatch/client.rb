@@ -1370,14 +1370,20 @@ module Cronwatch
           Thread.current.report_on_exception = false
           send_to(channel, alert)
           outcomes[i] = true
-        rescue StandardError, ScriptError => e
+        # Anything the channel raised, SystemStackError and exit included, is
+        # a failed send: raised again through join, it would replace the
+        # job's own error and lose the alert.
+        rescue Exception => e # rubocop:disable Lint/RescueException
           outcomes[i] = e
         end
       end
       deadline = AbortSignal.monotonic + (@channel_timeout_ms / 1000.0)
       results = threads.each_with_index.map do |thread, i|
         next outcomes[i] if thread.nil?
-        next outcomes[i] if thread.join([deadline - AbortSignal.monotonic, 0].max)
+        if thread.join([deadline - AbortSignal.monotonic, 0].max)
+          # A thread killed from outside leaves no outcome: not sent.
+          next outcomes[i] || RuntimeError.new("the channel's thread ended without sending")
+        end
 
         @sending_lock.synchronize { @abandoned[i] = thread }
         TimeoutError.new("timed out after #{@channel_timeout_ms}ms")
@@ -1432,21 +1438,28 @@ module Cronwatch
       thread = Thread.new do
         Thread.current.report_on_exception = false
         outcome = [:ok, @triage.call(context)]
-      rescue StandardError, ScriptError => e
+      # Anything triage raised counts as no diagnosis, as a channel's does.
+      rescue Exception => e # rubocop:disable Lint/RescueException
         outcome = [:error, e]
       end
       unless thread.join(timeout_ms / 1000.0)
         @sending_lock.synchronize { @abandoned[:triage] = thread }
         raise TimeoutError, "timed out after #{timeout_ms}ms"
       end
-      raise outcome[1] if outcome[0] == :error
+      outcome ||= [:error, RuntimeError.new("the triage thread ended without an answer")]
+      return no_triage(alert, signal, outcome[1]) if outcome[0] == :error
 
       diagnosis = outcome[1]
       alert.triage_result = diagnosis.is_a?(String) && !diagnosis.empty? ? Output.utf8(diagnosis) : nil
     rescue StandardError => e
+      no_triage(alert, signal, e)
+    end
+
+    # A triage that gave nothing: the alert goes without one, and why is reported.
+    def no_triage(alert, signal, error)
       signal&.abort!
       alert.triage_result = nil
-      report(e, "triage for #{alert.job}")
+      report(error, "triage for #{alert.job}")
     end
 
     # A whole number in range, or the fallback for anything that is not a number.
