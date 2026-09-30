@@ -398,6 +398,58 @@ pub async fn replay_fixture<S: Store>(fixture: &str, mut make: impl FnMut() -> S
         cases += 1;
     }
     must(store.close().await);
+
+    // nul: text is written without U+0000, which Postgres refuses.
+    let store = make();
+    must(store.init().await);
+    for (i, step) in objects(field(fix, "nul")).into_iter().enumerate() {
+        let what = format!("nul step {i}");
+        let from = || -> Vec<RunStatus> {
+            field(step, "from")
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|s| s.as_str().map(RunStatus::parse))
+                .collect()
+        };
+        let mut wrote = None;
+        let got = if let Some(d) = step.get("upsertJob") {
+            let now = field(step, "now").as_f64().unwrap_or(0.0) as i64;
+            must(store.upsert_job(&must(Definition::from_json(&d.to_json())), now).await);
+            json_of(&must(store.get_job("nul").await), |j| {
+                Value::Object(
+                    js::Object::new()
+                        .with("name", j.name.as_str())
+                        .with("definition", Value::Object(j.definition.as_object().clone()))
+                        .with("createdAt", j.created_at)
+                        .with("updatedAt", j.updated_at),
+                )
+                .to_json()
+            })
+        } else if let Some(s) = step.get("setState") {
+            must(store.set_state(&must(JobState::from_value(s))).await);
+            json_of(&must(store.get_state("nul").await), JobState::to_json)
+        } else if let Some(s) = step.get("compareAndSetState") {
+            let expected = field(step, "expected").as_f64().unwrap_or(0.0) as i64;
+            wrote = Some(must(store.compare_and_set_state(&must(JobState::from_value(s)), expected).await));
+            json_of(&must(store.get_state("nul").await), JobState::to_json)
+        } else {
+            if let Some(r) = step.get("insertRun") {
+                must(store.insert_run(&fixture_run(r)).await);
+            } else if let Some(r) = step.get("updateRun") {
+                must(store.update_run(&fixture_run(r)).await);
+            } else {
+                wrote = Some(must(store.update_run_if(&fixture_run(field(step, "updateRunIf")), &from()).await));
+            }
+            json_of(&must(store.get_run("n1").await), Run::to_json)
+        };
+        if wrote.is_some() {
+            eq(&format!("{what}: wrote"), wrote, field(step, "written").as_bool());
+        }
+        same_json(&what, &got, &field(step, "stored").to_json());
+        cases += 1;
+    }
+    must(store.close().await);
     assert!(cases > 0, "no cases replayed");
     cases
 }

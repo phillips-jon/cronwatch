@@ -197,6 +197,19 @@ impl Metrics {
         self.to_value().to_json()
     }
 
+    /// The metrics as a store writes them: names without U+0000, which
+    /// Postgres refuses, read back as JSON would read them.
+    pub fn without_nul(&self) -> Metrics {
+        if !self.0.iter().any(|(k, _)| k.contains('\0')) {
+            return self.clone();
+        }
+        let mut out = Metrics::new();
+        for (k, v) in self.iter() {
+            out.set(crate::output::strip_nul(k), v);
+        }
+        out
+    }
+
     /// Reads a JSON object of numbers.
     pub fn from_json(text: &str) -> Result<Metrics, JsonError> {
         Metrics::from_value(&js::parse(text)?)
@@ -314,6 +327,21 @@ impl Run {
         self.to_value().to_json()
     }
 
+    /// The run as a store writes it: its trigger, output, error and metric
+    /// names without U+0000, which Postgres refuses (a refused write would
+    /// lose the whole run). Its id and job are identifiers, kept as given;
+    /// the client never makes one with a NUL.
+    pub fn without_nul(&self) -> Run {
+        let strip = crate::output::strip_nul;
+        Run {
+            error: self.error.as_deref().map(strip),
+            output: self.output.as_deref().map(strip),
+            metrics: self.metrics.without_nul(),
+            trigger: strip(&self.trigger),
+            ..self.clone()
+        }
+    }
+
     /// Reads the SDK's JSON.
     pub fn from_json(text: &str) -> Result<Run, JsonError> {
         Run::from_value(&js::parse(text)?)
@@ -407,6 +435,21 @@ impl Definition {
     /// The SDK's JSON.
     pub fn to_json(&self) -> String {
         self.0.to_json()
+    }
+
+    /// The definition's JSON as a store writes it: every key and string
+    /// without U+0000, which Postgres refuses.
+    pub fn to_json_without_nul(&self) -> String {
+        crate::output::strip_json_nul(&self.to_json())
+    }
+
+    /// The definition as a store holds it (see [`to_json_without_nul`](Self::to_json_without_nul)).
+    pub fn without_nul(&self) -> Definition {
+        let text = self.to_json();
+        if !text.contains("\\u0000") {
+            return self.clone();
+        }
+        Definition::from_json(&crate::output::strip_json_nul(&text)).unwrap_or_else(|_| self.clone())
     }
 
     /// Reads a JSON object.
@@ -518,6 +561,21 @@ impl JobState {
     /// The SDK's JSON.
     pub fn to_json(&self) -> String {
         self.to_value().to_json()
+    }
+
+    /// The state's JSON as a store writes it: every key and string without
+    /// U+0000, which Postgres refuses.
+    pub fn to_json_without_nul(&self) -> String {
+        crate::output::strip_json_nul(&self.to_json())
+    }
+
+    /// The state as a store holds it (see [`to_json_without_nul`](Self::to_json_without_nul)).
+    pub fn without_nul(&self) -> JobState {
+        let text = self.to_json();
+        if !text.contains("\\u0000") {
+            return self.clone();
+        }
+        JobState::from_json(&crate::output::strip_json_nul(&text)).unwrap_or_else(|_| self.clone())
     }
 
     /// Reads the SDK's JSON.

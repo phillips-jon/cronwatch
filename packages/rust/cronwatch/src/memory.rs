@@ -8,7 +8,8 @@ use crate::types::{Definition, JobState, Run, RunStatus, StoredJob};
 
 /// Keeps everything in process memory (stores/memory.ts). The default when
 /// no store is given, good for tests and for trying the library out. State
-/// is gone on restart, so a missed run cannot be noticed across one.
+/// is gone on restart, so a missed run cannot be noticed across one. Text
+/// is held as the SQL stores write it, without U+0000.
 #[derive(Debug, Default)]
 pub struct MemoryStore {
     inner: Mutex<Inner>,
@@ -76,9 +77,10 @@ impl Store for MemoryStore {
         let mut inner = self.lock();
         let name = definition.name().to_string();
         let created_at = inner.jobs.get(&name).map_or(now, |j| j.created_at);
-        inner
-            .jobs
-            .insert(name.clone(), StoredJob { name, definition: definition.clone(), created_at, updated_at: now });
+        inner.jobs.insert(
+            name.clone(),
+            StoredJob { name, definition: definition.without_nul(), created_at, updated_at: now },
+        );
         ready(())
     }
 
@@ -110,7 +112,7 @@ impl Store for MemoryStore {
         }
         inner.seq += 1;
         let seq = inner.seq;
-        inner.runs.insert(run.id.clone(), (run.clone(), seq));
+        inner.runs.insert(run.id.clone(), (run.without_nul(), seq));
         ready(())
     }
 
@@ -118,7 +120,7 @@ impl Store for MemoryStore {
     /// forgotten) stays gone, as SQL's `UPDATE` has it.
     fn update_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>> {
         if let Some(entry) = self.lock().runs.get_mut(&run.id) {
-            entry.0 = finish(&entry.0, run);
+            entry.0 = finish(&entry.0, &run.without_nul());
         }
         ready(())
     }
@@ -127,7 +129,7 @@ impl Store for MemoryStore {
         let mut inner = self.lock();
         let wrote = match inner.runs.get_mut(&run.id) {
             Some(entry) if from.contains(&entry.0.status) => {
-                entry.0 = finish(&entry.0, run);
+                entry.0 = finish(&entry.0, &run.without_nul());
                 true
             }
             _ => false,
@@ -172,7 +174,7 @@ impl Store for MemoryStore {
     }
 
     fn set_state<'a>(&'a self, state: &'a JobState) -> BoxFuture<'a, Result<(), BoxError>> {
-        self.lock().states.insert(state.job.clone(), state.clone());
+        self.lock().states.insert(state.job.clone(), state.without_nul());
         ready(())
     }
 
@@ -186,7 +188,7 @@ impl Store for MemoryStore {
         if current != expected {
             return ready(false);
         }
-        inner.states.insert(state.job.clone(), state.clone());
+        inner.states.insert(state.job.clone(), state.without_nul());
         ready(true)
     }
 
