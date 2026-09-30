@@ -1655,6 +1655,11 @@ jobs:
           path: ~/.nuget/packages
           key: nuget-${{ matrix.os }}-${{ hashFiles('packages/dotnet/Directory.Packages.props', 'packages/dotnet/**/*.csproj') }}
           restore-keys: nuget-${{ matrix.os }}-
+      # The URL tests compare the port's readings with Node's own, and the
+      # runner's Node may be an older one that reads "^" in a path differently.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
       - name: dotnet build
         working-directory: packages/dotnet
         run: dotnet build -c Release
