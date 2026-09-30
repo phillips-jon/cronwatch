@@ -1,0 +1,32 @@
+<Project>
+  <!-- The release's version lives here alone: every project inherits it, and
+       CronwatchClient.Version reads it back from the assembly. -->
+  <PropertyGroup>
+    <Version>0.8.0</Version>
+    <Authors>Jon C. Phillips</Authors>
+    <Copyright>Copyright (c) Jon C. Phillips</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://cronwatch.dev</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/phillips-jon/cronwatch</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>cron;monitoring;scheduled-jobs;alerts</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <Deterministic>true</Deterministic>
+    <DebugType>embedded</DebugType>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+</Project>

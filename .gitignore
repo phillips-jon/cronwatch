@@ -30,3 +30,8 @@ packages/elixir/_build_floor/
 
 # Maven builds (target/ above covers the output)
 packages/java/**/.flattened-pom.xml
+
+# .NET builds
+packages/dotnet/**/bin/
+packages/dotnet/**/obj/
+packages/dotnet/**/TestResults/

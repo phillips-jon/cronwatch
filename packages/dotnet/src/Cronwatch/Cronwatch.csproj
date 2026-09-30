@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Cronwatch</RootNamespace>
+    <AssemblyName>Cronwatch</AssemblyName>
+    <IsPackable>true</IsPackable>
+    <PackageId>Cronwatch</PackageId>
+    <Description>Know when your scheduled jobs fail, run long, or never run: missed, failed, stuck and over-budget alerts for cron jobs, kept in your own database.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <InternalsVisibleTo Include="Cronwatch.Tests" />
+  </ItemGroup>
+</Project>

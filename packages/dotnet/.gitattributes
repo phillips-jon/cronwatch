@@ -1,0 +1,16 @@
+# A C# raw string literal takes its line breaks from the file, so every
+# source file is LF on every system, and what is compared byte for byte is
+# never converted.
+*.cs text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.slnx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.editorconfig text eol=lf
+*.css -text
+*.js -text
+*.png -text
+*.ico -text
+*.svg -text
