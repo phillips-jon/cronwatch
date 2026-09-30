@@ -7,7 +7,7 @@ This is the .NET port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronw
 It is not on NuGet yet. The first release will be the `Cronwatch` package:
 
 ```bash
-dotnet add package Cronwatch --version 0.9.0
+dotnet add package Cronwatch --version 0.10.0
 ```
 
 ## Install

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cronwatch-sdk"
-version = "0.9.0"
+version = "0.10.0"
 description = "Cron and scheduled-job monitoring that lives inside your app."
 readme = "README.md"
 license = "MIT"

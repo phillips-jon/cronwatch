@@ -3,8 +3,8 @@ module cronwatch.dev/go/river
 go 1.25.0
 
 require (
-	cronwatch.dev/go v0.9.0
-	cronwatch.dev/go/robfigcron v0.9.0
+	cronwatch.dev/go v0.10.0
+	cronwatch.dev/go/robfigcron v0.10.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/riverqueue/river v0.44.1
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.44.1

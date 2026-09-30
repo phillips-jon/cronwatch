@@ -1,6 +1,6 @@
 # Release Notes for CronWatch
 
-## Unreleased
+## 0.10.0 - 2026-09-30
 
 ### Added
 - Listed in the Craft Plugin Store.

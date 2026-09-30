@@ -4,7 +4,7 @@ Tags: cron, wp-cron, monitoring, scheduled tasks, alerts
 Requires at least: 6.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 0.9.0
+Stable tag: 0.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -130,7 +130,7 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
-= Unreleased =
+= 0.10.0 =
 
 * An alert is saved in the same write that records the failure, so a PHP process killed before the alert went out no longer loses it: the next check sends it.
 * A cron hook whose job options the `cronwatch_job_options` filter made invalid is reported and skipped, instead of stopping the check for every other job.

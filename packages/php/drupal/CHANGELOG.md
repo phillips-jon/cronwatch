@@ -2,7 +2,7 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
-## Unreleased
+## 0.10.0 - 2026-09-30
 
 ### Changed
 - `composer.json` points its documentation link at the Drupal page of the docs, not the docs' front page.
