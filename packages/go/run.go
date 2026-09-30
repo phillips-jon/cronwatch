@@ -569,8 +569,9 @@ func WithoutEvaluation() RecordOption { return func(r *recordConfig) { r.skipEva
 // whose write lands evaluates it, and the other reports it as already
 // finished. A stored run of another job is left alone and reported. A
 // finished run is judged as if it had been wrapped here (expect, failures,
-// duration, budgets) and its output and error are redacted the same way.
-// Returns the alerts it sent.
+// duration, budgets) and its output and error are redacted the same way. A
+// metric that is not a finite number is refused before anything is
+// written, as JobContext.Metric refuses it. Returns the alerts it sent.
 func (c *Client) RecordRun(ctx context.Context, input Run, options ...RecordOption) ([]Alert, error) {
 	var cfg recordConfig
 	for _, o := range options {
@@ -582,6 +583,13 @@ func (c *Client) RecordRun(ctx context.Context, input Run, options ...RecordOpti
 	}
 	if strings.Contains(input.ID, "\x00") {
 		return nil, fmt.Errorf("recordRun: run ids cannot contain a NUL character (job %s)", js.Quote(input.Job))
+	}
+	// Refused as JobContext.Metric refuses them: a store keeps NaN and
+	// infinities as null, or refuses them.
+	for _, m := range input.Metrics {
+		if math.IsNaN(m.Value) || math.IsInf(m.Value, 0) {
+			return nil, fmt.Errorf("recordRun: metric %s must be a finite number (job %s, run %s)", js.Quote(m.Name), js.Quote(input.Job), js.Quote(input.ID))
+		}
 	}
 	if err := c.sync(ctx, def); err != nil {
 		return nil, err

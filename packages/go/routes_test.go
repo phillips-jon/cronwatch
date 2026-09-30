@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -213,6 +214,30 @@ func TestRoutesPagesRenderAndTheAPIAnswers(t *testing.T) {
 	status(t, "api missing", w.get("/cronwatch/api/jobs/missing", auth), 404)
 	status(t, "page missing", w.get("/cronwatch/jobs/missing", auth), 404)
 	status(t, "nope", w.get("/cronwatch/nope", auth), 404)
+}
+
+func TestRoutesARunWhoseMetricsAreNoFiniteNumbersStillShowsItsJobPage(t *testing.T) {
+	w := newWeb(t, nil)
+	w.cw.MustJob("imported")
+	now := w.c.Now()
+	_, err := w.cw.RecordRun(bg, cronwatch.Run{ID: "nan", Job: "imported", Status: cronwatch.StatusOK, StartedAt: now, FinishedAt: ptr(now), DurationMs: ptr(int64(0)),
+		Metrics: cronwatch.Metrics{{Name: "rows", Value: math.NaN()}}, Trigger: "source"})
+	if err == nil || err.Error() != `recordRun: metric "rows" must be a finite number (job "imported", run "nan")` {
+		t.Fatalf("recordRun: %v", err)
+	}
+	if r := must[*cronwatch.Run](t)(w.cw.GetRun(bg, "nan")); r != nil {
+		t.Fatal("a refused run was written")
+	}
+	// As a store that kept NaN, or a foreign row, may hold them.
+	check(t, w.cw.Store().InsertRun(bg, cronwatch.Run{ID: "odd", Job: "imported", Status: cronwatch.StatusOK, StartedAt: now, FinishedAt: ptr(now), DurationMs: ptr(int64(0)), Trigger: "source",
+		Metrics: cronwatch.Metrics{{Name: "rows", Value: math.NaN()}, {Name: "label", Value: math.Inf(1)}, {Name: "cost", Value: 1.25}, {Name: "n", Value: 3}}}))
+	page := w.get("/cronwatch/jobs/imported", auth)
+	status(t, "job page", page, 200)
+	html := page.Body.String()
+	contains(t, "finite metrics", html, `<span class="k">cost</span> 1.2500</span><span><span class="k">n</span> 3<`)
+	if strings.Contains(html, `class="k">rows<`) || strings.Contains(html, `class="k">label<`) {
+		t.Error("a metric that is no finite number was shown")
+	}
 }
 
 func TestRoutesNamesBreakAfterTheirSeparatorsOnlyAsText(t *testing.T) {
