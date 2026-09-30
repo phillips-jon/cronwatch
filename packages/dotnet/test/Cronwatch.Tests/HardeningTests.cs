@@ -34,7 +34,7 @@ public class HardeningTests
         (await State(m, job)).Undelivered!.Select(a => a.Type.Value).ToList();
 
     private static IChannel Throwing(string name, Func<bool> down, Action<Alert>? sent = null, Action? attempt = null) =>
-        Channel.Create(name, (a, ctx, ct) =>
+        CustomChannel.Create(name, (a, ctx, ct) =>
         {
             attempt?.Invoke();
             if (down())
@@ -119,7 +119,7 @@ public class HardeningTests
     public async Task Dispatch_does_not_overwrite_a_silence_made_while_an_alert_was_being_sent()
     {
         CronwatchClient? cw = null;
-        var silencer = Channel.Create("silencer", (a, ctx, ct) => cw!.SilenceAsync("loud", "1h", ct));
+        var silencer = CustomChannel.Create("silencer", (a, ctx, ct) => cw!.SilenceAsync("loud", "1h", ct));
         await using var m = Make(channels: [silencer]);
         cw = m.Cw;
         await Fail(m.Cw, "loud");
@@ -134,7 +134,7 @@ public class HardeningTests
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var hung = Channel.Create("hung", async (a, ctx, ct) =>
+        var hung = CustomChannel.Create("hung", async (a, ctx, ct) =>
         {
             entered.TrySetResult();
             try
@@ -477,7 +477,7 @@ public class HardeningTests
         }
         var tried = new ConcurrentQueue<string>();
         // Each attempt takes a second of the client's clock and fails; the budget covers two.
-        var slow = Channel.Create("slow", (a, ctx, ct) =>
+        var slow = CustomChannel.Create("slow", (a, ctx, ct) =>
         {
             tried.Enqueue(a.Job);
             clock.Advance(TimeSpan.FromSeconds(1));
@@ -726,12 +726,12 @@ public class HardeningTests
         {
             Alerts =
             {
-                Channel.Create("console", (a, ctx, ct) =>
+                CustomChannel.Create("console", (a, ctx, ct) =>
                 {
                     seen.Enqueue("console");
                     return Task.CompletedTask;
                 }),
-                Channel.Create("second", (a, ctx, ct) =>
+                CustomChannel.Create("second", (a, ctx, ct) =>
                 {
                     seen.Enqueue("second");
                     return Task.CompletedTask;

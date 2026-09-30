@@ -333,7 +333,7 @@ public class ClientTests
     [Fact]
     public async Task A_failing_alert_channel_does_not_break_the_run()
     {
-        var broken = Channel.Create("broken", (a, ctx, ct) => throw new InvalidOperationException("no network"));
+        var broken = CustomChannel.Create("broken", (a, ctx, ct) => throw new InvalidOperationException("no network"));
         await using var m = Make(channels: [broken]);
         await Assert.ThrowsAsync<InvalidOperationException>(() => m.Cw.RunAsync("x", (j, ct) => throw new InvalidOperationException("job")));
         Assert.Equal(["alert channel broken"], m.Errors.Wheres());
@@ -344,7 +344,7 @@ public class ClientTests
     public async Task An_alert_no_channel_accepted_is_queued_and_retried_at_the_next_check()
     {
         var failing = true;
-        var flaky = Channel.Create("flaky", (a, ctx, ct) => failing ? throw new InvalidOperationException("down") : Task.CompletedTask);
+        var flaky = CustomChannel.Create("flaky", (a, ctx, ct) => failing ? throw new InvalidOperationException("down") : Task.CompletedTask);
         var clock = Clock();
         var options = new CronwatchOptions
         {

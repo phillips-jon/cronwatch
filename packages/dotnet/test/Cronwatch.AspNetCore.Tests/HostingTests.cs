@@ -73,7 +73,7 @@ public class HostingTests
         {
             o.Clock = clock;
             o.ProcessExitHook = false;
-            o.Alerts.Add(Channel.Create("quiet", (alert, ctx, ct) => Task.CompletedTask));
+            o.Alerts.Add(CustomChannel.Create("quiet", (alert, ctx, ct) => Task.CompletedTask));
             o.Sources.Add(counting);
         });
         await using WebApplication app = builder.Build();

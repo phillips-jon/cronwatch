@@ -174,7 +174,7 @@ public static partial class Golden
         var cw = new CronwatchClient(new CronwatchOptions
         {
             Store = new MemoryStore(),
-            Alerts = { Channel.Create("capture", (alert, ctx, ct) => Task.CompletedTask) },
+            Alerts = { CustomChannel.Create("capture", (alert, ctx, ct) => Task.CompletedTask) },
             CronSecret = CronSecret.None,
             ProcessExitHook = false,
             Clock = new UtcClock(),

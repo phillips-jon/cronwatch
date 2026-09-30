@@ -36,7 +36,7 @@ public static class ForeignRows
         var cw = new CronwatchClient(new CronwatchOptions
         {
             Store = store,
-            Alerts = { Channel.Create("capture", (alert, _, _) => { sent.Enqueue(alert); return Task.CompletedTask; }) },
+            Alerts = { CustomChannel.Create("capture", (alert, _, _) => { sent.Enqueue(alert); return Task.CompletedTask; }) },
             CronSecret = CronSecret.None,
             OnError = (e, where) => errors.Enqueue(where + ": " + e.Message),
             OnWarning = _ => { },

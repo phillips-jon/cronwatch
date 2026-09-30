@@ -65,16 +65,16 @@ public sealed record Alert
     public string ToJson() => ToValue().ToJson();
 
     /// <summary>An alert read from JSON.</summary>
-    /// <exception cref="JsonException">When it is not an alert.</exception>
+    /// <exception cref="JsonParseException">When it is not an alert.</exception>
     public static Alert FromJson(string text) => FromValue(Json.Parse(text));
 
     /// <summary>An alert read from a JSON value, leniently.</summary>
-    /// <exception cref="JsonException">When it is not an alert.</exception>
+    /// <exception cref="JsonParseException">When it is not an alert.</exception>
     public static Alert FromValue(object? v)
     {
         if (v is not JsObject o)
         {
-            throw new JsonException("an alert must be an object, not " + Json.Kind(v));
+            throw new JsonParseException("an alert must be an object, not " + Json.Kind(v));
         }
         var type = new AlertType(Values.String(o, "type"));
         Run? run = null;

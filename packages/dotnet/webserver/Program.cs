@@ -31,7 +31,7 @@ builder.Logging.ClearProviders();
 builder.WebHost.UseKestrel(k => k.Listen(IPAddress.Loopback, port));
 builder.Services.AddCronwatch(o =>
 {
-    o.Alerts.Add(Channel.Create("test", (alert, ctx, ct) =>
+    o.Alerts.Add(CustomChannel.Create("test", (alert, ctx, ct) =>
     {
         Console.Out.Write("alert " + alert.Job + " " + alert.Type.Value + "\n");
         Console.Out.Flush();

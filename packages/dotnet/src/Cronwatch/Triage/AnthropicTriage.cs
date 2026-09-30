@@ -118,7 +118,7 @@ public sealed class AnthropicTriage : ITriage
         {
             message = Json.Parse(answer.Body);
         }
-        catch (JsonException e)
+        catch (JsonParseException e)
         {
             throw Post.Fail(
                 "Anthropic " + Post.Origin(url) + " answered " + answer.Status.ToString(CultureInfo.InvariantCulture)

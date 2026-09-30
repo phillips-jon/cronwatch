@@ -453,7 +453,7 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
         {
             value = Json.Parse(TextOr(row, "definition"));
         }
-        catch (JsonException e)
+        catch (JsonParseException e)
         {
             throw new InvalidOperationException("job " + name + ": " + e.Message, e);
         }
@@ -476,7 +476,7 @@ public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRu
                 // so one such row cannot fail the reads it is part of.
                 metrics = Metrics.Lenient(Json.Parse(metricsText));
             }
-            catch (JsonException e)
+            catch (JsonParseException e)
             {
                 throw new InvalidOperationException("run " + id + ": " + e.Message, e);
             }

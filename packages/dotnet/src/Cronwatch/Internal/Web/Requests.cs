@@ -308,7 +308,7 @@ internal static class Requests
             {
                 value = Json.Parse(text);
             }
-            catch (JsonException)
+            catch (JsonParseException)
             {
                 // Not JSON, or nested past Json.MaxDepth: the SDK's readBody reads it as none.
                 return null;

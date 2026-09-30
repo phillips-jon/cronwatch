@@ -7,22 +7,26 @@ using Cronwatch.Internal;
 
 namespace Cronwatch;
 
-/// <summary>Why text is not JSON, with <c>JSON.parse</c>'s wording and the position in UTF-16 units.</summary>
-public sealed class JsonException : Exception
+/// <summary>
+/// Why text is not JSON, with <c>JSON.parse</c>'s wording and the position in UTF-16 units, or why a
+/// JSON value is not the record it was read as. Named apart from <c>System.Text.Json.JsonException</c>,
+/// so an app importing both namespaces can name either.
+/// </summary>
+public sealed class JsonParseException : Exception
 {
     /// <summary>An error with no message.</summary>
-    public JsonException()
+    public JsonParseException()
     {
     }
 
     /// <summary>An error with this message.</summary>
-    public JsonException(string message)
+    public JsonParseException(string message)
         : base(message)
     {
     }
 
     /// <summary>An error with this message and cause.</summary>
-    public JsonException(string message, Exception inner)
+    public JsonParseException(string message, Exception inner)
         : base(message, inner)
     {
     }
@@ -233,7 +237,7 @@ public static class Json
     /// as <c>List&lt;object?&gt;</c>. A lone surrogate escape (<c>\ud800</c>) is kept, as JavaScript
     /// keeps it. Arrays and objects nested more than <see cref="MaxDepth"/> deep are refused.
     /// </summary>
-    /// <exception cref="JsonException">When the text is not JSON.</exception>
+    /// <exception cref="JsonParseException">When the text is not JSON.</exception>
     public static object? Parse(string text)
     {
         var p = new Parser(text);
@@ -248,7 +252,7 @@ public static class Json
     }
 
     /// <summary><see cref="Parse"/> of text that must be an object.</summary>
-    /// <exception cref="JsonException">When the text is not JSON or not an object.</exception>
+    /// <exception cref="JsonParseException">When the text is not JSON or not an object.</exception>
     public static JsObject ParseObject(string text)
     {
         object? v = Parse(text);
@@ -256,7 +260,7 @@ public static class Json
         {
             return o;
         }
-        throw new JsonException("expected a JSON object, not " + Kind(v));
+        throw new JsonParseException("expected a JSON object, not " + Kind(v));
     }
 
     /// <summary>A value's type as JavaScript's <c>typeof</c> names it, for messages.</summary>
@@ -308,7 +312,7 @@ public static class Json
     {
         public int I;
 
-        public JsonException Fail(string what) =>
+        public JsonParseException Fail(string what) =>
             new(what + " at position " + I.ToString(CultureInfo.InvariantCulture));
 
         public void Space()
@@ -332,7 +336,7 @@ public static class Json
         {
             if (depth >= MaxDepth)
             {
-                throw new JsonException("JSON nested too deeply");
+                throw new JsonParseException("JSON nested too deeply");
             }
             if (I >= s.Length)
             {

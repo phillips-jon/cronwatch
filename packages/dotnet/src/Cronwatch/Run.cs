@@ -66,16 +66,16 @@ public sealed record Run
     public string ToJson() => ToValue().ToJson();
 
     /// <summary>A run read from JSON.</summary>
-    /// <exception cref="JsonException">When it is not a run.</exception>
+    /// <exception cref="JsonParseException">When it is not a run.</exception>
     public static Run FromJson(string text) => FromValue(Json.Parse(text));
 
     /// <summary>A run read from a JSON value.</summary>
-    /// <exception cref="JsonException">When it is not a run.</exception>
+    /// <exception cref="JsonParseException">When it is not a run.</exception>
     public static Run FromValue(object? v)
     {
         if (v is not JsObject o)
         {
-            throw new JsonException("a run must be an object, not " + Json.Kind(v));
+            throw new JsonParseException("a run must be an object, not " + Json.Kind(v));
         }
         return new Run
         {
@@ -117,7 +117,7 @@ public sealed class Definition : IEquatable<Definition>
     internal static Definition Own(JsObject fields) => new(fields);
 
     /// <summary>A definition read from JSON.</summary>
-    /// <exception cref="JsonException">When it is not an object.</exception>
+    /// <exception cref="JsonParseException">When it is not an object.</exception>
     public static Definition FromJson(string text) => new(Json.ParseObject(text));
 
     /// <summary>The job's name.</summary>

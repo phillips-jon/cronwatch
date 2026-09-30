@@ -97,7 +97,7 @@ public abstract class Expect
                     return new ContainsRule(text);
                 }
             }
-            catch (JsonException)
+            catch (JsonParseException)
             {
                 // Kept as stored, below.
             }

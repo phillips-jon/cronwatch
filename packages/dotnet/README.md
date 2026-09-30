@@ -32,7 +32,7 @@ var dataSource = SqliteFactory.Instance.CreateDataSource("Data Source=data/cronw
 await using var cw = new CronwatchClient(new CronwatchOptions
 {
     Store = SqlStore.Sqlite(dataSource), // default: a MemoryStore
-    Alerts = { Channel.Create("pager", (alert, ctx, ct) => Console.Out.WriteLineAsync(alert.Title)) }, // default: the console
+    Alerts = { CustomChannel.Create("pager", (alert, ctx, ct) => Console.Out.WriteLineAsync(alert.Title)) }, // default: the console
     Retention = "30d",
 });
 

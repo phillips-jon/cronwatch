@@ -30,7 +30,7 @@ builder.WebHost.UseUrls("http://127.0.0.1:0");
 builder.Services.AddCronwatch(o =>
 {
     o.Store = SqlStore.Sqlite(SqliteFactory.Instance.CreateDataSource("Data Source=" + file + ";Pooling=False"));
-    o.Alerts.Add(Channel.Create("print", (alert, ctx, ct) => Console.Out.WriteLineAsync("alert " + alert.Job + " " + alert.Type.Value)));
+    o.Alerts.Add(CustomChannel.Create("print", (alert, ctx, ct) => Console.Out.WriteLineAsync("alert " + alert.Job + " " + alert.Type.Value)));
     o.Token = "aot-example-token";
     o.ProcessExitHook = false;
 });

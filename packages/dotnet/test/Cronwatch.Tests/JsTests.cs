@@ -49,7 +49,7 @@ public class JsTests
     public void Nesting_past_the_limit_is_refused()
     {
         string deep = new string('[', 300) + new string(']', 300);
-        Assert.Throws<JsonException>(() => Json.Parse(deep));
+        Assert.Throws<JsonParseException>(() => Json.Parse(deep));
         Assert.IsType<List<object?>>(Json.Parse(new string('[', 200) + new string(']', 200)));
     }
 

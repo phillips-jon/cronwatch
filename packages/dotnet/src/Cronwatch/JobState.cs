@@ -128,16 +128,16 @@ public sealed record JobState
     public string ToJson() => ToValue().ToJson();
 
     /// <summary>A state read from JSON.</summary>
-    /// <exception cref="JsonException">When it is not a state.</exception>
+    /// <exception cref="JsonParseException">When it is not a state.</exception>
     public static JobState FromJson(string text) => FromValue(Json.Parse(text));
 
     /// <summary>A state read from a JSON value, leniently, as the SDK reads a stored state.</summary>
-    /// <exception cref="JsonException">When it is not an object.</exception>
+    /// <exception cref="JsonParseException">When it is not an object.</exception>
     public static JobState FromValue(object? v)
     {
         if (v is not JsObject o)
         {
-            throw new JsonException("a job state must be an object, not " + Json.Kind(v));
+            throw new JsonParseException("a job state must be an object, not " + Json.Kind(v));
         }
         var open = new List<KeyValuePair<Condition, long>>();
         if (o.Get("open") is JsObject opened)
@@ -169,7 +169,7 @@ public sealed record JobState
                 {
                     undelivered.Add(Alert.FromValue(a));
                 }
-                catch (JsonException)
+                catch (JsonParseException)
                 {
                     // Not an alert: it could never be delivered.
                 }

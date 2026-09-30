@@ -24,7 +24,7 @@ public class CorrectnessTests
         var sent = new ConcurrentQueue<string>();
         var inFlight = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var slowForMissed = Channel.Create("slow-for-missed", async (a, ctx, ct) =>
+        var slowForMissed = CustomChannel.Create("slow-for-missed", async (a, ctx, ct) =>
         {
             if (a.Type == AlertType.Missed)
             {

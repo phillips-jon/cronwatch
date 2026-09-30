@@ -114,7 +114,7 @@ public sealed class Metrics : IReadOnlyDictionary<string, double>, IEquatable<Me
     /// Metrics read from stored JSON: null is none, and anything else must be an object of
     /// numbers.
     /// </summary>
-    /// <exception cref="JsonException">When it is not.</exception>
+    /// <exception cref="JsonParseException">When it is not.</exception>
     public static Metrics FromValue(object? v)
     {
         if (v == null)
@@ -123,14 +123,14 @@ public sealed class Metrics : IReadOnlyDictionary<string, double>, IEquatable<Me
         }
         if (v is not JsObject o)
         {
-            throw new JsonException("metrics must be an object, not " + Json.Kind(v));
+            throw new JsonParseException("metrics must be an object, not " + Json.Kind(v));
         }
         var output = new JsObject();
         foreach (var e in o)
         {
             if (!Json.TryNumber(e.Value, out double n))
             {
-                throw new JsonException("metric " + Json.Quote(e.Key) + " must be a number, not " + Json.Kind(e.Value));
+                throw new JsonParseException("metric " + Json.Quote(e.Key) + " must be a number, not " + Json.Kind(e.Value));
             }
             output.Set(e.Key, n);
         }

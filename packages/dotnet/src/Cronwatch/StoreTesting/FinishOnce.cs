@@ -61,7 +61,7 @@ public static class FinishOnce
             Client = new CronwatchClient(new CronwatchOptions
             {
                 Store = store,
-                Alerts = { Channel.Create("capture", (alert, _, _) => { Alerts.Enqueue(alert.Type.Value); return Task.CompletedTask; }) },
+                Alerts = { CustomChannel.Create("capture", (alert, _, _) => { Alerts.Enqueue(alert.Type.Value); return Task.CompletedTask; }) },
                 CronSecret = CronSecret.None,
                 OnError = (e, _) => Errors.Enqueue(e.Message),
                 OnWarning = _ => { },

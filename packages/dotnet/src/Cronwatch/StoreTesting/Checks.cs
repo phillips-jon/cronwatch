@@ -93,7 +93,7 @@ internal static class Checks
         {
             return Write(Json.Parse(text));
         }
-        catch (JsonException)
+        catch (JsonParseException)
         {
             return text;
         }

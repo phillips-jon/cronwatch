@@ -58,8 +58,11 @@ public sealed class ChannelContext
     public override string ToString() => "ChannelContext";
 }
 
-/// <summary>Channels made from functions.</summary>
-public static class Channel
+/// <summary>
+/// Channels made from functions. Named apart from <c>System.Threading.Channels.Channel</c>, so an app
+/// importing both namespaces can name either.
+/// </summary>
+public static class CustomChannel
 {
     /// <summary>A channel named <paramref name="name"/> that sends with <paramref name="send"/>: the SDK's <c>custom()</c>.</summary>
     public static IChannel Create(string name, Func<Alert, ChannelContext, CancellationToken, Task> send) =>
