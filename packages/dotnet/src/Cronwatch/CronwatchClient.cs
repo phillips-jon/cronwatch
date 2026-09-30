@@ -55,6 +55,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         _defaultStore = options.Store == null;
         _channels = options.AlertsGiven ? new List<IChannel>(options.Alerts) : [new ConsoleChannel()];
         _triage = options.Triage;
+        _transport = options.Transport ?? new LazyTransport();
         _sources = new List<ISource>(options.Sources ?? []);
         if (options.CronSecret is { } secret)
         {
@@ -576,6 +577,10 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         if (_processExitHook)
         {
             AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
+        }
+        if (_transport is LazyTransport owned)
+        {
+            owned.Dispose();
         }
         try
         {
