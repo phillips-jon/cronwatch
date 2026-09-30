@@ -315,7 +315,12 @@ final class PgCronSource implements Source {
     }
 
     // Declare each job. A paused one (active = false) keeps its failures but loses its schedule,
-    // so it is not missed.
+    // so it is not missed. One forgotten since it was declared (the dashboard's forget) is declared
+    // again, though unchanged: recordRun takes runs only of a declared job.
+    Set<String> live = new HashSet<>();
+    for (Definition d : host.definedJobs()) {
+      live.add(d.name());
+    }
     Map<Long, String> names = new LinkedHashMap<>();
     Map<Long, Definition> definitions = new HashMap<>();
     Set<String> used = new HashSet<>();
@@ -378,7 +383,7 @@ final class PgCronSource implements Source {
             schedule == null ? base : base.copy().schedule(schedule).timezone(timezone);
         Definition definition = options.describe(name);
         String key = keyOf(definition);
-        if (!key.equals(declared.get(name))) {
+        if (!key.equals(declared.get(name)) || !live.contains(name)) {
           try {
             host.job(name, options);
           } catch (CronwatchException e) {

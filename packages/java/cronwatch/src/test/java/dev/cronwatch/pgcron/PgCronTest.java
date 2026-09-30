@@ -382,6 +382,30 @@ class PgCronTest {
   }
 
   @Test
+  void aJobForgottenFromTheDashboardIsDeclaredAgainAndItsLaterRunsRecorded() {
+    AtomicLong c = new AtomicLong(T0);
+    FakeCron cron = new FakeCron();
+    cron.job(1, "vacuum", "0 3 * * *");
+    cron.add(1, "succeeded", T0 - 5000, T0 - 4000, "VACUUM");
+    try (Kit k = kit(new MemoryStore(), c, PgCron.source(cron, PgCronOptions.builder().build()))) {
+      k.cw.check();
+      k.cw.forget("vacuum");
+      cron.add(1, "succeeded", T0 - 3000, T0 - 2000, "VACUUM");
+      cron.add(1, "failed", T0 - 1000, T0, "ERROR:  boom");
+      c.addAndGet(1000);
+      CheckResult result = k.cw.check();
+      assertEquals(List.of(), k.others());
+      assertEquals(List.of("vacuum"), names(result));
+      assertEquals("0 3 * * *", result.jobs().get(0).definition().schedule());
+      assertEquals(
+          List.of("pgcron:3", "pgcron:2"),
+          ids(k.cw.runs("vacuum", 20)),
+          "the runs after the forget");
+      assertEquals(List.of("vacuum"), k.cw.definedJobs().stream().map(d -> d.name()).toList());
+    }
+  }
+
+  @Test
   void aJobsOptionsApplyAndAScheduleItCannotReadIsReported() {
     FakeCron cron = new FakeCron();
     cron.job(1, "odd", "not a schedule");
