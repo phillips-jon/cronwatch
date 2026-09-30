@@ -2,9 +2,15 @@
 # Deploy cronwatch.dev (the static site in site/dist). Runs on the server as
 # the joncphillips user:
 #
-#   ssh joncpu /var/www/cronwatch.dev/deploy/release-deploy [--force | --prepare]
+#   ssh joncpu /var/www/cronwatch.dev/deploy/release-deploy [--force | --prepare] [<commit>]
 #
-# The GitHub Action runs it after CI passes on a push to main. Each deploy builds a new
+# <commit> is a full 40-character commit id on main; without one it deploys
+# the tip of main. The GitHub Action runs it after CI passes on a push to
+# main, through a key whose authorized_keys entry forces this script, so the
+# commit arrives in SSH_ORIGINAL_COMMAND as "deploy <commit>": the commit CI
+# passed, deployed exactly, never whatever main has moved on to since. A
+# commit that is already live, or older than the live one (CI runs finishing
+# out of order), is skipped. Each deploy builds a new
 # release beside the live one, so a build never touches what is serving:
 #
 #   /var/www/cronwatch.dev-repo.git          bare clone that fetches from GitHub
@@ -36,7 +42,35 @@ NODE_PREFIX=${CRONWATCH_NODE:-/opt/node-cronwatch}
 WEB_ROOT=site/dist
 KEEP=3
 
-MODE="${1:-}"
+MODE=""
+WANT=""
+if [ $# -eq 0 ] && [ -n "${SSH_ORIGINAL_COMMAND+set}" ]; then
+    # The deploy key's forced command: what the client asked for is only
+    # read, never run. "deploy" alone (an older workflow) deploys main.
+    if [[ "$SSH_ORIGINAL_COMMAND" =~ ^deploy(\ ([0-9a-f]{40}))?$ ]]; then
+        WANT="${BASH_REMATCH[2]}"
+    else
+        echo "Refusing the command sent over SSH; expected 'deploy' or 'deploy <40-character commit id>'." >&2
+        exit 1
+    fi
+else
+    for arg in "$@"; do
+        case "$arg" in
+            --force | --prepare)
+                [ -z "$MODE" ] || { echo "Give --force or --prepare, not both." >&2; exit 1; }
+                MODE="$arg"
+                ;;
+            *)
+                if [[ "$arg" =~ ^[0-9a-f]{40}$ ]] && [ -z "$WANT" ]; then
+                    WANT="$arg"
+                else
+                    echo "Usage: release-deploy [--force | --prepare] [<40-character commit id>]" >&2
+                    exit 1
+                fi
+                ;;
+        esac
+    done
+fi
 PREPARE=false
 [ "$MODE" = "--prepare" ] && PREPARE=true
 
@@ -62,7 +96,22 @@ flock -n 9 || { echo "Another deploy is already running." >&2; exit 1; }
 
 echo "Fetching..."
 git -C "$REPO" fetch --quiet origin
-NEW=$(git -C "$REPO" rev-parse refs/remotes/origin/main)
+MAIN=$(git -C "$REPO" rev-parse refs/remotes/origin/main)
+if [ -n "$WANT" ]; then
+    # Only a commit on main: never a branch, a pull request or anything else
+    # that merely exists in the clone.
+    if ! git -C "$REPO" cat-file -e "$WANT^{commit}" 2>/dev/null; then
+        echo "Commit $WANT is not in the clone after fetching." >&2
+        exit 1
+    fi
+    if ! git -C "$REPO" merge-base --is-ancestor "$WANT" "$MAIN"; then
+        echo "Commit $WANT is not on main." >&2
+        exit 1
+    fi
+    NEW="$WANT"
+else
+    NEW="$MAIN"
+fi
 CURRENT=""
 CURRENT_DIR=""
 if [ -L "$LIVE" ]; then
@@ -71,6 +120,13 @@ if [ -L "$LIVE" ]; then
 fi
 if [ "$NEW" = "$CURRENT" ] && [ "$MODE" != "--force" ] && ! $PREPARE; then
     echo "Already live: $(git -C "$REPO" log -1 --format='%h %s' "$NEW")"
+    exit 0
+fi
+# CI runs can finish out of order: never replace the live release with an
+# older commit unless asked to (--force, or ./rollback).
+if [ -n "$WANT" ] && [ -n "$CURRENT" ] && [ "$MODE" != "--force" ] && ! $PREPARE \
+    && git -C "$REPO" merge-base --is-ancestor "$NEW" "$CURRENT" 2>/dev/null; then
+    echo "Not deploying $(git -C "$REPO" rev-parse --short "$NEW"): it is older than the live $(git -C "$REPO" rev-parse --short "$CURRENT")."
     exit 0
 fi
 

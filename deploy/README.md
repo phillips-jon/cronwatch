@@ -9,7 +9,7 @@ The site is static: `site/dist`, built by `npm run build:site`. On the server it
 /opt/node-cronwatch                      the Node the builds run on
 ```
 
-`release-deploy` fetches, builds a new worktree beside the live one (installing only the site workspace), checks that `site/dist/index.html` carries the timeline of runs drawn from the demo captures and that the docs exist, marks the release `.release-ok`, moves the symlink in one rename, and confirms `https://cronwatch.dev/` answers 200 with exactly the `index.html` it just built (switching back if not; on a first deploy, with nothing to switch back to, it says so loudly and exits non-zero). nginx follows the symlink, so nothing restarts (the contact form service is the one exception; see [Contact form](#contact-form)). The newest three releases that went live are kept; `rollback` switches to the previous one at once.
+`release-deploy` fetches, takes the commit it was given (the one CI passed; it must be on `main`, and one older than the live release is skipped) or else the tip of `main`, builds a new worktree beside the live one (installing only the site workspace), checks that `site/dist/index.html` carries the timeline of runs drawn from the demo captures and that the docs exist, marks the release `.release-ok`, moves the symlink in one rename, and confirms `https://cronwatch.dev/` answers 200 with exactly the `index.html` it just built (switching back if not; on a first deploy, with nothing to switch back to, it says so loudly and exits non-zero). nginx follows the symlink, so nothing restarts (the contact form service is the one exception; see [Contact form](#contact-form)). The newest three releases that went live are kept; `rollback` switches to the previous one at once.
 
 ## One-time setup
 
@@ -19,7 +19,7 @@ As root:
 2. The vhost: install `deploy/nginx.conf` as `/etc/nginx/sites-available/cronwatch.dev`, symlink into `sites-enabled` with only the port 80 block active, `nginx -t`, reload, then `certbot certonly --webroot -w /var/www/certbot -d cronwatch.dev -d www.cronwatch.dev`, enable the 443 blocks, `nginx -t`, reload. The 443 blocks put `http2` on the listen line for nginx 1.24; on 1.25.1 or newer, switch to `http2 on;`.
 3. The deploy key: generate a keypair for GitHub Actions and add the public half to `/home/joncphillips/.ssh/authorized_keys` as
    `restrict,command="/usr/bin/flock -w 900 /home/joncphillips/.build.lock /var/www/cronwatch.dev/deploy/release-deploy" ssh-ed25519 ...`
-   (`restrict` turns off forwarding, the pty and anything OpenSSH adds later. The 900 second wait for the shared build lock leaves room for the build itself inside the workflow's 20 minute timeout.)
+   (`restrict` turns off forwarding, the pty and anything OpenSSH adds later. The 900 second wait for the shared build lock leaves room for the build itself inside the workflow's 20 minute timeout.) The forced command never runs what the client asks for. The workflow sends `deploy <commit>`, which OpenSSH puts in `SSH_ORIGINAL_COMMAND`, and `release-deploy` accepts only `deploy` or `deploy` followed by a 40-character lower-case commit id, and refuses anything else.
 
 As joncphillips:
 
@@ -38,8 +38,10 @@ On GitHub: secrets `DEPLOY_SSH_KEY` (the private half) and `DEPLOY_KNOWN_HOSTS` 
 ## Day to day
 
 ```
-ssh joncpu /var/www/cronwatch.dev/deploy/release-deploy --force   # rebuild the live commit
-ssh joncpu /var/www/cronwatch.dev/deploy/rollback                 # back to the previous release
+ssh joncpu /var/www/cronwatch.dev/deploy/release-deploy --force            # rebuild the tip of main
+ssh joncpu /var/www/cronwatch.dev/deploy/release-deploy <commit>           # deploy that commit on main
+ssh joncpu /var/www/cronwatch.dev/deploy/release-deploy --force <commit>   # even if it is older than the live one
+ssh joncpu /var/www/cronwatch.dev/deploy/rollback                          # back to the previous release
 ```
 
 The copy of `release-deploy` that runs is the live release's, so a push that changes the script is deployed by the previous version; run it once by hand with `--force` to exercise a new one.

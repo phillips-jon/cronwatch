@@ -2,12 +2,17 @@
 #
 # Waits for the CI workflow, so nothing reaches the server that failed the
 # dash check, typecheck, tests or build (the server itself only builds the
-# site). Can also be started by hand.
+# site). It hands the server the exact commit CI tested
+# (workflow_run.head_sha), and the server deploys that commit, not whatever
+# main has moved on to since; one older than the live release is skipped.
+# Can also be started by hand on main, which deploys the commit main points
+# at then, without waiting for CI.
 #
 # Stays off until the repository variable DEPLOY_ENABLED is "true". Needs two
 # repository secrets:
 #   DEPLOY_SSH_KEY      private key whose public half is in ~joncphillips/.ssh/authorized_keys
 #                       on the server, restricted there to running deploy/release-deploy only
+#                       (which reads the commit from SSH_ORIGINAL_COMMAND)
 #   DEPLOY_KNOWN_HOSTS  output of: ssh-keyscan -p 2222 cronwatch.dev
 name: Deploy
 
@@ -30,9 +35,10 @@ jobs:
   deploy:
     if: >-
       vars.DEPLOY_ENABLED == 'true' && (
-        github.event_name == 'workflow_dispatch' || (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (
           github.event.workflow_run.conclusion == 'success' &&
-          github.event.workflow_run.event == 'push'
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main'
         )
       )
     runs-on: ubuntu-latest
@@ -42,9 +48,15 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          COMMIT: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
+          if ! [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Not a commit id: $COMMIT" >&2
+            exit 1
+          fi
+          echo "Deploying $COMMIT"
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          ssh -i ~/.ssh/deploy_key -p 2222 -o IdentitiesOnly=yes -o BatchMode=yes joncphillips@cronwatch.dev deploy
+          ssh -i ~/.ssh/deploy_key -p 2222 -o IdentitiesOnly=yes -o BatchMode=yes joncphillips@cronwatch.dev "deploy $COMMIT"
