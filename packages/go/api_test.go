@@ -4,9 +4,13 @@ package cronwatch_test
 // and a definition's field order under functional options.
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"net/http"
 	"regexp"
@@ -265,6 +269,34 @@ func TestASecretSplitByTheCutIsRedactedWhole(t *testing.T) {
 	if r := must[*cronwatch.Run](t)(k.cw.GetRun(bg, h.ID())); strings.Contains(*r.Output, "opaqueTOKEN") {
 		t.Error("finish: the token was kept")
 	}
+}
+
+func TestPrintingAClientOrRoutesShowsNoSecret(t *testing.T) {
+	const secret, token = "cron-secret-4f9a2b7c", "dashboard-token-8e1d3a6f"
+	cw := cronwatch.MustNew(cronwatch.WithCronSecret(secret))
+	cw.MustJob("nightly")
+	routes := must[*cronwatch.Routes](t)(cw.Routes(cronwatch.WithToken(token)))
+	sum := sha256.Sum256([]byte("cronwatch-cookie:" + token))
+	cookie := hex.EncodeToString(sum[:])
+	var logged bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logged, nil))
+	logger.Info("ready", "client", cw, "routes", routes)
+	jsonLogged := &bytes.Buffer{}
+	slog.New(slog.NewJSONHandler(jsonLogged, nil)).Info("ready", "client", cw, "routes", routes)
+	outputs := []string{logged.String(), jsonLogged.String()}
+	for _, format := range []string{"%v", "%+v", "%#v", "%s"} {
+		outputs = append(outputs, fmt.Sprintf(format, cw), fmt.Sprintf(format, routes))
+	}
+	for _, out := range outputs {
+		for _, s := range []string{secret, token, cookie} {
+			if strings.Contains(out, s) {
+				t.Errorf("printed a secret: %s", out)
+			}
+		}
+	}
+	eq(t, "client", cw.String(), "cronwatch.Client{jobs: 1, store: *cronwatch.MemoryStore, cron secret: set}")
+	eq(t, "routes", routes.String(), "cronwatch.Routes{base: found from the mount, token: set}")
+	contains(t, "slog", logged.String(), "client.jobs=1")
 }
 
 func TestNewAndWithStoreValidate(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"reflect"
 	"regexp"
@@ -104,6 +105,34 @@ type Client struct {
 	busyMu      sync.Mutex
 	channelBusy map[int]int
 	triageBusy  int
+}
+
+// String names the client, how many jobs it declares and its store's type,
+// and says whether a cron secret is set, never the secret: fmt and loggers
+// print a value's fields otherwise.
+func (c *Client) String() string {
+	if c == nil {
+		return "cronwatch.Client(nil)"
+	}
+	return fmt.Sprintf("cronwatch.Client{jobs: %d, store: %T, cron secret: %s}", c.declaredCount(), c.store, secretState(c.cronSecret != ""))
+}
+
+// GoString is String, for %#v.
+func (c *Client) GoString() string { return c.String() }
+
+// LogValue is what log/slog writes for the client: String's fields.
+func (c *Client) LogValue() slog.Value {
+	if c == nil {
+		return slog.StringValue("cronwatch.Client(nil)")
+	}
+	return slog.GroupValue(slog.Int("jobs", c.declaredCount()), slog.String("store", fmt.Sprintf("%T", c.store)),
+		slog.String("cronSecret", secretState(c.cronSecret != "")))
+}
+
+func (c *Client) declaredCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.order)
 }
 
 // jobDef is a declared job: its stored definition, and the live expect rule

@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"math/big"
 	"net/http"
@@ -121,6 +122,43 @@ type Routes struct {
 	origin     string
 	trustProxy bool
 	announce   sync.Once
+}
+
+// String names the routes and where they are mounted, and says whether a
+// token is set, never the token or its cookie: fmt and loggers print a
+// value's fields otherwise.
+func (rt *Routes) String() string {
+	if rt == nil {
+		return "cronwatch.Routes(nil)"
+	}
+	base := "found from the mount"
+	if rt.base != nil {
+		base = strconv.Quote(*rt.base)
+	}
+	return "cronwatch.Routes{base: " + base + ", token: " + secretState(rt.token != "") + "}"
+}
+
+// GoString is String, for %#v.
+func (rt *Routes) GoString() string { return rt.String() }
+
+// LogValue is what log/slog writes for the routes: String's fields.
+func (rt *Routes) LogValue() slog.Value {
+	if rt == nil {
+		return slog.StringValue("cronwatch.Routes(nil)")
+	}
+	base := ""
+	if rt.base != nil {
+		base = *rt.base
+	}
+	return slog.GroupValue(slog.String("base", base), slog.String("token", secretState(rt.token != "")))
+}
+
+// secretState is how a secret is printed: whether it is set.
+func secretState(set bool) string {
+	if set {
+		return "set"
+	}
+	return "none"
 }
 
 // Routes is the dashboard and its JSON API as an http.Handler, the SDK's
