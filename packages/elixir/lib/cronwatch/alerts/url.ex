@@ -296,7 +296,7 @@ defmodule Cronwatch.Alerts.URL do
   defp double_dot?(seg), do: String.downcase(seg) in ["..", ".%2e", "%2e.", "%2e%2e"]
 
   defp c0_or_high?(c), do: c < 0x20 or c > 0x7E
-  defp path_char?(c), do: not (c0_or_high?(c) or c in ~c" \"#<>?`{}")
+  defp path_char?(c), do: not (c0_or_high?(c) or c in ~c" \"#<>?^`{}")
   defp query_char?(c), do: not (c0_or_high?(c) or c in ~c" \"#<>'")
   defp fragment_char?(c), do: not (c0_or_high?(c) or c in ~c" \"<>`")
 
