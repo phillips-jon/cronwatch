@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your .NET service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the .NET port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir or Java process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](DESIGN.md) has the plan and how each part works). Phase 1 has the core: jobs, runs in the caller's flow, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, the current run across tasks and threads, the process-exit hook, the memory store, and the SQL store over ADO.NET on SQLite. Phase 2 adds the SQL store on Postgres, MySQL and MariaDB, the SDK's fifteen alert channels, Claude triage and the pg_cron source. Phase 3 adds the dashboard and a job's handler, framework-free in the core, `Cronwatch.Hosting` (the client in the Generic Host's container) and `Cronwatch.AspNetCore` (the dashboard and handler on ASP.NET Core). Phase 4 adds the Hangfire and Quartz.NET integrations.
+This is the .NET port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a .NET process and a Node, Ruby, Python, PHP, Go, Rust, Elixir or Java process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](DESIGN.md) has the plan and how each part works). Phase 1 has the core: jobs, runs in the caller's flow, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, the current run across tasks and threads, the process-exit hook, the memory store, and the SQL store over ADO.NET on SQLite. Phase 2 adds the SQL store on Postgres, MySQL and MariaDB, the SDK's fifteen alert channels, Claude triage and the pg_cron source. Phase 3 adds the dashboard and a job's handler, framework-free in the core, `Cronwatch.Hosting` (the client in the Generic Host's container) and `Cronwatch.AspNetCore` (the dashboard and handler on ASP.NET Core). Phase 4 adds the bridge the scheduler integrations share, `Cronwatch.Hangfire`, `Cronwatch.Quartz`, hosted jobs (`AddCronwatchJob`) and `cronwatch check` from a crontab.
 
 It is not on NuGet yet. The first release will be the `Cronwatch` package:
 
@@ -160,6 +160,30 @@ var app = builder.Build();
 return await app.RunCronwatchCommandAsync(args); // `dotnet MyApp.dll cronwatch check`, else runs the app
 ```
 
+### Hangfire
+
+`Cronwatch.Hangfire` (Hangfire 1.8.0 or newer) records every attempt of a job as a run, declares each recurring job on its cron and zone, and runs the check as a recurring job of its own, with nothing changed in the app's jobs:
+
+```csharp
+GlobalConfiguration.Configuration.UseInMemoryStorage().UseCronwatch(cw);
+CronwatchHangfire.ScheduleCheck(); // `cronwatch-check`, every minute, once per cluster
+```
+
+(`services.AddHangfire((sp, c) => c.UseCronwatch(sp))` takes the client from the container.) Each recurring job is a job named after its id, tagged `hangfire` and `hangfire:<app>`, its cron checked against Cronos, Hangfire's own reader: one the two read differently is reported once and watched without a schedule. A retry is a new run, so failing attempts open one alert and the one that succeeds closes it (`FailuresBeforeAlert` allows some first). A job stopped by its server's shutdown, which Hangfire puts back in its queue, is given back rather than failed; one whose type or arguments no longer load is recorded failed. A job that is not recurring is watched only when named, with `[CronwatchJob("import")]` on its method. `CronwatchClient.Current` and `job.Log` work inside every watched job.
+
+### Quartz.NET
+
+`Cronwatch.Quartz` (Quartz.NET 4.0.0 or newer) records every firing as a run and declares each job on its trigger:
+
+```csharp
+builder.Services.AddQuartz(q =>
+{
+    q.UseCronwatch(o => o.ScheduleCheck = true); // a check job every minute, once per cluster
+});
+```
+
+Jobs are named after their key (`nightlyReport` in the `DEFAULT` group, `reports.nightly` in another) and tagged `quartz` and `quartz:<app>`. A job with one cron trigger is declared on its expression in the trigger's zone, checked against Quartz's own `CronExpression` (Quartz counts the days of the week from 1 for Sunday, so a day it reads differently is reported and the job watched without a schedule); a simple trigger repeating forever is declared `every <interval>`; anything else is a job without a schedule. In a clustered job store, a firing Quartz recovers after its node stopped finishes the earlier firing's run as failed. `CronwatchClient.Current` works inside a job; a scheduler watched without the builder (`CronwatchQuartz.WatchAsync(cw, scheduler)`) gets its run from `context.CronwatchRun()`.
+
 ### Coravel
 
 Coravel is not integrated: an invocable that should be watched wraps its body in a run.
@@ -222,7 +246,7 @@ dotnet test
 CRONWATCH_CULTURE=tr-TR dotnet test
 ```
 
-The suite replays the repository's `conformance/` fixtures byte for byte, and runs the channels against real local servers. The server tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set, as URLs like `postgres://postgres:pw@127.0.0.1:5432/cw` or `mysql://root:pw@127.0.0.1:3306/cw` (MariaDB's too), each test on tables of its own prefix. The croner parity check and the SQLite file shared with Node need the built SDK (`npm run build --workspace packages/sdk` at the repository's root) and skip without it. The tests run on a `FakeTimeProvider`, in UTC. `CRONWATCH_TRIES=N` runs the properties longer. The dashboard replays the SDK's captures (`packages/ruby/test/web/golden.json`) three ways: straight into the routes, through ASP.NET Core's test server, and through Kestrel over a raw socket. `CRONWATCH_TEST_DOTNET=1 npm test --workspace packages/mcp`, at the repository's root, drives `@cronwatch/mcp` against `webserver`, a seeded dashboard.
+The suite replays the repository's `conformance/` fixtures byte for byte, and runs the channels against real local servers. The server tests run when `CRONWATCH_TEST_PG`, `CRONWATCH_TEST_MYSQL`, `CRONWATCH_TEST_MARIADB` and `CRONWATCH_TEST_PGCRON` are set, as URLs like `postgres://postgres:pw@127.0.0.1:5432/cw` or `mysql://root:pw@127.0.0.1:3306/cw` (MariaDB's too), each test on tables of its own prefix. The croner parity check and the SQLite file shared with Node need the built SDK (`npm run build --workspace packages/sdk` at the repository's root) and skip without it. The tests run on a `FakeTimeProvider`, in UTC. `CRONWATCH_TRIES=N` runs the properties longer. The dashboard replays the SDK's captures (`packages/ruby/test/web/golden.json`) three ways: straight into the routes, through ASP.NET Core's test server, and through Kestrel over a raw socket. `CRONWATCH_TEST_DOTNET=1 npm test --workspace packages/mcp`, at the repository's root, drives `@cronwatch/mcp` against `webserver`, a seeded dashboard. The integrations' tests run a real Hangfire server on its in-memory storage and a real Quartz scheduler on its RAM store, and the Quartz recovery test a clustered Postgres job store when `CRONWATCH_TEST_PG` is set; `-p:HangfireVersion=1.8.0` and `-p:QuartzVersion=4.0.0` run them on the oldest releases the packages support (the newest by default). `examples/aot` is published with Native AOT (`dotnet publish examples/aot -c Release -o artifacts/aot && artifacts/aot/aot once`).
 
 ## License
 
