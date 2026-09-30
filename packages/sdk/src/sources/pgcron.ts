@@ -251,6 +251,9 @@ export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
       const all = (rows as PgCronJob[]).map((r) => ({ ...r, jobid: Number(r.jobid) }));
 
       // Declare each job. A paused one (active = false) keeps its failures but loses its schedule, so it is not missed.
+      // One forgotten since it was declared (the dashboard's forget) is declared again, though
+      // unchanged: recordRun takes runs only of a declared job.
+      const live = host.definedJobs ? new Set(host.definedJobs().map((d) => d.name)) : null;
       const names = new Map<number, string>();
       const definitions = new Map<number, JobOptions>();
       const used = new Set<string>();
@@ -314,7 +317,7 @@ export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
           ...(schedule ? { schedule, timezone } : {}),
         };
         try {
-          if (declared.get(name) !== keyOf(definition)) {
+          if (declared.get(name) !== keyOf(definition) || (live !== null && !live.has(name))) {
             const key = keyOf(definition);
             try {
               host.job(name, definition);

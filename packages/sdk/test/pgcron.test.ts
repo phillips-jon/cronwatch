@@ -234,6 +234,26 @@ test("pg_cron: jobs are declared, history is copied quietly, and imports are ide
   assert.equal((await cw.runs("db:nightly-vacuum", 100)).length, 20, "its history is kept");
 });
 
+test("pg_cron: a job forgotten from the dashboard is declared again and its later runs recorded", async () => {
+  const c = clock();
+  const cron = fakeCron();
+  cron.jobs.push(job(1, "vacuum", "0 3 * * *"));
+  cron.add(1, "succeeded", T0 - 5000, T0 - 4000, "VACUUM");
+  const errors: string[] = [];
+  const cw = cronwatch({ store: memory(), alerts: [capture()], now: c.now, sources: [pgCron(cron.db)], onError: (e, where) => errors.push(`${where}: ${(e as Error).message}`) });
+  await cw.check();
+  await cw.forget("vacuum");
+  cron.add(1, "succeeded", T0 - 3000, T0 - 2000, "VACUUM");
+  cron.add(1, "failed", T0 - 1000, T0, "ERROR:  boom");
+  c.advance(1000);
+  const result = await cw.check();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(result.jobs.map((j) => j.name), ["vacuum"]);
+  assert.equal(result.jobs[0]!.definition.schedule, "0 3 * * *");
+  assert.deepEqual((await cw.runs("vacuum")).map((r) => r.id), ["pgcron:3", "pgcron:2"], "the runs after the forget");
+  assert.deepEqual(cw.definedJobs().map((d) => d.name), ["vacuum"]);
+});
+
 test("pg_cron: runs a job's options, and reports a schedule it cannot read", async () => {
   const cron = fakeCron();
   cron.jobs.push(job(1, "odd", "not a schedule"));

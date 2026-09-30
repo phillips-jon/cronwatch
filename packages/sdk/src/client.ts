@@ -149,6 +149,13 @@ export interface RunHandle {
 export interface SourceHost {
   /** Declare a job, as CronWatch.job(). Throws for an invalid name or option. */
   job(name: string, options?: JobOptions): unknown;
+  /**
+   * The definitions declared now, as CronWatch.definedJobs(): a source reads
+   * it to declare again a job forgotten since (the dashboard's forget), whose
+   * definition has not changed. A host without it is taken to keep every
+   * job the source declared.
+   */
+  definedJobs?(): { name: string }[];
   /** See CronWatch.recordRun(). */
   recordRun(run: Run, options?: RecordRunOptions): Promise<Alert[]>;
   readonly store: Store;
