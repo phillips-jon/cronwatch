@@ -11,6 +11,9 @@
     <PackageReference Include="Npgsql" />
     <!-- The release under test; the package itself asks for the floor. -->
     <PackageReference Include="Quartz" VersionOverride="$(QuartzVersion)" />
+    <!-- The readings report's: the Cronos Hangfire carries, and NCrontab. -->
+    <PackageReference Include="Cronos" />
+    <PackageReference Include="NCrontab" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Cronwatch.Quartz/Cronwatch.Quartz.csproj" />

@@ -39,5 +39,7 @@
   </ItemGroup>
   <ItemGroup Label="Quartz">
     <PackageVersion Include="Quartz" Version="$(QuartzFloor)" />
+    <!-- The readings report's third library (Cronos and Quartz are the others). -->
+    <PackageVersion Include="NCrontab" Version="3.4.0" />
   </ItemGroup>
 </Project>
