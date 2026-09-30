@@ -66,6 +66,9 @@ internal sealed partial class HostedJobs : IHostedService, IDisposable
             declared.Add((h, _cw.Job(h.Name, h.Options)));
         }
         CancellationToken stop = _stopping.Token;
+        // Without the flow of the host's start, so nothing it held (a log scope, an activity, an
+        // AsyncLocal of the app's) reaches every run for the life of the app.
+        using var suppressed = ExecutionContext.SuppressFlow();
         _loops = Task.Run(
             async () =>
             {

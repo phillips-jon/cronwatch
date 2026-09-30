@@ -226,6 +226,44 @@ public class HostedJobTests
         }
     }
 
+    /// <summary>A job that notes what the flow that started the host left in <see cref="Ambient"/>.</summary>
+    internal sealed class Looking : ICronwatchJob
+    {
+        public static readonly AsyncLocal<string?> Ambient = new();
+
+        public static readonly ConcurrentQueue<string> Seen = new();
+
+        public Task RunAsync(JobContext job, CancellationToken cancellationToken)
+        {
+            Seen.Enqueue(Ambient.Value ?? "none");
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task A_hosted_job_carries_nothing_from_the_flow_that_started_the_host()
+    {
+        Looking.Seen.Clear();
+        Made m;
+        // What the host's start had in its flow (a log scope, an activity) must not reach every
+        // run for the life of the app.
+        Looking.Ambient.Value = "the host's start";
+        try
+        {
+            m = await StartAsync(s => s.AddCronwatchJob<Looking>("looking", new JobOptions { Schedule = "* * * * *" }));
+        }
+        finally
+        {
+            Looking.Ambient.Value = null;
+        }
+        await using (m)
+        {
+            await m.FireAsync("looking", T0.AddMinutes(1));
+            await Eventually("the run", () => Task.FromResult(!Looking.Seen.IsEmpty));
+            Assert.Equal(["none"], Looking.Seen);
+        }
+    }
+
     [Fact]
     public async Task A_bad_schedule_stops_the_host_from_starting()
     {
