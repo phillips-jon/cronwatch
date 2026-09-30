@@ -65,6 +65,14 @@ final class SchedulerTest extends TestCase
         return $tester->getDisplay();
     }
 
+    public function testAMessagesOwnDescriptionWinsOverTheDefault(): void
+    {
+        [, $given] = \Cronwatch\Symfony\MessengerSubscriber::definition(Report::class, new \Cronwatch\Watch(description: 'Builds the nightly report'));
+        $this->assertSame('Builds the nightly report', $given['description']);
+        [, $plain] = \Cronwatch\Symfony\MessengerSubscriber::definition(Report::class, new \Cronwatch\Watch());
+        $this->assertSame('Message ' . Report::class, $plain['description']);
+    }
+
     public function testEveryKindOfRecurringMessageIsAJobNamedAsDesignMdSays(): void
     {
         TestSchedule::$messages = [

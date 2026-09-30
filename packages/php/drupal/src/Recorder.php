@@ -282,7 +282,7 @@ final class Recorder {
     if (isset($this->handles[$name])) {
       return $this->handles[$name];
     }
-    $options = ['description' => "Items of the {$id} queue"] + $options;
+    $options = $options + ['description' => "Items of the {$id} queue"];
     $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG_QUEUE, $this->appTag(self::TAG_QUEUE)]));
     return $this->declare($name, $options, ['kind' => 'queue', 'queue' => $id]);
   }

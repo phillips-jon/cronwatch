@@ -88,7 +88,7 @@ final class QueueWatcher
                 $options = array_replace($options, $more);
             }
         }
-        $options = ['description' => "Queued job {$class}"] + $options;
+        $options = $options + ['description' => "Queued job {$class}"];
         $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG]));
         return [$name !== null && $name !== '' ? $name : JobName::ofClass($class), $options];
     }

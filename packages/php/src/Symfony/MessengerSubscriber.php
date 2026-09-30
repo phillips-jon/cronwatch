@@ -141,7 +141,7 @@ final class MessengerSubscriber implements EventSubscriberInterface
     /** @return array{string, array<string, mixed>} */
     public static function definition(string $class, Watch $watch): array
     {
-        $options = ['description' => "Message {$class}"] + $watch->options();
+        $options = $watch->options() + ['description' => "Message {$class}"];
         $options['tags'] = array_values(array_unique([...array_map('strval', (array) ($options['tags'] ?? [])), self::TAG]));
         return [$watch->name !== null && $watch->name !== '' ? $watch->name : JobName::ofClass($class), $options];
     }
