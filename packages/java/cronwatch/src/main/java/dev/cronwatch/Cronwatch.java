@@ -296,24 +296,30 @@ public final class Cronwatch implements AutoCloseable {
    * @throws CronwatchException when the job is not declared here, or the store fails
    */
   public boolean syncJob(String name) {
-    JobDef def = core.declared(name);
-    if (def == null) {
+    JobDef declared = core.declared(name);
+    if (declared == null) {
       throw CronwatchException.invalid(
           "job " + Json.quote(name) + " is not declared in this process");
     }
     core.ensureReady();
-    StoredJob stored = Core.call(() -> core.store.getJob(name));
-    boolean write =
-        stored == null || !sameJson(stored.definition().toObject(), def.stored().toObject());
-    if (write) {
-      Core.call(
-          () -> {
-            core.store.upsertJob(def.stored(), core.now());
-            return null;
-          });
-    }
-    core.markSynced(def);
-    return write;
+    return core.inTurn(
+        name,
+        () -> {
+          // The declaration as it stands once its turn comes: one made since is the one written.
+          JobDef def = Objects.requireNonNullElse(core.declared(name), declared);
+          StoredJob stored = Core.call(() -> core.store.getJob(name));
+          boolean write =
+              stored == null || !sameJson(stored.definition().toObject(), def.stored().toObject());
+          if (write) {
+            Core.call(
+                () -> {
+                  core.store.upsertJob(def.stored(), core.now());
+                  return null;
+                });
+          }
+          core.markSynced(def);
+          return write;
+        });
   }
 
   /** Whether two JSON values are equal, an object's keys in any order. */

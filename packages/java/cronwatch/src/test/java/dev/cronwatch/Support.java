@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.jspecify.annotations.Nullable;
 
@@ -209,8 +210,8 @@ final class Support {
 
   /**
    * A store over another whose methods throw while named in {@link #broken}, whose state reads take
-   * {@code readDelayMs}, whose {@code updateRunIf} can be held at a gate, and whose {@code
-   * compareAndSetState} can be missing or refuse.
+   * {@code readDelayMs}, whose {@code updateRunIf} can be held at a gate, whose first {@code
+   * upsertJob} can be held at one, and whose {@code compareAndSetState} can be missing or refuse.
    */
   static final class Wrapped implements Store {
     final Store inner;
@@ -228,6 +229,12 @@ final class Support {
 
     /** Run once {@code insertRun} has written the row, before it returns, when set. */
     volatile @Nullable Runnable afterInsert;
+
+    /** Waited on inside the first {@code upsertJob} after it is set, and in no later one. */
+    final AtomicReference<@Nullable CountDownLatch> upsertGate = new AtomicReference<>();
+
+    /** Counted down when the {@code upsertJob} that waits on {@link #upsertGate} is entered. */
+    final CountDownLatch upsertEntered = new CountDownLatch(1);
 
     Wrapped(Store inner) {
       this.inner = inner;
@@ -255,6 +262,11 @@ final class Support {
     @Override
     public void upsertJob(Definition definition, long now) throws Exception {
       check("upsertJob");
+      CountDownLatch held = upsertGate.getAndSet(null);
+      if (held != null) {
+        upsertEntered.countDown();
+        held.await();
+      }
       inner.upsertJob(definition, now);
     }
 

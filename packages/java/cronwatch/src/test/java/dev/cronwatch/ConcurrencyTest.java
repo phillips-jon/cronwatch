@@ -15,9 +15,12 @@ import dev.cronwatch.store.Store;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -158,5 +161,105 @@ class ConcurrencyTest {
                     }));
     assertEquals(List.of("evaluating busy"), m.errors().wheres());
     assertEquals(RunStatus.FAILED, m.cw().runs("busy", 1).get(0).status());
+  }
+
+  private static JobOptions every5m() {
+    return JobOptions.builder().schedule("every 5m");
+  }
+
+  /** The schedule the store holds for a job, or "null". */
+  private static String schedule(Store store, String name) throws Exception {
+    StoredJob job = store.getJob(name);
+    assertNotNull(job, name + " is not stored");
+    return String.valueOf(job.definition().schedule());
+  }
+
+  @Test
+  void aHandleKeptFromAnEarlierDeclarationWritesTheOneThatStandsNotItsOwn() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Support.Made m = Support.make(b -> b.store(store));
+    Job earlier = m.cw().job("a");
+    m.cw().job("a", every5m());
+    earlier.run(j -> {});
+    assertEquals("every 5m", schedule(store, "a"));
+    m.cw().check();
+    assertEquals("every 5m", schedule(store, "a"));
+  }
+
+  // The .NET port's: the declaration that stands is in the store already, and stays there.
+  @Test
+  void aHandleKeptFromAnEarlierDeclarationDoesNotWriteOverTheOneThatStands() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Support.Made m = Support.make(b -> b.store(store));
+    Job earlier = m.cw().job("a");
+    m.cw().job("a", every5m());
+    assertTrue(m.cw().syncJob("a"));
+    earlier.run(j -> {});
+    assertEquals("every 5m", schedule(store, "a"));
+    m.cw().check();
+    assertEquals("every 5m", schedule(store, "a"));
+  }
+
+  @Test
+  void aHandleWhoseJobWasForgottenWritesItsOwnDefinition() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Support.Made m = Support.make(b -> b.store(store));
+    Job handle = m.cw().job("a", every5m());
+    m.cw().forget("a");
+    handle.run(j -> {});
+    assertEquals("every 5m", schedule(store, "a"));
+  }
+
+  @Test
+  void aDeclarationMadeWhileTheEarlierOneIsBeingWrittenIsStillToBeWritten() throws Exception {
+    MemoryStore inner = new MemoryStore();
+    Wrapped store = new Wrapped(inner);
+    CountDownLatch gate = new CountDownLatch(1);
+    store.upsertGate.set(gate);
+    Support.Made m = Support.make(b -> b.store(store));
+    Thread run = Support.background(() -> m.cw().job("a").run(j -> {}));
+    store.upsertEntered.await();
+    m.cw().job("a", every5m());
+    gate.countDown();
+    run.join();
+    m.cw().check();
+    assertEquals("every 5m", schedule(inner, "a"));
+  }
+
+  /**
+   * A run of a job declared without a schedule, held in the write of that declaration while the job
+   * is declared again with one and {@code later} is called; then the run is let go. Returns what
+   * {@code later} answered and the schedule the store ends with.
+   */
+  private static List<Object> laterWrite(Function<Cronwatch, Object> later) throws Exception {
+    MemoryStore inner = new MemoryStore();
+    Wrapped store = new Wrapped(inner);
+    CountDownLatch gate = new CountDownLatch(1);
+    store.upsertGate.set(gate);
+    Support.Made m = Support.make(b -> b.store(store));
+    Thread run = Support.background(() -> m.cw().job("a").run(j -> {}));
+    store.upsertEntered.await();
+    m.cw().job("a", every5m());
+    FutureTask<Object> answer = new FutureTask<>(() -> later.apply(m.cw()));
+    Thread second = Thread.ofVirtual().start(answer);
+    // Were the later write not to wait its turn, it would land here, under the earlier one.
+    Support.await(
+        "the later write to end or to wait its turn",
+        () -> !second.isAlive() || second.getState() == Thread.State.WAITING);
+    gate.countDown();
+    run.join();
+    return List.of(answer.get(), schedule(inner, "a"));
+  }
+
+  @Test
+  void aDeclarationsWriteWaitsForTheEarlierOnesSoTheLaterOneStays() throws Exception {
+    assertEquals(
+        List.of("every 5m", "every 5m"),
+        laterWrite(cw -> String.valueOf(cw.jobSummary("a").definition().schedule())));
+  }
+
+  @Test
+  void syncJobWaitsForAnEarlierWriteOfTheDeclarationSoItsOwnStays() throws Exception {
+    assertEquals(List.of(true, "every 5m"), laterWrite(cw -> cw.syncJob("a")));
   }
 }

@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiFunction;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 
@@ -126,6 +127,9 @@ final class Core {
    * keep a lock each for good.
    */
   private final ConcurrentHashMap<String, JobLock> jobLocks = new ConcurrentHashMap<>();
+
+  /** Each job's lock for the writes of its declaration, kept as {@link #jobLocks} are. */
+  private final ConcurrentHashMap<String, JobLock> syncLocks = new ConcurrentHashMap<>();
 
   private final ReentrantLock readyLock = new ReentrantLock();
   private boolean ready;
@@ -311,23 +315,58 @@ final class Core {
     }
   }
 
-  /** Writes a declared definition to the store once per declaration. */
+  /**
+   * Writes the declaration of {@code def}'s name as it stands, unless the store has it, once per
+   * declaration: a handle kept from an earlier declaration writes the one that replaced it, never
+   * its own over it, and one forgotten since writes its own.
+   */
   void sync(JobDef def) {
     ensureReady();
+    String name = def.name();
+    if (standing(name, def) == null) {
+      return;
+    }
+    inTurn(
+        name,
+        () -> {
+          JobDef standing = standing(name, def);
+          if (standing == null) {
+            return false;
+          }
+          call(
+              () -> {
+                store.upsertJob(standing.stored(), now());
+                return null;
+              });
+          markSynced(standing);
+          return true;
+        });
+  }
+
+  /** The declaration of {@code name} still to be written, {@code def} without one, or null. */
+  private @Nullable JobDef standing(String name, JobDef def) {
     declaredLock.lock();
     try {
-      if (synced.contains(def.name()) && definitions.get(def.name()) == def) {
-        return;
-      }
+      return synced.contains(name) ? null : definitions.getOrDefault(name, def);
     } finally {
       declaredLock.unlock();
     }
-    call(
-        () -> {
-          store.upsertJob(def.stored(), now());
-          return null;
-        });
-    markSynced(def);
+  }
+
+  /**
+   * Runs {@code write} in turn with every other write of {@code name}'s declaration (a fair lock of
+   * its own, apart from the one its state updates take), so two declarations of one name reach the
+   * store in the order they were made and the later one stays.
+   */
+  <T> T inTurn(String name, Supplier<T> write) {
+    JobLock held = hold(syncLocks, name);
+    held.lock.lock();
+    try {
+      return write.get();
+    } finally {
+      held.lock.unlock();
+      release(syncLocks, name);
+    }
   }
 
   void markSynced(JobDef def) {
@@ -356,15 +395,7 @@ final class Core {
    */
   <P, R> Changed<R> updateState(
       String job, StoreCall<P> prepare, BiFunction<JobState, P, Changed<R>> change) {
-    JobLock held =
-        jobLocks.compute(
-            job,
-            (k, l) -> {
-              JobLock out = l == null ? new JobLock() : l;
-              out.users++;
-              return out;
-            });
-    ReentrantLock lock = held.lock;
+    ReentrantLock lock = hold(jobLocks, job).lock;
     lock.lock();
     try {
       P prepared = call(prepare);
@@ -391,13 +422,24 @@ final class Core {
       }
     } finally {
       lock.unlock();
-      release(job);
+      release(jobLocks, job);
     }
   }
 
-  /** One user fewer of a job's update lock, dropped once it has none. */
-  private void release(String job) {
-    jobLocks.computeIfPresent(job, (k, l) -> --l.users == 0 ? null : l);
+  /** One user more of a job's lock in {@code locks}, made if it has none. */
+  private static JobLock hold(ConcurrentHashMap<String, JobLock> locks, String job) {
+    return locks.compute(
+        job,
+        (k, l) -> {
+          JobLock out = l == null ? new JobLock() : l;
+          out.users++;
+          return out;
+        });
+  }
+
+  /** One user fewer of a job's lock in {@code locks}, dropped once it has none. */
+  private static void release(ConcurrentHashMap<String, JobLock> locks, String job) {
+    locks.computeIfPresent(job, (k, l) -> --l.users == 0 ? null : l);
   }
 
   /** How many jobs' update locks are held or waited on now. */

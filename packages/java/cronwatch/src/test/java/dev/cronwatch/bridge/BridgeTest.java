@@ -446,6 +446,26 @@ class BridgeTest {
     }
   }
 
+  // The .NET audit: a job that fired before its scheduler's entry was read ran on the handle its
+  // fallback made, which wrote its declaration over the entry's and took the schedule away.
+  @Test
+  void aRunOnAFallbacksHandleDoesNotWriteOverTheEntryDeclaredSince() throws Exception {
+    MemoryStore store = new MemoryStore();
+    try (Cronwatch cw = client(store)) {
+      Watch w = new Watch(cw, "quartz", "billing", "Quartz");
+      Job fired = w.fallback("report", JobOptions.builder());
+      assertNotNull(fired);
+      w.declare(List.of(entry("report", "x", "0 2 * * *")));
+      assertTrue(w.settle(Duration.ofSeconds(10)));
+      String declared = stored(store, "report");
+      assertTrue(declared.contains("\"schedule\":\"0 2 * * *\""), declared);
+      fired.run(ctx -> {});
+      assertEquals(declared, stored(store, "report"), "the schedule is kept");
+      cw.check();
+      assertEquals(declared, stored(store, "report"), "and after a check");
+    }
+  }
+
   // The Rust audit: a store that panicked while a declaration was written left the writer marked
   // busy, so nothing was written again and settle waited for good.
   @Test
