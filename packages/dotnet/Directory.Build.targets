@@ -1,0 +1,12 @@
+<Project>
+  <!-- Read after each project, where IsPackable is known: what every one of
+       the five packages carries besides its own files. -->
+  <PropertyGroup Condition="'$(IsPackable)' == 'true'">
+    <!-- The dashboard's app icon, embedded, as nuget.org's prefix reservation
+         asks of packages under it. -->
+    <PackageIcon>icon.png</PackageIcon>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)src/Cronwatch/Web/Assets/icons/icon-192.png" Pack="true" PackagePath="icon.png" Visible="false" />
+  </ItemGroup>
+</Project>
