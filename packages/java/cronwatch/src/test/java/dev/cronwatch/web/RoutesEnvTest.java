@@ -43,7 +43,9 @@ class RoutesEnvTest {
     pb.environment().putAll(vars);
     Process p = pb.start();
     p.getOutputStream().close();
-    String out = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    // Windows ends the child's lines with \r\n; read them as the others.
+    String out =
+        new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
     assertTrue(p.waitFor(120, TimeUnit.SECONDS), name + " did not end");
     assertEquals(0, p.exitValue(), name + " failed:\n" + out);
     assertTrue(out.contains("CHILD OK"), name + " did not run:\n" + out);
