@@ -132,7 +132,11 @@ public sealed interface AlertDetails
     }
   }
 
-  /** The details of an alert of this type, as the SDK's JSON holds them. */
+  /**
+   * The details of an alert of this type, as the SDK's JSON holds them: a field of another type
+   * reads as the SDK's code would treat it, and an alert type this release does not know reads as
+   * {@link Failure}.
+   */
   static AlertDetails fromValue(AlertType type, JsObject o) {
     if (type.equals(AlertType.MISSED)) {
       return new Missed(

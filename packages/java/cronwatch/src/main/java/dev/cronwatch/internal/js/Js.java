@@ -81,7 +81,7 @@ public final class Js {
    * digit would do, it gives the two-digit decimal closest to the value ({@code 4.9E-324} for
    * JavaScript's {@code 5e-324}), so the one-digit decimals around it are tried first.
    */
-  private static BigDecimal shortest(double x) {
+  public static BigDecimal shortest(double x) {
     BigDecimal d = new BigDecimal(Double.toString(x)).stripTrailingZeros();
     if (d.precision() != 2) {
       return d;
