@@ -21,6 +21,7 @@ import pytest
 
 from cronwatch import AlertDraft, Cronwatch, JobDefinition, Run, _js, alerts
 from cronwatch.alerts import _shared, email, sigv4, twilio
+from cronwatch.alerts import _http
 from cronwatch.alerts._http import RequestTimeout, UrllibHTTP
 from cronwatch.format import compose_alert
 
@@ -595,6 +596,121 @@ def test_the_default_http_raises_when_no_answer_comes_before_the_deadline() -> N
         for s in held:
             s.close()
         sock.close()
+
+
+class OneAnswer:
+    """A server on 127.0.0.1 that reads one request and hands the socket to `answer`."""
+
+    def __init__(self, answer: Callable[[socket.socket], None]) -> None:
+        self.sock = socket.socket()
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.listen(1)
+        self.url = f"http://127.0.0.1:{self.sock.getsockname()[1]}"
+
+        def serve() -> None:
+            try:
+                client, _ = self.sock.accept()
+            except OSError:
+                return
+            with client:
+                data = b""
+                while b"\r\n\r\n" not in data:
+                    chunk = client.recv(65536)
+                    if not chunk:
+                        return
+                    data += chunk
+                try:
+                    answer(client)
+                except OSError:
+                    pass
+
+        self.thread = threading.Thread(target=serve, daemon=True)
+        self.thread.start()
+
+    def close(self) -> None:
+        self.sock.close()
+        self.thread.join(15)
+
+
+def test_a_providers_refusal_reaches_the_error_with_its_reason() -> None:
+    """The last read of a body with a Content-Length closes the response; the
+    next pass must end the loop, not fail on the closed socket and drop what
+    was read."""
+    reason = b'{"message":"API key is invalid"}'
+
+    def refuse(client: socket.socket) -> None:
+        client.sendall(b"HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: " + str(len(reason)).encode() + b"\r\n\r\n" + reason)
+        client.recv(1)  # keep the connection open: the client closes it
+
+    server = OneAnswer(refuse)
+    try:
+        response = UrllibHTTP(timeout=5).post(f"{server.url}/emails", "{}", {})
+        assert response.status == 401
+        assert response.body == reason.decode()
+    finally:
+        server.close()
+    server = OneAnswer(refuse)
+    try:
+        with pytest.raises(RuntimeError, match="answered 401: .*API key is invalid"):
+            A.Resend(api_key="re_secret", **EMAIL, http=_Redirect(server.url)).send(failed())
+    finally:
+        server.close()
+
+
+class _Redirect:
+    """Posts through the default http, to `base` whatever the URL."""
+
+    def __init__(self, base: str) -> None:
+        self._base = base
+        self._http = UrllibHTTP(timeout=5)
+
+    def post(self, _url: str, body: str, headers: dict[str, str]) -> alerts.Response:
+        return self._http.post(f"{self._base}/in", body, headers)
+
+
+def test_the_deadline_covers_a_status_line_and_headers_sent_a_line_at_a_time() -> None:
+    """Each header line comes well inside a read timeout, so only a deadline
+    for the whole request stops it. The server keeps trickling until the
+    client has hung up (or, were it never to, for nine seconds, and then
+    answers, which the test would see as a success it must not get)."""
+    gone = threading.Event()
+
+    def trickle(client: socket.socket) -> None:
+        client.sendall(b"HTTP/1.1 200 OK\r\n")
+        for i in range(90):
+            if gone.wait(0.1):
+                return
+            client.sendall(f"X-Slow-{i}: x\r\n".encode())
+        client.sendall(b"Content-Length: 0\r\n\r\n")
+
+    server = OneAnswer(trickle)
+    try:
+        with pytest.raises(RequestTimeout, match="^The operation was aborted due to timeout$"):
+            UrllibHTTP(timeout=0.5).post(f"{server.url}/", "{}", {})
+    finally:
+        gone.set()
+        server.close()
+
+
+def test_an_answers_body_is_read_to_one_mebibyte_and_no_further() -> None:
+    sent = [0]
+
+    def flood(client: socket.socket) -> None:
+        client.sendall(b"HTTP/1.1 500 Oops\r\nContent-Length: 104857600\r\n\r\n")
+        block = b"x" * 65536
+        while sent[0] < 104857600:
+            client.sendall(block)
+            sent[0] += len(block)
+
+    server = OneAnswer(flood)
+    try:
+        response = UrllibHTTP(timeout=10).post(f"{server.url}/", "{}", {})
+        assert response.status == 500
+        assert len(response.body) == _http.MAX_BODY == 1_048_576
+        assert set(response.body) == {"x"}
+    finally:
+        server.close()
+    assert sent[0] < 104857600, "the client hung up rather than read it all"
 
 
 def test_the_default_http_trims_header_values() -> None:
