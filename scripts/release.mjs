@@ -69,6 +69,11 @@ const VERSIONED = [
   { file: "packages/java/pom.xml", pattern: /^(\s*<revision>)([^<]+)(<\/revision>)/m },
   // The README's dependency snippet names the release.
   { file: "packages/java/README.md", pattern: /^( {2}<version>)([^<]+)(<\/version>)/m },
+  // The .NET solution's version lives in Directory.Build.props alone: every
+  // project inherits it, and CronwatchClient.Version reads it back from the
+  // assembly. The README's install line names the release.
+  { file: "packages/dotnet/Directory.Build.props", pattern: /^(\s*<Version>)([^<]+)(<\/Version>)/m },
+  { file: "packages/dotnet/README.md", pattern: /^(dotnet add package Cronwatch --version )(\S+)()$/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -139,6 +144,11 @@ const PUBLISH = [
   // ~/.m2/settings.xml; the deployment is checked in the Portal before it is
   // published (packages/java/DESIGN.md, Releasing). java.yml comes later.
   { dir: "packages/java", commands: (v) => [`# packages/java: published to Maven Central by hand for now, (cd packages/java && ./mvnw -B -P release deploy), then check the validated deployment of ${v} in the Central Publisher Portal and press Publish (packages/java/DESIGN.md, Releasing)`] },
+  // NuGet reads each package from the .nupkg pushed to it, so the solution
+  // needs no tag of its own. By hand for now, the core first so no package is
+  // listed before one it needs; nuget.yml, with trusted publishing, comes
+  // later (packages/dotnet/DESIGN.md, Releasing).
+  { dir: "packages/dotnet", commands: (v) => [`# packages/dotnet: published to nuget.org by hand for now, (cd packages/dotnet && dotnet pack -c Release -o artifacts && dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key <a key scoped to Cronwatch*>), after checking each package's files for ${v} (packages/dotnet/DESIGN.md, Releasing)`] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */

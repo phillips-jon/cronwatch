@@ -35,3 +35,4 @@ packages/java/**/.flattened-pom.xml
 packages/dotnet/**/bin/
 packages/dotnet/**/obj/
 packages/dotnet/**/TestResults/
+packages/dotnet/artifacts/
