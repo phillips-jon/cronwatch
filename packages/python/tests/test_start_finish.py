@@ -246,6 +246,34 @@ def test_close_waits_for_a_check_under_way_before_it_closes_the_store() -> None:
     assert events == ["sent", "closed", "closed"]
 
 
+def test_close_waits_for_the_interval_thread_whose_tick_has_woken_but_not_yet_checked() -> None:
+    events: list[str] = []
+    store = Wrapped(MemoryStore(), close=lambda: events.append("closed"))
+    cw, _, _ = make(store=store)
+    cw._first_tick_s = 0.0
+    entered = threading.Event()
+    gate = threading.Event()
+    original = cw.check
+
+    def woken() -> Any:
+        # The tick has woken; its check (and the flight close() waits on) is not made yet.
+        entered.set()
+        assert gate.wait(10)
+        result = original()
+        events.append("checked")
+        return result
+
+    cw.check = woken  # type: ignore[method-assign]
+    cw.start("5m")
+    assert entered.wait(5)
+    closing = threading.Thread(target=cw.close)
+    closing.start()
+    closing.join(0.2)
+    gate.set()
+    closing.join(5)
+    assert events == ["checked", "closed"]
+
+
 def test_close_from_inside_a_check_does_not_wait_on_itself() -> None:
     closed: list[bool] = []
     store = Wrapped(MemoryStore(), close=lambda: closed.append(True))

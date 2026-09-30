@@ -861,8 +861,14 @@ class Cronwatch:
         its own channel, triage and retry timeouts; what it raises was
         reported to whoever started it), then close the store, so that check
         neither writes after the store is closed nor loses the alerts it
-        would queue."""
+        would queue. The interval's thread is waited for too, so a tick that
+        woke just before the stop has not started a check the wait misses."""
+        self._after_fork_check()
+        with self._ticker_lock:
+            ticker = self._ticker
         self.stop()
+        if ticker is not None and ticker._thread is not threading.current_thread():
+            ticker._thread.join()
         with self._check_lock:
             flight = self._checking
         if flight is not None and flight.owner != threading.get_ident():
