@@ -102,10 +102,28 @@ function highlight(code, lang) {
   return out;
 }
 
+/**
+ * The heading ids given so far on the page being rendered. A repeated
+ * heading gets its slug with -1, -2 and so on, as GitHub numbers them, so
+ * every #fragment names one section. markdown() starts each page afresh.
+ */
+let headingIds = new Set();
+function uniqueId(base) {
+  let id = base;
+  for (let n = 1; headingIds.has(id); n++) id = `${base}-${n}`;
+  headingIds.add(id);
+  return id;
+}
+/** One page's markdown as HTML, its heading ids unique on the page. */
+function markdown(body) {
+  headingIds = new Set();
+  return marked.parse(body);
+}
+
 const renderer = {
   heading({ tokens, depth }) {
     const text = this.parser.parseInline(tokens);
-    const id = slug(text);
+    const id = uniqueId(slug(text));
     return `<h${depth} id="${id}"><a class="anchor" href="#${id}">${text}</a></h${depth}>\n`;
   },
   code({ text, lang }) {
@@ -533,7 +551,7 @@ function buildPages() {
     const { meta, body } = frontmatter(readFileSync(path.join(PAGES, file), "utf8"));
     const route = `/${file.replace(/\.md$/, "")}/`;
     const updated = meta.updated ? `<p class="updated">Last updated ${escape(meta.updated)}</p>` : "";
-    const html = curlyApostrophes(marked.parse(body)).replace(/(<\/h1>\n)/, `$1${updated}`);
+    const html = curlyApostrophes(markdown(body)).replace(/(<\/h1>\n)/, `$1${updated}`);
     write(route, { title: meta.title, description: meta.description ?? "", body: solo(meta.label ?? meta.title, html) });
     indexed.push(route);
   }
@@ -701,7 +719,7 @@ function build() {
     const { meta, body } = frontmatter(versioned(readFileSync(path.join(DOCS, file), "utf8")));
     const name = file.replace(/\.md$/, "");
     const route = name === "index" ? "/docs/" : `/docs/${name}/`;
-    return { name, route, meta, html: curlyApostrophes(marked.parse(body)), order: Number(meta.order ?? 999) };
+    return { name, route, meta, html: curlyApostrophes(markdown(body)), order: Number(meta.order ?? 999) };
   }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 
   // The docs search index is a script, not JSON: the CSP's connect-src is

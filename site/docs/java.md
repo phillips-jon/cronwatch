@@ -108,7 +108,7 @@ A job that never starts cannot report itself, so something has to look. `cw.star
 CheckResult result = cw.check();   // checkedAt, jobs, alerts, pruned
 ```
 
-One process checking is enough; every instance of a service checking is harmless, since a check judges each run once. Calls at the same time share one check. In a Spring Boot app the starter runs the check for you, once per cluster under ShedLock or Quartz; see [Java schedulers](/docs/java-schedulers/#the-check).
+One process checking is enough; every instance of a service checking is harmless, since a check judges each run once. Calls at the same time share one check. In a Spring Boot app the starter runs the check for you, once per cluster under ShedLock or Quartz; see [Java schedulers](/docs/java-schedulers/#the-check-1).
 
 ### From a crontab
 
