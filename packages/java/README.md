@@ -2,7 +2,7 @@
 
 Cron and scheduled-job monitoring that lives inside your JVM service. Wrap a job once; every run is recorded in a database you already have, and you are told when a run is missed, fails, gets stuck, runs slow or goes over budget. No server to run, no account to make. This is the library behind [cronwatch.dev](https://cronwatch.dev).
 
-This is the Java port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Java process and a Node, Ruby, Python, PHP, Go, Rust or Elixir process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](DESIGN.md) has the plan and how each part works). Phase 1 has the core: jobs, runs in the calling thread, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, the current run across threads, the shutdown hook, the memory store, and the SQL store over JDBC on SQLite. Phase 2 adds the SQL store on Postgres, MySQL and MariaDB, the SDK's fifteen alert channels, Claude triage and the pg_cron source. Phase 3 adds the dashboard and its JSON API and a job's handler, framework-free, with adapters for the JDK's own HTTP server, servlet containers (`dev.cronwatch:cronwatch-servlet`) and Spring MVC and WebFlux (`dev.cronwatch:cronwatch-spring-boot-starter`). Phase 4 has the scheduler integrations: the Spring Boot starter's (every `@Scheduled` method watched with no code changes, ShedLock, the app's Quartz schedulers), `cronwatch-quartz` and `cronwatch-jobrunr`, and `CronwatchCli` for a check from a crontab line.
+This is the Java port of [`@cronwatch/sdk`](https://www.npmjs.com/package/@cronwatch/sdk): the same rules, the same alert text and the same stored rows, so a Java process and a Node, Ruby, Python, PHP, Go, Rust or Elixir process can share one database, and every port reads the tables the others write. It is built in phases ([DESIGN.md](DESIGN.md) has the plan and how each part works). Phase 1 has the core: jobs, runs in the calling thread, runs that span calls, checks, silences, sources, deferred delivery and the triage hook, the current run across threads, the shutdown hook, the memory store, and the SQL store over JDBC on SQLite. Phase 2 adds the SQL store on Postgres, MySQL and MariaDB, the SDK's fifteen alert channels, Claude triage and the pg_cron source. Phase 3 adds the dashboard and its JSON API and a job's handler, framework-free, with adapters for the JDK's own HTTP server, servlet containers (`dev.cronwatch:cronwatch-servlet`) and Spring MVC and WebFlux (`dev.cronwatch:cronwatch-spring-boot-starter`). Phase 4 has the scheduler integrations: the Spring Boot starter's (every `@Scheduled` method watched with no code changes, ShedLock, the app's Quartz schedulers when `cronwatch-quartz` is a dependency), `cronwatch-quartz` and `cronwatch-jobrunr`, and `CronwatchCli` for a check from a crontab line.
 
 It is not on Maven Central yet. The first release will be `dev.cronwatch:cronwatch`.
 
@@ -209,12 +209,15 @@ In a servlet container, `new CronwatchServlet(handler)` serves it.
 `dev.cronwatch:cronwatch-spring-boot-starter`, for Spring Boot 3.5 and 4, makes the client a bean from `cronwatch.*` properties and the app's own beans: a `Store` bean is the store (else `SqlStore` over the app's one `DataSource`, else the memory store), every `Channel` bean is a channel, and a `Triage`, `Source` beans and an `ErrorHandler` are used when the app has them. When neither `CRONWATCH_ENV` nor `APP_ENV` is set, the environment is the app's active profile (`dev` and `local` are development, `prod` production). An app's own `Cronwatch` bean replaces it.
 
 ```properties
-cronwatch.store=auto                  # auto, memory or jdbc (the app's DataSource)
+# auto, memory or jdbc (the app's DataSource)
+cronwatch.store=auto
 cronwatch.retention=30d
 cronwatch.defaults.grace=10m
 cronwatch.check-every=1m
-cronwatch.check-mode=auto             # auto, local, shedlock, quartz or none
-cronwatch.app=billing                 # default: $CRONWATCH_APP_ID, else spring.application.name
+# auto, local, shedlock, quartz or none
+cronwatch.check-mode=auto
+# default: $CRONWATCH_APP_ID, else spring.application.name
+cronwatch.app=billing
 cronwatch.jobs[NightlyReports.build].grace=15m
 ```
 
@@ -238,7 +241,7 @@ A `cron` is declared as written, in the annotation's zone (else the JVM's), and 
 
 ## Quartz
 
-`dev.cronwatch:cronwatch-quartz` watches a Quartz 2.5 scheduler (the starter does it for every `Scheduler` bean). Every job the scheduler holds with a trigger is declared (`nightlyReport` in the `DEFAULT` group, `reports.nightly` for `nightly` in `reports`), and every firing is a run, opened in the worker thread before `execute` and closed after it, failed with what the job threw:
+`dev.cronwatch:cronwatch-quartz` watches a Quartz 2.5 scheduler. In a Spring Boot app, the starter does it for every `Scheduler` bean once `cronwatch-quartz` is a dependency of the app: the starter's dependency on it is optional, so it does not bring it in. Every job the scheduler holds with a trigger is declared (`nightlyReport` in the `DEFAULT` group, `reports.nightly` for `nightly` in `reports`), and every firing is a run, opened in the worker thread before `execute` and closed after it, failed with what the job threw:
 
 ```java quartz
 Cronwatch cw = Cronwatch.builder().build();

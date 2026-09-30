@@ -13,7 +13,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * defaults are the SDK's.
  *
  * <pre>
- * cronwatch.store=auto            # auto, memory or jdbc (the app's DataSource)
+ * # auto, memory or jdbc (the app's DataSource)
+ * cronwatch.store=auto
  * cronwatch.retention=30d
  * cronwatch.check-every=1m
  * cronwatch.jobs[NightlyReports.build].grace=15m
@@ -171,7 +172,10 @@ public class CronwatchProperties {
 
     private boolean enabled = true;
 
-    /** Whether the app's Quartz schedulers are watched. */
+    /**
+     * Whether the app's Quartz schedulers are watched, which needs {@code cronwatch-quartz} on the
+     * class path: the starter's dependency on it is optional.
+     */
     public boolean isEnabled() {
       return enabled;
     }

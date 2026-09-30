@@ -7,12 +7,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * The dashboard's settings, {@code cronwatch.web.*}. Each is optional.
  *
  * <pre>
- * cronwatch.web.path=/cronwatch        # where the dashboard is, within the app's context
+ * # where the dashboard is, within the app's context
+ * cronwatch.web.path=/cronwatch
  * cronwatch.web.token=${CRONWATCH_TOKEN}
  * cronwatch.web.origin=https://app.example.com
  * cronwatch.web.trust-proxy=false
- * cronwatch.web.open=false             # true serves it with no token, behind the app's own auth
- * cronwatch.web.order=-110             # ahead of Spring Security's filter chain (-100); -90 when open
+ * # true serves it with no token, behind the app's own auth
+ * cronwatch.web.open=false
+ * # ahead of Spring Security's filter chain (-100); -90 when open
+ * cronwatch.web.order=-110
  * </pre>
  */
 @ConfigurationProperties(prefix = "cronwatch.web")

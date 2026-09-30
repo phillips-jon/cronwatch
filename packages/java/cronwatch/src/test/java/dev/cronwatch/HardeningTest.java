@@ -40,9 +40,9 @@ import org.junit.jupiter.api.Test;
  * The SDK's {@code client-hardening.test.ts}, ported: missed with a short period, store outages, a
  * store that initialises late, a hung channel and triage, the retry queue and its budget, deliver
  * at check, overlapping runs, refused options, capped output, an error named once, the baseline, a
- * job that cannot be evaluated, and the interval's bounds. The handler case is phase 3's; {@code
- * deliver} taking only its two values and {@code execute} being private are the type system's in
- * Java.
+ * job that cannot be evaluated, and the interval's bounds. The handler case is in {@code
+ * web.HandlerTest}; {@code deliver} taking only its two values and {@code execute} being private
+ * are the type system's in Java.
  */
 class HardeningTest {
   private static void fail(Cronwatch cw, String name, String message) {
