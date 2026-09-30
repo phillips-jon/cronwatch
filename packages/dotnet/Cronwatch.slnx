@@ -4,5 +4,6 @@
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Cronwatch.Tests/Cronwatch.Tests.csproj" />
+    <Project Path="test/ProcessExitChild/ProcessExitChild.csproj" />
   </Folder>
 </Solution>
