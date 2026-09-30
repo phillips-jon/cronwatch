@@ -1,5 +1,5 @@
 import type { Alert, AlertChannel } from "../types.js";
-import { postable } from "./shared.js";
+import { cut, postable } from "./shared.js";
 
 export interface DiscordOptions {
   /** A channel webhook URL from Server Settings, Integrations, Webhooks. */
@@ -17,6 +17,9 @@ const COLOR: Record<Alert["type"], number> = {
 };
 
 const TIMEOUT_MS = 10_000;
+
+/** The longest embed description Discord takes. The title (under 256) and it stay well inside the embed's 6000. */
+export const DESCRIPTION_MAX = 4096;
 
 /** Sends alerts to a Discord channel through a webhook. */
 export function discord(options: DiscordOptions): AlertChannel {
@@ -39,7 +42,7 @@ export function discord(options: DiscordOptions): AlertChannel {
             {
               title: alert.title,
               ...(url ? { url } : {}),
-              description: "```\n" + codeBlockSafe(alert.message.slice(0, 3800)) + "\n```" + (alert.triage ? `\n**Triage:** ${escapeMarkdown(alert.triage.slice(0, 1000))}` : ""),
+              description: embedDescription(alert),
               color: COLOR[alert.type],
               timestamp: new Date(alert.at).toISOString(),
             },
@@ -49,6 +52,18 @@ export function discord(options: DiscordOptions): AlertChannel {
       if (!response.ok) throw new Error(`Discord webhook answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
     },
   };
+}
+
+/**
+ * The message in a code block, then the triage. Each part has its own cap,
+ * and escaping can grow both, so the whole is held to DESCRIPTION_MAX (in
+ * UTF-16 units) by cutting the message's block, never the triage: Discord
+ * refuses a longer one on every retry.
+ */
+export function embedDescription(alert: Alert): string {
+  const triage = alert.triage ? `\n**Triage:** ${escapeMarkdown(alert.triage.slice(0, 1000))}` : "";
+  const fences = "```\n".length + "\n```".length;
+  return "```\n" + cut(codeBlockSafe(alert.message.slice(0, 3800)), DESCRIPTION_MAX - fences - triage.length) + "\n```" + triage;
 }
 
 /** Breaks up ``` so text inside a code block cannot close it. */

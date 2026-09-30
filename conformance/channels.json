@@ -982,8 +982,8 @@
         "content-type": "application/json"
       },
       "body": {
-        "length": 5226,
-        "sha256": "de5b6e40974df6ccd1aa2a179fe4c022df37ee1fe99a0c3c2aaf89bea38dec1f"
+        "length": 4272,
+        "sha256": "ec3852f443e43990fdc52f9c301d27e1b167de6855dbf4c3674f55c612214276"
       }
     },
     {
@@ -1204,8 +1204,8 @@
         "content-type": "application/json"
       },
       "body": {
-        "length": 5277,
-        "sha256": "0f0b53dafa70ba227c7fd585d99136f025206448ff7b59d9e4de05ce8e22b914"
+        "length": 4323,
+        "sha256": "461339bdc0da34e5866f7a7c56686a435c7a4121dec73efd1e87c6bde1e125bf"
       }
     },
     {
@@ -14402,6 +14402,174 @@
         "body": {
           "length": 1600,
           "sha256": "3c9590e07c921d95a4b0660dd2fe13288e742e36d6b6d16f1c896f4e87cd26fa"
+        }
+      }
+    ],
+    "discordDescriptions": [
+      {
+        "message": {
+          "parts": [
+            [
+              "Error: short\nline",
+              1
+            ]
+          ]
+        },
+        "triage": null,
+        "description": {
+          "text": "```\nError: short\nline\n```"
+        }
+      },
+      {
+        "message": {
+          "parts": [
+            [
+              "Error: long\n",
+              1
+            ],
+            [
+              "```",
+              1200
+            ],
+            [
+              "x",
+              400
+            ],
+            [
+              "😀",
+              200
+            ]
+          ]
+        },
+        "triage": {
+          "parts": [
+            [
+              "*_`~|[]()<>\\",
+              100
+            ]
+          ]
+        },
+        "description": {
+          "length": 4096,
+          "sha256": "d7ef7c7fe6d2f89d9691583e05aa827676866556cdf8d38483c1608ce5261879"
+        }
+      },
+      {
+        "message": {
+          "parts": [
+            [
+              "😀",
+              1900
+            ]
+          ]
+        },
+        "triage": {
+          "parts": [
+            [
+              "t",
+              1001
+            ]
+          ]
+        },
+        "description": {
+          "length": 4095,
+          "sha256": "8eb5b8b178aab1582d9913104744877addc05ad3ee4981b7342c912f18aaa0fc"
+        }
+      },
+      {
+        "message": {
+          "parts": [
+            [
+              "```",
+              1300
+            ]
+          ]
+        },
+        "triage": null,
+        "description": {
+          "length": 4096,
+          "sha256": "b70aac5449e7e1550ade479e555bc81c9edf62b8287a2f8a69b77a6af307e684"
+        }
+      },
+      {
+        "message": {
+          "parts": [
+            [
+              "m",
+              3800
+            ]
+          ]
+        },
+        "triage": {
+          "parts": [
+            [
+              "An ordinary diagnosis. ",
+              22
+            ]
+          ]
+        },
+        "description": {
+          "length": 4096,
+          "sha256": "52c9374f4a2e2cffeda8520c6692d319cbda38648e0a81713ccab92d1920b84a"
+        }
+      },
+      {
+        "message": {
+          "parts": [
+            [
+              "m",
+              3800
+            ]
+          ]
+        },
+        "triage": {
+          "parts": [
+            [
+              "t",
+              275
+            ]
+          ]
+        },
+        "description": {
+          "length": 4096,
+          "sha256": "82fe53af96797a5e655cd86a280d2f4f041718867f16ddac52f33b49952c5e11"
+        }
+      },
+      {
+        "message": {
+          "parts": [
+            [
+              "m",
+              3800
+            ]
+          ]
+        },
+        "triage": {
+          "parts": [
+            [
+              "t",
+              276
+            ]
+          ]
+        },
+        "description": {
+          "length": 4096,
+          "sha256": "f152f89c0e28df4eca7473a92d594f3eaf39261f4fb279d73561256d7fbdac92"
+        }
+      },
+      {
+        "message": {
+          "parts": [
+            [
+              "m",
+              3800
+            ]
+          ]
+        },
+        "triage": "",
+        "description": {
+          "length": 3808,
+          "sha256": "13566991f6173d0d5e780f586a45d886859a70e084101ebe4590e0119d0c8ff3"
         }
       }
     ]

@@ -41,6 +41,26 @@ test("discord keeps job output inside its code block and pings no one", async (t
   assert.match(description, /\*\*Triage:\*\* See \\\[the docs\\\]\\\(https:\/\/evil\.example\\\) \\\*now\\\*/);
 });
 
+test("discord holds the whole description to 4096, cutting the message and keeping the triage", async (t) => {
+  const calls = stubFetch(t);
+  const message = "Error: long\n" + "```".repeat(1200) + "x".repeat(400) + "\u{1F600}".repeat(200);
+  const triage = "*_`~|[]()<>\\".repeat(100);
+  await discord({ webhookUrl: "https://discord.example/api/webhooks/1/secret" }).send(alert({ message, triage }));
+  const description: string = calls[0]!.body.embeds[0].description;
+  assert.equal(description.length, 4096);
+  assert.ok(description.endsWith(`\n**Triage:** ${triage.slice(0, 1000).replace(/[\\`*_~|[\]()<>]/g, "\\$&")}`), "the triage is whole");
+  assert.ok(description.startsWith("```\nError: long\n"));
+  assert.equal(description.match(/```/g)!.length, 2, "only the block's own fences");
+  assert.ok(calls[0]!.body.embeds[0].title.length + description.length <= 6000);
+
+  // Emoji at the cut: never half a surrogate pair.
+  calls.length = 0;
+  await discord({ webhookUrl: "https://discord.example/api/webhooks/1/secret" }).send(alert({ message: "\u{1F600}".repeat(1900), triage: "t".repeat(1001) }));
+  const cutDescription: string = calls[0]!.body.embeds[0].description;
+  assert.ok(cutDescription.length <= 4096);
+  assert.doesNotMatch(cutDescription, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+});
+
 test("slack escapes control characters and fences, in the blocks and the fallback text", async (t) => {
   const calls = stubFetch(t);
   await slack({ webhookUrl: "https://hooks.slack.example/T/B/secret" }).send(alert());

@@ -45,6 +45,7 @@ import {
 } from "../packages/sdk/src/evaluate.ts";
 import { median, percentile } from "../packages/sdk/src/stats.ts";
 import { capOutput, errorMessage, OUTPUT_CAP, redactSecrets } from "../packages/sdk/src/output.ts";
+import { embedDescription } from "../packages/sdk/src/alerts/discord.ts";
 import { createRecorder } from "../packages/sdk/src/job.ts";
 import { checkExpectation, toStored } from "../packages/sdk/src/serialize.ts";
 import { errorBody } from "../packages/sdk/src/alerts/shared.ts";
@@ -1192,7 +1193,6 @@ function outputCases() {
       checks: needles.map((needle) => ({ expect: needle, result: checkExpectation(needle, text) })),
     };
   });
-
   return {
     outputCap: OUTPUT_CAP,
     redact: redact.map((input) => ({ input, result: digest(redactSecrets(expand(input))) })),
@@ -1663,7 +1663,24 @@ function textCutCases(alerts) {
   const long = { ...clone(alerts[0].alert), title: "nightly failed", message: ("a".repeat(152) + "{\n").repeat(12), triage: null };
   const bodies = [1, 3, 10, 12, 0, -1, 2.7, null].map((n) => ({ segments: n, body: digest(smsBody(long, "https://app.example/j", n === null ? Number.NaN : n)) }));
   bodies.push({ segments: 10, link: "long", body: digest(smsBody(long, `https://app.example/${"p".repeat(2000)}`, 10)) });
-  return { textCuts: { errorBodies, subjects, smsSegments: segments, smsBodies: bodies } };
+  // Discord's embed description, held to 4096 UTF-16 units as a whole by
+  // cutting the message's code block (never mid surrogate pair), never the triage.
+  const recipe = (spec) => ({ parts: spec });
+  const descriptionInputs = [
+    [recipe([["Error: short\nline", 1]]), null],
+    [recipe([["Error: long\n", 1], ["```", 1200], ["x", 400], [emoji, 200]]), recipe([["*_`~|[]()<>\\", 100]])],
+    [recipe([[emoji, 1900]]), recipe([["t", 1001]])],
+    [recipe([["```", 1300]]), null],
+    [recipe([["m", 3800]]), recipe([["An ordinary diagnosis. ", 22]])],
+    [recipe([["m", 3800]]), recipe([["t", 275]])],
+    [recipe([["m", 3800]]), recipe([["t", 276]])],
+    [recipe([["m", 3800]]), ""],
+  ];
+  const discordDescriptions = descriptionInputs.map(([message, triage]) => {
+    const alert = { ...clone(alerts[0].alert), message: expand(message), triage: triage === null ? null : typeof triage === "string" ? triage : expand(triage) };
+    return { message, triage, description: digest(embedDescription(alert)) };
+  });
+  return { textCuts: { errorBodies, subjects, smsSegments: segments, smsBodies: bodies, discordDescriptions } };
 }
 
 // ---------------------------------------------------------------- pg_cron
