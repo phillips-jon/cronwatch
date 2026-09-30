@@ -3,8 +3,8 @@ package dev.cronwatch;
 import java.util.Objects;
 
 /**
- * Where alerts go. {@link Console} is the default; the fifteen channels of the SDK come in a later
- * release, and {@link #of} makes one of a function.
+ * Where alerts go. {@link Console} is the default; the fifteen channels of the SDK are in {@code
+ * dev.cronwatch.alerts}, and {@link #of} makes one of a function.
  *
  * <p>Each send runs on a virtual thread of the client's and is waited on for 15 seconds; past its
  * time it is interrupted and counted as failed. A channel that blocks in code that ignores

@@ -1,8 +1,9 @@
 /**
  * CronWatch for Spring Boot 3.5 and 4: the client from {@code cronwatch.*} properties, the
  * dashboard on Spring MVC or WebFlux ({@code dev.cronwatch.spring.web}), every {@code @Scheduled}
- * method watched with no code changes, ShedLock's lock providers and Quartz's schedulers handled,
- * and the check run once per cluster when the app has either.
+ * method watched with no code changes, ShedLock's lock providers and Quartz's schedulers handled
+ * (Quartz's when the app has {@code cronwatch-quartz}, an optional dependency of the starter), and
+ * the check run once per cluster when the app has either.
  */
 @org.jspecify.annotations.NullMarked
 module dev.cronwatch.spring {

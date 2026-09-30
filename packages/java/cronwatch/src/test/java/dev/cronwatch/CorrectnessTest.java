@@ -26,7 +26,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The SDK's {@code correctness.test.ts}, ported: state an alert in flight cannot overwrite,
  * pruning, expect, runs a check marks stuck, the interval stopped before its first check, fire
- * times around the autumn clock change, and an error named once. The routes' 404 case is phase 3's.
+ * times around the autumn clock change, and an error named once. The routes' 404 case is in {@code
+ * web.RoutesTest}.
  */
 class CorrectnessTest {
   @Test
