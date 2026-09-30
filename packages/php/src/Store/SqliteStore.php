@@ -16,23 +16,50 @@ use Cronwatch\JobState;
  *     new SqliteStore(pdo: $pdo)          // an open connection of your own
  *
  * The directory is created when missing and the file made private (0600).
- * ":memory:" works too. `prefix` names the tables: lowercase letters, digits
- * and underscores, default "cronwatch_".
+ * ":memory:" works too. Without a path the file is data/cronwatch.db in the
+ * app's root, beside its vendor directory (see defaultPath()). `prefix`
+ * names the tables: lowercase letters, digits and underscores, default
+ * "cronwatch_".
  */
 final class SqliteStore extends PdoStore
 {
     /** How long opening SQLite keeps retrying a busy database before it gives up. */
     public const BUSY_RETRY_MS = 2_000;
 
+    public readonly string $path;
+
     public function __construct(
-        public readonly string $path = './data/cronwatch.db',
+        ?string $path = null,
         ?\PDO $pdo = null,
         string $prefix = Sql::DEFAULT_PREFIX,
     ) {
         if (!extension_loaded('pdo_sqlite')) {
             throw new \LogicException('SqliteStore needs the pdo_sqlite extension');
         }
+        $this->path = $path ?? self::defaultPath();
         parent::__construct($prefix, 'sqlite', $pdo, $pdo === null);
+    }
+
+    /**
+     * The file used when none is given: data/cronwatch.db in the app's root
+     * (Composer's root package, the directory holding vendor/), else in the
+     * working directory. Not the working directory first: under PHP-FPM or
+     * mod_php that is the script's own, often public/, so the dashboard and
+     * the cron check would each keep a file of their own, one of them where
+     * the web server could hand it out.
+     */
+    public static function defaultPath(): string
+    {
+        $root = null;
+        if (class_exists(\Composer\InstalledVersions::class)) {
+            $root = \Composer\InstalledVersions::getRootPackage()['install_path'] ?? null;
+        }
+        if (!is_string($root) && class_exists(\Composer\Autoload\ClassLoader::class, false)) {
+            // vendor/composer/ClassLoader.php
+            $root = dirname((string) (new \ReflectionClass(\Composer\Autoload\ClassLoader::class))->getFileName(), 3);
+        }
+        $base = is_string($root) ? realpath($root) : false;
+        return ($base !== false ? $base : (getcwd() ?: '.')) . '/data/cronwatch.db';
     }
 
     protected function open(): \PDO

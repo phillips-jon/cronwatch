@@ -50,7 +50,39 @@ final class Output
         if (strlen($clean) <= self::OUTPUT_CAP || Js::length16($clean) <= self::OUTPUT_CAP) {
             return $clean;
         }
-        return "[earlier output trimmed]\n" . Js::tail16($clean, self::OUTPUT_CAP);
+        return self::TRIMMED . Js::tail16($clean, self::OUTPUT_CAP);
+    }
+
+    private const TRIMMED = "[earlier output trimmed]\n";
+
+    /**
+     * How much text before the kept tail redaction reads, and never keeps:
+     * three times the longest secret a default pattern can match (a PEM key's
+     * 16 KB body with its header and footer, under OUTPUT_CAP + 1024), since
+     * a replacement grows what it replaces at most threefold.
+     */
+    public const REDACT_EDGE = 3 * (self::OUTPUT_CAP + 1024);
+
+    /**
+     * Output or an error as it is stored: redacted, then capped like
+     * capOutput, so the cut cannot fall inside a secret and keep what follows
+     * its label. Text of at most OUTPUT_CAP + REDACT_EDGE UTF-16 units is
+     * redacted whole. Longer text is cut to that many units from its end
+     * first, and after redacting, the first REDACT_EDGE units are never kept:
+     * a secret whose label fell before that cut is left out with them. NULs
+     * go before and after `redact`.
+     *
+     * @param \Closure(string): string $redact
+     */
+    public static function redactAndCap(string $text, \Closure $redact): string
+    {
+        $clean = self::stripNul($text);
+        $window = self::OUTPUT_CAP + self::REDACT_EDGE;
+        if (strlen($clean) <= $window || Js::length16($clean) <= $window) {
+            return self::capOutput($redact($clean));
+        }
+        $redacted = self::stripNul($redact(Js::tail16($clean, $window)));
+        return self::TRIMMED . Js::tail16($redacted, min(self::OUTPUT_CAP, Js::length16($redacted) - self::REDACT_EDGE));
     }
 
     /** "Name: message" and the first five stack frames, capped like output. */

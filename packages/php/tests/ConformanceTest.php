@@ -371,6 +371,64 @@ final class ConformanceTest extends TestCase
         });
     }
 
+    public function testSilenceEnd(): void
+    {
+        $this->eachCase(self::fixture('health.json')->silenceEnd, fn (\stdClass $c) => self::differs(
+            $c->silencedUntil,
+            Evaluate::silenceEnd($c->now, Duration::parse($c->duration, 'silence duration')),
+        ));
+    }
+
+    /** @return list<Alert> */
+    private static function alerts(array $alerts): array
+    {
+        return array_map(fn (\stdClass $a) => Alert::fromJson($a), $alerts);
+    }
+
+    /**
+     * A value as JSON with each alert's keys sorted: the alerts in these
+     * cases are written by hand, in an order no composed alert has, so an
+     * alert is compared field by field. Everything around them (the state's
+     * own keys) keeps its order.
+     */
+    private static function canonical(mixed $value): mixed
+    {
+        $value = Js::plain(Js::parse(Js::stringify($value)));
+        $sort = function (mixed $v, bool $inAlert) use (&$sort): mixed {
+            if (!is_array($v)) {
+                return $v;
+            }
+            $alert = $inAlert || (isset($v['title'], $v['definition']) && !array_is_list($v));
+            $v = array_map(fn (mixed $item) => $sort($item, $alert), $v);
+            if ($alert && !array_is_list($v)) {
+                ksort($v, SORT_STRING);
+            }
+            return $v;
+        };
+        return $sort($value, false);
+    }
+
+    private static function same(mixed $expected, mixed $actual): ?string
+    {
+        return self::differs(self::canonical($expected), self::canonical($actual));
+    }
+
+    public function testDelivery(): void
+    {
+        $d = self::fixture('health.json')->delivery;
+        $this->assertSame($d->maxUndelivered, Evaluate::MAX_UNDELIVERED);
+        $this->assertSame($d->sendLeaseMs, Evaluate::SEND_LEASE_MS);
+        $this->eachCase($d->alertKey, fn (\stdClass $c) => self::same($c->key, Evaluate::alertKey(Alert::fromJson($c->alert))));
+        $this->eachCase($d->normalizeState, fn (\stdClass $c) => self::same($c->normalized, Evaluate::normalizeState(self::state($c->state), 'j')));
+        $this->eachCase($d->queueUndelivered, fn (\stdClass $c) => self::same($c->result, Evaluate::queueUndelivered(self::state($c->state), self::alerts($c->alerts))));
+        $this->eachCase($d->holdAlerts, fn (\stdClass $c) => self::same($c->result, Evaluate::holdAlerts(self::state($c->state), self::alerts($c->alerts), $c->until, $c->deferred)));
+        $this->eachCase($d->releaseSending, fn (\stdClass $c) => self::same($c->result, Evaluate::releaseSending(self::state($c->state), $c->now)));
+        $this->eachCase($d->recordSent, fn (\stdClass $c) => self::same(
+            $c->result,
+            Evaluate::recordSent(self::state($c->state), self::alerts($c->delivered), self::alerts($c->failed), self::alerts($c->stale), $c->now),
+        ));
+    }
+
     public function testStaleAlert(): void
     {
         $this->eachCase(self::fixture('health.json')->staleAlert, fn (\stdClass $c) => self::differs($c->stale, Evaluate::staleAlert(Alert::fromJson($c->alert), self::state($c->state))));
@@ -405,6 +463,13 @@ final class ConformanceTest extends TestCase
     public function testRedactSecrets(): void
     {
         $this->eachCase(self::fixture('output.json')->redact, fn (\stdClass $c) => self::differs($c->result, self::digest(Output::redactSecrets(self::expand($c->input)))));
+    }
+
+    public function testRedactAndCap(): void
+    {
+        $this->assertSame(self::fixture('output.json')->redactEdge, Output::REDACT_EDGE);
+        $redact = Output::redactSecrets(...);
+        $this->eachCase(self::fixture('output.json')->redactAndCap, fn (\stdClass $c) => self::differs($c->result, self::digest(Output::redactAndCap(self::expand($c->input), $redact))));
     }
 
     /** An error message from a name, a message and frames, as a Throwable's is written, or from a value that is not one. */

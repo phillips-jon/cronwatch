@@ -9,6 +9,7 @@ use Cronwatch\JobDefinition;
 use Cronwatch\JobState;
 use Cronwatch\Js;
 use Cronwatch\Run;
+use Cronwatch\SendingAlert;
 use Cronwatch\Store\ComparesAndSetsState;
 use Cronwatch\Store\MemoryStore;
 use Cronwatch\Store\PostgresStore;
@@ -194,9 +195,9 @@ final class StoreConformanceTest extends TestCase
         $store->setState(new JobState('a', [], 0, 99, 6));
         $this->assertSame('{"job":"a","open":{},"consecutiveFailures":0,"silencedUntil":99,"lastAlertAt":6}', Js::stringify($store->getState('a')));
         $undelivered = new Alert('failed', null, ['consecutiveFailures' => 1], 'a', new JobDefinition(['name' => 'a']), 'a failed', 'boom', 7);
-        $full = new JobState('a', ['stuck' => 7], 1, null, 6, ['missed'], [$undelivered]);
+        $full = new JobState('a', ['stuck' => 7], 1, null, 6, ['missed'], [$undelivered], sending: [new SendingAlert(8, $undelivered)]);
         $store->setState($full);
-        $this->assertSame(self::json($store, Js::stringify($full)), self::json($store, Js::stringify($store->getState('a'))), 'pendingRecovery and undelivered round-trip');
+        $this->assertSame(self::json($store, Js::stringify($full)), self::json($store, Js::stringify($store->getState('a'))), 'pendingRecovery, undelivered and sending round-trip');
         $store->setState(new JobState('a', [], 0, 99, 6));
 
         // compareAndSetState: writes only over the version it was told to expect.

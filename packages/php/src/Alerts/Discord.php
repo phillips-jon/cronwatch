@@ -14,6 +14,9 @@ use Cronwatch\Js;
  */
 final class Discord implements AlertChannel
 {
+    /** The longest embed description Discord takes. The title (under 256) and it stay well inside the embed's 6000. */
+    public const DESCRIPTION_MAX = 4096;
+
     private const COLOR = [
         'missed' => 0xb7791f,
         'failed' => 0xc62828,
@@ -30,7 +33,7 @@ final class Discord implements AlertChannel
      * @param string $webhookUrl a channel webhook URL from Server Settings, Integrations, Webhooks
      * @param (callable(Alert): string)|null $link link back to the job in your dashboard
      */
-    public function __construct(private readonly string $webhookUrl, ?callable $link = null, ?Http $http = null)
+    public function __construct(#[\SensitiveParameter] private readonly string $webhookUrl, ?callable $link = null, ?Http $http = null)
     {
         if ($webhookUrl === '') {
             throw new \InvalidArgumentException('Discord needs a webhookUrl');
@@ -51,8 +54,7 @@ final class Discord implements AlertChannel
         if ($url !== null) {
             $embed['url'] = $url;
         }
-        $embed['description'] = "```\n" . self::codeBlockSafe(Js::slice16($alert->message, 3800)) . "\n```"
-            . (Shared::present($alert->triage) ? "\n**Triage:** " . self::escapeMarkdown(Js::slice16((string) $alert->triage, 1000)) : '');
+        $embed['description'] = self::embedDescription($alert);
         $embed['color'] = self::COLOR[$alert->type] ?? null;
         $embed['timestamp'] = Js::iso($alert->at);
         $response = $this->http->post(Shared::postable($this->webhookUrl), Js::stringify([
@@ -64,6 +66,19 @@ final class Discord implements AlertChannel
         if (!$response->ok()) {
             throw new \RuntimeException("Discord webhook answered {$response->status}: " . Js::head16($response->body, 200));
         }
+    }
+
+    /**
+     * The message in a code block, then the triage. Each part has its own cap,
+     * and escaping can grow both, so the whole is held to DESCRIPTION_MAX (in
+     * UTF-16 units) by cutting the message's block, never the triage: Discord
+     * refuses a longer one on every retry.
+     */
+    public static function embedDescription(Alert $alert): string
+    {
+        $triage = Shared::present($alert->triage) ? "\n**Triage:** " . self::escapeMarkdown(Js::slice16((string) $alert->triage, 1000)) : '';
+        $fences = strlen("```\n") + strlen("\n```");
+        return "```\n" . Shared::cut(self::codeBlockSafe(Js::slice16($alert->message, 3800)), self::DESCRIPTION_MAX - $fences - Js::length16($triage)) . "\n```" . $triage;
     }
 
     /** Breaks up ``` so text inside a code block cannot close it. */

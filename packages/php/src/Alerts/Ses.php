@@ -34,11 +34,11 @@ final class Ses implements AlertChannel
      */
     public function __construct(
         private readonly string $region,
-        mixed $accessKeyId,
-        mixed $secretAccessKey,
+        #[\SensitiveParameter] mixed $accessKeyId,
+        #[\SensitiveParameter] mixed $secretAccessKey,
         private readonly string $from,
         string|array $to,
-        mixed $sessionToken = null,
+        #[\SensitiveParameter] mixed $sessionToken = null,
         private readonly ?string $configurationSetName = null,
         private readonly ?string $subjectPrefix = null,
         ?callable $link = null,

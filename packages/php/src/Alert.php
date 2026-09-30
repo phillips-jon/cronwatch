@@ -46,23 +46,31 @@ final class Alert
         if ($data instanceof self) {
             return $data;
         }
+        // A queued alert may come from a foreign or hand-edited row: a field
+        // of the wrong kind reads as absent rather than making the state unreadable.
         $f = Js::fields($data);
         $run = $f['run'] ?? null;
         $details = Js::plain($f['details'] ?? []);
+        $definition = $f['definition'] ?? null;
         $alert = new self(
-            type: (string) ($f['type'] ?? ''),
-            run: $run === null ? null : Run::fromJson($run),
+            type: self::text($f['type'] ?? null),
+            run: $run instanceof \stdClass || $run instanceof Run || (is_array($run) && $run !== []) ? Run::fromJson($run) : null,
             details: is_array($details) ? $details : [],
-            job: (string) ($f['job'] ?? ''),
-            definition: JobDefinition::fromJson($f['definition'] ?? []),
-            title: (string) ($f['title'] ?? ''),
-            message: (string) ($f['message'] ?? ''),
-            at: $f['at'] ?? 0,
+            job: self::text($f['job'] ?? null),
+            definition: JobDefinition::fromJson($definition instanceof \stdClass || $definition instanceof JobDefinition || is_array($definition) ? $definition : []),
+            title: self::text($f['title'] ?? null),
+            message: self::text($f['message'] ?? null),
+            at: Js::isNumber($f['at'] ?? null) ? $f['at'] : 0,
         );
         if (array_key_exists('triage', $f)) {
-            $alert->setTriage($f['triage']);
+            $alert->setTriage(is_string($f['triage']) ? $f['triage'] : null);
         }
         return $alert;
+    }
+
+    private static function text(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '';
     }
 
     /** An alert's details as JSON: an object, even when empty. */

@@ -116,7 +116,8 @@ final class MysqlStore extends PdoStore
      *   VERIFY_CA and VERIFY_IDENTITY check it. TLS without `ssl-ca` uses
      *   OpenSSL's default CA file.
      * - `ssl-ca` (`sslca`, `sslrootcert`), `ssl-cert` (`sslcert`), `ssl-key`
-     *   (`sslkey`): files, which turn TLS on.
+     *   (`sslkey`): files, which turn TLS on. A CA with no mode checks the
+     *   server's certificate against it (as VERIFY_CA).
      *
      * Doctrine's `serverVersion` is ignored; any other parameter is refused,
      * rather than dropped without a word. A DSN (mysql:host=...) has none.
@@ -170,7 +171,10 @@ final class MysqlStore extends PdoStore
             $options[self::attribute('SSL_CA')] = $default;
         }
         if ($tls) {
-            $options[self::attribute('SSL_VERIFY_SERVER_CERT')] = in_array($mode, ['VERIFY_CA', 'VERIFY_IDENTITY'], true);
+            // A CA given with no mode is checked against, as PHP and MySQL's
+            // own client do; only REQUIRED or PREFERRED, said outright, skip the check.
+            $verify = in_array($mode, ['VERIFY_CA', 'VERIFY_IDENTITY'], true) || ($mode === null && isset($options[self::attribute('SSL_CA')]));
+            $options[self::attribute('SSL_VERIFY_SERVER_CERT')] = $verify;
         }
         return $options;
     }

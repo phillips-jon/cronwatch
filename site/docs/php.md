@@ -21,12 +21,12 @@ PHP 8.2 or newer, with no dependencies beyond `ext-json` and `ext-pcre`, which e
 | `Cronwatch\Store\SqliteStore` | one SQLite file | `pdo_sqlite` |
 | `Cronwatch\Store\MysqlStore` | MySQL 8.0.13 or newer, MariaDB 10.6 or newer | `pdo_mysql` |
 | `Cronwatch\Store\PostgresStore` | Postgres | `pdo_pgsql` |
-| `Cronwatch\Alerts\...` | Slack, Discord, webhook, email, SMS and error tracker channels | `ext-curl` when it is loaded, PHP's own streams otherwise |
+| `Cronwatch\Alerts\...` | Slack, Discord, webhook, email, SMS and error tracker channels | `ext-curl` when it is loaded, PHP's own stream sockets otherwise |
 | `Cronwatch\Triage\Anthropic` | Claude triage | the same; no Anthropic package |
 | `Cronwatch\Sources\PgCron` | watching pg_cron's jobs | `pdo_pgsql` |
 | `Cronwatch\Web\PsrHandler`, `PsrMiddleware`, `PsrJobHandler` | the dashboard and `handler()` in a PSR-15 stack | `psr/http-server-handler` (and `psr/http-server-middleware` for the middleware), with a PSR-7 and PSR-17 implementation such as `nyholm/psr7` |
 
-A store made without its extension throws a `LogicException` that names it. Over PHP's streams, an `https` channel needs `ext-openssl`.
+A store made without its extension throws a `LogicException` that names it. Over PHP's stream sockets, an `https` channel needs `ext-openssl`.
 
 ## Create one client
 
@@ -206,9 +206,9 @@ A run that is never finished is marked stuck by the first check after the job's 
 
 `Cronwatch\Store\MemoryStore` is the default. It forgets when the process ends, so it is for tests and trying things out.
 
-`new SqliteStore($path = './data/cronwatch.db', pdo: null, prefix: 'cronwatch_')` keeps everything in one file, in WAL mode. The directory is made if it is missing and the file is created private (mode 0600). `pdo:` takes an open `PDO` of your own. The tables, statements and JSON are the SDK's SQLite store's byte for byte, so a Node process using `@cronwatch/sdk/sqlite` on the same file sees the same jobs, runs and state.
+`new SqliteStore($path = null, pdo: null, prefix: 'cronwatch_')` keeps everything in one file, in WAL mode. Without a path the file is `data/cronwatch.db` in the app's root (the directory holding `vendor/`), whatever the working directory, so the dashboard under PHP-FPM and the cron check share it and it is not put in a `public/` directory the web server hands out (unless the app's root is itself the document root); a relative path you give is the working directory's, so give an absolute one. The directory is made if it is missing and the file is created private (mode 0600). `pdo:` takes an open `PDO` of your own. The tables, statements and JSON are the SDK's SQLite store's byte for byte, so a Node process using `@cronwatch/sdk/sqlite` on the same file sees the same jobs, runs and state.
 
-`new MysqlStore($url = null, $username = null, $password = null, pdo: null, prefix: 'cronwatch_')` is for MySQL 8.0.13 or newer and MariaDB 10.6 or newer. It takes a `mysql://` (or `mariadb://`) URL, a `mysql:` PDO DSN, or `DATABASE_URL` when given nothing. The URL's TLS parameters are used (`ssl-mode` or `sslmode`, `ssl-ca`, `ssl-cert`, `ssl-key`) and any other parameter is refused, so a URL that asks for TLS never connects without it. It keeps the same three tables in MySQL's dialect: the JSON columns are `LONGTEXT` holding the SDK's JSON byte for byte, never MySQL's `JSON` type (which reorders keys), and names compare as bytes (`utf8mb4_bin`), as they do in SQLite and Postgres.
+`new MysqlStore($url = null, $username = null, $password = null, pdo: null, prefix: 'cronwatch_')` is for MySQL 8.0.13 or newer and MariaDB 10.6 or newer. It takes a `mysql://` (or `mariadb://`) URL, a `mysql:` PDO DSN, or `DATABASE_URL` when given nothing. The URL's TLS parameters are used (`ssl-mode` or `sslmode`, `ssl-ca`, `ssl-cert`, `ssl-key`) and any other parameter is refused, so a URL that asks for TLS never connects without it. A CA file given with no mode checks the server's certificate against it; only `ssl-mode=REQUIRED` or `PREFERRED`, said outright, skip that check. It keeps the same three tables in MySQL's dialect: the JSON columns are `LONGTEXT` holding the SDK's JSON byte for byte, never MySQL's `JSON` type (which reorders keys), and names compare as bytes (`utf8mb4_bin`), as they do in SQLite and Postgres.
 
 `new PostgresStore($url = null, $username = null, $password = null, pdo: null, prefix: 'cronwatch_')` takes a `postgres://` or `postgresql://` URL (its query parameters, such as `sslmode`, go to libpq), a `pgsql:` DSN, or `DATABASE_URL`. It uses the SDK's tables and statements, so a process in any other language can share the database, and creates its tables under an advisory lock, so many processes can start at once.
 
@@ -240,7 +240,7 @@ $alerts = [
 ];
 ```
 
-Every alert goes to every channel, one after another. A channel that throws goes to `onError` as `alert channel <name>` and never stops the others; each request has a ten second deadline, so a hung webhook holds a check for at most that long.
+Every alert goes to every channel, one after another. A channel that throws goes to `onError` as `alert channel <name>` and never stops the others; each request has a ten second deadline, so a hung webhook holds a check for at most that long. An alert is stored with the state that opens its condition before it is sent, so one whose process ends mid-send (a time limit, a deploy, a kill) is sent by a check after five minutes: once, or twice if a channel took it just before the process ended.
 
 A channel implements `Cronwatch\Alerts\AlertChannel` (`name()` and `send(Alert $alert, ChannelContext $context)`, which throws when the alert went nowhere), or is any callable, which is named `custom`. A callable that takes two arguments gets the `ChannelContext` too, whose `onError()` reports a problem that did not stop the alert (one of several recipients refusing it, say).
 
@@ -330,7 +330,7 @@ The first argument is a `postgres://` URL (a connection of its own), a `pdo_pgsq
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, `redact` rewrites them. The default, `Cronwatch\Output::redactSecrets`, blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks. An `expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent anywhere, `redact` rewrites them. The default, `Cronwatch\Output::redactSecrets`, blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off. An `expect` rule is checked before redaction, so it still sees what was logged.
 
 ```php
 use Cronwatch\Output;
@@ -392,14 +392,14 @@ The client:
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
 | `jobs()`, `jobsWithRuns($limit = 20)`, `jobSummary($name)` | summaries, without alerting |
 | `runs($name, $limit = 50)`, `getRun($id)` | newest first; `limit` is 1 to 500 |
-| `silence($name, '2h')`, `unsilence($name)` | stop alerts for a while; state keeps updating underneath |
-| `forget($name)` | remove a job and its runs |
+| `silence($name, '2h')`, `unsilence($name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
+| `forget($name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resumeRun($name, $id)` | `job($name)->resume($id)` for a job declared in this process |
-| `recordRun($run, evaluate: true)` | record a run that happened elsewhere, for a source; returns the alerts it sent |
+| `recordRun($run, evaluate: true)` | record a run that happened elsewhere, for a source; a metric that is not a finite number throws and nothing is recorded; returns the alerts it sent |
 | `routes(...)` | the dashboard and JSON API |
 | `definedJobs()` | the definitions declared in this process |
 | `Cronwatch::current()` | the context of the run in progress in this process, or null |
-| `close()` | close the store |
+| `close()` | close the store; called during a check, once the check ends |
 
 There is no `start()` or `stop()`: a PHP process does not stay up between checks, so the check is a crontab line, a scheduler entry or a worker's own loop. A check called from inside a check (by a channel, a source or triage) throws `LogicException`.
 

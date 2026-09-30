@@ -197,7 +197,7 @@ CRONWATCH_TEST_MYSQL=mysql://root:pw@127.0.0.1:33061/cw CRONWATCH_TEST_MARIADB=m
 
 `tests/WebGoldenTest.php` replays `packages/ruby/test/web/golden.json`, the SDK routes' answers to a fixed seed, through `handle()`, the superglobals and PSR-7, and every status, header and body must match; `tests/WebServeTest.php` runs `serve()` under `php -S`. The MCP server's end to end test drives the dashboard too: `CRONWATCH_TEST_PHP=1 npm test --workspace packages/mcp` at the root (after `composer install` here).
 
-`tests/ChannelsTest.php` runs the default HTTP client (curl, and PHP's streams) against a local `php -S` server. The WordPress plugin's tests install WordPress with WP-CLI and run the built plugin in it, when `CRONWATCH_TEST_WORDPRESS` is a `mysql://` URL and `CRONWATCH_TEST_WPCLI` the path to `wp-cli.phar` (`CRONWATCH_TEST_WP_VERSION` picks the WordPress version).
+`tests/ChannelsTest.php` runs the default HTTP client (curl, and its own client on PHP's stream sockets) against a local `php -S` server and a raw socket server. The WordPress plugin's tests install WordPress with WP-CLI and run the built plugin in it, when `CRONWATCH_TEST_WORDPRESS` is a `mysql://` URL and `CRONWATCH_TEST_WPCLI` the path to `wp-cli.phar` (`CRONWATCH_TEST_WP_VERSION` picks the WordPress version).
 
 `tests/FinishOnceTest.php` starts PHP worker processes that finish the same runs at the same moment, on SQLite and on each server. `tests/NodeCompatTest.php` shares a SQLite file with the built SDK, and `tests/ScheduleFuzzTest.php` checks thousands of generated cron expressions against croner itself; both need Node and the SDK built first (`npm ci && npm run build` at the repository root), and skip with the reason otherwise. `npm run check:php` at the root runs the suite.
 

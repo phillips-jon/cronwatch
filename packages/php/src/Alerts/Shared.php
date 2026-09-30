@@ -41,7 +41,7 @@ final class Shared
      *
      * @return array{protocol: string, scheme: string, username: string, host: string, pathname: string, search: string}|null
      */
-    public static function url(string $url): ?array
+    public static function url(#[\SensitiveParameter] string $url): ?array
     {
         $url = self::cleanUrl($url);
         if (preg_match('/^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^\/?#]*)([^?#]*)(\?[^#]*)?/', $url, $m) !== 1) {
@@ -86,7 +86,7 @@ final class Shared
      * U+0020 around it dropped, and every tab, CR and LF inside it removed (a
      * pasted webhook URL often ends in a newline).
      */
-    public static function cleanUrl(string $url): string
+    public static function cleanUrl(#[\SensitiveParameter] string $url): string
     {
         return str_replace(["\t", "\r", "\n"], '', trim($url, "\x00..\x20"));
     }
@@ -98,7 +98,7 @@ final class Shared
      * URL" for anything else (no scheme, no host, or a space or control
      * character left inside it).
      */
-    public static function postable(string $url): string
+    public static function postable(#[\SensitiveParameter] string $url): string
     {
         $clean = self::cleanUrl($url);
         $parts = preg_match('/[\x00-\x20\x7F]/', $clean) === 1 ? null : self::url($clean);
@@ -116,7 +116,7 @@ final class Shared
      * and credentials taken out, so only its origin can show: what curl,
      * PHP's streams or WordPress say can quote the URL.
      */
-    public static function scrub(string $message, string $url): string
+    public static function scrub(#[\SensitiveParameter] string $message, #[\SensitiveParameter] string $url): string
     {
         $clean = self::cleanUrl($url);
         $message = str_replace([$clean, $url], self::origin($url), $message);
@@ -138,7 +138,7 @@ final class Shared
     }
 
     /** new URL(url).origin: the scheme, host and port only. A URL's path or query can hold a credential. */
-    public static function origin(string $url): string
+    public static function origin(#[\SensitiveParameter] string $url): string
     {
         $parts = self::url($url);
         if ($parts === null) {
@@ -157,7 +157,7 @@ final class Shared
      * @param array<string, string> $headers
      * @param list<string|null> $secrets
      */
-    public static function post(Http $http, string $provider, string $url, array $headers, string $body, array $secrets = []): HttpResponse
+    public static function post(Http $http, string $provider, #[\SensitiveParameter] string $url, #[\SensitiveParameter] array $headers, #[\SensitiveParameter] string $body, #[\SensitiveParameter] array $secrets = []): HttpResponse
     {
         // UTF-8 as fetch sends a string, U+FFFD for bytes that are not.
         $response = $http->post(self::postable($url), Js::wellFormed($body), $headers);
@@ -176,7 +176,7 @@ final class Shared
      *
      * @param list<string|null> $secrets
      */
-    public static function errorBody(string $text, array $secrets = []): string
+    public static function errorBody(#[\SensitiveParameter] string $text, #[\SensitiveParameter] array $secrets = []): string
     {
         $kept = array_values(array_filter($secrets, fn ($s) => is_string($s) && Js::length16($s) >= 4));
         $longest = array_reduce($kept, fn (int $n, string $s) => max($n, Js::length16($s)), 0);
@@ -197,7 +197,7 @@ final class Shared
      * @param array<array-key, mixed> $headers
      * @return array<string, string>
      */
-    public static function headers(array $headers): array
+    public static function headers(#[\SensitiveParameter] array $headers): array
     {
         $out = [];
         foreach ($headers as $name => $value) {
@@ -211,7 +211,7 @@ final class Shared
     }
 
     /** A header value without the spaces, tabs and line breaks around it, as fetch sends it; one with a line break or NUL inside is refused, as fetch refuses it. */
-    public static function headerValue(string $value): string
+    public static function headerValue(#[\SensitiveParameter] string $value): string
     {
         $value = trim($value, " \t\r\n");
         if (strpbrk($value, "\r\n\0") !== false) {
@@ -252,7 +252,7 @@ final class Shared
         return self::present($value) ? Js::string($value) : null;
     }
 
-    public static function basicAuth(string $user, string $password): string
+    public static function basicAuth(#[\SensitiveParameter] string $user, #[\SensitiveParameter] string $password): string
     {
         return 'Basic ' . base64_encode(Js::wellFormed("{$user}:{$password}"));
     }

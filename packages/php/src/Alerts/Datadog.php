@@ -37,7 +37,7 @@ final class Datadog implements AlertChannel
      * @param string|null $host associates the event with a host and its tags
      */
     public function __construct(
-        mixed $apiKey,
+        #[\SensitiveParameter] mixed $apiKey,
         ?string $site = null,
         private readonly array $tags = [],
         private readonly ?string $host = null,

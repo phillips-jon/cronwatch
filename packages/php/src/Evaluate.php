@@ -39,6 +39,20 @@ final class Evaluate
     }
 
     /**
+     * When a silence of `ms` from `now` ends (silenceEnd): a whole
+     * millisecond, never past MAX_DURATION_MS (2^53 - 1), however long the
+     * silence asked for. Every port sharing the store reads it back
+     * unchanged, where a larger number could wrap to a time long past and
+     * send alerts during the silence.
+     */
+    public static function silenceEnd(int|float $now, int|float $ms): int|float
+    {
+        $whole = $ms >= self::MAX_DURATION_MS ? self::MAX_DURATION_MS : (int) floor($ms);
+        $end = $now + $whole;
+        return $end >= self::MAX_DURATION_MS ? self::MAX_DURATION_MS : $end;
+    }
+
+    /**
      * The version a stored state counts as for compareAndSetState
      * (stateVersion): a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
      * else 0, as when it is absent. The SQL stores read it the same way, so a
@@ -81,7 +95,11 @@ final class Evaluate
         return new JobState($job, [], 0, null, null, [], []);
     }
 
-    /** A stored state with every field present, or a fresh one. State written by an older version lacks the newer fields. */
+    /**
+     * A stored state with every field present, or a fresh one. State written
+     * by an older version lacks the newer fields. `sending` is the exception:
+     * it is there only while it holds an alert (see holdAlerts).
+     */
     public static function normalizeState(?JobState $state, string $job): JobState
     {
         if ($state === null) {
@@ -96,7 +114,160 @@ final class Evaluate
             $state->pendingRecovery ?? [],
             $state->undelivered ?? [],
             $state->version,
+            $state->sending === null || $state->sending === [] ? null : array_values($state->sending),
         );
+    }
+
+    // ------------------------------------------------------------ delivery
+
+    /** Alerts kept per job for retry, and per job being sent; past it the oldest go. */
+    public const MAX_UNDELIVERED = 20;
+
+    /**
+     * How long an alert in `sending` is left to the process sending it.
+     * Longer than any send takes: at most three alerts go out together, each
+     * with 25 seconds of triage and 15 of channels.
+     */
+    public const SEND_LEASE_MS = 5 * 60_000;
+
+    /** Identifies an alert across retries, and in `sending`. */
+    public static function alertKey(Alert $alert): string
+    {
+        return $alert->type . '|' . Js::number($alert->at) . '|' . ($alert->run?->id ?? '');
+    }
+
+    /**
+     * `alerts` added to the undelivered queue: one with the same key as a
+     * queued alert replaces it where it stands, the rest go at the end, and
+     * only the newest MAX_UNDELIVERED stay. `dropped` counts those let go.
+     *
+     * @param list<Alert> $alerts
+     * @return array{state: JobState, dropped: int}
+     */
+    public static function queueUndelivered(JobState $state, array $alerts): array
+    {
+        $next = self::cloneState($state);
+        $byKey = [];
+        foreach ($alerts as $alert) {
+            $byKey[self::alertKey($alert)] = $alert;
+        }
+        $queue = [];
+        $known = [];
+        foreach ($next->undelivered ?? [] as $alert) {
+            $key = self::alertKey($alert);
+            $queue[] = $byKey[$key] ?? $alert;
+            $known[$key] = true;
+        }
+        foreach ($alerts as $alert) {
+            if (!isset($known[self::alertKey($alert)])) {
+                $queue[] = $alert;
+            }
+        }
+        [$next->undelivered, $dropped] = self::newest($queue);
+        return ['state' => $next, 'dropped' => $dropped];
+    }
+
+    /**
+     * The outbox. Alerts just composed are written with the state that opens
+     * their condition, before any is sent, so a process that stops part way
+     * does not lose them: into `sending`, each with its lease ending at
+     * `until`, when this process sends them, or (deliver: "check") straight
+     * into the undelivered queue for a check elsewhere. `dropped` counts
+     * alerts let go past MAX_UNDELIVERED.
+     *
+     * @param list<Alert> $alerts
+     * @return array{state: JobState, dropped: int}
+     */
+    public static function holdAlerts(JobState $state, array $alerts, int|float $until, bool $deferred): array
+    {
+        if ($alerts === []) {
+            return ['state' => $state, 'dropped' => 0];
+        }
+        if ($deferred) {
+            return self::queueUndelivered($state, $alerts);
+        }
+        $next = self::cloneState($state);
+        $held = [...($next->sending ?? []), ...array_map(fn (Alert $alert) => new SendingAlert($until, $alert), $alerts)];
+        [$next->sending, $dropped] = self::newest($held);
+        return ['state' => $next, 'dropped' => $dropped];
+    }
+
+    /**
+     * Alerts in `sending` whose lease ran out by `now`: the process sending
+     * them stopped before it recorded how the send went. They go to the
+     * undelivered queue, where the retry sends them (with triage, which is
+     * never stored with them here) or drops them as stale. An entry without
+     * an alert is dropped; one without a numeric `until` counts as run out.
+     *
+     * @return array{state: JobState, dropped: int}
+     */
+    public static function releaseSending(JobState $state, int|float $now): array
+    {
+        $held = [];
+        $lapsed = [];
+        foreach ($state->sending ?? [] as $entry) {
+            if (Js::isNumber($entry->until) && $entry->until > $now) {
+                $held[] = $entry;
+            } else {
+                $lapsed[] = $entry;
+            }
+        }
+        if ($lapsed === []) {
+            return ['state' => $state, 'dropped' => 0];
+        }
+        $next = clone $state;
+        $next->sending = $held === [] ? null : $held;
+        $alerts = [];
+        foreach ($lapsed as $entry) {
+            if ($entry->alert !== null) {
+                $alerts[] = $entry->alert;
+            }
+        }
+        return self::queueUndelivered($next, $alerts);
+    }
+
+    /**
+     * How a send went. Delivered and stale alerts leave the queue; failed
+     * ones replace their queued copy, so a triage made on this attempt is
+     * kept, or join the queue. Every one of them leaves `sending`.
+     * lastAlertAt moves only on a delivery. `dropped` in the result counts
+     * alerts let go past MAX_UNDELIVERED.
+     *
+     * @param list<Alert> $delivered
+     * @param list<Alert> $failed
+     * @param list<Alert> $stale
+     * @return array{state: JobState, dropped: int}
+     */
+    public static function recordSent(JobState $state, array $delivered, array $failed, array $stale, int|float $now): array
+    {
+        $next = self::cloneState($state);
+        $done = [];
+        foreach ([...$delivered, ...$stale] as $alert) {
+            $done[self::alertKey($alert)] = true;
+        }
+        $next->undelivered = array_values(array_filter($next->undelivered ?? [], fn (Alert $alert) => !isset($done[self::alertKey($alert)])));
+        $sent = $done;
+        foreach ($failed as $alert) {
+            $sent[self::alertKey($alert)] = true;
+        }
+        $held = array_values(array_filter($next->sending ?? [], fn (SendingAlert $entry) => $entry->alert === null || !isset($sent[self::alertKey($entry->alert)])));
+        $next->sending = $held === [] ? null : $held;
+        if ($delivered !== []) {
+            $next->lastAlertAt = $now;
+        }
+        return self::queueUndelivered($next, $failed);
+    }
+
+    /**
+     * The newest MAX_UNDELIVERED of `list`, and how many went.
+     *
+     * @template T
+     * @param list<T> $list
+     * @return array{list<T>, int}
+     */
+    private static function newest(array $list): array
+    {
+        return [array_slice($list, -self::MAX_UNDELIVERED), max(0, count($list) - self::MAX_UNDELIVERED)];
     }
 
     private static function cloneState(JobState $state): JobState

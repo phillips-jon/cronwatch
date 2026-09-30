@@ -22,9 +22,9 @@ final class Webhook implements AlertChannel
 
     /** @param array<string, string> $headers extra request headers, for an Authorization header say; values are trimmed */
     public function __construct(
-        private readonly string $url,
-        private readonly array $headers = [],
-        private readonly ?string $secret = null,
+        #[\SensitiveParameter] private readonly string $url,
+        #[\SensitiveParameter] private readonly array $headers = [],
+        #[\SensitiveParameter] private readonly ?string $secret = null,
         ?Http $http = null,
     ) {
         if ($url === '') {
@@ -60,7 +60,7 @@ final class Webhook implements AlertChannel
     }
 
     /** HMAC-SHA256 of the body as lowercase hex. */
-    public static function hmacSha256Hex(string $secret, string $body): string
+    public static function hmacSha256Hex(#[\SensitiveParameter] string $secret, #[\SensitiveParameter] string $body): string
     {
         return hash_hmac('sha256', Js::wellFormed($body), Js::wellFormed($secret));
     }

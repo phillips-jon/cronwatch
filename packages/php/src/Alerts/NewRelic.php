@@ -31,7 +31,7 @@ final class NewRelic implements AlertChannel
      */
     public function __construct(
         string|int|float|null $accountId,
-        mixed $apiKey,
+        #[\SensitiveParameter] mixed $apiKey,
         ?string $region = null,
         ?string $eventType = null,
         ?callable $link = null,

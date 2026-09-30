@@ -205,6 +205,24 @@ final class ChannelConformanceTest extends TestCase
         $this->eachCase(self::fixture()->textCuts->errorBodies, fn (\stdClass $c) => self::differs($c->body, Shared::errorBody($c->text, $c->secrets)));
     }
 
+    /** Long text travels as {"parts": [[piece, times], ...]}. */
+    private static function expand(mixed $spec): mixed
+    {
+        return $spec instanceof \stdClass && isset($spec->parts)
+            ? implode('', array_map(fn (array $part) => str_repeat($part[0], $part[1]), $spec->parts))
+            : $spec;
+    }
+
+    public function testDiscordDescriptionsHoldTo4096(): void
+    {
+        $this->eachCase(self::fixture()->textCuts->discordDescriptions, function (\stdClass $c): ?string {
+            $alert = self::first();
+            $alert->message = self::expand($c->message);
+            $alert->triage = self::expand($c->triage);
+            return self::differs($c->description, self::digest(Alerts\Discord::embedDescription($alert)));
+        });
+    }
+
     public function testEmailSubjectsCutOnACodePoint(): void
     {
         $this->eachCase(self::fixture()->textCuts->subjects, function (\stdClass $c): ?string {

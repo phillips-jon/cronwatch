@@ -30,7 +30,7 @@ final class Resend implements AlertChannel
      * @param (callable(Alert): string)|null $link link back to the job in your dashboard
      */
     public function __construct(
-        mixed $apiKey,
+        #[\SensitiveParameter] mixed $apiKey,
         private readonly string $from,
         string|array $to,
         private readonly ?string $subjectPrefix = null,

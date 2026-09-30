@@ -143,7 +143,21 @@ abstract class PdoStore implements Store, UpdatesRunIf, ComparesAndSetsState, De
 
     public function insertRun(Run $run): void
     {
-        $this->run($this->sql['insertRun'], Sql::insertRunParams($run));
+        $this->resent = false;
+        try {
+            $this->run($this->sql['insertRun'], Sql::insertRunParams($run));
+        } catch (\PDOException $error) {
+            // Sent again after the connection broke, it finds the row its
+            // first send wrote before the break: that row is this one, not
+            // another process's, so the insert went through.
+            if ($this->resent) {
+                $stored = $this->getRun($run->id);
+                if ($stored !== null && self::canonical(Sql::insertRunParams($stored)) === self::canonical(Sql::insertRunParams($run))) {
+                    return;
+                }
+            }
+            throw $error;
+        }
     }
 
     public function updateRun(Run $run): void

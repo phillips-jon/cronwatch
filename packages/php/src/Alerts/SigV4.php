@@ -25,15 +25,15 @@ final class SigV4
      */
     public static function sign(
         string $method,
-        string $url,
-        array $headers,
-        string $body,
+        #[\SensitiveParameter] string $url,
+        #[\SensitiveParameter] array $headers,
+        #[\SensitiveParameter] string $body,
         string $region,
         string $service,
         int|float $now,
-        string $accessKeyId,
-        string $secretAccessKey,
-        ?string $sessionToken = null,
+        #[\SensitiveParameter] string $accessKeyId,
+        #[\SensitiveParameter] string $secretAccessKey,
+        #[\SensitiveParameter] ?string $sessionToken = null,
     ): array {
         $parts = Shared::url($url) ?? throw new \InvalidArgumentException('SigV4 needs an absolute URL');
         $amzDate = (string) preg_replace(['/[-:]/', '/\.[0-9]{3}/'], '', Js::iso($now));

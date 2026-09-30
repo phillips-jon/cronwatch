@@ -537,6 +537,88 @@ final class ClientHardeningTest extends TestCase
         $this->assertSame('password=hunter2', $plain->runs('r')[0]->output);
     }
 
+    public function testASecretSplitByThe16KbCutIsRedactedWhole(): void
+    {
+        $cap = \Cronwatch\Output::OUTPUT_CAP;
+        $pem = "-----BEGIN PRIVATE KEY-----\n" . implode("\n", array_map(fn (int $i) => str_repeat('QUJD', 15) . sprintf('%04d', $i), range(0, 24))) . "\n-----END PRIVATE KEY-----";
+        $bearer = 'Authorization: Bearer opaqueTOKENvalue1234567890';
+        $cw = $this->make();
+        // The cut lands inside the key's body, and in a second run just after "Bear".
+        $cw->run('pem', function ($job) use ($cap, $pem): void {
+            $job->log(str_repeat('x', $cap));
+            $job->log(substr($pem, 0, 900));
+            $job->log(substr($pem, 900));
+            $job->log('done');
+        });
+        $output = $cw->runs('pem')[0]->output;
+        $this->assertStringNotContainsString('QUJD', $output);
+        $this->assertStringEndsWith("[redacted]\ndone", $output);
+        $tail = str_repeat('y', $cap - 30);
+        $cw->run('bearer', fn () => "{$bearer}\n{$tail}");
+        $output = $cw->runs('bearer')[0]->output;
+        $this->assertStringNotContainsString('opaqueTOKEN', $output);
+        $this->assertLessThanOrEqual($cap + strlen("[earlier output trimmed]\n"), strlen($output));
+
+        // Errors, recorded runs and flushed lines the same way.
+        $this->failing(fn () => $cw->run('thrown', self::thrower(str_repeat('e', $cap) . " {$bearer} " . str_repeat('z', $cap - 40))));
+        $this->assertStringNotContainsString('opaqueTOKEN', $cw->runs('thrown')[0]->error);
+        $cw->job('imported');
+        $cw->recordRun(['id' => 'i1', 'job' => 'imported', 'status' => 'ok', 'startedAt' => 1, 'finishedAt' => 2, 'durationMs' => 1, 'error' => null, 'output' => "{$bearer}\n{$tail}", 'metrics' => [], 'trigger' => 'source']);
+        $this->assertStringNotContainsString('opaqueTOKEN', $cw->getRun('i1')->output);
+        $handle = $cw->job('flushed')->start();
+        $handle->log($bearer);
+        $handle->log($tail);
+        $handle->flush();
+        $this->assertStringNotContainsString('opaqueTOKEN', $cw->getRun($handle->id)->output);
+        $handle->finish();
+        $this->assertStringNotContainsString('opaqueTOKEN', $cw->getRun($handle->id)->output);
+    }
+
+    public function testTextPastTheRedactionWindowNeverKeepsWhatCameRightAfterItsCut(): void
+    {
+        $cap = \Cronwatch\Output::OUTPUT_CAP;
+        $edge = \Cronwatch\Output::REDACT_EDGE;
+        $trimmed = "[earlier output trimmed]\n";
+        $redact = \Cronwatch\Output::redactSecrets(...);
+        $text = "-----BEGIN PRIVATE KEY-----\n" . str_repeat('QUJD', 4000) . "\n" . str_repeat('k', $cap + $edge - 8000);
+        $kept = \Cronwatch\Output::redactAndCap($text, $redact);
+        $this->assertStringStartsWith($trimmed, $kept);
+        $this->assertSame(strlen($trimmed) + $cap, strlen($kept));
+        $this->assertStringNotContainsString('QUJD', $kept);
+
+        // A redaction that shrinks the window cannot pull its first units into view.
+        $shrinking = fn (string $t) => (string) preg_replace('/s{100}/', '', $t);
+        $this->assertSame($trimmed, \Cronwatch\Output::redactAndCap(str_repeat('QUJD', 100) . str_repeat('s', $cap + $edge), $shrinking));
+
+        // Short text is redacted whole, then capped as before; NULs go either side of redact.
+        $this->assertSame('password=[redacted]', \Cronwatch\Output::redactAndCap('password=x', $redact));
+        $this->assertSame('ab', \Cronwatch\Output::redactAndCap("a\0b", fn (string $t) => "{$t}\0"));
+        $this->assertSame($trimmed . str_repeat('x', $cap), \Cronwatch\Output::redactAndCap(str_repeat('x', $cap + 5), $redact));
+    }
+
+    public function testCloseDuringACheckWaitsForItBeforeItClosesTheStore(): void
+    {
+        $order = [];
+        $store = new FlakyStore(new MemoryStore());
+        $store->hooks['close'] = function (\Closure $next, array $args) use (&$order) {
+            $order[] = 'close';
+            return $next(...$args);
+        };
+        $cw = null;
+        // The channel closes the client while the check's stuck alert goes out.
+        $cw = $this->make(['store' => $store, 'alerts' => [new Custom('closer', function () use (&$cw, &$order): void {
+            $cw->close();
+            $order[] = 'send';
+        })]]);
+        $run = $cw->job('slow', ['timeout' => '5m'])->start();
+        $this->clock->advance(6 * self::MIN);
+        $cw->check();
+        $this->assertSame(['send', 'close'], $order);
+        $this->assertSame([], $this->wheres());
+        $this->assertSame('timeout', $store->inner->getRun($run->id)->status);
+        $this->assertSame(self::T0 + 6 * self::MIN, $store->inner->getState('slow')->lastAlertAt, 'the check recorded its send before the store closed');
+    }
+
     public function testACheckCalledFromInsideACheckIsRefused(): void
     {
         $cw = null;
@@ -581,6 +663,30 @@ final class ClientHardeningTest extends TestCase
         $store->breakAfter = ['deleteRunIf'];
         $store->insertRun(new Run('gone', 'flaky', 'running', 1));
         $this->assertTrue($store->deleteRunIf('gone', 'flaky', 'running'));
+        $this->assertSame([], $this->errors);
+    }
+
+    public function testAnInsertWhoseAnswerWasLostWithTheConnectionIsStillJudged(): void
+    {
+        // A recorded failure's insert lands, then the connection breaks and the
+        // store sends it again, which hits the row its first send wrote: that
+        // row is its own, so the failure is judged and alerted, not taken for
+        // another process's.
+        $store = new \Cronwatch\Tests\Support\ResendingStore();
+        $cw = $this->make(['store' => $store]);
+        $cw->job('imported');
+        $store->breakAfter = ['insertRun'];
+        $sent = $cw->recordRun(['id' => 'pgcron:7', 'job' => 'imported', 'status' => 'failed', 'startedAt' => self::T0 - 1000, 'finishedAt' => self::T0, 'durationMs' => 1000, 'error' => 'ERROR: boom', 'trigger' => 'pg_cron']);
+        $this->assertSame(1, $store->resends);
+        $this->assertSame(['failed'], array_map(fn (Alert $a) => $a->type, $sent));
+        $this->assertSame(['failed'], $this->capture->types());
+
+        // A run's start the same way: recorded once, and its finish judged.
+        $store->breakAfter = ['insertRun'];
+        $cw->job('nightly')->run(fn () => 'done');
+        $this->assertSame(2, $store->resends);
+        $this->assertSame('ok', $cw->runs('nightly')[0]->status);
+        $this->assertCount(1, $cw->runs('nightly'));
         $this->assertSame([], $this->errors);
     }
 }

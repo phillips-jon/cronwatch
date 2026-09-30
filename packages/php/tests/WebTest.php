@@ -640,6 +640,21 @@ final class WebTest extends TestCase
         }
     }
 
+    public function testAStoredMetricThatIsNoFiniteNumberIsLeftOffTheJobPage(): void
+    {
+        [$cw, $web] = $this->app();
+        $cw->job('odd');
+        $cw->store->insertRun(Run::fromJson([
+            'id' => 'o1', 'job' => 'odd', 'status' => 'ok', 'startedAt' => self::T0 - self::MIN, 'finishedAt' => self::T0, 'durationMs' => self::MIN,
+            'error' => null, 'output' => null, 'metrics' => ['rows' => null, 'label' => 'abc', 'cost' => 1.25, 'n' => 3], 'trigger' => 'run',
+        ]));
+        $res = self::send($web, 'GET', '/cronwatch/jobs/odd', self::BEARER);
+        $this->assertSame(200, $res->status);
+        $this->assertStringContainsString('<span class="metrics"><span><span class="k">cost</span> 1.2500</span><span><span class="k">n</span> 3</span></span>', $res->body);
+        $this->assertStringNotContainsString('>rows<', $res->body);
+        $this->assertStringNotContainsString('>label<', $res->body);
+    }
+
     public function testWithoutATokenInDevelopmentNothingARequestSaysAboutItselfLetsItIn(): void
     {
         putenv('CRONWATCH_ENV=development');
