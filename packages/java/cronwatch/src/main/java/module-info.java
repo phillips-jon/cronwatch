@@ -19,4 +19,9 @@ module dev.cronwatch {
   exports dev.cronwatch.store;
   exports dev.cronwatch.jdbc;
   exports dev.cronwatch.storetest;
+
+// Micrometer's context propagation finds the current run's accessor through
+// META-INF/services on the class path. It is not provided here: a provides
+// clause naming a type of a module required statically fails resolution
+// when that module is absent (ModuleTest holds it).
 }
