@@ -471,17 +471,45 @@ export class CronWatch {
    * name is marked as written only while that same declaration stands, so a
    * forget that lands during the write (deleting the row after it) leaves
    * the name to be written again, as does one forgotten before it.
+   *
+   * With `confirm`, as a run starts, a name already written is read back:
+   * another process may have forgotten the job since, and a job still
+   * declared here comes back on its next run.
    */
-  private async sync(definition: JobDefinition): Promise<void> {
+  private async sync(definition: JobDefinition, confirm = false): Promise<void> {
     await this.ensureReady();
     const name = definition.name;
-    if (this.synced.has(name)) return;
+    if (this.synced.has(name)) {
+      if (!confirm || (await this.store.getJob(name))) return;
+      this.synced.delete(name);
+    }
     await this.serial(name, async () => {
       if (this.synced.has(name)) return;
       const standing = this.definitions.get(name) ?? definition;
       await this.store.upsertJob(toStored(standing), this.now());
       if (this.definitions.get(name) === standing) this.synced.add(name);
     }, this.syncing);
+  }
+
+  /**
+   * Every stored job, once each declaration has been written. A job declared
+   * here that the store no longer has was forgotten by another process after
+   * this one wrote it: it is written again, as its next run would, so it is
+   * checked and shown while any process still declares it.
+   */
+  private async storedJobs(): Promise<StoredJob[]> {
+    for (const definition of this.definitions.values()) await this.sync(definition);
+    const jobs = await this.store.listJobs();
+    const listed = new Set(jobs.map((job) => job.name));
+    const missing = [...this.definitions.values()].filter((definition) => !listed.has(definition.name));
+    if (missing.length === 0) return jobs;
+    for (const definition of missing) {
+      // Not one forgotten here meanwhile.
+      if (this.definitions.get(definition.name) !== definition) continue;
+      this.synced.delete(definition.name);
+      await this.sync(definition);
+    }
+    return this.store.listJobs();
   }
 
   /**
@@ -564,7 +592,7 @@ export class CronWatch {
     };
     let recorded = false;
     try {
-      await this.sync(definition);
+      await this.sync(definition, true);
       await this.store.insertRun({ ...run });
       recorded = true;
     } catch (e) {
@@ -736,7 +764,7 @@ export class CronWatch {
     };
     let recorded = false;
     try {
-      await this.sync(definition);
+      await this.sync(definition, true);
       await this.store.insertRun({ ...run });
       recorded = true;
     } catch (e) {
@@ -1080,7 +1108,7 @@ export class CronWatch {
     // as failing (see unevaluableSummary) and does not stop the others.
     const jobs: JobSummary[] = [];
     const retries = { spentMs: 0 };
-    for (const stored of await this.store.listJobs()) {
+    for (const stored of await this.storedJobs()) {
       try {
         const recent = await this.store.listRuns(stored.name, BASELINE_WINDOW);
         let nextExpectedAt: number | null = null;
@@ -1141,17 +1169,18 @@ export class CronWatch {
   /** Every job's summary with its newest `limit` runs, read together. What the dashboard shows. */
   async jobsWithRuns(limit = 20): Promise<{ job: JobSummary; runs: Run[] }[]> {
     await this.ensureReady();
-    for (const definition of this.definitions.values()) await this.sync(definition);
+    const jobs = await this.storedJobs();
     const now = this.now();
     const out: { job: JobSummary; runs: Run[] }[] = [];
-    for (const stored of await this.store.listJobs()) out.push(await this.snapshot(stored, now, clampLimit(limit, 20, 0)));
+    for (const stored of jobs) out.push(await this.snapshot(stored, now, clampLimit(limit, 20, 0)));
     return out;
   }
 
+  /** A job's summary, or null for one the store does not have. One declared here and forgotten elsewhere is written again, as storedJobs() does. */
   async jobSummary(name: string): Promise<JobSummary | null> {
     await this.ensureReady();
     const definition = this.definitions.get(name);
-    if (definition) await this.sync(definition);
+    if (definition) await this.sync(definition, true);
     const stored = await this.store.getJob(name);
     if (!stored) return null;
     return (await this.snapshot(stored, this.now(), 0)).job;
@@ -1189,7 +1218,11 @@ export class CronWatch {
     return state;
   }
 
-  /** Remove a job and its runs from the store. A job still declared in code comes back on its next run. */
+  /**
+   * Remove a job and its runs from the store. A job still declared in code
+   * comes back: here on its next run, and in any other process that declares
+   * it on its next run there, or at that process's next check or dashboard read.
+   */
   async forget(name: string): Promise<void> {
     await this.ensureReady();
     this.definitions.delete(name);
