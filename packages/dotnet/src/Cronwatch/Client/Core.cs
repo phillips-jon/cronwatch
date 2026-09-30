@@ -38,6 +38,7 @@ public sealed partial class CronwatchClient
     private readonly Action<string> _onWarning;
     private readonly TimeProvider _time;
     private readonly string? _environment;
+    private readonly Func<JobContext, IDisposable?>? _runScope;
     internal readonly Timings Timings;
 
     private readonly Lock _declaredLock = new();
@@ -75,6 +76,37 @@ public sealed partial class CronwatchClient
     }
 
     internal void Report(string message, string where) => Report(new CronwatchException(message), where);
+
+    /// <summary>The app's scope around a run's function (<see cref="CronwatchOptions.RunScope"/>), or null.</summary>
+    internal IDisposable? OpenRunScope(JobContext context)
+    {
+        if (_runScope == null)
+        {
+            return null;
+        }
+        try
+        {
+            return _runScope(context);
+        }
+        catch (Exception e)
+        {
+            Report(e, "run scope for " + context.Name);
+            return null;
+        }
+    }
+
+    /// <summary>Disposes a run scope, reporting a throw.</summary>
+    internal void CloseRunScope(IDisposable? scope, string name)
+    {
+        try
+        {
+            scope?.Dispose();
+        }
+        catch (Exception e)
+        {
+            Report(e, "run scope for " + name);
+        }
+    }
 
     internal void Warn(string message)
     {

@@ -79,6 +79,40 @@ public abstract class Expect
         return Definition.Own(output);
     }
 
+    /// <summary>
+    /// A rule read back from a stored definition, for a process whose job another process declared:
+    /// <c>contains "text"</c> as the same rule, a pattern the engine reads as the same pattern, and
+    /// anything else (a custom function, which is the other process's, or a pattern this engine
+    /// does not read) kept as stored and passing every output.
+    /// </summary>
+    internal static Expect FromStored(string description)
+    {
+        const string Prefix = "contains ";
+        if (description.StartsWith(Prefix, StringComparison.Ordinal))
+        {
+            try
+            {
+                if (Json.Parse(description[Prefix.Length..]) is string text && string.Equals(Prefix + Json.Quote(text), description, StringComparison.Ordinal))
+                {
+                    return new ContainsRule(text);
+                }
+            }
+            catch (JsonException)
+            {
+                // Kept as stored, below.
+            }
+        }
+        JsRegex? pattern = ExpectPatterns.FromStored(description);
+        return pattern != null ? new MatchRule(pattern) : new StoredRule(description);
+    }
+
+    private sealed class StoredRule(string description) : Expect
+    {
+        internal override string? Check(string output) => null;
+
+        internal override string Describe() => description;
+    }
+
     private sealed class ContainsRule(string text) : Expect
     {
         internal override string? Check(string output) =>

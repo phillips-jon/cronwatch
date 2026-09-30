@@ -162,6 +162,7 @@ public sealed partial class CronwatchClient
         activity?.SetTag("cronwatch.job", def.Name);
         activity?.SetTag("cronwatch.run_id", o.Run.Id);
         activity?.SetTag("cronwatch.trigger", options.Trigger);
+        IDisposable? scope = OpenRunScope(o.Context);
         T value = default!;
         Exception? thrown = null;
         try
@@ -174,6 +175,7 @@ public sealed partial class CronwatchClient
         }
         finally
         {
+            CloseRunScope(scope, def.Name);
             o.EndFunction();
         }
         Run finished = await CloseAsync(o, value, thrown, cancellationToken).ConfigureAwait(false);
@@ -183,6 +185,27 @@ public sealed partial class CronwatchClient
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(thrown);
         }
         return value;
+    }
+
+    /// <summary>A run opened from outside its function, with its activity: <see cref="Job.OpenAsync"/>.</summary>
+    internal async Task<ObservedRun> OpenObservedAsync(JobDef def, RunOptions options, CancellationToken cancellationToken)
+    {
+        // Started here, so its parent is the caller's activity; this method's end puts the
+        // caller's back as current, and the run's own is made current by MakeCurrent.
+        Activity? activity = CronwatchTelemetry.Source.StartActivity("cronwatch.run");
+        try
+        {
+            activity?.SetTag("cronwatch.job", def.Name);
+            activity?.SetTag("cronwatch.trigger", options.Trigger);
+            Opened o = await OpenAsync(def, options, cancellationToken).ConfigureAwait(false);
+            activity?.SetTag("cronwatch.run_id", o.Run.Id);
+            return new ObservedRun(this, o, activity);
+        }
+        catch (Exception)
+        {
+            activity?.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Opens a run: the running row written by the client's own task, the timeout armed.</summary>
@@ -234,7 +257,9 @@ public sealed partial class CronwatchClient
         o.EndFunction();
         if (!o.Claim())
         {
-            return o.Run;
+            // Closed already: the run as that close recorded it, or as it was opened when it was
+            // given back.
+            return o.Open.Recording is { } recorded ? await recorded.WaitAsync(cancellationToken).ConfigureAwait(false) : o.Run;
         }
         JobDef def = o.Def;
         Run run = o.Run;

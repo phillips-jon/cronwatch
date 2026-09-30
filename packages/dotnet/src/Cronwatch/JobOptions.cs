@@ -78,7 +78,9 @@ public sealed class JobOptions
     }
 
     /// <summary>What a successful run's output must show; see <see cref="Cronwatch.Expect"/>.</summary>
-    public Expect? Expect { get; init; }
+    public Expect? Expect { get => _expect; init => _expect = value; }
+
+    private Expect? _expect;
 
     /// <summary>Alert on the Nth failure in a row rather than the first. Default 1.</summary>
     public int? FailuresBeforeAlert
@@ -132,6 +134,52 @@ public sealed class JobOptions
             _values[key] = _budget;
         }
     }
+
+    /// <summary>
+    /// A copy of these options, for an integration that adds to options the app gave. The budget
+    /// and every value are copied; the expect rule is shared, as it is immutable.
+    /// </summary>
+    internal JobOptions Copy()
+    {
+        var copy = new JobOptions();
+        copy.MergeFrom(this);
+        return copy;
+    }
+
+    /// <summary>
+    /// Sets each field <paramref name="other"/> sets, after these: a key already here keeps its
+    /// place and takes the other's value, as the SDK's object spread does; its expect rule, when it
+    /// has one, replaces this one's.
+    /// </summary>
+    internal void MergeFrom(JobOptions other)
+    {
+        foreach (string key in other._order)
+        {
+            object? v = other._values[key];
+            if (v is BudgetMap b)
+            {
+                foreach (var e in b)
+                {
+                    _budget[e.Key] = e.Value;
+                }
+                Touch("budget");
+            }
+            else
+            {
+                Put(key, Json.Copy(v));
+            }
+        }
+        if (other._expect != null)
+        {
+            _expect = other._expect;
+        }
+    }
+
+    /// <summary>Sets a field in place, as the property would; null takes it out.</summary>
+    internal void SetField(string key, object? value) => Put(key, value);
+
+    /// <summary>Sets the expect rule.</summary>
+    internal void SetExpect(Expect? rule) => _expect = rule;
 
     /// <summary>The fields as the SDK's options object, in their order, <c>expect</c> left to <see cref="Expect"/>.</summary>
     internal JsObject Fields()

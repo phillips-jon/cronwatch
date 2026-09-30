@@ -74,6 +74,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         _onWarning = options.OnWarning ?? DefaultOnWarning;
         _time = options.Clock ?? TimeProvider.System;
         _environment = options.Environment;
+        _runScope = options.RunScope;
         Timings = options.TimingsOverride ?? new Timings();
         _processExitHook = options.ProcessExitHook;
         if (_processExitHook)
@@ -210,6 +211,13 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
             throw CronwatchException.Invalid(e.Message);
         }
     }
+
+    /// <summary>The definition <see cref="Job"/> would declare, the client's defaults applied, without declaring it.</summary>
+    /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/>, as <see cref="Job"/> refuses.</exception>
+    internal Definition Describe(string name, JobOptions options) => Define(name, options).Stored;
+
+    /// <summary>The handle of the job declared under <paramref name="name"/> in this client, or null.</summary>
+    internal Job? DeclaredJob(string name) => Declared(name) is { } def ? new Job(this, def) : null;
 
     private Job DeclaredOrNew(string name, JobOptions? options)
     {

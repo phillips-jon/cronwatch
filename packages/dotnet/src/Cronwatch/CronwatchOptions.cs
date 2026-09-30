@@ -136,6 +136,14 @@ public sealed class CronwatchOptions
     /// </summary>
     public string? Environment { get; init; }
 
+    /// <summary>
+    /// Called in the run's own flow as each run's function starts, with the run; what it answers
+    /// is disposed when the function ends. <c>Cronwatch.Hosting</c> opens an <c>ILogger</c> scope
+    /// here, so every line a job logs carries its name and run id. A throw is reported and the
+    /// run goes on without it.
+    /// </summary>
+    public Func<JobContext, IDisposable?>? RunScope { get; init; }
+
     internal bool AlertsGiven => _alerts.Touched;
 
     internal Timings? TimingsOverride { get; init; }
