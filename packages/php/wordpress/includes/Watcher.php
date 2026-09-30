@@ -23,8 +23,10 @@ use Cronwatch\Output;
  * other way (a plain do_action, or outside cron) finds no note and is not a
  * run.
  *
- * What the callbacks echo is kept as the run's output and echoed on as
- * before. A callback that throws, a fatal error or an exit() ends the
+ * What the callbacks echo is passed on as it is written (an output buffer
+ * with a callback, flushed every 8 KB), and its end is kept as the run's
+ * output: never all of it, so a callback that streams a large export uses
+ * no more memory than it did without the plugin. A callback that throws, a fatal error or an exit() ends the
  * request: the run is recorded as failed from inside WordPress's fatal
  * error handler (which may end the process with wp_die() before a plugin's
  * shutdown function is called) or from a shutdown function of its own,
@@ -40,6 +42,12 @@ final class Watcher
     private array $wrapped = [];
     /** @var list<array{hook: string, handle: ?RunHandle, level: int}> Runs in progress, innermost last. */
     private array $open = [];
+    /** How much of the end of a run's output is kept: four times the run's cap, so the cap (counted in UTF-16 units) always has enough. */
+    public const OUTPUT_KEPT = 4 * \Cronwatch\Output::OUTPUT_CAP;
+    /** The size at which a run's output buffer is flushed on. */
+    public const CHUNK = 8192;
+    /** @var array<int, string> the kept end of each open run's output passed on so far, by buffer level */
+    private array $kept = [];
     private bool $shutdownHooked = false;
     /** Memory given back when a fatal error (memory exhausted) ends a run, so it can still be recorded. */
     private ?string $reserve = null;
@@ -117,8 +125,35 @@ final class Watcher
             return;
         }
         $this->hookFailures();
-        ob_start();
+        $level = ob_get_level() + 1;
+        $this->kept[$level] = '';
+        ob_start(fn (string $chunk, int $phase): string => $this->passOn($level, $chunk, $phase), self::CHUNK);
         $this->open[] = ['hook' => $hook, 'handle' => $handle, 'level' => ob_get_level()];
+    }
+
+    /**
+     * A run's output buffer handler: each chunk goes on as it is, and the
+     * end of what went on is kept for the run. What is cleaned (at the end
+     * of the run, which reads the rest itself) is neither kept nor sent.
+     */
+    private function passOn(int $level, string $chunk, int $phase): string
+    {
+        if (($phase & PHP_OUTPUT_HANDLER_CLEAN) !== 0) {
+            return '';
+        }
+        if ($chunk !== '' && isset($this->kept[$level])) {
+            $this->kept[$level] = self::keepEnd($this->kept[$level] . $chunk);
+        }
+        return $chunk;
+    }
+
+    /** The last OUTPUT_KEPT bytes of `text`, starting on a whole UTF-8 character. */
+    private static function keepEnd(string $text): string
+    {
+        if (strlen($text) <= self::OUTPUT_KEPT) {
+            return $text;
+        }
+        return (string) preg_replace('/^[\x80-\xBF]+/', '', substr($text, -self::OUTPUT_KEPT));
     }
 
     /** The last callback on a watched hook: finishes the run begin() started. */
@@ -169,9 +204,12 @@ final class Watcher
             while (ob_get_level() > $entry['level']) {
                 ob_end_flush();
             }
-            $output = (string) ob_get_clean();
-            echo $output; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the callbacks' own output, passed on unchanged.
+            $rest = (string) ob_get_contents();
+            ob_end_clean();
+            $output = self::keepEnd(($this->kept[$entry['level']] ?? '') . $rest);
+            echo $rest; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the callbacks' own output, passed on unchanged.
         }
+        unset($this->kept[$entry['level']]);
         $handle = $entry['handle'];
         try {
             $text = rtrim($output, "\r\n");
