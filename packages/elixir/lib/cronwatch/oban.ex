@@ -44,8 +44,10 @@ if Code.ensure_loaded?(Oban) do
     worker's own process: each attempt is a run (trigger `oban`, id
     `oban:<app>:<job id>:<attempt>`, with the jobs table's prefix before the
     job's id when it is not `public`, since a job's id is unique only within
-    its table), with its context in the worker's process, so
-    `Cronwatch.log/1` and `Cronwatch.metric/2` work inside `perform/1`. A
+    its table, and `.<times snoozed>` after the attempt once the job has
+    snoozed, since a snooze gives its attempt back), with its context in the
+    worker's process, so `Cronwatch.log/1` and `Cronwatch.metric/2` work
+    inside `perform/1`. A
     retry is a new attempt and a new run: failing attempts open one failed
     alert and the one that succeeds closes it, and `failures_before_alert`
     says how many attempts to allow first. The worker's process is
@@ -53,9 +55,10 @@ if Code.ensure_loaded?(Oban) do
     is a failed run at once.
 
     A `{:snooze, period}` gives the run back (nothing judged, nothing
-    alerted), since the job did not fail and will run again; a `{:cancel,
-    reason}` (and the older `:discard`) fails it, since the worker gave up on
-    the job. An attempt left running by a node that died before its monitor
+    alerted), since the job did not fail and will run again; a store that
+    cannot take it back (no `delete_run_if`, or a failed delete) keeps it as
+    an `ok` run, still not judged; a `{:cancel, reason}` (and the older
+    `:discard`) fails it, since the worker gave up on the job. An attempt left running by a node that died before its monitor
     could record it is closed when Oban's Lifeline rescues the job and its
     next attempt starts: that start fails the earlier attempt's run with
     `Oban rescued the job after its node stopped`.
@@ -568,7 +571,7 @@ if Code.ensure_loaded?(Oban) do
 
             cw_job ->
               close_rescued(cfg, cw_job, job, meta[:conf])
-              id = if is_integer(job.id), do: run_id(cfg, meta[:conf], job.id, job.attempt)
+              id = if is_integer(job.id), do: run_id(cfg, meta[:conf], job.id, job.attempt, snoozed(job))
               Exec.open(cw_job, trigger: @trigger, id: id, defer: true)
           end
         rescue
@@ -589,7 +592,8 @@ if Code.ensure_loaded?(Oban) do
       case pop(cfg) do
         %{} = run ->
           case meta.state do
-            :snoozed -> Exec.take_back(run, {:returned, :ok})
+            # Nothing judged: one the store cannot take back is recorded, not judged.
+            :snoozed -> Exec.take_back(run, :unjudged)
             state when state in [:cancelled, :discard] -> Exec.close(run, {:returned, {:error, perform_error(meta)}})
             _ -> Exec.close(run, {:returned, success(meta[:result])})
           end
@@ -662,8 +666,8 @@ if Code.ensure_loaded?(Oban) do
     # An earlier attempt still running (its node died before its monitor
     # could record it, and Lifeline rescued the job) is failed as this one
     # starts.
-    defp close_rescued(cfg, cw_job, %{id: id, attempt: attempt}, conf) when is_integer(id) and attempt > 1 do
-      prior = run_id(cfg, conf, id, attempt - 1)
+    defp close_rescued(cfg, cw_job, %{id: id, attempt: attempt} = job, conf) when is_integer(id) and attempt > 1 do
+      prior = run_id(cfg, conf, id, attempt - 1, snoozed(job))
 
       case Cronwatch.get_run(prior, instance: cfg.instance) do
         {:ok, %{status: "running", job: job_name}} when job_name == cw_job.name ->
@@ -683,16 +687,25 @@ if Code.ensure_loaded?(Oban) do
     # only within its table, so two apps sharing a store with an Oban
     # database each, or two Oban instances on different prefixes, would
     # otherwise give two runs one id: the second insert refused, its run
-    # unrecorded, and a rescue able to fail the other's run.
-    def run_id(cfg, conf, id, attempt) do
+    # unrecorded, and a rescue able to fail the other's run. A job snoozed
+    # adds how many times (`oban:billing:42:1.2`): since Oban 2.24 a snooze
+    # gives its attempt back, so the execution after it has the snoozed
+    # one's attempt, and would otherwise be refused as a run already
+    # recorded when the snooze could not be taken back.
+    def run_id(cfg, conf, id, attempt, snoozed \\ 0) do
       prefix =
         case conf do
           %{prefix: prefix} when is_binary(prefix) and prefix not in ["", "public"] -> prefix <> ":"
           _ -> ""
         end
 
-      "#{cfg.app_tag}:#{prefix}#{id}:#{attempt}"
+      suffix = if is_integer(snoozed) and snoozed > 0, do: ".#{snoozed}", else: ""
+      "#{cfg.app_tag}:#{prefix}#{id}:#{attempt}#{suffix}"
     end
+
+    # How many times the job has snoozed (Oban keeps it in the job's meta).
+    defp snoozed(%{meta: %{"snoozed" => n}}) when is_integer(n), do: n
+    defp snoozed(_), do: 0
   end
 
   defmodule Cronwatch.Oban.CheckWorker do

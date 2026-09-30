@@ -147,15 +147,17 @@ defmodule Cronwatch.Run.Exec do
   # stuck; a row no longer running (a check marked it stuck meanwhile) is
   # reported and left as it is. A run whose start was never written has
   # nothing to take back.
-  defp take_back(c, job, info) do
+  defp take_back(c, job, info, unjudged \\ false) do
     cond do
       not info.recorded ->
         true
 
       not Store.has?(c.store, :delete_run_if, 3) ->
+        how = if unjudged, do: "recorded as it ended, not judged", else: "recorded as it ended"
+
         Core.report(
           c,
-          Cronwatch.Error.other("the store cannot take back a run (it has no delete_run_if/4); recorded as it ended"),
+          Cronwatch.Error.other("the store cannot take back a run (it has no delete_run_if/4); #{how}"),
           "discarding #{job.name}"
         )
 
@@ -240,16 +242,38 @@ defmodule Cronwatch.Run.Exec do
   @doc """
   Takes back a run `open/2` opened (an attempt given back without failing),
   as `discard_when` does; when the store cannot, the run is recorded with
-  `outcome`, as it ended.
+  `outcome`, as it ended. With `outcome` `:unjudged` (a queue's snooze,
+  nothing to judge), such a run is recorded as `ok` and not judged: the
+  job's state is left as it was, so it neither recovers the job nor counts
+  as a failure.
   """
   def take_back(%{config: c, job: job, info: info} = state, outcome) do
     if unwind(state, "discarded") do
-      if take_back(c, job, info),
-        do: Lines.close(Runs.table(c.name, :lines), info.key),
-        else: record_outcome(c, job, info, outcome)
+      cond do
+        take_back(c, job, info, outcome == :unjudged) -> Lines.close(Runs.table(c.name, :lines), info.key)
+        outcome == :unjudged -> record_unjudged(c, job, info)
+        true -> record_outcome(c, job, info, outcome)
+      end
     end
 
     :ok
+  end
+
+  # A run given back that the store could not take back: stored as it
+  # ended, ok, with its lines, and not judged.
+  defp record_unjudged(c, job, info) do
+    lines = Runs.table(c.name, :lines)
+
+    record(
+      c,
+      job,
+      info,
+      fn run ->
+        snap = Lines.snapshot(lines, info.key)
+        Core.conclude(c, nil, %{run | metrics: snap.metrics, output: Lines.output(snap)}, nil, nil)
+      end,
+      false
+    )
   end
 
   # Undoes what open/2 set up in this process, and answers whether the run
@@ -432,7 +456,7 @@ defmodule Cronwatch.Run.Exec do
   end
 
   # Everything after the function: in a task that outlives the caller.
-  defp record(c, job, info, build) do
+  defp record(c, job, info, build, evaluate \\ true) do
     task =
       Task.Supervisor.async_nolink(Cronwatch.Supervisor.tasks(c.name), fn ->
         lines = Runs.table(c.name, :lines)
@@ -448,10 +472,11 @@ defmodule Cronwatch.Run.Exec do
 
           run = build.(run)
           Lines.close(lines, info.key)
-          wait_for(c, job, info.started)
+          # A run not judged does not judge its start either.
+          unless not evaluate and info.started == :deferred, do: wait_for(c, job, info.started)
 
           try do
-            case Core.record_finish!(c, job, run, info.recorded, finished_at) do
+            case Core.record_finish!(c, job, run, info.recorded, finished_at, evaluate) do
               nil ->
                 :ok
 

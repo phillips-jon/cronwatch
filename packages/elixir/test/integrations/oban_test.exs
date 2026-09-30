@@ -21,6 +21,16 @@ defmodule Cronwatch.Test.Workers.Snoozer do
   def perform(_job), do: {:snooze, 1}
 end
 
+defmodule Cronwatch.Test.Workers.SnoozeThenFail do
+  @moduledoc "Snoozes once, then fails."
+  use Oban.Worker, queue: :default, max_attempts: 1
+
+  @impl Oban.Worker
+  def perform(%Oban.Job{meta: meta}) do
+    if (meta["snoozed"] || 0) == 0, do: {:snooze, 1}, else: {:error, "still broken"}
+  end
+end
+
 defmodule Cronwatch.Test.Workers.Canceller do
   @moduledoc "Gives up on its job."
   use Oban.Worker, queue: :default
@@ -69,6 +79,7 @@ defmodule Cronwatch.ObanTest do
   alias Cronwatch.Test.Oban, as: TestOban
   alias Cronwatch.Test.Stores
   alias Cronwatch.Test.Workers
+  alias Cronwatch.Test.Wrap
 
   @moduletag timeout: 120_000
 
@@ -193,6 +204,42 @@ defmodule Cronwatch.ObanTest do
         assert run.error =~ ~s(failed with {:cancel, "the invoice was deleted"})
         assert Capture.types(alerts) == ["failed"]
         assert messages(errors) == []
+      end
+
+      test "a snooze the store cannot take back is not judged, and the retry after it is a run of its own",
+           %{engine: engine} do
+        oban = TestOban.start(engine)
+        # A store of the app's own without delete_run_if.
+        store = Wrap.spec(inner: Stores.memory())
+
+        %{cw: cw, alerts: alerts, errors: errors} =
+          make(
+            store: store,
+            integrations: [{Cronwatch.Oban, oban: oban, app: "billing", workers: [Workers.SnoozeThenFail]}]
+          )
+
+        name = "Cronwatch.Test.Workers.SnoozeThenFail"
+        Cronwatch.job!(name, instance: cw)
+        Cronwatch.run(name, fn _ -> {:error, "earlier"} end, instance: cw)
+        assert Capture.types(alerts) == ["failed"]
+
+        {:ok, _} = Oban.insert(oban, Workers.SnoozeThenFail.new(%{}))
+        drain(oban)
+
+        [earlier, snoozed, retry] = runs(cw, name)
+        assert earlier.error == "earlier"
+        assert snoozed.status == "ok"
+        assert retry.status == "failed"
+        assert retry.id != snoozed.id, "the retry is not taken for the snoozed attempt"
+        assert retry.error =~ "still broken"
+
+        # The snooze neither recovered the job nor reset its failures.
+        assert Capture.types(alerts) == ["failed"]
+        assert Cronwatch.job_summary!(name, instance: cw).consecutive_failures == 2
+
+        assert messages(errors) == [
+                 "the store cannot take back a run (it has no delete_run_if/4); recorded as it ended, not judged"
+               ]
       end
 
       test "a raise fails the run with the exception", %{engine: engine} do

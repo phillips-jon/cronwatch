@@ -201,11 +201,12 @@ defmodule Cronwatch.Core do
   end
 
   @doc """
-  Writes a finished run and evaluates it. `recorded` says whether its start
-  was written; if not, it is inserted now. Answers why nothing was recorded,
-  or nil. Raises when the store does, so a handle can be finished again.
+  Writes a finished run and evaluates it (unless `evaluate` is false).
+  `recorded` says whether its start was written; if not, it is inserted now.
+  Answers why nothing was recorded, or nil. Raises when the store does, so a
+  handle can be finished again.
   """
-  def record_finish!(c, job, run, recorded, finished_at) do
+  def record_finish!(c, job, run, recorded, finished_at, evaluate \\ true) do
     inserted =
       if recorded do
         :claim
@@ -215,7 +216,7 @@ defmodule Cronwatch.Core do
 
         try do
           store!(c, :insert_run, [run])
-          finish_run(c, job.definition, run, finished_at)
+          if evaluate, do: finish_run(c, job.definition, run, finished_at)
           :done
         rescue
           e in Error ->
@@ -248,7 +249,7 @@ defmodule Cronwatch.Core do
             why
 
           {:ok, late} ->
-            if not late or run.status == "ok", do: finish_run(c, job.definition, run, finished_at)
+            if evaluate and (not late or run.status == "ok"), do: finish_run(c, job.definition, run, finished_at)
             nil
         end
     end
