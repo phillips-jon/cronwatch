@@ -30,16 +30,23 @@ from .alerts import ChannelContext, Console, channel_name, send_to
 from .duration import Duration, format_duration, parse_duration
 from .evaluate import (
     BASELINE_WINDOW,
+    MAX_UNDELIVERED,
+    SEND_LEASE_MS,
+    Evaluation,
     apply_silence,
     empty_state,
     has_full_baseline,
+    hold_alerts,
     is_silenced,
     is_stuck,
     normalize_state,
     on_check,
     on_run_finish,
     on_run_start,
+    record_sent,
+    release_sending,
     run_duration,
+    silence_end,
     stale_alert,
     state_version,
     summarize,
@@ -48,14 +55,13 @@ from .evaluate import (
 )
 from .format import compose_alert
 from .job import AbortSignal, JobContext, RunRecorder, _current
-from .output import cap_output, error_message, redact_secrets, strip_nul
+from .output import cap_output, describe_error, redact_and_cap, redact_secrets
 from .run_handle import RunHandle, _Retry
 from .schedule import parse_schedule
 from .serialize import check_expectation, to_stored
 from .stores.memory import MemoryStore
 from .types import (
     Alert,
-    AlertDraft,
     AlertType,
     CheckResult,
     JobDefinition,
@@ -79,8 +85,6 @@ TRIAGE_TIMEOUT_MS = 25_000
 #: How long one channel may take to send one alert.
 CHANNEL_TIMEOUT_MS = 15_000
 PRUNE_INTERVAL_MS = 60 * 60_000
-#: Undelivered alerts kept per job for retry; the oldest go first.
-MAX_UNDELIVERED = 20
 #: Wall-clock time one check spends retrying undelivered alerts, across every job.
 RETRY_BUDGET_MS = 20_000
 #: Reads and writes of one job's state before an update gives up on a store that keeps changing under it.
@@ -153,9 +157,12 @@ def _clamp_limit(limit: Any, fallback: int, minimum: int) -> int:
     return min(500, max(minimum, n))
 
 
-def _alert_key(alert: Alert) -> str:
-    """Identifies an alert across retries."""
-    return f"{alert.type}|{_js_string(alert.at)}|{alert.run.id if alert.run else ''}"
+@dataclass
+class _Held:
+    """Alerts written with the state that opened their conditions, and how many older ones the queue let go."""
+
+    alerts: list[Alert]
+    dropped: int
 
 
 def _check_run_id(job: str, run_id: Any, method: str) -> None:
@@ -177,6 +184,8 @@ class _Flight:
 
     def __init__(self) -> None:
         self._done = threading.Event()
+        #: The thread running the check, which close() must not wait on.
+        self.owner = threading.get_ident()
         self._value: CheckResult | None = None
         self._error: BaseException | None = None
 
@@ -187,6 +196,10 @@ class _Flight:
     def reject(self, error: BaseException) -> None:
         self._error = error
         self._done.set()
+
+    def wait(self) -> None:
+        """Until the check is over, however it ended."""
+        self._done.wait()
 
     def value(self) -> CheckResult:
         self._done.wait()
@@ -421,7 +434,7 @@ class _Execution:
         )
         self.recorded = False
         try:
-            client._sync(self.definition)
+            client._sync(self.definition, confirm=True)
             client.store.insert_run(self.run.copy())
             self.recorded = True
         except Exception as error:
@@ -450,7 +463,7 @@ class _Execution:
         run.duration_ms = run_duration(self.started_at, finished_at)
         run.metrics = self.recorder.metrics()
         logged = self.recorder.output()
-        run.output = logged if logged is not None else (cap_output(result) if isinstance(result, str) else None)
+        run.output = logged if logged is not None else (result if isinstance(result, str) else None)
         seen = self.recorder.expect_text()
         expect_text = seen if seen is not None else (result if isinstance(result, str) else None)
         client._conclude(self.definition, run, result, error, threw, expect_text)
@@ -619,7 +632,9 @@ class Cronwatch:
         alone, so recording the same run twice changes nothing. When two
         processes record the same finish, only the one whose write lands
         evaluates it. ``evaluate=False`` stores it without judging it, for
-        history imported on first sight. Returns the alerts it sent."""
+        history imported on first sight. A metric that is not a finite number
+        raises before anything is written, as metric() does. Returns the
+        alerts it sent."""
         self._after_fork_check()
         given = run if isinstance(run, Run) else Run.from_dict(run)
         with self._registry:
@@ -628,6 +643,10 @@ class Cronwatch:
             raise ValueError(f'record_run: job "{given.job}" is not declared; call job() first')
         if "\x00" in given.id:
             raise ValueError(f'record_run: run ids cannot contain a NUL character (job "{given.job}")')
+        # Refused as metric() refuses them: a store keeps NaN and Infinity as null.
+        for metric, value in (given.metrics or {}).items():
+            if not _js.is_finite(value):
+                raise ValueError(f'record_run: metric "{metric}" must be a finite number (job "{given.job}", run "{given.id}")')
         self._sync(declared)
         run = given.copy()
         run.metrics = {str(k): v for k, v in (run.metrics or {}).items()}
@@ -637,9 +656,9 @@ class Cronwatch:
                 run.status = RunStatus.FAILED
                 run.error = unmet
         if run.output is not None:
-            run.output = strip_nul(self._redact(cap_output(_js.well_formed(run.output))))
+            run.output = redact_and_cap(run.output, self._redact)
         if run.error is not None:
-            run.error = strip_nul(self._redact(cap_output(_js.well_formed(run.error))))
+            run.error = redact_and_cap(run.error, self._redact)
         definition = to_stored(declared)
 
         stored = self.store.get_run(run.id)
@@ -699,18 +718,19 @@ class Cronwatch:
         """Every job's summary with its newest `limit` runs, read together. What the dashboard shows."""
         self._after_fork_check()
         self._ensure_ready()
-        for definition in self.defined_jobs():
-            self._sync(definition)
+        stored_jobs = self._stored_jobs()
         at = self.now()
         count = _clamp_limit(limit, 20, 0)
-        return [self._snapshot(stored, at, count) for stored in self.store.list_jobs()]
+        return [self._snapshot(stored, at, count) for stored in stored_jobs]
 
     def job_summary(self, name: str) -> JobSummary | None:
+        """A job's summary, or None for one the store does not have. One declared
+        here and forgotten elsewhere is written again, as a check would."""
         self._ensure_ready()
         with self._registry:
             definition = self._definitions.get(name)
         if definition is not None:
-            self._sync(definition)
+            self._sync(definition, confirm=True)
         stored = self.store.get_job(name)
         if stored is None:
             return None
@@ -728,11 +748,12 @@ class Cronwatch:
         return result
 
     def silence(self, name: str, duration: Duration) -> JobState:
-        """Stop alerts for a job for a while. State keeps updating underneath."""
+        """Stop alerts for a job for a while. State keeps updating underneath.
+        The end is a whole millisecond, held at 2^53 - 1 (see silence_end)."""
         ms = parse_duration(duration, "silence duration")
 
         def change(state: JobState) -> None:
-            state.silenced_until = self.now() + ms
+            state.silenced_until = silence_end(self.now(), ms)
 
         return self._patch_state(name, change)
 
@@ -743,7 +764,10 @@ class Cronwatch:
         return self._patch_state(name, change)
 
     def forget(self, name: str) -> None:
-        """Remove a job and its runs from the store. A job still declared in code comes back on its next run."""
+        """Remove a job and its runs from the store. A job still declared in code
+        comes back: here on its next run, and in any other process that
+        declares it on its next run there, or at that process's next check or
+        dashboard read."""
         self._ensure_ready()
         with self._registry:
             self._definitions.pop(name, None)
@@ -799,7 +823,16 @@ class Cronwatch:
             ticker.stop()
 
     def close(self) -> None:
+        """Stop the interval, wait for a check already under way (bounded by
+        its own channel, triage and retry timeouts; what it raises was
+        reported to whoever started it), then close the store, so that check
+        neither writes after the store is closed nor loses the alerts it
+        would queue."""
         self.stop()
+        with self._check_lock:
+            flight = self._checking
+        if flight is not None and flight.owner != threading.get_ident():
+            flight.wait()
         close = getattr(self.store, "close", None)
         if callable(close):
             close()
@@ -913,19 +946,30 @@ class Cronwatch:
             # Only once init has gone through: a failure is tried again on the next call.
             self._ready = True
 
-    def _sync(self, definition: JobDefinition) -> None:
+    def _sync(self, definition: JobDefinition, confirm: bool = False) -> None:
         """Writes the declaration of `definition`'s name as it stands, unless the
         store has it. A handle kept from an earlier declaration writes the one
         that replaced it, never its own over it, and one forgotten since writes
         its own. The writes of one name take turns, each reading what stands
         once its turn comes, so one still under way cannot land after a later
         one; and a name declared again while its write was under way is still
-        to be written."""
+        to be written. A name is marked as written only while that same
+        declaration stands, so a forget that lands during the write (deleting
+        the row after it) leaves the name to be written again, as does one
+        forgotten before it.
+
+        With `confirm`, as a run starts, a name already written is read back:
+        another process may have forgotten the job since, and a job still
+        declared here comes back on its next run."""
         self._ensure_ready()
         name = definition.name
         with self._registry:
-            if name in self._synced:
+            written = name in self._synced
+        if written:
+            if not confirm or self.store.get_job(name) is not None:
                 return
+            with self._registry:
+                self._synced.discard(name)
         with self._serial(name, syncing=True):
             with self._registry:
                 if name in self._synced:
@@ -933,8 +977,30 @@ class Cronwatch:
                 standing = self._definitions.get(name, definition)
             self.store.upsert_job(to_stored(standing), self.now())
             with self._registry:
-                if self._definitions.get(name, standing) is standing:
+                if self._definitions.get(name) is standing:
                     self._synced.add(name)
+
+    def _stored_jobs(self) -> list[StoredJob]:
+        """Every stored job, once each declaration has been written. A job
+        declared here that the store no longer has was forgotten by another
+        process after this one wrote it: it is written again, as its next run
+        would, so it is checked and shown while any process still declares it."""
+        for definition in self.defined_jobs():
+            self._sync(definition)
+        jobs: list[StoredJob] = self.store.list_jobs()
+        listed = {job.name for job in jobs}
+        missing = [definition for definition in self.defined_jobs() if definition.name not in listed]
+        if not missing:
+            return jobs
+        for definition in missing:
+            with self._registry:
+                # Not one forgotten here meanwhile.
+                if self._definitions.get(definition.name) is not definition:
+                    continue
+                self._synced.discard(definition.name)
+            self._sync(definition)
+        again: list[StoredJob] = self.store.list_jobs()
+        return again
 
     def _serial(self, job: str, syncing: bool = False) -> threading.RLock:
         """The job's lock: two runs (or a run and a check) in this process never
@@ -1069,13 +1135,14 @@ class Cronwatch:
 
     def _conclude(self, definition: JobDefinition, run: Run, result: Any, error: Any, threw: bool, expect_text: str | None) -> None:
         """Sets a finished run's status and error from how it ended, then redacts
-        its output and error. Shared by runs and RunHandle.finish(). A result
-        that is an HTTP response with a status of 400 or more is a failure, as
-        a fetch Response is in the SDK (see cronwatch._response)."""
+        its output and error and caps them, in that order. Shared by runs and
+        RunHandle.finish(). A result that is an HTTP response with a status of
+        400 or more is a failure, as a fetch Response is in the SDK (see
+        cronwatch._response)."""
         status = None if threw else response_status(result)
         if threw:
             run.status = RunStatus.FAILED
-            run.error = error_message(error)
+            run.error = describe_error(error)
         elif status is not None and status[0] >= 400:
             run.status = RunStatus.FAILED
             run.error = f"HTTP {status[0]}{' ' + status[1] if status[1] else ''}"
@@ -1087,11 +1154,12 @@ class Cronwatch:
             else:
                 run.status = RunStatus.OK
         # Redacted after the expect check, so a rule can still match what was
-        # logged. NULs go last, so not even a custom redact can store one.
+        # logged, and before the cap, so the cut cannot keep half a secret.
+        # NULs go last, so not even a custom redact can store one.
         if run.output is not None:
-            run.output = strip_nul(self._redact(_js.well_formed(run.output)))
+            run.output = redact_and_cap(run.output, self._redact)
         if run.error is not None:
-            run.error = strip_nul(self._redact(_js.well_formed(run.error)))
+            run.error = redact_and_cap(run.error, self._redact)
 
     def _record_finish(self, definition: JobDefinition, run: Run, recorded: bool, finished_at: int) -> str | None:
         """Writes a finished run and evaluates it. `recorded` says whether its
@@ -1193,7 +1261,7 @@ class Cronwatch:
         run = Run(id=run_id or str(uuid.uuid4()), job=name, status=RunStatus.RUNNING, started_at=self.now(), trigger=trigger)
         recorded = False
         try:
-            self._sync(definition)
+            self._sync(definition, confirm=True)
             self.store.insert_run(run.copy())
             recorded = True
         except Exception as error:
@@ -1268,13 +1336,14 @@ class Cronwatch:
             return None
         finished_at = self.now()
         logged = recorder.output()
-        added = logged if logged is not None else (cap_output(result) if isinstance(result, str) else None)
+        added = logged if logged is not None else (result if isinstance(result, str) else None)
         run = source.copy()
         run.status = RunStatus.RUNNING
         run.finished_at = finished_at
         run.duration_ms = run_duration(source.started_at, finished_at)
         run.error = None
-        run.output = _join_output(source.output, added)
+        # Capped by _conclude(), after it is redacted.
+        run.output = _join_lines(source.output, added)
         run.metrics = {**(source.metrics or {}), **recorder.metrics()}
         seen = recorder.expect_text()
         expect_text = _join_lines(head, _join_lines(source.output, seen if seen is not None else (result if isinstance(result, str) else None)))
@@ -1305,7 +1374,7 @@ class Cronwatch:
                 return False
             updated = stored.copy()
             if lines is not None:
-                updated.output = _join_output(stored.output, strip_nul(self._redact(_js.well_formed(lines))))
+                updated.output = _join_output(stored.output, redact_and_cap(lines, self._redact))
             updated.metrics = {**(stored.metrics or {}), **metrics}
             return self._write_run_if(updated, [RunStatus.RUNNING])
         except Exception as error:
@@ -1329,21 +1398,41 @@ class Cronwatch:
 
     def _finish_run(self, definition: JobDefinition, run: Run, at: int) -> list[Alert]:
         """Evaluate a finished run (ok, failed, or timed out by a check), already
-        written, against the job's state and send what that produces. Never raises."""
+        written, against the job's state and send what that produces. The
+        alerts are written with that state (see _outbox()). Never raises."""
         past: list[list[Run]] = []
 
-        def change(previous: JobState) -> tuple[JobState, list[AlertDraft]]:
+        def change(previous: JobState) -> tuple[JobState, _Held]:
             if not past:
                 past.append(self._history(run))
-            settled = apply_silence(previous, on_run_finish(definition, run, previous, past[0], at), at)
-            return settled.state, settled.alerts
+            return self._outbox(apply_silence(previous, on_run_finish(definition, run, previous, past[0], at), at), definition, at)
 
         try:
-            _, drafts = self._update_state(run.job, change)
+            _, held = self._update_state(run.job, change)
         except Exception as error:
             self._report(error, f"evaluating {run.job}")
             return []
-        return self._dispatch(drafts, definition, at)
+        self._report_dropped(run.job, held.dropped)
+        return self._dispatch(run.job, held.alerts, at)
+
+    def _outbox(self, settled: Evaluation, definition: JobDefinition, at: int) -> tuple[JobState, _Held]:
+        """An evaluation as it is written: its drafts composed into alerts and
+        held in the same state (hold_alerts), so the write that opens a
+        condition also keeps its alerts, and a process that stops before
+        sending them does not lose them. Called inside _update_state(), so it
+        only computes."""
+        composed = [compose_alert(draft, definition, at) for draft in settled.alerts]
+        held = hold_alerts(settled.state, composed, self.now() + SEND_LEASE_MS, self._defer_delivery)
+        return held.state, _Held(composed, held.dropped)
+
+    def _report_dropped(self, name: str, dropped: int) -> None:
+        """Reports alerts let go because a job's queue was full."""
+        if dropped <= 0:
+            return
+        self._report(
+            RuntimeError(f"{dropped} undelivered alert{'' if dropped == 1 else 's'} for {name} dropped: only the newest {MAX_UNDELIVERED} are kept for retry"),
+            f"alert queue for {name}",
+        )
 
     def _history(self, run: Run) -> list[Run]:
         """The runs before `run`, newest first, with up to BASELINE_WINDOW
@@ -1371,16 +1460,21 @@ class Cronwatch:
 
         # Runs that never reported back. One that cannot be judged (its job's
         # stored timeout no longer parses, say) is reported and skipped.
-        for run in self.store.running_runs():
+        for listed in self.store.running_runs():
             try:
                 with self._registry:
-                    declared = self._definitions.get(run.job)
+                    declared = self._definitions.get(listed.job)
                 if declared is not None:
                     judged: JobDefinition | None = to_stored(declared)
                 else:
-                    stored_job = self.store.get_job(run.job)
+                    stored_job = self.store.get_job(listed.job)
                     judged = stored_job.definition if stored_job else None
-                if judged is None or not is_stuck(judged, run, at):
+                if judged is None or not is_stuck(judged, listed, at):
+                    continue
+                # Read again just before the write: lines and metrics flushed since
+                # the list was read (while earlier stuck runs were sent, say) are kept.
+                run = self.store.get_run(listed.id)
+                if run is None or run.status != RunStatus.RUNNING or run.job != listed.job:
                     continue
                 timeout = timeout_ms(judged)
                 run.status = RunStatus.TIMEOUT
@@ -1392,26 +1486,30 @@ class Cronwatch:
                     continue
                 alerts.extend(self._finish_run(judged, run, at))
             except Exception as error:
-                self._report(error, f"checking {run.job}")
+                self._report(error, f"checking {listed.job}")
 
         # Each job on its own: one that cannot be evaluated is reported, shown
         # as failing (see unevaluable_summary) and does not stop the others.
         jobs: list[JobSummary] = []
         retries = [0.0]
-        for stored in self.store.list_jobs():
+        for stored in self._stored_jobs():
             try:
                 recent = self.store.list_runs(stored.name, BASELINE_WINDOW)
                 expected: list[int | None] = [None]
 
-                def change(previous: JobState, stored: StoredJob = stored, recent: list[Run] = recent, expected: list[int | None] = expected) -> tuple[JobState, list[AlertDraft]]:
+                def change(previous: JobState, stored: StoredJob = stored, recent: list[Run] = recent, expected: list[int | None] = expected) -> tuple[JobState, _Held]:
                     evaluation = on_check(stored.definition, stored, recent[0] if recent else None, previous, at)
                     expected[0] = evaluation.next_expected_at
                     settled = apply_silence(previous, evaluation, at)
-                    return settled.state, settled.alerts
+                    # Alerts a process stopped sending part way go back to the retry queue.
+                    released = release_sending(settled.state, self.now())
+                    state, held = self._outbox(Evaluation(released.state, settled.alerts), stored.definition, at)
+                    return state, _Held(held.alerts, released.dropped + held.dropped)
 
-                state, drafts = self._update_state(stored.name, change)
+                state, held = self._update_state(stored.name, change)
+                self._report_dropped(stored.name, held.dropped)
                 alerts.extend(self._retry_undelivered(stored.name, state, at, retries))
-                alerts.extend(self._dispatch(drafts, stored.definition, at))
+                alerts.extend(self._dispatch(stored.name, held.alerts, at))
                 jobs.append(summarize(stored, recent, state, expected[0], at))
             except Exception as error:
                 self._report(error, f"checking {stored.name}")
@@ -1450,26 +1548,25 @@ class Cronwatch:
             state = empty_state(stored.name)
         return unevaluable_summary(stored, recent, state, at)
 
-    def _dispatch(self, drafts: list[AlertDraft], definition: JobDefinition, at: int) -> list[Alert]:
-        """Compose, triage and send each draft. The state was saved before this
-        (_update_state), so a slow channel holds up nothing else; afterwards only
-        the delivery fields are written back, onto a fresh read of the state."""
-        if not drafts:
-            return []
-        composed: list[Alert] = []
+    def _dispatch(self, name: str, alerts: list[Alert], at: int) -> list[Alert]:
+        """Triage and send each alert the outbox holds (see _outbox()). The
+        state, with the alerts in it, was saved before this, so a slow channel
+        holds up nothing else; afterwards only the delivery fields are written
+        back, onto a fresh read of the state, and the alerts leave `sending`.
+        Triage is made here, never stored with the held alert: the write that
+        opens a condition cannot wait for it, and a retry triages an alert
+        that has none. With deliver="check" the alerts were queued for a
+        check elsewhere instead."""
+        if not alerts or self._defer_delivery:
+            return alerts
         delivered: list[Alert] = []
         failed: list[Alert] = []
-        for draft in drafts:
-            alert = compose_alert(draft, definition, at)
-            if self._defer_delivery:
-                failed.append(alert)
-            else:
-                if self.triage is not None and alert.type != AlertType.RECOVERED:
-                    self._add_triage(alert, self._triage_timeout_ms)
-                (delivered if self._deliver(alert) else failed).append(alert)
-            composed.append(alert)
-        self._record_delivery(definition.name, delivered, failed, [], at)
-        return composed
+        for alert in alerts:
+            if self.triage is not None and alert.type != AlertType.RECOVERED:
+                self._add_triage(alert, self._triage_timeout_ms)
+            (delivered if self._deliver(alert) else failed).append(alert)
+        self._record_delivery(name, delivered, failed, [], at)
+        return alerts
 
     def _retry_undelivered(self, name: str, state: JobState, at: int, budget: list[float]) -> list[Alert]:
         """Send the alerts that no channel accepted last time, once each, oldest
@@ -1500,30 +1597,18 @@ class Cronwatch:
 
     def _record_delivery(self, name: str, delivered: list[Alert], failed: list[Alert], dropped: list[Alert], at: int) -> None:
         """Mark delivered alerts done, drop stale ones, and keep failed ones for
-        the next check. A failed alert replaces its stored copy, so a triage made
-        on this attempt is kept. last_alert_at moves only on a delivery."""
+        the next check, taking them all out of `sending` (record_sent). A
+        failed alert replaces its stored copy, so a triage made on this attempt
+        is kept. last_alert_at moves only on a delivery. When this write fails,
+        alerts still in `sending` are retried once their lease runs out."""
 
         def change(previous: JobState) -> tuple[JobState, int]:
-            state = normalize_state(previous, name)
-            done = {_alert_key(a) for a in [*delivered, *dropped]}
-            retried = {_alert_key(a): a for a in failed}
-            kept = [retried.get(_alert_key(a), a) for a in (state.undelivered or []) if _alert_key(a) not in done]
-            known = {_alert_key(a) for a in kept}
-            kept.extend(a for a in failed if _alert_key(a) not in known)
-            state.undelivered = kept[-MAX_UNDELIVERED:]
-            if delivered:
-                state.last_alert_at = at
-            return state, max(0, len(kept) - MAX_UNDELIVERED)
+            sent = record_sent(normalize_state(previous, name), delivered, failed, dropped, at)
+            return sent.state, sent.dropped
 
         try:
             _, trimmed = self._update_state(name, change)
-            if trimmed > 0:
-                self._report(
-                    RuntimeError(
-                        f"{trimmed} undelivered alert{'' if trimmed == 1 else 's'} for {name} dropped: only the newest {MAX_UNDELIVERED} are kept for retry"
-                    ),
-                    f"alert queue for {name}",
-                )
+            self._report_dropped(name, trimmed)
         except Exception as error:
             self._report(error, f"recording alert delivery for {name}")
 

@@ -328,6 +328,30 @@ def test_discord_keeps_job_output_inside_its_code_block_and_pings_no_one() -> No
     assert body["embeds"][0]["color"] == 0xC62828
 
 
+def test_discord_holds_the_whole_description_to_4096_cutting_the_message_and_keeping_the_triage() -> None:
+    http = FakeHTTP()
+    alert = alert_j("*_`~|[]()<>\\" * 100)
+    alert.message = "Error: long\n" + "```" * 1200 + "x" * 400 + "\U0001F600" * 200
+    A.Discord("https://discord.example/api/webhooks/1/secret", http=http).send(alert)
+    embed = json.loads(http.requests[0]["body"])["embeds"][0]
+    description = embed["description"]
+    assert _js.length16(description) == 4096
+    escaped = "".join("\\" + ch for ch in ("*_`~|[]()<>\\" * 100)[:1000])
+    assert description.endswith(f"\n**Triage:** {escaped}"), "the triage is whole"
+    assert description.startswith("```\nError: long\n")
+    assert description.count("```") == 2, "only the block's own fences"
+    assert _js.length16(embed["title"]) + _js.length16(description) <= 6000
+
+    # Emoji at the cut: never half a surrogate pair.
+    http.requests.clear()
+    alert = alert_j("t" * 1001)
+    alert.message = "\U0001F600" * 1900
+    A.Discord("https://discord.example/api/webhooks/1/secret", http=http).send(alert)
+    cut = json.loads(http.requests[0]["body"])["embeds"][0]["description"]
+    assert _js.length16(cut) <= 4096
+    assert "\ufffd" not in cut and all(not 0xD800 <= ord(ch) <= 0xDFFF for ch in cut)
+
+
 def test_discord_adds_the_link_and_reports_a_refusal() -> None:
     http = FakeHTTP(400, "x" * 500)
     channel = A.Discord("https://discord.example/w", link=lambda a: f"https://app.example/{a.job}", http=http)

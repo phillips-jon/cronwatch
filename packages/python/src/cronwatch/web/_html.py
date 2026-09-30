@@ -400,8 +400,11 @@ def job_page(job: JobSummary, runs: Sequence[Run], now: int, base: str, complete
         opened = "" if str(run.status) == "ok" else " open"
         output = f'<details class="out"{opened}><summary>output</summary><pre>{h(run.output)}</pre></details>' if truthy(run.output) else ""
         detail = error + output
+        # A foreign row may hold a metric that is no finite number (null, text); it is left out.
         metrics = "".join(
-            f'<span><span class="k">{h(k)}</span> {h(v if _js.is_integer(v) else to_fixed(v, 4))}</span>' for k, v in entries(run.metrics)
+            f'<span><span class="k">{h(k)}</span> {h(v if _js.is_integer(v) else to_fixed(v, 4))}</span>'
+            for k, v in entries(run.metrics)
+            if _js.is_finite(v)
         )
         took = '<span class="muted">running</span>' if run.duration_ms is None else h(format_duration(run.duration_ms))
         has_detail = ' class="has-detail"' if detail else ""

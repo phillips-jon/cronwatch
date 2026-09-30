@@ -130,10 +130,12 @@ def test_store_conformance(store: Any) -> None:
             "lastAlertAt": 6,
             "pendingRecovery": ["missed"],
             "undelivered": [{"type": "failed", "job": "a", "title": "a failed", "message": "boom", "at": 7, "details": {"consecutiveFailures": 1}}],
+            "sending": [{"until": 8, "alert": {"type": "failed", "job": "a", "title": "a failed", "message": "boom", "at": 7, "details": {"consecutiveFailures": 1}}}],
         }
     )
     store.set_state(full)
-    assert store.get_state("a").to_dict() == full.to_dict(), "pendingRecovery and undelivered round-trip"
+    assert store.get_state("a").to_dict() == full.to_dict(), "pendingRecovery, undelivered and sending round-trip"
+    assert store.get_state("a").to_dict()["sending"][0]["until"] == 8
     store.set_state(JobState(job="a", open={}, silenced_until=99, last_alert_at=6))
 
     # compare_and_set_state: writes only over the version it was told to expect.

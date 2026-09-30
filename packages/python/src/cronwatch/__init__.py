@@ -44,6 +44,7 @@ from .types import (
     JobWithRuns,
     Run,
     RunStatus,
+    SendingAlert,
     StoredJob,
 )
 
@@ -100,6 +101,7 @@ __all__ = [
     "Run",
     "RunHandle",
     "RunStatus",
+    "SendingAlert",
     "StoredJob",
     "TriageContext",
     "__version__",

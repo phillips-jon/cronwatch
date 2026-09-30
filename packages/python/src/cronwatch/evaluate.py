@@ -25,6 +25,7 @@ from .types import (
     JobSummary,
     Run,
     RunStatus,
+    SendingAlert,
     StoredJob,
 )
 
@@ -47,6 +48,14 @@ def run_duration(started_at: float, finished_at: float) -> float:
     near a 64-bit limit must not make a duration no store can write."""
     ms = finished_at - started_at
     return min(ms, MAX_DURATION_MS) if ms > 0 else 0
+
+
+def silence_end(now: float, ms: float) -> int:
+    """When a silence of `ms` from `now` ends: a whole millisecond, never past
+    MAX_DURATION_MS (2^53 - 1), however long the silence asked for. Every port
+    sharing the store reads it back unchanged, where a larger number could
+    wrap to a time long past and send alerts during the silence."""
+    return int(min(now + math.floor(min(ms, MAX_DURATION_MS)), MAX_DURATION_MS))
 
 
 def state_version(state: JobState | None) -> int:
@@ -94,7 +103,9 @@ def empty_state(job: str) -> JobState:
 
 
 def normalize_state(state: JobState | None, job: str) -> JobState:
-    """A stored state with every field present, or a fresh one. State written by an older version lacks the newer fields."""
+    """A stored state with every field present, or a fresh one. State written
+    by an older version lacks the newer fields. `sending` is the exception: it
+    is there only while it holds an alert (see hold_alerts)."""
     if state is None:
         return empty_state(job)
     out = state.copy()
@@ -103,11 +114,113 @@ def normalize_state(state: JobState | None, job: str) -> JobState:
         out.pending_recovery = []
     if out.undelivered is None:
         out.undelivered = []
+    if not isinstance(out.sending, list) or not out.sending:
+        out.sending = None
     return out
 
 
 def _clone_state(state: JobState) -> JobState:
     return normalize_state(state, state.job)
+
+
+# ---------------------------------------------------------------- delivery
+
+#: Alerts kept per job for retry, and per job being sent; past it the oldest go.
+MAX_UNDELIVERED = 20
+
+#: How long an alert in `sending` is left to the process sending it. Longer
+#: than any send takes: at most three alerts go out together, each with 25
+#: seconds of triage and 15 of channels.
+SEND_LEASE_MS = 5 * 60_000
+
+
+@dataclass
+class Delivery:
+    """A state after a delivery step, and how many alerts it let go past MAX_UNDELIVERED."""
+
+    state: JobState
+    dropped: int
+
+
+def alert_key(alert: Alert) -> str:
+    """Identifies an alert across retries, and in `sending`."""
+    return f"{alert.type}|{_js.number(alert.at)}|{alert.run.id if alert.run else ''}"
+
+
+def _newest(items: list[Any], most: int) -> tuple[list[Any], int]:
+    """The newest `most` of `items`, and how many went."""
+    return items[-most:], max(0, len(items) - most)
+
+
+def _held_alert(entry: Any) -> bool:
+    return isinstance(entry, SendingAlert) and isinstance(entry.alert, Alert)
+
+
+def queue_undelivered(state: JobState, alerts: Sequence[Alert]) -> Delivery:
+    """`alerts` added to the undelivered queue: one with the same key as a
+    queued alert replaces it where it stands, the rest go at the end, and only
+    the newest MAX_UNDELIVERED stay. `dropped` counts those let go."""
+    following = _clone_state(state)
+    by_key = {alert_key(a): a for a in alerts}
+    queue = [by_key.get(alert_key(a), a) for a in following.undelivered or []]
+    known = {alert_key(a) for a in queue}
+    queue.extend(a for a in alerts if alert_key(a) not in known)
+    following.undelivered, dropped = _newest(queue, MAX_UNDELIVERED)
+    return Delivery(following, dropped)
+
+
+def hold_alerts(state: JobState, alerts: Sequence[Alert], until: int, deferred: bool) -> Delivery:
+    """The outbox. Alerts just composed are written with the state that opens
+    their condition, before any is sent, so a process that stops part way
+    does not lose them: into `sending`, each with its lease ending at
+    `until`, when this process sends them, or (deliver="check") straight into
+    the undelivered queue for a check elsewhere. `dropped` counts alerts let
+    go past MAX_UNDELIVERED."""
+    if not alerts:
+        return Delivery(state, 0)
+    if deferred:
+        return queue_undelivered(state, alerts)
+    following = _clone_state(state)
+    kept, dropped = _newest([*(following.sending or []), *(SendingAlert(until=until, alert=a) for a in alerts)], MAX_UNDELIVERED)
+    following.sending = kept
+    return Delivery(following, dropped)
+
+
+def release_sending(state: JobState, now: int) -> Delivery:
+    """Alerts in `sending` whose lease ran out by `now`: the process sending
+    them stopped before it recorded how the send went. They go to the
+    undelivered queue, where the retry sends them (with triage, which is
+    never stored with them here) or drops them as stale. An entry that is not
+    an object with an alert is dropped; one without a numeric `until` counts
+    as run out."""
+    sending = state.sending or []
+
+    def lapsed(entry: Any) -> bool:
+        return not (isinstance(entry, SendingAlert) and _js.is_number(entry.until) and entry.until > now)
+
+    gone = [e for e in sending if lapsed(e)]
+    if not gone:
+        return Delivery(state, 0)
+    held = [e for e in sending if not lapsed(e)]
+    following = state.copy()
+    following.sending = held or None
+    return queue_undelivered(following, [e.alert for e in gone if _held_alert(e)])
+
+
+def record_sent(state: JobState, delivered: Sequence[Alert], failed: Sequence[Alert], stale: Sequence[Alert], now: int) -> Delivery:
+    """How a send went. Delivered and stale alerts leave the queue; failed
+    ones replace their queued copy, so a triage made on this attempt is kept,
+    or join the queue. Every one of them leaves `sending`. last_alert_at moves
+    only on a delivery. `dropped` counts alerts let go past MAX_UNDELIVERED."""
+    following = _clone_state(state)
+    done = {alert_key(a) for a in [*delivered, *stale]}
+    following.undelivered = [a for a in following.undelivered or [] if alert_key(a) not in done]
+    sent = {alert_key(a) for a in [*delivered, *failed, *stale]}
+    held = [e for e in following.sending or [] if not (_held_alert(e) and alert_key(e.alert) in sent)]
+    following.sending = held or None
+    if delivered:
+        following.last_alert_at = now
+    return queue_undelivered(following, failed)
 
 
 def _open_condition(state: JobState, condition: Condition, now: int) -> bool:

@@ -195,6 +195,92 @@ def test_a_run_never_finished_is_marked_stuck_after_the_jobs_timeout() -> None:
     assert alerts.types() == ["stuck"]
 
 
+class HeldChannel:
+    """A channel whose sends wait for `gate`, and which sets `entered` when one has started."""
+
+    name = "held"
+
+    def __init__(self, events: list[str] | None = None) -> None:
+        self.entered = threading.Event()
+        self.gate = threading.Event()
+        self.events = events if events is not None else []
+
+    def send(self, alert: Any, context: Any = None) -> None:
+        self.entered.set()
+        assert self.gate.wait(10)
+        self.events.append("sent")
+
+
+def test_close_waits_for_a_check_under_way_before_it_closes_the_store() -> None:
+    events: list[str] = []
+    held = HeldChannel(events)
+    store = Wrapped(MemoryStore(), close=lambda: events.append("closed"))
+    cw, c, _ = make(alerts=[held], store=store)
+    cw.job("callback", timeout="30m").start()
+    c.advance(31 * MIN)
+    results: list[Any] = []
+    check = threading.Thread(target=lambda: results.append(cw.check()))
+    check.start()
+    assert held.entered.wait(5)
+    flight = cw._checking
+    assert flight is not None
+    waiting = threading.Event()
+    wait = flight.wait
+
+    def watched() -> None:
+        waiting.set()
+        wait()
+
+    flight.wait = watched  # type: ignore[method-assign]
+    closing = threading.Thread(target=cw.close)
+    closing.start()
+    assert waiting.wait(5), "close waits on the check under way"
+    assert events == []
+    held.gate.set()
+    closing.join(5)
+    check.join(5)
+    assert events == ["sent", "closed"]
+    assert [str(a.type) for a in results[0].alerts] == ["stuck"]
+    # With no check under way it closes straight away.
+    cw.close()
+    assert events == ["sent", "closed", "closed"]
+
+
+def test_close_from_inside_a_check_does_not_wait_on_itself() -> None:
+    closed: list[bool] = []
+    store = Wrapped(MemoryStore(), close=lambda: closed.append(True))
+    cw, _, _ = make(store=store)
+    cw.sources.append(type("Closer", (), {"name": "closer", "sync": lambda self, host: host.close()})())
+    cw.check()
+    assert closed == [True]
+
+
+def test_lines_flushed_while_a_check_marks_earlier_runs_stuck_are_kept_on_the_run_it_marks_next() -> None:
+    held = HeldChannel()
+    cw, c, _ = make(alerts=[held])
+    first = cw.job("first", timeout="30m").start()
+    c.advance(1000)
+    second = cw.job("second", timeout="30m").start()
+    second.log("early line")
+    second.metric("rows", 1)
+    second.flush()
+    c.advance(31 * MIN)
+    check = threading.Thread(target=cw.check)
+    check.start()
+    # The first stuck run's alert is being sent; the second is still running, and flushes.
+    assert held.entered.wait(5)
+    second.log("important progress line")
+    second.metric("rows", 2)
+    second.flush()
+    held.gate.set()
+    check.join(10)
+    stored = cw.get_run(second.id)
+    assert stored.status == "timeout"
+    assert stored.output == "early line\nimportant progress line"
+    assert stored.metrics == {"rows": 2}
+    assert cw.get_run(first.id).status == "timeout"
+
+
 def test_a_late_success_after_a_timeout_mark_closes_stuck_and_recovers_a_late_failure_does_not_count_twice() -> None:
     cw, c, alerts = make()
     job = cw.job("slowpoke", timeout="10m", failures_before_alert=2)
