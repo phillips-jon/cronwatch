@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use super::{digest, field, fixture, objects};
 use crate::alerts::post::error_body;
-use crate::alerts::testing::{compose_email, sms_body, sms_segments};
+use crate::alerts::testing::{compose_email, embed_description, sms_body, sms_segments};
 use crate::alerts::*;
 use crate::deliver::{Channel, ChannelContext};
 use crate::js::{self, Object, Value};
@@ -53,6 +53,22 @@ impl Transport for Recorder {
         self.requests.lock().unwrap().push(request);
         Box::pin(std::future::ready(Ok(Response::new(status, body))))
     }
+}
+
+/// The fixture's recipe for long text: a string, or `{ parts: [[piece,
+/// times], ...] }` joined.
+fn expand(spec: &Value) -> String {
+    if let Some(s) = spec.as_str() {
+        return s.to_string();
+    }
+    let parts = spec.as_object().and_then(|o| o.get("parts")).and_then(Value::as_array).expect("a recipe");
+    parts
+        .iter()
+        .map(|p| {
+            let pair = p.as_array().expect("a pair");
+            pair[0].as_str().expect("a piece").repeat(pair[1].as_f64().expect("a count") as usize)
+        })
+        .collect()
 }
 
 fn text<'a>(o: &'a Object, key: &str) -> &'a str {
@@ -391,15 +407,33 @@ async fn conformance_channels() {
         }
         count += 1;
     }
+    for (i, c) in objects(cuts, "discordDescriptions").into_iter().enumerate() {
+        let mut a = first.clone();
+        a.message = expand(field(c, "message"));
+        a.triage = match field(c, "triage") {
+            Value::Null => None,
+            v => Some(expand(v)),
+        };
+        let got = digest(&js::from_units(&embed_description(&a)));
+        if got.to_json() != field(c, "description").to_json() {
+            failures.push(format!(
+                "discordDescription {i}: {}, want {}",
+                got.to_json(),
+                field(c, "description").to_json()
+            ));
+        }
+        count += 1;
+    }
 
     assert!(failures.is_empty(), "channels.json: {} cases differ:\n{}", failures.len(), failures.join("\n"));
     // Every case of the fixture, so a case added there is not skipped here.
-    let total = ["sends", "providerSends", "failures", "providerFailures"]
-        .iter()
-        .map(|k| objects(&f, k).len())
-        .sum::<usize>()
-        + objects(partial, "cases").len()
-        + ["errorBodies", "subjects", "smsSegments", "smsBodies"].iter().map(|k| objects(cuts, k).len()).sum::<usize>();
+    let total =
+        ["sends", "providerSends", "failures", "providerFailures"].iter().map(|k| objects(&f, k).len()).sum::<usize>()
+            + objects(partial, "cases").len()
+            + ["errorBodies", "subjects", "smsSegments", "smsBodies", "discordDescriptions"]
+                .iter()
+                .map(|k| objects(cuts, k).len())
+                .sum::<usize>();
     assert_eq!(count, total);
     eprintln!("channels.json: {count} cases replayed");
 }

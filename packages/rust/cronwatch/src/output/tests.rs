@@ -74,6 +74,31 @@ fn conformance_redact() {
 }
 
 #[test]
+fn conformance_redact_and_cap() {
+    let fixture = load();
+    assert_eq!(fixture.get("redactEdge").and_then(Value::as_f64), Some(REDACT_EDGE as f64));
+    let cases = list(&fixture, "redactAndCap").clone();
+    assert_eq!(cases.len(), 15, "redactAndCap cases");
+    for (i, c) in cases.iter().enumerate() {
+        let o = c.as_object().expect("a case");
+        let input = expand(o.get("input").expect("input"));
+        let got = redact_and_cap(&input, redact_secrets);
+        same(
+            &format!("redactAndCap case {i} {:?}", js::head16(&input, 60)),
+            &digest(Some(&got)),
+            o.get("result").expect("result"),
+        );
+    }
+}
+
+#[test]
+fn redact_and_cap_strips_a_nul_a_custom_redact_adds() {
+    let long = format!("{}{}", "a".repeat(OUTPUT_CAP + REDACT_EDGE), "b");
+    assert!(!redact_and_cap(&long, |t| format!("\0{t}\0")).contains('\0'));
+    assert_eq!(redact_and_cap("x\0y", |t| format!("{t}\0")), "xy");
+}
+
+#[test]
 fn conformance_error_message() {
     let cases = list(&load(), "errorMessage").clone();
     assert_eq!(cases.len(), 16, "errorMessage cases");

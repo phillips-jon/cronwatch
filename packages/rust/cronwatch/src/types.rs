@@ -506,6 +506,13 @@ pub struct JobState {
     /// Alerts no channel accepted, each retried once per check. `None` is
     /// absent.
     pub undelivered: Option<Vec<Alert>>,
+    /// The outbox: alerts written with the state that opened their
+    /// condition, while the process that wrote them sends them. Each leaves
+    /// once that process records how the send went; one still here after its
+    /// `until` (the process stopped part way) goes to `undelivered` at the
+    /// next check. `None` when empty, and in state written before the field
+    /// existed: it is never written as `[]`.
+    pub sending: Option<Vec<SendingAlert>>,
     /// Goes up by one on every write (see `Store::compare_and_set_state`).
     /// `None` is a state written before versions, which counts as 0.
     pub version: Option<i64>,
@@ -515,8 +522,41 @@ pub struct JobState {
     pub(crate) tail: Vec<(String, Value)>,
 }
 
-const STATE_KEYS: [&str; 7] =
-    ["job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered"];
+const STATE_KEYS: [&str; 8] =
+    ["job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending"];
+
+/// An alert in [`JobState::sending`]. Read leniently, as the SDK's
+/// `releaseSending` treats an entry: one with no numeric `until` has run out,
+/// and one with no alert (or one that is not an alert) is dropped when it
+/// has, so a malformed entry never makes the whole state unreadable.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SendingAlert {
+    /// When the sender's lease runs out, in epoch milliseconds.
+    pub until: Option<i64>,
+    /// The alert as composed, never with a triage.
+    pub alert: Option<Alert>,
+}
+
+impl SendingAlert {
+    /// The entry as the SDK writes it.
+    pub fn to_value(&self) -> Value {
+        let mut o = Object::new();
+        if let Some(until) = self.until {
+            o.set("until", until);
+        }
+        if let Some(alert) = &self.alert {
+            o.set("alert", alert.to_value());
+        }
+        Value::Object(o)
+    }
+
+    fn from_value(v: &Value) -> SendingAlert {
+        let Value::Object(o) = v else {
+            return SendingAlert::default();
+        };
+        SendingAlert { until: nullable_int(o, "until"), alert: o.get("alert").and_then(|a| Alert::from_value(a).ok()) }
+    }
+}
 
 impl JobState {
     /// A new state for a job: nothing open, no failures.
@@ -567,6 +607,10 @@ impl JobState {
         if let (Some(version), false) = (self.version, wrote_version) {
             o.set("version", version);
         }
+        // Last, where the SDK's normalizeState puts it; never as [].
+        if let Some(list) = self.sending.as_ref().filter(|l| !l.is_empty()) {
+            o.set("sending", list.iter().map(SendingAlert::to_value).collect::<Vec<_>>());
+        }
         Value::Object(o)
     }
 
@@ -616,6 +660,12 @@ impl JobState {
             // An entry that is not an alert is dropped rather than fail
             // every read of the state: it could never be delivered.
             s.undelivered = Some(list.iter().filter_map(|a| Alert::from_value(a).ok()).collect());
+        }
+        if let Some(Value::Array(list)) = o.get("sending") {
+            // Kept only when it holds an entry, as normalizeState keeps it.
+            if !list.is_empty() {
+                s.sending = Some(list.iter().map(SendingAlert::from_value).collect());
+            }
         }
         for (k, v) in o.iter() {
             if STATE_KEYS.contains(&k) {

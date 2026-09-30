@@ -28,7 +28,7 @@ use crate::run::{Job, StartCall};
 use crate::schedule;
 use crate::serialize::{ExpectRule, to_stored};
 use crate::store::Store;
-use crate::types::{Definition, JobState};
+use crate::types::{Definition, JobState, StoredJob};
 
 /// Reads and writes of one job's state before an update gives up on a store
 /// that keeps changing under it.
@@ -461,11 +461,24 @@ impl Client {
     /// own. The writes of one name take turns, in the order they were asked
     /// for, so one still under way cannot land after a later one; and a name
     /// declared again while its write was under way is still to be written.
+    /// A name is marked as written only while that same declaration stands,
+    /// so a forget that lands during the write (deleting the row after it)
+    /// leaves the name to be written again, as does one forgotten before it.
     pub(crate) async fn sync(&self, def: &Arc<JobDef>) -> Result<(), Error> {
+        self.sync_with(def, false).await
+    }
+
+    /// `sync`, and with `confirm`, as a run starts, a name already written is
+    /// read back: another process may have forgotten the job since, and a job
+    /// still declared here comes back on its next run.
+    pub(crate) async fn sync_with(&self, def: &Arc<JobDef>, confirm: bool) -> Result<(), Error> {
         self.ensure_ready().await?;
         let name = &def.name;
         if lock(&self.inner.declared).synced.contains(name) {
-            return Ok(());
+            if !confirm || self.inner.store.get_job(name).await.map_err(Error::store)?.is_some() {
+                return Ok(());
+            }
+            lock(&self.inner.declared).synced.remove(name);
         }
         let turn = self.sync_lock(name);
         let _turn = turn.lock().await;
@@ -482,6 +495,35 @@ impl Client {
             declared.synced.insert(name.clone());
         }
         Ok(())
+    }
+
+    /// Every stored job, once each declaration has been written. A job
+    /// declared here that the store no longer has was forgotten by another
+    /// process after this one wrote it: it is written again, as its next run
+    /// would, so it is checked and shown while any process still declares it.
+    pub(crate) async fn stored_jobs(&self) -> Result<Vec<StoredJob>, Error> {
+        let declared = self.declared_all();
+        for def in &declared {
+            self.sync(def).await?;
+        }
+        let jobs = self.inner.store.list_jobs().await.map_err(Error::store)?;
+        let listed: HashSet<&str> = jobs.iter().map(|j| j.name.as_str()).collect();
+        let missing: Vec<&Arc<JobDef>> = declared.iter().filter(|d| !listed.contains(d.name.as_str())).collect();
+        if missing.is_empty() {
+            return Ok(jobs);
+        }
+        for def in missing {
+            // Not one forgotten or declared again here meanwhile.
+            {
+                let mut state = lock(&self.inner.declared);
+                if !state.definitions.get(&def.name).is_some_and(|d| Arc::ptr_eq(d, def)) {
+                    continue;
+                }
+                state.synced.remove(&def.name);
+            }
+            self.sync(def).await?;
+        }
+        self.inner.store.list_jobs().await.map_err(Error::store)
     }
 
     /// Writes the definition declared in this process under `name` to the
@@ -585,9 +627,17 @@ impl Client {
         }
     }
 
-    /// Stops the interval [`start`](Self::start) began and closes the store.
+    /// Stops the interval [`start`](Self::start) began, waits for a check
+    /// already under way (bounded by its own channel, triage and retry
+    /// timeouts; what it fails with was given to whoever started it), then
+    /// closes the store, so that check neither writes after the store is
+    /// closed nor loses the alerts it would queue.
     pub async fn close(&self) -> Result<(), Error> {
         self.stop();
+        let checking = lock(&self.inner.checking).clone();
+        if let Some(mut rx) = checking {
+            let _ = rx.wait_for(Option::is_some).await;
+        }
         self.inner.store.close().await.map_err(Error::store)
     }
 }

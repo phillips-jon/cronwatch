@@ -141,7 +141,7 @@ impl Client {
             metrics: Metrics::new(),
             trigger,
         };
-        let inserted = match self.sync(def).await {
+        let inserted = match self.sync_with(def, true).await {
             Ok(()) => self.inner.store.insert_run(&run).await.map_err(Error::store),
             Err(err) => Err(err),
         };
@@ -399,7 +399,8 @@ impl RunHandle {
         }
         let mut next = stored.clone();
         if let Some(lines) = lines {
-            next.output = join_output(stored.output.as_deref(), Some(output::strip_nul(&c.redact(&lines))));
+            let lines = output::redact_and_cap(&lines, |t| c.redact(t));
+            next.output = join_output(stored.output.as_deref(), Some(lines));
         }
         next.metrics = stored.metrics.merged(&metrics);
         // Only over a row still running, so a flush never undoes a finish
@@ -451,7 +452,7 @@ impl RunHandle {
     /// blocking client's.
     #[cfg(feature = "blocking")]
     pub(crate) async fn fail_named(&self, type_name: &str, message: &str) -> Option<Run> {
-        self.finish_inner(None, Some(output::error_message(output::error_name(type_name), message, &[]))).await
+        self.finish_inner(None, Some(output::describe(output::error_name(type_name), message, &[]))).await
     }
 
     /// Finishes the run in a task of its own, so a caller that drops the
@@ -524,16 +525,14 @@ impl RunHandle {
             (state.rec.clone(), state.head.clone())
         };
         let finished_at = c.now();
-        let mut added = rec.output();
-        if added.is_none() {
-            added = result_text.as_deref().map(output::cap_output);
-        }
+        let added = rec.output().or_else(|| result_text.clone());
         let mut run = from.clone();
         run.status = RunStatus::Running;
         run.finished_at = Some(finished_at);
         run.duration_ms = Some(run_duration(from.started_at, finished_at));
         run.error = None;
-        run.output = join_output(from.output.as_deref(), added);
+        // Capped by conclude, after it is redacted.
+        run.output = join_lines(from.output.as_deref(), added);
         run.metrics = from.metrics.merged(&recorder_metrics(&rec));
         let expect_text = rec.expect_text().or(result_text);
         let expect_text = join_lines(head.as_deref(), join_lines(from.output.as_deref(), expect_text));

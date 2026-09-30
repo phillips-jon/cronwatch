@@ -348,7 +348,9 @@ pub(crate) fn job_page(job: &JobSummary, runs: &[Run], now: i64, base: &str, com
                 ));
             }
             let mut metrics = String::new();
-            for (name, value) in run.metrics.iter() {
+            // A foreign row may hold a metric that is no finite number; it is
+            // left out.
+            for (name, value) in run.metrics.iter().filter(|(_, v)| v.is_finite()) {
                 metrics.push_str(&format!(
                     r#"<span><span class="k">{}</span> {}</span>"#,
                     h(name),

@@ -704,18 +704,25 @@ async fn a_json_body_cut_through_a_surrogate_pair_keeps_the_lone_half() {
     assert!(body.contains(&format!("{}\\ud83d\"", "b".repeat(2989))));
     assert!(matches!(crate::js::parse(&body), Ok(Value::Object(_))));
 
+    // Discord's description holds 4096 units, so the message and the triage
+    // are cut at their own caps in two sends.
     let rec = Recorder::new(204, "");
-    a.message = format!("{}\u{1F600}", "c".repeat(3799));
-    a.triage = Some(format!("{}\u{1F600}", "d".repeat(999)));
     let ch = discord(DiscordOptions {
         webhook_url: "https://discord.example/api/webhooks/1/x".into(),
         transport: some(&rec),
         ..Default::default()
     })
     .unwrap();
+    a.message = format!("{}\u{1F600}", "c".repeat(3799));
+    a.triage = None;
     ch.send(&a, &quiet()).await.unwrap();
-    let body = String::from_utf8(rec.taken()[0].body.clone()).unwrap();
+    a.message = "m".into();
+    a.triage = Some(format!("{}\u{1F600}", "d".repeat(999)));
+    ch.send(&a, &quiet()).await.unwrap();
+    let taken = rec.taken();
+    let body = String::from_utf8(taken[0].body.clone()).unwrap();
     assert!(body.contains(&format!("{}\\ud83d\\n```", "c".repeat(3799))), "{body}");
+    let body = String::from_utf8(taken[1].body.clone()).unwrap();
     assert!(body.contains(&format!("{}\\ud83d\"", "d".repeat(999))));
 }
 

@@ -2,7 +2,6 @@
 //! accepted, retried once per check (client.ts dispatch, retryUndelivered,
 //! recordDelivery, deliver, addTriage).
 
-use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::future::Future;
 use std::io::Write;
@@ -11,11 +10,17 @@ use std::time::{Duration, Instant};
 
 use crate::client::Client;
 use crate::error::Error;
-use crate::evaluate::{AlertDraft, is_silenced, normalize_state, stale_alert};
+use crate::evaluate::{
+    Evaluation, MAX_UNDELIVERED, SEND_LEASE_MS, hold_alerts, is_silenced, normalize_state, record_sent, stale_alert,
+};
 use crate::format::compose_alert;
 use crate::panics::panic_text;
 use crate::store::{BoxError, BoxFuture};
 use crate::types::{Alert, AlertType, Definition, JobState, Run};
+
+/// Alerts written with the state that opened their conditions, and how many
+/// older ones the queue let go.
+pub(crate) type Held = (Vec<Alert>, usize);
 
 /// How long one channel may take to send one alert.
 pub(crate) const CHANNEL_TIMEOUT: Duration = Duration::from_secs(15);
@@ -24,8 +29,6 @@ pub(crate) const TRIAGE_TIMEOUT: Duration = Duration::from_secs(25);
 /// Wall-clock time one check spends retrying undelivered alerts, across every
 /// job. Once it is spent the rest wait for the next check.
 pub(crate) const RETRY_BUDGET: Duration = Duration::from_secs(20);
-/// Undelivered alerts kept per job for retry; the oldest go first.
-pub(crate) const MAX_UNDELIVERED: usize = 20;
 
 /// Where alerts go.
 ///
@@ -173,40 +176,59 @@ pub trait Source: Send + Sync + 'static {
     fn sync<'a>(&'a self, host: &'a Client) -> BoxFuture<'a, Result<Vec<Alert>, BoxError>>;
 }
 
-/// Identifies an alert across retries.
-fn alert_key(a: &Alert) -> String {
-    format!("{}|{}|{}", a.alert_type, a.at, a.run.as_ref().map_or("", |r| r.id.as_str()))
-}
-
 impl Client {
-    /// Composes, triages and sends each draft. The state was saved before
-    /// this (`update_state`), so a slow channel holds up nothing else;
-    /// afterwards only the delivery fields are written back, onto a fresh
-    /// read of the state.
-    pub(crate) async fn dispatch(&self, drafts: Vec<AlertDraft>, def: &Definition, now: i64) -> Vec<Alert> {
-        let mut composed = Vec::new();
-        if drafts.is_empty() {
-            return composed;
+    /// An evaluation as it is written: its drafts composed into alerts and
+    /// held in the same state (`hold_alerts`), so the write that opens a
+    /// condition also keeps its alerts, and a process that stops before
+    /// sending them does not lose them. Called inside `update_state`, so it
+    /// only computes.
+    pub(crate) fn outbox(&self, settled: Evaluation, def: &Definition, now: i64) -> (JobState, Held) {
+        let alerts: Vec<Alert> = settled.alerts.into_iter().map(|d| compose_alert(d, def, now)).collect();
+        let until = self.now().saturating_add(SEND_LEASE_MS);
+        let (state, dropped) = hold_alerts(&settled.state, &alerts, until, self.inner.defer_delivery);
+        (state, (alerts, dropped))
+    }
+
+    /// Triages and sends each alert the outbox holds (see `outbox`). The
+    /// state, with the alerts in it, was saved before this, so a slow channel
+    /// holds up nothing else; afterwards only the delivery fields are written
+    /// back, onto a fresh read of the state, and the alerts leave `sending`.
+    /// Triage is made here, never stored with the held alert: the write that
+    /// opens a condition cannot wait for it, and a retry triages an alert
+    /// that has none. With `Deliver::AtCheck` the alerts were queued for a
+    /// check elsewhere instead. Returns the alerts, triaged.
+    pub(crate) async fn dispatch(&self, name: &str, alerts: Vec<Alert>, now: i64) -> Vec<Alert> {
+        if alerts.is_empty() || self.inner.defer_delivery {
+            return alerts;
         }
-        let (mut delivered, mut failed) = (Vec::new(), Vec::new());
-        for draft in drafts {
-            let mut alert = compose_alert(draft, def, now);
-            if self.inner.defer_delivery {
-                failed.push(alert.clone());
-            } else {
-                if self.inner.triage.is_some() && alert.alert_type != AlertType::Recovered {
-                    self.add_triage(&mut alert, TRIAGE_TIMEOUT).await;
-                }
-                if self.deliver(&alert).await {
-                    delivered.push(alert.clone());
-                } else {
-                    failed.push(alert.clone());
-                }
+        let (mut delivered, mut failed, mut sent) = (Vec::new(), Vec::new(), Vec::new());
+        for mut alert in alerts {
+            if self.inner.triage.is_some() && alert.alert_type != AlertType::Recovered {
+                self.add_triage(&mut alert, TRIAGE_TIMEOUT).await;
             }
-            composed.push(alert);
+            if self.deliver(&alert).await {
+                delivered.push(alert.clone());
+            } else {
+                failed.push(alert.clone());
+            }
+            sent.push(alert);
         }
-        self.record_delivery(def.name(), &delivered, &failed, &[], now).await;
-        composed
+        self.record_delivery(name, &delivered, &failed, &[], now).await;
+        sent
+    }
+
+    /// Reports alerts let go because a job's queue was full.
+    pub(crate) fn report_dropped(&self, name: &str, dropped: usize) {
+        if dropped == 0 {
+            return;
+        }
+        let plural = if dropped == 1 { "" } else { "s" };
+        self.report(
+            Error::Other(format!(
+                "{dropped} undelivered alert{plural} for {name} dropped: only the newest {MAX_UNDELIVERED} are kept for retry"
+            )),
+            &format!("alert queue for {name}"),
+        );
     }
 
     /// Sends the alerts no channel accepted last time, once each, oldest
@@ -250,50 +272,20 @@ impl Client {
     }
 
     /// Marks delivered alerts done, drops stale ones, and keeps failed ones
-    /// for the next check. A failed alert replaces its stored copy, so a
-    /// triage made on this attempt is kept. `last_alert_at` moves only on a
-    /// delivery.
+    /// for the next check, taking them all out of `sending` (`record_sent`).
+    /// A failed alert replaces its stored copy, so a triage made on this
+    /// attempt is kept. `last_alert_at` moves only on a delivery. When this
+    /// write fails, alerts still in `sending` are retried once their lease
+    /// runs out.
     async fn record_delivery(&self, name: &str, delivered: &[Alert], failed: &[Alert], dropped: &[Alert], now: i64) {
         let result = self
             .update_state(name, async { Ok(()) }, |previous, _| {
-                let mut state = normalize_state(Some(&previous), name);
-                let done: HashSet<String> = delivered.iter().chain(dropped).map(alert_key).collect();
-                let retried: HashMap<String, &Alert> = failed.iter().map(|a| (alert_key(a), a)).collect();
-                let mut kept = Vec::new();
-                let mut known = HashSet::new();
-                for a in state.undelivered.take().unwrap_or_default() {
-                    let key = alert_key(&a);
-                    if done.contains(&key) {
-                        continue;
-                    }
-                    kept.push(retried.get(&key).map_or(a, |r| (*r).clone()));
-                    known.insert(key);
-                }
-                for a in failed {
-                    if !known.contains(&alert_key(a)) {
-                        kept.push(a.clone());
-                    }
-                }
-                let trimmed = kept.len().saturating_sub(MAX_UNDELIVERED);
-                state.undelivered = Some(kept.split_off(trimmed));
-                if !delivered.is_empty() {
-                    state.last_alert_at = Some(now);
-                }
-                Ok((state, trimmed))
+                Ok(record_sent(&normalize_state(Some(&previous), name), delivered, failed, dropped, now))
             })
             .await;
         match result {
             Err(err) => self.report(err, &format!("recording alert delivery for {name}")),
-            Ok((_, trimmed)) if trimmed > 0 => {
-                let plural = if trimmed == 1 { "" } else { "s" };
-                self.report(
-                    Error::Other(format!(
-                        "{trimmed} undelivered alert{plural} for {name} dropped: only the newest {MAX_UNDELIVERED} are kept for retry"
-                    )),
-                    &format!("alert queue for {name}"),
-                );
-            }
-            Ok(_) => {}
+            Ok((_, trimmed)) => self.report_dropped(name, trimmed),
         }
     }
 

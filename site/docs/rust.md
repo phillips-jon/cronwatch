@@ -345,7 +345,7 @@ It reads through a `sqlx::PgPool` on the database pg_cron runs in (its `cron.dat
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `expect` rule is checked before redaction, so it still sees what was logged. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off.
 
 ```rust
 Client::builder().no_redaction(); // keep output as logged
@@ -412,14 +412,14 @@ The client (every call that can reach the store is `async` and returns a `Result
 | `start(every)`, `stop()` | check in a task; the interval is at least five seconds |
 | `jobs()`, `jobs_with_runs(limit)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
-| `silence(name, d)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath |
-| `forget(name)` | remove a job and its runs |
+| `silence(name, d)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
+| `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resume_run(name, run_id)` | `resume` for a job declared in this process |
-| `record_run(run, options)` | record a run that happened elsewhere, for a source; returns the alerts it sent |
+| `record_run(run, options)` | record a run that happened elsewhere, for a source; returns the alerts it sent. A metric that is not a finite number is an error and nothing is recorded |
 | `sync_job(name)` | write a declaration to the store now, unless it already holds it |
 | `routes(options)` | the dashboard and JSON API |
 | `defined_jobs()` | the definitions declared in this process |
-| `close()` | stop the check task and close the store |
+| `close()` | stop the check task, wait for a check already under way, then close the store |
 
 Errors are `cronwatch::Error`: `Invalid` (an option, name, schedule or run id the SDK refuses, with its message), `Store` (the store's own error, kept as its source) and `Other`. Nothing panics for a bad option or a store failure. Rust errors carry no stack frames on stable, so a failed run's error has none; call `cronwatch::capture_panic_frames()` once at startup to keep a panic's backtrace with its run.
 

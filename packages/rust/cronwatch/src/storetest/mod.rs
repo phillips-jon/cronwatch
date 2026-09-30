@@ -242,11 +242,12 @@ pub async fn run<S: Store>(make: impl FnOnce() -> S) {
     same_json("state", &json_of(&must(store.get_state("a").await), JobState::to_json), plain);
     let full = concat!(
         r#"{"job":"a","open":{"stuck":7},"consecutiveFailures":1,"silencedUntil":null,"lastAlertAt":6,"pendingRecovery":["missed"],"undelivered":["#,
-        r#"{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"a","definition":{"name":"a"},"title":"a failed","message":"boom","at":7,"triage":null}]}"#
+        r#"{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"a","definition":{"name":"a"},"title":"a failed","message":"boom","at":7,"triage":null}],"#,
+        r#""sending":[{"until":8,"alert":{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"a","definition":{"name":"a"},"title":"a failed","message":"boom","at":7}}]}"#
     );
     must(store.set_state(&state(full)).await);
     same_json(
-        "pendingRecovery and undelivered round-trip",
+        "pendingRecovery, undelivered and sending round-trip",
         &json_of(&must(store.get_state("a").await), JobState::to_json),
         full,
     );

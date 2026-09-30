@@ -9,11 +9,12 @@ use tokio::sync::watch;
 use crate::client::{Client, clamp_limit, lock};
 use crate::error::Error;
 use crate::evaluate::{
-    BASELINE_WINDOW, apply_silence, empty_state, is_stuck, normalize_state, on_check, summarize, unevaluable_summary,
+    BASELINE_WINDOW, Evaluation, apply_silence, empty_state, is_stuck, normalize_state, on_check, release_sending,
+    silence_end, summarize, unevaluable_summary,
 };
 use crate::options::DurationSpec;
 use crate::panics::panic_text;
-use crate::run::{later_by, timeout_text};
+use crate::run::timeout_text;
 use crate::schedule;
 use crate::types::{Alert, CheckResult, JobState, JobSummary, Run, RunStatus, StoredJob, run_duration};
 
@@ -97,9 +98,9 @@ impl Client {
 
         // Runs that never reported back. One that cannot be judged (its job's
         // stored timeout no longer parses, say) is reported and skipped.
-        for run in store.running_runs().await.map_err(Error::store)? {
-            if let Err(err) = self.check_running(run.clone(), now, &mut alerts).await {
-                self.report(err, &format!("checking {}", run.job));
+        for listed in store.running_runs().await.map_err(Error::store)? {
+            if let Err(err) = self.check_running(&listed, now, &mut alerts).await {
+                self.report(err, &format!("checking {}", listed.job));
             }
         }
 
@@ -107,7 +108,7 @@ impl Client {
         // as failing (see `unevaluable_summary`) and does not stop the others.
         let mut jobs = Vec::new();
         let mut spent = Duration::ZERO;
-        for job in store.list_jobs().await.map_err(Error::store)? {
+        for job in self.stored_jobs().await? {
             match self.check_job(&job, now, &mut spent).await {
                 Ok((summary, found)) => {
                     alerts.extend(found);
@@ -132,16 +133,25 @@ impl Client {
     }
 
     /// A running run marked timed out once it has gone on past its job's
-    /// timeout, and judged.
-    async fn check_running(&self, mut run: Run, now: i64, alerts: &mut Vec<Alert>) -> Result<(), Error> {
-        let def = match self.declared(&run.job) {
+    /// timeout, and judged. The listed run only says whether it is past its
+    /// timeout; the row marked is read again just before the write, so lines
+    /// and metrics flushed since the list was read (while earlier stuck runs
+    /// were sent, say) are kept.
+    async fn check_running(&self, listed: &Run, now: i64, alerts: &mut Vec<Alert>) -> Result<(), Error> {
+        let def = match self.declared(&listed.job) {
             Some(declared) => declared.stored.clone(),
-            None => match self.inner.store.get_job(&run.job).await.map_err(Error::store)? {
+            None => match self.inner.store.get_job(&listed.job).await.map_err(Error::store)? {
                 Some(stored) => stored.definition,
                 None => return Ok(()),
             },
         };
-        if !is_stuck(&def, &run, now).map_err(Error::Other)? {
+        if !is_stuck(&def, listed, now).map_err(Error::Other)? {
+            return Ok(());
+        }
+        let Some(mut run) = self.inner.store.get_run(&listed.id).await.map_err(Error::store)? else {
+            return Ok(());
+        };
+        if run.status != RunStatus::Running || run.job != listed.job {
             return Ok(());
         }
         run.status = RunStatus::Timeout;
@@ -164,15 +174,21 @@ impl Client {
     ) -> Result<(JobSummary, Vec<Alert>), Error> {
         let recent = self.inner.store.list_runs(&job.name, BASELINE_WINDOW).await.map_err(Error::store)?;
         let last = recent.first();
-        let (state, (drafts, next_expected_at)) = self
+        let (state, ((held, dropped), next_expected_at)) = self
             .update_state(&job.name, async { Ok(()) }, |previous, _| {
                 let out = on_check(&job.definition, job, last, &previous, now).map_err(Error::Other)?;
                 let settled = apply_silence(&previous, out.evaluation, now);
-                Ok((settled.state, (settled.alerts, out.next_expected_at)))
+                // Alerts a process stopped sending part way go back to the
+                // retry queue.
+                let (released, let_go) = release_sending(&settled.state, self.now());
+                let (state, (alerts, dropped)) =
+                    self.outbox(Evaluation { state: released, alerts: settled.alerts }, &job.definition, now);
+                Ok((state, ((alerts, let_go + dropped), out.next_expected_at)))
             })
             .await?;
+        self.report_dropped(&job.name, dropped);
         let mut alerts = self.retry_undelivered(&job.name, &state, now, spent).await;
-        alerts.extend(self.dispatch(drafts, &job.definition, now).await);
+        alerts.extend(self.dispatch(&job.name, held, now).await);
         let summary = summarize(job, &recent, &state, next_expected_at, now).map_err(Error::Other)?;
         Ok((summary, alerts))
     }
@@ -219,22 +235,22 @@ impl Client {
     /// together. What the dashboard shows.
     pub async fn jobs_with_runs(&self, limit: usize) -> Result<Vec<JobWithRuns>, Error> {
         self.ensure_ready().await?;
-        for def in self.declared_all() {
-            self.sync(&def).await?;
-        }
+        let jobs = self.stored_jobs().await?;
         let now = self.now();
         let mut out = Vec::new();
-        for job in self.inner.store.list_jobs().await.map_err(Error::store)? {
+        for job in jobs {
             out.push(self.snapshot(&job, now, clamp_limit(limit, 0)).await);
         }
         Ok(out)
     }
 
-    /// One job's summary, or `None` when the store does not know it.
+    /// One job's summary, or `None` when the store does not know it. One
+    /// declared here and forgotten elsewhere is written again, as a check
+    /// does.
     pub async fn job_summary(&self, name: &str) -> Result<Option<JobSummary>, Error> {
         self.ensure_ready().await?;
         if let Some(def) = self.declared(name) {
-            self.sync(&def).await?;
+            self.sync_with(&def, true).await?;
         }
         let Some(stored) = self.inner.store.get_job(name).await.map_err(Error::store)? else {
             return Ok(None);
@@ -256,7 +272,8 @@ impl Client {
 
     /// Stops alerts for a job for a while. State keeps updating underneath:
     /// nothing opens while it is silenced, so the first problem after the
-    /// silence alerts as usual.
+    /// silence alerts as usual. The end is a whole millisecond, held at
+    /// 2^53 - 1.
     pub async fn silence(&self, name: &str, d: impl Into<DurationSpec>) -> Result<JobState, Error> {
         let ms = schedule::parse_duration(&d.into().to_value(), "silence duration").map_err(Error::Invalid)?;
         self.silence_ms(name, ms).await
@@ -264,7 +281,7 @@ impl Client {
 
     /// Silences a job for `ms` milliseconds, a value `parse_duration` read.
     pub(crate) async fn silence_ms(&self, name: &str, ms: f64) -> Result<JobState, Error> {
-        let until = later_by(self.now(), ms);
+        let until = silence_end(self.now(), ms);
         self.patch_state(name, move |s| s.silenced_until = Some(until)).await
     }
 
@@ -288,7 +305,9 @@ impl Client {
     }
 
     /// Removes a job and its runs from the store. A job still declared in code
-    /// comes back on its next run.
+    /// comes back: here on its next run, and in any other process that
+    /// declares it on its next run there, or at that process's next check or
+    /// dashboard read.
     pub async fn forget(&self, name: &str) -> Result<(), Error> {
         self.ensure_ready().await?;
         {

@@ -245,31 +245,25 @@ pub(crate) fn http_failure<T: Any>(value: &T) -> Option<String> {
 }
 
 /// An error as a failed run's error: `Name: message`, the name from the
-/// error's type (see `output::error_name`), capped like output.
+/// error's type (see `output::error_name`), not capped: it is redacted and
+/// then capped with the run's output (`redact_and_cap`).
 pub(crate) fn error_text<E: fmt::Display + ?Sized>(err: &E) -> String {
     // An error whose Display panics must not leave its run running.
     let message = catch_unwind(AssertUnwindSafe(|| err.to_string()))
         .unwrap_or_else(|panic| format!("its Display panicked: {}", panic_text(&*panic)));
-    output::error_message(output::error_name(type_name::<E>()), &message, &[])
+    output::describe(output::error_name(type_name::<E>()), &message, &[])
 }
 
 /// A panic as a failed run's error: `panic: <message>`, with the frames the
-/// opt-in hook kept (`capture_panic_frames`), capped like output.
+/// opt-in hook kept (`capture_panic_frames`), not capped, as `error_text`.
 fn panic_error(panic: &(dyn Any + Send)) -> String {
-    output::error_message("panic", &panic_text(panic), &take_frames())
+    output::describe("panic", &panic_text(panic), &take_frames())
 }
 
 /// `ms` milliseconds as a `Duration`, held at 2^53 ms past it, so a timeout
 /// of any length is one tokio can wait for.
 pub(crate) fn ms_duration(ms: f64) -> Duration {
     Duration::from_secs_f64((ms.clamp(0.0, MAX_INTERVAL_MS as f64)) / 1000.0)
-}
-
-/// `t` plus `ms` milliseconds, with `ms` held at `MAX_INTERVAL_MS` so the
-/// sum cannot wrap: a silence of any length ends in some 285,000 years at
-/// most.
-pub(crate) fn later_by(t: i64, ms: f64) -> i64 {
-    t.saturating_add(ms.min(MAX_INTERVAL_MS as f64) as i64)
 }
 
 /// How a run's start went: whether its row was written, and the task
@@ -686,7 +680,7 @@ impl Client {
     /// waits on it.
     async fn begin_run(&self, def: &Arc<JobDef>, run: &Run, close: bool) -> Started {
         let name = &def.name;
-        let inserted = match self.sync(def).await {
+        let inserted = match self.sync_with(def, true).await {
             Ok(()) => self.inner.store.insert_run(run).await.map_err(Error::store),
             Err(err) => Err(err),
         };
@@ -717,7 +711,7 @@ impl Client {
         run.metrics = Metrics::lenient(&js::Value::Object(rec.metrics()));
         run.output = rec.output();
         if run.output.is_none() && failure.is_none() {
-            run.output = result_text.as_deref().map(output::cap_output);
+            run.output = result_text.clone();
         }
         let mut expect_text = rec.expect_text();
         if expect_text.is_none() && failure.is_none() {
@@ -739,8 +733,8 @@ impl Client {
     }
 
     /// Sets a finished run's status and error from how it ended, then redacts
-    /// its output and error. `failure` is the error text of a function that
-    /// failed.
+    /// its output and error and caps them, in that order. `failure` is the
+    /// error text of a function that failed.
     pub(crate) fn conclude(&self, def: &JobDef, run: &mut Run, failure: Option<String>, expect_text: Option<&str>) {
         if let Some(failure) = failure {
             run.status = RunStatus::Failed;
@@ -752,9 +746,10 @@ impl Client {
             run.status = RunStatus::Ok;
         }
         // Redacted after the expect check, so a rule can still match what was
-        // logged. NULs go last, so not even a custom redact can store one.
-        run.output = run.output.take().map(|o| output::strip_nul(&self.redact(&o)));
-        run.error = run.error.take().map(|e| output::strip_nul(&self.redact(&e)));
+        // logged, and before the cap, so the cut cannot keep half a secret.
+        // NULs go last, so not even a custom redact can store one.
+        run.output = run.output.take().map(|o| output::redact_and_cap(&o, |t| self.redact(t)));
+        run.error = run.error.take().map(|e| output::redact_and_cap(&e, |t| self.redact(t)));
     }
 
     /// Writes a finished run and evaluates it. `recorded` says whether its
@@ -837,18 +832,21 @@ impl Client {
     }
 
     /// Evaluates a finished run (ok, failed, or timed out by a check), already
-    /// written, against the job's state, and sends what that produces. Never
-    /// fails: problems go to the error handler.
+    /// written, against the job's state, and sends what that produces. The
+    /// alerts are written with that state (see `outbox`). Never fails:
+    /// problems go to the error handler.
     pub(crate) async fn finish_run(&self, def: &Definition, run: &Run, now: i64) -> Vec<Alert> {
         let result = self
             .update_state(&run.job, self.history(run), |previous, history: &Vec<Run>| {
                 let e = on_run_finish(def, run, &previous, history, now).map_err(Error::Other)?;
-                let settled = apply_silence(&previous, e, now);
-                Ok((settled.state, settled.alerts))
+                Ok(self.outbox(apply_silence(&previous, e, now), def, now))
             })
             .await;
         match result {
-            Ok((_, drafts)) => self.dispatch(drafts, def, now).await,
+            Ok((_, (alerts, dropped))) => {
+                self.report_dropped(&run.job, dropped);
+                self.dispatch(&run.job, alerts, now).await
+            }
             Err(err) => {
                 self.report(err, &format!("evaluating {}", run.job));
                 Vec::new()
@@ -880,8 +878,9 @@ impl Client {
     /// finish, only the one whose write lands evaluates it. A stored run of
     /// another job is left alone and reported. A finished run is judged as if
     /// it had been wrapped here (expect, failures, duration, budgets) and its
-    /// output and error are redacted the same way. Returns the alerts it
-    /// sent.
+    /// output and error are redacted the same way. A metric that is not a
+    /// finite number is refused before anything is written, as
+    /// [`JobContext::metric`] refuses it. Returns the alerts it sent.
     pub async fn record_run(&self, input: Run, options: RecordOptions) -> Result<Vec<Alert>, Error> {
         let Some(def) = self.declared(&input.job) else {
             return Err(Error::Invalid(format!(
@@ -895,6 +894,16 @@ impl Client {
                 js::quote(&input.job)
             )));
         }
+        // Refused as `JobContext::metric` refuses them: a store keeps NaN and
+        // infinity as null.
+        if let Some((metric, _)) = input.metrics.iter().find(|(_, v)| !v.is_finite()) {
+            return Err(Error::Invalid(format!(
+                "recordRun: metric {} must be a finite number (job {}, run {})",
+                js::quote(metric),
+                js::quote(&input.job),
+                js::quote(&input.id)
+            )));
+        }
         self.sync(&def).await?;
         let mut run = input;
         if run.status == RunStatus::Ok {
@@ -903,8 +912,8 @@ impl Client {
                 run.error = Some(unmet);
             }
         }
-        run.output = run.output.take().map(|o| output::strip_nul(&self.redact(&output::cap_output(&o))));
-        run.error = run.error.take().map(|e| output::strip_nul(&self.redact(&output::cap_output(&e))));
+        run.output = run.output.take().map(|o| output::redact_and_cap(&o, |t| self.redact(t)));
+        run.error = run.error.take().map(|e| output::redact_and_cap(&e, |t| self.redact(t)));
         let evaluate = !options.skip_evaluation;
         let store = &self.inner.store;
         if let Some(stored) = store.get_run(&run.id).await.map_err(Error::store)? {
