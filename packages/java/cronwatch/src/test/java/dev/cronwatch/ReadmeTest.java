@@ -23,7 +23,10 @@ class ReadmeTest {
   private static final String IMPORTS =
       """
       import dev.cronwatch.*;
+      import dev.cronwatch.alerts.*;
       import dev.cronwatch.jdbc.SqlStore;
+      import dev.cronwatch.pgcron.*;
+      import dev.cronwatch.triage.*;
       import dev.cronwatch.store.MemoryStore;
       import java.nio.file.Files;
       import java.nio.file.Path;
