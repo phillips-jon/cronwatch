@@ -163,6 +163,30 @@ public class PgCronTests
         await k.DisposeAsync();
     }
 
+    // The review: the source declared a job again only when its settings changed, so after the
+    // dashboard's forget every later run was refused as not declared until the process restarted.
+    [Fact]
+    public async Task A_job_forgotten_from_the_dashboard_is_declared_again_and_its_later_runs_recorded()
+    {
+        var clock = Clock();
+        var cron = new FakeCron();
+        cron.AddJob(1, "vacuum", "0 3 * * *");
+        cron.Add(1, "succeeded", T0 - 5000, T0 - 4000, "VACUUM");
+        var k = Kit(cron.Source(), clock: clock);
+        await k.Cw.CheckAsync();
+        await k.Cw.ForgetAsync("vacuum");
+        cron.Add(1, "succeeded", T0 - 3000, T0 - 2000, "VACUUM");
+        cron.Add(1, "failed", T0 - 1000, T0, "ERROR:  boom");
+        clock.Advance(1000);
+        CheckResult result = await k.Cw.CheckAsync();
+        Assert.Empty(Others(k));
+        Assert.Equal(["vacuum"], Names(result));
+        Assert.Equal("0 3 * * *", result.Jobs[0].Definition.Schedule);
+        Assert.Equal(["pgcron:3", "pgcron:2"], (await k.Cw.RunsAsync("vacuum", 50)).Select(r => r.Id));
+        Assert.Equal(["vacuum"], k.Cw.DefinedJobs.Select(d => d.Name));
+        await k.DisposeAsync();
+    }
+
     [Fact]
     public async Task A_pick_job_name_or_options_function_that_fails_fails_only_its_job_reported_once()
     {
