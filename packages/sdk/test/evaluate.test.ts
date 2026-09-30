@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  emptyState, jobHealth, MAX_DURATION_MS, muteOpens, normalizeState, onCheck, onRunFinish, onRunStart, runDuration, stateVersion, summarize,
+  emptyState, failureCount, jobHealth, MAX_DURATION_MS, muteOpens, normalizeState, onCheck, onRunFinish, onRunStart, runDuration, stateVersion, summarize,
 } from "../src/evaluate.js";
 import type { AlertDetails, AlertDraft, JobDefinition, Run, StoredJob } from "../src/types.js";
 import { MIN, HOUR, T0 } from "./helpers.js";
@@ -301,4 +301,20 @@ test("stateVersion: a whole number from 0 to 2^53 - 1, else 0", () => {
     assert.equal(stateVersion({ version } as unknown as { version: number }), 0, String(version));
   }
   assert.ok(Object.is(stateVersion({ version: -0 }), 0));
+});
+
+test("failureCount: a whole number held at 2^53 - 1, else 0; a failed run from the top stays there", () => {
+  assert.equal(failureCount(null), 0);
+  assert.equal(failureCount({ consecutiveFailures: 4 }), 4);
+  for (const count of [2 ** 53, 2 ** 63, 2 ** 64]) assert.equal(failureCount({ consecutiveFailures: count }), MAX_DURATION_MS, String(count));
+  for (const count of [1.5, "3", true, null, -1, -(2 ** 63), Infinity, Number.NaN]) {
+    assert.equal(failureCount({ consecutiveFailures: count } as unknown as { consecutiveFailures: number }), 0, String(count));
+  }
+  assert.ok(Object.is(failureCount({ consecutiveFailures: -0 }), 0));
+  const foreign = normalizeState({ ...emptyState("j"), consecutiveFailures: 2 ** 63 }, "j");
+  assert.equal(foreign.consecutiveFailures, MAX_DURATION_MS);
+  const failedRun: Run = { id: "f", job: "j", status: "failed", startedAt: T0, finishedAt: T0 + 1, durationMs: 1, error: "boom", output: null, metrics: {}, trigger: "run" };
+  const { state, alerts } = onRunFinish({ name: "j", failuresBeforeAlert: 3 }, failedRun, foreign, [], T0 + 1);
+  assert.equal(state.consecutiveFailures, MAX_DURATION_MS);
+  assert.deepEqual(alerts.map((a) => a.details), [{ consecutiveFailures: MAX_DURATION_MS, threshold: 3 }]);
 });

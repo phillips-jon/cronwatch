@@ -894,6 +894,12 @@ function formatCases() {
 const STATE_VERSIONS = [undefined, "7", "0", "1.5", '"x"', '"3"', "true", "null", "-1", "-0", "2.0", "1e3", "[1]",
   "9007199254740991", "9007199254740992", "9007199254740993", "1e400"];
 
+// Failures in a row a state's JSON may hold: the SDK's own, and what a foreign
+// row may hold instead, up to the 64-bit limits. undefined leaves the field out.
+const FAILURE_COUNTS = [undefined, "3", "0", "-0", "-1", "1.5", "2.0", "1e3", '"3"', "true", "null", "[1]",
+  "9007199254740990", "9007199254740991", "9007199254740992", "9223372036854775807", "-9223372036854775808",
+  "18446744073709551615", "1e400"];
+
 function healthCases() {
   const r = (id, status, startedAt, durationMs = 1000, extra = {}) => ({
     id, job: "j", status, startedAt, finishedAt: durationMs === null ? null : startedAt + durationMs, durationMs,
@@ -975,6 +981,17 @@ function healthCases() {
     return { state: text, version: stateVersion(JSON.parse(text)) };
   });
 
+  // The failures in a row a stored state counts as, from the state's JSON
+  // text: a whole number held at 2^53 - 1, and 0 when negative or not a whole
+  // number. Then a failed run from it: the count goes up by one, held at 2^53 - 1.
+  const failedDef = { name: "j", failuresBeforeAlert: 3 };
+  const failedRun = r("f", "failed", T0 - MIN);
+  const failureCounts = FAILURE_COUNTS.map((c) => {
+    const text = `{"job":"j","open":{}${c === undefined ? "" : `,"consecutiveFailures":${c}`},"silencedUntil":null,"lastAlertAt":null}`;
+    const normalized = normalizeState(JSON.parse(text), "j");
+    return { state: text, consecutiveFailures: normalized.consecutiveFailures, failed: clone(onRunFinish(failedDef, failedRun, normalized, [], T0)) };
+  });
+
   // A job that could not be evaluated: its summary reads nothing from the definition.
   const broken = { name: "j", definition: { name: "j", schedule: "not a schedule", timeout: "soon" }, createdAt: T0 - DAY, updatedAt: T0 };
   const unevaluable = [
@@ -1016,6 +1033,7 @@ function healthCases() {
   return {
     jobHealth: jobHealthCases, summarize: summaries, percentile: stats, median: medians, normalizeState: normalized, muteOpens: mutes, isStuck: stuck,
     unevaluableSummary: unevaluable, applySilence: silences, staleAlert: staleCases, runDuration: durations, stateVersion: versions,
+    failureCount: failureCounts,
   };
 }
 

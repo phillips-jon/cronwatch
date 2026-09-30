@@ -3517,5 +3517,487 @@
       "state": "{\"job\":\"j\",\"version\":1e400}",
       "version": 0
     }
+  ],
+  "failureCount": [
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":3,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 3,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 4,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": {
+              "id": "f",
+              "job": "j",
+              "status": "failed",
+              "startedAt": 1767605340000,
+              "finishedAt": 1767605341000,
+              "durationMs": 1000,
+              "error": "Error: boom",
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            "details": {
+              "consecutiveFailures": 4,
+              "threshold": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":0,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":-0,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":-1,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":1.5,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":2.0,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 2,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 3,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": {
+              "id": "f",
+              "job": "j",
+              "status": "failed",
+              "startedAt": 1767605340000,
+              "finishedAt": 1767605341000,
+              "durationMs": 1000,
+              "error": "Error: boom",
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            "details": {
+              "consecutiveFailures": 3,
+              "threshold": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":1e3,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 1000,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 1001,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": {
+              "id": "f",
+              "job": "j",
+              "status": "failed",
+              "startedAt": 1767605340000,
+              "finishedAt": 1767605341000,
+              "durationMs": 1000,
+              "error": "Error: boom",
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            "details": {
+              "consecutiveFailures": 1001,
+              "threshold": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":\"3\",\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":true,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":null,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":[1],\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":9007199254740990,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 9007199254740990,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 9007199254740991,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": {
+              "id": "f",
+              "job": "j",
+              "status": "failed",
+              "startedAt": 1767605340000,
+              "finishedAt": 1767605341000,
+              "durationMs": 1000,
+              "error": "Error: boom",
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            "details": {
+              "consecutiveFailures": 9007199254740991,
+              "threshold": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":9007199254740991,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 9007199254740991,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 9007199254740991,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": {
+              "id": "f",
+              "job": "j",
+              "status": "failed",
+              "startedAt": 1767605340000,
+              "finishedAt": 1767605341000,
+              "durationMs": 1000,
+              "error": "Error: boom",
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            "details": {
+              "consecutiveFailures": 9007199254740991,
+              "threshold": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":9007199254740992,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 9007199254740991,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 9007199254740991,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": {
+              "id": "f",
+              "job": "j",
+              "status": "failed",
+              "startedAt": 1767605340000,
+              "finishedAt": 1767605341000,
+              "durationMs": 1000,
+              "error": "Error: boom",
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            "details": {
+              "consecutiveFailures": 9007199254740991,
+              "threshold": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":9223372036854775807,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 9007199254740991,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 9007199254740991,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": {
+              "id": "f",
+              "job": "j",
+              "status": "failed",
+              "startedAt": 1767605340000,
+              "finishedAt": 1767605341000,
+              "durationMs": 1000,
+              "error": "Error: boom",
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            "details": {
+              "consecutiveFailures": 9007199254740991,
+              "threshold": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":-9223372036854775808,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":18446744073709551615,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 9007199254740991,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {
+            "failed": 1767605400000
+          },
+          "consecutiveFailures": 9007199254740991,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": [
+          {
+            "type": "failed",
+            "run": {
+              "id": "f",
+              "job": "j",
+              "status": "failed",
+              "startedAt": 1767605340000,
+              "finishedAt": 1767605341000,
+              "durationMs": 1000,
+              "error": "Error: boom",
+              "output": null,
+              "metrics": {},
+              "trigger": "run"
+            },
+            "details": {
+              "consecutiveFailures": 9007199254740991,
+              "threshold": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "state": "{\"job\":\"j\",\"open\":{},\"consecutiveFailures\":1e400,\"silencedUntil\":null,\"lastAlertAt\":null}",
+      "consecutiveFailures": 0,
+      "failed": {
+        "state": {
+          "job": "j",
+          "open": {},
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        },
+        "alerts": []
+      }
+    }
   ]
 }

@@ -61,6 +61,19 @@ export function stateVersion(state: Pick<JobState, "version"> | null | undefined
   return typeof version === "number" && Number.isSafeInteger(version) && version >= 0 ? version + 0 : 0;
 }
 
+/**
+ * The failures in a row a stored state counts as: its `consecutiveFailures`
+ * when that is a whole number, held at MAX_DURATION_MS (2^53 - 1), and 0 when
+ * it is negative or not a whole number. A foreign row's count past 2^53, or at
+ * a 64-bit limit, stays at the top instead of losing precision or wrapping
+ * negative, and a `1.5`, `"3"` or `-1` counts as none.
+ */
+export function failureCount(state: Pick<JobState, "consecutiveFailures"> | null | undefined): number {
+  const count: unknown = state?.consecutiveFailures;
+  if (typeof count !== "number" || !Number.isInteger(count) || count <= 0) return 0;
+  return Math.min(count, MAX_DURATION_MS);
+}
+
 export function emptyState(job: string): JobState {
   return { job, open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, pendingRecovery: [], undelivered: [] };
 }
@@ -72,6 +85,7 @@ export function normalizeState(state: JobState | null, job: string): JobState {
     ...emptyState(job),
     ...state,
     open: { ...state.open },
+    consecutiveFailures: failureCount(state),
     pendingRecovery: [...(state.pendingRecovery ?? [])],
     undelivered: [...(state.undelivered ?? [])],
   };
@@ -215,7 +229,8 @@ export function onRunFinish(
   }
 
   // failed or timeout
-  next.consecutiveFailures += 1;
+  // Held at the top: a count at the limit neither loses precision nor wraps below a threshold.
+  next.consecutiveFailures = Math.min(next.consecutiveFailures + 1, MAX_DURATION_MS);
   closeCondition(next, "missed");
   const threshold = Math.max(1, def.failuresBeforeAlert ?? 1);
   const condition = run.status === "timeout" ? "stuck" : "failed";
