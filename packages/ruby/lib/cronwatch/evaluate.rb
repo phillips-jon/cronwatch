@@ -48,6 +48,19 @@ module Cronwatch
       version.to_i
     end
 
+    # The failures in a row a stored state counts as: its `consecutive_failures`
+    # when that is a whole number, held at MAX_DURATION_MS (2**53 - 1), and 0
+    # when it is negative or not a whole number. A foreign row's count past
+    # 2**53 stays at the top, as the SDK holds it, and a 1.5, "3" or -1
+    # counts as none.
+    def failure_count(state)
+      count = state&.consecutive_failures
+      return 0 unless count.is_a?(Integer) || (count.is_a?(Float) && count.finite? && count == count.floor)
+      return 0 unless count.positive?
+
+      [count, MAX_DURATION_MS].min.to_i
+    end
+
     def empty_state(job)
       JobState.new(job: job, open: {}, consecutive_failures: 0, silenced_until: nil, last_alert_at: nil,
                    pending_recovery: [], undelivered: [])
@@ -61,7 +74,7 @@ module Cronwatch
       JobState.new(
         job: state.job.nil? ? job : state.job,
         open: (state.open || {}).dup,
-        consecutive_failures: state.consecutive_failures.nil? ? 0 : state.consecutive_failures,
+        consecutive_failures: failure_count(state),
         silenced_until: state.silenced_until,
         last_alert_at: state.last_alert_at,
         pending_recovery: (state.pending_recovery || []).dup,
@@ -233,7 +246,8 @@ module Cronwatch
       end
 
       # failed or timeout
-      next_state.consecutive_failures += 1
+      # Held at the top, as the SDK holds it: a count at the limit stays there.
+      next_state.consecutive_failures = [next_state.consecutive_failures + 1, MAX_DURATION_MS].min
       close_condition(next_state, :missed)
       threshold = [1, definition.failures_before_alert || 1].max
       condition = run.status == :timeout ? :stuck : :failed

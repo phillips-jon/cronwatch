@@ -374,6 +374,24 @@ class ConformanceTest < Minitest::Test
     end
   end
 
+  # The failures in a row a foreign state's JSON counts as, then a failed run from it.
+  def test_failure_count
+    definition = Cronwatch::JobDefinition.from_h({ "name" => "j", "failuresBeforeAlert" => 3 })
+    run = Cronwatch::Run.from_h({
+                                  "id" => "f", "job" => "j", "status" => "failed", "startedAt" => T0 - 60_000,
+                                  "finishedAt" => T0 - 59_000, "durationMs" => 1000, "error" => "Error: boom",
+                                  "output" => nil, "metrics" => {}, "trigger" => "run",
+                                })
+    each_case(HEALTH["failureCount"]) do |c|
+      state = Cronwatch::Evaluate.normalize_state(Cronwatch::JobState.from_h(JSON.parse(c["state"])), "j")
+      differs(c["consecutiveFailures"], state.consecutive_failures) ||
+        begin
+          result = Cronwatch::Evaluate.on_run_finish(definition, run, state, [], T0)
+          differs(c["failed"], { "state" => result.state, "alerts" => result.alerts })
+        end
+    end
+  end
+
   def test_unevaluable_summary
     each_case(HEALTH["unevaluableSummary"]) do |c|
       stored = Cronwatch::StoredJob.from_h(c["stored"])
