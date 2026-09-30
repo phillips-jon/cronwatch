@@ -179,7 +179,7 @@ If the scheduler itself stops (its crontab line is gone, the server is down), th
 | `CRONWATCH_LOG_CHANNEL` | a channel from `config/logging.php`, written to as well |
 | `CRONWATCH_TRIAGE=true` | Claude triage, reading `ANTHROPIC_API_KEY`; `CRONWATCH_TRIAGE_MODEL` and `CRONWATCH_TRIAGE_CONTEXT` |
 
-Email, Slack and Discord alerts link to the job's page on the dashboard. `alerts.channels` in `config/cronwatch.php` takes more: any of the library's channels (Resend, Postmark, SES, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)), or class names the container makes. `CRON_SECRET`, `CRONWATCH_RETENTION` (default `30d`) and `CRONWATCH_DELIVER` (`check` for a process that cannot reach the network) are read too. Failures outside jobs (the store, a channel) go to the app's log.
+Email, Slack and Discord alerts link to the job's page on the dashboard, at `APP_URL` (or the dashboard's `CRONWATCH_DOMAIN`), never at the host of whatever request sent the alert. `alerts.channels` in `config/cronwatch.php` takes more: any of the library's channels (Resend, Postmark, SES, Twilio, Sentry and the rest; see [PHP](/docs/php/#email-sms-and-error-trackers)), or class names the container makes. `CRON_SECRET`, `CRONWATCH_RETENTION` (default `30d`) and `CRONWATCH_DELIVER` (`check` for a process that cannot reach the network) are read too. Failures outside jobs (the store, a channel) go to the app's log.
 
 To build the client yourself, bind `Cronwatch\Cronwatch` again in one of your own providers' `register()`, which runs after the package's.
 
