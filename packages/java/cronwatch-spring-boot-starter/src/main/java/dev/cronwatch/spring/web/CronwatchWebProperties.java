@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * cronwatch.web.origin=https://app.example.com
  * cronwatch.web.trust-proxy=false
  * cronwatch.web.open=false             # true serves it with no token, behind the app's own auth
- * cronwatch.web.order=-110             # ahead of Spring Security's filter chain (-100)
+ * cronwatch.web.order=-110             # ahead of Spring Security's filter chain (-100); -90 when open
  * </pre>
  */
 @ConfigurationProperties(prefix = "cronwatch.web")
@@ -20,13 +20,19 @@ public class CronwatchWebProperties {
   /** Ahead of Spring Security's filter chain, whose order is -100. */
   public static final int DEFAULT_ORDER = -110;
 
+  /**
+   * Behind Spring Security's filter chain: the order of a dashboard served {@link #isOpen() open},
+   * which has no token of its own and is left to the app's auth.
+   */
+  public static final int OPEN_ORDER = -90;
+
   private boolean enabled = true;
   private String path = "/cronwatch";
   private @Nullable String token;
   private boolean open;
   private @Nullable String origin;
   private boolean trustProxy;
-  private int order = DEFAULT_ORDER;
+  private @Nullable Integer order;
 
   /** Made by Spring. */
   public CronwatchWebProperties() {}
@@ -91,9 +97,13 @@ public class CronwatchWebProperties {
     this.trustProxy = trustProxy;
   }
 
-  /** The filter's order: ahead of Spring Security's chain by default. */
+  /**
+   * The filter's order: the one set, else ahead of Spring Security's chain ({@link #DEFAULT_ORDER})
+   * for a dashboard with a token, and behind it ({@link #OPEN_ORDER}) for one served open, so the
+   * app's auth runs before it.
+   */
   public int getOrder() {
-    return order;
+    return order != null ? order : open ? OPEN_ORDER : DEFAULT_ORDER;
   }
 
   /** Sets {@link #getOrder()}. */
@@ -113,7 +123,7 @@ public class CronwatchWebProperties {
         + ", trustProxy="
         + trustProxy
         + ", order="
-        + order
+        + getOrder()
         + "]";
   }
 }
