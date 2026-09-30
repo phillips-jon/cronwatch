@@ -111,7 +111,7 @@ test("an update that keeps losing gives up and reports, and the run still finish
  * so a test can declare the job again, or ask for another write, while that
  * one is under way.
  */
-function heldUpsert(store: Store) {
+function heldUpsert(store: Store, options: { afterWrite?: boolean } = {}) {
   let release!: () => void;
   let entered!: () => void;
   const gate = new Promise<void>((r) => { release = r; });
@@ -120,16 +120,34 @@ function heldUpsert(store: Store) {
   const wrapped: Store = {
     ...store,
     async upsertJob(definition, now) {
+      if (options.afterWrite) await store.upsertJob(definition, now);
       if (!held) {
         held = true;
         entered();
         await gate;
       }
-      await store.upsertJob(definition, now);
+      if (!options.afterWrite) await store.upsertJob(definition, now);
     },
   };
   return { store: wrapped, waiting, release };
 }
+
+test("a forget that lands while a job's first write is under way leaves it to be written on its next run", async () => {
+  const inner = memory();
+  // The write lands, then waits: the forget deletes the row it wrote.
+  const { store, waiting, release } = heldUpsert(inner, { afterWrite: true });
+  const cw = cronwatch({ store, alerts: [capture()], cronSecret: null });
+  const handle = cw.job("nightly", { schedule: "every 5m" });
+  const first = handle.run(async () => {});
+  await waiting;
+  await cw.forget("nightly");
+  release();
+  await first;
+  assert.equal(await inner.getJob("nightly"), null, "forgotten after it was written");
+  await handle.run(async () => {});
+  assert.equal((await inner.getJob("nightly"))!.definition.schedule, "every 5m", "its next run brings it back");
+  assert.deepEqual((await cw.jobs()).map((j) => j.name), ["nightly"]);
+});
 
 test("a handle kept from an earlier declaration writes the one that stands, not its own", async () => {
   const store = memory();

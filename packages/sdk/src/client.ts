@@ -467,7 +467,10 @@ export class CronWatch {
    * that replaced it, never its own over it, and one forgotten since writes
    * its own. The writes of one name take turns, in the order they were asked
    * for, so one still under way cannot land after a later one; and a name
-   * declared again while its write was under way is still to be written.
+   * declared again while its write was under way is still to be written. A
+   * name is marked as written only while that same declaration stands, so a
+   * forget that lands during the write (deleting the row after it) leaves
+   * the name to be written again, as does one forgotten before it.
    */
   private async sync(definition: JobDefinition): Promise<void> {
     await this.ensureReady();
@@ -477,7 +480,7 @@ export class CronWatch {
       if (this.synced.has(name)) return;
       const standing = this.definitions.get(name) ?? definition;
       await this.store.upsertJob(toStored(standing), this.now());
-      if ((this.definitions.get(name) ?? standing) === standing) this.synced.add(name);
+      if (this.definitions.get(name) === standing) this.synced.add(name);
     }, this.syncing);
   }
 
