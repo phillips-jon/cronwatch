@@ -4,10 +4,13 @@
 //
 //   node node_store.mjs <dist> write|read <path> <prefix> <fixture.json>
 //   node node_store.mjs <dist> cas <path> <prefix> <state json> <expected version>
+//   node node_store.mjs <dist> run <path> <prefix> <now>
 //
 // write replays the fixture's store calls; read prints what the store hands
 // back for the fixture's jobs and runs, as JSON on stdout; cas makes one
-// compareAndSetState and prints whether it wrote, and the state after.
+// compareAndSetState and prints whether it wrote, and the state after; run
+// has a Node client run the job every-5 (logging "from node") and check
+// every job, at the clock time given, and prints the jobs it checked.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -38,6 +41,13 @@ try {
     const state = JSON.parse(arg);
     out.written = await store.compareAndSetState(state, Number(expected));
     out.state = await store.getState(state.job);
+  } else if (action === "run") {
+    const { cronwatch } = await import(pathToFileURL(path.join(dist, "index.js")).href);
+    const now = Number(arg);
+    const cw = cronwatch({ store, now: () => now, alerts: [], cronSecret: null, onError: (e) => { throw e; } });
+    await cw.job("every-5", { schedule: "every 5m", timeout: "2m", maxDuration: "90s" }).run((job) => { job.log("from node"); });
+    const result = await cw.check();
+    out.jobs = result.jobs.map((j) => j.name);
   } else if (action === "read") {
     const fixture = JSON.parse(readFileSync(arg, "utf8"));
     out.jobs = await store.listJobs();
