@@ -110,7 +110,7 @@ pre b.bad { color: var(--bad); } pre b.warn { color: var(--warn); } pre b.ok { c
 /* Calluna sets old-style figures; the dashboard's counts and times read as
    figures in a table, so they line up. */
 figure.browser, figure.timeline { font-variant-numeric: lining-nums; }
-.installs.tabbed { display: block; max-width: 720px; }
+.installs.tabbed { display: block; max-width: 800px; }
 .installs.tabbed .for { display: none; }
 .installs.tabbed .install { display: flex; justify-content: space-between; width: 100%; }
 .tabs { display: flex; flex-wrap: wrap; gap: 2px 4px; margin: 0 0 14px; border-bottom: 1px solid var(--rule); }
@@ -134,9 +134,13 @@ figure.browser, figure.timeline { font-variant-numeric: lining-nums; }
    its own cup: #e76f00 on dark paper (6:1), a deeper one on light (4.2:1). */
 .tab-java:hover .logo, .tab-java[aria-selected="true"] .logo { fill: #c45e00; }
 :root[data-theme="dark"] .tab-java:hover .logo, :root[data-theme="dark"] .tab-java[aria-selected="true"] .logo { fill: #e76f00; }
-/* Below about 780px eight names do not fit in a row, so the logos stand
+/* .NET's own purple, #512bd4, reads at 7:1 on light paper but 2.5:1 on
+   dark, so dark paper takes a lighter one of the same hue (6:1). */
+.tab-dotnet:hover .logo, .tab-dotnet[aria-selected="true"] .logo { fill: #512bd4; }
+:root[data-theme="dark"] .tab-dotnet:hover .logo, :root[data-theme="dark"] .tab-dotnet[aria-selected="true"] .logo { fill: #9780e5; }
+/* Below about 860px nine names do not fit in a row, so the logos stand
    alone, each tab a share of the row, and the names stay for screen readers. */
-@media (max-width: 780px) {
+@media (max-width: 860px) {
   .tabs { flex-wrap: nowrap; gap: 0; }
   .tab { position: relative; flex: 1 1 0; justify-content: center; padding: 11px 0 12px; }
   .tab .logo { width: 18px; height: 18px; }
