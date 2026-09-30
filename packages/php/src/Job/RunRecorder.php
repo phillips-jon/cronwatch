@@ -15,7 +15,7 @@ use Cronwatch\Run;
  */
 final class RunRecorder
 {
-    /** Lines are dropped from the front once the output is well past the cap; capOutput trims it exactly at the end. */
+    /** Lines are dropped from the front once the output is well past the cap; redactAndCap trims it exactly at the end. */
     public const KEEP = 64 * 1024;
 
     /** @var array<int, string> The lines kept, from index $first on. */
@@ -60,9 +60,13 @@ final class RunRecorder
         $this->metrics[$name] = $value;
     }
 
+    /**
+     * The lines still held (past 64 KB the oldest are let go), joined and not
+     * yet capped: the client redacts them first, then caps them (Output::redactAndCap).
+     */
     public function output(): ?string
     {
-        return $this->lines === [] ? null : Output::capOutput(implode("\n", $this->lines));
+        return $this->lines === [] ? null : implode("\n", $this->lines);
     }
 
     /**

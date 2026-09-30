@@ -407,6 +407,13 @@ final class ConformanceTest extends TestCase
         $this->eachCase(self::fixture('output.json')->redact, fn (\stdClass $c) => self::differs($c->result, self::digest(Output::redactSecrets(self::expand($c->input)))));
     }
 
+    public function testRedactAndCap(): void
+    {
+        $this->assertSame(self::fixture('output.json')->redactEdge, Output::REDACT_EDGE);
+        $redact = Output::redactSecrets(...);
+        $this->eachCase(self::fixture('output.json')->redactAndCap, fn (\stdClass $c) => self::differs($c->result, self::digest(Output::redactAndCap(self::expand($c->input), $redact))));
+    }
+
     /** An error message from a name, a message and frames, as a Throwable's is written, or from a value that is not one. */
     public function testErrorMessage(): void
     {

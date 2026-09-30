@@ -330,7 +330,7 @@ The first argument is a `postgres://` URL (a connection of its own), a `pdo_pgsq
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, `redact` rewrites them. The default, `Cronwatch\Output::redactSecrets`, blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks. An `expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent anywhere, `redact` rewrites them. The default, `Cronwatch\Output::redactSecrets`, blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off. An `expect` rule is checked before redaction, so it still sees what was logged.
 
 ```php
 use Cronwatch\Output;

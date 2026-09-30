@@ -272,10 +272,10 @@ final class Cronwatch
             }
         }
         if ($run->output !== null) {
-            $run->output = Output::stripNul(($this->redact)(Output::capOutput(Js::wellFormed($run->output))));
+            $run->output = Output::redactAndCap(Js::wellFormed($run->output), $this->redact);
         }
         if ($run->error !== null) {
-            $run->error = Output::stripNul(($this->redact)(Output::capOutput(Js::wellFormed($run->error))));
+            $run->error = Output::redactAndCap(Js::wellFormed($run->error), $this->redact);
         }
         $definition = Serialize::toStored($declared);
 
@@ -803,7 +803,7 @@ final class Cronwatch
         $run->finishedAt = $finishedAt;
         $run->durationMs = Evaluate::runDuration($run->startedAt, $finishedAt);
         $run->metrics = $recorder->metrics();
-        $run->output = $recorder->output() ?? (is_string($result) ? Output::capOutput(Js::wellFormed($result)) : null);
+        $run->output = $recorder->output() ?? (is_string($result) ? Js::wellFormed($result) : null);
         $expectText = $recorder->expectText() ?? (is_string($result) ? Js::wellFormed($result) : null);
         $this->conclude($definition, $run, $result, $error, $threw, $expectText);
         try {
@@ -856,16 +856,16 @@ final class Cronwatch
 
     /**
      * Sets a finished run's status and error from how it ended, then redacts
-     * its output and error. An HTTP response of 400 or more that the function
-     * returned fails the run, as a fetch Response does in the SDK (see
-     * Web\ResponseStatus for the kinds it reads).
+     * its output and error and caps them, in that order. An HTTP response of
+     * 400 or more that the function returned fails the run, as a fetch
+     * Response does in the SDK (see Web\ResponseStatus for the kinds it reads).
      */
     private function conclude(JobDefinition $definition, Run $run, mixed $result, mixed $error, bool $threw, ?string $expectText): void
     {
         $http = $threw ? null : Web\ResponseStatus::of($result);
         if ($threw) {
             $run->status = RunStatus::FAILED;
-            $run->error = Output::errorMessage($error);
+            $run->error = Output::describeError($error);
         } elseif ($http !== null && $http[0] >= 400) {
             $run->status = RunStatus::FAILED;
             $run->error = "HTTP {$http[0]}" . ($http[1] !== '' ? " {$http[1]}" : '');
@@ -879,12 +879,13 @@ final class Cronwatch
             }
         }
         // Redacted after the expect check, so a rule can still match what was
-        // logged. NULs go last, so not even a custom redact can store one.
+        // logged, and before the cap, so the cut cannot keep half a secret. NULs go
+        // last, so not even a custom redact can store one.
         if ($run->output !== null) {
-            $run->output = Output::stripNul(($this->redact)(Js::wellFormed($run->output)));
+            $run->output = Output::redactAndCap(Js::wellFormed($run->output), $this->redact);
         }
         if ($run->error !== null) {
-            $run->error = Output::stripNul(($this->redact)(Js::wellFormed($run->error)));
+            $run->error = Output::redactAndCap(Js::wellFormed($run->error), $this->redact);
         }
     }
 
@@ -1127,13 +1128,14 @@ final class Cronwatch
             return null;
         }
         $finishedAt = $this->now();
-        $added = $recorder->output() ?? (is_string($result) ? Output::capOutput(Js::wellFormed($result)) : null);
+        $added = $recorder->output() ?? (is_string($result) ? Js::wellFormed($result) : null);
         $run = clone $source;
         $run->status = RunStatus::RUNNING;
         $run->finishedAt = $finishedAt;
         $run->durationMs = Evaluate::runDuration($source->startedAt, $finishedAt);
         $run->error = null;
-        $run->output = self::joinOutput($source->output, $added);
+        // Capped by conclude(), after it is redacted.
+        $run->output = self::joinLines($source->output, $added);
         $run->metrics = array_replace($source->metrics, $recorder->metrics());
         $seen = $recorder->expectText() ?? (is_string($result) ? Js::wellFormed($result) : null);
         $expectText = self::joinLines($head, self::joinLines($source->output, $seen));
@@ -1175,7 +1177,7 @@ final class Cronwatch
             }
             $updated = clone $stored;
             if ($lines !== null) {
-                $updated->output = self::joinOutput($stored->output, Output::stripNul(($this->redact)(Js::wellFormed($lines))));
+                $updated->output = self::joinOutput($stored->output, Output::redactAndCap(Js::wellFormed($lines), $this->redact));
             }
             $updated->metrics = array_replace($stored->metrics, $metrics);
             return $this->writeRunIf($updated, [RunStatus::RUNNING]);

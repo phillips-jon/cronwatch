@@ -537,6 +537,65 @@ final class ClientHardeningTest extends TestCase
         $this->assertSame('password=hunter2', $plain->runs('r')[0]->output);
     }
 
+    public function testASecretSplitByThe16KbCutIsRedactedWhole(): void
+    {
+        $cap = \Cronwatch\Output::OUTPUT_CAP;
+        $pem = "-----BEGIN PRIVATE KEY-----\n" . implode("\n", array_map(fn (int $i) => str_repeat('QUJD', 15) . sprintf('%04d', $i), range(0, 24))) . "\n-----END PRIVATE KEY-----";
+        $bearer = 'Authorization: Bearer opaqueTOKENvalue1234567890';
+        $cw = $this->make();
+        // The cut lands inside the key's body, and in a second run just after "Bear".
+        $cw->run('pem', function ($job) use ($cap, $pem): void {
+            $job->log(str_repeat('x', $cap));
+            $job->log(substr($pem, 0, 900));
+            $job->log(substr($pem, 900));
+            $job->log('done');
+        });
+        $output = $cw->runs('pem')[0]->output;
+        $this->assertStringNotContainsString('QUJD', $output);
+        $this->assertStringEndsWith("[redacted]\ndone", $output);
+        $tail = str_repeat('y', $cap - 30);
+        $cw->run('bearer', fn () => "{$bearer}\n{$tail}");
+        $output = $cw->runs('bearer')[0]->output;
+        $this->assertStringNotContainsString('opaqueTOKEN', $output);
+        $this->assertLessThanOrEqual($cap + strlen("[earlier output trimmed]\n"), strlen($output));
+
+        // Errors, recorded runs and flushed lines the same way.
+        $this->failing(fn () => $cw->run('thrown', self::thrower(str_repeat('e', $cap) . " {$bearer} " . str_repeat('z', $cap - 40))));
+        $this->assertStringNotContainsString('opaqueTOKEN', $cw->runs('thrown')[0]->error);
+        $cw->job('imported');
+        $cw->recordRun(['id' => 'i1', 'job' => 'imported', 'status' => 'ok', 'startedAt' => 1, 'finishedAt' => 2, 'durationMs' => 1, 'error' => null, 'output' => "{$bearer}\n{$tail}", 'metrics' => [], 'trigger' => 'source']);
+        $this->assertStringNotContainsString('opaqueTOKEN', $cw->getRun('i1')->output);
+        $handle = $cw->job('flushed')->start();
+        $handle->log($bearer);
+        $handle->log($tail);
+        $handle->flush();
+        $this->assertStringNotContainsString('opaqueTOKEN', $cw->getRun($handle->id)->output);
+        $handle->finish();
+        $this->assertStringNotContainsString('opaqueTOKEN', $cw->getRun($handle->id)->output);
+    }
+
+    public function testTextPastTheRedactionWindowNeverKeepsWhatCameRightAfterItsCut(): void
+    {
+        $cap = \Cronwatch\Output::OUTPUT_CAP;
+        $edge = \Cronwatch\Output::REDACT_EDGE;
+        $trimmed = "[earlier output trimmed]\n";
+        $redact = \Cronwatch\Output::redactSecrets(...);
+        $text = "-----BEGIN PRIVATE KEY-----\n" . str_repeat('QUJD', 4000) . "\n" . str_repeat('k', $cap + $edge - 8000);
+        $kept = \Cronwatch\Output::redactAndCap($text, $redact);
+        $this->assertStringStartsWith($trimmed, $kept);
+        $this->assertSame(strlen($trimmed) + $cap, strlen($kept));
+        $this->assertStringNotContainsString('QUJD', $kept);
+
+        // A redaction that shrinks the window cannot pull its first units into view.
+        $shrinking = fn (string $t) => (string) preg_replace('/s{100}/', '', $t);
+        $this->assertSame($trimmed, \Cronwatch\Output::redactAndCap(str_repeat('QUJD', 100) . str_repeat('s', $cap + $edge), $shrinking));
+
+        // Short text is redacted whole, then capped as before; NULs go either side of redact.
+        $this->assertSame('password=[redacted]', \Cronwatch\Output::redactAndCap('password=x', $redact));
+        $this->assertSame('ab', \Cronwatch\Output::redactAndCap("a\0b", fn (string $t) => "{$t}\0"));
+        $this->assertSame($trimmed . str_repeat('x', $cap), \Cronwatch\Output::redactAndCap(str_repeat('x', $cap + 5), $redact));
+    }
+
     public function testACheckCalledFromInsideACheckIsRefused(): void
     {
         $cw = null;
