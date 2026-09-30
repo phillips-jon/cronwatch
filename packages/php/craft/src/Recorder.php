@@ -52,7 +52,7 @@ final class Recorder
     private ?Cronwatch $client = null;
     /** @var array<string, int> queue job id => the attempt's run key */
     private array $queueRuns = [];
-    /** @var list<array{string, int}> the open command runs, innermost last: [route, key] */
+    /** @var list<array{string, int, int}> the open command runs, innermost last: [route, key, spl_object_id(action)] */
     private array $commandRuns = [];
 
     public function __construct(private readonly Plugin $plugin)
@@ -126,11 +126,35 @@ final class Recorder
         return array_values($event->channels);
     }
 
-    /** The dashboard's page for a job, for alert links. */
+    /**
+     * The dashboard's page for a job, for alert links.
+     *
+     * Craft makes Control Panel URLs from baseCpUrl when it is set, else
+     * from @web, which Craft takes from the request itself when no config
+     * sets it: in a web request (a queue job the Control Panel's queue
+     * runner runs) that is the Host header, which a visitor chooses. There
+     * the primary site's configured URL gives the host instead, and without
+     * one (a site URL that is @web itself) the alert goes without a link.
+     */
     public function jobUrl(string $job): string
     {
         try {
-            return UrlHelper::cpUrl('cronwatch', ['job' => $job]);
+            $url = UrlHelper::cpUrl('cronwatch', ['job' => $job]);
+            $request = Craft::$app->getRequest();
+            if (Craft::$app->getConfig()->getGeneral()->baseCpUrl || $request->getIsConsoleRequest() || !$request->isWebAliasSetDynamically) {
+                return $url;
+            }
+            $site = Craft::$app->getSites()->getPrimarySite();
+            $raw = trim((string) $site->getBaseUrl(false));
+            if ($raw === '' || str_starts_with($raw, '@web')) {
+                return '';
+            }
+            $trusted = UrlHelper::hostInfo((string) $site->getBaseUrl());
+            $current = UrlHelper::hostInfo($url);
+            if (!str_contains($trusted, '//') || !str_contains($current, '//') || !str_starts_with($url, $current)) {
+                return '';
+            }
+            return $trusted . substr($url, strlen($current));
         } catch (\Throwable) {
             return '';
         }
@@ -325,22 +349,40 @@ final class Recorder
         if ($found === null) {
             return;
         }
-        $this->safely(function () use ($found, $route): void {
+        $this->safely(function () use ($found, $route, $action): void {
             [$name, $options, $tags] = $found;
             $handle = $this->declare($name, $options, $tags);
-            $this->commandRuns[] = [$route, $this->client()->startExecution($handle->definition, self::TRIGGER_COMMAND)];
+            $this->commandRuns[] = [$route, $this->client()->startExecution($handle->definition, self::TRIGGER_COMMAND), spl_object_id($action)];
         }, "starting {$route}");
     }
 
-    /** A console controller's EVENT_AFTER_ACTION: the exit code decides. */
+    /**
+     * A console controller's EVENT_AFTER_ACTION: the exit code decides.
+     *
+     * The run is found by its action, from the innermost out. Runs opened
+     * after it are of actions it ran itself that never reached their own
+     * EVENT_AFTER_ACTION: each threw an exception this action caught (the
+     * console error handler never saw it), so each is failed first.
+     */
     public function commandFinished(ActionEvent $event): void
     {
         $route = $event->action->getUniqueId();
-        $open = end($this->commandRuns);
-        if ($open === false || $open[0] !== $route) {
+        $action = spl_object_id($event->action);
+        $at = null;
+        for ($i = count($this->commandRuns) - 1; $i >= 0; $i--) {
+            if ($this->commandRuns[$i][2] === $action && $this->commandRuns[$i][0] === $route) {
+                $at = $i;
+                break;
+            }
+        }
+        if ($at === null) {
             return;
         }
-        array_pop($this->commandRuns);
+        while (count($this->commandRuns) > $at + 1) {
+            $inner = array_pop($this->commandRuns);
+            $this->safely(fn () => $this->client()->finishExecution($inner[1], null, "Threw an exception that craft {$route}, which ran it, caught", true), "finishing {$inner[0]}");
+        }
+        $open = array_pop($this->commandRuns);
         $code = is_int($event->result) ? $event->result : 0;
         $this->safely(fn () => $code === 0
             ? $this->client()->finishExecution($open[1], is_string($event->result) ? $event->result : null)

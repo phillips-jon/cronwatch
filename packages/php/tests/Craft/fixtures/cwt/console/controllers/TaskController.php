@@ -31,6 +31,22 @@ final class TaskController extends Controller
         throw new \RuntimeException('cwt command broke');
     }
 
+    /** Runs cwt/task/inner, which throws, and carries on past it. */
+    public function actionNested(): int
+    {
+        try {
+            $this->run('inner');
+        } catch (\RuntimeException $error) {
+            $this->stdout("caught: {$error->getMessage()}\n");
+        }
+        return ExitCode::OK;
+    }
+
+    public function actionInner(): int
+    {
+        throw new \RuntimeException('cwt inner broke');
+    }
+
     public function actionUnwatched(): int
     {
         return ExitCode::OK;

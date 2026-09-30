@@ -42,7 +42,7 @@ The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, 
 
 ### Commands
 
-A listed command's run is recorded as `craft <route>` runs it, with the trigger `"command"`: ok, failed with `Exited with code N` for a non-zero exit, or failed with the exception that ended it. Its job is `craft:<route>` with slashes as colons (`craft:resave:entries`) unless `name` says otherwise, and its schedule is what you give, so a command the crontab stopped running is reported missed.
+A listed command's run is recorded as `craft <route>` runs it, with the trigger `"command"`: ok, failed with `Exited with code N` for a non-zero exit, or failed with the exception that ended it. A listed command that another runs, and whose exception that one catches, is failed when the caller finishes. Its job is `craft:<route>` with slashes as colons (`craft:resave:entries`) unless `name` says otherwise, and its schedule is what you give, so a command the crontab stopped running is reported missed.
 
 A command of your own can carry its options in code instead, with the `WatchCommand` behavior (`actions` limits it to some of the controller's actions):
 
@@ -120,6 +120,8 @@ return [
     // 'commands' => [...], 'queueJobs' => [...],
 ];
 ```
+
+Alerts link to the job's page in the Control Panel, at `baseCpUrl` when it is set, else at the site's `@web`. Where `@web` is not set in config, Craft takes it from each request, so an alert sent from a web request (a queue job the Control Panel ran) links to the primary site's URL instead, and a site whose URL is `@web` itself sends alerts without a link; set `baseCpUrl` or `@web` for links everywhere.
 
 Nothing leaves the site until a channel is set; with none, alerts go to Craft's log (the `cronwatch` category), as do failures outside jobs. A listener adds channels, any of the library's ([PHP](/docs/php/#email-sms-and-error-trackers)) or a callable taking the `Cronwatch\Alert`:
 
