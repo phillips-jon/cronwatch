@@ -22,6 +22,11 @@ class CronwatchCliTest {
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
+  /** What a stream took, with Windows line ends read as the others. */
+  private static String text(ByteArrayOutputStream stream) {
+    return stream.toString(StandardCharsets.UTF_8).replace("\r\n", "\n");
+  }
+
   private int run(java.util.function.Supplier<Cronwatch> factory, String... args) {
     return CronwatchCli.run(
         factory,
@@ -45,9 +50,9 @@ class CronwatchCliTest {
               return cw;
             },
             "check");
-    assertEquals(0, status, err.toString(StandardCharsets.UTF_8));
-    assertEquals("cronwatch: checked 1 job, sent 0 alerts\n", out.toString(StandardCharsets.UTF_8));
-    assertEquals("", err.toString(StandardCharsets.UTF_8));
+    assertEquals(0, status, text(err));
+    assertEquals("cronwatch: checked 1 job, sent 0 alerts\n", text(out));
+    assertEquals("", text(err));
     assertEquals(1, store.listJobs().size(), "the check wrote the declaration");
   }
 
@@ -72,10 +77,8 @@ class CronwatchCliTest {
             () -> Cronwatch.builder().store(down()).alerts(List.of()).noShutdownHook().build(),
             "check");
     assertEquals(1, status);
-    assertTrue(
-        err.toString(StandardCharsets.UTF_8).startsWith("cronwatch: the check failed: "),
-        err.toString(StandardCharsets.UTF_8));
-    assertTrue(err.toString(StandardCharsets.UTF_8).contains("the database is down"));
+    assertTrue(text(err).startsWith("cronwatch: the check failed: "), text(err));
+    assertTrue(text(err).contains("the database is down"));
   }
 
   @Test
@@ -87,9 +90,7 @@ class CronwatchCliTest {
             },
             "check");
     assertEquals(1, status);
-    assertEquals(
-        "cronwatch: the client could not be made: no store configured\n",
-        err.toString(StandardCharsets.UTF_8));
+    assertEquals("cronwatch: the client could not be made: no store configured\n", text(err));
   }
 
   @SuppressWarnings("unchecked")
@@ -105,22 +106,18 @@ class CronwatchCliTest {
   void aFactoryThatThrowsACheckedExceptionIsStatusOne() {
     int status = run(() -> sneaky(new java.io.IOException("config not found")), "check");
     assertEquals(1, status);
-    assertEquals(
-        "cronwatch: the client could not be made: config not found\n",
-        err.toString(StandardCharsets.UTF_8));
+    assertEquals("cronwatch: the client could not be made: config not found\n", text(err));
   }
 
   @Test
   void anUnknownCommandIsStatusTwoWithTheUsage() {
     assertEquals(2, run(() -> client(new MemoryStore()), "run", "nightly"));
-    assertTrue(
-        err.toString(StandardCharsets.UTF_8)
-            .startsWith("cronwatch: unknown command run nightly\n"));
-    assertTrue(err.toString(StandardCharsets.UTF_8).contains("usage: cronwatch check"));
+    assertTrue(text(err).startsWith("cronwatch: unknown command run nightly\n"));
+    assertTrue(text(err).contains("usage: cronwatch check"));
     err.reset();
     assertEquals(2, run(() -> client(new MemoryStore())));
-    assertTrue(err.toString(StandardCharsets.UTF_8).startsWith("cronwatch: no command given\n"));
+    assertTrue(text(err).startsWith("cronwatch: no command given\n"));
     assertEquals(0, run(() -> client(new MemoryStore()), "--help"));
-    assertTrue(out.toString(StandardCharsets.UTF_8).startsWith("usage: cronwatch check"));
+    assertTrue(text(out).startsWith("usage: cronwatch check"));
   }
 }

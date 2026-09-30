@@ -426,6 +426,9 @@ class RowsProperties {
               throw new AssertionError(e.toString(), e);
             }
           });
+    } finally {
+      // Windows will not delete the temporary directory while the file is open.
+      store.close();
     }
   }
 }
