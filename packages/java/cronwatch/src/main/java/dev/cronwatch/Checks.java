@@ -55,14 +55,17 @@ final class Checks {
     CompletableFuture<CheckResult> shared = core.checking.compareAndExchange(null, mine);
     if (shared == null) {
       shared = mine;
+      // The check is let go of before anyone is answered, as the SDK's is: a caller that asks
+      // again once answered starts a check of its own rather than joining this finished one.
       core.spawn(
           () -> {
             try {
-              mine.complete(runCheck());
-            } catch (Throwable t) {
-              mine.completeExceptionally(t);
-            } finally {
+              CheckResult result = runCheck();
               core.checking.compareAndSet(mine, null);
+              mine.complete(result);
+            } catch (Throwable t) {
+              core.checking.compareAndSet(mine, null);
+              mine.completeExceptionally(t);
             }
           },
           "check");

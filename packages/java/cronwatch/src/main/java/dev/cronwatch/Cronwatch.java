@@ -374,14 +374,17 @@ public final class Cronwatch implements AutoCloseable {
     CompletableFuture<RunHandle> shared = core.starting.putIfAbsent(key, mine);
     if (shared == null) {
       shared = mine;
+      // Let go of before anyone is answered, so a start with this id once answered reads the
+      // stored run rather than joining this finished start.
       core.spawn(
           () -> {
             try {
-              mine.complete(recordStart(def, options.trigger, id));
-            } catch (Throwable t) {
-              mine.completeExceptionally(t);
-            } finally {
+              RunHandle handle = recordStart(def, options.trigger, id);
               core.starting.remove(key, mine);
+              mine.complete(handle);
+            } catch (Throwable t) {
+              core.starting.remove(key, mine);
+              mine.completeExceptionally(t);
             }
           },
           "starting " + def.name());
