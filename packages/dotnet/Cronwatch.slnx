@@ -1,18 +1,23 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Cronwatch/Cronwatch.csproj" />
+    <Project Path="src/Cronwatch.AspNetCore/Cronwatch.AspNetCore.csproj" />
     <Project Path="src/Cronwatch.Hosting/Cronwatch.Hosting.csproj" />
     <Project Path="src/Cronwatch.Hangfire/Cronwatch.Hangfire.csproj" />
     <Project Path="src/Cronwatch.Quartz/Cronwatch.Quartz.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/Cronwatch.AspNetCore.Tests/Cronwatch.AspNetCore.Tests.csproj" />
     <Project Path="test/Cronwatch.Tests/Cronwatch.Tests.csproj" />
     <Project Path="test/Cronwatch.Hosting.Tests/Cronwatch.Hosting.Tests.csproj" />
     <Project Path="test/Cronwatch.Hangfire.Tests/Cronwatch.Hangfire.Tests.csproj" />
     <Project Path="test/Cronwatch.Quartz.Tests/Cronwatch.Quartz.Tests.csproj" />
+    <Project Path="test/Cronwatch.WebTest/Cronwatch.WebTest.csproj" />
     <Project Path="test/ProcessExitChild/ProcessExitChild.csproj" />
+    <Project Path="test/WebEnvChild/WebEnvChild.csproj" />
   </Folder>
   <Folder Name="/examples/">
     <Project Path="examples/crontab/Crontab.csproj" />
   </Folder>
+  <Project Path="webserver/webserver.csproj" />
 </Solution>

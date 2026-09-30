@@ -85,6 +85,13 @@ public sealed class CronwatchOptions
     /// <summary>A diagnosis for each alert, or null for none.</summary>
     public ITriage? Triage { get; init; }
 
+    /// <summary>
+    /// The one POST every channel and triage make, unless one has a transport of its own. Default:
+    /// an <see cref="Cronwatch.Alerts.HttpClientTransport"/> the client makes on its first send and
+    /// disposes with itself.
+    /// </summary>
+    public Cronwatch.Alerts.ITransport? Transport { get; init; }
+
     /// <summary>Sources synced at the start of every check.</summary>
     public IList<ISource> Sources { get; init; } = new List<ISource>();
 
@@ -203,4 +210,7 @@ internal sealed class Timings
     public TimeSpan FirstCheck { get; set; } = TimeSpan.FromSeconds(1);
 
     public TimeSpan MinInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>The SDK's <c>now</c> option, for a seed whose clock goes where no <see cref="DateTimeOffset"/> can.</summary>
+    public Func<long>? Now { get; set; }
 }

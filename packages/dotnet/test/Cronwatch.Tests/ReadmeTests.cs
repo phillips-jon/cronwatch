@@ -5,7 +5,11 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Cronwatch.Alerts;
+using Cronwatch.PgCron;
+using Cronwatch.Triage;
 using Microsoft.Data.Sqlite;
+using Npgsql;
 using Xunit;
 
 namespace Cronwatch.Tests;
@@ -155,6 +159,34 @@ public class ReadmeTests
         await using var m = Support.Make();
         await new SendDigest(m.Cw).Invoke();
         Assert.Equal(RunStatus.Ok, Assert.Single(await m.Cw.RunsAsync("send-digest")).Status);
+    }
+
+    [Fact]
+    public async Task Alerts_triage_and_pg_cron()
+    {
+        // Nothing here reaches a server: the data source connects on first use, and the client
+        // is only made and disposed.
+        const string connectionString = "Host=127.0.0.1;Database=cw;Username=postgres";
+        const string slackWebhookUrl = "https://hooks.slack.example/T/B/not-a-real-hook";
+        const string resendApiKey = "not-a-real-key";
+
+        var pg = NpgsqlDataSource.Create(connectionString);
+
+        await using var cw = new CronwatchClient(new CronwatchOptions
+        {
+            Store = SqlStore.Postgres(pg), // SqlStore.MySql(dataSource) for MySQL and MariaDB
+            Alerts =
+            {
+                Slack.Webhook(slackWebhookUrl),
+                new ResendChannel(new ResendOptions { ApiKey = resendApiKey, From = "cron@example.com", To = { "ops@example.com" } }),
+            },
+            Triage = new AnthropicTriage(), // reads ANTHROPIC_API_KEY when it runs
+            Sources = { new PgCronSource(pg, new PgCronOptions { Jobs = ["nightly-vacuum"] }) },
+        });
+
+        Assert.Equal("postgres", ((SqlStore)cw.Store).Dialect);
+        Assert.DoesNotContain(resendApiKey, cw.ToString(), StringComparison.Ordinal);
+        await pg.DisposeAsync();
     }
 
     [Fact]

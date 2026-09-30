@@ -1452,10 +1452,41 @@ jobs:
         include:
           # The floor and, until .NET 11 is released in November 2026, the
           # newest. The test project gains the newest target when it ships.
-          - { dotnet: "10.0.x" }
+          - { dotnet: "10.0.x", newest: true }
+    # The databases for SqlStore's server tests, as the java job has them.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+          MARIADB_DATABASE: cw
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       DOTNET_NOLOGO: "1"
       DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      # SqlStore on the three servers, each test on tables of its own prefix;
+      # pg_cron's variable is set below, on the newest entry.
+      CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+      CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
+      CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -1468,6 +1499,22 @@ jobs:
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
+      # A second Postgres with pg_cron, for the pg_cron source's tests against
+      # the real extension, as the java job starts it, on the newest entry.
+      - name: Start Postgres with pg_cron
+        if: matrix.newest
+        run: |
+          docker run -d --name pgcron -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 5433:5432 postgres:16 \
+            bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-cron > /dev/null && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw'
+          for _ in $(seq 1 90); do
+            if [ "$(docker exec pgcron psql postgres://postgres:pw@127.0.0.1:5432/cw -tAc 'show shared_preload_libraries' 2>/dev/null)" = "pg_cron" ]; then
+              echo "CRONWATCH_TEST_PGCRON=postgres://postgres:pw@127.0.0.1:5433/cw" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs pgcron
+          exit 1
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           dotnet-version: ${{ matrix.dotnet }}
@@ -1493,6 +1540,12 @@ jobs:
         env:
           CRONWATCH_CULTURE: tr-TR
         run: dotnet test -c Release --no-build
+      # @cronwatch/mcp end to end against webserver, the seeded dashboard on
+      # Kestrel through MapCronwatch.
+      - name: MCP against the .NET dashboard
+        env:
+          CRONWATCH_TEST_DOTNET: "1"
+        run: npm test --workspace packages/mcp
       # The package's files, and no dependency in its .nuspec: the core
       # depends on no other package.
       - name: dotnet pack, and the package's files
@@ -1508,6 +1561,21 @@ jobs:
             unzip -l "$nupkg" | grep -q " $f\$" || { echo "missing $f"; exit 1; }
           done
           if unzip -l "$nupkg" | grep -Eq ' (test|conformance|examples)/'; then echo "the package carries test files"; exit 1; fi
+      # Cronwatch.Hosting, Cronwatch.AspNetCore, Cronwatch.Hangfire and
+      # Cronwatch.Quartz: each its assembly, XML
+      # documentation, README and license, and nothing from the tests.
+      - name: dotnet pack, the integration packages' files
+        working-directory: packages/dotnet
+        run: |
+          for p in Cronwatch.Hosting Cronwatch.AspNetCore Cronwatch.Hangfire Cronwatch.Quartz; do
+            dotnet pack src/$p -c Release --no-build -o artifacts/$p
+            nupkg=$(ls artifacts/$p/$p.*.nupkg)
+            unzip -l "$nupkg"
+            for f in lib/net10.0/$p.dll lib/net10.0/$p.xml README.md LICENSE; do
+              unzip -l "$nupkg" | grep -q " $f\$" || { echo "$p is missing $f"; exit 1; }
+            done
+            if unzip -l "$nupkg" | grep -Eq ' (test|conformance|examples|webserver)/'; then echo "$p carries test files"; exit 1; fi
+          done
   dotnet-frameworks:
     name: dotnet-frameworks (${{ matrix.name }})
     runs-on: ubuntu-latest

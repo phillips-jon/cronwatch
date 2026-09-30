@@ -15,5 +15,14 @@
     <None Include="../../README.md" Pack="true" PackagePath="/" />
     <None Include="../../LICENSE" Pack="true" PackagePath="/" />
     <InternalsVisibleTo Include="Cronwatch.Tests" />
+    <InternalsVisibleTo Include="Cronwatch.WebTest" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The dashboard's style sheet, scripts and icons: the SDK's files, byte
+         for byte, written and checked by golden.mjs and make-dashboard-icons.mjs,
+         read once through GetManifestResourceStream under these names (spelled
+         out, since RecursiveDir would name them with backslashes on Windows). -->
+    <EmbeddedResource Include="Web/Assets/*" LogicalName="Cronwatch.Web.Assets/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Web/Assets/icons/*" LogicalName="Cronwatch.Web.Assets/icons/%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

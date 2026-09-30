@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Not packed: the cases of the dashboard and handler tests that depend on
+       the environment, each run by RoutesEnvTests as a child process with the
+       variables it names, since the environment is shared by every test. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CA2007;CA1849;CA2000;CA1303</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Cronwatch/Cronwatch.csproj" />
+  </ItemGroup>
+</Project>

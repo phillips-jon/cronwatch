@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Cronwatch.Alerts;
 
 namespace Cronwatch;
 
@@ -28,11 +29,21 @@ public sealed class ChannelContext
 {
     private readonly Action<Exception> _report;
 
-    /// <summary>A context reporting to <paramref name="report"/>.</summary>
+    /// <summary>A context reporting to <paramref name="report"/>, posting through a transport shared by the process.</summary>
     public ChannelContext(Action<Exception> report)
+        : this(report, SharedTransport.Instance)
+    {
+    }
+
+    /// <summary>A context reporting to <paramref name="report"/> and posting through <paramref name="transport"/>.</summary>
+    public ChannelContext(Action<Exception> report, ITransport transport)
     {
         _report = report ?? throw new ArgumentNullException(nameof(report));
+        Transport = transport ?? throw new ArgumentNullException(nameof(transport));
     }
+
+    /// <summary>The client's transport, which a channel without one of its own posts through.</summary>
+    public ITransport Transport { get; }
 
     /// <summary>
     /// Reports a problem that did not stop the alert going out, such as one of several recipients
@@ -91,7 +102,64 @@ public sealed class ConsoleChannel : IChannel
 /// <summary>What triage is given: the alert and the job's recent runs.</summary>
 /// <param name="Alert">The alert to diagnose.</param>
 /// <param name="RecentRuns">The job's newest runs, newest first.</param>
-public sealed record TriageContext(Alert Alert, IReadOnlyList<Run> RecentRuns);
+public sealed record TriageContext(Alert Alert, IReadOnlyList<Run> RecentRuns)
+{
+    /// <summary>The client's transport, which triage without one of its own posts through.</summary>
+    public ITransport Transport { get; init; } = SharedTransport.Instance;
+}
+
+/// <summary>
+/// The transport a context made without the client's uses: one <see cref="HttpClientTransport"/>
+/// for the process, made on its first send.
+/// </summary>
+internal static class SharedTransport
+{
+    private static readonly Lazy<HttpClientTransport> Made = new(() => new HttpClientTransport());
+
+    public static ITransport Instance { get; } = new LazyShared();
+
+    private sealed class LazyShared : ITransport
+    {
+        public Task<TransportResponse> PostAsync(TransportRequest request, CancellationToken cancellationToken) =>
+            Made.Value.PostAsync(request, cancellationToken);
+
+        public override string ToString() => "HttpClientTransport";
+    }
+}
+
+/// <summary>
+/// The client's default transport: an <see cref="HttpClientTransport"/> made on the first send, so
+/// a client that never alerts over HTTP never makes an <c>HttpClient</c>, and disposed with the
+/// client.
+/// </summary>
+internal sealed class LazyTransport : ITransport, IDisposable
+{
+    private readonly Lock _lock = new();
+    private HttpClientTransport? _made;
+    private bool _disposed;
+
+    public Task<TransportResponse> PostAsync(TransportRequest request, CancellationToken cancellationToken)
+    {
+        HttpClientTransport transport;
+        lock (_lock)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            transport = _made ??= new HttpClientTransport();
+        }
+        return transport.PostAsync(request, cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            _disposed = true;
+            _made?.Dispose();
+        }
+    }
+
+    public override string ToString() => "HttpClientTransport";
+}
 
 /// <summary>
 /// A short diagnosis added to each alert but recoveries: the SDK's <c>triage</c>. Tried once per

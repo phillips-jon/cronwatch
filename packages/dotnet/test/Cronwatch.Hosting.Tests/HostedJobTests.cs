@@ -295,6 +295,35 @@ public class HostedJobTests
         Assert.Equal(0, await running);
     }
 
+    [Fact]
+    public async Task A_runs_log_lines_carry_its_job_and_run_in_a_scope()
+    {
+        var lines = new ConcurrentQueue<string>();
+        var builder = Host.CreateApplicationBuilder();
+        builder.Logging.ClearProviders();
+        builder.Logging.AddProvider(new CaptureLogs(lines));
+        builder.Services.AddCronwatch(o =>
+        {
+            o.Clock = Clock();
+            o.ProcessExitHook = false;
+            o.NoCheck = true;
+            o.OnWarning = _ => { };
+        });
+        using IHost host = builder.Build();
+        var cw = host.Services.GetRequiredService<CronwatchClient>();
+        var log = host.Services.GetRequiredService<ILogger<HostedJobTests>>();
+        string? runId = null;
+        await cw.Job("scoped").RunAsync((job, ct) =>
+        {
+            runId = job.RunId;
+            log.LogInformation("inside");
+            return Task.CompletedTask;
+        });
+        log.LogInformation("outside");
+        Assert.Contains("[cronwatch_job=scoped cronwatch_run=" + runId + "] inside", lines);
+        Assert.Contains("[] outside", lines);
+    }
+
     private sealed class CaptureLogs(ConcurrentQueue<string> lines) : ILoggerProvider
     {
         public ILogger CreateLogger(string categoryName) => new Logger(lines);
@@ -303,15 +332,28 @@ public class HostedJobTests
         {
         }
 
+        /// <summary>Writes each line after the scopes open in its flow: <c>[scope] line</c>.</summary>
         private sealed class Logger(ConcurrentQueue<string> lines) : ILogger
         {
+            private static readonly AsyncLocal<string?> Scope = new();
+
             public IDisposable? BeginScope<TState>(TState state)
-                where TState : notnull => null;
+                where TState : notnull
+            {
+                string? previous = Scope.Value;
+                Scope.Value = state.ToString();
+                return new Restore(() => Scope.Value = previous);
+            }
 
             public bool IsEnabled(LogLevel logLevel) => true;
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
-                lines.Enqueue(formatter(state, exception));
+                lines.Enqueue("[" + Scope.Value + "] " + formatter(state, exception));
+        }
+
+        private sealed class Restore(Action restore) : IDisposable
+        {
+            public void Dispose() => restore();
         }
     }
 }

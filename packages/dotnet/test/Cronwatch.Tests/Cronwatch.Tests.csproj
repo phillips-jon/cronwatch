@@ -11,6 +11,8 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="MySqlConnector" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Cronwatch/Cronwatch.csproj" />
@@ -18,5 +20,6 @@
     <ProjectReference Include="../ProcessExitChild/ProcessExitChild.csproj" ReferenceOutputAssembly="false" />
     <!-- Built for the crontab example's test, which runs its two lines as processes. -->
     <ProjectReference Include="../../examples/crontab/Crontab.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebEnvChild/WebEnvChild.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>

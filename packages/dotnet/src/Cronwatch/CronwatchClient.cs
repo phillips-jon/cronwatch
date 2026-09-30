@@ -55,6 +55,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         _defaultStore = options.Store == null;
         _channels = options.AlertsGiven ? new List<IChannel>(options.Alerts) : [new ConsoleChannel()];
         _triage = options.Triage;
+        _transport = options.Transport ?? new LazyTransport();
         _sources = new List<ISource>(options.Sources ?? []);
         if (options.CronSecret is { } secret)
         {
@@ -215,9 +216,6 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     /// <summary>The definition <see cref="Job"/> would declare, the client's defaults applied, without declaring it.</summary>
     /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/>, as <see cref="Job"/> refuses.</exception>
     internal Definition Describe(string name, JobOptions options) => Define(name, options).Stored;
-
-    /// <summary>The handle of the job declared under <paramref name="name"/> in this client, or null.</summary>
-    internal Job? DeclaredJob(string name) => Declared(name) is { } def ? new Job(this, def) : null;
 
     private Job DeclaredOrNew(string name, JobOptions? options)
     {
@@ -584,6 +582,10 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         if (_processExitHook)
         {
             AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
+        }
+        if (_transport is LazyTransport owned)
+        {
+            owned.Dispose();
         }
         try
         {

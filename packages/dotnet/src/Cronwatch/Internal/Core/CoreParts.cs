@@ -215,6 +215,7 @@ internal static class HttpFailure
     public static string? Of(object? value) => value switch
     {
         HttpResponseMessage m => Text((int)m.StatusCode, m.ReasonPhrase),
+        Web.WebResponse w => Text(w.Status),
         _ => null,
     };
 }
