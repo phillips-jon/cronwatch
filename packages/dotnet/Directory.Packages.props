@@ -25,6 +25,13 @@
     <PackageVersion Include="Hangfire.Core" Version="$(HangfireVersion)" />
     <PackageVersion Include="Hangfire.InMemory" Version="1.0.0" />
     <PackageVersion Include="Hangfire.PostgreSql" Version="1.21.1" />
+    <!-- The Cronos Hangfire 1.8 carries inside its own assembly (1.8.25's is
+         0.11.1, compared line for line), for reading its crons as it does. -->
+    <PackageVersion Include="Cronos" Version="0.11.1" />
+    <!-- Hangfire.Core asks for Newtonsoft.Json 11.0.1, which has a known
+         vulnerability (GHSA-5crp-9r3c-p9vr); Cronwatch.Hangfire asks for the
+         fixed release, so an app that takes it gets that one. -->
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup Label="Quartz">
     <PackageVersion Include="Quartz" Version="$(QuartzVersion)" />
