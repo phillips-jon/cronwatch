@@ -12,10 +12,10 @@ namespace Cronwatch.Tests;
 public class SuiteTests
 {
     /// <summary>The fixtures this phase replays.</summary>
-    private static readonly string[] Replayed = ["duration", "schedule", "output", "evaluate", "format", "health", "store", "triage"];
+    private static readonly string[] Replayed = ["duration", "schedule", "output", "evaluate", "format", "health", "store", "triage", "pgcron"];
 
-    /// <summary>The fixtures the channels and pg_cron replay in phase 2.</summary>
-    private static readonly string[] Later = ["channels", "pgcron"];
+    /// <summary>The fixtures the channels replay in phase 2.</summary>
+    private static readonly string[] Later = ["channels"];
 
     [Fact]
     public void Every_fixture_the_sdk_writes_is_known()
