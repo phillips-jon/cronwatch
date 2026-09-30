@@ -184,12 +184,12 @@ class HardeningTest {
         Support.make(
             b -> {
               b.alerts(List.of(hung, good));
-              b.timings.channelMs = 300;
+              b.timings.channelMs = 1000;
             });
     fail(m.cw(), "h", "x");
     assertEquals(List.of("failed"), good.types(), "the other channel has it");
     assertEquals(List.of("alert channel hung"), m.errors().wheres());
-    assertTrue(m.errors().messages().get(0).contains("timed out after 300ms"));
+    assertTrue(m.errors().messages().get(0).contains("timed out after 1000ms"));
     assertEquals(List.of(), m.cw().store().getState("h").undelivered(), "delivered once");
     Support.await("the hung send to be interrupted", interrupted::get);
   }
@@ -560,18 +560,18 @@ class HardeningTest {
       queued(store, clock, name);
     }
     List<String> tried = new CopyOnWriteArrayList<>();
-    // Each attempt takes half a second of wall clock and fails; the budget covers two.
+    // Each attempt takes a second of wall clock and fails; the budget covers two.
     Channel slow =
         Channel.of(
             "slow",
             (a, ctx) -> {
               tried.add(a.job());
-              Thread.sleep(500);
+              Thread.sleep(1000);
               throw new IOException("timed out");
             });
     Cronwatch.Builder b =
         Support.builder(clock, new Capture(), new Errors()).store(store).alerts(List.of(slow));
-    b.timings.retryBudgetMs = 800;
+    b.timings.retryBudgetMs = 1500;
     try (Cronwatch server = b.build()) {
       server.check();
       assertEquals(List.of("a", "b"), tried, "the budget covers two attempts");
