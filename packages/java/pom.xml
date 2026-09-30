@@ -43,6 +43,7 @@
 
   <modules>
     <module>cronwatch</module>
+    <module>cronwatch-quartz</module>
   </modules>
 
   <properties>

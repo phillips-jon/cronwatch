@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  dev.cronwatch:cronwatch-quartz, the Quartz integration: a global
+  JobListener that records every firing as a run, the jobs declared from
+  the scheduler's triggers, and a check job. Quartz is provided: the app
+  brings it (2.5.0 or newer), and its version is the one that runs.
+  -Dquartz.version= picks the one the tests run against.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>dev.cronwatch</groupId>
+    <artifactId>cronwatch-parent</artifactId>
+    <version>${revision}</version>
+  </parent>
+
+  <artifactId>cronwatch-quartz</artifactId>
+  <packaging>jar</packaging>
+
+  <name>CronWatch for Quartz</name>
+  <description>CronWatch for Quartz 2.5: every firing recorded as a run, the jobs declared from the scheduler's triggers, and a check job run once per cluster.</description>
+
+  <properties>
+    <quartz.version>2.5.2</quartz.version>
+    <postgresql.version>42.7.13</postgresql.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.cronwatch</groupId>
+      <artifactId>cronwatch</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.quartz-scheduler</groupId>
+      <artifactId>quartz</artifactId>
+      <version>${quartz.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.jspecify</groupId>
+      <artifactId>jspecify</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>${postgresql.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <compilerArgs combine.children="append">
+            <!-- Quartz is an automatic module (org.quartz) that the API names. -->
+            <arg>-Xlint:-requires-transitive-automatic</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
