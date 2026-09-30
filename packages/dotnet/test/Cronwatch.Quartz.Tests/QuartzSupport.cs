@@ -68,11 +68,15 @@ internal static class QuartzSupport
     private static readonly ConcurrentDictionary<string, Func<IJobExecutionContext, ValueTask>> Behaviours = new(StringComparer.Ordinal);
 
     /// <summary>A job of <paramref name="key"/> that runs <paramref name="behaviour"/>.</summary>
-    public static IJobDetail Job(JobKey key, Func<IJobExecutionContext, ValueTask> behaviour)
+    public static IJobDetail Job(JobKey key, Func<IJobExecutionContext, ValueTask> behaviour) =>
+        JobBuilder.Create<DelegateJob>().WithIdentity(key).UsingJobData("behaviour", Behaviour(behaviour)).Build();
+
+    /// <summary>The id a <see cref="DelegateJob"/>'s data names to run <paramref name="behaviour"/>.</summary>
+    public static string Behaviour(Func<IJobExecutionContext, ValueTask> behaviour)
     {
         string id = Guid.NewGuid().ToString("N");
         Behaviours[id] = behaviour;
-        return JobBuilder.Create<DelegateJob>().WithIdentity(key).UsingJobData("behaviour", id).Build();
+        return id;
     }
 
     public static IJobDetail Job(string name, Func<IJobExecutionContext, ValueTask> behaviour) => Job(new JobKey(name), behaviour);
