@@ -89,9 +89,10 @@ public sealed class Routes
 
     /// <summary>
     /// The token the dashboard asks for (the generated one in development), or null when it is
-    /// open or locked for want of one.
+    /// open or locked for want of one. A method, not a property, so a logger that walks public
+    /// getters never finds it.
     /// </summary>
-    public string? Token => _token.Length == 0 ? null : _token;
+    public string? Token() => _token.Length == 0 ? null : _token;
 
     /// <summary>
     /// Whether the dashboard is served open, with no token (<see cref="DashboardToken.None"/>): it is

@@ -16,5 +16,6 @@
     <ProjectReference Include="../../src/Cronwatch/Cronwatch.csproj" />
     <!-- Built for the process-exit test, which runs it as a child. -->
     <ProjectReference Include="../ProcessExitChild/ProcessExitChild.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../WebEnvChild/WebEnvChild.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
