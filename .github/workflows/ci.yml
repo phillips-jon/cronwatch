@@ -74,7 +74,9 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       - run: npm run check:dashes
       - run: npm run typecheck
       # A second Postgres with pg_cron, for the pg_cron source's tests against
@@ -141,7 +143,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK, then fails if conformance/ or the dashboard fixture
       # (packages/ruby/test/web/golden.json) is stale.
       - run: npm run check:conformance
@@ -244,7 +248,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK, then fails if conformance/, the dashboard fixture
       # (packages/ruby/test/web/golden.json) or the icons are stale.
       - run: npm run check:conformance
@@ -366,7 +372,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK, then fails if conformance/, the dashboard fixture
       # (packages/ruby/test/web/golden.json) or the icons are stale.
       - run: npm run check:conformance
@@ -684,7 +692,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
@@ -823,7 +833,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
@@ -1029,7 +1041,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
@@ -1251,7 +1265,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Once more on failure: node-gyp's download of the Node headers for
+      # better-sqlite3 now and then dies mid-stream on the runners.
+      - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
