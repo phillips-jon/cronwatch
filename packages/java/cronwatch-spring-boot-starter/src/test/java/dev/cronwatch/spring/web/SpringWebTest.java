@@ -15,11 +15,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.support.GenericApplicationContext;
 
 /**
  * The dashboard through the starter, in a real Spring Boot app: the golden replay on Spring MVC
@@ -34,6 +36,12 @@ class SpringWebTest {
   static class App {}
 
   private static ConfigurableApplicationContext start(Cronwatch cw, String type, String... more) {
+    return start(cw, type, null, more);
+  }
+
+  /** The app, with a bean of {@code extra}'s class besides when it is given. */
+  private static ConfigurableApplicationContext start(
+      Cronwatch cw, String type, @Nullable Class<?> extra, String... more) {
     List<String> properties = new ArrayList<>();
     properties.add("server.port=0");
     properties.add("server.address=127.0.0.1");
@@ -42,9 +50,37 @@ class SpringWebTest {
     properties.add("logging.level.root=warn");
     properties.addAll(List.of(more));
     return new SpringApplicationBuilder(App.class)
-        .initializers(c -> c.getBeanFactory().registerSingleton("cronwatch", cw))
+        .initializers(
+            c -> {
+              c.getBeanFactory().registerSingleton("cronwatch", cw);
+              if (type.equals("reactive")) {
+                ((GenericApplicationContext) c).registerBean(nettyFactory());
+              }
+              if (extra != null) {
+                ((GenericApplicationContext) c).registerBean(extra);
+              }
+            })
         .properties(properties.toArray(String[]::new))
         .run();
+  }
+
+  /**
+   * Reactor Netty's server factory. With Tomcat on the class path too (the MVC tests need it),
+   * Spring Boot 3.5 serves a reactive app on Tomcat, which writes a content-type back its own way;
+   * Boot 4 has each server in a module of its own, where the factory's package moved.
+   */
+  private static Class<?> nettyFactory() {
+    for (String name :
+        List.of(
+            "org.springframework.boot.reactor.netty.NettyReactiveWebServerFactory",
+            "org.springframework.boot.web.embedded.netty.NettyReactiveWebServerFactory")) {
+      try {
+        return Class.forName(name);
+      } catch (ClassNotFoundException e) {
+        // The other Boot line's.
+      }
+    }
+    throw new IllegalStateException("no NettyReactiveWebServerFactory");
   }
 
   private static int port(ConfigurableApplicationContext context) {
@@ -140,6 +176,74 @@ class SpringWebTest {
                   exact.getBytes(StandardCharsets.UTF_8));
           assertEquals(200, atTheCap.status(), type + ": a body of exactly 1 MiB is read");
           assertEquals(Golden.T0 + 2 * 3_600_000, cw.jobSummary("s").silencedUntil(), type);
+        }
+      }
+    }
+  }
+
+  /** A stand-in for Spring Security's chain on Spring MVC, at its order: refuses everything. */
+  static final class Refusing implements jakarta.servlet.Filter, org.springframework.core.Ordered {
+    @Override
+    public void doFilter(
+        jakarta.servlet.ServletRequest request,
+        jakarta.servlet.ServletResponse response,
+        jakarta.servlet.FilterChain chain)
+        throws java.io.IOException {
+      ((jakarta.servlet.http.HttpServletResponse) response).sendError(401);
+    }
+
+    @Override
+    public int getOrder() {
+      return -100;
+    }
+  }
+
+  /** The same on WebFlux, at the order of Spring Security's {@code WebFilterChainProxy}. */
+  static final class RefusingWeb
+      implements org.springframework.web.server.WebFilter, org.springframework.core.Ordered {
+    @Override
+    public reactor.core.publisher.Mono<Void> filter(
+        org.springframework.web.server.ServerWebExchange exchange,
+        org.springframework.web.server.WebFilterChain chain) {
+      exchange.getResponse().setStatusCode(org.springframework.http.HttpStatus.UNAUTHORIZED);
+      return exchange.getResponse().setComplete();
+    }
+
+    @Override
+    public int getOrder() {
+      return -100;
+    }
+  }
+
+  @Test
+  void anOpenDashboardSitsBehindTheAppsSecurity() throws Exception {
+    // cronwatch.web.open serves the dashboard with no token "behind the app's own auth": ahead of
+    // Spring Security's chain it would be open to anyone.
+    for (String type : List.of("servlet", "reactive")) {
+      try (Cronwatch cw = Cronwatch.builder().noCronSecret().noShutdownHook().build()) {
+        cw.run("x", job -> {});
+        Class<?> refusing = type.equals("servlet") ? Refusing.class : RefusingWeb.class;
+        try (ConfigurableApplicationContext context =
+            start(cw, type, refusing, "cronwatch.web.open=true")) {
+          assertEquals(401, get(port(context), "/cronwatch/api/jobs").status(), type + ": open");
+        }
+        try (ConfigurableApplicationContext context =
+            start(cw, type, refusing, "cronwatch.web.token=tok")) {
+          assertEquals(
+              200,
+              RawHttp.send(
+                      port(context),
+                      "GET",
+                      "/cronwatch/api/jobs",
+                      List.of(Map.entry("authorization", "Bearer tok")),
+                      null)
+                  .status(),
+              type + ": with a token, ahead of the app's security");
+        }
+        try (ConfigurableApplicationContext context =
+            start(cw, type, refusing, "cronwatch.web.open=true", "cronwatch.web.order=-110")) {
+          assertEquals(
+              200, get(port(context), "/cronwatch/api/jobs").status(), type + ": moved ahead");
         }
       }
     }

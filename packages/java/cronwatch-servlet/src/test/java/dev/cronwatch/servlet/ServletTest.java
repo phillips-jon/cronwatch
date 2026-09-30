@@ -194,6 +194,45 @@ class ServletTest {
     }
   }
 
+  /** A filter ahead of the dashboard that reads the body as text, as a logging filter might. */
+  private static final Filter READS_THE_TEXT =
+      (request, response, chain) -> {
+        request.getReader().transferTo(java.io.Writer.nullWriter());
+        chain.doFilter(request, response);
+      };
+
+  @Test
+  void aBodyAFilterAheadReadAsTextIsNone() throws Exception {
+    // The servlet specification refuses getInputStream() once getReader() was called: the body is
+    // then none, as one read already, never a 500.
+    AtomicLong clock = new AtomicLong(T0);
+    try (Cronwatch cw =
+        Cronwatch.builder().clock(clock::get).noCronSecret().noShutdownHook().build()) {
+      cw.run("r", job -> {});
+      Server server =
+          jetty(
+              "/",
+              "/cronwatch",
+              new CronwatchFilter(cw.routes(RoutesOptions.builder().token("tok").build())),
+              READS_THE_TEXT);
+      try {
+        RawHttp.Answer res =
+            RawHttp.send(
+                port(server),
+                "POST",
+                "/cronwatch/api/jobs/r/silence?for=1h",
+                List.of(
+                    Map.entry("authorization", "Bearer tok"),
+                    Map.entry("content-type", "application/json")),
+                "{\"for\":\"3h\"}".getBytes(StandardCharsets.UTF_8));
+        assertEquals(200, res.status(), res.text());
+        assertEquals(T0 + HOUR, cw.jobSummary("r").silencedUntil(), "the query's");
+      } finally {
+        server.stop();
+      }
+    }
+  }
+
   @Test
   void theBodyCapAndABodyCutShortOverTheWire() throws Exception {
     AtomicLong clock = new AtomicLong(T0);

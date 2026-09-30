@@ -182,6 +182,8 @@ cronwatch.web.token=${CRONWATCH_TOKEN}
 # cronwatch.web.origin=https://app.example.com, cronwatch.web.open=true, cronwatch.web.order=-110
 ```
 
+The filter runs ahead of Spring Security's chain (order -110, before its -100), since the dashboard checks its own token; with `cronwatch.web.open=true` it has none, so it runs behind the chain (order -90) and your security rules guard it. `cronwatch.web.order` sets either.
+
 Tomcat, Jetty and Spring Security refuse an encoded slash (`%2F`) in a path by default, so a job whose name holds a `/` is reached through the dashboard behind them only if the app allows it; the JDK's server passes it through.
 
 ### A job's handler

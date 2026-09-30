@@ -16,9 +16,10 @@ import org.springframework.context.annotation.Configuration;
 /**
  * The dashboard on the app's own server, from {@code cronwatch.web.*}: on Spring MVC through the
  * servlet filter, on WebFlux through a {@code WebFilter}, at {@code cronwatch.web.path} ({@code
- * /cronwatch} by default) within the app's context, ahead of Spring Security's filter chain. It
- * uses the app's {@link Cronwatch} bean, and a {@link Routes} bean of the app's own replaces the
- * one made here; {@code cronwatch.web.enabled=false} turns it off.
+ * /cronwatch} by default) within the app's context, ahead of Spring Security's filter chain (behind
+ * it when served open, {@code cronwatch.web.open}, so the app's auth guards it). It uses the app's
+ * {@link Cronwatch} bean, and a {@link Routes} bean of the app's own replaces the one made here;
+ * {@code cronwatch.web.enabled=false} turns it off.
  */
 @AutoConfiguration(afterName = "dev.cronwatch.spring.CronwatchAutoConfiguration")
 @ConditionalOnWebApplication
