@@ -5,6 +5,7 @@ import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.internal.output.Output;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
@@ -27,7 +28,12 @@ public final class Recorder {
   private final List<String> head = new ArrayList<>();
   private long headSize;
   private boolean dropped;
-  private Metrics metrics = Metrics.empty();
+
+  /** Set in place, as the SDK sets a metric: a copy per call made a run of many quadratic. */
+  private final LinkedHashMap<String, Double> metrics = new LinkedHashMap<>();
+
+  /** The metrics as last read, until another is reported. */
+  private @Nullable Metrics read = Metrics.empty();
 
   /** An empty recorder. */
   public Recorder() {}
@@ -96,7 +102,8 @@ public final class Recorder {
     }
     lock.lock();
     try {
-      metrics = metrics.with(name, value);
+      metrics.put(name, value);
+      read = null;
     } finally {
       lock.unlock();
     }
@@ -106,7 +113,12 @@ public final class Recorder {
   public Metrics metrics() {
     lock.lock();
     try {
-      return metrics;
+      Metrics m = read;
+      if (m == null) {
+        m = Metrics.of(metrics);
+        read = m;
+      }
+      return m;
     } finally {
       lock.unlock();
     }
