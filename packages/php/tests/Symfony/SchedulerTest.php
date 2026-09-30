@@ -106,6 +106,33 @@ final class SchedulerTest extends TestCase
         $this->assertSame(['declaring Cronwatch.Tests.Symfony.Fixtures.Failing'], $this->wheres());
     }
 
+    public function testAPeriodicMessageOutsideItsFromAndUntilHasNoSchedule(): void
+    {
+        // The test clock is 2026-01-05 09:30Z.
+        TestSchedule::$messages = [
+            RecurringMessage::every('1 day', new Plain('ended'), until: '2026-01-01T00:00:00Z'),
+            RecurringMessage::every('1 hour', new Report(), from: '2026-02-01T00:00:00Z'),
+            RecurringMessage::every('2 hours', new Failing(), from: '2025-12-01T00:00:00Z', until: '2026-03-01T00:00:00Z'),
+            RecurringMessage::every('30 minutes', new AsyncReport(), until: '2026-01-02T00:00:00Z')->withJitter(30),
+        ];
+        self::bootKernel();
+        $cw = $this->client();
+        $jobs = $this->declared($cw);
+        $this->assertArrayNotHasKey('schedule', $jobs['Cronwatch.Tests.Symfony.Fixtures.Plain'], 'its until has passed');
+        $this->assertArrayNotHasKey('schedule', $jobs['nightly-report'], 'its from is still to come');
+        $this->assertSame('every 2h', $jobs['Cronwatch.Tests.Symfony.Fixtures.Failing']['schedule'], 'inside its window');
+        $this->assertArrayNotHasKey('schedule', $jobs['Cronwatch.Tests.Symfony.Fixtures.AsyncReport'], 'read through the jitter');
+        $messages = $this->messages();
+        $this->assertContains('the trigger "every 1 day" ended at 2026-01-01T00:00:00+00:00, so the job is watched without a schedule', $messages);
+        $this->assertContains('the trigger "every 1 hour" starts at 2026-02-01T00:00:00+00:00, so the job is watched without a schedule', $messages);
+        $this->assertCount(3, $messages);
+
+        // Never reported missed after it ended.
+        $this->clock->advance(3 * 86_400_000);
+        $cw->check();
+        $this->assertSame([], $this->capture->types());
+    }
+
     public function testCollisionsExclusionsAndConfiguredOptions(): void
     {
         TestSchedule::$messages = [
@@ -167,7 +194,9 @@ final class SchedulerTest extends TestCase
     {
         TestSchedule::$messages = [RecurringMessage::every('1 second', new RedispatchMessage(new RedispatchedReport(), 'async'))];
         self::bootKernel();
-        $cw = $this->client();
+        // The worker's scheduler starts the trigger at its own time (its
+        // `from`), as the app's clock and the client's are one: so is this one.
+        $cw = $this->client(['now' => fn (): float => microtime(true) * 1000]);
         // One worker on both transports: the schedule sends the message on, then the worker handles it.
         $application = new Application(static::$kernel);
         $tester = new CommandTester($application->find('messenger:consume'));
