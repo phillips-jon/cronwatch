@@ -331,6 +331,38 @@ public class ClientTests
     }
 
     [Fact]
+    public async Task Record_run_refuses_a_metric_that_is_no_finite_number_and_stores_nothing()
+    {
+        await using var m = Make();
+        m.Cw.Job("imported");
+        var run = new Run
+        {
+            Id = "nan",
+            Job = "imported",
+            Status = RunStatus.Ok,
+            StartedAt = T0,
+            FinishedAt = T0 + 1,
+            DurationMs = 1,
+            Metrics = Metrics.Empty.With("cost", 1).With("rows", double.NaN),
+            Trigger = "source",
+        };
+        var e = await Assert.ThrowsAsync<CronwatchException>(() => m.Cw.RecordRunAsync(run));
+        Assert.Equal("recordRun: metric \"rows\" must be a finite number (job \"imported\", run \"nan\")", e.Message);
+        Assert.Null(await m.Cw.GetRunAsync("nan"));
+        await Assert.ThrowsAsync<CronwatchException>(() => m.Cw.RecordRunAsync(run with { Metrics = Metrics.Empty.With("rows", double.PositiveInfinity) }));
+        Assert.Null(await m.Cw.GetRunAsync("nan"));
+    }
+
+    [Fact]
+    public async Task A_silence_ends_on_a_whole_millisecond_held_at_2_to_the_53_minus_1()
+    {
+        await using var m = Make();
+        Assert.Equal(9_007_199_254_740_991L, (await m.Cw.SilenceAsync("a", "99999999999999999999w")).SilencedUntil);
+        Assert.Equal(T0 + 1, (await m.Cw.SilenceAsync("b", 1.5)).SilencedUntil);
+        Assert.Equal(9_007_199_254_740_991L, (await m.Cw.SilenceAsync("c", 1e300)).SilencedUntil);
+    }
+
+    [Fact]
     public async Task A_failing_alert_channel_does_not_break_the_run()
     {
         var broken = CustomChannel.Create("broken", (a, ctx, ct) => throw new InvalidOperationException("no network"));

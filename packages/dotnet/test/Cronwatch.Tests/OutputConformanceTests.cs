@@ -36,6 +36,23 @@ public class OutputConformanceTests
     }
 
     [Fact]
+    public void Redact_and_cap()
+    {
+        Assert.Equal(OutputText.RedactEdge, Fixtures.Integer(Fixture, "redactEdge"));
+        var cases = Fixtures.Objects(Fixture, "redactAndCap");
+        Assert.Equal(15, cases.Count);
+        var failures = new Fixtures.Failures();
+        for (int i = 0; i < cases.Count; i++)
+        {
+            var c = cases[i];
+            string input = Fixtures.Expand(c.Get("input"));
+            string got = OutputText.RedactAndCap(input, OutputText.RedactSecrets);
+            failures.Same("redactAndCap case " + i + " " + Js.Head(input, 60), Fixtures.Digest(got), c.Get("result"));
+        }
+        failures.Check("output");
+    }
+
+    [Fact]
     public void Error_message()
     {
         var cases = Fixtures.Objects(Fixture, "errorMessage");

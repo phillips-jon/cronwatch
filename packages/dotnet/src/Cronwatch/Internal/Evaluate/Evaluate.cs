@@ -71,6 +71,16 @@ internal static class Evaluate
     }
 
     /// <summary>
+    /// When a silence of <paramref name="ms"/> from <paramref name="now"/> ends: a whole
+    /// millisecond, never past <see cref="MaxDurationMs"/> (2^53 - 1), however long the silence
+    /// asked for. Every port sharing the store reads it back unchanged.
+    /// </summary>
+    public static long SilenceEnd(long now, double ms)
+    {
+        return Math.Min(SaturatingAdd(now, Js.ToLong(Math.Floor(Math.Min(ms, MaxDurationMs)))), MaxDurationMs);
+    }
+
+    /// <summary>
     /// The version a stored state's <c>version</c> value counts as for compare-and-set: a JSON
     /// number that is a whole number from 0 to 2^53 - 1, else 0.
     /// </summary>
@@ -93,6 +103,13 @@ internal static class Evaluate
 
     /// <summary>A count of failures in a row held from 0 to 2^53 - 1.</summary>
     public static long FailureCount(long count) => Math.Clamp(count, 0, MaxDurationMs);
+
+    /// <summary>a + b, held at the ends of the range.</summary>
+    public static long SaturatingAdd(long a, long b)
+    {
+        long r = unchecked(a + b);
+        return ((a ^ r) & (b ^ r)) < 0 ? (a < 0 ? long.MinValue : long.MaxValue) : r;
+    }
 
     /// <summary>a - b, held at the ends of the range.</summary>
     public static long SaturatingSub(long a, long b)
@@ -130,6 +147,155 @@ internal static class Evaluate
     }
 
     private static MutableState CloneState(JobState s) => MutableState.Of(NormalizeState(s, s.Job));
+
+    // ---- delivery
+
+    /// <summary>Alerts kept per job for retry, and per job being sent; past it the oldest go.</summary>
+    public const int MaxUndelivered = 20;
+
+    /// <summary>
+    /// How long an alert in <c>sending</c> is left to the process sending it. Longer than any send
+    /// takes: at most three alerts go out together, each with 25 seconds of triage and 15 of
+    /// channels.
+    /// </summary>
+    public const long SendLeaseMs = 5 * 60_000;
+
+    /// <summary>Identifies an alert across retries, and in <c>sending</c>.</summary>
+    public static string AlertKey(Alert a) => a.Type.Value + "|" + Js.FormatLong(a.At) + "|" + (a.Run == null ? "" : a.Run.Id);
+
+    /// <summary>The newest <paramref name="max"/> of <paramref name="list"/>, and how many went.</summary>
+    private static (List<T> Kept, int Dropped) Newest<T>(List<T> list, int max)
+    {
+        int cut = Math.Max(0, list.Count - max);
+        return (list.GetRange(cut, list.Count - cut), cut);
+    }
+
+    /// <summary>
+    /// <paramref name="alerts"/> added to the undelivered queue: one with the same key as a queued
+    /// alert replaces it where it stands, the rest go at the end, and only the newest
+    /// <see cref="MaxUndelivered"/> stay. <c>Dropped</c> counts those let go.
+    /// </summary>
+    public static (JobState State, int Dropped) QueueUndelivered(JobState state, IReadOnlyList<Alert> alerts)
+    {
+        var next = CloneState(state);
+        var byKey = new Dictionary<string, Alert>(StringComparer.Ordinal);
+        foreach (var a in alerts)
+        {
+            byKey[AlertKey(a)] = a;
+        }
+        var queue = new List<Alert>();
+        var known = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var a in next.Queued())
+        {
+            string key = AlertKey(a);
+            queue.Add(byKey.TryGetValue(key, out var replaced) ? replaced : a);
+            known.Add(key);
+        }
+        foreach (var a in alerts)
+        {
+            if (!known.Contains(AlertKey(a)))
+            {
+                queue.Add(a);
+            }
+        }
+        var (kept, dropped) = Newest(queue, MaxUndelivered);
+        next.Undelivered = kept;
+        return (next.ToState(), dropped);
+    }
+
+    /// <summary>
+    /// The outbox. Alerts just composed are written with the state that opens their condition,
+    /// before any is sent, so a process that stops part way does not lose them: into
+    /// <c>sending</c>, each with its lease ending at <paramref name="until"/>, when this process
+    /// sends them, or (<paramref name="deferred"/>, delivering at check) straight into the
+    /// undelivered queue for a check elsewhere. <c>Dropped</c> counts alerts let go past
+    /// <see cref="MaxUndelivered"/>.
+    /// </summary>
+    public static (JobState State, int Dropped) HoldAlerts(JobState state, IReadOnlyList<Alert> alerts, long until, bool deferred)
+    {
+        if (alerts.Count == 0)
+        {
+            return (state, 0);
+        }
+        if (deferred)
+        {
+            return QueueUndelivered(state, alerts);
+        }
+        var next = CloneState(state);
+        var sending = new List<SendingAlert>(next.Sending ?? []);
+        foreach (var a in alerts)
+        {
+            sending.Add(new SendingAlert { Until = until, Alert = a });
+        }
+        var (kept, dropped) = Newest(sending, MaxUndelivered);
+        next.Sending = kept;
+        return (next.ToState(), dropped);
+    }
+
+    /// <summary>
+    /// Alerts in <c>sending</c> whose lease ran out by <paramref name="now"/>: the process sending
+    /// them stopped before it recorded how the send went. They go to the undelivered queue, where
+    /// the retry sends them (with triage, which is never stored with them here) or drops them as
+    /// stale. An entry with no alert is dropped; one without a numeric <c>until</c> counts as run
+    /// out.
+    /// </summary>
+    public static (JobState State, int Dropped) ReleaseSending(JobState state, long now)
+    {
+        var held = new List<SendingAlert>();
+        var lapsed = new List<Alert>();
+        bool any = false;
+        foreach (var e in (IReadOnlyList<SendingAlert>?)state.Sending ?? [])
+        {
+            if (e.Until is long until && until > now)
+            {
+                held.Add(e);
+                continue;
+            }
+            any = true;
+            if (e.Alert != null)
+            {
+                lapsed.Add(e.Alert);
+            }
+        }
+        if (!any)
+        {
+            return (state, 0);
+        }
+        return QueueUndelivered(state with { Sending = held.Count > 0 ? ValueList<SendingAlert>.Of(held) : null }, lapsed);
+    }
+
+    /// <summary>
+    /// How a send went. Delivered and stale alerts leave the queue; failed ones replace their
+    /// queued copy, so a triage made on this attempt is kept, or join the queue. Every one of them
+    /// leaves <c>sending</c>. <c>lastAlertAt</c> moves only on a delivery. <c>Dropped</c> counts
+    /// alerts let go past <see cref="MaxUndelivered"/>.
+    /// </summary>
+    public static (JobState State, int Dropped) RecordSent(
+        JobState state, IReadOnlyList<Alert> delivered, IReadOnlyList<Alert> failed, IReadOnlyList<Alert> stale, long now)
+    {
+        var next = CloneState(state);
+        var done = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var a in delivered)
+        {
+            done.Add(AlertKey(a));
+        }
+        foreach (var a in stale)
+        {
+            done.Add(AlertKey(a));
+        }
+        next.Undelivered = next.Queued().FindAll(a => !done.Contains(AlertKey(a)));
+        var sent = new HashSet<string>(done, StringComparer.Ordinal);
+        foreach (var a in failed)
+        {
+            sent.Add(AlertKey(a));
+        }
+        next.Sending = next.Sending?.FindAll(e => e.Alert == null || !sent.Contains(AlertKey(e.Alert)));
+        if (delivered.Count > 0)
+        {
+            next.LastAlertAt = now;
+        }
+        return QueueUndelivered(next.ToState(), failed);
+    }
 
     private static bool OpenCondition(MutableState s, Condition c, long now)
     {

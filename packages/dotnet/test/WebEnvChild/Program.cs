@@ -38,6 +38,12 @@ try
         case "environmentFallback":
             await Cases.EnvironmentFallback();
             break;
+        case "givenOverDotNet":
+            await Cases.GivenOverDotNet();
+            break;
+        case "dotNetOrder":
+            await Cases.DotNetOrder();
+            break;
         default:
             throw new ArgumentException(args[0]);
     }
@@ -264,6 +270,43 @@ internal static class Cases
         Handler h = cw.Job("dev").Handler((j, r, ct) => Task.CompletedTask);
         Check((await h.HandleAsync(new WebRequest("GET", "/"))).Status == 200, "development lets it run");
         Check(wheres.Count == 0, "nothing reported");
+    }
+
+    /// <summary>
+    /// A stale <c>ASPNETCORE_ENVIRONMENT</c> or <c>DOTNET_ENVIRONMENT</c> of Development (the
+    /// parent sets both) does not outrank the environment the app gives (a host's resolved
+    /// <c>--environment Production</c>): the dashboard is locked and a handler without a secret
+    /// fails closed.
+    /// </summary>
+    public static async Task GivenOverDotNet()
+    {
+        int ran = 0;
+        await using var cw = new CronwatchClient(new CronwatchOptions
+        {
+            CronSecret = "",
+            ProcessExitHook = false,
+            Alerts = [],
+            OnError = (e, where) => { },
+            Environment = "Production",
+        });
+        Check(cw.Routes().Token() == null, "locked in production");
+        Handler h = cw.Job("closed").Handler((j, r, ct) =>
+        {
+            ran++;
+            return Task.CompletedTask;
+        });
+        Check((await h.HandleAsync(new WebRequest("GET", "/"))).Status == 503, "503");
+        Check(ran == 0, "ran");
+        // With nothing given, the variables are read.
+        await using var fallback = Client();
+        Check(fallback.Routes().Token() != null, "development from the variables");
+    }
+
+    /// <summary>ASP.NET Core's order: <c>ASPNETCORE_ENVIRONMENT</c> (Production here) before <c>DOTNET_ENVIRONMENT</c> (Development).</summary>
+    public static async Task DotNetOrder()
+    {
+        await using var cw = Client();
+        Check(cw.Routes().Token() == null, "production from ASPNETCORE_ENVIRONMENT");
     }
 
     /// <summary>The environment an app gives, read when none of the variables says: a host's.</summary>

@@ -206,7 +206,7 @@ WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/
 
 `RoutesOptions`:
 
-- `Token`: the token. Left out, it is `CRONWATCH_TOKEN` (under `AddCronwatch`, `Cronwatch:Token` first). Send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie holds a digest of it. Without a token, in development, the dashboard makes one and prints a sign-in link to standard output on its first request (naming the host only when `Origin` is set or the request came to a loopback host); anywhere else it answers 503. The environment is `CRONWATCH_ENV`, else `APP_ENV`, `DOTNET_ENVIRONMENT` or `ASPNETCORE_ENVIRONMENT` (under `AddCronwatch`, the host's environment when CronWatch's own are unset), and `development`, `dev`, `local`, `test` and `testing` count as development, so ASP.NET Core's `Development` does.
+- `Token`: the token. Left out, it is `CRONWATCH_TOKEN` (under `AddCronwatch`, `Cronwatch:Token` first). Send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie holds a digest of it. Without a token, in development, the dashboard makes one and prints a sign-in link to standard output on its first request (naming the host only when `Origin` is set or the request came to a loopback host); anywhere else it answers 503. The environment is `CRONWATCH_ENV`, else `APP_ENV`, else the options' `Environment` (under `AddCronwatch`, `Cronwatch:Environment`, else the host's environment, `--environment` included), else `ASPNETCORE_ENVIRONMENT` or `DOTNET_ENVIRONMENT`, and `development`, `dev`, `local`, `test` and `testing` count as development, so ASP.NET Core's `Development` does.
 - `Token = DashboardToken.None`: serve it to anyone, for a mount behind your own auth.
 - `Origin = "https://app.example.com"`: the public origin, pinned whatever a request says, for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line.
 - `TrustProxy = true`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
@@ -346,7 +346,7 @@ It reads through a data source on the database pg_cron runs in (its `cron.databa
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `Expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `Expect` rule is checked before redaction, so it still sees what was logged. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off.
 
 ```csharp
 new CronwatchOptions { Redact = Redaction.None };                                            // keep output as logged
@@ -410,7 +410,7 @@ The core, `Cronwatch.Hosting`, `Cronwatch.AspNetCore` and `Cronwatch.Quartz` are
 | `Deliver` | `Deliver.Now` | `Deliver.AtCheck` queues alerts for another client's check to send |
 | `Transport` | an `HttpClientTransport` | for every channel and triage without one of their own |
 | `OnError`, `OnWarning` | a line to standard error | the error and where, for failures outside jobs: the store, a channel, triage |
-| `Environment` | | the environment when none of `CRONWATCH_ENV`, `APP_ENV`, `DOTNET_ENVIRONMENT` and `ASPNETCORE_ENVIRONMENT` is set |
+| `Environment` | | the environment when neither `CRONWATCH_ENV` nor `APP_ENV` is set; it outranks `ASPNETCORE_ENVIRONMENT` and `DOTNET_ENVIRONMENT` |
 | `ProcessExitHook` | `true` | see [The current run and the timeout](#the-current-run-and-the-timeout) |
 | `Clock` | `TimeProvider.System` | every time and timer the client uses; a `FakeTimeProvider` in tests |
 
@@ -426,14 +426,14 @@ A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname
 | `JobsAsync()`, `JobsWithRunsAsync(limit)`, `JobSummaryAsync(name)` | summaries, without alerting |
 | `RunsAsync(name, limit)`, `GetRunAsync(id)` | newest first; `limit` is held to 1 to 500 |
 | `SilenceAsync(name, duration)`, `UnsilenceAsync(name)` | stop alerts for a while; state keeps updating underneath |
-| `ForgetAsync(name)` | remove a job and its runs |
+| `ForgetAsync(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `job.StartAsync(options)`, `job.ResumeAsync(id)`, `ResumeRunAsync(name, id)` | runs that span calls |
 | `job.OpenAsync(options)` | a run seen from outside the function, for a scheduler integration: an `ObservedRun` to close or take back |
 | `RecordRunAsync(run)` | record a run that happened elsewhere, for a source; answers the alerts it sent |
 | `SyncJobAsync(name)` | write a declaration to the store now, unless it already holds it |
 | `DefinedJobs` | the jobs declared in this client |
 | `Routes()`, `job.Handler(fn)` | the dashboard and a job's handler |
-| `DisposeAsync()` | stop the check, record open runs and let go of the store |
+| `DisposeAsync()` | stop the check, record open runs, wait up to five seconds for a check under way, and let go of the store |
 
 `CronwatchException` has a `Kind`: `Invalid` (an option, name, schedule or run id the SDK refuses, with its message), `Store` (the store's own exception as `InnerException`) and `Other`. Reads (`JobsAsync`, `JobSummaryAsync`, `RunsAsync`) and `CheckAsync` throw it when the store fails; `RunAsync`, `Start`, `FlushAsync` and `FinishAsync` never do.
 

@@ -241,6 +241,26 @@ public class BridgeTests
     }
 
     [Fact]
+    public async Task A_job_forgotten_from_the_dashboard_is_declared_again_at_the_watchs_next_read()
+    {
+        await using var m = Make();
+        var w = new Watch(m.Cw, "gocron", "billing", "gocron");
+        w.Declare([E("nightly", "entry 1", "0 2 * * *")]);
+        Assert.True(await w.SettleAsync(Settle));
+        await m.Cw.ForgetAsync("nightly");
+        Assert.Null(await m.Store.GetJobAsync("nightly"));
+
+        // The scheduler still runs it, unchanged: the next read declares it again, with its
+        // schedule, rather than taking it for unchanged, and a check keeps it.
+        w.Declare([E("nightly", "entry 1", "0 2 * * *")]);
+        Assert.True(await w.SettleAsync(Settle));
+        Assert.True(w.Declares("nightly"));
+        Assert.Contains("\"schedule\":\"0 2 * * *\"", await Stored(m.Store, "nightly"), StringComparison.Ordinal);
+        await m.Cw.CheckAsync();
+        Assert.Contains("\"schedule\":\"0 2 * * *\"", await Stored(m.Store, "nightly"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Unschedule_takes_only_this_apps_jobs()
     {
         var store = new MemoryStore();

@@ -15,6 +15,7 @@ internal sealed class MutableState
     public long? LastAlertAt;
     public List<Condition>? PendingRecovery;
     public List<Alert>? Undelivered;
+    public List<SendingAlert>? Sending;
     public long? Version;
     public readonly JsObject Extra;
 
@@ -31,6 +32,7 @@ internal sealed class MutableState
         LastAlertAt = s.LastAlertAt;
         PendingRecovery = s.PendingRecovery == null ? null : [.. s.PendingRecovery];
         Undelivered = s.Undelivered == null ? null : [.. s.Undelivered];
+        Sending = s.Sending == null ? null : [.. s.Sending];
         Version = s.Version;
         Extra = s.Extra;
     }
@@ -54,6 +56,8 @@ internal sealed class MutableState
         LastAlertAt = LastAlertAt,
         PendingRecovery = PendingRecovery == null ? null : ValueList<Condition>.Of(PendingRecovery),
         Undelivered = Undelivered == null ? null : ValueList<Alert>.Of(Undelivered),
+        // Absent when empty: the key is there only while it holds an alert.
+        Sending = Sending is { Count: > 0 } ? ValueList<SendingAlert>.Of(Sending) : null,
         Version = Version,
         Extra = Extra,
     };

@@ -12,7 +12,7 @@ public sealed record JobState
 {
     private static readonly HashSet<string> KnownKeys = new(StringComparer.Ordinal)
     {
-        "job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered",
+        "job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending",
     };
 
     /// <summary>The job's name.</summary>
@@ -38,6 +38,15 @@ public sealed record JobState
 
     /// <summary>Alerts no channel accepted, retried at each check; null in a state written before the field existed.</summary>
     public ValueList<Alert>? Undelivered { get; init; }
+
+    /// <summary>
+    /// The outbox: alerts written with the state that opened their condition, while the process
+    /// that wrote them sends them. Each leaves once that process records how the send went; one
+    /// still here after its <see cref="SendingAlert.Until"/> (the process stopped part way) goes
+    /// to <see cref="Undelivered"/> at the next check. Null when empty, and in state written
+    /// before the field existed; an empty list is written as no key.
+    /// </summary>
+    public ValueList<SendingAlert>? Sending { get; init; }
 
     /// <summary>
     /// The version as stored when it is a whole number (any other value reads as null); see
@@ -102,6 +111,15 @@ public sealed record JobState
                 list.Add(a.ToValue());
             }
             o.Set("undelivered", list);
+        }
+        if (Sending is { Count: > 0 })
+        {
+            var list = new List<object?>();
+            foreach (var e in Sending)
+            {
+                list.Add(e.ToValue());
+            }
+            o.Set("sending", list);
         }
         bool wroteVersion = false;
         foreach (var e in _extra)
@@ -175,6 +193,15 @@ public sealed record JobState
                 }
             }
         }
+        List<SendingAlert>? sending = null;
+        if (o.Get("sending") is List<object?> sl && sl.Count > 0)
+        {
+            sending = [];
+            foreach (var e in sl)
+            {
+                sending.Add(SendingAlert.FromValue(e));
+            }
+        }
         long? version = null;
         var extra = new JsObject();
         foreach (var e in o)
@@ -200,6 +227,7 @@ public sealed record JobState
             LastAlertAt = Values.NullableInteger(o, "lastAlertAt"),
             PendingRecovery = pending == null ? null : ValueList<Condition>.Of(pending),
             Undelivered = undelivered == null ? null : ValueList<Alert>.Of(undelivered),
+            Sending = sending == null ? null : ValueList<SendingAlert>.Of(sending),
             Version = version,
             Extra = extra,
         };

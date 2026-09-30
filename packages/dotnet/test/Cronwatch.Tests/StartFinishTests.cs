@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -336,5 +337,76 @@ public class StartFinishTests
         Assert.Equal("working", finished.Output);
         Assert.False(run.IsActive);
         Assert.Null(await run.FinishAsync());
+    }
+
+    [Fact]
+    public async Task Lines_flushed_while_a_check_marks_earlier_runs_stuck_are_kept_on_the_run_it_marks_next()
+    {
+        var sending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var held = CustomChannel.Create("held", async (a, ctx, ct) =>
+        {
+            sending.TrySetResult();
+            await gate.Task;
+        });
+        await using var m = Make(channels: [held]);
+        RunHandle first = await m.Cw.Job("first", new JobOptions { Timeout = "30m" }).StartAsync();
+        m.Clock.Advance(1000);
+        RunHandle second = await m.Cw.Job("second", new JobOptions { Timeout = "30m" }).StartAsync();
+        second.Log("early line");
+        second.Metric("rows", 1);
+        await second.FlushAsync();
+        m.Clock.Advance(31 * 60_000);
+        Task<CheckResult> check = m.Cw.CheckAsync();
+        // The first stuck run's alert is being sent; the second is still running, and flushes.
+        await sending.Task.WaitAsync(TimeSpan.FromMinutes(1));
+        second.Log("important progress line");
+        second.Metric("rows", 2);
+        await second.FlushAsync();
+        gate.SetResult();
+        await check;
+        Run stored = (await m.Cw.GetRunAsync(second.Id))!;
+        Assert.Equal(RunStatus.Timeout, stored.Status);
+        Assert.Equal("early line\nimportant progress line", stored.Output);
+        Assert.Equal("{\"rows\":2}", stored.Metrics.ToJson());
+        Assert.Equal(RunStatus.Timeout, (await m.Cw.GetRunAsync(first.Id))!.Status);
+    }
+
+    /// <summary>A store that says when it is disposed.</summary>
+    private sealed class Closing(ConcurrentQueue<string> events) : Wrapped, IAsyncDisposable
+    {
+        public ValueTask DisposeAsync()
+        {
+            events.Enqueue("closed");
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task Disposing_waits_for_a_check_under_way_before_it_disposes_the_store()
+    {
+        var sending = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var events = new ConcurrentQueue<string>();
+        var held = CustomChannel.Create("held", async (a, ctx, ct) =>
+        {
+            sending.TrySetResult();
+            await gate.Task;
+            events.Enqueue("sent");
+        });
+        var m = Make(store: new Closing(events), channels: [held]);
+        await m.Cw.Job("callback", new JobOptions { Timeout = "30m" }).StartAsync();
+        m.Clock.Advance(31 * 60_000);
+        Task<CheckResult> check = m.Cw.CheckAsync();
+        await sending.Task.WaitAsync(TimeSpan.FromMinutes(1));
+        Task closing = m.Cw.DisposeAsync().AsTask();
+        // The wait is on the client's clock, which does not move here: only the check ends it.
+        await Task.WhenAny(closing, Task.Delay(200));
+        Assert.False(closing.IsCompleted, "still waiting on the check");
+        Assert.Empty(events);
+        gate.SetResult();
+        await closing;
+        Assert.Equal(["sent", "closed"], events);
+        Assert.Equal([AlertType.Stuck], (await check).Alerts.Select(a => a.Type));
     }
 }

@@ -437,6 +437,89 @@ public class CronwatchQuartzTests
         }
     }
 
+    /// <summary>A memory store whose insert of a run of <c>opening</c> waits at a gate, and says when it is there.</summary>
+    private sealed class GatedInsert(MemoryStore inner) : IStore, IConditionalRunStore, IStateCasStore, IRunDeletingStore
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Gate { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task InitAsync(CancellationToken cancellationToken = default) => inner.InitAsync(cancellationToken);
+
+        public Task UpsertJobAsync(Definition definition, long now, CancellationToken cancellationToken = default) => inner.UpsertJobAsync(definition, now, cancellationToken);
+
+        public Task<StoredJob?> GetJobAsync(string name, CancellationToken cancellationToken = default) => inner.GetJobAsync(name, cancellationToken);
+
+        public Task<System.Collections.Generic.IReadOnlyList<StoredJob>> ListJobsAsync(CancellationToken cancellationToken = default) => inner.ListJobsAsync(cancellationToken);
+
+        public Task DeleteJobAsync(string name, CancellationToken cancellationToken = default) => inner.DeleteJobAsync(name, cancellationToken);
+
+        public async Task InsertRunAsync(Run run, CancellationToken cancellationToken = default)
+        {
+            if (run.Job == "opening")
+            {
+                Entered.TrySetResult();
+                await Gate.Task;
+            }
+            await inner.InsertRunAsync(run, cancellationToken);
+        }
+
+        public Task UpdateRunAsync(Run run, CancellationToken cancellationToken = default) => inner.UpdateRunAsync(run, cancellationToken);
+
+        public Task<Run?> GetRunAsync(string id, CancellationToken cancellationToken = default) => inner.GetRunAsync(id, cancellationToken);
+
+        public Task<System.Collections.Generic.IReadOnlyList<Run>> ListRunsAsync(string job, int limit, CancellationToken cancellationToken = default) =>
+            inner.ListRunsAsync(job, limit, cancellationToken);
+
+        public Task<Run?> LastRunAsync(string job, CancellationToken cancellationToken = default) => inner.LastRunAsync(job, cancellationToken);
+
+        public Task<System.Collections.Generic.IReadOnlyList<Run>> RunningRunsAsync(CancellationToken cancellationToken = default) => inner.RunningRunsAsync(cancellationToken);
+
+        public Task<JobState?> GetStateAsync(string job, CancellationToken cancellationToken = default) => inner.GetStateAsync(job, cancellationToken);
+
+        public Task SetStateAsync(JobState state, CancellationToken cancellationToken = default) => inner.SetStateAsync(state, cancellationToken);
+
+        public Task<long> PruneAsync(long before, CancellationToken cancellationToken = default) => inner.PruneAsync(before, cancellationToken);
+
+        public Task<bool> UpdateRunIfAsync(Run run, System.Collections.Generic.IReadOnlyList<RunStatus> from, CancellationToken cancellationToken = default) =>
+            inner.UpdateRunIfAsync(run, from, cancellationToken);
+
+        public Task<bool> CompareAndSetStateAsync(JobState state, long expected, CancellationToken cancellationToken = default) =>
+            inner.CompareAndSetStateAsync(state, expected, cancellationToken);
+
+        public Task<bool> DeleteRunIfAsync(string id, string job, RunStatus status, CancellationToken cancellationToken = default) =>
+            inner.DeleteRunIfAsync(id, job, status, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Stopping_while_a_firing_is_being_opened_keeps_the_job_listener_until_its_run_is_closed()
+    {
+        var store = new GatedInsert(new MemoryStore());
+        await using var m = Client(store);
+        IScheduler scheduler = await BuildAsync();
+        try
+        {
+            CronwatchQuartz q = await CronwatchQuartz.WatchAsync(m.Cw, scheduler);
+            await scheduler.Start(default);
+            await scheduler.ScheduleJob(Job("opening", _ => default), Once("opening"), default, default);
+            // The firing's run is being opened: its row is waiting to be written.
+            await store.Entered.Task.WaitAsync(TimeSpan.FromSeconds(60));
+            await q.DisposeAsync();
+            // Quartz tells only the listeners it holds when the job ends, so the job listener stays.
+            Assert.Contains(scheduler.ListenerManager.GetJobListeners(), l => l.Name == CronwatchQuartz.ListenerName);
+            store.Gate.SetResult();
+            await Eventually("the run closed", async () => (await Runs(m.Cw, "opening")) is [{ Status.Value: "ok" }]);
+            // Let go before the run was written: whoever sees the run closed sees the listener gone.
+            Assert.DoesNotContain(scheduler.ListenerManager.GetJobListeners(), l => l.Name == CronwatchQuartz.ListenerName);
+            Assert.Empty(m.Errors);
+        }
+        finally
+        {
+            store.Gate.TrySetResult();
+            await scheduler.Shutdown(true, default);
+        }
+    }
+
     [Fact]
     public async Task Stopping_while_a_firing_runs_still_closes_its_run()
     {

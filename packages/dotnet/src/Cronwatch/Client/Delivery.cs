@@ -9,40 +9,75 @@ namespace Cronwatch;
 /// <summary>Delivery: channels, triage, and the queue of alerts no channel accepted.</summary>
 public sealed partial class CronwatchClient
 {
-    internal const int MaxUndelivered = 20;
+    /// <summary>Alerts written with the state that opened their conditions, and how many older ones the queue let go.</summary>
+    internal sealed record Held(IReadOnlyList<Alert> Alerts, int Dropped);
 
-    private static string AlertKey(Alert a) => a.Type.Value + "|" + Js.FormatLong(a.At) + "|" + (a.Run == null ? "" : a.Run.Id);
-
-    /// <summary>Composes each draft, sends it (or queues it when delivering at check), and records what went where.</summary>
-    internal async Task<IReadOnlyList<Alert>> DispatchAsync(IReadOnlyList<AlertDraft> drafts, Definition def, long now)
+    /// <summary>
+    /// An evaluation as it is written: its drafts composed into alerts and held in the same state
+    /// (<see cref="Evaluate.HoldAlerts"/>), so the write that opens a condition also keeps its
+    /// alerts, and a process that stops before sending them does not lose them. Called inside
+    /// <see cref="UpdateStateAsync{TResult}"/>, so it only computes.
+    /// </summary>
+    internal (JobState State, Held Result) Outbox(Evaluation settled, Definition def, long now)
     {
-        var composed = new List<Alert>();
-        if (drafts.Count == 0)
+        var alerts = new List<Alert>(settled.Alerts.Count);
+        foreach (var draft in settled.Alerts)
         {
-            return composed;
+            alerts.Add(AlertFormat.ComposeAlert(draft, def, now));
         }
-        var delivered = new List<Alert>();
-        var failed = new List<Alert>();
-        foreach (var draft in drafts)
+        var (state, dropped) = Evaluate.HoldAlerts(settled.State, alerts, Evaluate.SaturatingAdd(Now(), Evaluate.SendLeaseMs), _deferDelivery);
+        return (state, new Held(alerts, dropped));
+    }
+
+    /// <summary>Reports alerts let go because a job's queue was full.</summary>
+    private void ReportDropped(string name, int dropped)
+    {
+        if (dropped <= 0)
         {
-            Alert alert = AlertFormat.ComposeAlert(draft, def, now);
-            if (_deferDelivery)
+            return;
+        }
+        Report(
+            dropped + " undelivered alert" + (dropped == 1 ? "" : "s") + " for " + name + " dropped: only the newest "
+            + Evaluate.MaxUndelivered + " are kept for retry",
+            "alert queue for " + name);
+    }
+
+    /// <summary>
+    /// Triages and sends each alert the outbox holds (see <see cref="Outbox"/>). The state, with
+    /// the alerts in it, was saved before this, so a slow channel holds up nothing else;
+    /// afterwards only the delivery fields are written back, onto a fresh read of the state, and
+    /// the alerts leave <c>sending</c>. Triage is made here, never stored with the held alert.
+    /// Delivering at check, the alerts were queued for a check elsewhere instead.
+    /// </summary>
+    internal async Task<IReadOnlyList<Alert>> DispatchAsync(string name, IReadOnlyList<Alert> alerts, long now)
+    {
+        if (alerts.Count == 0)
+        {
+            return alerts;
+        }
+        if (_deferDelivery)
+        {
+            foreach (var alert in alerts)
             {
-                failed.Add(alert);
                 Count(alert, "queued");
             }
-            else
-            {
-                if (_triage != null && alert.Type != AlertType.Recovered)
-                {
-                    alert = await AddTriageAsync(alert, Timings.Triage).ConfigureAwait(false);
-                }
-                (await DeliverAsync(alert).ConfigureAwait(false) ? delivered : failed).Add(alert);
-            }
-            composed.Add(alert);
+            return alerts;
         }
-        await RecordDeliveryAsync(def.Name, delivered, failed, [], now).ConfigureAwait(false);
-        return composed;
+        var sent = new List<Alert>(alerts.Count);
+        var delivered = new List<Alert>();
+        var failed = new List<Alert>();
+        foreach (var held in alerts)
+        {
+            Alert alert = held;
+            if (_triage != null && alert.Type != AlertType.Recovered)
+            {
+                alert = await AddTriageAsync(alert, Timings.Triage).ConfigureAwait(false);
+            }
+            (await DeliverAsync(alert).ConfigureAwait(false) ? delivered : failed).Add(alert);
+            sent.Add(alert);
+        }
+        await RecordDeliveryAsync(name, delivered, failed, [], now).ConfigureAwait(false);
+        return sent;
     }
 
     /// <summary>What one check has spent retrying alerts, across all jobs.</summary>
@@ -96,61 +131,20 @@ public sealed partial class CronwatchClient
         return delivered;
     }
 
+    /// <summary>
+    /// Marks delivered alerts done, drops stale ones, and keeps failed ones for the next check,
+    /// taking them all out of <c>sending</c> (<see cref="Evaluate.RecordSent"/>). A failed alert
+    /// replaces its stored copy, so a triage made on this attempt is kept. <c>lastAlertAt</c>
+    /// moves only on a delivery. When this write fails, alerts still in <c>sending</c> are retried
+    /// once their lease runs out.
+    /// </summary>
     private async Task RecordDeliveryAsync(string name, List<Alert> delivered, List<Alert> failed, List<Alert> dropped, long now)
     {
         try
         {
             var (_, trimmed) = await UpdateStateAsync(name, previous =>
-            {
-                var state = MutableState.Of(Evaluate.NormalizeState(previous, name));
-                var done = new HashSet<string>(StringComparer.Ordinal);
-                foreach (var a in delivered)
-                {
-                    done.Add(AlertKey(a));
-                }
-                foreach (var a in dropped)
-                {
-                    done.Add(AlertKey(a));
-                }
-                var retried = new Dictionary<string, Alert>(StringComparer.Ordinal);
-                foreach (var a in failed)
-                {
-                    retried[AlertKey(a)] = a;
-                }
-                var kept = new List<Alert>();
-                var known = new HashSet<string>(StringComparer.Ordinal);
-                foreach (var a in state.Queued())
-                {
-                    string key = AlertKey(a);
-                    if (done.Contains(key))
-                    {
-                        continue;
-                    }
-                    kept.Add(retried.TryGetValue(key, out var r) ? r : a);
-                    known.Add(key);
-                }
-                foreach (var a in failed)
-                {
-                    if (!known.Contains(AlertKey(a)))
-                    {
-                        kept.Add(a);
-                    }
-                }
-                int cut = Math.Max(0, kept.Count - MaxUndelivered);
-                state.Undelivered = kept.GetRange(cut, kept.Count - cut);
-                if (delivered.Count > 0)
-                {
-                    state.LastAlertAt = now;
-                }
-                return (state.ToState(), cut);
-            }).ConfigureAwait(false);
-            if (trimmed > 0)
-            {
-                Report(
-                    trimmed + " undelivered alert" + (trimmed == 1 ? "" : "s") + " for " + name + " dropped: only the newest "
-                    + MaxUndelivered + " are kept for retry",
-                    "alert queue for " + name);
-            }
+                Evaluate.RecordSent(Evaluate.NormalizeState(previous, name), delivered, failed, dropped, now)).ConfigureAwait(false);
+            ReportDropped(name, trimmed);
         }
         catch (Exception e)
         {

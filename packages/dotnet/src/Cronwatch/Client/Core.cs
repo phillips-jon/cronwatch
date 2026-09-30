@@ -266,16 +266,27 @@ public sealed partial class CronwatchClient
     /// <summary>
     /// Writes the declaration of <paramref name="def"/>'s name as it stands, unless the store has
     /// it: a handle kept from an earlier declaration writes the one that replaced it, never its
-    /// own over it, and one forgotten since writes its own.
+    /// own over it, and one forgotten since writes its own. With <paramref name="confirm"/>, as a
+    /// run starts, a name already written is read back: another process may have forgotten the
+    /// job since, and a job still declared here comes back on its next run.
     /// </summary>
-    internal async Task SyncAsync(JobDef def)
+    internal async Task SyncAsync(JobDef def, bool confirm = false)
     {
         await EnsureReadyAsync().ConfigureAwait(false);
+        bool written;
         lock (_declaredLock)
         {
-            if (_synced.Contains(def.Name))
+            written = _synced.Contains(def.Name);
+        }
+        if (written)
+        {
+            if (!confirm || await CallAsync(() => _store.GetJobAsync(def.Name)).ConfigureAwait(false) != null)
             {
                 return;
+            }
+            lock (_declaredLock)
+            {
+                _synced.Remove(def.Name);
             }
         }
         await InTurnAsync(def.Name, async () =>
@@ -328,6 +339,46 @@ public sealed partial class CronwatchClient
             }
             mine.SetResult();
         }
+    }
+
+    /// <summary>
+    /// Every stored job, once each declaration has been written. A job declared here that the
+    /// store no longer has was forgotten by another process after this one wrote it: it is
+    /// written again, as its next run would, so it is checked and shown while any process still
+    /// declares it.
+    /// </summary>
+    internal async Task<IReadOnlyList<StoredJob>> StoredJobsAsync()
+    {
+        foreach (JobDef def in DeclaredAll())
+        {
+            await SyncAsync(def).ConfigureAwait(false);
+        }
+        var jobs = await CallAsync(() => _store.ListJobsAsync()).ConfigureAwait(false);
+        var listed = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var job in jobs)
+        {
+            listed.Add(job.Name);
+        }
+        bool wrote = false;
+        foreach (JobDef def in DeclaredAll())
+        {
+            if (listed.Contains(def.Name))
+            {
+                continue;
+            }
+            lock (_declaredLock)
+            {
+                // Not one forgotten or declared again here meanwhile.
+                if (!_definitions.TryGetValue(def.Name, out var current) || !ReferenceEquals(current, def))
+                {
+                    continue;
+                }
+                _synced.Remove(def.Name);
+            }
+            await SyncAsync(def).ConfigureAwait(false);
+            wrote = true;
+        }
+        return wrote ? await CallAsync(() => _store.ListJobsAsync()).ConfigureAwait(false) : jobs;
     }
 
     internal void MarkSynced(JobDef def)

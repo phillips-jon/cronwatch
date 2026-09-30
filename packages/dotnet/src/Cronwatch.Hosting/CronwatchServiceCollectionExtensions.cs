@@ -73,7 +73,8 @@ public static class CronwatchServiceCollectionExtensions
         Action<Exception, string> onError = o.OnError ?? ((error, where) => Log.Error(logger, where, error));
         Action<string> onWarning = o.OnWarning ?? (message => Log.Warning(logger, message));
         TimeProvider? clock = o.Clock ?? sp.GetService<TimeProvider>();
-        // CronWatch's own variables come first; this is read only when none of them is set.
+        // CronWatch's own variables come first; this comes next, ahead of .NET's variables, which
+        // the host has already read in resolving its environment.
         string? environment = o.Environment ?? sp.GetService<IHostEnvironment>()?.EnvironmentName;
         Duration retention = o.Retention ?? "30d";
         // Every line the app logs inside a run carries the job and the run.

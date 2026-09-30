@@ -192,4 +192,53 @@ public class ConcurrencyTests
         });
         await Eventually("the queues to be let go of", () => m.Cw.LockedJobs == 0);
     }
+
+    [Fact]
+    public async Task A_forget_that_lands_while_a_jobs_first_write_is_under_way_leaves_it_to_be_written_on_its_next_run()
+    {
+        var store = new Wrapped();
+        await using var m = Make(store: store);
+        var written = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // The row is written, then the write waits: the forget deletes it after it landed.
+        store.AfterUpsert = d => written.TrySetResult() ? gate.Task : Task.CompletedTask;
+        Job handle = m.Cw.Job("nightly", new JobOptions { Schedule = "0 3 * * *" });
+        Task run = handle.RunAsync((j, ct) => Task.CompletedTask);
+        await written.Task.WaitAsync(TimeSpan.FromMinutes(1));
+        await m.Cw.ForgetAsync("nightly");
+        gate.SetResult();
+        await run;
+        Assert.Null(await store.GetJobAsync("nightly"));
+        await handle.RunAsync((j, ct) => Task.CompletedTask);
+        Assert.Equal("0 3 * * *", (await store.GetJobAsync("nightly"))?.Definition.Schedule);
+    }
+
+    [Fact]
+    public async Task A_job_forgotten_by_another_process_comes_back_in_a_long_lived_one_that_still_declares_it()
+    {
+        var shared = new MemoryStore();
+        await using var worker = Make(store: shared);
+        await using var other = Make(store: shared);
+        Job job = worker.Cw.Job("nightly", new JobOptions { Schedule = "0 3 * * *" });
+        await job.RunAsync((j, ct) => Task.CompletedTask);
+
+        async Task ComesBack(string what, Func<Task> read)
+        {
+            await other.Cw.ForgetAsync("nightly");
+            Assert.Null(await shared.GetJobAsync("nightly"));
+            await read();
+            Assert.True((await shared.GetJobAsync("nightly"))?.Definition.Schedule == "0 3 * * *", what + " brings the job back with its schedule");
+        }
+
+        await ComesBack("a run", () => job.RunAsync((j, ct) => Task.CompletedTask));
+        await ComesBack("a start", async () => await (await job.StartAsync()).FinishAsync());
+        await ComesBack("a check", () => worker.Cw.CheckAsync());
+        await ComesBack("the board", () => worker.Cw.JobsAsync());
+        await ComesBack("a summary", () => worker.Cw.JobSummaryAsync("nightly"));
+
+        // The process that forgot it, and does not declare it, leaves it gone.
+        await other.Cw.ForgetAsync("nightly");
+        await other.Cw.CheckAsync();
+        Assert.Null(await shared.GetJobAsync("nightly"));
+    }
 }

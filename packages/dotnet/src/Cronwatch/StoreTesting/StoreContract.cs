@@ -174,9 +174,11 @@ public static class StoreContract
             + "\"lastAlertAt\":6,\"pendingRecovery\":[\"missed\"],\"undelivered\":[{\"type\":\"failed\","
             + "\"run\":null,\"details\":{\"consecutiveFailures\":1,\"threshold\":1},\"job\":\"a\","
             + "\"definition\":{\"name\":\"a\"},\"title\":\"a failed\",\"message\":\"boom\",\"at\":7,"
-            + "\"triage\":null}]}";
+            + "\"triage\":null}],\"sending\":[{\"until\":8,\"alert\":{\"type\":\"failed\",\"run\":null,"
+            + "\"details\":{\"consecutiveFailures\":1,\"threshold\":1},\"job\":\"a\",\"definition\":{\"name\":\"a\"},"
+            + "\"title\":\"a failed\",\"message\":\"boom\",\"at\":7}}]}";
         await Must("setState", () => store.SetStateAsync(State(full))).ConfigureAwait(false);
-        SameJson("pendingRecovery and undelivered round-trip", JsonOf(await Get("getState", () => store.GetStateAsync("a")).ConfigureAwait(false)), full);
+        SameJson("pendingRecovery, undelivered and sending round-trip", JsonOf(await Get("getState", () => store.GetStateAsync("a")).ConfigureAwait(false)), full);
         await Must("setState", () => store.SetStateAsync(State(plain))).ConfigureAwait(false);
 
         // compareAndSetState writes only over the version it was told to expect.
