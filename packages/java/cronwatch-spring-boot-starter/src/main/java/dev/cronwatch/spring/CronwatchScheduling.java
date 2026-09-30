@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -187,12 +188,32 @@ public final class CronwatchScheduling
         return found;
       }
     }
+    // A method found on a bean the invocation could be of. A JDK proxy's class is shared by every
+    // bean with its interfaces and its method is the interface's, so two beans implementing one
+    // interface method cannot be told apart: neither is credited, rather than both runs to one.
+    Set<String> fits = new LinkedHashSet<>();
     for (ScheduledMethods.Found f : methods.all()) {
       if (f.method().getName().equals(method.getName())
           && (method.getDeclaringClass().isAssignableFrom(f.userClass())
               || f.userClass().isAssignableFrom(targetClass))) {
-        return t.get(key(f.userClass(), f.method().getName()));
+        fits.add(key(f.userClass(), f.method().getName()));
       }
+    }
+    if (fits.size() == 1) {
+      return t.get(fits.iterator().next());
+    }
+    if (fits.size() > 1) {
+      String label = targetClass.getName() + "#" + method.getName();
+      watch.reportOnce(
+          "cronwatch: the @Scheduled method "
+              + Json.quote(label)
+              + " runs on a JDK proxy "
+              + fits.size()
+              + " beans share ("
+              + String.join(", ", fits)
+              + "), which cannot be told apart, so its runs are not recorded;"
+              + " set spring.aop.proxy-target-class=true",
+          "running " + label);
     }
     return null;
   }
