@@ -312,7 +312,7 @@ func (h *RunHandle) Flush(ctx context.Context) {
 	}
 	next := stored.clone()
 	if lines != nil {
-		next.Output = joinOutput(stored.Output, ptr(output.StripNul(c.redact(*lines))))
+		next.Output = joinOutput(stored.Output, ptr(output.RedactAndCap(*lines, c.redact)))
 	}
 	next.Metrics = stored.Metrics.merged(metrics)
 	// Only over a row still running, so a flush never undoes a finish written meanwhile.
@@ -419,14 +419,15 @@ func (h *RunHandle) finish(ctx context.Context, result any, failure error) *Run 
 	finishedAt := c.now()
 	added := rec.Output()
 	if added == nil && isText {
-		added = ptr(output.CapOutput(resultText))
+		added = ptr(resultText)
 	}
 	run := from.clone()
 	run.Status = StatusRunning
 	run.FinishedAt = ptr(finishedAt)
 	run.DurationMs = ptr(runDuration(from.StartedAt, finishedAt))
 	run.Error = nil
-	run.Output = joinOutput(from.Output, added)
+	// Capped by conclude, after it is redacted.
+	run.Output = joinLines(from.Output, added)
 	run.Metrics = from.Metrics.merged(recorderMetrics(rec))
 	expectText := rec.ExpectText()
 	if expectText == nil && isText {
@@ -435,7 +436,7 @@ func (h *RunHandle) finish(ctx context.Context, result any, failure error) *Run 
 	expectText = joinLines(head, joinLines(from.Output, expectText))
 	var failureText *string
 	if failure != nil {
-		failureText = ptr(output.ErrorMessage(failure))
+		failureText = ptr(output.DescribeError(failure))
 	}
 	c.conclude(h.def, &run, result, failureText, expectText)
 	why, err := c.recordFinish(sctx, h.def, &run, h.recorded, finishedAt)

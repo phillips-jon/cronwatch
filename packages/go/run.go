@@ -293,7 +293,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	run.Output = rec.Output()
 	resultText, isText := out.result.(string)
 	if run.Output == nil && isText && !out.panicked && out.err == nil {
-		run.Output = ptr(output.CapOutput(resultText))
+		run.Output = ptr(resultText)
 	}
 	expectText := rec.ExpectText()
 	if expectText == nil && isText && !out.panicked && out.err == nil {
@@ -304,7 +304,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	case out.panicked:
 		failure = &panicText
 	case out.err != nil:
-		failure = ptr(output.ErrorMessage(out.err))
+		failure = ptr(output.DescribeError(out.err))
 	}
 	c.conclude(def, &run, out.result, failure, expectText)
 	out.run = run
@@ -393,8 +393,8 @@ func httpFailure(result any) (string, bool) {
 }
 
 // conclude sets a finished run's status and error from how it ended, then
-// redacts its output and error. failure is the error text of a function
-// that failed, or nil.
+// redacts its output and error and caps them, in that order. failure is the
+// error text of a function that failed, not yet capped, or nil.
 func (c *Client) conclude(def *jobDef, run *Run, result any, failure *string, expectText *string) {
 	if failure != nil {
 		run.Status = StatusFailed
@@ -409,12 +409,13 @@ func (c *Client) conclude(def *jobDef, run *Run, result any, failure *string, ex
 		run.Status = StatusOK
 	}
 	// Redacted after the expect check, so a rule can still match what was
-	// logged. NULs go last, so not even a custom redact can store one.
+	// logged, and before the cap, so the cut cannot keep half a secret. NULs
+	// go last, so not even a custom redact can store one.
 	if run.Output != nil {
-		run.Output = ptr(output.StripNul(c.redact(*run.Output)))
+		run.Output = ptr(output.RedactAndCap(*run.Output, c.redact))
 	}
 	if run.Error != nil {
-		run.Error = ptr(output.StripNul(c.redact(*run.Error)))
+		run.Error = ptr(output.RedactAndCap(*run.Error, c.redact))
 	}
 }
 
@@ -593,10 +594,10 @@ func (c *Client) RecordRun(ctx context.Context, input Run, options ...RecordOpti
 		}
 	}
 	if run.Output != nil {
-		run.Output = ptr(output.StripNul(c.redact(output.CapOutput(*run.Output))))
+		run.Output = ptr(output.RedactAndCap(*run.Output, c.redact))
 	}
 	if run.Error != nil {
-		run.Error = ptr(output.StripNul(c.redact(output.CapOutput(*run.Error))))
+		run.Error = ptr(output.RedactAndCap(*run.Error, c.redact))
 	}
 	evaluate := !cfg.skipEvaluation
 

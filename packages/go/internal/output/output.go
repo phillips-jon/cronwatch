@@ -69,7 +69,38 @@ func CapOutput(s string) string {
 	if len(clean) <= OutputCap || js.Length16(clean) <= OutputCap {
 		return clean
 	}
-	return "[earlier output trimmed]\n" + js.Tail16(clean, OutputCap)
+	return trimmedLine + js.Tail16(clean, OutputCap)
+}
+
+const trimmedLine = "[earlier output trimmed]\n"
+
+// RedactEdge is how much text before the kept tail redaction reads, and
+// never keeps: three times the longest secret a default pattern can match
+// (a PEM key's 16 KB body with its header and footer, under OutputCap +
+// 1024), since a replacement grows what it replaces at most threefold.
+const RedactEdge = 3 * (OutputCap + 1024)
+
+// RedactAndCap is output or an error as it is stored: redacted, then capped
+// like CapOutput, so the cut cannot fall inside a secret and keep what
+// follows its label. Text of at most OutputCap + RedactEdge code units is
+// redacted whole. Longer text is cut to that many units from its end first,
+// and after redacting, the first RedactEdge units are never kept: a secret
+// whose label fell before that cut is left out with them. NULs go before and
+// after redact.
+func RedactAndCap(text string, redact func(string) string) string {
+	clean := StripNul(text)
+	// Each byte is at most one code unit, so a short text needs no count.
+	if len(clean) <= OutputCap+RedactEdge {
+		return CapOutput(redact(clean))
+	}
+	n := js.Length16(clean)
+	from := n - (OutputCap + RedactEdge)
+	if from <= 0 {
+		return CapOutput(redact(clean))
+	}
+	redacted := StripNul(redact(js.Slice16(clean, from, n)))
+	m := js.Length16(redacted)
+	return trimmedLine + js.Slice16(redacted, max(m-OutputCap, RedactEdge), m)
 }
 
 // Describe is an error as a JavaScript stack reads: "Name: message", then
@@ -143,11 +174,11 @@ func ErrorName(err error) string {
 
 // PanicMessage is a recovered panic as a failed run's error: "panic:
 // <value>" and up to five frames of the goroutine that panicked, innermost
-// first, as "function (file:line)", capped like output. Call it from the
-// deferred function that recovered the value, so the panicking frames are
-// still on the stack.
+// first, as "function (file:line)", not capped: the client redacts it and
+// then caps it (RedactAndCap). Call it from the deferred function that
+// recovered the value, so the panicking frames are still on the stack.
 func PanicMessage(value any) string {
-	return CapOutput(Describe("panic", js.WellFormed(fmt.Sprint(value)), panicFrames()))
+	return Describe("panic", js.WellFormed(fmt.Sprint(value)), panicFrames())
 }
 
 // panicFrames reads the stack of the deferred call: the frames below

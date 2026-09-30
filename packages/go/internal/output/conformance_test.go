@@ -87,6 +87,22 @@ func TestConformanceRedact(t *testing.T) {
 	}
 }
 
+func TestConformanceRedactAndCap(t *testing.T) {
+	f := loadOutput(t)
+	if n := get(f, "redactEdge").(float64); int(n) != RedactEdge {
+		t.Fatalf("redactEdge %v", n)
+	}
+	cases, _ := get(f, "redactAndCap").([]any)
+	if len(cases) == 0 {
+		t.Fatal("no redactAndCap cases")
+	}
+	for i, c := range cases {
+		o := c.(*js.Object)
+		got := RedactAndCap(expand(get(o, "input")), RedactSecrets)
+		same(t, "redactAndCap case "+js.FormatNumber(float64(i)), digest(&got), get(o, "result"))
+	}
+}
+
 func TestConformanceErrorMessage(t *testing.T) {
 	cases, _ := get(loadOutput(t), "errorMessage").([]any)
 	for i, c := range cases {
