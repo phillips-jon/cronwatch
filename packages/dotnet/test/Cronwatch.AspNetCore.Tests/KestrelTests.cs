@@ -92,4 +92,37 @@ public class KestrelTests
             await app.StopAsync();
         }
     }
+
+    /// <summary>
+    /// A mount whose path is percent-encoded on the wire, by a literal of the app's (<c>/ops tools</c>)
+    /// or a route group's parameter: the routes find their base in the target as sent, so they
+    /// serve under it, and the sign-in cookie's path is the one the browser sends.
+    /// </summary>
+    [Fact]
+    public async Task A_mount_percent_encoded_on_the_wire_is_the_base_as_sent()
+    {
+        await using var cw = new CronwatchClient(new CronwatchOptions { ProcessExitHook = false, Alerts = [] });
+        WebApplicationBuilder b = WebApplication.CreateSlimBuilder();
+        b.Logging.ClearProviders();
+        b.Services.AddSingleton(cw);
+        b.WebHost.UseKestrel(k => k.Listen(IPAddress.Loopback, 0));
+        await using WebApplication app = b.Build();
+        app.UseCronwatch("/mw tools", new RoutesOptions { Token = "tok" });
+        app.MapCronwatch("/ops tools", new RoutesOptions { Token = "tok" });
+        app.MapGroup("/{tenant}/admin").MapCronwatch("/cronwatch", new RoutesOptions { Token = "tok" });
+        await app.StartAsync();
+        int port = GoldenTests.PortOf(app);
+
+        RawHttp.Answer literal = await RawHttp.SendAsync(port, "GET", "/ops%20tools/api/jobs", Bearer, null);
+        Assert.Equal(200, literal.Status);
+        Assert.Equal("{\"ok\":true,\"jobs\":[]}", literal.Text);
+        RawHttp.Answer middleware = await RawHttp.SendAsync(port, "GET", "/mw%20tools/api/jobs", Bearer, null);
+        Assert.Equal(200, middleware.Status);
+
+        RawHttp.Answer signIn = await RawHttp.SendAsync(port, "GET", "/acme%3B%20co/admin/cronwatch/?token=tok", [], null);
+        Assert.Equal(303, signIn.Status);
+        Assert.Equal("/acme%3B%20co/admin/cronwatch/", signIn.Header("location"));
+        Assert.Contains("; Path=/acme%3B%20co/admin/cronwatch; HttpOnly;", signIn.Header("set-cookie"), System.StringComparison.Ordinal);
+        await app.StopAsync();
+    }
 }

@@ -344,13 +344,41 @@ public sealed class Routes
     }
 
     /// <summary>Where the dashboard is mounted for this request: the option, else the adapter's, else ours.</summary>
-    private string BasePathOf(WebRequest req)
+    private string BasePathOf(WebRequest req, string pathname)
     {
         if (_base != null)
         {
             return _base;
         }
-        return req.Mount is { } mount ? TrimTrailingSlashes(mount) : DefaultBasePath;
+        return req.Mount is { } mount ? MountAsSent(pathname, TrimTrailingSlashes(mount)) : DefaultBasePath;
+    }
+
+    /// <summary>
+    /// An adapter's mount as the target spells it. A server hands its mount over decoded
+    /// (ASP.NET Core's <c>PathBase</c> and route values), where the target keeps what the client
+    /// escaped, so <c>/ops tools</c> is <c>/ops%20tools</c> there: the base is the target's first as
+    /// many segments as the mount has, since a server decodes within a segment and never a
+    /// <c>%2F</c> into one more. A target with fewer segments keeps the mount as given.
+    /// </summary>
+    internal static string MountAsSent(string pathname, string mount)
+    {
+        int segments = 0;
+        foreach (char c in mount)
+        {
+            if (c == '/')
+            {
+                segments++;
+            }
+        }
+        int seen = 0;
+        for (int i = 0; i < pathname.Length; i++)
+        {
+            if (pathname[i] == '/' && ++seen > segments)
+            {
+                return pathname[..i];
+            }
+        }
+        return seen == segments ? pathname : mount;
     }
 
     /// <summary>The origin a browser sees: the configured one, the forwarded one under TrustProxy, or ours.</summary>
@@ -404,8 +432,8 @@ public sealed class Routes
     {
         ArgumentNullException.ThrowIfNull(request);
         var (rawPath, rawQuery) = Requests.Target(request.Target);
-        string b = BasePathOf(request);
         string pathname = Requests.NormalizePath(rawPath);
+        string b = BasePathOf(request, pathname);
         string path = Requests.StripBase(pathname, b);
         bool wantsHtml = !path.StartsWith("/api", StringComparison.Ordinal);
         try
