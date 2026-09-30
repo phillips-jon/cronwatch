@@ -57,6 +57,25 @@ final class Evaluate
         return 0;
     }
 
+    /**
+     * The failures in a row a stored state counts as (failureCount): its
+     * consecutiveFailures when that is a whole number, held at
+     * MAX_DURATION_MS (2^53 - 1), and 0 when it is negative or not a whole
+     * number. A foreign row's count at a 64-bit limit stays at the top
+     * instead of turning into a float past it, and a 1.5 or -1 counts as none.
+     */
+    public static function failureCount(?JobState $state): int
+    {
+        $count = $state?->consecutiveFailures;
+        if (is_int($count)) {
+            return $count > 0 ? min($count, self::MAX_DURATION_MS) : 0;
+        }
+        if (is_float($count) && is_finite($count) && floor($count) === $count && $count > 0) {
+            return $count >= self::MAX_DURATION_MS ? self::MAX_DURATION_MS : (int) $count;
+        }
+        return 0;
+    }
+
     public static function emptyState(string $job): JobState
     {
         return new JobState($job, [], 0, null, null, [], []);
@@ -71,7 +90,7 @@ final class Evaluate
         return new JobState(
             $state->job,
             $state->open,
-            $state->consecutiveFailures,
+            self::failureCount($state),
             $state->silencedUntil,
             $state->lastAlertAt,
             $state->pendingRecovery ?? [],
@@ -329,7 +348,8 @@ final class Evaluate
         }
 
         // failed or timeout
-        $next->consecutiveFailures += 1;
+        // Held at the top: a count at the limit neither turns into a float nor passes 2^53 - 1.
+        $next->consecutiveFailures = min(self::failureCount($next) + 1, self::MAX_DURATION_MS);
         self::closeCondition($next, Condition::MISSED);
         $threshold = max(1, $def->get('failuresBeforeAlert') ?? 1);
         $condition = $run->status === RunStatus::TIMEOUT ? Condition::STUCK : Condition::FAILED;

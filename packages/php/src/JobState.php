@@ -40,7 +40,9 @@ final class JobState
         return new self(
             job: (string) ($f['job'] ?? ''),
             open: Js::fields($f['open'] ?? []),
-            consecutiveFailures: $f['consecutiveFailures'] ?? 0,
+            // A foreign row's count may be anything; one that is not a number
+            // reads as none. Evaluate::failureCount() says what it counts as.
+            consecutiveFailures: is_int($f['consecutiveFailures'] ?? null) || is_float($f['consecutiveFailures'] ?? null) ? $f['consecutiveFailures'] : 0,
             silencedUntil: $f['silencedUntil'] ?? null,
             lastAlertAt: $f['lastAlertAt'] ?? null,
             pendingRecovery: is_array($pending) ? array_values(array_map('strval', $pending)) : null,

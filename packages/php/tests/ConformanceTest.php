@@ -339,6 +339,21 @@ final class ConformanceTest extends TestCase
         $this->eachCase(self::fixture('health.json')->stateVersion, fn (\stdClass $c) => self::differs($c->version, Evaluate::stateVersion(JobState::fromJson(Js::parse($c->state)))));
     }
 
+    public function testFailureCount(): void
+    {
+        $def = JobDefinition::fromJson(['name' => 'j', 'failuresBeforeAlert' => 3]);
+        $run = Run::fromJson([
+            'id' => 'f', 'job' => 'j', 'status' => 'failed', 'startedAt' => Clock::T0 - 60_000, 'finishedAt' => Clock::T0 - 59_000, 'durationMs' => 1000,
+            'error' => 'Error: boom', 'output' => null, 'metrics' => new \stdClass(), 'trigger' => 'run',
+        ]);
+        $this->eachCase(self::fixture('health.json')->failureCount, function (\stdClass $c) use ($def, $run): ?string {
+            $normalized = Evaluate::normalizeState(JobState::fromJson(Js::parse($c->state)), 'j');
+            $failed = Evaluate::onRunFinish($def, $run, $normalized, [], Clock::T0);
+            return self::differs($c->consecutiveFailures, $normalized->consecutiveFailures)
+                ?? self::differs($c->failed, ['state' => $failed->state, 'alerts' => $failed->alerts]);
+        });
+    }
+
     public function testUnevaluableSummary(): void
     {
         $this->eachCase(self::fixture('health.json')->unevaluableSummary, fn (\stdClass $c) => self::differs(
