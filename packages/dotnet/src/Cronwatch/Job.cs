@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Cronwatch;
 
 /// <summary>A declared job's handle, from <see cref="CronwatchClient.Job"/>.</summary>
-public sealed class Job
+public sealed partial class Job
 {
     private static readonly RunOptions DefaultRun = new();
     private static readonly StartOptions DefaultStart = new();

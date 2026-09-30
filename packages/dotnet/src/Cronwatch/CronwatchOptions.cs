@@ -195,4 +195,7 @@ internal sealed class Timings
     public TimeSpan FirstCheck { get; set; } = TimeSpan.FromSeconds(1);
 
     public TimeSpan MinInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>The SDK's <c>now</c> option, for a seed whose clock goes where no <see cref="DateTimeOffset"/> can.</summary>
+    public Func<long>? Now { get; set; }
 }

@@ -54,7 +54,7 @@ public sealed partial class CronwatchClient
     private readonly ConcurrentDictionary<Task, byte> _inFlight = new();
     private readonly CancellationTokenSource _closing = new();
 
-    internal long Now() => _time.GetUtcNow().ToUnixTimeMilliseconds();
+    internal long Now() => Timings.Now is { } now ? now() : _time.GetUtcNow().ToUnixTimeMilliseconds();
 
     /// <summary>The zone a cron without one is read in: the clock's.</summary>
     internal TimeZoneInfo LocalZone => _time.LocalTimeZone;

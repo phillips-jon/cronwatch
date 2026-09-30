@@ -15,6 +15,7 @@
     <None Include="../../README.md" Pack="true" PackagePath="/" />
     <None Include="../../LICENSE" Pack="true" PackagePath="/" />
     <InternalsVisibleTo Include="Cronwatch.Tests" />
+    <InternalsVisibleTo Include="Cronwatch.WebTest" />
   </ItemGroup>
   <ItemGroup>
     <!-- The dashboard's style sheet, scripts and icons: the SDK's files, byte
