@@ -401,6 +401,12 @@ final class PgCron implements Source
      */
     private function declare(Cronwatch $host, array $all, string $timezone, bool $recording): array
     {
+        // One forgotten since it was declared (the dashboard's forget) is declared again, though
+        // unchanged: recordRun takes runs only of a declared job.
+        $live = [];
+        foreach ($host->definedJobs() as $defined) {
+            $live[$defined->name] = true;
+        }
         $names = [];
         $definitions = [];
         $used = [];
@@ -469,7 +475,7 @@ final class PgCron implements Source
             }
             try {
                 $key = self::keyOf($definition);
-                if (($this->declared[$name] ?? null) !== $key) {
+                if (($this->declared[$name] ?? null) !== $key || !isset($live[$name])) {
                     try {
                         $host->job($name, $definition);
                     } catch (\Throwable $error) {

@@ -249,6 +249,27 @@ final class PgCronTest extends TestCase
         $this->assertCount(20, $cw->runs('db:nightly-vacuum', 100), 'its history is kept');
     }
 
+    public function testAJobForgottenFromTheDashboardIsDeclaredAgainAndItsLaterRunsRecorded(): void
+    {
+        $clock = new Clock();
+        $cron = new FakeCron();
+        $cron->job(1, 'vacuum', '0 3 * * *');
+        $cron->add(1, 'succeeded', self::T0 - 5000, self::T0 - 4000, 'VACUUM');
+        $errors = [];
+        $cw = self::client($cron, $clock, null, $errors, new Capture());
+        $cw->check();
+        $cw->forget('vacuum');
+        $cron->add(1, 'succeeded', self::T0 - 3000, self::T0 - 2000, 'VACUUM');
+        $cron->add(1, 'failed', self::T0 - 1000, self::T0, 'ERROR:  boom');
+        $clock->advance(1000);
+        $result = $cw->check();
+        $this->assertSame([], $errors);
+        $this->assertSame(['vacuum'], array_map(fn ($j) => $j->name, $result->jobs));
+        $this->assertSame('0 3 * * *', $result->jobs[0]->definition->schedule);
+        $this->assertSame(['pgcron:3', 'pgcron:2'], array_map(fn ($r) => $r->id, $cw->runs('vacuum')), 'the runs after the forget');
+        $this->assertSame(['vacuum'], array_map(fn ($d) => $d->name, $cw->definedJobs()));
+    }
+
     public function testJobOptionsApplyAndAnUnreadableScheduleIsReported(): void
     {
         $cron = new FakeCron();
