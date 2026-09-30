@@ -1,6 +1,7 @@
 package river_test
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 
 	cronwatch "cronwatch.dev/go"
 	cwriver "cronwatch.dev/go/river"
+	"cronwatch.dev/go/storetest"
 	"github.com/riverqueue/river"
 	"github.com/robfig/cron/v3"
 )
@@ -89,6 +91,57 @@ func TestPeriodicJobsAreDeclaredAndMarked(t *testing.T) {
 	}
 	eq(t, "by ID", defs["nightly-report"], `{"grace":"5m","schedule":"0 2 * * *","timezone":"UTC","timeout":"2h","tags":["river","river:billing"],"name":"nightly-report"}`)
 	eq(t, "by kind", defs["report"], `{"grace":"5m","schedule":"every 1h","tags":["river","river:billing"],"name":"report"}`)
+}
+
+// The review: PeriodicJob only appended, so a job remade with its ID and a
+// new interval was two entries on different schedules (watched without
+// one), and one River removed kept its schedule and was reported missed.
+func TestPeriodicJobsChangedAtRuntimeAreFollowed(t *testing.T) {
+	t.Setenv("CRONWATCH_APP_ID", "billing")
+	ctx := context.Background()
+	errs := &storetest.Errors{}
+	store := cronwatch.NewMemoryStore()
+	cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithErrorHandler(errs.Add))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := cwriver.New(cw, cwriver.Options{})
+	args := func() (river.JobArgs, *river.InsertOpts) { return ReportArgs{}, nil }
+	schedule := func(name string) string {
+		t.Helper()
+		w.Wait()
+		if _, err := cw.Check(ctx); err != nil {
+			t.Fatal(err)
+		}
+		job, err := store.GetJob(ctx, name)
+		if err != nil || job == nil {
+			t.Fatalf("%s is not stored (%v)", name, err)
+		}
+		return job.Definition.Schedule()
+	}
+
+	w.PeriodicJob(river.PeriodicInterval(time.Hour), args, &river.PeriodicJobOpts{ID: "nightly"})
+	daily := w.PeriodicJob(river.PeriodicInterval(24*time.Hour), args, &river.PeriodicJobOpts{ID: "daily"})
+	w.PeriodicJob(river.PeriodicInterval(time.Hour), args, &river.PeriodicJobOpts{ID: "weekly"})
+	// Remade with the same ID and a new interval: the new one stands.
+	w.PeriodicJob(river.PeriodicInterval(2*time.Hour), args, &river.PeriodicJobOpts{ID: "nightly"})
+	if err := w.Sync(ctx); err != nil {
+		t.Fatal(err)
+	}
+	eq(t, "remade", schedule("nightly"), "every 2h")
+	eq(t, "nothing reported", len(errs.List()), 0)
+
+	// Taken out of River's bundle, and so out of the watcher's.
+	w.Remove(daily)
+	eq(t, "removed", schedule("daily"), "")
+	w.RemoveByID("weekly")
+	eq(t, "removed by ID", schedule("weekly"), "")
+	if err := w.Sync(ctx); err != nil {
+		t.Fatal(err)
+	}
+	eq(t, "kept", schedule("nightly"), "every 2h")
+	w.Clear()
+	eq(t, "cleared", schedule("nightly"), "")
 }
 
 func TestTheConstructorsMetadataIsKept(t *testing.T) {

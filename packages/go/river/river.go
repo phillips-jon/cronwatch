@@ -41,6 +41,17 @@
 // config) is declared again without its schedule by the next Sync, which
 // the check worker runs, so it is never reported missed.
 //
+// Periodic jobs changed while the client runs are followed through the
+// watcher: one made again with the ID of an earlier one (after River's
+// Remove or Clear, with a new schedule, say) replaces it, and one taken out
+// of River's bundle is taken out here with w.Remove, w.RemoveByID or
+// w.Clear, beside the bundle's own call:
+//
+//	client.PeriodicJobs().RemoveByID("nightly-report")
+//	w.RemoveByID("nightly-report")
+//
+// The job then loses its schedule at once, so it is never reported missed.
+//
 // # Runs and retries
 //
 // The middleware records each attempt of a job that carries the metadata,
@@ -114,8 +125,16 @@ type Watcher struct {
 	watch   *bridge.Watch
 	options Options
 
-	mu       sync.Mutex
-	periodic []bridge.Entry
+	declaring sync.Mutex
+	mu        sync.Mutex
+	periodic  []periodic
+}
+
+// periodic is a periodic job this watcher declared.
+type periodic struct {
+	job   *river.PeriodicJob
+	id    string
+	entry bridge.Entry
 }
 
 // New makes a Watcher.
@@ -139,12 +158,66 @@ func (w *Watcher) PeriodicJob(schedule river.PeriodicSchedule, constructor river
 	} else {
 		e.Schedule, e.Timezone = converted.Schedule, converted.Timezone
 	}
+	job := river.NewPeriodicJob(schedule, marked(constructor, name), opts)
+	id := ""
+	if opts != nil {
+		id = opts.ID
+	}
 	w.mu.Lock()
-	w.periodic = append(w.periodic, e)
-	entries := slices.Clone(w.periodic)
+	// Made again with the ID of an earlier one: it replaces that one, as
+	// River's bundle holds one periodic job per ID.
+	if id != "" {
+		w.periodic = slices.DeleteFunc(w.periodic, func(p periodic) bool { return p.id == id })
+	}
+	w.periodic = append(w.periodic, periodic{job: job, id: id, entry: e})
 	w.mu.Unlock()
-	w.watch.Declare(entries)
-	return river.NewPeriodicJob(schedule, marked(constructor, name), opts)
+	w.declare()
+	return job
+}
+
+// Remove takes periodic jobs made by PeriodicJob out of what the watcher
+// declares, as River's client.PeriodicJobs().Remove takes them out of the
+// client: each job no periodic job holds any more loses its schedule at
+// once, so it is never reported missed.
+func (w *Watcher) Remove(jobs ...*river.PeriodicJob) {
+	w.drop(func(p periodic) bool { return slices.Contains(jobs, p.job) })
+}
+
+// RemoveByID is Remove for the periodic jobs of these IDs, as River's
+// client.PeriodicJobs().RemoveByID.
+func (w *Watcher) RemoveByID(ids ...string) {
+	w.drop(func(p periodic) bool { return p.id != "" && slices.Contains(ids, p.id) })
+}
+
+// Clear is Remove for every periodic job, as River's
+// client.PeriodicJobs().Clear. The check keeps running.
+func (w *Watcher) Clear() {
+	w.drop(func(periodic) bool { return true })
+}
+
+func (w *Watcher) drop(gone func(periodic) bool) {
+	w.mu.Lock()
+	w.periodic = slices.DeleteFunc(w.periodic, gone)
+	w.mu.Unlock()
+	w.declare()
+}
+
+// declare declares the periodic jobs held now (bridge.Watch.Declare), one
+// call at a time, so an older list never lands after a newer one.
+func (w *Watcher) declare() {
+	w.declaring.Lock()
+	defer w.declaring.Unlock()
+	w.watch.Declare(w.entries())
+}
+
+func (w *Watcher) entries() []bridge.Entry {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	entries := make([]bridge.Entry, len(w.periodic))
+	for i, p := range w.periodic {
+		entries[i] = p.entry
+	}
+	return entries
 }
 
 // periodicName is a periodic job's CronWatch name: its ID, else the kind
@@ -250,10 +323,7 @@ func (w *Watcher) Wait() { w.watch.Settle() }
 // any more (taken out of the config since a process declared it). The
 // check worker runs it before each check.
 func (w *Watcher) Sync(ctx context.Context) error {
-	w.mu.Lock()
-	entries := slices.Clone(w.periodic)
-	w.mu.Unlock()
-	w.watch.Declare(entries)
+	w.declare()
 	_, err := w.watch.Unschedule(ctx)
 	return err
 }
