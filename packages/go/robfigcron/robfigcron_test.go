@@ -135,6 +135,26 @@ func TestEntriesAreJobsWithTheirSchedules(t *testing.T) {
 
 func Skipped() {}
 
+// The review: forgetting a job the cron still runs left the watch holding
+// it as unchanged, and the next sync took it for an entry gone.
+func TestAJobForgottenWhileTheCronRunsItKeepsItsSchedule(t *testing.T) {
+	ctx := context.Background()
+	k := newKit(t, nil)
+	w := robfigcron.New(k.cw, robfigcron.Options{Logger: quiet})
+	c := cron.New(w.Option(), cron.WithLocation(time.UTC))
+	_, err := c.AddFunc("0 2 * * *", NightlyReport)
+	check(t, err)
+	check(t, w.Sync(ctx))
+	k.check(t)
+	check(t, k.cw.Forget(ctx, "robfigcron_test.NightlyReport"))
+	for range 2 {
+		check(t, w.Sync(ctx))
+		k.check(t)
+	}
+	eq(t, "the schedule", k.stored(t, "robfigcron_test.NightlyReport").Schedule(), "0 2 * * *")
+	eq(t, "nothing reported", len(k.errors.List()), 0)
+}
+
 func TestRunsAreRecordedAndEntriesFollowed(t *testing.T) {
 	k := newKit(t, nil)
 	var recovered []any

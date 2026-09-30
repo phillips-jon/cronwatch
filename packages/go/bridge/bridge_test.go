@@ -339,6 +339,54 @@ func (s *listingStore) ListJobs(ctx context.Context) ([]cronwatch.StoredJob, err
 	return jobs, err
 }
 
+// The review: the dashboard's forget took a job out of the client, the
+// watch kept it as unchanged and never declared it again, the next run
+// wrote it back, and Unschedule took it for an entry gone, so the job the
+// scheduler still runs lost its schedule until restart.
+func TestAJobForgottenWhileTheSchedulerRunsItKeepsItsSchedule(t *testing.T) {
+	ctx := context.Background()
+	entries := []bridge.Entry{{Name: "nightly", Where: "x", Schedule: "0 2 * * *"}}
+	const want = `{"schedule":"0 2 * * *","tags":["gocron","gocron:billing"],"name":"nightly"}`
+	for _, order := range []string{"a run, then a sync", "a sync before any run"} {
+		t.Run(order, func(t *testing.T) {
+			store := cronwatch.NewMemoryStore()
+			cw, errs := newClient(t, store)
+			w := bridge.NewWatch(cw, "gocron", "billing", "gocron")
+			w.Declare(entries)
+			w.Settle()
+			check2(t, cw.Forget(ctx, "nightly"))
+			if order == "a run, then a sync" {
+				check2(t, w.Job("nightly").Run(ctx, func(context.Context, *cronwatch.JobContext) error { return nil }))
+				w.Declare(entries)
+			}
+			for range 2 {
+				names, err := w.Unschedule(ctx)
+				check2(t, err)
+				eq(t, "nothing unscheduled", strings.Join(names, ","), "")
+				w.Declare(entries)
+				w.Settle()
+				check(t, cw)
+			}
+			eq(t, "stored", stored(t, store, "nightly"), want)
+			eq(t, "declared", cw.Declares("nightly") && cw.DefinedJobs()[0].Schedule() == "0 2 * * *", true)
+			eq(t, "nothing reported", len(errs.List()), 0)
+		})
+	}
+}
+
+func TestFallbackDeclaresAForgottenJobAgain(t *testing.T) {
+	ctx := context.Background()
+	store := cronwatch.NewMemoryStore()
+	cw, _ := newClient(t, store)
+	w := bridge.NewWatch(cw, "river", "billing", "River")
+	first := w.Fallback(ctx, "report", []cronwatch.JobOption{cronwatch.Grace("1m")})
+	check2(t, cw.Forget(ctx, "report"))
+	again := w.Fallback(ctx, "report", []cronwatch.JobOption{cronwatch.Grace("1m")})
+	if again == nil || again == first || !cw.Declares("report") {
+		t.Fatal("the forgotten job was not declared again")
+	}
+}
+
 // The audit: an entry declared while Unschedule read the store was taken
 // for gone, and its job lost its schedule for the life of the process.
 func TestUnscheduleKeepsAnEntryDeclaredMeanwhile(t *testing.T) {

@@ -317,6 +317,15 @@ func (c *Client) DefinedJobs() []Definition {
 	return out
 }
 
+// Declares reports whether this client declares a job of that name now: it
+// was declared with Job and not forgotten since (the dashboard's forget
+// takes it out). A scheduler integration asks, so a job the scheduler still
+// runs is declared again after a forget.
+func (c *Client) Declares(name string) bool {
+	_, ok := c.declared(name)
+	return ok
+}
+
 func (c *Client) declared(name string) (*jobDef, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
