@@ -213,6 +213,12 @@ await test("postgres: output and errors with NUL characters are still recorded",
     assert.equal(run!.output, "beforeafter");
     assert.match(run!.error!, /^Error: badbyte/);
     assert.equal((await cw.store.getState("nul"))!.consecutiveFailures, 1, "the state, with its alert, was written too");
+    // So are a trigger, metric names and a definition's text.
+    const nul2 = cw.job("nul2", { description: "a\u0000b", tags: ["t\u0000"], budget: { "c\u0000": 5 } });
+    await nul2.run(async (job) => void job.metric("ro\u0000ws", 2), { trigger: "cr\u0000on" });
+    const [second] = await cw.runs("nul2");
+    assert.deepEqual([second!.status, second!.trigger, second!.metrics], ["ok", "cron", { rows: 2 }]);
+    assert.deepEqual((await cw.store.getJob("nul2"))!.definition, { name: "nul2", description: "ab", tags: ["t"], budget: { c: 5 } });
   } finally {
     await cw.close();
     await drop(prefix);

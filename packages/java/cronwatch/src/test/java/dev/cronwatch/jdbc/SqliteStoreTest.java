@@ -87,10 +87,10 @@ class SqliteStoreTest {
 
   @Test
   void theSqliteStoreReplaysStoreJson() throws IOException {
-    assertEquals(26, StoreReplay.run(fixture(), () -> SqlStore.sqlite(source(":memory:"))));
+    assertEquals(32, StoreReplay.run(fixture(), () -> SqlStore.sqlite(source(":memory:"))));
     int[] n = {0};
     assertEquals(
-        26,
+        32,
         StoreReplay.run(
             fixture(), () -> store(dir.resolve("replay-" + n[0]++ + ".db"), "cronwatch_")));
   }
@@ -245,7 +245,7 @@ class SqliteStoreTest {
   }
 
   @Test
-  void textKeepsNulsAndALoneSurrogateIsWrittenAsTheReplacementCharacter() throws Exception {
+  void textDropsNulsAndALoneSurrogateIsWrittenAsTheReplacementCharacter() throws Exception {
     Path file = dir.resolve("text.db");
     try (SqlStore s = store(file, "cronwatch_")) {
       s.init();
@@ -264,7 +264,7 @@ class SqliteStoreTest {
       s.insertRun(run);
       Run back = s.getRun("t1");
       assertNotNull(back);
-      assertEquals("a\u0000b", back.error());
+      assertEquals("ab", back.error(), "no NUL, as on Postgres");
       assertEquals("x�y 😀", back.output());
     }
     // The bytes the file holds are the ones better-sqlite3 writes for the same string.

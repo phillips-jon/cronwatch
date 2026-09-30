@@ -23,6 +23,31 @@ pub(crate) fn strip_nul(s: &str) -> String {
     if s.contains('\0') { s.replace('\0', "") } else { s.to_string() }
 }
 
+/// Removes every U+0000 from JSON text, keys and strings alike, by dropping
+/// each `\u0000` escape (a NUL can appear in JSON no other way). Escapes
+/// are read left to right in pairs, so an escaped backslash followed by
+/// `u0000` is left as it is (output.ts's stripJsonNul).
+pub(crate) fn strip_json_nul(json: &str) -> String {
+    if !json.contains("\\u0000") {
+        return json.to_string();
+    }
+    let mut out = String::with_capacity(json.len());
+    let mut rest = json;
+    while let Some(at) = rest.find('\\') {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + 1..];
+        if let Some(past) = after.strip_prefix("u0000") {
+            rest = past;
+            continue;
+        }
+        let next = after.chars().next().map_or(0, char::len_utf8);
+        out.push_str(&rest[at..at + 1 + next]);
+        rest = &after[next..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Removes NULs, then keeps the last `OUTPUT_CAP` code units behind a line
 /// saying the rest was trimmed. A cut through a surrogate pair leaves
 /// U+FFFD, the character JavaScript's lone half becomes once written out as

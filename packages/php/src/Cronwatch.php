@@ -259,6 +259,9 @@ final class Cronwatch
     {
         $given = $run instanceof Run ? $run : Run::fromJson($run);
         $declared = $this->definitions[$given->job] ?? throw new \InvalidArgumentException("recordRun: job \"{$given->job}\" is not declared; call job() first");
+        if (str_contains($given->id, "\0")) {
+            throw new \InvalidArgumentException("recordRun: run ids cannot contain a NUL character (job \"{$given->job}\")");
+        }
         $this->sync($declared);
         $run = clone $given;
         if ($run->status === RunStatus::OK) {
@@ -964,6 +967,10 @@ final class Cronwatch
         $length = Js::length16($id);
         if ($id === '' || $length > 200) {
             throw new \InvalidArgumentException("job \"{$job}\": {$method}() needs a run id of 1 to 200 characters (got {$length} characters)");
+        }
+        // Postgres refuses NUL in text, so no store could hold such an id.
+        if (str_contains($id, "\0")) {
+            throw new \InvalidArgumentException("job \"{$job}\": {$method}() cannot take a run id containing a NUL character");
         }
         if (str_starts_with($id, self::RESERVED_RUN_ID_PREFIX)) {
             throw new \InvalidArgumentException("job \"{$job}\": {$method}() cannot take a run id starting with \"" . self::RESERVED_RUN_ID_PREFIX . '", which the pg_cron source uses for its runs');

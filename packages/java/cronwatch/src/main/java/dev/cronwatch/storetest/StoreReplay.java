@@ -7,10 +7,12 @@ import static dev.cronwatch.storetest.Checks.json;
 import static dev.cronwatch.storetest.Checks.must;
 import static dev.cronwatch.storetest.Checks.sameJson;
 
+import dev.cronwatch.Definition;
 import dev.cronwatch.JobState;
 import dev.cronwatch.Metrics;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
+import dev.cronwatch.StoredJob;
 import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
@@ -23,10 +25,10 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Replays the store cases of the repository's {@code conformance/store.json}, which the SDK's
- * memory store answered, against a store: prune scripts, {@code compareAndSetState} steps and
- * {@code updateRunIf} steps ({@link #run}), and states another process wrote with a version that is
- * not a whole number ({@link #foreignVersions}). The caller reads the fixture and passes its text,
- * since a published jar cannot reach the repository:
+ * memory store answered, against a store: prune scripts, {@code compareAndSetState} steps, {@code
+ * updateRunIf} steps and text written without NUL ({@link #run}), and states another process wrote
+ * with a version that is not a whole number ({@link #foreignVersions}). The caller reads the
+ * fixture and passes its text, since a published jar cannot reach the repository:
  *
  * <pre>{@code
  * String fixture = Files.readString(Path.of("conformance/store.json"));
@@ -201,8 +203,76 @@ public final class StoreReplay {
       i++;
     }
     must("close", runs::close);
+    cases += nul(fix, fresh);
     if (cases == 0) {
       throw new AssertionError("no cases replayed");
+    }
+    return cases;
+  }
+
+  /**
+   * The {@code nul} steps: text is written without U+0000, which Postgres refuses (a run's trigger,
+   * output, error and metric names, and every key and string of a definition and a state).
+   */
+  private static int nul(JsObject fix, Supplier<? extends Store> fresh) {
+    Store store = fresh.get();
+    must("init", store::init);
+    int cases = 0;
+    for (JsObject step : objects(fix.get("nul"))) {
+      String what = "nul step " + cases;
+      String want = Json.stringify(step.get("stored"));
+      if (step.has("upsertJob")) {
+        Definition d = Definition.of(field(step, "upsertJob"));
+        long now = number(step, "now");
+        must(what, () -> store.upsertJob(d, now));
+        StoredJob j = get(what, () -> store.getJob("nul"));
+        String got =
+            j == null
+                ? "null"
+                : new JsObject()
+                    .set("name", j.name())
+                    .set("definition", Json.parse(j.definition().toJson()))
+                    .set("createdAt", j.createdAt())
+                    .set("updatedAt", j.updatedAt())
+                    .toJson();
+        sameJson(what, got, want);
+      } else if (step.has("setState") || step.has("compareAndSetState")) {
+        if (step.has("setState")) {
+          JobState st = JobState.fromValue(step.get("setState"));
+          must(what, () -> store.setState(st));
+        } else {
+          JobState st = JobState.fromValue(step.get("compareAndSetState"));
+          long expected = number(step, "expected");
+          eq(
+              what + ": wrote",
+              get(what, () -> store.compareAndSetState(st, expected)),
+              step.get("written"));
+        }
+        sameJson(what, json(get(what, () -> store.getState("nul"))), want);
+      } else {
+        if (step.has("insertRun")) {
+          Run r = Run.fromValue(step.get("insertRun"));
+          must(what, () -> store.insertRun(r));
+        } else if (step.has("updateRun")) {
+          Run r = Run.fromValue(step.get("updateRun"));
+          must(what, () -> store.updateRun(r));
+        } else {
+          Run r = Run.fromValue(step.get("updateRunIf"));
+          List<RunStatus> from = new ArrayList<>();
+          if (step.get("from") instanceof List<?> list) {
+            for (Object s : list) {
+              from.add(RunStatus.of(String.valueOf(s)));
+            }
+          }
+          eq(what + ": wrote", get(what, () -> store.updateRunIf(r, from)), step.get("written"));
+        }
+        sameJson(what, json(get(what, () -> store.getRun("n1"))), want);
+      }
+      cases++;
+    }
+    must("close", store::close);
+    if (cases == 0) {
+      throw new AssertionError("no nul cases");
     }
     return cases;
   }

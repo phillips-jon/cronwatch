@@ -24,7 +24,7 @@ class MemoryStoreContractTest {
 
   @Test
   void theMemoryStoreReplaysStoreJson() throws IOException {
-    assertEquals(26, StoreReplay.run(fixture(), MemoryStore::new));
+    assertEquals(32, StoreReplay.run(fixture(), MemoryStore::new));
   }
 
   @Test

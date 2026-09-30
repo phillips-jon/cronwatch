@@ -136,6 +136,18 @@ func TestStartWithAnIDTwiceRecordsOneRun(t *testing.T) {
 	if err := job.Run(bg, ok, cronwatch.WithRunID("x")); err == nil || !strings.Contains(err.Error(), "WithRunID is for Start") {
 		t.Error(err)
 	}
+	// No store could hold a NUL (Postgres refuses it), so such an id is refused wherever one is taken.
+	if _, err := job.Start(bg, cronwatch.WithRunID("01HX\x00run")); err == nil || err.Error() != `job "inngest-fn": start() cannot take a run id containing a NUL character` {
+		t.Error(err)
+	}
+	if _, err := job.Resume(bg, "01HX\x00run"); err == nil || err.Error() != `job "inngest-fn": resume() cannot take a run id containing a NUL character` {
+		t.Error(err)
+	}
+	nul := cronwatch.Run{ID: "x\x00y", Job: "inngest-fn", Status: cronwatch.StatusOK, StartedAt: 1, FinishedAt: ptr(int64(2)), DurationMs: ptr(int64(1)), Metrics: cronwatch.Metrics{}, Trigger: "run"}
+	if _, err := k.cw.RecordRun(bg, nul); err == nil || err.Error() != `recordRun: run ids cannot contain a NUL character (job "inngest-fn")` {
+		t.Error(err)
+	}
+	eq(t, "runs", len(runs(t, k.cw, "inngest-fn")), 1)
 }
 
 func TestResumeInASecondClientAppendsAndFinishes(t *testing.T) {

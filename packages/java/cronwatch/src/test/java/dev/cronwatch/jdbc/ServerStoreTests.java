@@ -151,7 +151,7 @@ abstract class ServerStoreTests {
 
   @Test
   void theStoreReplaysStoreJson() throws IOException {
-    assertEquals(26, StoreReplay.run(fixture(), this::store));
+    assertEquals(32, StoreReplay.run(fixture(), this::store));
   }
 
   @Test

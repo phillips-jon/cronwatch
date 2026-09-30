@@ -274,6 +274,10 @@ defmodule Cronwatch.Check do
       raise Error.invalid("record_run: job #{Cronwatch.JS.quote(input.job)} is not declared; call job() first")
     end
 
+    if is_binary(input.id) and String.contains?(input.id, <<0>>) do
+      raise Error.invalid("record_run: run ids cannot contain a NUL character (job #{Cronwatch.JS.quote(input.job)})")
+    end
+
     Core.sync!(c, declared)
 
     run =

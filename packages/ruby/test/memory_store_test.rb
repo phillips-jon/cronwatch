@@ -183,6 +183,52 @@ module StoreConformance
     %w[a b].each { |name| store.delete_job(name) }
   end
 
+  # conformance/store.json's nul script: text is written without U+0000
+  # (Postgres refuses it), and the six characters "\u0000" stay as they are.
+  def test_nul_replays_the_sdk_script
+    store = make_store
+    store.init if store.respond_to?(:init)
+    failures = []
+    STORE_SCRIPTS["nul"].each_with_index do |step, i|
+      written = nil
+      stored =
+        if step["upsertJob"]
+          store.upsert_job(Cronwatch::JobDefinition.from_h(step["upsertJob"]), step["now"])
+          store.get_job("nul")&.to_h
+        elsif step["insertRun"] || step["updateRun"]
+          if step["insertRun"] then store.insert_run(Cronwatch::Run.from_h(step["insertRun"]))
+          else store.update_run(Cronwatch::Run.from_h(step["updateRun"]))
+          end
+          store.get_run("n1")&.to_h
+        elsif step["updateRunIf"]
+          written = store.update_run_if(Cronwatch::Run.from_h(step["updateRunIf"]), step["from"])
+          store.get_run("n1")&.to_h
+        elsif step["setState"]
+          store.set_state(Cronwatch::JobState.from_h(step["setState"]))
+          store.get_state("nul")&.to_h
+        else
+          written = store.compare_and_set_state(Cronwatch::JobState.from_h(step["compareAndSetState"]), step["expected"])
+          store.get_state("nul")&.to_h
+        end
+      expected = canonical_json([step.key?("written") ? step["written"] : nil, step["stored"]])
+      actual = canonical_json([written, stored])
+      failures << "nul step #{i}\n    expected #{expected}\n    got      #{actual}" unless expected == actual
+    end
+    assert failures.empty?, failures.join("\n")
+    store.delete_job("nul")
+  end
+
+  def canonical_json(value)
+    sort = lambda do |v|
+      case v
+      when Hash then v.to_h { |k, x| [k.to_s, sort.call(x)] }.sort.to_h
+      when Array then v.map { |x| sort.call(x) }
+      else v
+      end
+    end
+    Cronwatch::JS.json(sort.call(JSON.parse(Cronwatch::JS.json(value))))
+  end
+
   CAS_SCRIPT = STORE_SCRIPTS["compareAndSetState"]
 
   # conformance/store.json's compareAndSetState script, recorded from the

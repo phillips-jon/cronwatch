@@ -7,8 +7,10 @@ import dev.cronwatch.Channel;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.Gen;
 import dev.cronwatch.JobState;
+import dev.cronwatch.Metrics;
 import dev.cronwatch.Run;
 import dev.cronwatch.StoredJob;
+import dev.cronwatch.internal.output.Output;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import dev.cronwatch.store.MemoryStore;
@@ -355,18 +357,36 @@ class RowsProperties {
     }
   }
 
+  /**
+   * Reads back what was written, but for NULs: every store writes a run's trigger, output, error
+   * and metric names, and every key and string of a definition and a state, without them.
+   */
   private static void readsBackTheSame(Store store, Read read) throws Exception {
     for (StoredJob j : read.jobs()) {
       if (j.name().equals(j.definition().name())) {
         StoredJob back = Objects.requireNonNull(store.getJob(j.name()), j.name());
-        assertEquals(j.definition().toJson(), back.definition().toJson());
+        assertEquals(Output.stripJsonNul(j.definition().toJson()), back.definition().toJson());
       }
     }
     for (Run r : read.runs()) {
-      assertEquals(r.toJson(), Objects.requireNonNull(store.getRun(r.id()), r.id()).toJson());
+      Run written =
+          new Run(
+              r.id(),
+              r.job(),
+              r.status(),
+              r.startedAt(),
+              r.finishedAt(),
+              r.durationMs(),
+              Output.stripNulOrNull(r.error()),
+              Output.stripNulOrNull(r.output()),
+              Metrics.lenient(Json.parse(Output.stripJsonNul(r.metrics().toJson()))),
+              Output.stripNul(r.trigger()));
+      assertEquals(written.toJson(), Objects.requireNonNull(store.getRun(r.id()), r.id()).toJson());
     }
     for (JobState s : read.states()) {
-      assertEquals(s.toJson(), Objects.requireNonNull(store.getState(s.job()), s.job()).toJson());
+      assertEquals(
+          Output.stripJsonNul(s.toJson()),
+          Objects.requireNonNull(store.getState(s.job()), s.job()).toJson());
     }
   }
 

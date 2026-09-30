@@ -53,6 +53,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     alias Cronwatch.Metrics
     alias Cronwatch.Run
     alias Cronwatch.Store.SQL
+    alias Cronwatch.Store.Text
     alias Cronwatch.StoredJob
 
     @enforce_keys [:repo, :prefix, :dialect, :sql]
@@ -408,7 +409,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @impl Cronwatch.Store
     def upsert_job(h, %Object{} = definition, now) do
       name = Object.get(definition, "name")
-      exec(h, h.sql.upsert_job, [name, JS.stringify(definition), now, now])
+      exec(h, h.sql.upsert_job, [name, Text.json(definition), now, now])
     end
 
     @impl Cronwatch.Store
@@ -425,6 +426,8 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     @impl Cronwatch.Store
     def insert_run(h, %Run{} = run) do
+      run = Text.run(run)
+
       # MySQL's trigger column is VARCHAR(255), which refuses anything longer
       # (the others are TEXT): a long trigger is cut to fit rather than lose
       # the whole run.
@@ -440,12 +443,13 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     end
 
     @impl Cronwatch.Store
-    def update_run(h, %Run{} = run), do: exec(h, h.sql.update_run, update_params(run))
+    def update_run(h, %Run{} = run), do: exec(h, h.sql.update_run, update_params(Text.run(run)))
 
     @impl Cronwatch.Store
     def update_run_if(_h, _run, []), do: {:ok, false}
 
     def update_run_if(h, %Run{} = run, from) do
+      run = Text.run(run)
       sql = SQL.update_run_if(h.dialect, h.prefix, length(from))
 
       with {:ok, n} <- changed(h, sql, update_params(run) ++ from) do
@@ -501,12 +505,12 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     @impl Cronwatch.Store
     def set_state(h, %JobState{} = state) do
-      exec(h, h.sql.set_state, [state.job, JobState.to_json(state)])
+      exec(h, h.sql.set_state, [state.job, Text.state_json(state)])
     end
 
     @impl Cronwatch.Store
     def compare_and_set_state(%__MODULE__{dialect: :mysql} = h, %JobState{} = state, 0) do
-      body = JobState.to_json(state)
+      body = Text.state_json(state)
 
       # Version 0 on MySQL is a row at version 0 (or with none), or no row at
       # all.
@@ -541,11 +545,11 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     end
 
     def compare_and_set_state(h, %JobState{} = state, 0) do
-      with {:ok, n} <- changed(h, h.sql.cas_insert, [state.job, JobState.to_json(state)]), do: {:ok, n > 0}
+      with {:ok, n} <- changed(h, h.sql.cas_insert, [state.job, Text.state_json(state)]), do: {:ok, n > 0}
     end
 
     def compare_and_set_state(h, %JobState{} = state, expected) do
-      with {:ok, n} <- changed(h, h.sql.cas_update, [JobState.to_json(state), state.job, expected]),
+      with {:ok, n} <- changed(h, h.sql.cas_update, [Text.state_json(state), state.job, expected]),
            do: {:ok, n > 0}
     end
 

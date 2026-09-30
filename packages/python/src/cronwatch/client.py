@@ -163,6 +163,9 @@ def _check_run_id(job: str, run_id: Any, method: str) -> None:
     if not isinstance(run_id, str) or run_id == "" or _js.length16(run_id) > 200:
         got = f"{_js.length16(run_id)} characters" if isinstance(run_id, str) else type(run_id).__name__
         raise ValueError(f'job "{job}": {method}() needs a run id of 1 to 200 characters (got {got})')
+    # Postgres refuses NUL in text, so no store could hold such an id.
+    if "\x00" in run_id:
+        raise ValueError(f'job "{job}": {method}() cannot take a run id containing a NUL character')
     if run_id.startswith(RESERVED_RUN_ID_PREFIX):
         raise ValueError(
             f'job "{job}": {method}() cannot take a run id starting with "{RESERVED_RUN_ID_PREFIX}", which the pg_cron source uses for its runs'
@@ -622,6 +625,8 @@ class Cronwatch:
             declared = self._definitions.get(given.job)
         if declared is None:
             raise ValueError(f'record_run: job "{given.job}" is not declared; call job() first')
+        if "\x00" in given.id:
+            raise ValueError(f'record_run: run ids cannot contain a NUL character (job "{given.job}")')
         self._sync(declared)
         run = given.copy()
         run.metrics = {str(k): v for k, v in (run.metrics or {}).items()}

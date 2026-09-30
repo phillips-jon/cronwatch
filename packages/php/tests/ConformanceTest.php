@@ -583,6 +583,57 @@ final class ConformanceTest extends TestCase
         }
     }
 
+    /**
+     * Text is written without U+0000, which Postgres refuses: a run's
+     * trigger, output, error and metric names, and every key and string of
+     * a definition and a state. The six characters "\u0000" stay.
+     */
+    #[DataProvider('stores')]
+    public function testStoreNul(string $kind): void
+    {
+        $backend = $this->backend($kind);
+        try {
+            $store = $backend->open();
+            $store->init();
+            $this->eachCase(self::fixture('store.json')->nul, function (\stdClass $c) use ($store): ?string {
+                $written = null;
+                if (isset($c->upsertJob)) {
+                    $store->upsertJob(JobDefinition::fromJson($c->upsertJob), $c->now);
+                    $stored = $store->getJob('nul');
+                } elseif (isset($c->insertRun)) {
+                    $store->insertRun(Run::fromJson($c->insertRun));
+                    $stored = $store->getRun('n1');
+                } elseif (isset($c->updateRun)) {
+                    $store->updateRun(Run::fromJson($c->updateRun));
+                    $stored = $store->getRun('n1');
+                } elseif (isset($c->updateRunIf)) {
+                    $written = $store->updateRunIf(Run::fromJson($c->updateRunIf), $c->from);
+                    $stored = $store->getRun('n1');
+                } elseif (isset($c->setState)) {
+                    $store->setState(JobState::fromJson($c->setState));
+                    $stored = $store->getState('nul');
+                } else {
+                    $written = $store->compareAndSetState(JobState::fromJson($c->compareAndSetState), $c->expected);
+                    $stored = $store->getState('nul');
+                }
+                // Postgres's JSONB holds keys in an order of its own.
+                $sorted = function (mixed $value) use (&$sorted): mixed {
+                    if (!is_array($value)) {
+                        return $value;
+                    }
+                    if (!array_is_list($value)) {
+                        ksort($value, SORT_STRING);
+                    }
+                    return array_map($sorted, $value);
+                };
+                $canonical = fn (mixed $value) => Js::stringify($sorted(json_decode(Js::stringify($value), true)));
+                return self::differs($canonical([$c->written ?? null, $c->stored]), $canonical([$written, $stored]));
+            });
+        } finally {
+            $backend->done();
+        }
+    }
+
     // ------------------------------------------------------------ every fixture
 
     /** The fixtures replayed by a test of their own. */

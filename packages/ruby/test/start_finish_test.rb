@@ -101,6 +101,16 @@ class StartFinishTest < Minitest::Test
     assert_match(/\(got 201 characters\)\z/, error.message)
     error = assert_raises(ArgumentError) { job.resume(42) }
     assert_equal 'job "inngest-fn": resume() needs a run id of 1 to 200 characters (got Integer)', error.message
+    # No store could hold a NUL (Postgres refuses it), so such an id is refused wherever one is taken.
+    error = assert_raises(ArgumentError) { job.start(id: "01HX\0run") }
+    assert_equal 'job "inngest-fn": start() cannot take a run id containing a NUL character', error.message
+    error = assert_raises(ArgumentError) { job.resume("01HX\0run") }
+    assert_equal 'job "inngest-fn": resume() cannot take a run id containing a NUL character', error.message
+    nul = { id: "x\0y", job: "inngest-fn", status: "ok", started_at: 1, finished_at: 2, duration_ms: 1,
+            error: nil, output: nil, metrics: {}, trigger: "run" }
+    error = assert_raises(ArgumentError) { cw.record_run(nul) }
+    assert_equal 'record_run: run ids cannot contain a NUL character (job "inngest-fn")', error.message
+    assert_equal 1, cw.runs("inngest-fn").length
   end
 
   def test_resume_in_a_second_client_on_the_same_store_memory_appends_and_finishes

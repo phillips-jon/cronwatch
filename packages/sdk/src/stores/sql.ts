@@ -1,3 +1,4 @@
+import { stripJsonNul, stripNul } from "../output.js";
 import type { JobState, Run, StoredJob, StoredJobDefinition } from "../types.js";
 
 /**
@@ -124,19 +125,29 @@ export function updateRunIfSql(dialect: Dialect, p: string, count: number): stri
   return text.replace(/\?/g, () => `$${++n}`);
 }
 
+/**
+ * Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
+ * whole row, so every dialect writes text without it: a run's trigger,
+ * output, error and metric names, and every key and string of a definition
+ * and a state. Identifiers (a job's name, a run's id) are written as given;
+ * the client refuses one with a NUL before it gets here.
+ */
+const text = (value: string | null) => (value === null ? null : stripNul(value));
+const jsonText = (value: unknown) => stripJsonNul(JSON.stringify(value));
+
 // Parameters in statement order, so both drivers bind the same values.
 export const params = {
-  upsertJob: (definition: StoredJobDefinition, now: number) => [definition.name, JSON.stringify(definition), now, now],
+  upsertJob: (definition: StoredJobDefinition, now: number) => [definition.name, jsonText(definition), now, now],
   insertRun: (run: Run) => [
-    run.id, run.job, run.status, run.startedAt, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.trigger,
+    run.id, run.job, run.status, run.startedAt, run.finishedAt, run.durationMs, text(run.error), text(run.output), jsonText(run.metrics), stripNul(run.trigger),
   ],
-  updateRun: (run: Run) => [run.status, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.id],
+  updateRun: (run: Run) => [run.status, run.finishedAt, run.durationMs, text(run.error), text(run.output), jsonText(run.metrics), run.id],
   updateRunIf: (run: Run, fromStatuses: Run["status"][]) => [
-    run.status, run.finishedAt, run.durationMs, run.error, run.output, JSON.stringify(run.metrics), run.id, ...fromStatuses,
+    run.status, run.finishedAt, run.durationMs, text(run.error), text(run.output), jsonText(run.metrics), run.id, ...fromStatuses,
   ],
-  setState: (state: JobState) => [state.job, JSON.stringify(state)],
-  casInsert: (state: JobState) => [state.job, JSON.stringify(state)],
-  casUpdate: (state: JobState, expectedVersion: number) => [JSON.stringify(state), state.job, expectedVersion],
+  setState: (state: JobState) => [state.job, jsonText(state)],
+  casInsert: (state: JobState) => [state.job, jsonText(state)],
+  casUpdate: (state: JobState, expectedVersion: number) => [jsonText(state), state.job, expectedVersion],
 };
 
 // SQLite hands back JSON as TEXT and Postgres as parsed JSONB; Postgres returns BIGINT as a string.

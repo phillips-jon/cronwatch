@@ -231,6 +231,77 @@ class PgCronTest < Minitest::Test
 
   def at(ms) = Time.at(Rational(ms, 1000)).utc
 
+  def test_a_jobs_job_name_or_options_callback_that_fails_fails_only_its_job_reported_once
+    clock = Clock.new
+    cron = FakeCron.new
+    %w[one two three four].each_with_index { |name, i| cron.job(i + 1, name, "0 * * * *") }
+    broken = Set.new
+    fault = ->(what, jobid) { broken.include?("#{what}:#{jobid}") }
+    errors = []
+    source = PgCron.new(
+      cron,
+      jobs: lambda { |j|
+        raise "pick broke" if fault.call("pick", j.jobid)
+
+        true
+      },
+      job_name: lambda { |j|
+        raise "name broke" if fault.call("throw", j.jobid)
+        return nil if fault.call("nil", j.jobid)
+        return 7 if fault.call("number", j.jobid)
+
+        "j-#{j.jobname}"
+      },
+      options: lambda { |j|
+        raise "options broke" if fault.call("options", j.jobid)
+
+        {}
+      },
+    )
+    cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [], now: clock.to_proc, cron_secret: nil,
+                       on_error: ->(e, _where) { errors << e.message }, sources: [source])
+    notices = -> { errors.grep_v(/cron\.timezone|row level/) }
+    tail = "; it keeps its last declaration until that works"
+    # First sight, with job 1's name callable raising and job 2's giving nil: only those two are skipped.
+    broken << "throw:1" << "nil:2"
+    first = cron.add(3, "succeeded", T0 - 60_000, T0 - 59_000, "ok")
+    cw.check
+    assert_equal %w[j-four j-three], cw.store.list_jobs.map(&:name)
+    assert_equal "j-three", cw.get_run("pgcron:#{first.runid}")&.job
+    assert_equal ["pg_cron job 1: job_name raised RuntimeError: name broke#{tail}",
+                  "pg_cron job 2: job_name returned nil, not a name#{tail}"], notices.call
+
+    # Once they work, both are declared; then every callable fails in turn for jobs already declared.
+    broken.clear
+    cw.check
+    assert_equal %w[j-four j-one j-three j-two], cw.store.list_jobs.map(&:name)
+    broken << "pick:1" << "number:2" << "options:3" << "throw:4"
+    errors.clear
+    later = [cron.add(1, "failed", T0 + 1000, T0 + 2000, "ERROR:  one"), cron.add(3, "succeeded", T0 + 1000, T0 + 2000, "ok")]
+    clock.advance(5000)
+    cw.check
+    cw.check
+    assert_equal ["pg_cron job 1: the jobs callback raised RuntimeError: pick broke#{tail}",
+                  "pg_cron job 2: job_name returned Integer, not a name#{tail}",
+                  "pg_cron job 3: the options callback raised RuntimeError: options broke#{tail}",
+                  "pg_cron job 4: job_name raised RuntimeError: name broke#{tail}"], notices.call, "each reported once, over two syncs"
+    # Each keeps its name and schedule, is not retired, and its runs are still copied.
+    cw.store.list_jobs.each do |stored|
+      assert_equal "0 * * * *", stored.definition.schedule, stored.name
+      refute_match(/no longer|renamed/, stored.definition.description.to_s, stored.name)
+    end
+    assert_equal "j-one", cw.get_run("pgcron:#{later[0].runid}")&.job
+    assert_equal "j-three", cw.get_run("pgcron:#{later[1].runid}")&.job
+
+    # Working again and then failing again is reported again.
+    broken.clear
+    cw.check
+    broken << "pick:1"
+    cw.check
+    assert_equal 5, notices.call.length
+    assert_match(/\Apg_cron job 1: the jobs callback raised/, notices.call[4])
+  end
+
   def test_a_run_cut_off_by_a_restart_is_recorded_and_one_held_run_never_stops_the_others
     clock = Clock.new
     cron = FakeCron.new

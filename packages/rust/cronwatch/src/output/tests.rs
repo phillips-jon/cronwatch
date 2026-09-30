@@ -389,6 +389,14 @@ pub(crate) fn sha256_hex(data: &[u8]) -> String {
 }
 
 #[test]
+fn json_nul_escapes_are_dropped_and_nothing_else() {
+    assert_eq!(strip_json_nul(r#"{"a\u0000b":"c\u0000"}"#), r#"{"ab":"c"}"#);
+    assert_eq!(strip_json_nul(r#"["kept \\u0000","\\\u0000x"]"#), r#"["kept \\u0000","\\x"]"#);
+    assert_eq!(strip_json_nul(r#"["\u00001","é\n\"",""]"#), r#"["1","é\n\"",""]"#);
+    assert_eq!(strip_json_nul("plain"), "plain");
+}
+
+#[test]
 fn sha256_is_sha256() {
     assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     assert_eq!(sha256_hex(b""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");

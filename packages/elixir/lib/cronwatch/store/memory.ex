@@ -98,6 +98,7 @@ defmodule Cronwatch.Store.Memory.Server do
   alias Cronwatch.JobState
   alias Cronwatch.JS.Object
   alias Cronwatch.Run
+  alias Cronwatch.Store.Text
   alias Cronwatch.StoredJob
 
   defstruct jobs: %{}, runs: %{}, order: %{}, states: %{}, seq: 0
@@ -117,7 +118,7 @@ defmodule Cronwatch.Store.Memory.Server do
         job -> job.created_at
       end
 
-    job = %StoredJob{name: name, definition: definition, created_at: created, updated_at: now}
+    job = %StoredJob{name: name, definition: Text.kept(definition), created_at: created, updated_at: now}
     {:reply, :ok, %{s | jobs: Map.put(s.jobs, name, job)}}
   end
 
@@ -146,7 +147,7 @@ defmodule Cronwatch.Store.Memory.Server do
       {:reply, {:error, %RuntimeError{message: "run #{id} already exists"}}, s}
     else
       seq = s.seq + 1
-      {:reply, :ok, %{s | runs: Map.put(s.runs, id, run), order: Map.put(s.order, id, seq), seq: seq}}
+      {:reply, :ok, %{s | runs: Map.put(s.runs, id, Text.run(run)), order: Map.put(s.order, id, seq), seq: seq}}
     end
   end
 
@@ -205,13 +206,15 @@ defmodule Cronwatch.Store.Memory.Server do
   end
 
   def handle_call({:get_state, job}, _from, s), do: {:reply, {:ok, s.states[job]}, s}
-  def handle_call({:set_state, state}, _from, s), do: {:reply, :ok, %{s | states: Map.put(s.states, state.job, state)}}
+
+  def handle_call({:set_state, state}, _from, s),
+    do: {:reply, :ok, %{s | states: Map.put(s.states, state.job, Text.state(state))}}
 
   def handle_call({:cas, %JobState{} = state, expected}, _from, s) do
     current = if s.states[state.job], do: JobState.version_or_zero(s.states[state.job]), else: 0
 
     if current == expected,
-      do: {:reply, {:ok, true}, %{s | states: Map.put(s.states, state.job, state)}},
+      do: {:reply, {:ok, true}, %{s | states: Map.put(s.states, state.job, Text.state(state))}},
       else: {:reply, {:ok, false}, s}
   end
 
@@ -230,6 +233,8 @@ defmodule Cronwatch.Store.Memory.Server do
   end
 
   defp finish(existing, run) do
+    run = Text.run(run)
+
     %{
       existing
       | status: run.status,

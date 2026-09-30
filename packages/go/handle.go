@@ -25,6 +25,10 @@ func checkRunID(job, id, method string) error {
 	if n := js.Length16(id); n == 0 || n > 200 {
 		return fmt.Errorf("job %s: %s() needs a run id of 1 to 200 characters (got %d characters)", js.Quote(job), method, n)
 	}
+	// Postgres refuses NUL in text, so no store could hold such an id.
+	if strings.Contains(id, "\x00") {
+		return fmt.Errorf("job %s: %s() cannot take a run id containing a NUL character", js.Quote(job), method)
+	}
 	if strings.HasPrefix(id, ReservedRunIDPrefix) {
 		return fmt.Errorf("job %s: %s() cannot take a run id starting with %s, which the pg_cron source uses for its runs", js.Quote(job), method, js.Quote(ReservedRunIDPrefix))
 	}

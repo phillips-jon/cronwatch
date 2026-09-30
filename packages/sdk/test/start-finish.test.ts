@@ -96,6 +96,12 @@ test("start with an id twice records one run and returns a handle on it", async 
   assert.equal((await cw.runs("inngest-fn")).length, 1);
   await assert.rejects(cw.job("other").start({ id: "01HX-run" }), /belongs to job "inngest-fn"/);
   await assert.rejects(job.start({ id: "" }), /run id of 1 to 200 characters/);
+  // No store could hold a NUL (Postgres refuses it), so such an id is refused wherever one is taken.
+  await assert.rejects(job.start({ id: "01HX\u0000run" }), /start\(\) cannot take a run id containing a NUL character/);
+  await assert.rejects(job.resume("01HX\u0000run"), /resume\(\) cannot take a run id containing a NUL character/);
+  const nulRun = { id: "x\u0000y", job: "inngest-fn", status: "ok" as const, startedAt: 1, finishedAt: 2, durationMs: 1, error: null, output: null, metrics: {}, trigger: "run" };
+  await assert.rejects(cw.recordRun(nulRun), /recordRun: run ids cannot contain a NUL character/);
+  assert.equal((await cw.runs("inngest-fn")).length, 1);
 });
 
 type Pair = { a: Store; b: Store; done: () => Promise<void> | void };

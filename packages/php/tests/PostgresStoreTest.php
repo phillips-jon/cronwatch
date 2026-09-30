@@ -181,6 +181,13 @@ final class PostgresStoreTest extends TestCase
             $this->assertSame('beforeafter', $run->output);
             $this->assertStringStartsWith('RuntimeException: badbyte', (string) $run->error);
             $this->assertSame(1, $cw->store->getState('nul')->consecutiveFailures, 'the state, with its alert, was written too');
+            // So are a trigger, metric names and a definition's text.
+            $cw->job('nul2', ['description' => "a\0b", 'tags' => ["t\0"], 'budget' => ["c\0" => 5]])
+                ->run(fn (JobContext $job) => $job->metric("ro\0ws", 2), trigger: "cr\0on");
+            $second = $cw->runs('nul2')[0];
+            $this->assertSame(['ok', 'cron', ['rows' => 2]], [$second->status, $second->trigger, $second->metrics]);
+            $definition = $cw->store->getJob('nul2')->definition;
+            $this->assertSame(['ab', ['t'], ['c' => 5]], [$definition->get('description'), $definition->get('tags'), Js::fields($definition->get('budget'))]);
         } finally {
             $backend->done();
         }

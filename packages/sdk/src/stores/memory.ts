@@ -1,4 +1,5 @@
 import { stateVersion } from "../evaluate.js";
+import { stripJsonNul, stripNul } from "../output.js";
 import type { JobState, Run, Store, StoredJob, StoredJobDefinition } from "../types.js";
 
 /**
@@ -14,6 +15,16 @@ export function memory(): Store {
   let seq = 0;
 
   const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
+  // Text is held as the SQL stores write it (see params in stores/sql.ts),
+  // without U+0000, so every store reads back the same.
+  const kept = <T>(v: T): T => JSON.parse(stripJsonNul(JSON.stringify(v)));
+  const keptRun = (run: Run): Run => ({
+    ...clone(run),
+    trigger: stripNul(run.trigger),
+    output: run.output === null ? null : stripNul(run.output),
+    error: run.error === null ? null : stripNul(run.error),
+    metrics: kept(run.metrics),
+  });
   // Code unit order, as the SQL stores sort by bytes rather than by locale.
   const byName = (a: StoredJob, b: StoredJob) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
@@ -22,7 +33,7 @@ export function memory(): Store {
       const existing = jobs.get(definition.name);
       jobs.set(definition.name, {
         name: definition.name,
-        definition: clone(definition),
+        definition: kept(definition),
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
       });
@@ -42,20 +53,20 @@ export function memory(): Store {
     async insertRun(run) {
       // Like SQL's primary key: an id already recorded is refused, never overwritten.
       if (runs.has(run.id)) throw new Error(`run ${run.id} already exists`);
-      runs.set(run.id, clone(run));
+      runs.set(run.id, keptRun(run));
       order.set(run.id, ++seq);
     },
     async updateRun(run) {
       // Like SQL's UPDATE: a run that is gone (its job was forgotten) stays gone, and only these fields change.
       const existing = runs.get(run.id);
       if (!existing) return;
-      const { status, finishedAt, durationMs, error, output, metrics } = clone(run);
+      const { status, finishedAt, durationMs, error, output, metrics } = keptRun(run);
       runs.set(run.id, { ...existing, status, finishedAt, durationMs, error, output, metrics });
     },
     async updateRunIf(run, fromStatuses) {
       const existing = runs.get(run.id);
       if (!existing || !fromStatuses.includes(existing.status)) return false;
-      const { status, finishedAt, durationMs, error, output, metrics } = clone(run);
+      const { status, finishedAt, durationMs, error, output, metrics } = keptRun(run);
       runs.set(run.id, { ...existing, status, finishedAt, durationMs, error, output, metrics });
       return true;
     },
@@ -85,11 +96,11 @@ export function memory(): Store {
       return s ? clone(s) : null;
     },
     async setState(state) {
-      states.set(state.job, clone(state));
+      states.set(state.job, kept(state));
     },
     async compareAndSetState(state, expectedVersion) {
       if (stateVersion(states.get(state.job)) !== expectedVersion) return false;
-      states.set(state.job, clone(state));
+      states.set(state.job, kept(state));
       return true;
     },
     async prune(before) {

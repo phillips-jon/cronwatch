@@ -62,6 +62,86 @@ function job(jobid: number, jobname: string | null, schedule: string, active = t
   return { jobid, jobname, schedule, database: "postgres", username: "postgres", active };
 }
 
+test("pg_cron: a jobs, jobName or options callback that fails fails only its job, reported once", async () => {
+  const c = clock();
+  const cron = fakeCron();
+  cron.jobs.push(job(1, "one", "0 * * * *"), job(2, "two", "0 * * * *"), job(3, "three", "0 * * * *"), job(4, "four", "0 * * * *"));
+  const broken = new Set<string>();
+  const fault = (what: string, jobid: number) => broken.has(`${what}:${jobid}`);
+  const errors: string[] = [];
+  const cw = cronwatch({
+    store: memory(),
+    alerts: [],
+    now: c.now,
+    onError: (e) => errors.push((e as Error).message),
+    sources: [
+      pgCron(cron.db, {
+        jobs: (j) => {
+          if (fault("pick", j.jobid)) throw new Error("pick broke");
+          return true;
+        },
+        jobName: (j) => {
+          if (fault("throw", j.jobid)) throw new Error("name broke");
+          if (fault("null", j.jobid)) return null as unknown as string;
+          if (fault("undefined", j.jobid)) return undefined as unknown as string;
+          return `j-${j.jobname}`;
+        },
+        options: (j) => {
+          if (fault("options", j.jobid)) throw new Error("options broke");
+          return {};
+        },
+      }),
+    ],
+  });
+  const notices = () => errors.filter((e) => !/cron\.timezone|row level/.test(e));
+  // First sight, with job 1's name callback throwing and job 2's giving null: only those two are skipped.
+  broken.add("throw:1");
+  broken.add("null:2");
+  const first = cron.add(3, "succeeded", T0 - 60_000, T0 - 59_000, "ok");
+  await cw.check();
+  assert.deepEqual((await cw.store.listJobs()).map((j) => j.name), ["j-four", "j-three"]);
+  assert.equal((await cw.getRun(`pgcron:${first.runid}`))?.job, "j-three");
+  assert.deepEqual(notices(), [
+    "pg_cron job 1: jobName threw Error: name broke; it keeps its last declaration until that works",
+    "pg_cron job 2: jobName returned null, not a name; it keeps its last declaration until that works",
+  ]);
+
+  // Once they work, both are declared; then every callback fails in turn for jobs already declared.
+  broken.clear();
+  await cw.check();
+  assert.deepEqual((await cw.store.listJobs()).map((j) => j.name), ["j-four", "j-one", "j-three", "j-two"]);
+  broken.add("pick:1");
+  broken.add("undefined:2");
+  broken.add("options:3");
+  broken.add("throw:4");
+  errors.length = 0;
+  const later = [cron.add(1, "failed", T0 + 1000, T0 + 2000, "ERROR:  one"), cron.add(3, "succeeded", T0 + 1000, T0 + 2000, "ok")];
+  c.advance(5000);
+  await cw.check();
+  await cw.check();
+  assert.deepEqual(notices(), [
+    "pg_cron job 1: the jobs callback threw Error: pick broke; it keeps its last declaration until that works",
+    "pg_cron job 2: jobName returned undefined, not a name; it keeps its last declaration until that works",
+    "pg_cron job 3: the options callback threw Error: options broke; it keeps its last declaration until that works",
+    "pg_cron job 4: jobName threw Error: name broke; it keeps its last declaration until that works",
+  ], "each reported once, over two syncs");
+  // Each keeps its name and schedule, is not retired, and its runs are still copied.
+  for (const stored of await cw.store.listJobs()) {
+    assert.equal(stored.definition.schedule, "0 * * * *", stored.name);
+    assert.doesNotMatch(stored.definition.description ?? "", /no longer|renamed/, stored.name);
+  }
+  assert.equal((await cw.getRun(`pgcron:${later[0]!.runid}`))?.job, "j-one");
+  assert.equal((await cw.getRun(`pgcron:${later[1]!.runid}`))?.job, "j-three");
+
+  // Working again and then failing again is reported again.
+  broken.clear();
+  await cw.check();
+  broken.add("pick:1");
+  await cw.check();
+  assert.equal(notices().length, 5);
+  assert.match(notices()[4]!, /^pg_cron job 1: the jobs callback threw/);
+});
+
 test("pg_cron schedules become CronWatch schedules", () => {
   assert.equal(pgCronSchedule("30 seconds"), "every 30s");
   assert.equal(pgCronSchedule("1 second"), "every 1s");

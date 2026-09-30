@@ -98,6 +98,25 @@ defmodule Cronwatch.StartFinishTest do
     assert m =~ ~s(belongs to job "inngest-fn")
     assert {:error, %{message: m}} = Cronwatch.start(job, id: "")
     assert m =~ "run id of 1 to 200 characters"
+    # No store could hold a NUL (Postgres refuses it), so such an id is refused wherever one is taken.
+    assert {:error, %{message: m}} = Cronwatch.start(job, id: "01HX\0run")
+    assert m =~ "start() cannot take a run id containing a NUL character"
+    assert {:error, %{message: m}} = Cronwatch.resume(job, "01HX\0run")
+    assert m =~ "resume() cannot take a run id containing a NUL character"
+
+    nul_run = %Cronwatch.Run{
+      id: "x\0y",
+      job: "inngest-fn",
+      status: "ok",
+      started_at: 1,
+      finished_at: 2,
+      duration_ms: 1,
+      trigger: "run"
+    }
+
+    assert {:error, %{message: m}} = Cronwatch.record_run(nul_run, instance: cw)
+    assert m =~ "record_run: run ids cannot contain a NUL character"
+    assert length(Cronwatch.runs!("inngest-fn", 50, instance: cw)) == 1
   end
 
   for backend <- [:memory, :sqlite] do

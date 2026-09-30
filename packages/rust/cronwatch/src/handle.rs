@@ -29,6 +29,13 @@ fn check_run_id(job: &str, id: &str, method: &str) -> Result<(), Error> {
             js::quote(job)
         )));
     }
+    // Postgres refuses NUL in text, so no store could hold such an id.
+    if id.contains('\0') {
+        return Err(Error::Invalid(format!(
+            "job {}: {method}() cannot take a run id containing a NUL character",
+            js::quote(job)
+        )));
+    }
     if id.starts_with(RESERVED_RUN_ID_PREFIX) {
         return Err(Error::Invalid(format!(
             "job {}: {method}() cannot take a run id starting with {}, which the pg_cron source uses for its runs",

@@ -483,6 +483,62 @@ func ReplayFixture(t *testing.T, path string, newStore func(t *testing.T) cronwa
 		cases++
 	}
 	must(store.Close())
+
+	// nul: text is written without U+0000, which Postgres refuses: a run's
+	// trigger, output, error and metric names, and every key and string of
+	// a definition and a state.
+	store = newStore(t)
+	must(store.Init(ctx))
+	for i, step := range objects(field(fix, "nul")) {
+		what := fmt.Sprintf("nul step %d", i)
+		var got any
+		wrote := func(ok bool, err error) {
+			t.Helper()
+			must(err)
+			if want, _ := field(step, "written").(bool); ok != want {
+				t.Errorf("%s: wrote %v", what, ok)
+			}
+		}
+		switch {
+		case step.Has("upsertJob"):
+			must(store.UpsertJob(ctx, definition(t, js.Stringify(field(step, "upsertJob"))), int64(field(step, "now").(float64))))
+			j, err := store.GetJob(ctx, "nul")
+			must(err)
+			if j == nil {
+				t.Fatalf("%s: no job", what)
+			}
+			got = json.RawMessage(js.Stringify(js.NewObject("name", j.Name, "definition", j.Definition.JSValue(), "createdAt", j.CreatedAt, "updatedAt", j.UpdatedAt)))
+		case step.Has("insertRun"), step.Has("updateRun"), step.Has("updateRunIf"):
+			switch {
+			case step.Has("insertRun"):
+				must(store.InsertRun(ctx, run(field(step, "insertRun"))))
+			case step.Has("updateRun"):
+				must(store.UpdateRun(ctx, run(field(step, "updateRun"))))
+			default:
+				from := []cronwatch.RunStatus{}
+				for _, s := range field(step, "from").([]any) {
+					from = append(from, cronwatch.RunStatus(s.(string)))
+				}
+				wrote(store.(cronwatch.RunUpdater).UpdateRunIf(ctx, run(field(step, "updateRunIf")), from))
+			}
+			r, err := store.GetRun(ctx, "n1")
+			must(err)
+			got = r
+		default:
+			if step.Has("setState") {
+				must(store.SetState(ctx, state(t, js.Stringify(field(step, "setState")))))
+			} else {
+				st := state(t, js.Stringify(field(step, "compareAndSetState")))
+				wrote(store.(cronwatch.StateComparer).CompareAndSetState(ctx, st, int64(field(step, "expected").(float64))))
+			}
+			s, err := store.GetState(ctx, "nul")
+			must(err)
+			got = s
+		}
+		sameJSON(t, what, got, js.Stringify(field(step, "stored")))
+		cases++
+	}
+	must(store.Close())
 	if cases == 0 {
 		t.Fatal("no cases replayed")
 	}

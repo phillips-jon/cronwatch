@@ -86,10 +86,10 @@ impl StartOptions {
     }
 
     /// Your own stable id for the run, such as a queue's job id: 1 to 200
-    /// characters, not starting with `pgcron:` (the pg_cron source's). A
-    /// start with an id already recorded for this job records nothing and
-    /// returns a handle on that run instead; an id recorded for another job
-    /// is an error.
+    /// characters, with no NUL, not starting with `pgcron:` (the pg_cron
+    /// source's). A start with an id already recorded for this job records
+    /// nothing and returns a handle on that run instead; an id recorded for
+    /// another job is an error.
     pub fn id(mut self, id: impl Into<String>) -> Self {
         self.id = Some(id.into());
         self
@@ -889,6 +889,12 @@ impl Client {
                 js::quote(&input.job)
             )));
         };
+        if input.id.contains('\0') {
+            return Err(Error::Invalid(format!(
+                "recordRun: run ids cannot contain a NUL character (job {})",
+                js::quote(&input.job)
+            )));
+        }
         self.sync(&def).await?;
         let mut run = input;
         if run.status == RunStatus::Ok {

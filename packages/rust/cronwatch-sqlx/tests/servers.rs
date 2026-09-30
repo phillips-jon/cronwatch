@@ -366,6 +366,23 @@ async fn nul_characters_are_still_recorded_on_postgres() {
     assert!(runs[0].error.as_deref().unwrap().starts_with("Error: badbyte"), "{:?}", runs[0].error);
     let st = store.get_state("nul").await.unwrap().unwrap();
     assert_eq!(st.consecutive_failures, 1, "the state, with its alert, was written too");
+    // So are a trigger, metric names and a definition's text.
+    let nul2 = p.client.job("nul2", JobOptions::new().description("a\0b").tags(["t\0"]).budget("c\0", 5.0)).unwrap();
+    nul2.run_with(cronwatch::RunOptions::new().trigger("cr\0on"), |j| async move {
+        j.metric("ro\0ws", 2.0)?;
+        Ok::<(), cronwatch::Error>(())
+    })
+    .await
+    .unwrap();
+    let second = &p.client.runs("nul2", 10).await.unwrap()[0];
+    assert_eq!((second.status.clone(), second.trigger.as_str()), (RunStatus::Ok, "cron"));
+    assert_eq!(second.metrics.iter().collect::<Vec<_>>(), [("rows", 2.0)]);
+    let stored = store.get_job("nul2").await.unwrap().unwrap();
+    storetest::same_json(
+        "nul2",
+        &stored.definition.to_json(),
+        r#"{"name":"nul2","description":"ab","tags":["t"],"budget":{"c":5}}"#,
+    );
     assert!(p.errors.list().is_empty(), "{:?}", p.errors.list());
     s.cleanup().await;
 }

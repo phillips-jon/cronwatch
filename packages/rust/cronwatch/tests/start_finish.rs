@@ -408,3 +408,20 @@ async fn start_and_resume_refuse_the_pg_cron_namespace() {
     let h = job.start(StartOptions::new().id("pgcron-42")).await.unwrap();
     assert!(h.is_active(), "only the prefix with its colon is reserved");
 }
+
+// No store could hold a NUL (Postgres refuses it), so such an id is refused
+// wherever one is taken.
+#[tokio::test]
+async fn a_run_id_with_a_nul_is_refused() {
+    let k = Kit::new();
+    let job = k.cw.job("nul-id", JobOptions::new()).unwrap();
+    let err = job.start(StartOptions::new().id("01HX\0run")).await.unwrap_err().to_string();
+    assert_eq!(err, r#"job "nul-id": start() cannot take a run id containing a NUL character"#);
+    let err = job.resume("01HX\0run").await.unwrap_err().to_string();
+    assert_eq!(err, r#"job "nul-id": resume() cannot take a run id containing a NUL character"#);
+    let mut run = pg_run("x\0y", k.now(), RunStatus::Ok);
+    run.job = "nul-id".into();
+    let err = k.cw.record_run(run, RecordOptions::new()).await.unwrap_err().to_string();
+    assert_eq!(err, r#"recordRun: run ids cannot contain a NUL character (job "nul-id")"#);
+    assert!(k.cw.runs("nul-id", 10).await.unwrap().is_empty());
+}

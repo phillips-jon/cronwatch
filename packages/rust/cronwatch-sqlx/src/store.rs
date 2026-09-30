@@ -240,6 +240,11 @@ fn run_of(row: &Row) -> Result<Run, BoxError> {
 }
 
 // Parameters in statement order, so every dialect binds the same values.
+// Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
+// whole row, so every dialect writes text without it (stores/sql.ts): a
+// run's trigger, output, error and metric names (Run::without_nul), and
+// every key and string of a definition and a state. Identifiers are written
+// as given; the client refuses one with a NUL before it gets here.
 
 fn insert_run_params(r: &Run) -> Vec<Param> {
     vec![
@@ -323,7 +328,7 @@ impl Store for SqlStore {
         Box::pin(async move {
             let params = vec![
                 Param::Text(definition.name().into()),
-                Param::Json(definition.to_json()),
+                Param::Json(definition.to_json_without_nul()),
                 Param::Int(now),
                 Param::Int(now),
             ];
@@ -352,6 +357,7 @@ impl Store for SqlStore {
 
     fn insert_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>> {
         Box::pin(async move {
+            let run = &run.without_nul();
             let mut params = insert_run_params(run);
             // MySQL's trigger column is VARCHAR(255), which refuses anything
             // longer (the others are TEXT): a long trigger is cut to fit
@@ -364,7 +370,7 @@ impl Store for SqlStore {
     }
 
     fn update_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>> {
-        Box::pin(async move { self.run(&self.sql.update_run, update_run_params(run)).await.map(|_| ()) })
+        Box::pin(async move { self.run(&self.sql.update_run, update_run_params(&run.without_nul())).await.map(|_| ()) })
     }
 
     fn update_run_if<'a>(&'a self, run: &'a Run, from: &'a [RunStatus]) -> BoxFuture<'a, Result<bool, BoxError>> {
@@ -372,6 +378,7 @@ impl Store for SqlStore {
             if from.is_empty() {
                 return Ok(false);
             }
+            let run = &run.without_nul();
             let mut params = update_run_params(run);
             params.extend(from.iter().map(|s| Param::Text(s.as_str().into())));
             let n = self.run(&self.sql.update_run_if(from.len()), params).await?;
@@ -440,7 +447,7 @@ impl Store for SqlStore {
 
     fn set_state<'a>(&'a self, state: &'a JobState) -> BoxFuture<'a, Result<(), BoxError>> {
         Box::pin(async move {
-            let params = vec![Param::Text(state.job.clone()), Param::Json(state.to_json())];
+            let params = vec![Param::Text(state.job.clone()), Param::Json(state.to_json_without_nul())];
             self.run(&self.sql.set_state, params).await.map(|_| ())
         })
     }
@@ -451,7 +458,7 @@ impl Store for SqlStore {
         expected: i64,
     ) -> BoxFuture<'a, Result<bool, BoxError>> {
         Box::pin(async move {
-            let body = state.to_json();
+            let body = state.to_json_without_nul();
             let job = || Param::Text(state.job.clone());
             if expected != 0 {
                 let params = vec![Param::Json(body), job(), Param::Int(expected)];

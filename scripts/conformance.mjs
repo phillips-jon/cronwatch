@@ -1323,7 +1323,59 @@ async function storeCases() {
     }
     foreignVersion.push({ stored, counts, steps });
   }
-  return { prune: out, compareAndSetState: cas, updateRunIf, foreignVersion };
+  // nul: Postgres refuses U+0000 in TEXT and JSONB, so every store writes
+  // text without it: a run's trigger, output, error and metric names, and
+  // every key and string of a definition and a state. The six characters
+  // "\u0000" (a backslash, then u0000) are text like any other, and stay.
+  const literal = "\\u0000";
+  const nulDef = {
+    name: "nul", schedule: "every 1h", description: "night\u0000ly", tags: ["a\u0000b", `kept ${literal}`], budget: { "co\u0000st": 2 }, expect: "do\u0000ne",
+  };
+  const nulRun = (extra) => ({ ...r("n1", "nul", "running", 1000), metrics: { "ro\u0000ws": 3 }, trigger: "cr\u0000on", ...extra });
+  const nulAlert = clone(sdk.composeAlert(
+    { type: "failed", run: nulRun({ status: "failed", finishedAt: 1010, durationMs: 10, error: "Error: b\u0000oom", output: `x\u0000${literal}` }), details: { consecutiveFailures: 1, threshold: 1 } },
+    nulDef,
+    2000,
+  ));
+  nulAlert.triage = "tri\u0000age";
+  const nulState = (extra) => ({ job: "nul", open: { failed: 1010 }, consecutiveFailures: 1, silencedUntil: null, lastAlertAt: null, undelivered: [nulAlert], ...extra });
+  const nulSteps = [
+    { upsertJob: nulDef, now: 5 },
+    { insertRun: nulRun() },
+    { updateRun: nulRun({ status: "timeout", finishedAt: 1500, durationMs: 500, error: "stu\u0000ck", output: "out\u0000put", metrics: { "b\u0000ytes": 1 } }) },
+    { updateRunIf: nulRun({ status: "ok", finishedAt: 1600, durationMs: 600, output: `a\u0000b${literal}c`, metrics: { "x\u0000": 1.5 } }), from: ["timeout"] },
+    { setState: nulState() },
+    { compareAndSetState: nulState({ version: 1, consecutiveFailures: 2 }), expected: 0 },
+  ];
+  const nulStore = sdk.memory();
+  const nul = [];
+  for (const step of nulSteps) {
+    const out = { ...clone(step) };
+    if (step.upsertJob) {
+      await nulStore.upsertJob(clone(step.upsertJob), step.now);
+      out.stored = await nulStore.getJob("nul");
+    } else if (step.insertRun) {
+      await nulStore.insertRun(clone(step.insertRun));
+      out.stored = await nulStore.getRun("n1");
+    } else if (step.updateRun) {
+      await nulStore.updateRun(clone(step.updateRun));
+      out.stored = await nulStore.getRun("n1");
+    } else if (step.updateRunIf) {
+      out.written = await nulStore.updateRunIf(clone(step.updateRunIf), step.from);
+      out.stored = await nulStore.getRun("n1");
+    } else if (step.setState) {
+      await nulStore.setState(clone(step.setState));
+      out.stored = await nulStore.getState("nul");
+    } else {
+      out.written = await nulStore.compareAndSetState(clone(step.compareAndSetState), step.expected);
+      out.stored = await nulStore.getState("nul");
+    }
+    const hasNul = (v) => typeof v === "string" ? v.includes("\u0000")
+      : v !== null && typeof v === "object" && Object.entries(v).some(([k, x]) => k.includes("\u0000") || hasNul(x));
+    if (hasNul(out.stored)) throw new Error("nul: a NUL was stored");
+    nul.push(out);
+  }
+  return { prune: out, compareAndSetState: cas, updateRunIf, foreignVersion, nul };
 }
 
 // ---------------------------------------------------------------- channels

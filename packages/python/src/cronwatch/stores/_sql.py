@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from .. import _js
+from ..output import strip_json_nul, strip_nul
 from ..types import JobDefinition, JobState, Run, StoredJob
 
 DEFAULT_PREFIX = "cronwatch_"
@@ -141,14 +142,23 @@ def update_run_if_sql(dialect: str, p: str, count: int) -> str:
     return _number(text) if dialect == "postgres" else text
 
 
+# Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
+# whole row, so every dialect writes text without it: a run's trigger,
+# output, error and metric names, and every key and string of a definition
+# and a state. Identifiers (a job's name, a run's id) are written as given;
+# the client refuses one with a NUL before it gets here.
 def _text(value: str | None) -> str | None:
-    """A TEXT value as a JavaScript driver writes it: a lone surrogate as U+FFFD."""
-    return None if value is None else _js.well_formed(value)
+    """A TEXT value as a JavaScript driver writes it: a lone surrogate as U+FFFD, and no NUL."""
+    return None if value is None else strip_nul(_js.well_formed(value))
+
+
+def _json_text(value: Any) -> str:
+    return strip_json_nul(_js.dumps(value))
 
 
 # Parameters in statement order, so every driver binds the same values.
 def upsert_job_params(definition: JobDefinition, now: int) -> list[Any]:
-    return [definition.name, _js.dumps(definition.to_dict()), now, now]
+    return [definition.name, _json_text(definition.to_dict()), now, now]
 
 
 def insert_run_params(run: Run) -> list[Any]:
@@ -161,13 +171,13 @@ def insert_run_params(run: Run) -> list[Any]:
         run.duration_ms,
         _text(run.error),
         _text(run.output),
-        _js.dumps(run.metrics or {}),
-        run.trigger,
+        _json_text(run.metrics or {}),
+        strip_nul(run.trigger),
     ]
 
 
 def update_run_params(run: Run) -> list[Any]:
-    return [str(run.status), run.finished_at, run.duration_ms, _text(run.error), _text(run.output), _js.dumps(run.metrics or {}), run.id]
+    return [str(run.status), run.finished_at, run.duration_ms, _text(run.error), _text(run.output), _json_text(run.metrics or {}), run.id]
 
 
 def update_run_if_params(run: Run, from_statuses: Sequence[object]) -> list[Any]:
@@ -175,11 +185,11 @@ def update_run_if_params(run: Run, from_statuses: Sequence[object]) -> list[Any]
 
 
 def state_params(state: JobState) -> list[Any]:
-    return [state.job, _js.dumps(state.to_dict())]
+    return [state.job, _json_text(state.to_dict())]
 
 
 def cas_update_params(state: JobState, expected_version: int) -> list[Any]:
-    return [_js.dumps(state.to_dict()), state.job, expected_version]
+    return [_json_text(state.to_dict()), state.job, expected_version]
 
 
 def _json(value: Any) -> Any:

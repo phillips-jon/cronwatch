@@ -9,6 +9,7 @@ use Cronwatch\Cronwatch;
 use Cronwatch\Evaluate;
 use Cronwatch\JobDefinition;
 use Cronwatch\Js;
+use Cronwatch\Output;
 use Cronwatch\Run;
 use Cronwatch\RunStatus;
 use Cronwatch\Source;
@@ -91,6 +92,8 @@ final class PgCron implements Source
     private bool $scanned = false;
     /** @var array<string, true> */
     private array $warned = [];
+    /** @var array<int, true> Jobids whose callback failed, reported once until it works again. */
+    private array $failing = [];
 
     /**
      * @param \PDO|string|object $db a pdo_pgsql PDO, a postgres:// URL, or an object with query(string $sql, array $params): array
@@ -99,7 +102,9 @@ final class PgCron implements Source
      * @param string $prefix put before every job name, to keep them apart from your own ("db:"). Also keeps run ids apart.
      * @param (callable(array<string, mixed>): string)|null $jobName the CronWatch name for a cron.job row. Default its jobname
      *        with anything other than letters, digits, ".", "_", ":" and "-" turned into "-", or "pg_cron:<jobid>" when it has
-     *        none. The prefix goes in front either way.
+     *        none. The prefix goes in front either way. One that throws or returns no string, like a jobs or options
+     *        function that throws, is reported once and fails only that job, which keeps its last declaration until the
+     *        callback works again.
      * @param array<string, mixed>|(callable(array<string, mixed>): array<string, mixed>)|null $options grace, timeout,
      *        maxDuration, expect and the rest, for every job or per job. The schedule and timezone always come from pg_cron.
      * @param string|null $timezone the timezone pg_cron reads its cron expressions in. Default the server's cron.timezone,
@@ -298,9 +303,7 @@ final class PgCron implements Source
             $this->warnOnce($host, 'empty', "cron.job shows no jobs. pg_cron's row level security shows a role only the jobs it scheduled: connect as that role, or give this one BYPASSRLS.");
         }
         $all = array_map(fn (array $r) => ['jobid' => (int) $r['jobid']] + $r, $rows);
-        $jobs = array_values(array_filter($all, $this->picks(...)));
-
-        [$names, $definitions] = $this->declare($host, $jobs, $timezone, $recording);
+        [$names, $definitions] = $this->declare($host, $all, $timezone, $recording);
         $this->retireUnused($host, $names, $definitions, $all, $rows !== []);
         if (!$recording || $names === []) {
             return [];
@@ -388,22 +391,68 @@ final class PgCron implements Source
      * Declares each job. A paused one (active = false) keeps its failures but
      * loses its schedule, so it is not missed.
      *
-     * @param list<array<string, mixed>> $jobs
+     * A callback of the app's (jobs, jobName, options) that throws, or a
+     * jobName that gives no name, fails only its job, as a bad row does:
+     * reported once until it works again, and the job carries on as last
+     * declared (skipped when it never was), so its runs are still copied.
+     *
+     * @param list<array<string, mixed>> $all every cron.job row, picked here
      * @return array{array<int, string>, array<int, array<string, mixed>>} each jobid's name and definition as declared
      */
-    private function declare(Cronwatch $host, array $jobs, string $timezone, bool $recording): array
+    private function declare(Cronwatch $host, array $all, string $timezone, bool $recording): array
     {
         $names = [];
         $definitions = [];
         $used = [];
-        foreach ($jobs as $job) {
+        $trouble = function (int $jobid, string $what) use ($host, &$names, &$definitions, &$used): void {
+            if (!isset($this->failing[$jobid])) {
+                $this->failing[$jobid] = true;
+                $host->onError(new \RuntimeException("pg_cron job {$jobid}: {$what}; it keeps its last declaration until that works"), 'source pg_cron');
+            }
+            $last = $this->known[$jobid] ?? null;
+            if ($last === null || isset($used[$last[0]])) {
+                return;
+            }
+            $names[$jobid] = $last[0];
+            $definitions[$jobid] = $last[1];
+            $used[$last[0]] = true;
+        };
+        $threw = fn (\Throwable $e) => Output::errorName($e) . ': ' . Js::wellFormed($e->getMessage());
+        foreach ($all as $job) {
             $jobid = $job['jobid'];
-            $name = $this->prefix . ($this->jobName !== null ? (string) ($this->jobName)($job) : self::jobName($job));
+            try {
+                $picked = $this->picks($job);
+            } catch (\Throwable $error) {
+                $trouble($jobid, 'the jobs callback threw ' . $threw($error));
+                continue;
+            }
+            if (!$picked) {
+                unset($this->failing[$jobid]);
+                continue;
+            }
+            try {
+                $base = $this->jobName !== null ? ($this->jobName)($job) : self::jobName($job);
+            } catch (\Throwable $error) {
+                $trouble($jobid, 'jobName threw ' . $threw($error));
+                continue;
+            }
+            if (!is_string($base)) {
+                $trouble($jobid, 'jobName returned ' . ($base === null ? 'null' : get_debug_type($base)) . ', not a name');
+                continue;
+            }
+            try {
+                $extra = $this->options instanceof \Closure ? ($this->options)($job) : ($this->options ?? []);
+            } catch (\Throwable $error) {
+                $trouble($jobid, 'the options callback threw ' . $threw($error));
+                continue;
+            }
+            unset($this->failing[$jobid]);
+            $extra = is_array($extra) ? $extra : [];
+            $name = $this->prefix . $base;
             if (isset($used[$name])) {
                 $name = "{$name}:{$jobid}";
             }
             $used[$name] = true;
-            $extra = $this->options instanceof \Closure ? ($this->options)($job) : ($this->options ?? []);
             unset($extra['schedule'], $extra['timezone']);
             $active = self::boolean($job['active'] ?? true);
             $schedule = $active && $recording ? self::schedule((string) ($job['schedule'] ?? '')) : null;

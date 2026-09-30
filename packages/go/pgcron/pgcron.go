@@ -78,7 +78,9 @@ type Options struct {
 	// JobName is the CronWatch name for a job. Default its jobname with
 	// anything other than letters, digits, ".", "_", ":" and "-" turned
 	// into "-", or "pg_cron:<jobid>" when it has none (JobName). The prefix
-	// goes in front either way.
+	// goes in front either way. One that panics or returns "", like a Pick
+	// or OptionsFor that panics, is reported once and fails only that job,
+	// which keeps its last declaration until the callback works again.
 	JobName func(Job) string
 	// Options are job options (Grace, Timeout, MaxDuration, Expect and the
 	// rest) for every job; OptionsFor gives them per job. The schedule and
@@ -280,6 +282,9 @@ type Source struct {
 	retired map[string]bool
 	scanned bool
 	warned  map[string]bool
+	// failing are jobids whose callback failed, reported once until it
+	// works again.
+	failing map[int64]bool
 }
 
 var _ cronwatch.Source = (*Source)(nil)
@@ -290,6 +295,7 @@ func New(db Querier, o Options) *Source {
 		db: db, o: o, idPrefix: "pgcron:" + o.Prefix,
 		cursors: map[int64]int64{}, lastAt: map[int64]int64{}, pending: map[int64]string{}, held: map[int64]int64{},
 		known: map[int64]declared{}, declaredKeys: map[string]string{}, retired: map[string]bool{}, warned: map[string]bool{},
+		failing: map[int64]bool{},
 	}
 }
 
@@ -351,6 +357,25 @@ func (s *Source) runIDOf(id string) (int64, bool) {
 		return 0, false
 	}
 	return int64(n), true
+}
+
+// guard is fn's answer, or the value it panicked with.
+func guard[T any](fn func() T) (out T, panicked any) {
+	defer func() {
+		if p := recover(); p != nil {
+			panicked = p
+		}
+	}()
+	return fn(), nil
+}
+
+// panicText is a recovered panic's value as text: an error's message, or
+// the value printed.
+func panicText(p any) string {
+	if err, ok := p.(error); ok {
+		return err.Error()
+	}
+	return fmt.Sprint(p)
 }
 
 func keyOf(def cronwatch.Definition) string { return js.Stringify(def) }
@@ -484,23 +509,60 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 	names := map[int64]string{}
 	definitions := map[int64]cronwatch.Definition{}
 	used := map[string]bool{}
+	// A callback of the app's (Pick, JobName, OptionsFor) that panicked, or
+	// a JobName that gave no name, fails only its job, as a bad row does:
+	// reported once until it works again, and the job carries on as last
+	// declared (skipped when it never was), so its runs are still copied.
+	trouble := func(j Job, what string) {
+		if !s.failing[j.JobID] {
+			s.failing[j.JobID] = true
+			host.ReportError(fmt.Errorf("pg_cron job %d: %s; it keeps its last declaration until that works", j.JobID, what), "source pg_cron")
+		}
+		last, ok := s.known[j.JobID]
+		if !ok || used[last.name] {
+			return
+		}
+		order = append(order, j.JobID)
+		names[j.JobID] = last.name
+		definitions[j.JobID] = last.definition
+		used[last.name] = true
+	}
 	for _, j := range all {
-		if !s.picks(j) {
+		picked, p := guard(func() bool { return s.picks(j) })
+		if p != nil {
+			trouble(j, "Pick panicked: "+panicText(p))
+			continue
+		}
+		if !picked {
+			delete(s.failing, j.JobID)
 			continue
 		}
 		base := JobName(j)
 		if s.o.JobName != nil {
-			base = s.o.JobName(j)
+			base, p = guard(func() string { return s.o.JobName(j) })
+			if p != nil {
+				trouble(j, "JobName panicked: "+panicText(p))
+				continue
+			}
+			if base == "" {
+				trouble(j, "JobName returned no name")
+				continue
+			}
 		}
+		extra := s.o.Options
+		if s.o.OptionsFor != nil {
+			extra, p = guard(func() []cronwatch.JobOption { return s.o.OptionsFor(j) })
+			if p != nil {
+				trouble(j, "OptionsFor panicked: "+panicText(p))
+				continue
+			}
+		}
+		delete(s.failing, j.JobID)
 		name := s.o.Prefix + base
 		if used[name] {
 			name += ":" + strconv.FormatInt(j.JobID, 10)
 		}
 		used[name] = true
-		extra := s.o.Options
-		if s.o.OptionsFor != nil {
-			extra = s.o.OptionsFor(j)
-		}
 		schedule := ""
 		if j.Active && recording {
 			schedule, _ = Schedule(j.Schedule)

@@ -17,6 +17,16 @@ export function stripNul(text: string): string {
   return text.includes("\u0000") ? text.replace(/\u0000/g, "") : text;
 }
 
+/**
+ * Removes every U+0000 from JSON text, keys and strings alike, by dropping
+ * each \u0000 escape (a NUL can appear in JSON no other way). Escapes are
+ * read left to right in pairs, so an escaped backslash followed by "u0000"
+ * is left as it is.
+ */
+export function stripJsonNul(json: string): string {
+  return json.includes("\\u0000") ? json.replace(/\\(u0000|[\s\S])/g, (escape, next: string) => (next === "u0000" ? "" : escape)) : json;
+}
+
 /** "Name: message" and the first five stack frames, capped like output. */
 export function errorMessage(error: unknown): string {
   return capOutput(describeError(error));

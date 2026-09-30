@@ -2,9 +2,12 @@ package cronwatch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
+
+	"cronwatch.dev/go/internal/output"
 )
 
 // MemoryStore keeps everything in process memory (stores/memory.ts). The
@@ -31,6 +34,36 @@ var (
 	_ RunDeleter    = (*MemoryStore)(nil)
 )
 
+// Text is held as the SQL stores write it (see sqlstore), without U+0000,
+// so every store reads back the same: through the value's JSON with every
+// \u0000 escape dropped, which keeps JavaScript's key order.
+func kept[T any](v json.Marshaler, from func(any) (T, error), fallback T) T {
+	b, err := v.MarshalJSON()
+	if err != nil {
+		return fallback
+	}
+	var out T
+	if unmarshal([]byte(output.StripJSONNul(string(b))), &out, from) != nil {
+		return fallback
+	}
+	return out
+}
+
+// keptRun is a copy of run without NUL in its trigger, output, error or
+// metric names. Its id and job are identifiers, kept as given.
+func keptRun(run Run) Run {
+	c := run.clone()
+	c.Trigger = output.StripNul(c.Trigger)
+	if c.Output != nil {
+		c.Output = ptr(output.StripNul(*c.Output))
+	}
+	if c.Error != nil {
+		c.Error = ptr(output.StripNul(*c.Error))
+	}
+	c.Metrics = kept(c.Metrics, metricsFrom, c.Metrics)
+	return c
+}
+
 // Init does nothing.
 func (m *MemoryStore) Init(context.Context) error { return nil }
 
@@ -44,7 +77,7 @@ func (m *MemoryStore) UpsertJob(_ context.Context, def Definition, now int64) er
 	if existing, ok := m.jobs[def.Name()]; ok {
 		created = existing.CreatedAt
 	}
-	m.jobs[def.Name()] = StoredJob{Name: def.Name(), Definition: def.clone(), CreatedAt: created, UpdatedAt: now}
+	m.jobs[def.Name()] = StoredJob{Name: def.Name(), Definition: kept(def, definitionFrom, def.clone()), CreatedAt: created, UpdatedAt: now}
 	return nil
 }
 
@@ -94,7 +127,7 @@ func (m *MemoryStore) InsertRun(_ context.Context, run Run) error {
 		return fmt.Errorf("run %s already exists", run.ID)
 	}
 	m.seq++
-	m.runs[run.ID] = run.clone()
+	m.runs[run.ID] = keptRun(run)
 	m.order[run.ID] = m.seq
 	return nil
 }
@@ -102,7 +135,7 @@ func (m *MemoryStore) InsertRun(_ context.Context, run Run) error {
 // finish writes the fields a finish changes onto a stored run.
 func finish(existing, run Run) Run {
 	r := existing.clone()
-	c := run.clone()
+	c := keptRun(run)
 	r.Status, r.FinishedAt, r.DurationMs, r.Error, r.Output, r.Metrics = c.Status, c.FinishedAt, c.DurationMs, c.Error, c.Output, c.Metrics
 	return r
 }
@@ -221,7 +254,7 @@ func (m *MemoryStore) GetState(_ context.Context, job string) (*JobState, error)
 func (m *MemoryStore) SetState(_ context.Context, state JobState) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.states[state.Job] = state.clone()
+	m.states[state.Job] = kept(state, stateFrom, state.clone())
 	return nil
 }
 
@@ -231,7 +264,7 @@ func (m *MemoryStore) CompareAndSetState(_ context.Context, state JobState, expe
 	if m.states[state.Job].version() != expected {
 		return false, nil
 	}
-	m.states[state.Job] = state.clone()
+	m.states[state.Job] = kept(state, stateFrom, state.clone())
 	return true, nil
 }
 

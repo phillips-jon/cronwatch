@@ -182,6 +182,10 @@ defmodule Cronwatch.RunHandle do
         got = if is_binary(id), do: "#{JS.len16(id)} characters", else: inspect(id)
         {:error, Error.invalid("job #{JS.quote(job)}: #{method}() needs a run id of 1 to 200 characters (got #{got})")}
 
+      # Postgres refuses NUL in text, so no store could hold such an id.
+      String.contains?(id, <<0>>) ->
+        {:error, Error.invalid("job #{JS.quote(job)}: #{method}() cannot take a run id containing a NUL character")}
+
       String.starts_with?(id, @reserved) ->
         {:error,
          Error.invalid(

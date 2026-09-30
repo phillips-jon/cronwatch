@@ -103,6 +103,9 @@ final class PgCronSource implements Source {
   private boolean scanned;
   private final Set<String> warned = new HashSet<>();
 
+  /** Jobids whose callback failed, reported once until it works again. */
+  private final Set<Long> failing = new HashSet<>();
+
   /** A job as last declared: its name and the definition its options gave. */
   private record Declared(String name, Definition definition) {}
 
@@ -128,6 +131,48 @@ final class PgCronSource implements Source {
       host.reportError(
           new CronwatchException(CronwatchException.Kind.OTHER, message), "source pg_cron");
     }
+  }
+
+  /**
+   * A callback of the app's (pick, jobName, options) that threw, or a jobName that gave no name,
+   * fails only its job, as a bad row does: reported once until it works again, and the job carries
+   * on as last declared (skipped when it never was), so its runs are still copied.
+   */
+  private void trouble(
+      Cronwatch host,
+      PgCronJob job,
+      String what,
+      Map<Long, String> names,
+      Map<Long, Definition> definitions,
+      Set<String> used) {
+    if (failing.add(job.jobId())) {
+      host.reportError(
+          new CronwatchException(
+              CronwatchException.Kind.OTHER,
+              "pg_cron job "
+                  + job.jobId()
+                  + ": "
+                  + what
+                  + "; it keeps its last declaration until that works"),
+          "source pg_cron");
+    }
+    Declared last = known.get(job.jobId());
+    if (last == null || used.contains(last.name())) {
+      return;
+    }
+    names.put(job.jobId(), last.name());
+    definitions.put(job.jobId(), last.definition());
+    used.add(last.name());
+  }
+
+  /**
+   * What a callback threw, as the SDK names an error: its class's simple name, then its message.
+   */
+  private static String threw(RuntimeException e) {
+    Class<?> type = e.getClass();
+    String name = type.getSimpleName().isEmpty() ? type.getName() : type.getSimpleName();
+    String message = e.getMessage();
+    return name + ": " + (message == null ? "" : message);
   }
 
   private boolean picks(PgCronJob job) {
@@ -275,16 +320,43 @@ final class PgCronSource implements Source {
     Map<Long, Definition> definitions = new HashMap<>();
     Set<String> used = new HashSet<>();
     for (PgCronJob job : all) {
-      if (!picks(job)) {
+      boolean picked;
+      try {
+        picked = picks(job);
+      } catch (RuntimeException e) {
+        trouble(host, job, "the jobs callback threw " + threw(e), names, definitions, used);
         continue;
       }
-      String name = o.prefix + (o.jobName != null ? o.jobName.apply(job) : PgCron.jobName(job));
+      if (!picked) {
+        failing.remove(job.jobId());
+        continue;
+      }
+      @Nullable String given;
+      try {
+        given = o.jobName != null ? o.jobName.apply(job) : PgCron.jobName(job);
+      } catch (RuntimeException e) {
+        trouble(host, job, "jobName threw " + threw(e), names, definitions, used);
+        continue;
+      }
+      if (given == null) {
+        trouble(host, job, "jobName returned null, not a name", names, definitions, used);
+        continue;
+      }
+      @Nullable JobOptions asked;
+      try {
+        asked = o.options == null ? null : o.options.apply(job);
+      } catch (RuntimeException e) {
+        trouble(host, job, "the options callback threw " + threw(e), names, definitions, used);
+        continue;
+      }
+      failing.remove(job.jobId());
+      String name = o.prefix + given;
       if (used.contains(name)) {
         name = name + ":" + job.jobId();
       }
       used.add(name);
       try {
-        JobOptions extra = o.options == null ? JobOptions.builder() : o.options.apply(job).copy();
+        JobOptions extra = asked == null ? JobOptions.builder() : asked.copy();
         if (PgCronOptions.fromPgCron(extra.describe(name))) {
           throw CronwatchException.invalid(
               "PgCronOptions: options may not set a schedule or timezone; they come from pg_cron");

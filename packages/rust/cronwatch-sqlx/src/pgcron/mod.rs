@@ -28,6 +28,7 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -92,7 +93,9 @@ pub struct PgCronOptions {
     /// The CronWatch name for a job. Default [`job_name`]: its jobname with
     /// anything other than letters, digits, `.`, `_`, `:` and `-` turned into
     /// `-`, or `pg_cron:<jobid>` when it has none. The prefix goes in front
-    /// either way.
+    /// either way. One that panics, like a `pick` or `options_for` that
+    /// panics, is reported once and fails only that job, which keeps its
+    /// last declaration until the callback works again.
     pub job_name: Option<NameFn>,
     /// Job options (grace, timeout, max duration, expect and the rest) for
     /// every job; `options_for` gives them per job instead. The schedule and
@@ -340,6 +343,18 @@ fn key_of(def: &Definition) -> String {
     def.to_json()
 }
 
+/// Calls one of the app's callbacks; a panic is the error, naming it.
+fn guarded<T>(what: &str, f: impl FnOnce() -> T) -> Result<T, String> {
+    catch_unwind(AssertUnwindSafe(f)).map_err(|panic| {
+        let text = panic
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_string())
+            .or_else(|| panic.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "a panic without a message".into());
+        format!("{what} panicked: {text}")
+    })
+}
+
 /// Where the source is between syncs.
 #[derive(Default)]
 struct State {
@@ -364,6 +379,8 @@ struct State {
     retired: HashSet<String>,
     scanned: bool,
     warned: HashSet<&'static str>,
+    /// Jobids whose callback panicked, reported once until it works again.
+    failing: HashSet<i64>,
 }
 
 /// The pg_cron source. Hand it to [`cronwatch::ClientBuilder::source`].
@@ -411,6 +428,24 @@ impl PgCron {
         }
         self.o.job_ids.iter().flatten().any(|id| *id == j.job_id)
             || self.o.jobs.iter().flatten().any(|name| j.job_name.as_deref() == Some(name.as_str()))
+    }
+
+    /// Asks the app's callbacks about a job: `None` when it is not picked,
+    /// else its name before the prefix and its options. A callback that
+    /// panics is the error, saying which.
+    fn ask(&self, j: &PgCronJob) -> Result<Option<(String, JobOptions)>, String> {
+        if !guarded("the jobs callback", || self.picks(j))? {
+            return Ok(None);
+        }
+        let base = match &self.o.job_name {
+            Some(f) => guarded("job_name", || f(j))?,
+            None => job_name(j),
+        };
+        let extra = match &self.o.options_for {
+            Some(f) => guarded("the options callback", || f(j))?,
+            None => self.o.options.clone(),
+        };
+        Ok(Some((base, extra)))
     }
 
     /// A server setting from `pg_settings`, or `None` when the role may not
@@ -547,22 +582,44 @@ impl PgCron {
         let mut definitions: HashMap<i64, Definition> = HashMap::new();
         let mut used: HashSet<String> = HashSet::new();
         for j in &all {
-            if !self.picks(j) {
-                continue;
-            }
-            let base = match &self.o.job_name {
-                Some(f) => f(j),
-                None => job_name(j),
+            let (base, extra) = match self.ask(j) {
+                Ok(Some(asked)) => {
+                    st.failing.remove(&j.job_id);
+                    asked
+                }
+                Ok(None) => {
+                    st.failing.remove(&j.job_id);
+                    continue;
+                }
+                // A callback of the app's that panicked fails only its job,
+                // as a bad row does: reported once until it works again, and
+                // the job carries on as last declared (skipped when it never
+                // was), so its runs are still copied.
+                Err(what) => {
+                    if st.failing.insert(j.job_id) {
+                        host.report_error(
+                            cronwatch::Error::Other(format!(
+                                "pg_cron job {}: {what}; it keeps its last declaration until that works",
+                                j.job_id
+                            )),
+                            "source pg_cron",
+                        );
+                    }
+                    if let Some((last, def)) = st.known.get(&j.job_id).cloned()
+                        && used.insert(last.clone())
+                    {
+                        order.push(j.job_id);
+                        names.insert(j.job_id, last);
+                        definitions.insert(j.job_id, def);
+                    }
+                    continue;
+                }
             };
             let mut name = format!("{}{base}", self.o.prefix);
             if used.contains(&name) {
                 name = format!("{name}:{}", j.job_id);
             }
             used.insert(name.clone());
-            let extra = match &self.o.options_for {
-                Some(f) => f(j),
-                None => self.o.options.clone(),
-            };
             let sched = if j.active && recording { schedule(&j.schedule) } else { None };
             let paused = if j.active { "" } else { " (paused)" };
             let base_options = JobOptions::new()

@@ -919,6 +919,7 @@ export class CronWatch {
   async recordRun(input: Run, options: RecordRunOptions = {}): Promise<Alert[]> {
     const declared = this.definitions.get(input.job);
     if (!declared) throw new Error(`recordRun: job "${input.job}" is not declared; call job() first`);
+    if (input.id.includes("\u0000")) throw new Error(`recordRun: run ids cannot contain a NUL character (job "${input.job}")`);
     await this.sync(declared);
     const run: Run = { ...input, metrics: { ...input.metrics } };
     if (run.status === "ok") {
@@ -1328,6 +1329,8 @@ function checkRunId(job: string, id: unknown, method: string): void {
   if (typeof id !== "string" || id.length === 0 || id.length > 200) {
     throw new Error(`job "${job}": ${method}() needs a run id of 1 to 200 characters (got ${typeof id === "string" ? `${id.length} characters` : typeof id})`);
   }
+  // Postgres refuses NUL in text, so no store could hold such an id.
+  if (id.includes("\u0000")) throw new Error(`job "${job}": ${method}() cannot take a run id containing a NUL character`);
   if (id.startsWith(RESERVED_RUN_ID_PREFIX)) {
     throw new Error(`job "${job}": ${method}() cannot take a run id starting with "${RESERVED_RUN_ID_PREFIX}", which the pg_cron source uses for its runs`);
   }

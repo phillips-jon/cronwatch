@@ -427,6 +427,104 @@ async fn a_jobs_options_apply_and_a_schedule_it_cannot_read_is_reported() {
 }
 
 #[tokio::test]
+async fn a_pick_job_name_or_options_callback_that_panics_fails_only_its_job_reported_once() {
+    let c = Clock::new(T0);
+    let cron = FakeCron::new();
+    for (id, n) in [(1, "one"), (2, "two"), (3, "three"), (4, "four")] {
+        cron.job(id, name(n), "0 * * * *", true);
+    }
+    let broken: Arc<Mutex<HashSet<String>>> = Arc::default();
+    let fault = {
+        let broken = broken.clone();
+        move |what: &str, id: i64| {
+            if broken.lock().unwrap().contains(&format!("{what}:{id}")) {
+                panic!("{what} broke");
+            }
+        }
+    };
+    let (f1, f2, f3) = (fault.clone(), fault.clone(), fault);
+    let options = PgCronOptions {
+        pick: Some(Arc::new(move |j: &PgCronJob| {
+            f1("pick", j.job_id);
+            true
+        })),
+        job_name: Some(Arc::new(move |j: &PgCronJob| {
+            f2("name", j.job_id);
+            format!("j-{}", j.job_name.as_deref().unwrap_or(""))
+        })),
+        options_for: Some(Arc::new(move |j: &PgCronJob| {
+            f3("options", j.job_id);
+            JobOptions::new()
+        })),
+        ..Default::default()
+    };
+    let k = Kit::new(&cron, Some(&c), None, options);
+    let set = |keys: &[&str]| {
+        let mut b = broken.lock().unwrap();
+        b.clear();
+        b.extend(keys.iter().map(|k| k.to_string()));
+    };
+    let names = || async { k.cw.store().list_jobs().await.unwrap().into_iter().map(|j| j.name).collect::<Vec<_>>() };
+    let message = |id: i64, what: &str| {
+        format!("source pg_cron: pg_cron job {id}: {what}; it keeps its last declaration until that works")
+    };
+
+    // First sight, with job 1's name callback and job 2's options panicking:
+    // only those two are skipped.
+    set(&["name:1", "options:2"]);
+    let first = cron.add(3, "succeeded", T0 - 60_000, T0 - 59_000, Some("ok"));
+    k.check().await;
+    assert_eq!(names().await, ["j-four", "j-three"]);
+    assert_eq!(k.run(&pid(first)).await.unwrap().job, "j-three");
+    assert_eq!(
+        k.others(),
+        [message(1, "job_name panicked: name broke"), message(2, "the options callback panicked: options broke")]
+    );
+
+    // Once they work, both are declared; then each callback panics for jobs
+    // already declared.
+    set(&[]);
+    k.check().await;
+    assert_eq!(names().await, ["j-four", "j-one", "j-three", "j-two"]);
+    set(&["pick:1", "options:3", "name:4"]);
+    let seen = k.others().len();
+    let later = [
+        cron.add(1, "failed", T0 + 1000, T0 + 2000, Some("ERROR:  one")),
+        cron.add(3, "succeeded", T0 + 1000, T0 + 2000, Some("ok")),
+    ];
+    c.advance(5000);
+    k.check().await;
+    k.check().await;
+    assert_eq!(
+        k.others()[seen..],
+        [
+            message(1, "the jobs callback panicked: pick broke"),
+            message(3, "the options callback panicked: options broke"),
+            message(4, "job_name panicked: name broke"),
+        ],
+        "each reported once, over two syncs"
+    );
+    // Each keeps its name and schedule, is not retired, and its runs are
+    // still copied.
+    for stored in k.cw.store().list_jobs().await.unwrap() {
+        assert_eq!(stored.definition.schedule(), "0 * * * *", "{}", stored.name);
+        let description = stored.definition.description();
+        assert!(!description.contains("no longer") && !description.contains("renamed"), "{}", stored.name);
+    }
+    assert_eq!(k.run(&pid(later[0])).await.unwrap().job, "j-one");
+    assert_eq!(k.run(&pid(later[1])).await.unwrap().job, "j-three");
+
+    // Working again and then failing again is reported again.
+    set(&[]);
+    k.check().await;
+    set(&["pick:1"]);
+    k.check().await;
+    let others = k.others();
+    assert_eq!(others.len(), seen + 4, "{others:?}");
+    assert_eq!(others[seen + 3], message(1, "the jobs callback panicked: pick broke"));
+}
+
+#[tokio::test]
 async fn a_run_cut_off_by_a_restart_is_recorded_and_one_held_run_never_stops_the_others() {
     let c = Clock::new(T0);
     let cron = FakeCron::new();

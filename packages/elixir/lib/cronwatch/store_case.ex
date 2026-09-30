@@ -643,9 +643,66 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
         end)
 
       close(store)
-      total = prune + cas + update
+
+      store = make.()
+      init(store)
+      nul = fix |> Object.get("nul") |> Enum.with_index() |> Enum.reduce(0, &(replay_nul(store, &1) + &2))
+      close(store)
+
+      total = prune + cas + update + nul
       assert total > 0, "no cases replayed"
       total
+    end
+
+    # A step of store.json's nul cases: text is written without U+0000.
+    defp replay_nul(store, {step, i}) do
+      what = "nul step #{i}"
+      want = JS.stringify(Object.get(step, "stored"))
+
+      cond do
+        Object.has_key?(step, "upsertJob") ->
+          must(c(store, :upsert_job, [Object.get(step, "upsertJob"), Object.get(step, "now")]))
+          same_json(what, json_of(must(c(store, :get_job, ["nul"])), &stored_job_json/1), want)
+
+        Object.has_key?(step, "insertRun") ->
+          must(c(store, :insert_run, [fixture_run(Object.get(step, "insertRun"))]))
+          same_json(what, json_of(must(c(store, :get_run, ["n1"])), &Run.to_json/1), want)
+
+        Object.has_key?(step, "updateRun") ->
+          must(c(store, :update_run, [fixture_run(Object.get(step, "updateRun"))]))
+          same_json(what, json_of(must(c(store, :get_run, ["n1"])), &Run.to_json/1), want)
+
+        Object.has_key?(step, "updateRunIf") ->
+          run = fixture_run(Object.get(step, "updateRunIf"))
+          assert must(c(store, :update_run_if, [run, Object.get(step, "from")])) == Object.get(step, "written"), what
+          same_json(what, json_of(must(c(store, :get_run, ["n1"])), &Run.to_json/1), want)
+
+        Object.has_key?(step, "setState") ->
+          must(c(store, :set_state, [fixture_state(Object.get(step, "setState"))]))
+          same_json(what, json_of(must(c(store, :get_state, ["nul"])), &JobState.to_json/1), want)
+
+        true ->
+          st = fixture_state(Object.get(step, "compareAndSetState"))
+
+          assert must(c(store, :compare_and_set_state, [st, Object.get(step, "expected")])) ==
+                   Object.get(step, "written"),
+                 what
+
+          same_json(what, json_of(must(c(store, :get_state, ["nul"])), &JobState.to_json/1), want)
+      end
+
+      1
+    end
+
+    defp stored_job_json(job) do
+      JS.stringify(
+        Object.new([
+          {"name", job.name},
+          {"definition", job.definition},
+          {"createdAt", job.created_at},
+          {"updatedAt", job.updated_at}
+        ])
+      )
     end
   end
 end

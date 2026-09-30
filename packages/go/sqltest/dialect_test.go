@@ -255,6 +255,26 @@ func TestPostgresNulCharactersAreStillRecorded(t *testing.T) {
 	if st.ConsecutiveFailures != 1 {
 		t.Error("the state, with its alert, was written too")
 	}
+	// So are a trigger, metric names and a definition's text.
+	nul2 := cw.MustJob("nul2", cronwatch.Description("a\x00b"), cronwatch.Tags("t\x00"), cronwatch.Budget("c\x00", 5))
+	must(t, nul2.Run(ctx, func(_ context.Context, job *cronwatch.JobContext) error {
+		return job.Metric("ro\x00ws", 2)
+	}, cronwatch.WithTrigger("cr\x00on")))
+	second, err := cw.Runs(ctx, "nul2", 10)
+	must(t, err)
+	if len(second) != 1 || second[0].Status != cronwatch.StatusOK || second[0].Trigger != "cron" || len(second[0].Metrics) != 1 || second[0].Metrics[0] != (cronwatch.Metric{Name: "rows", Value: 2}) {
+		t.Errorf("runs %+v", second)
+	}
+	stored, err := store.GetJob(ctx, "nul2")
+	must(t, err)
+	// JSONB gives the keys back in its own order.
+	var got, want any
+	text, _ := stored.Definition.MarshalJSON()
+	must(t, json.Unmarshal(text, &got))
+	must(t, json.Unmarshal([]byte(`{"name":"nul2","description":"ab","tags":["t"],"budget":{"c":5}}`), &want))
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("definition %s", text)
+	}
 	if len(reported) > 0 {
 		t.Errorf("reported %v", reported)
 	}

@@ -467,6 +467,89 @@ final class PgCronTest extends TestCase
 
     // ------------------------------------------------------------ a real pg_cron
 
+    public function testACallbackThatFailsFailsOnlyItsJobReportedOnce(): void
+    {
+        $clock = new Clock();
+        $cron = new FakeCron();
+        $cron->job(1, 'one', '0 * * * *');
+        $cron->job(2, 'two', '0 * * * *');
+        $cron->job(3, 'three', '0 * * * *');
+        $cron->job(4, 'four', '0 * * * *');
+        $broken = [];
+        $fault = function (string $what, array $job) use (&$broken): bool {
+            return isset($broken["{$what}:{$job['jobid']}"]);
+        };
+        $errors = [];
+        $cw = self::client($cron, $clock, null, $errors, null, [
+            'jobs' => function (array $j) use ($fault): bool {
+                if ($fault('pick', $j)) {
+                    throw new \RuntimeException('pick broke');
+                }
+                return true;
+            },
+            'jobName' => function (array $j) use ($fault): mixed {
+                if ($fault('throw', $j)) {
+                    throw new \RuntimeException('name broke');
+                }
+                if ($fault('null', $j)) {
+                    return null;
+                }
+                return $fault('number', $j) ? 7 : "j-{$j['jobname']}";
+            },
+            'options' => function (array $j) use ($fault): array {
+                if ($fault('options', $j)) {
+                    throw new \RuntimeException('options broke');
+                }
+                return [];
+            },
+        ]);
+        $names = fn () => array_map(fn ($j) => $j->name, $cw->store->listJobs());
+        $keeps = '; it keeps its last declaration until that works';
+
+        // First sight, with job 1's name callback throwing and job 2's giving null: only those two are skipped.
+        $broken = ['throw:1' => true, 'null:2' => true];
+        $first = $cron->add(3, 'succeeded', self::T0 - 60_000, self::T0 - 59_000, 'ok');
+        $cw->check();
+        $this->assertSame(['j-four', 'j-three'], $names());
+        $this->assertSame('j-three', $cw->getRun("pgcron:{$first->runid}")?->job);
+        $this->assertSame([
+            "pg_cron job 1: jobName threw RuntimeException: name broke{$keeps}",
+            "pg_cron job 2: jobName returned null, not a name{$keeps}",
+        ], self::unexpected($errors));
+
+        // Once they work, both are declared; then every callback fails in turn for jobs already declared.
+        $broken = [];
+        $cw->check();
+        $this->assertSame(['j-four', 'j-one', 'j-three', 'j-two'], $names());
+        $broken = ['pick:1' => true, 'number:2' => true, 'options:3' => true, 'throw:4' => true];
+        $errors = [];
+        $later = [$cron->add(1, 'failed', self::T0 + 1000, self::T0 + 2000, 'ERROR:  one'), $cron->add(3, 'succeeded', self::T0 + 1000, self::T0 + 2000, 'ok')];
+        $clock->advance(5000);
+        $cw->check();
+        $cw->check();
+        $this->assertSame([
+            "pg_cron job 1: the jobs callback threw RuntimeException: pick broke{$keeps}",
+            "pg_cron job 2: jobName returned int, not a name{$keeps}",
+            "pg_cron job 3: the options callback threw RuntimeException: options broke{$keeps}",
+            "pg_cron job 4: jobName threw RuntimeException: name broke{$keeps}",
+        ], self::unexpected($errors), 'each reported once, over two syncs');
+        // Each keeps its name and schedule, is not retired, and its runs are still copied.
+        foreach ($cw->store->listJobs() as $stored) {
+            $this->assertSame('0 * * * *', $stored->definition->get('schedule'), $stored->name);
+            $this->assertDoesNotMatchRegularExpression('/no longer|renamed/', (string) $stored->definition->get('description'), $stored->name);
+        }
+        $this->assertSame('j-one', $cw->getRun("pgcron:{$later[0]->runid}")?->job);
+        $this->assertSame('j-three', $cw->getRun("pgcron:{$later[1]->runid}")?->job);
+
+        // Working again and then failing again is reported again.
+        $broken = [];
+        $cw->check();
+        $broken = ['pick:1' => true];
+        $cw->check();
+        $this->assertCount(5, self::unexpected($errors));
+        $this->assertStringStartsWith('pg_cron job 1: the jobs callback threw', self::unexpected($errors)[4]);
+    }
+
     private static function url(): string
     {
         $url = getenv('CRONWATCH_TEST_PGCRON');

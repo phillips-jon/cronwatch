@@ -579,6 +579,9 @@ func (c *Client) RecordRun(ctx context.Context, input Run, options ...RecordOpti
 	if !ok {
 		return nil, fmt.Errorf("recordRun: job %s is not declared; call Job first", js.Quote(input.Job))
 	}
+	if strings.Contains(input.ID, "\x00") {
+		return nil, fmt.Errorf("recordRun: run ids cannot contain a NUL character (job %s)", js.Quote(input.Job))
+	}
 	if err := c.sync(ctx, def); err != nil {
 		return nil, err
 	}

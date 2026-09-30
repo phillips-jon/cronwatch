@@ -95,6 +95,10 @@ def schedule(text: str) -> str | None:
     return " ".join(fields)
 
 
+def _raised(error: BaseException) -> str:
+    return f"{type(error).__name__}: {error}"
+
+
 def job_name(job: Job) -> str:
     """The default CronWatch name for a pg_cron job, before the prefix."""
     cleaned = _LEADING.sub("", _NOT_NAME.sub("-", job.jobname or ""), count=1)[:100]
@@ -262,8 +266,10 @@ class PgCron:
     prefix:   put before every job name, to keep them apart from your own ("db:"). Also keeps run ids apart.
     job_name: a function giving the CronWatch name for a Job. Default its jobname with anything other than
               letters, digits, ".", "_", ":" and "-" turned into "-", or "pg_cron:<jobid>" when it has none.
-              The prefix goes in front either way.
-    options:  grace, timeout, max_duration, expect and the rest, for every job (a dict) or per job (a function
+              The prefix goes in front either way. One that raises or returns no string, like a `jobs` or
+              `options` function that raises, is reported once and fails only that job, which keeps its
+              last declaration until the callback works again.
+    options: grace, timeout, max_duration, expect and the rest, for every job (a dict) or per job (a function
               given a Job). The schedule and timezone always come from pg_cron.
     timezone: the timezone pg_cron reads its cron expressions in. Default the server's cron.timezone, read from
               pg_settings, which shows it only to roles with pg_read_all_settings; UTC (pg_cron's default) is
@@ -305,6 +311,8 @@ class PgCron:
         self._retired: set[str] = set()
         self._scanned = False
         self._warned: set[str] = set()
+        # Jobids whose callback failed, reported once until it works again.
+        self._failing: set[int] = set()
 
     def sync(self, host: Any) -> list[Alert]:
         """Declares the jobs and records their new runs. Returns the alerts recording them sent."""
@@ -331,8 +339,7 @@ class PgCron:
                 "cron.job shows no jobs. pg_cron's row level security shows a role only the jobs it scheduled: connect as that role, or give this one BYPASSRLS.",
             )
         every = [self._job_from(r) for r in rows]
-        picked = [job for job in every if self._picks(job)]
-        names, definitions = self._declare(host, picked, timezone, recording)
+        names, definitions = self._declare(host, every, timezone, recording)
         self._retire_unused(host, names, definitions, every)
         if not recording or not names:
             return []
@@ -385,19 +392,56 @@ class PgCron:
     # ---------------------------------------------------------------- declaring jobs
 
     def _declare(self, host: Any, jobs: list[Job], timezone: str, recording: bool) -> tuple[dict[int, str], dict[int, dict[str, Any]]]:
-        """Declares each job. A paused one (active = false) keeps its failures
-        but loses its schedule, so it is not missed. Returns each jobid's name
-        and definition as declared."""
+        """Declares each job `jobs` picks. A paused one (active = false) keeps
+        its failures but loses its schedule, so it is not missed. Returns each
+        jobid's name and definition as declared."""
         names: dict[int, str] = {}
         definitions: dict[int, dict[str, Any]] = {}
         used: set[str] = set()
+
+        def trouble(job: Job, what: str) -> None:
+            """A callback of the app's (jobs, job_name, options) that raised, or
+            a job_name that gave no name, fails only its job, as a bad row does:
+            reported once until it works again, and the job carries on as last
+            declared (skipped when it never was), so its runs are still copied."""
+            if job.jobid not in self._failing:
+                self._failing.add(job.jobid)
+                host.on_error(RuntimeError(f"pg_cron job {job.jobid}: {what}; it keeps its last declaration until that works"), "source pg_cron")
+            last = self._known.get(job.jobid)
+            if last is None or last[0] in used:
+                return
+            names[job.jobid] = last[0]
+            definitions[job.jobid] = last[1]
+            used.add(last[0])
+
         for job in jobs:
-            name = self._prefix + (str(self._job_name(job)) if self._job_name else job_name(job))
+            try:
+                picked = self._picks(job)
+            except Exception as error:  # noqa: BLE001, the app's callback fails only its job
+                trouble(job, f"the jobs callback raised {_raised(error)}")
+                continue
+            if not picked:
+                self._failing.discard(job.jobid)
+                continue
+            try:
+                base: Any = self._job_name(job) if self._job_name else job_name(job)
+            except Exception as error:  # noqa: BLE001, the app's callback fails only its job
+                trouble(job, f"job_name raised {_raised(error)}")
+                continue
+            if not isinstance(base, str):
+                trouble(job, f"job_name returned {'None' if base is None else type(base).__name__}, not a name")
+                continue
+            try:
+                extra = (self._options(job) if callable(self._options) else self._options) or {}
+                extra = {k: v for k, v in dict(extra).items() if k not in _SCHEDULE_ONLY}
+            except Exception as error:  # noqa: BLE001, the app's callback fails only its job
+                trouble(job, f"the options callback raised {_raised(error)}")
+                continue
+            self._failing.discard(job.jobid)
+            name = self._prefix + base
             if name in used:
                 name = f"{name}:{job.jobid}"
             used.add(name)
-            extra = (self._options(job) if callable(self._options) else self._options) or {}
-            extra = {k: v for k, v in dict(extra).items() if k not in _SCHEDULE_ONLY}
             cadence = schedule(job.schedule) if job.active and recording else None
             paused = "" if job.active else " (paused)"
             definition: dict[str, Any] = {"description": f"pg_cron job {job.jobid} in {job.database} as {job.username}{paused}", "tags": ["pg_cron"], **extra}
