@@ -6,7 +6,7 @@
     "keywords": ["Drupal", "cron", "monitoring", "queue", "alerts"],
     "homepage": "https://cronwatch.dev",
     "support": {
-        "docs": "https://cronwatch.dev/docs/",
+        "docs": "https://cronwatch.dev/docs/drupal/",
         "issues": "https://github.com/phillips-jon/cronwatch/issues",
         "source": "https://github.com/phillips-jon/cronwatch/tree/main/packages/php/drupal"
     },
