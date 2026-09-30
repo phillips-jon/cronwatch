@@ -17,6 +17,7 @@ This page sets up the TypeScript library. Every other language has a port with t
 - **Rust**: the `cronwatch` crate, with crates for tokio-cron-scheduler and apalis. See [Rust](/docs/rust/) and [Rust schedulers](/docs/rust-schedulers/).
 - **Elixir**: the `cronwatch` package on Hex, with integrations for Oban and Quantum. See [Elixir](/docs/elixir/) and [Elixir schedulers](/docs/elixir-schedulers/).
 - **Java**: `dev.cronwatch:cronwatch` on Maven Central, with a Spring Boot starter (`@Scheduled` and ShedLock) and modules for Quartz and JobRunr. See [Java](/docs/java/) and [Java schedulers](/docs/java-schedulers/).
+- **.NET**: the `Cronwatch` package on NuGet, with `Cronwatch.Hosting` for the Generic Host (hosted jobs on a cron included), `Cronwatch.AspNetCore` for the dashboard, and packages for Hangfire and Quartz.NET. See [.NET](/docs/dotnet/) and [.NET schedulers](/docs/dotnet-schedulers/).
 
 ## Install
 

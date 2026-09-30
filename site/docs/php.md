@@ -1,13 +1,13 @@
 ---
 title: PHP
-description: cronwatch/cronwatch in plain PHP: jobs, crontab scripts, vendor/bin/cronwatch check, the dashboard, stores, alert channels, Claude triage, pg_cron, and sharing one database with Node, Ruby, Python, Go, Rust, Elixir and Java.
+description: cronwatch/cronwatch in plain PHP: jobs, crontab scripts, vendor/bin/cronwatch check, the dashboard, stores, alert channels, Claude triage, pg_cron, and sharing one database with Node, Ruby, Python, Go, Rust, Elixir, Java and .NET.
 order: 3.76
 group: PHP
 ---
 
 # PHP
 
-`cronwatch/cronwatch` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a PHP process can share one database with a Node, Ruby, Python, Go, Rust, Elixir or Java process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain PHP (crontab scripts, a bare `public/` script, any PSR-15 stack) and the API underneath. The frameworks have pages of their own: [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/).
+`cronwatch/cronwatch` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a PHP process can share one database with a Node, Ruby, Python, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain PHP (crontab scripts, a bare `public/` script, any PSR-15 stack) and the API underneath. The frameworks have pages of their own: [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Drupal](/docs/drupal/) and [Craft CMS](/docs/craft/).
 
 ```bash
 composer require cronwatch/cronwatch
@@ -405,7 +405,7 @@ There is no `start()` or `stop()`: a PHP process does not stay up between checks
 
 ## Sharing a database with the other languages
 
-The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem's store, the Python package's and the Go, Rust, Elixir and Java ports' SQL stores: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The MySQL store keeps the same columns and values in MySQL's dialect, which the Go, Rust, Elixir and Java ports' MySQL stores write too; Node, Ruby and Python have no MySQL store. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote, column by column. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem's store, the Python package's and the Go, Rust, Elixir, Java and .NET ports' SQL stores: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The MySQL store keeps the same columns and values in MySQL's dialect, which the Go, Rust, Elixir, Java and .NET ports' MySQL stores write too; Node, Ruby and Python have no MySQL store. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote, column by column. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store.
 

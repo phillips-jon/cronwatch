@@ -26,7 +26,7 @@ Bundler requires the gem after Rails has loaded, so `gem "cronwatch"` alone brin
 
 The generator writes two files:
 
-- `db/migrate/<timestamp>_create_cronwatch_tables.rb`, which creates the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) with the SDK's own statements, so a Node, Python, PHP, Go, Rust, Elixir or Java process can share them. Running the generator again leaves an existing migration alone.
+- `db/migrate/<timestamp>_create_cronwatch_tables.rb`, which creates the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) with the SDK's own statements, so a Node, Python, PHP, Go, Rust, Elixir, Java or .NET process can share them. Running the generator again leaves an existing migration alone.
 - `config/initializers/cronwatch.rb`, which sets the store and the channels.
 
 It takes two options. `--prefix ops_` names the tables `ops_jobs`, `ops_runs` and `ops_state`, in the migration and in the initializer's store; a prefix is lowercase letters, digits and underscores, and a bad one is refused before anything is written. `--database` (or `--db`) puts the migration in that database's migrations directory, in an app with several.
@@ -112,7 +112,7 @@ A class name is looked up on first use, so the initializer does not have to load
 
 On Postgres the store never joins a transaction your code has open. A job that runs inside `ActiveRecord::Base.transaction` has its run recorded as it happens, and the run stays recorded if the transaction rolls back, so its alert is not sent again on the next failure. To do that the store connects through a pool of its own, with the writing database config of `connection_class` (`ActiveRecord::Base` by default): each process may open up to that config's `pool` (5 unless set) more connections, only as it needs them. Count them against your database's connection limit, or point `connection_class` at a class whose config sets a smaller `pool`. SQLite allows one writer at a time, so there the store uses your pool and, inside an open transaction, runs in a savepoint of it: a store error cannot abort your transaction, and the rows commit or roll back with it.
 
-Postgres and SQLite are supported and tested. MySQL is not supported: the gem writes only the SDK's Postgres and SQLite statements, not the MySQL tables the PHP, Go, Rust, Elixir and Java ports use, and any other adapter is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter` when the store is first used.
+Postgres and SQLite are supported and tested. MySQL is not supported: the gem writes only the SDK's Postgres and SQLite statements, not the MySQL tables the PHP, Go, Rust, Elixir, Java and .NET ports use, and any other adapter is refused with `Cronwatch::Stores::ActiveRecord::UnsupportedAdapter` when the store is first used.
 
 ## Email, SMS and error trackers
 

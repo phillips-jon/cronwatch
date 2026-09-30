@@ -1,13 +1,13 @@
 ---
 title: Ruby
-description: The cronwatch gem in plain Ruby, its API, and sharing one database with Node, Python, PHP, Go, Rust, Elixir and Java.
+description: The cronwatch gem in plain Ruby, its API, and sharing one database with Node, Python, PHP, Go, Rust, Elixir, Java and .NET.
 order: 3.52
 group: Ruby
 ---
 
 # Ruby
 
-The `cronwatch` gem is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Ruby process can share one database with a Node, Python, PHP, Go, Rust, Elixir or Java process and the [MCP server](/docs/mcp/) works against any of them. For a Rails app, start with [Ruby on Rails](/docs/rails/); this page covers plain Ruby and the API underneath.
+The `cronwatch` gem is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Ruby process can share one database with a Node, Python, PHP, Go, Rust, Elixir, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. For a Rails app, start with [Ruby on Rails](/docs/rails/); this page covers plain Ruby and the API underneath.
 
 ```ruby
 # Gemfile
@@ -426,7 +426,7 @@ A run is judged once, however many times it is finished. The finish is written o
 
 ## Sharing a database with the other languages
 
-A Rails app and a Node service can watch their jobs in one database. The Python, PHP, Go, Rust, Elixir and Java ports write the same tables too, so a process in any of them can join; this section describes the Node side, which the gem's tests run beside it. The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The gem's tests run the SDK's own stores in Node beside it, on SQLite and Postgres, and check that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes in every column. Create the tables from either side; the other side's `CREATE TABLE IF NOT EXISTS` finds them and leaves them alone. Use the same prefix on both sides.
+A Rails app and a Node service can watch their jobs in one database. The Python, PHP, Go, Rust, Elixir, Java and .NET ports write the same tables too, so a process in any of them can join; this section describes the Node side, which the gem's tests run beside it. The ActiveRecord store writes the same three tables as `@cronwatch/sdk/postgres` and `@cronwatch/sdk/sqlite`: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The gem's tests run the SDK's own stores in Node beside it, on SQLite and Postgres, and check that each reads what the other wrote, that the tables are the same whoever creates them, and that the rows are the same bytes in every column. Create the tables from either side; the other side's `CREATE TABLE IF NOT EXISTS` finds them and leaves them alone. Use the same prefix on both sides.
 
 Each process alerts on the jobs it runs, and either side's check sees every job in the store. One dashboard, Rails or Node, shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store, on one side.
 
