@@ -4,8 +4,8 @@
 // from memory with no files and no dependencies, and into the Rust crate as
 // files it reads with include_bytes! (a published crate cannot reach outside
 // its own directory), into the Elixir package as files it reads when it
-// compiles, for the same reason, and into the Java core as resources in its
-// jar:
+// compiles, for the same reason, into the Java core as resources in its
+// jar, and into the .NET core as embedded resources in its assembly:
 //
 //   packages/sdk/src/routes/icons.ts
 //   packages/ruby/lib/cronwatch/web/icons.rb
@@ -15,10 +15,11 @@
 //   packages/rust/cronwatch/src/web/assets/icons/*
 //   packages/elixir/lib/cronwatch/web/assets/icons/*
 //   packages/java/cronwatch/src/main/resources/dev/cronwatch/web/assets/icons/*
+//   packages/dotnet/src/Cronwatch/Web/Assets/icons/*
 //
 // Run from the repo root after changing the drawing:
 //
-//   node scripts/make-dashboard-icons.mjs            write the five files and the Rust, Elixir and Java icons
+//   node scripts/make-dashboard-icons.mjs            write the five files and the Rust, Elixir, Java and .NET icons
 //   node scripts/make-dashboard-icons.mjs --check    exit 1 when any is stale
 //   node scripts/make-dashboard-icons.mjs --out DIR  also write the PNGs and SVGs to DIR
 //
@@ -40,6 +41,7 @@ const GO_OUT = path.join(ROOT, "packages/go/routes_icons.go");
 const RUST_OUT = path.join(ROOT, "packages/rust/cronwatch/src/web/assets/icons");
 const ELIXIR_OUT = path.join(ROOT, "packages/elixir/lib/cronwatch/web/assets/icons");
 const JAVA_OUT = path.join(ROOT, "packages/java/cronwatch/src/main/resources/dev/cronwatch/web/assets/icons");
+const DOTNET_OUT = path.join(ROOT, "packages/dotnet/src/Cronwatch/Web/Assets/icons");
 
 // The favicon's colours (site/src/assets/favicon.svg).
 const SQUARE = [0x14, 0x14, 0x17];
@@ -278,12 +280,13 @@ const (
 )
 `;
 
-// The Rust crate's, the Elixir package's and the Java core's icons, each a file of its own,
+// The Rust crate's, the Elixir package's, the Java core's and the .NET core's icons, each a file of its own,
 // byte for byte.
 const iconFiles = [...Object.entries(pngs), ["icon.svg", Buffer.from(ICON_SVG)], ["maskable.svg", Buffer.from(MASKABLE_SVG)]];
 const rustFiles = iconFiles.map(([name, data]) => [path.join(RUST_OUT, name), data]);
 const elixirFiles = iconFiles.map(([name, data]) => [path.join(ELIXIR_OUT, name), data]);
 const javaFiles = iconFiles.map(([name, data]) => [path.join(JAVA_OUT, name), data]);
+const dotnetFiles = iconFiles.map(([name, data]) => [path.join(DOTNET_OUT, name), data]);
 
 const outDir = process.argv.includes("--out") ? process.argv[process.argv.indexOf("--out") + 1] : null;
 if (outDir) {
@@ -295,7 +298,7 @@ if (outDir) {
 
 const sizes = Object.entries(pngs).map(([name, data]) => `${name} ${data.length} bytes`).join(", ");
 if (process.argv.includes("--check")) {
-  const stale = [[TS_OUT, ts], [RB_OUT, rb], [PY_OUT, py], [PHP_OUT, php], [GO_OUT, go], ...rustFiles, ...elixirFiles, ...javaFiles].filter(([file, text]) => {
+  const stale = [[TS_OUT, ts], [RB_OUT, rb], [PY_OUT, py], [PHP_OUT, php], [GO_OUT, go], ...rustFiles, ...elixirFiles, ...javaFiles, ...dotnetFiles].filter(([file, text]) => {
     try {
       return typeof text === "string" ? readFileSync(file, "utf8") !== text : !readFileSync(file).equals(text);
     } catch {
@@ -320,6 +323,8 @@ if (process.argv.includes("--check")) {
   for (const [file, data] of elixirFiles) writeFileSync(file, data);
   mkdirSync(JAVA_OUT, { recursive: true });
   for (const [file, data] of javaFiles) writeFileSync(file, data);
+  mkdirSync(DOTNET_OUT, { recursive: true });
+  for (const [file, data] of dotnetFiles) writeFileSync(file, data);
   const written = [TS_OUT, RB_OUT, PY_OUT, PHP_OUT, GO_OUT].map((file) => path.relative(ROOT, file)).join(", ");
-  console.log(`wrote ${written}, ${path.relative(ROOT, RUST_OUT)}, ${path.relative(ROOT, ELIXIR_OUT)} and ${path.relative(ROOT, JAVA_OUT)} (${sizes})`);
+  console.log(`wrote ${written}, ${path.relative(ROOT, RUST_OUT)}, ${path.relative(ROOT, ELIXIR_OUT)}, ${path.relative(ROOT, JAVA_OUT)} and ${path.relative(ROOT, DOTNET_OUT)} (${sizes})`);
 }
