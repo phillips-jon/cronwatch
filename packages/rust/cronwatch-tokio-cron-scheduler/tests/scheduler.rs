@@ -178,6 +178,30 @@ async fn a_job_removed_and_added_again_gets_its_schedule_back_at_once() {
     following.abort();
 }
 
+// The review: forgetting a job the scheduler still runs left the watch
+// holding it as unchanged, and the next sync took it for an entry gone.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_job_forgotten_while_the_scheduler_runs_it_keeps_its_schedule() {
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let (cw, errors) = client(store.clone());
+    let watcher = Watcher::new(&cw, options("billing"));
+    let scheduler = JobScheduler::new().await.unwrap();
+    scheduler
+        .add(watcher.job("nightly", "0 0 3 * * *", "", |_| async { Ok::<_, Failed>(()) }, JobOptions::new()).unwrap())
+        .await
+        .unwrap();
+    watcher.sync(&scheduler).await.unwrap();
+    cw.check().await.unwrap();
+    cw.forget("nightly").await.unwrap();
+    for _ in 0..2 {
+        watcher.sync(&scheduler).await.unwrap();
+        cw.check().await.unwrap();
+    }
+    assert!(stored(&*store, "nightly").await.contains(r#""schedule":"0 0 3 * * *""#), "the schedule is kept");
+    assert_eq!(cw.defined_jobs().iter().map(|d| d.schedule().to_string()).collect::<Vec<_>>(), ["0 0 3 * * *"]);
+    assert!(errors.lock().unwrap().is_empty(), "{:?}", errors.lock().unwrap());
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_sync_finds_a_job_removed_without_following_and_one_another_release_dropped() {
     let store: Arc<dyn Store> = Arc::new(MemoryStore::new());

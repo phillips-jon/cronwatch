@@ -111,6 +111,8 @@ struct Declared {
     job: Job,
     /// The definition's JSON, to tell a changed declaration.
     key: String,
+    /// The options that declared it, to declare it again after a forget.
+    options: JobOptions,
     /// The entry is still in the scheduler.
     current: bool,
 }
@@ -271,16 +273,20 @@ impl Watch {
 
     fn declare_one(&self, name: &str, label: &str, options: JobOptions, current: bool) {
         let key = describe_job(name, &options).to_json();
+        // Unchanged, and still declared: a job forgotten since (the
+        // dashboard's forget) is declared again, or its next run would write
+        // it back and unschedule take it for an entry gone.
+        let live = self.inner.cw.declared(name).is_some();
         {
             let mut state = lock(&self.inner.state);
             if let Some(d) = state.jobs.get_mut(name) {
-                if d.key == key {
+                if d.key == key && live {
                     d.current = d.current || current;
                     return;
                 }
             }
         }
-        let job = match self.inner.cw.job(name, options) {
+        let job = match self.inner.cw.job(name, options.clone()) {
             Ok(job) => job,
             Err(err) => {
                 self.report_once(&err.to_string(), &format!("declaring {label}"));
@@ -294,10 +300,11 @@ impl Watch {
                 Some(d) => {
                     d.job = job;
                     d.key = key;
+                    d.options = options;
                     d.current = d.current || current;
                 }
                 None => {
-                    state.jobs.insert(name.to_string(), Declared { job, key, current });
+                    state.jobs.insert(name.to_string(), Declared { job, key, options, current });
                 }
             }
         }
@@ -385,14 +392,15 @@ impl Watch {
     /// the job in another process): declared again from the definition the
     /// store holds, when that is this app's (tagged with its app tag), so
     /// the schedule another process stored is kept, else with `options` and
-    /// this watch's tags. Declared once per name in this process. `None`,
+    /// this watch's tags. Declared once per name in this process, and again
+    /// after the dashboard's forget. `None`,
     /// with the reason reported, when the client refuses it or the store
     /// cannot be read (the run then goes unrecorded, and the next one asks
     /// again), since a declaration made without the stored one would write
     /// over its schedule. A job [`declare`](Self::declare) has declared is
     /// `declare`'s.
     pub async fn fallback(&self, name: &str, options: JobOptions) -> Option<Job> {
-        if let Some(job) = self.job(name) {
+        if let Some(job) = self.held(name) {
             return Some(job);
         }
         let cw = &self.inner.cw;
@@ -415,7 +423,7 @@ impl Watch {
         // a scheduler entry meanwhile is that one, so the client never ends
         // up holding the declaration without the schedule.
         let _turn = lock(&self.inner.declaring);
-        if let Some(job) = self.job(name) {
+        if let Some(job) = self.held(name) {
             return Some(job);
         }
         match cw.job(name, made) {
@@ -428,6 +436,22 @@ impl Watch {
                 None
             }
         }
+    }
+
+    /// The job declared under `name`, or the one [`fallback`](Self::fallback)
+    /// declared for it while the client still declares it: one forgotten
+    /// since (the dashboard's forget) is dropped, to be made again.
+    fn held(&self, name: &str) -> Option<Job> {
+        let live = self.inner.cw.declared(name).is_some();
+        let mut state = lock(&self.inner.state);
+        if let Some(d) = state.jobs.get(name) {
+            return Some(d.job.clone());
+        }
+        if live {
+            return state.fallback.get(name).cloned();
+        }
+        state.fallback.remove(name);
+        None
     }
 
     /// Declares again without its schedule every job of this app's (tagged
@@ -451,6 +475,30 @@ impl Watch {
         }
         let cw = &self.inner.cw;
         let mut failed: Vec<String> = Vec::new();
+        // A job whose entry the scheduler still has, forgotten since (the
+        // dashboard's forget), is declared again first, so it keeps its
+        // schedule rather than being taken for an entry gone.
+        {
+            let _turn = lock(&self.inner.declaring);
+            let defined = self.defined();
+            let mut forgotten: Vec<(String, String, JobOptions)> = lock(&self.inner.state)
+                .jobs
+                .iter()
+                .filter(|(name, d)| d.current && !defined.contains(*name))
+                .map(|(name, d)| (name.clone(), d.key.clone(), d.options.clone()))
+                .collect();
+            forgotten.sort_by(|a, b| a.0.cmp(&b.0));
+            for (name, key, options) in forgotten {
+                match cw.job(&name, options) {
+                    Ok(job) => {
+                        if let Some(d) = lock(&self.inner.state).jobs.get_mut(&name).filter(|d| d.key == key) {
+                            d.job = job;
+                        }
+                    }
+                    Err(err) => self.report_once(&err.to_string(), &format!("declaring {}", js::quote(&name))),
+                }
+            }
+        }
         let defined = self.defined();
         mine.sort();
         for name in mine.iter().filter(|n| defined.contains(*n)) {
