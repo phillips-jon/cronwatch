@@ -16,7 +16,7 @@ composer require cronwatch/craft
 php craft plugin/install cronwatch
 ```
 
-It is not in the Plugin Store yet, so it installs through Composer. Installing makes three tables in Craft's database (`cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`, after Craft's table prefix) with the library's own `CREATE` statements; uninstalling drops them.
+Or install it from the [Plugin Store](https://plugins.craftcms.com/cronwatch) in the Control Panel. Installing makes three tables in Craft's database (`cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`, after Craft's table prefix) with the library's own `CREATE` statements; uninstalling drops them.
 
 ## What is watched
 
