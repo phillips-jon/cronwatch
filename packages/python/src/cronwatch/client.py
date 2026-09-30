@@ -471,6 +471,7 @@ class Cronwatch:
     # Set by _reset_process_state(), again in a forked child.
     _pid: int
     _locks: dict[str, threading.RLock]
+    _syncing: dict[str, threading.RLock]
     _check_lock: threading.Lock
     _checking: _Flight | None
     _ticker_lock: threading.Lock
@@ -810,6 +811,8 @@ class Cronwatch:
         triage threads belong to one process. A forked child starts with fresh ones."""
         self._pid = os.getpid()
         self._locks = {}
+        # Each job's lock for writing its declaration. See _sync().
+        self._syncing = {}
         self._check_lock = threading.Lock()
         self._checking = None
         self._ticker_lock = threading.Lock()
@@ -911,23 +914,39 @@ class Cronwatch:
             self._ready = True
 
     def _sync(self, definition: JobDefinition) -> None:
+        """Writes the declaration of `definition`'s name as it stands, unless the
+        store has it. A handle kept from an earlier declaration writes the one
+        that replaced it, never its own over it, and one forgotten since writes
+        its own. The writes of one name take turns, each reading what stands
+        once its turn comes, so one still under way cannot land after a later
+        one; and a name declared again while its write was under way is still
+        to be written."""
         self._ensure_ready()
+        name = definition.name
         with self._registry:
-            if definition.name in self._synced:
+            if name in self._synced:
                 return
-        self.store.upsert_job(to_stored(definition), self.now())
-        with self._registry:
-            self._synced.add(definition.name)
+        with self._serial(name, syncing=True):
+            with self._registry:
+                if name in self._synced:
+                    return
+                standing = self._definitions.get(name, definition)
+            self.store.upsert_job(to_stored(standing), self.now())
+            with self._registry:
+                if self._definitions.get(name, standing) is standing:
+                    self._synced.add(name)
 
-    def _serial(self, job: str) -> threading.RLock:
+    def _serial(self, job: str, syncing: bool = False) -> threading.RLock:
         """The job's lock: two runs (or a run and a check) in this process never
         read and write the job's state over each other. Other processes are
-        coordinated by _update_state instead."""
+        coordinated by _update_state instead. With `syncing`, the lock of its
+        own that _sync() writes the job's declaration under."""
         self._after_fork_check()
         with self._registry:
-            lock = self._locks.get(job)
+            locks = self._syncing if syncing else self._locks
+            lock = locks.get(job)
             if lock is None:
-                lock = self._locks[job] = threading.RLock()
+                lock = locks[job] = threading.RLock()
             return lock
 
     def _read_state(self, job: str) -> JobState:

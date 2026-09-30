@@ -643,3 +643,77 @@ def test_a_redact_that_fails_is_reported_and_the_default_is_used() -> None:
     custom, _, _ = make(redact=lambda text: text.replace("hunter2", "***"))
     custom.run("r", lambda ctx: ctx.log("password=hunter2\x00"))
     assert custom.runs("r")[0].output == "password=***"
+
+
+class HeldUpsert:
+    """A store whose first write of a job's definition waits until it is let
+    go, so a test can declare the job again, or ask for another write, while
+    that one is under way."""
+
+    def __init__(self, inner: Any) -> None:
+        self.entered = threading.Event()
+        self.release = threading.Event()
+        self._held = False
+
+        def upsert_job(definition: JobDefinition, now: int) -> None:
+            if not self._held:
+                self._held = True
+                self.entered.set()
+                assert self.release.wait(5)
+            inner.upsert_job(definition, now)
+
+        self.store = Wrapped(inner, upsert_job=upsert_job)
+
+
+def test_a_handle_kept_from_an_earlier_declaration_writes_the_one_that_stands_not_its_own() -> None:
+    store = MemoryStore()
+    cw, _, _ = make(store=store)
+    earlier = cw.job("a")
+    cw.job("a", schedule="every 5m")
+    earlier.run(lambda ctx: None)
+    assert store.get_job("a").definition.schedule == "every 5m"
+    cw.check()
+    assert store.get_job("a").definition.schedule == "every 5m"
+
+
+def test_a_handle_whose_job_was_forgotten_writes_its_own_definition() -> None:
+    store = MemoryStore()
+    cw, _, _ = make(store=store)
+    handle = cw.job("a", schedule="every 5m")
+    cw.forget("a")
+    handle.run(lambda ctx: None)
+    assert store.get_job("a").definition.schedule == "every 5m"
+
+
+def test_a_declaration_made_while_the_earlier_one_is_being_written_is_still_to_be_written() -> None:
+    inner = MemoryStore()
+    held = HeldUpsert(inner)
+    cw, _, _ = make(store=held.store)
+    run = threading.Thread(target=lambda: cw.job("a").run(lambda ctx: None))
+    run.start()
+    assert held.entered.wait(5)
+    cw.job("a", schedule="every 5m")
+    held.release.set()
+    run.join(5)
+    cw.check()
+    assert inner.get_job("a").definition.schedule == "every 5m"
+
+
+def test_a_declarations_write_waits_for_the_earlier_ones_so_the_later_one_stays() -> None:
+    inner = MemoryStore()
+    held = HeldUpsert(inner)
+    cw, _, _ = make(store=held.store)
+    run = threading.Thread(target=lambda: cw.job("a").run(lambda ctx: None))
+    run.start()
+    assert held.entered.wait(5)
+    cw.job("a", schedule="every 5m")
+    summaries: list[Any] = []
+    later = threading.Thread(target=lambda: summaries.append(cw.job_summary("a")))
+    later.start()
+    # Were the later write not to wait its turn, it would land here, under the earlier one.
+    later.join(0.2)
+    held.release.set()
+    run.join(5)
+    later.join(5)
+    assert inner.get_job("a").definition.schedule == "every 5m"
+    assert summaries[0].definition.schedule == "every 5m"
