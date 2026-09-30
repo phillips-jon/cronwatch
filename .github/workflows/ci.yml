@@ -1267,3 +1267,72 @@ jobs:
             echo "$jar holds files it should not"
             exit 1
           fi
+      # The integrations' jars hold their own classes, module-info, resources
+      # and META-INF, and nothing from the tests.
+      - name: The integrations' jars
+        if: matrix.newest
+        working-directory: packages/java
+        run: |
+          for module in cronwatch-quartz cronwatch-jobrunr cronwatch-spring-boot-starter; do
+            jar=$(ls $module/target/$module-*.jar)
+            unzip -Z1 "$jar" | sort > "$RUNNER_TEMP/jar.txt"
+            (cd $module/target/test-classes && find . -type f | sed 's|^\./||' | sort) > "$RUNNER_TEMP/tests.txt"
+            if comm -12 "$RUNNER_TEMP/jar.txt" "$RUNNER_TEMP/tests.txt" | grep .; then
+              echo "$jar holds test files"
+              exit 1
+            fi
+            if grep -v -E '^(META-INF/|module-info\.class$|dev/$|dev/cronwatch/)' "$RUNNER_TEMP/jar.txt"; then
+              echo "$jar holds files it should not"
+              exit 1
+            fi
+          done
+
+  # The Spring Boot starter's, the Quartz module's and the JobRunr module's
+  # tests against the oldest and the newest release each supports: Maven
+  # resolves exactly the version a POM names, and an app's own build decides
+  # which one it runs. The Quartz module's recovery test runs on the JDBC job
+  # store over Postgres.
+  java-frameworks:
+    name: java-frameworks (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: oldest, boot: "3.5.0", shedlock: "6.10.0", quartz: "2.5.0", jobrunr: "8.0.0" }
+          - { name: newest, boot: "4.1.1", shedlock: "7.10.1", quartz: "2.5.2", jobrunr: "8.8.2" }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.m2/wrapper
+          key: maven-frameworks-${{ matrix.name }}-${{ hashFiles('packages/java/**/pom.xml', 'packages/java/.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: maven-frameworks-${{ matrix.name }}-
+      - name: ./mvnw verify, the integrations
+        working-directory: packages/java
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+        run: >-
+          ./mvnw -B verify
+          -pl cronwatch-quartz,cronwatch-jobrunr,cronwatch-spring-boot-starter -am
+          -Dspring-boot.version=${{ matrix.boot }}
+          -Dshedlock.version=${{ matrix.shedlock }}
+          -Dquartz.version=${{ matrix.quartz }}
+          -Djobrunr.version=${{ matrix.jobrunr }}
+          -Dtest='dev.cronwatch.quartz.*Test,dev.cronwatch.jobrunr.*Test,dev.cronwatch.spring.*Test'
+          -Dsurefire.failIfNoSpecifiedTests=false
