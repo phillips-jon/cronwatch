@@ -1,0 +1,44 @@
+#nullable enable
+Cronwatch.Hangfire.CronwatchCheckJob
+Cronwatch.Hangfire.CronwatchGlobalConfigurationExtensions
+Cronwatch.Hangfire.CronwatchHangfire
+Cronwatch.Hangfire.CronwatchHangfire.Client.get -> Cronwatch.CronwatchClient!
+Cronwatch.Hangfire.CronwatchHangfire.Dispose() -> void
+Cronwatch.Hangfire.CronwatchHangfire.Filter.get -> Cronwatch.Hangfire.CronwatchHangfireFilter!
+Cronwatch.Hangfire.CronwatchHangfire.SettleAsync(System.TimeSpan timeout) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.Hangfire.CronwatchHangfire.SyncAsync() -> System.Threading.Tasks.Task!
+Cronwatch.Hangfire.CronwatchHangfire.Watch.get -> Cronwatch.Bridge.Watch!
+Cronwatch.Hangfire.CronwatchHangfireFilter
+Cronwatch.Hangfire.CronwatchHangfireFilter.OnPerformed(Hangfire.Server.PerformedContext! context) -> void
+Cronwatch.Hangfire.CronwatchHangfireFilter.OnPerforming(Hangfire.Server.PerformingContext! context) -> void
+Cronwatch.Hangfire.CronwatchHangfireFilter.OnStateElection(Hangfire.States.ElectStateContext! context) -> void
+Cronwatch.Hangfire.CronwatchHangfireOptions
+Cronwatch.Hangfire.CronwatchHangfireOptions.App.get -> string?
+Cronwatch.Hangfire.CronwatchHangfireOptions.App.init -> void
+Cronwatch.Hangfire.CronwatchHangfireOptions.CronwatchHangfireOptions() -> void
+Cronwatch.Hangfire.CronwatchHangfireOptions.JobDefaults.get -> Cronwatch.JobOptions?
+Cronwatch.Hangfire.CronwatchHangfireOptions.JobDefaults.init -> void
+Cronwatch.Hangfire.CronwatchHangfireOptions.Jobs.get -> System.Collections.Generic.IDictionary<string!, Cronwatch.JobOptions!>!
+Cronwatch.Hangfire.CronwatchHangfireOptions.Jobs.init -> void
+Cronwatch.Hangfire.CronwatchHangfireOptions.Named.get -> System.Collections.Generic.IDictionary<string!, string!>!
+Cronwatch.Hangfire.CronwatchHangfireOptions.Named.init -> void
+Cronwatch.Hangfire.CronwatchHangfireOptions.ReadEvery.get -> System.TimeSpan
+Cronwatch.Hangfire.CronwatchHangfireOptions.ReadEvery.init -> void
+Cronwatch.Hangfire.CronwatchHangfireOptions.Storage.get -> Hangfire.JobStorage?
+Cronwatch.Hangfire.CronwatchHangfireOptions.Storage.init -> void
+Cronwatch.Hangfire.CronwatchJobAttribute
+Cronwatch.Hangfire.CronwatchJobAttribute.CronwatchJobAttribute(string! name) -> void
+Cronwatch.Hangfire.CronwatchJobAttribute.Name.get -> string!
+const Cronwatch.Hangfire.CronwatchHangfire.AttemptParameter = "CronwatchAttempt" -> string!
+const Cronwatch.Hangfire.CronwatchHangfire.CheckJobId = "cronwatch-check" -> string!
+const Cronwatch.Hangfire.CronwatchHangfire.Tag = "hangfire" -> string!
+const Cronwatch.Hangfire.CronwatchHangfire.Trigger = "hangfire" -> string!
+override Cronwatch.Hangfire.CronwatchHangfire.ToString() -> string!
+override Cronwatch.Hangfire.CronwatchHangfireFilter.ToString() -> string!
+override Cronwatch.Hangfire.CronwatchHangfireOptions.ToString() -> string!
+static Cronwatch.Hangfire.CronwatchCheckJob.RunAsync() -> System.Threading.Tasks.Task!
+static Cronwatch.Hangfire.CronwatchGlobalConfigurationExtensions.UseCronwatch(this Hangfire.IGlobalConfiguration! configuration, Cronwatch.CronwatchClient! cw, Cronwatch.Hangfire.CronwatchHangfireOptions? options = null) -> Hangfire.IGlobalConfiguration!
+static Cronwatch.Hangfire.CronwatchGlobalConfigurationExtensions.UseCronwatch(this Hangfire.IGlobalConfiguration! configuration, System.IServiceProvider! services, Cronwatch.Hangfire.CronwatchHangfireOptions? options = null) -> Hangfire.IGlobalConfiguration!
+static Cronwatch.Hangfire.CronwatchHangfire.ScheduleCheck() -> void
+static Cronwatch.Hangfire.CronwatchHangfire.ScheduleCheck(Hangfire.IRecurringJobManager! manager, string! cron = "* * * * *") -> void
+static Cronwatch.Hangfire.CronwatchHangfire.Start(Cronwatch.CronwatchClient! cw, Cronwatch.Hangfire.CronwatchHangfireOptions? options = null) -> Cronwatch.Hangfire.CronwatchHangfire!

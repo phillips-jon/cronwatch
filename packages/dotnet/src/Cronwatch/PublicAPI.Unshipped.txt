@@ -1,0 +1,1362 @@
+#nullable enable
+Cronwatch.Alert
+Cronwatch.Alert.<Clone>$() -> Cronwatch.Alert!
+Cronwatch.Alert.Alert() -> void
+Cronwatch.Alert.At.get -> long
+Cronwatch.Alert.At.init -> void
+Cronwatch.Alert.Definition.get -> Cronwatch.Definition!
+Cronwatch.Alert.Definition.init -> void
+Cronwatch.Alert.Details.get -> Cronwatch.AlertDetails!
+Cronwatch.Alert.Details.init -> void
+Cronwatch.Alert.Equals(Cronwatch.Alert? other) -> bool
+Cronwatch.Alert.Job.get -> string!
+Cronwatch.Alert.Job.init -> void
+Cronwatch.Alert.Message.get -> string!
+Cronwatch.Alert.Message.init -> void
+Cronwatch.Alert.Run.get -> Cronwatch.Run?
+Cronwatch.Alert.Run.init -> void
+Cronwatch.Alert.Title.get -> string!
+Cronwatch.Alert.Title.init -> void
+Cronwatch.Alert.ToJson() -> string!
+Cronwatch.Alert.ToValue() -> Cronwatch.JsObject!
+Cronwatch.Alert.Triage.get -> string?
+Cronwatch.Alert.Triage.init -> void
+Cronwatch.Alert.TriageTried.get -> bool
+Cronwatch.Alert.TriageTried.init -> void
+Cronwatch.Alert.Type.get -> Cronwatch.AlertType
+Cronwatch.Alert.Type.init -> void
+Cronwatch.Alert.WithTriage(string? diagnosis) -> Cronwatch.Alert!
+Cronwatch.AlertDetails
+Cronwatch.AlertDetails.AlertDetails(Cronwatch.AlertDetails! original) -> void
+Cronwatch.AlertDetails.Failure
+Cronwatch.AlertDetails.Failure.ConsecutiveFailures.get -> long
+Cronwatch.AlertDetails.Failure.ConsecutiveFailures.init -> void
+Cronwatch.AlertDetails.Failure.Deconstruct(out long ConsecutiveFailures, out long Threshold) -> void
+Cronwatch.AlertDetails.Failure.Equals(Cronwatch.AlertDetails.Failure? other) -> bool
+Cronwatch.AlertDetails.Failure.Failure(long ConsecutiveFailures, long Threshold) -> void
+Cronwatch.AlertDetails.Failure.Threshold.get -> long
+Cronwatch.AlertDetails.Failure.Threshold.init -> void
+Cronwatch.AlertDetails.Missed
+Cronwatch.AlertDetails.Missed.Deadline.get -> double
+Cronwatch.AlertDetails.Missed.Deadline.init -> void
+Cronwatch.AlertDetails.Missed.Deconstruct(out long DueAt, out double Deadline, out double GraceMs, out long? LastRunAt) -> void
+Cronwatch.AlertDetails.Missed.DueAt.get -> long
+Cronwatch.AlertDetails.Missed.DueAt.init -> void
+Cronwatch.AlertDetails.Missed.Equals(Cronwatch.AlertDetails.Missed? other) -> bool
+Cronwatch.AlertDetails.Missed.GraceMs.get -> double
+Cronwatch.AlertDetails.Missed.GraceMs.init -> void
+Cronwatch.AlertDetails.Missed.LastRunAt.get -> long?
+Cronwatch.AlertDetails.Missed.LastRunAt.init -> void
+Cronwatch.AlertDetails.Missed.Missed(long DueAt, double Deadline, double GraceMs, long? LastRunAt) -> void
+Cronwatch.AlertDetails.OverBudget
+Cronwatch.AlertDetails.OverBudget.Breaches.get -> Cronwatch.ValueList<Cronwatch.BudgetBreach!>!
+Cronwatch.AlertDetails.OverBudget.Breaches.init -> void
+Cronwatch.AlertDetails.OverBudget.Deconstruct(out Cronwatch.ValueList<Cronwatch.BudgetBreach!>! Breaches) -> void
+Cronwatch.AlertDetails.OverBudget.Equals(Cronwatch.AlertDetails.OverBudget? other) -> bool
+Cronwatch.AlertDetails.OverBudget.OverBudget(Cronwatch.ValueList<Cronwatch.BudgetBreach!>! Breaches) -> void
+Cronwatch.AlertDetails.Recovered
+Cronwatch.AlertDetails.Recovered.After.get -> Cronwatch.ValueList<Cronwatch.Condition>!
+Cronwatch.AlertDetails.Recovered.After.init -> void
+Cronwatch.AlertDetails.Recovered.Deconstruct(out Cronwatch.ValueList<Cronwatch.Condition>! After, out string? Reason, out long? Since) -> void
+Cronwatch.AlertDetails.Recovered.Equals(Cronwatch.AlertDetails.Recovered? other) -> bool
+Cronwatch.AlertDetails.Recovered.Reason.get -> string?
+Cronwatch.AlertDetails.Recovered.Reason.init -> void
+Cronwatch.AlertDetails.Recovered.Recovered(Cronwatch.ValueList<Cronwatch.Condition>! After, string? Reason, long? Since) -> void
+Cronwatch.AlertDetails.Recovered.Since.get -> long?
+Cronwatch.AlertDetails.Recovered.Since.init -> void
+Cronwatch.AlertDetails.Slow
+Cronwatch.AlertDetails.Slow.Basis.get -> string!
+Cronwatch.AlertDetails.Slow.Basis.init -> void
+Cronwatch.AlertDetails.Slow.Deconstruct(out long DurationMs, out double ThresholdMs, out string! Basis) -> void
+Cronwatch.AlertDetails.Slow.DurationMs.get -> long
+Cronwatch.AlertDetails.Slow.DurationMs.init -> void
+Cronwatch.AlertDetails.Slow.Equals(Cronwatch.AlertDetails.Slow? other) -> bool
+Cronwatch.AlertDetails.Slow.Slow(long DurationMs, double ThresholdMs, string! Basis) -> void
+Cronwatch.AlertDetails.Slow.ThresholdMs.get -> double
+Cronwatch.AlertDetails.Slow.ThresholdMs.init -> void
+Cronwatch.AlertType
+Cronwatch.AlertType.AlertType() -> void
+Cronwatch.AlertType.AlertType(string! Value) -> void
+Cronwatch.AlertType.Deconstruct(out string! Value) -> void
+Cronwatch.AlertType.Equals(Cronwatch.AlertType other) -> bool
+Cronwatch.AlertType.Value.get -> string!
+Cronwatch.AlertType.Value.init -> void
+Cronwatch.Alerts.BugsnagChannel
+Cronwatch.Alerts.BugsnagChannel.BugsnagChannel(Cronwatch.Alerts.BugsnagOptions! options) -> void
+Cronwatch.Alerts.BugsnagChannel.Name.get -> string!
+Cronwatch.Alerts.BugsnagChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.BugsnagOptions
+Cronwatch.Alerts.BugsnagOptions.ApiKey.init -> void
+Cronwatch.Alerts.BugsnagOptions.BugsnagOptions() -> void
+Cronwatch.Alerts.BugsnagOptions.Clock.get -> System.TimeProvider?
+Cronwatch.Alerts.BugsnagOptions.Clock.init -> void
+Cronwatch.Alerts.BugsnagOptions.Endpoint.get -> string!
+Cronwatch.Alerts.BugsnagOptions.Endpoint.init -> void
+Cronwatch.Alerts.BugsnagOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.BugsnagOptions.Link.init -> void
+Cronwatch.Alerts.BugsnagOptions.Recovered.get -> bool
+Cronwatch.Alerts.BugsnagOptions.Recovered.init -> void
+Cronwatch.Alerts.BugsnagOptions.ReleaseStage.get -> string!
+Cronwatch.Alerts.BugsnagOptions.ReleaseStage.init -> void
+Cronwatch.Alerts.BugsnagOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.BugsnagOptions.Transport.init -> void
+Cronwatch.Alerts.DatadogChannel
+Cronwatch.Alerts.DatadogChannel.DatadogChannel(Cronwatch.Alerts.DatadogOptions! options) -> void
+Cronwatch.Alerts.DatadogChannel.Name.get -> string!
+Cronwatch.Alerts.DatadogChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.DatadogOptions
+Cronwatch.Alerts.DatadogOptions.ApiKey.init -> void
+Cronwatch.Alerts.DatadogOptions.DatadogOptions() -> void
+Cronwatch.Alerts.DatadogOptions.Host.get -> string?
+Cronwatch.Alerts.DatadogOptions.Host.init -> void
+Cronwatch.Alerts.DatadogOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.DatadogOptions.Link.init -> void
+Cronwatch.Alerts.DatadogOptions.Site.get -> string!
+Cronwatch.Alerts.DatadogOptions.Site.init -> void
+Cronwatch.Alerts.DatadogOptions.Tags.get -> System.Collections.Generic.IList<string!>!
+Cronwatch.Alerts.DatadogOptions.Tags.init -> void
+Cronwatch.Alerts.DatadogOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.DatadogOptions.Transport.init -> void
+Cronwatch.Alerts.Discord
+Cronwatch.Alerts.DiscordChannel
+Cronwatch.Alerts.DiscordChannel.DiscordChannel(Cronwatch.Alerts.DiscordOptions! options) -> void
+Cronwatch.Alerts.DiscordChannel.Name.get -> string!
+Cronwatch.Alerts.DiscordChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.DiscordOptions
+Cronwatch.Alerts.DiscordOptions.DiscordOptions() -> void
+Cronwatch.Alerts.DiscordOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.DiscordOptions.Link.init -> void
+Cronwatch.Alerts.DiscordOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.DiscordOptions.Transport.init -> void
+Cronwatch.Alerts.DiscordOptions.WebhookUrl.init -> void
+Cronwatch.Alerts.HoneybadgerChannel
+Cronwatch.Alerts.HoneybadgerChannel.HoneybadgerChannel(Cronwatch.Alerts.HoneybadgerOptions! options) -> void
+Cronwatch.Alerts.HoneybadgerChannel.Name.get -> string!
+Cronwatch.Alerts.HoneybadgerChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.HoneybadgerOptions
+Cronwatch.Alerts.HoneybadgerOptions.ApiKey.init -> void
+Cronwatch.Alerts.HoneybadgerOptions.Endpoint.get -> string!
+Cronwatch.Alerts.HoneybadgerOptions.Endpoint.init -> void
+Cronwatch.Alerts.HoneybadgerOptions.Environment.get -> string!
+Cronwatch.Alerts.HoneybadgerOptions.Environment.init -> void
+Cronwatch.Alerts.HoneybadgerOptions.HoneybadgerOptions() -> void
+Cronwatch.Alerts.HoneybadgerOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.HoneybadgerOptions.Link.init -> void
+Cronwatch.Alerts.HoneybadgerOptions.Recovered.get -> bool
+Cronwatch.Alerts.HoneybadgerOptions.Recovered.init -> void
+Cronwatch.Alerts.HoneybadgerOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.HoneybadgerOptions.Transport.init -> void
+Cronwatch.Alerts.HttpClientTransport
+Cronwatch.Alerts.HttpClientTransport.Dispose() -> void
+Cronwatch.Alerts.HttpClientTransport.HttpClientTransport() -> void
+Cronwatch.Alerts.HttpClientTransport.PostAsync(Cronwatch.Alerts.TransportRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Cronwatch.Alerts.TransportResponse!>!
+Cronwatch.Alerts.ITransport
+Cronwatch.Alerts.ITransport.PostAsync(Cronwatch.Alerts.TransportRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<Cronwatch.Alerts.TransportResponse!>!
+Cronwatch.Alerts.MailgunChannel
+Cronwatch.Alerts.MailgunChannel.MailgunChannel(Cronwatch.Alerts.MailgunOptions! options) -> void
+Cronwatch.Alerts.MailgunChannel.Name.get -> string!
+Cronwatch.Alerts.MailgunChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.MailgunOptions
+Cronwatch.Alerts.MailgunOptions.ApiKey.init -> void
+Cronwatch.Alerts.MailgunOptions.Domain.get -> string?
+Cronwatch.Alerts.MailgunOptions.Domain.init -> void
+Cronwatch.Alerts.MailgunOptions.From.get -> string?
+Cronwatch.Alerts.MailgunOptions.From.init -> void
+Cronwatch.Alerts.MailgunOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.MailgunOptions.Link.init -> void
+Cronwatch.Alerts.MailgunOptions.MailgunOptions() -> void
+Cronwatch.Alerts.MailgunOptions.Region.get -> string!
+Cronwatch.Alerts.MailgunOptions.Region.init -> void
+Cronwatch.Alerts.MailgunOptions.SubjectPrefix.get -> string?
+Cronwatch.Alerts.MailgunOptions.SubjectPrefix.init -> void
+Cronwatch.Alerts.MailgunOptions.To.get -> System.Collections.Generic.IList<string!>!
+Cronwatch.Alerts.MailgunOptions.To.init -> void
+Cronwatch.Alerts.MailgunOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.MailgunOptions.Transport.init -> void
+Cronwatch.Alerts.NewRelicChannel
+Cronwatch.Alerts.NewRelicChannel.Name.get -> string!
+Cronwatch.Alerts.NewRelicChannel.NewRelicChannel(Cronwatch.Alerts.NewRelicOptions! options) -> void
+Cronwatch.Alerts.NewRelicChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.NewRelicOptions
+Cronwatch.Alerts.NewRelicOptions.AccountId.get -> string?
+Cronwatch.Alerts.NewRelicOptions.AccountId.init -> void
+Cronwatch.Alerts.NewRelicOptions.ApiKey.init -> void
+Cronwatch.Alerts.NewRelicOptions.EventType.get -> string!
+Cronwatch.Alerts.NewRelicOptions.EventType.init -> void
+Cronwatch.Alerts.NewRelicOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.NewRelicOptions.Link.init -> void
+Cronwatch.Alerts.NewRelicOptions.NewRelicOptions() -> void
+Cronwatch.Alerts.NewRelicOptions.Region.get -> string!
+Cronwatch.Alerts.NewRelicOptions.Region.init -> void
+Cronwatch.Alerts.NewRelicOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.NewRelicOptions.Transport.init -> void
+Cronwatch.Alerts.PostmarkChannel
+Cronwatch.Alerts.PostmarkChannel.Name.get -> string!
+Cronwatch.Alerts.PostmarkChannel.PostmarkChannel(Cronwatch.Alerts.PostmarkOptions! options) -> void
+Cronwatch.Alerts.PostmarkChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.PostmarkOptions
+Cronwatch.Alerts.PostmarkOptions.From.get -> string?
+Cronwatch.Alerts.PostmarkOptions.From.init -> void
+Cronwatch.Alerts.PostmarkOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.PostmarkOptions.Link.init -> void
+Cronwatch.Alerts.PostmarkOptions.MessageStream.get -> string!
+Cronwatch.Alerts.PostmarkOptions.MessageStream.init -> void
+Cronwatch.Alerts.PostmarkOptions.PostmarkOptions() -> void
+Cronwatch.Alerts.PostmarkOptions.ServerToken.init -> void
+Cronwatch.Alerts.PostmarkOptions.SubjectPrefix.get -> string?
+Cronwatch.Alerts.PostmarkOptions.SubjectPrefix.init -> void
+Cronwatch.Alerts.PostmarkOptions.To.get -> System.Collections.Generic.IList<string!>!
+Cronwatch.Alerts.PostmarkOptions.To.init -> void
+Cronwatch.Alerts.PostmarkOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.PostmarkOptions.Transport.init -> void
+Cronwatch.Alerts.ResendChannel
+Cronwatch.Alerts.ResendChannel.Name.get -> string!
+Cronwatch.Alerts.ResendChannel.ResendChannel(Cronwatch.Alerts.ResendOptions! options) -> void
+Cronwatch.Alerts.ResendChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.ResendOptions
+Cronwatch.Alerts.ResendOptions.ApiKey.init -> void
+Cronwatch.Alerts.ResendOptions.From.get -> string?
+Cronwatch.Alerts.ResendOptions.From.init -> void
+Cronwatch.Alerts.ResendOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.ResendOptions.Link.init -> void
+Cronwatch.Alerts.ResendOptions.ResendOptions() -> void
+Cronwatch.Alerts.ResendOptions.SubjectPrefix.get -> string?
+Cronwatch.Alerts.ResendOptions.SubjectPrefix.init -> void
+Cronwatch.Alerts.ResendOptions.To.get -> System.Collections.Generic.IList<string!>!
+Cronwatch.Alerts.ResendOptions.To.init -> void
+Cronwatch.Alerts.ResendOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.ResendOptions.Transport.init -> void
+Cronwatch.Alerts.RollbarChannel
+Cronwatch.Alerts.RollbarChannel.Name.get -> string!
+Cronwatch.Alerts.RollbarChannel.RollbarChannel(Cronwatch.Alerts.RollbarOptions! options) -> void
+Cronwatch.Alerts.RollbarChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.RollbarOptions
+Cronwatch.Alerts.RollbarOptions.AccessToken.init -> void
+Cronwatch.Alerts.RollbarOptions.Environment.get -> string!
+Cronwatch.Alerts.RollbarOptions.Environment.init -> void
+Cronwatch.Alerts.RollbarOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.RollbarOptions.Link.init -> void
+Cronwatch.Alerts.RollbarOptions.Recovered.get -> bool
+Cronwatch.Alerts.RollbarOptions.Recovered.init -> void
+Cronwatch.Alerts.RollbarOptions.RollbarOptions() -> void
+Cronwatch.Alerts.RollbarOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.RollbarOptions.Transport.init -> void
+Cronwatch.Alerts.SendGridChannel
+Cronwatch.Alerts.SendGridChannel.Name.get -> string!
+Cronwatch.Alerts.SendGridChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.SendGridChannel.SendGridChannel(Cronwatch.Alerts.SendGridOptions! options) -> void
+Cronwatch.Alerts.SendGridOptions
+Cronwatch.Alerts.SendGridOptions.ApiKey.init -> void
+Cronwatch.Alerts.SendGridOptions.From.get -> string?
+Cronwatch.Alerts.SendGridOptions.From.init -> void
+Cronwatch.Alerts.SendGridOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.SendGridOptions.Link.init -> void
+Cronwatch.Alerts.SendGridOptions.Region.get -> string!
+Cronwatch.Alerts.SendGridOptions.Region.init -> void
+Cronwatch.Alerts.SendGridOptions.SendGridOptions() -> void
+Cronwatch.Alerts.SendGridOptions.SubjectPrefix.get -> string?
+Cronwatch.Alerts.SendGridOptions.SubjectPrefix.init -> void
+Cronwatch.Alerts.SendGridOptions.To.get -> System.Collections.Generic.IList<string!>!
+Cronwatch.Alerts.SendGridOptions.To.init -> void
+Cronwatch.Alerts.SendGridOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.SendGridOptions.Transport.init -> void
+Cronwatch.Alerts.SentryChannel
+Cronwatch.Alerts.SentryChannel.Name.get -> string!
+Cronwatch.Alerts.SentryChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.SentryChannel.SentryChannel(Cronwatch.Alerts.SentryOptions! options) -> void
+Cronwatch.Alerts.SentryOptions
+Cronwatch.Alerts.SentryOptions.Dsn.init -> void
+Cronwatch.Alerts.SentryOptions.Environment.get -> string!
+Cronwatch.Alerts.SentryOptions.Environment.init -> void
+Cronwatch.Alerts.SentryOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.SentryOptions.Link.init -> void
+Cronwatch.Alerts.SentryOptions.Recovered.get -> bool
+Cronwatch.Alerts.SentryOptions.Recovered.init -> void
+Cronwatch.Alerts.SentryOptions.Release.get -> string?
+Cronwatch.Alerts.SentryOptions.Release.init -> void
+Cronwatch.Alerts.SentryOptions.SentryOptions() -> void
+Cronwatch.Alerts.SentryOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.SentryOptions.Transport.init -> void
+Cronwatch.Alerts.SesChannel
+Cronwatch.Alerts.SesChannel.Name.get -> string!
+Cronwatch.Alerts.SesChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.SesChannel.SesChannel(Cronwatch.Alerts.SesOptions! options) -> void
+Cronwatch.Alerts.SesOptions
+Cronwatch.Alerts.SesOptions.AccessKeyId.init -> void
+Cronwatch.Alerts.SesOptions.Clock.get -> System.TimeProvider?
+Cronwatch.Alerts.SesOptions.Clock.init -> void
+Cronwatch.Alerts.SesOptions.ConfigurationSetName.get -> string?
+Cronwatch.Alerts.SesOptions.ConfigurationSetName.init -> void
+Cronwatch.Alerts.SesOptions.From.get -> string?
+Cronwatch.Alerts.SesOptions.From.init -> void
+Cronwatch.Alerts.SesOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.SesOptions.Link.init -> void
+Cronwatch.Alerts.SesOptions.Region.get -> string?
+Cronwatch.Alerts.SesOptions.Region.init -> void
+Cronwatch.Alerts.SesOptions.SecretAccessKey.init -> void
+Cronwatch.Alerts.SesOptions.SesOptions() -> void
+Cronwatch.Alerts.SesOptions.SessionToken.init -> void
+Cronwatch.Alerts.SesOptions.SubjectPrefix.get -> string?
+Cronwatch.Alerts.SesOptions.SubjectPrefix.init -> void
+Cronwatch.Alerts.SesOptions.To.get -> System.Collections.Generic.IList<string!>!
+Cronwatch.Alerts.SesOptions.To.init -> void
+Cronwatch.Alerts.SesOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.SesOptions.Transport.init -> void
+Cronwatch.Alerts.Slack
+Cronwatch.Alerts.SlackChannel
+Cronwatch.Alerts.SlackChannel.Name.get -> string!
+Cronwatch.Alerts.SlackChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.SlackChannel.SlackChannel(Cronwatch.Alerts.SlackOptions! options) -> void
+Cronwatch.Alerts.SlackOptions
+Cronwatch.Alerts.SlackOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.SlackOptions.Link.init -> void
+Cronwatch.Alerts.SlackOptions.SlackOptions() -> void
+Cronwatch.Alerts.SlackOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.SlackOptions.Transport.init -> void
+Cronwatch.Alerts.SlackOptions.WebhookUrl.init -> void
+Cronwatch.Alerts.TransportRequest
+Cronwatch.Alerts.TransportRequest.Body.get -> System.ReadOnlyMemory<byte>
+Cronwatch.Alerts.TransportRequest.Header(string! name) -> string?
+Cronwatch.Alerts.TransportRequest.Headers.get -> System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<string!, string!>>!
+Cronwatch.Alerts.TransportRequest.TransportRequest(string! url, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, string!>>! headers, System.ReadOnlySpan<byte> body) -> void
+Cronwatch.Alerts.TransportRequest.Url.get -> string!
+Cronwatch.Alerts.TransportResponse
+Cronwatch.Alerts.TransportResponse.Body.get -> System.IO.Stream!
+Cronwatch.Alerts.TransportResponse.Dispose() -> void
+Cronwatch.Alerts.TransportResponse.Status.get -> int
+Cronwatch.Alerts.TransportResponse.TransportResponse(int status, System.IO.Stream! body) -> void
+Cronwatch.Alerts.TransportResponse.TransportResponse(int status, byte[]! body) -> void
+Cronwatch.Alerts.TransportResponse.TransportResponse(int status, string! body) -> void
+Cronwatch.Alerts.TwilioChannel
+Cronwatch.Alerts.TwilioChannel.Name.get -> string!
+Cronwatch.Alerts.TwilioChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.TwilioChannel.TwilioChannel(Cronwatch.Alerts.TwilioOptions! options) -> void
+Cronwatch.Alerts.TwilioOptions
+Cronwatch.Alerts.TwilioOptions.AccountSid.get -> string?
+Cronwatch.Alerts.TwilioOptions.AccountSid.init -> void
+Cronwatch.Alerts.TwilioOptions.ApiKeySecret.init -> void
+Cronwatch.Alerts.TwilioOptions.ApiKeySid.init -> void
+Cronwatch.Alerts.TwilioOptions.AuthToken.init -> void
+Cronwatch.Alerts.TwilioOptions.From.get -> string?
+Cronwatch.Alerts.TwilioOptions.From.init -> void
+Cronwatch.Alerts.TwilioOptions.Link.get -> System.Func<Cronwatch.Alert!, string?>?
+Cronwatch.Alerts.TwilioOptions.Link.init -> void
+Cronwatch.Alerts.TwilioOptions.MessagingServiceSid.get -> string?
+Cronwatch.Alerts.TwilioOptions.MessagingServiceSid.init -> void
+Cronwatch.Alerts.TwilioOptions.Recovered.get -> bool
+Cronwatch.Alerts.TwilioOptions.Recovered.init -> void
+Cronwatch.Alerts.TwilioOptions.Segments.get -> double?
+Cronwatch.Alerts.TwilioOptions.Segments.init -> void
+Cronwatch.Alerts.TwilioOptions.To.get -> System.Collections.Generic.IList<string!>!
+Cronwatch.Alerts.TwilioOptions.To.init -> void
+Cronwatch.Alerts.TwilioOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.TwilioOptions.Transport.init -> void
+Cronwatch.Alerts.TwilioOptions.TwilioOptions() -> void
+Cronwatch.Alerts.WebhookChannel
+Cronwatch.Alerts.WebhookChannel.Name.get -> string!
+Cronwatch.Alerts.WebhookChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.Alerts.WebhookChannel.WebhookChannel(Cronwatch.Alerts.WebhookOptions! options) -> void
+Cronwatch.Alerts.WebhookOptions
+Cronwatch.Alerts.WebhookOptions.Headers.init -> void
+Cronwatch.Alerts.WebhookOptions.Secret.init -> void
+Cronwatch.Alerts.WebhookOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Alerts.WebhookOptions.Transport.init -> void
+Cronwatch.Alerts.WebhookOptions.Url.init -> void
+Cronwatch.Alerts.WebhookOptions.WebhookOptions() -> void
+Cronwatch.Bridge.Entry
+Cronwatch.Bridge.Entry.Defaults.get -> Cronwatch.JobOptions!
+Cronwatch.Bridge.Entry.Entry(string! name, string! label, string! schedule, string! timezone, string? problem = null, Cronwatch.JobOptions? defaults = null, Cronwatch.JobOptions? options = null) -> void
+Cronwatch.Bridge.Entry.Label.get -> string!
+Cronwatch.Bridge.Entry.Name.get -> string!
+Cronwatch.Bridge.Entry.Options.get -> Cronwatch.JobOptions!
+Cronwatch.Bridge.Entry.Problem.get -> string?
+Cronwatch.Bridge.Entry.Schedule.get -> string!
+Cronwatch.Bridge.Entry.Timezone.get -> string!
+Cronwatch.Bridge.FireTimeChecks
+Cronwatch.Bridge.FireTimeChecks.Check(string! job, string! expression, string! zone, long now, System.Func<string!>! walk) -> (string? Schedule, string? Problem)
+Cronwatch.Bridge.FireTimeChecks.EndRead() -> void
+Cronwatch.Bridge.FireTimeChecks.FireTimeChecks() -> void
+Cronwatch.Bridge.FireTimeChecks.Walks.get -> int
+Cronwatch.Bridge.FireTimes
+Cronwatch.Bridge.ScheduleException
+Cronwatch.Bridge.ScheduleException.ScheduleException() -> void
+Cronwatch.Bridge.ScheduleException.ScheduleException(string! message) -> void
+Cronwatch.Bridge.ScheduleException.ScheduleException(string! message, System.Exception! inner) -> void
+Cronwatch.Bridge.SchedulerBridge
+Cronwatch.Bridge.Watch
+Cronwatch.Bridge.Watch.AppSlug.get -> string!
+Cronwatch.Bridge.Watch.AppTag.get -> string!
+Cronwatch.Bridge.Watch.Client.get -> Cronwatch.CronwatchClient!
+Cronwatch.Bridge.Watch.Declare(System.Collections.Generic.IReadOnlyList<Cronwatch.Bridge.Entry!>! entries) -> void
+Cronwatch.Bridge.Watch.Declares(string! name) -> bool
+Cronwatch.Bridge.Watch.FallbackAsync(string! name, Cronwatch.JobOptions! options) -> System.Threading.Tasks.Task<Cronwatch.Job?>!
+Cronwatch.Bridge.Watch.Job(string! name) -> Cronwatch.Job?
+Cronwatch.Bridge.Watch.ReportOnce(string! message, string! where) -> void
+Cronwatch.Bridge.Watch.SettleAsync(System.TimeSpan timeout) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.Bridge.Watch.Tag.get -> string!
+Cronwatch.Bridge.Watch.Tagged(Cronwatch.JobOptions! options) -> Cronwatch.JobOptions!
+Cronwatch.Bridge.Watch.UnscheduleAsync() -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string!>!>!
+Cronwatch.Bridge.Watch.Watch(Cronwatch.CronwatchClient! cw, string! tag, string? app, string! scheduler) -> void
+Cronwatch.BudgetBreach
+Cronwatch.BudgetBreach.<Clone>$() -> Cronwatch.BudgetBreach!
+Cronwatch.BudgetBreach.Basis.get -> string!
+Cronwatch.BudgetBreach.Basis.init -> void
+Cronwatch.BudgetBreach.BudgetBreach(string! Metric, double Value, double Limit, string! Basis) -> void
+Cronwatch.BudgetBreach.Deconstruct(out string! Metric, out double Value, out double Limit, out string! Basis) -> void
+Cronwatch.BudgetBreach.Equals(Cronwatch.BudgetBreach? other) -> bool
+Cronwatch.BudgetBreach.Limit.get -> double
+Cronwatch.BudgetBreach.Limit.init -> void
+Cronwatch.BudgetBreach.Metric.get -> string!
+Cronwatch.BudgetBreach.Metric.init -> void
+Cronwatch.BudgetBreach.ToValue() -> Cronwatch.JsObject!
+Cronwatch.BudgetBreach.Value.get -> double
+Cronwatch.BudgetBreach.Value.init -> void
+Cronwatch.ChannelContext
+Cronwatch.ChannelContext.ChannelContext(System.Action<System.Exception!>! report) -> void
+Cronwatch.ChannelContext.ChannelContext(System.Action<System.Exception!>! report, Cronwatch.Alerts.ITransport! transport) -> void
+Cronwatch.ChannelContext.ReportError(System.Exception! error) -> void
+Cronwatch.ChannelContext.ReportError(string! message) -> void
+Cronwatch.ChannelContext.Transport.get -> Cronwatch.Alerts.ITransport!
+Cronwatch.CheckResult
+Cronwatch.CheckResult.<Clone>$() -> Cronwatch.CheckResult!
+Cronwatch.CheckResult.Alerts.get -> Cronwatch.ValueList<Cronwatch.Alert!>!
+Cronwatch.CheckResult.Alerts.init -> void
+Cronwatch.CheckResult.CheckResult(long CheckedAt, Cronwatch.ValueList<Cronwatch.JobSummary!>! Jobs, Cronwatch.ValueList<Cronwatch.Alert!>! Alerts, long Pruned) -> void
+Cronwatch.CheckResult.CheckedAt.get -> long
+Cronwatch.CheckResult.CheckedAt.init -> void
+Cronwatch.CheckResult.Deconstruct(out long CheckedAt, out Cronwatch.ValueList<Cronwatch.JobSummary!>! Jobs, out Cronwatch.ValueList<Cronwatch.Alert!>! Alerts, out long Pruned) -> void
+Cronwatch.CheckResult.Equals(Cronwatch.CheckResult? other) -> bool
+Cronwatch.CheckResult.Jobs.get -> Cronwatch.ValueList<Cronwatch.JobSummary!>!
+Cronwatch.CheckResult.Jobs.init -> void
+Cronwatch.CheckResult.Pruned.get -> long
+Cronwatch.CheckResult.Pruned.init -> void
+Cronwatch.CheckResult.ToJson() -> string!
+Cronwatch.CheckResult.ToValue() -> Cronwatch.JsObject!
+Cronwatch.Condition
+Cronwatch.Condition.Condition() -> void
+Cronwatch.Condition.Condition(string! Value) -> void
+Cronwatch.Condition.Deconstruct(out string! Value) -> void
+Cronwatch.Condition.Equals(Cronwatch.Condition other) -> bool
+Cronwatch.Condition.Value.get -> string!
+Cronwatch.Condition.Value.init -> void
+Cronwatch.ConsoleChannel
+Cronwatch.ConsoleChannel.ConsoleChannel() -> void
+Cronwatch.ConsoleChannel.Name.get -> string!
+Cronwatch.ConsoleChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.CronSecret
+Cronwatch.CronwatchCli
+Cronwatch.CronwatchClient
+Cronwatch.CronwatchClient.CheckAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.CheckResult!>!
+Cronwatch.CronwatchClient.Clock.get -> System.TimeProvider!
+Cronwatch.CronwatchClient.CronwatchClient(Cronwatch.CronwatchOptions? options = null) -> void
+Cronwatch.CronwatchClient.DeclaredJob(string! name) -> Cronwatch.Job?
+Cronwatch.CronwatchClient.DefinedJobs.get -> System.Collections.Generic.IReadOnlyList<Cronwatch.Definition!>!
+Cronwatch.CronwatchClient.Dispose() -> void
+Cronwatch.CronwatchClient.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Cronwatch.CronwatchClient.ForgetAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.CronwatchClient.GetRunAsync(string! id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.CronwatchClient.Job(string! name, Cronwatch.JobOptions? options = null) -> Cronwatch.Job!
+Cronwatch.CronwatchClient.JobSummaryAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.JobSummary?>!
+Cronwatch.CronwatchClient.JobsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.JobSummary!>!>!
+Cronwatch.CronwatchClient.JobsWithRunsAsync(int limit = 20, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.JobWithRuns!>!>!
+Cronwatch.CronwatchClient.NowMs.get -> long
+Cronwatch.CronwatchClient.RecordRunAsync(Cronwatch.Run! run, bool evaluate = true, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Alert!>!>!
+Cronwatch.CronwatchClient.ReportError(System.Exception! error, string! where) -> void
+Cronwatch.CronwatchClient.ResumeRunAsync(string! name, string! runId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.RunHandle!>!
+Cronwatch.CronwatchClient.Routes(Cronwatch.Web.RoutesOptions? options = null) -> Cronwatch.Web.Routes!
+Cronwatch.CronwatchClient.RunAsync(string! name, System.Func<Cronwatch.JobContext!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! fn, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.CronwatchClient.RunAsync<T>(string! name, System.Func<Cronwatch.JobContext!, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! fn, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T>!
+Cronwatch.CronwatchClient.RunsAsync(string! name, int limit = 50, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!>!
+Cronwatch.CronwatchClient.SilenceAsync(string! name, Cronwatch.Duration duration, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.JobState!>!
+Cronwatch.CronwatchClient.Start(Cronwatch.Duration? every = null) -> void
+Cronwatch.CronwatchClient.Stop() -> void
+Cronwatch.CronwatchClient.Store.get -> Cronwatch.IStore!
+Cronwatch.CronwatchClient.SyncJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.CronwatchClient.UnsilenceAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.JobState!>!
+Cronwatch.CronwatchErrorKind
+Cronwatch.CronwatchErrorKind.Invalid = 0 -> Cronwatch.CronwatchErrorKind
+Cronwatch.CronwatchErrorKind.Other = 2 -> Cronwatch.CronwatchErrorKind
+Cronwatch.CronwatchErrorKind.Store = 1 -> Cronwatch.CronwatchErrorKind
+Cronwatch.CronwatchException
+Cronwatch.CronwatchException.CronwatchException() -> void
+Cronwatch.CronwatchException.CronwatchException(Cronwatch.CronwatchErrorKind kind, string! message, System.Exception? innerException = null) -> void
+Cronwatch.CronwatchException.CronwatchException(string! message) -> void
+Cronwatch.CronwatchException.CronwatchException(string! message, System.Exception! innerException) -> void
+Cronwatch.CronwatchException.Kind.get -> Cronwatch.CronwatchErrorKind
+Cronwatch.CronwatchOptions
+Cronwatch.CronwatchOptions.Alerts.get -> System.Collections.Generic.IList<Cronwatch.IChannel!>!
+Cronwatch.CronwatchOptions.Alerts.init -> void
+Cronwatch.CronwatchOptions.Clock.get -> System.TimeProvider?
+Cronwatch.CronwatchOptions.Clock.init -> void
+Cronwatch.CronwatchOptions.CronSecret.init -> void
+Cronwatch.CronwatchOptions.CronwatchOptions() -> void
+Cronwatch.CronwatchOptions.Defaults.get -> Cronwatch.JobOptions?
+Cronwatch.CronwatchOptions.Defaults.init -> void
+Cronwatch.CronwatchOptions.Deliver.get -> Cronwatch.Deliver
+Cronwatch.CronwatchOptions.Deliver.init -> void
+Cronwatch.CronwatchOptions.Environment.get -> string?
+Cronwatch.CronwatchOptions.Environment.init -> void
+Cronwatch.CronwatchOptions.OnError.get -> System.Action<System.Exception!, string!>?
+Cronwatch.CronwatchOptions.OnError.init -> void
+Cronwatch.CronwatchOptions.OnWarning.get -> System.Action<string!>?
+Cronwatch.CronwatchOptions.OnWarning.init -> void
+Cronwatch.CronwatchOptions.ProcessExitHook.get -> bool
+Cronwatch.CronwatchOptions.ProcessExitHook.init -> void
+Cronwatch.CronwatchOptions.Redact.get -> System.Func<string!, string!>?
+Cronwatch.CronwatchOptions.Redact.init -> void
+Cronwatch.CronwatchOptions.Retention.get -> Cronwatch.Duration
+Cronwatch.CronwatchOptions.Retention.init -> void
+Cronwatch.CronwatchOptions.RunScope.get -> System.Func<Cronwatch.JobContext!, System.IDisposable?>?
+Cronwatch.CronwatchOptions.RunScope.init -> void
+Cronwatch.CronwatchOptions.Sources.get -> System.Collections.Generic.IList<Cronwatch.ISource!>!
+Cronwatch.CronwatchOptions.Sources.init -> void
+Cronwatch.CronwatchOptions.Store.get -> Cronwatch.IStore?
+Cronwatch.CronwatchOptions.Store.init -> void
+Cronwatch.CronwatchOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.CronwatchOptions.Transport.init -> void
+Cronwatch.CronwatchOptions.Triage.get -> Cronwatch.ITriage?
+Cronwatch.CronwatchOptions.Triage.init -> void
+Cronwatch.CronwatchTelemetry
+Cronwatch.CustomChannel
+Cronwatch.Definition
+Cronwatch.Definition.Description.get -> string?
+Cronwatch.Definition.Equals(Cronwatch.Definition? other) -> bool
+Cronwatch.Definition.Expect.get -> string?
+Cronwatch.Definition.Get(string! key) -> object?
+Cronwatch.Definition.Has(string! key) -> bool
+Cronwatch.Definition.Keys.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Cronwatch.Definition.Name.get -> string!
+Cronwatch.Definition.Schedule.get -> string?
+Cronwatch.Definition.Tags.get -> Cronwatch.ValueList<string!>!
+Cronwatch.Definition.Timezone.get -> string?
+Cronwatch.Definition.ToJson() -> string!
+Cronwatch.Definition.ToObject() -> Cronwatch.JsObject!
+Cronwatch.Deliver
+Cronwatch.Deliver.AtCheck = 1 -> Cronwatch.Deliver
+Cronwatch.Deliver.Now = 0 -> Cronwatch.Deliver
+Cronwatch.Duration
+Cronwatch.Duration.Duration() -> void
+Cronwatch.Duration.Equals(Cronwatch.Duration other) -> bool
+Cronwatch.Duration.Text.get -> string?
+Cronwatch.Expect
+Cronwatch.IChannel
+Cronwatch.IChannel.Name.get -> string!
+Cronwatch.IChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.IConditionalRunStore
+Cronwatch.IConditionalRunStore.UpdateRunIfAsync(Cronwatch.Run! run, System.Collections.Generic.IReadOnlyList<Cronwatch.RunStatus>! from, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.IRunDeletingStore
+Cronwatch.IRunDeletingStore.DeleteRunIfAsync(string! id, string! job, Cronwatch.RunStatus status, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.ISource
+Cronwatch.ISource.Name.get -> string!
+Cronwatch.ISource.SyncAsync(Cronwatch.CronwatchClient! client, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Alert!>?>!
+Cronwatch.IStateCasStore
+Cronwatch.IStateCasStore.CompareAndSetStateAsync(Cronwatch.JobState! state, long expected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.IStore
+Cronwatch.IStore.DeleteJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.IStore.GetJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.StoredJob?>!
+Cronwatch.IStore.GetRunAsync(string! id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.IStore.GetStateAsync(string! job, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.JobState?>!
+Cronwatch.IStore.InitAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.IStore.InsertRunAsync(Cronwatch.Run! run, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.IStore.LastRunAsync(string! job, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.IStore.ListJobsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.StoredJob!>!>!
+Cronwatch.IStore.ListRunsAsync(string! job, int limit, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!>!
+Cronwatch.IStore.PruneAsync(long before, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+Cronwatch.IStore.RunningRunsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!>!
+Cronwatch.IStore.SetStateAsync(Cronwatch.JobState! state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.IStore.UpdateRunAsync(Cronwatch.Run! run, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.IStore.UpsertJobAsync(Cronwatch.Definition! definition, long now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.ITriage
+Cronwatch.ITriage.TriageAsync(Cronwatch.TriageContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string?>!
+Cronwatch.Job
+Cronwatch.Job.Client.get -> Cronwatch.CronwatchClient!
+Cronwatch.Job.Definition.get -> Cronwatch.Definition!
+Cronwatch.Job.Handler(System.Func<Cronwatch.JobContext!, Cronwatch.Web.WebRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! fn, Cronwatch.Web.HandlerOptions? options = null) -> Cronwatch.Web.Handler!
+Cronwatch.Job.Handler<T>(System.Func<Cronwatch.JobContext!, Cronwatch.Web.WebRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! fn, Cronwatch.Web.HandlerOptions? options = null) -> Cronwatch.Web.Handler!
+Cronwatch.Job.Name.get -> string!
+Cronwatch.Job.NextFire(long after, long? lastRunAt = null) -> long?
+Cronwatch.Job.OpenAsync(Cronwatch.RunOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.ObservedRun!>!
+Cronwatch.Job.ResumeAsync(string! runId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.RunHandle!>!
+Cronwatch.Job.RunAsync(Cronwatch.RunOptions! options, System.Func<Cronwatch.JobContext!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! fn, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.Job.RunAsync(System.Func<Cronwatch.JobContext!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! fn, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.Job.RunAsync<T>(Cronwatch.RunOptions! options, System.Func<Cronwatch.JobContext!, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! fn, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T>!
+Cronwatch.Job.RunAsync<T>(System.Func<Cronwatch.JobContext!, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! fn, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T>!
+Cronwatch.Job.StartAsync(Cronwatch.StartOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.RunHandle!>!
+Cronwatch.JobContext
+Cronwatch.JobContext.CancellationToken.get -> System.Threading.CancellationToken
+Cronwatch.JobContext.Log(string! line) -> void
+Cronwatch.JobContext.Metric(string! name, double value) -> void
+Cronwatch.JobContext.Metrics(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, double>>! values) -> void
+Cronwatch.JobContext.Name.get -> string!
+Cronwatch.JobContext.RunId.get -> string!
+Cronwatch.JobContext.StartedAt.get -> long
+Cronwatch.JobHealth
+Cronwatch.JobHealth.Deconstruct(out string! Value) -> void
+Cronwatch.JobHealth.Equals(Cronwatch.JobHealth other) -> bool
+Cronwatch.JobHealth.JobHealth() -> void
+Cronwatch.JobHealth.JobHealth(string! Value) -> void
+Cronwatch.JobHealth.Value.get -> string!
+Cronwatch.JobHealth.Value.init -> void
+Cronwatch.JobOptions
+Cronwatch.JobOptions.Budget.get -> Cronwatch.JobOptions.BudgetMap!
+Cronwatch.JobOptions.Budget.init -> void
+Cronwatch.JobOptions.BudgetMap
+Cronwatch.JobOptions.BudgetMap.Add(string! metric, double ceiling) -> void
+Cronwatch.JobOptions.BudgetMap.Count.get -> int
+Cronwatch.JobOptions.BudgetMap.GetEnumerator() -> System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<string!, double>>!
+Cronwatch.JobOptions.BudgetMap.this[string! metric].get -> double
+Cronwatch.JobOptions.BudgetMap.this[string! metric].set -> void
+Cronwatch.JobOptions.Describe(string! name) -> Cronwatch.Definition!
+Cronwatch.JobOptions.Description.get -> string?
+Cronwatch.JobOptions.Description.init -> void
+Cronwatch.JobOptions.Expect.get -> Cronwatch.Expect?
+Cronwatch.JobOptions.Expect.init -> void
+Cronwatch.JobOptions.FailuresBeforeAlert.get -> int?
+Cronwatch.JobOptions.FailuresBeforeAlert.init -> void
+Cronwatch.JobOptions.Field(string! key, object? value) -> Cronwatch.JobOptions!
+Cronwatch.JobOptions.Grace.get -> Cronwatch.Duration?
+Cronwatch.JobOptions.Grace.init -> void
+Cronwatch.JobOptions.JobOptions() -> void
+Cronwatch.JobOptions.MaxDuration.get -> Cronwatch.Duration?
+Cronwatch.JobOptions.MaxDuration.init -> void
+Cronwatch.JobOptions.Schedule.get -> string?
+Cronwatch.JobOptions.Schedule.init -> void
+Cronwatch.JobOptions.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Cronwatch.JobOptions.Tags.init -> void
+Cronwatch.JobOptions.Timeout.get -> Cronwatch.Duration?
+Cronwatch.JobOptions.Timeout.init -> void
+Cronwatch.JobOptions.Timezone.get -> string?
+Cronwatch.JobOptions.Timezone.init -> void
+Cronwatch.JobState
+Cronwatch.JobState.<Clone>$() -> Cronwatch.JobState!
+Cronwatch.JobState.ConsecutiveFailures.get -> long
+Cronwatch.JobState.ConsecutiveFailures.init -> void
+Cronwatch.JobState.CountedVersion.get -> long
+Cronwatch.JobState.Equals(Cronwatch.JobState? other) -> bool
+Cronwatch.JobState.Extra.get -> Cronwatch.JsObject!
+Cronwatch.JobState.Extra.init -> void
+Cronwatch.JobState.Job.get -> string!
+Cronwatch.JobState.Job.init -> void
+Cronwatch.JobState.JobState() -> void
+Cronwatch.JobState.LastAlertAt.get -> long?
+Cronwatch.JobState.LastAlertAt.init -> void
+Cronwatch.JobState.Open.get -> Cronwatch.ValueMap<Cronwatch.Condition, long>!
+Cronwatch.JobState.Open.init -> void
+Cronwatch.JobState.OpenAt(Cronwatch.Condition condition) -> long?
+Cronwatch.JobState.PendingRecovery.get -> Cronwatch.ValueList<Cronwatch.Condition>?
+Cronwatch.JobState.PendingRecovery.init -> void
+Cronwatch.JobState.SilencedUntil.get -> long?
+Cronwatch.JobState.SilencedUntil.init -> void
+Cronwatch.JobState.ToJson() -> string!
+Cronwatch.JobState.ToValue() -> Cronwatch.JsObject!
+Cronwatch.JobState.Undelivered.get -> Cronwatch.ValueList<Cronwatch.Alert!>?
+Cronwatch.JobState.Undelivered.init -> void
+Cronwatch.JobState.Version.get -> long?
+Cronwatch.JobState.Version.init -> void
+Cronwatch.JobStats
+Cronwatch.JobStats.<Clone>$() -> Cronwatch.JobStats!
+Cronwatch.JobStats.Deconstruct(out long Runs, out double OkRate, out long? P50Ms, out long? P95Ms) -> void
+Cronwatch.JobStats.Equals(Cronwatch.JobStats? other) -> bool
+Cronwatch.JobStats.JobStats(long Runs, double OkRate, long? P50Ms, long? P95Ms) -> void
+Cronwatch.JobStats.OkRate.get -> double
+Cronwatch.JobStats.OkRate.init -> void
+Cronwatch.JobStats.P50Ms.get -> long?
+Cronwatch.JobStats.P50Ms.init -> void
+Cronwatch.JobStats.P95Ms.get -> long?
+Cronwatch.JobStats.P95Ms.init -> void
+Cronwatch.JobStats.Runs.get -> long
+Cronwatch.JobStats.Runs.init -> void
+Cronwatch.JobStats.ToValue() -> Cronwatch.JsObject!
+Cronwatch.JobSummary
+Cronwatch.JobSummary.<Clone>$() -> Cronwatch.JobSummary!
+Cronwatch.JobSummary.ConsecutiveFailures.get -> long
+Cronwatch.JobSummary.ConsecutiveFailures.init -> void
+Cronwatch.JobSummary.Definition.get -> Cronwatch.Definition!
+Cronwatch.JobSummary.Definition.init -> void
+Cronwatch.JobSummary.Equals(Cronwatch.JobSummary? other) -> bool
+Cronwatch.JobSummary.Health.get -> Cronwatch.JobHealth
+Cronwatch.JobSummary.Health.init -> void
+Cronwatch.JobSummary.JobSummary() -> void
+Cronwatch.JobSummary.LastRun.get -> Cronwatch.Run?
+Cronwatch.JobSummary.LastRun.init -> void
+Cronwatch.JobSummary.Name.get -> string!
+Cronwatch.JobSummary.Name.init -> void
+Cronwatch.JobSummary.NextExpectedAt.get -> long?
+Cronwatch.JobSummary.NextExpectedAt.init -> void
+Cronwatch.JobSummary.Open.get -> Cronwatch.ValueList<Cronwatch.Condition>!
+Cronwatch.JobSummary.Open.init -> void
+Cronwatch.JobSummary.SilencedUntil.get -> long?
+Cronwatch.JobSummary.SilencedUntil.init -> void
+Cronwatch.JobSummary.Stats.get -> Cronwatch.JobStats!
+Cronwatch.JobSummary.Stats.init -> void
+Cronwatch.JobSummary.ToJson() -> string!
+Cronwatch.JobSummary.ToValue() -> Cronwatch.JsObject!
+Cronwatch.JobWithRuns
+Cronwatch.JobWithRuns.<Clone>$() -> Cronwatch.JobWithRuns!
+Cronwatch.JobWithRuns.Deconstruct(out Cronwatch.JobSummary! Job, out Cronwatch.ValueList<Cronwatch.Run!>! Runs) -> void
+Cronwatch.JobWithRuns.Equals(Cronwatch.JobWithRuns? other) -> bool
+Cronwatch.JobWithRuns.Job.get -> Cronwatch.JobSummary!
+Cronwatch.JobWithRuns.Job.init -> void
+Cronwatch.JobWithRuns.JobWithRuns(Cronwatch.JobSummary! Job, Cronwatch.ValueList<Cronwatch.Run!>! Runs) -> void
+Cronwatch.JobWithRuns.Runs.get -> Cronwatch.ValueList<Cronwatch.Run!>!
+Cronwatch.JobWithRuns.Runs.init -> void
+Cronwatch.JsObject
+Cronwatch.JsObject.Add(string! key, object? value) -> void
+Cronwatch.JsObject.Copy() -> Cronwatch.JsObject!
+Cronwatch.JsObject.Count.get -> int
+Cronwatch.JsObject.Get(string! key) -> object?
+Cronwatch.JsObject.GetEnumerator() -> System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<string!, object?>>!
+Cronwatch.JsObject.Has(string! key) -> bool
+Cronwatch.JsObject.IsEmpty.get -> bool
+Cronwatch.JsObject.JsObject() -> void
+Cronwatch.JsObject.Keys.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Cronwatch.JsObject.Remove(string! key) -> bool
+Cronwatch.JsObject.Set(string! key, object? value) -> Cronwatch.JsObject!
+Cronwatch.JsObject.ToJson() -> string!
+Cronwatch.JsObject.this[string! key].get -> object?
+Cronwatch.JsObject.this[string! key].set -> void
+Cronwatch.Json
+Cronwatch.JsonParseException
+Cronwatch.JsonParseException.JsonParseException() -> void
+Cronwatch.JsonParseException.JsonParseException(string! message) -> void
+Cronwatch.JsonParseException.JsonParseException(string! message, System.Exception! inner) -> void
+Cronwatch.MemoryStore
+Cronwatch.MemoryStore.CompareAndSetStateAsync(Cronwatch.JobState! state, long expected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.MemoryStore.DeleteJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.MemoryStore.DeleteRunIfAsync(string! id, string! job, Cronwatch.RunStatus status, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.MemoryStore.GetJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.StoredJob?>!
+Cronwatch.MemoryStore.GetRunAsync(string! id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.MemoryStore.GetStateAsync(string! job, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.JobState?>!
+Cronwatch.MemoryStore.InitAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.MemoryStore.InsertRunAsync(Cronwatch.Run! run, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.MemoryStore.LastRunAsync(string! job, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.MemoryStore.ListJobsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.StoredJob!>!>!
+Cronwatch.MemoryStore.ListRunsAsync(string! job, int limit, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!>!
+Cronwatch.MemoryStore.MemoryStore() -> void
+Cronwatch.MemoryStore.PruneAsync(long before, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+Cronwatch.MemoryStore.RunningRunsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!>!
+Cronwatch.MemoryStore.SetStateAsync(Cronwatch.JobState! state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.MemoryStore.UpdateRunAsync(Cronwatch.Run! run, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.MemoryStore.UpdateRunIfAsync(Cronwatch.Run! run, System.Collections.Generic.IReadOnlyList<Cronwatch.RunStatus>! from, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.MemoryStore.UpsertJobAsync(Cronwatch.Definition! definition, long now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.Metrics
+Cronwatch.Metrics.ContainsKey(string! key) -> bool
+Cronwatch.Metrics.Count.get -> int
+Cronwatch.Metrics.Equals(Cronwatch.Metrics? other) -> bool
+Cronwatch.Metrics.GetEnumerator() -> System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<string!, double>>!
+Cronwatch.Metrics.Keys.get -> System.Collections.Generic.IEnumerable<string!>!
+Cronwatch.Metrics.Merged(Cronwatch.Metrics! over) -> Cronwatch.Metrics!
+Cronwatch.Metrics.ToJson() -> string!
+Cronwatch.Metrics.ToValue() -> Cronwatch.JsObject!
+Cronwatch.Metrics.TryGetValue(string! key, out double value) -> bool
+Cronwatch.Metrics.Values.get -> System.Collections.Generic.IEnumerable<double>!
+Cronwatch.Metrics.With(string! name, double value) -> Cronwatch.Metrics!
+Cronwatch.Metrics.this[string! key].get -> double
+Cronwatch.ObservedRun
+Cronwatch.ObservedRun.CloseAsync(System.Exception? failure, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run!>!
+Cronwatch.ObservedRun.CloseWithAsync(object? value, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run!>!
+Cronwatch.ObservedRun.Context.get -> Cronwatch.JobContext!
+Cronwatch.ObservedRun.EndFunction() -> void
+Cronwatch.ObservedRun.Id.get -> string!
+Cronwatch.ObservedRun.IsOpen.get -> bool
+Cronwatch.ObservedRun.Job.get -> string!
+Cronwatch.ObservedRun.MakeCurrent() -> System.IDisposable!
+Cronwatch.ObservedRun.TakeBackAsync() -> System.Threading.Tasks.Task<bool>!
+Cronwatch.PgCron.PgCronJob
+Cronwatch.PgCron.PgCronJob.<Clone>$() -> Cronwatch.PgCron.PgCronJob!
+Cronwatch.PgCron.PgCronJob.Active.get -> bool
+Cronwatch.PgCron.PgCronJob.Active.init -> void
+Cronwatch.PgCron.PgCronJob.Database.get -> string!
+Cronwatch.PgCron.PgCronJob.Database.init -> void
+Cronwatch.PgCron.PgCronJob.Deconstruct(out long JobId, out string? JobName, out string! Schedule, out string! Database, out string! Username, out bool Active) -> void
+Cronwatch.PgCron.PgCronJob.Equals(Cronwatch.PgCron.PgCronJob? other) -> bool
+Cronwatch.PgCron.PgCronJob.JobId.get -> long
+Cronwatch.PgCron.PgCronJob.JobId.init -> void
+Cronwatch.PgCron.PgCronJob.JobName.get -> string?
+Cronwatch.PgCron.PgCronJob.JobName.init -> void
+Cronwatch.PgCron.PgCronJob.PgCronJob(long JobId, string? JobName, string! Schedule, string! Database, string! Username, bool Active) -> void
+Cronwatch.PgCron.PgCronJob.Schedule.get -> string!
+Cronwatch.PgCron.PgCronJob.Schedule.init -> void
+Cronwatch.PgCron.PgCronJob.Username.get -> string!
+Cronwatch.PgCron.PgCronJob.Username.init -> void
+Cronwatch.PgCron.PgCronOptions
+Cronwatch.PgCron.PgCronOptions.JobIds.get -> System.Collections.Generic.IReadOnlyList<long>?
+Cronwatch.PgCron.PgCronOptions.JobIds.init -> void
+Cronwatch.PgCron.PgCronOptions.JobName.get -> System.Func<Cronwatch.PgCron.PgCronJob!, string?>?
+Cronwatch.PgCron.PgCronOptions.JobName.init -> void
+Cronwatch.PgCron.PgCronOptions.Jobs.get -> System.Collections.Generic.IReadOnlyList<string!>?
+Cronwatch.PgCron.PgCronOptions.Jobs.init -> void
+Cronwatch.PgCron.PgCronOptions.Options.get -> Cronwatch.JobOptions?
+Cronwatch.PgCron.PgCronOptions.Options.init -> void
+Cronwatch.PgCron.PgCronOptions.OptionsFor.get -> System.Func<Cronwatch.PgCron.PgCronJob!, Cronwatch.JobOptions?>?
+Cronwatch.PgCron.PgCronOptions.OptionsFor.init -> void
+Cronwatch.PgCron.PgCronOptions.PgCronOptions() -> void
+Cronwatch.PgCron.PgCronOptions.Pick.get -> System.Func<Cronwatch.PgCron.PgCronJob!, bool>?
+Cronwatch.PgCron.PgCronOptions.Pick.init -> void
+Cronwatch.PgCron.PgCronOptions.Prefix.get -> string!
+Cronwatch.PgCron.PgCronOptions.Prefix.init -> void
+Cronwatch.PgCron.PgCronOptions.Timezone.get -> string?
+Cronwatch.PgCron.PgCronOptions.Timezone.init -> void
+Cronwatch.PgCron.PgCronRow
+Cronwatch.PgCron.PgCronRow.<Clone>$() -> Cronwatch.PgCron.PgCronRow!
+Cronwatch.PgCron.PgCronRow.Deconstruct(out long RunId, out long JobId, out string? Status, out string? ReturnMessage, out long? StartTime, out long? EndTime) -> void
+Cronwatch.PgCron.PgCronRow.EndTime.get -> long?
+Cronwatch.PgCron.PgCronRow.EndTime.init -> void
+Cronwatch.PgCron.PgCronRow.Equals(Cronwatch.PgCron.PgCronRow? other) -> bool
+Cronwatch.PgCron.PgCronRow.JobId.get -> long
+Cronwatch.PgCron.PgCronRow.JobId.init -> void
+Cronwatch.PgCron.PgCronRow.PgCronRow(long RunId, long JobId, string? Status, string? ReturnMessage, long? StartTime, long? EndTime) -> void
+Cronwatch.PgCron.PgCronRow.ReturnMessage.get -> string?
+Cronwatch.PgCron.PgCronRow.ReturnMessage.init -> void
+Cronwatch.PgCron.PgCronRow.RunId.get -> long
+Cronwatch.PgCron.PgCronRow.RunId.init -> void
+Cronwatch.PgCron.PgCronRow.StartTime.get -> long?
+Cronwatch.PgCron.PgCronRow.StartTime.init -> void
+Cronwatch.PgCron.PgCronRow.Status.get -> string?
+Cronwatch.PgCron.PgCronRow.Status.init -> void
+Cronwatch.PgCron.PgCronSource
+Cronwatch.PgCron.PgCronSource.Name.get -> string!
+Cronwatch.PgCron.PgCronSource.PgCronSource(System.Data.Common.DbDataSource! dataSource, Cronwatch.PgCron.PgCronOptions? options = null) -> void
+Cronwatch.PgCron.PgCronSource.SyncAsync(Cronwatch.CronwatchClient! client, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Alert!>?>!
+Cronwatch.Redaction
+Cronwatch.Run
+Cronwatch.Run.<Clone>$() -> Cronwatch.Run!
+Cronwatch.Run.DurationMs.get -> long?
+Cronwatch.Run.DurationMs.init -> void
+Cronwatch.Run.Equals(Cronwatch.Run? other) -> bool
+Cronwatch.Run.Error.get -> string?
+Cronwatch.Run.Error.init -> void
+Cronwatch.Run.FinishedAt.get -> long?
+Cronwatch.Run.FinishedAt.init -> void
+Cronwatch.Run.Id.get -> string!
+Cronwatch.Run.Id.init -> void
+Cronwatch.Run.Job.get -> string!
+Cronwatch.Run.Job.init -> void
+Cronwatch.Run.Metrics.get -> Cronwatch.Metrics!
+Cronwatch.Run.Metrics.init -> void
+Cronwatch.Run.Output.get -> string?
+Cronwatch.Run.Output.init -> void
+Cronwatch.Run.Run() -> void
+Cronwatch.Run.StartedAt.get -> long
+Cronwatch.Run.StartedAt.init -> void
+Cronwatch.Run.Status.get -> Cronwatch.RunStatus
+Cronwatch.Run.Status.init -> void
+Cronwatch.Run.ToJson() -> string!
+Cronwatch.Run.ToValue() -> Cronwatch.JsObject!
+Cronwatch.Run.Trigger.get -> string!
+Cronwatch.Run.Trigger.init -> void
+Cronwatch.RunHandle
+Cronwatch.RunHandle.FailAsync(System.Exception! error, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.RunHandle.FailAsync(string! error, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.RunHandle.FinishAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.RunHandle.FinishAsync(object? result, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.RunHandle.FlushAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.RunHandle.Id.get -> string!
+Cronwatch.RunHandle.IsActive.get -> bool
+Cronwatch.RunHandle.Job.get -> string!
+Cronwatch.RunHandle.Log(string! line) -> void
+Cronwatch.RunHandle.Metric(string! name, double value) -> void
+Cronwatch.RunHandle.StartedAt.get -> long?
+Cronwatch.RunOptions
+Cronwatch.RunOptions.DiscardWhen.get -> System.Func<System.Exception!, bool>?
+Cronwatch.RunOptions.DiscardWhen.init -> void
+Cronwatch.RunOptions.Id.get -> string?
+Cronwatch.RunOptions.Id.init -> void
+Cronwatch.RunOptions.MayTakeBack.get -> bool
+Cronwatch.RunOptions.MayTakeBack.init -> void
+Cronwatch.RunOptions.RunOptions() -> void
+Cronwatch.RunOptions.Trigger.get -> string!
+Cronwatch.RunOptions.Trigger.init -> void
+Cronwatch.RunStatus
+Cronwatch.RunStatus.Deconstruct(out string! Value) -> void
+Cronwatch.RunStatus.Equals(Cronwatch.RunStatus other) -> bool
+Cronwatch.RunStatus.RunStatus() -> void
+Cronwatch.RunStatus.RunStatus(string! Value) -> void
+Cronwatch.RunStatus.Value.get -> string!
+Cronwatch.RunStatus.Value.init -> void
+Cronwatch.SqlStore
+Cronwatch.SqlStore.CompareAndSetStateAsync(Cronwatch.JobState! state, long expected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.SqlStore.DeleteJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.SqlStore.DeleteRunIfAsync(string! id, string! job, Cronwatch.RunStatus status, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.SqlStore.Dialect.get -> string!
+Cronwatch.SqlStore.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Cronwatch.SqlStore.GetJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.StoredJob?>!
+Cronwatch.SqlStore.GetRunAsync(string! id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.SqlStore.GetStateAsync(string! job, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.JobState?>!
+Cronwatch.SqlStore.InitAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.SqlStore.InsertRunAsync(Cronwatch.Run! run, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.SqlStore.LastRunAsync(string! job, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Run?>!
+Cronwatch.SqlStore.ListJobsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.StoredJob!>!>!
+Cronwatch.SqlStore.ListRunsAsync(string! job, int limit, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!>!
+Cronwatch.SqlStore.Prefix.get -> string!
+Cronwatch.SqlStore.PruneAsync(long before, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+Cronwatch.SqlStore.RunningRunsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!>!
+Cronwatch.SqlStore.SetStateAsync(Cronwatch.JobState! state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.SqlStore.UpdateRunAsync(Cronwatch.Run! run, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.SqlStore.UpdateRunIfAsync(Cronwatch.Run! run, System.Collections.Generic.IReadOnlyList<Cronwatch.RunStatus>! from, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.SqlStore.UpsertJobAsync(Cronwatch.Definition! definition, long now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.SqlStore.WithPrefix(string! prefix) -> Cronwatch.SqlStore!
+Cronwatch.StartOptions
+Cronwatch.StartOptions.Id.get -> string?
+Cronwatch.StartOptions.Id.init -> void
+Cronwatch.StartOptions.StartOptions() -> void
+Cronwatch.StartOptions.Trigger.get -> string!
+Cronwatch.StartOptions.Trigger.init -> void
+Cronwatch.StoreTesting.FinishOnce
+Cronwatch.StoreTesting.FinishOnce.IShared
+Cronwatch.StoreTesting.FinishOnce.IShared.DoneAsync() -> System.Threading.Tasks.Task!
+Cronwatch.StoreTesting.FinishOnce.IShared.Open() -> Cronwatch.IStore!
+Cronwatch.StoreTesting.ForeignRows
+Cronwatch.StoreTesting.StoreContract
+Cronwatch.StoreTesting.StoreContractException
+Cronwatch.StoreTesting.StoreContractException.StoreContractException() -> void
+Cronwatch.StoreTesting.StoreContractException.StoreContractException(string! message) -> void
+Cronwatch.StoreTesting.StoreContractException.StoreContractException(string! message, System.Exception! innerException) -> void
+Cronwatch.StoreTesting.StoreReplay
+Cronwatch.StoredJob
+Cronwatch.StoredJob.<Clone>$() -> Cronwatch.StoredJob!
+Cronwatch.StoredJob.CreatedAt.get -> long
+Cronwatch.StoredJob.CreatedAt.init -> void
+Cronwatch.StoredJob.Deconstruct(out string! Name, out Cronwatch.Definition! Definition, out long CreatedAt, out long UpdatedAt) -> void
+Cronwatch.StoredJob.Definition.get -> Cronwatch.Definition!
+Cronwatch.StoredJob.Definition.init -> void
+Cronwatch.StoredJob.Equals(Cronwatch.StoredJob? other) -> bool
+Cronwatch.StoredJob.Name.get -> string!
+Cronwatch.StoredJob.Name.init -> void
+Cronwatch.StoredJob.StoredJob(string! Name, Cronwatch.Definition! Definition, long CreatedAt, long UpdatedAt) -> void
+Cronwatch.StoredJob.UpdatedAt.get -> long
+Cronwatch.StoredJob.UpdatedAt.init -> void
+Cronwatch.Triage.AnthropicTriage
+Cronwatch.Triage.AnthropicTriage.AnthropicTriage() -> void
+Cronwatch.Triage.AnthropicTriage.AnthropicTriage(Cronwatch.Triage.AnthropicTriageOptions! options) -> void
+Cronwatch.Triage.AnthropicTriage.TriageAsync(Cronwatch.TriageContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string?>!
+Cronwatch.Triage.AnthropicTriageOptions
+Cronwatch.Triage.AnthropicTriageOptions.AnthropicTriageOptions() -> void
+Cronwatch.Triage.AnthropicTriageOptions.ApiKey.init -> void
+Cronwatch.Triage.AnthropicTriageOptions.BaseUrl.init -> void
+Cronwatch.Triage.AnthropicTriageOptions.Context.init -> void
+Cronwatch.Triage.AnthropicTriageOptions.Effort.get -> string!
+Cronwatch.Triage.AnthropicTriageOptions.Effort.init -> void
+Cronwatch.Triage.AnthropicTriageOptions.Fallbacks.get -> bool
+Cronwatch.Triage.AnthropicTriageOptions.Fallbacks.init -> void
+Cronwatch.Triage.AnthropicTriageOptions.MaxTokens.get -> long
+Cronwatch.Triage.AnthropicTriageOptions.MaxTokens.init -> void
+Cronwatch.Triage.AnthropicTriageOptions.Model.get -> string!
+Cronwatch.Triage.AnthropicTriageOptions.Model.init -> void
+Cronwatch.Triage.AnthropicTriageOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Triage.AnthropicTriageOptions.Transport.init -> void
+Cronwatch.TriageContext
+Cronwatch.TriageContext.<Clone>$() -> Cronwatch.TriageContext!
+Cronwatch.TriageContext.Alert.get -> Cronwatch.Alert!
+Cronwatch.TriageContext.Alert.init -> void
+Cronwatch.TriageContext.Deconstruct(out Cronwatch.Alert! Alert, out System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>! RecentRuns) -> void
+Cronwatch.TriageContext.Equals(Cronwatch.TriageContext? other) -> bool
+Cronwatch.TriageContext.RecentRuns.get -> System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!
+Cronwatch.TriageContext.RecentRuns.init -> void
+Cronwatch.TriageContext.Transport.get -> Cronwatch.Alerts.ITransport!
+Cronwatch.TriageContext.Transport.init -> void
+Cronwatch.TriageContext.TriageContext(Cronwatch.Alert! Alert, System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>! RecentRuns) -> void
+Cronwatch.ValueList<T>
+Cronwatch.ValueList<T>.Count.get -> int
+Cronwatch.ValueList<T>.Equals(Cronwatch.ValueList<T>? other) -> bool
+Cronwatch.ValueList<T>.GetEnumerator() -> System.Collections.Generic.IEnumerator<T>!
+Cronwatch.ValueList<T>.this[int index].get -> T
+Cronwatch.ValueMap<TKey, TValue>
+Cronwatch.ValueMap<TKey, TValue>.ContainsKey(TKey key) -> bool
+Cronwatch.ValueMap<TKey, TValue>.Count.get -> int
+Cronwatch.ValueMap<TKey, TValue>.Equals(Cronwatch.ValueMap<TKey, TValue>? other) -> bool
+Cronwatch.ValueMap<TKey, TValue>.GetEnumerator() -> System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<TKey, TValue>>!
+Cronwatch.ValueMap<TKey, TValue>.Keys.get -> System.Collections.Generic.IEnumerable<TKey>!
+Cronwatch.ValueMap<TKey, TValue>.TryGetValue(TKey key, out TValue value) -> bool
+Cronwatch.ValueMap<TKey, TValue>.Values.get -> System.Collections.Generic.IEnumerable<TValue>!
+Cronwatch.ValueMap<TKey, TValue>.With(TKey key, TValue value) -> Cronwatch.ValueMap<TKey, TValue>!
+Cronwatch.ValueMap<TKey, TValue>.Without(TKey key) -> Cronwatch.ValueMap<TKey, TValue>!
+Cronwatch.ValueMap<TKey, TValue>.this[TKey key].get -> TValue
+Cronwatch.Web.DashboardToken
+Cronwatch.Web.Handler
+Cronwatch.Web.Handler.HandleAsync(Cronwatch.Web.WebRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Web.WebResponse!>!
+Cronwatch.Web.Handler.IsOpen.get -> bool
+Cronwatch.Web.Handler.Job.get -> Cronwatch.Job!
+Cronwatch.Web.HandlerOptions
+Cronwatch.Web.HandlerOptions.HandlerOptions() -> void
+Cronwatch.Web.HandlerOptions.Secret.init -> void
+Cronwatch.Web.HandlerSecret
+Cronwatch.Web.Routes
+Cronwatch.Web.Routes.HandleAsync(Cronwatch.Web.WebRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Web.WebResponse!>!
+Cronwatch.Web.Routes.IsOpen.get -> bool
+Cronwatch.Web.Routes.Token() -> string?
+Cronwatch.Web.RoutesOptions
+Cronwatch.Web.RoutesOptions.BasePath.get -> string?
+Cronwatch.Web.RoutesOptions.BasePath.init -> void
+Cronwatch.Web.RoutesOptions.Origin.get -> string?
+Cronwatch.Web.RoutesOptions.Origin.init -> void
+Cronwatch.Web.RoutesOptions.RoutesOptions() -> void
+Cronwatch.Web.RoutesOptions.Token.init -> void
+Cronwatch.Web.RoutesOptions.TrustProxy.get -> bool
+Cronwatch.Web.RoutesOptions.TrustProxy.init -> void
+Cronwatch.Web.WebAdapters
+Cronwatch.Web.WebBodyReader
+Cronwatch.Web.WebBodyTooLargeException
+Cronwatch.Web.WebBodyTooLargeException.WebBodyTooLargeException() -> void
+Cronwatch.Web.WebBodyTooLargeException.WebBodyTooLargeException(string! message) -> void
+Cronwatch.Web.WebBodyTooLargeException.WebBodyTooLargeException(string! message, System.Exception! inner) -> void
+Cronwatch.Web.WebRequest
+Cronwatch.Web.WebRequest.Body.init -> void
+Cronwatch.Web.WebRequest.BodyReader.init -> void
+Cronwatch.Web.WebRequest.DeclaredLength.get -> long?
+Cronwatch.Web.WebRequest.DeclaredLength.init -> void
+Cronwatch.Web.WebRequest.Header(string! name) -> string?
+Cronwatch.Web.WebRequest.Headers.init -> void
+Cronwatch.Web.WebRequest.IsTls.get -> bool
+Cronwatch.Web.WebRequest.IsTls.init -> void
+Cronwatch.Web.WebRequest.Method.get -> string!
+Cronwatch.Web.WebRequest.Mount.get -> string?
+Cronwatch.Web.WebRequest.Mount.init -> void
+Cronwatch.Web.WebRequest.Path.get -> string!
+Cronwatch.Web.WebRequest.ReadBodyAsync(int limit = 1048576, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
+Cronwatch.Web.WebRequest.Target.init -> void
+Cronwatch.Web.WebRequest.WebRequest(string! method, string! target) -> void
+Cronwatch.Web.WebResponse
+Cronwatch.Web.WebResponse.Body.get -> System.ReadOnlyMemory<byte>
+Cronwatch.Web.WebResponse.Header(string! name) -> string?
+Cronwatch.Web.WebResponse.Headers.get -> System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<string!, string!>>!
+Cronwatch.Web.WebResponse.Result.get -> object?
+Cronwatch.Web.WebResponse.Status.get -> int
+Cronwatch.Web.WebResponse.Text() -> string!
+Cronwatch.Web.WebResponse.WebResponse(int status) -> void
+Cronwatch.Web.WebResponse.WithBody(byte[]! body) -> Cronwatch.Web.WebResponse!
+Cronwatch.Web.WebResponse.WithBody(string! body) -> Cronwatch.Web.WebResponse!
+Cronwatch.Web.WebResponse.WithHeader(string! name, string! value) -> Cronwatch.Web.WebResponse!
+abstract Cronwatch.AlertDetails.<Clone>$() -> Cronwatch.AlertDetails!
+abstract Cronwatch.AlertDetails.ToValue() -> Cronwatch.JsObject!
+const Cronwatch.Alerts.TwilioChannel.MaxSegments = 10 -> int
+const Cronwatch.Bridge.SchedulerBridge.SampleRuns = 8 -> int
+const Cronwatch.CronwatchClient.ReservedRunIdPrefix = "pgcron:" -> string!
+const Cronwatch.CronwatchTelemetry.Name = "Cronwatch" -> string!
+const Cronwatch.Json.MaxDepth = 256 -> int
+const Cronwatch.PgCron.PgCronSource.HoldMs = 600000 -> long
+const Cronwatch.Triage.AnthropicTriage.DefaultEffort = "medium" -> string!
+const Cronwatch.Triage.AnthropicTriage.DefaultMaxTokens = 800 -> long
+const Cronwatch.Triage.AnthropicTriage.DefaultModel = "claude-opus-5" -> string!
+const Cronwatch.Triage.AnthropicTriage.FallbackBeta = "server-side-fallback-2026-07-01" -> string!
+const Cronwatch.Web.Routes.DefaultBasePath = "/cronwatch" -> string!
+const Cronwatch.Web.WebRequest.MaxBody = 1048576 -> int
+override Cronwatch.Alert.Equals(object? obj) -> bool
+override Cronwatch.Alert.GetHashCode() -> int
+override Cronwatch.Alert.ToString() -> string!
+override Cronwatch.AlertDetails.Equals(object? obj) -> bool
+override Cronwatch.AlertDetails.Failure.<Clone>$() -> Cronwatch.AlertDetails.Failure!
+override Cronwatch.AlertDetails.Failure.Equals(object? obj) -> bool
+override Cronwatch.AlertDetails.Failure.GetHashCode() -> int
+override Cronwatch.AlertDetails.Failure.ToString() -> string!
+override Cronwatch.AlertDetails.Failure.ToValue() -> Cronwatch.JsObject!
+override Cronwatch.AlertDetails.GetHashCode() -> int
+override Cronwatch.AlertDetails.Missed.<Clone>$() -> Cronwatch.AlertDetails.Missed!
+override Cronwatch.AlertDetails.Missed.Equals(object? obj) -> bool
+override Cronwatch.AlertDetails.Missed.GetHashCode() -> int
+override Cronwatch.AlertDetails.Missed.ToString() -> string!
+override Cronwatch.AlertDetails.Missed.ToValue() -> Cronwatch.JsObject!
+override Cronwatch.AlertDetails.OverBudget.<Clone>$() -> Cronwatch.AlertDetails.OverBudget!
+override Cronwatch.AlertDetails.OverBudget.Equals(object? obj) -> bool
+override Cronwatch.AlertDetails.OverBudget.GetHashCode() -> int
+override Cronwatch.AlertDetails.OverBudget.ToString() -> string!
+override Cronwatch.AlertDetails.OverBudget.ToValue() -> Cronwatch.JsObject!
+override Cronwatch.AlertDetails.Recovered.<Clone>$() -> Cronwatch.AlertDetails.Recovered!
+override Cronwatch.AlertDetails.Recovered.Equals(object? obj) -> bool
+override Cronwatch.AlertDetails.Recovered.GetHashCode() -> int
+override Cronwatch.AlertDetails.Recovered.ToString() -> string!
+override Cronwatch.AlertDetails.Recovered.ToValue() -> Cronwatch.JsObject!
+override Cronwatch.AlertDetails.Slow.<Clone>$() -> Cronwatch.AlertDetails.Slow!
+override Cronwatch.AlertDetails.Slow.Equals(object? obj) -> bool
+override Cronwatch.AlertDetails.Slow.GetHashCode() -> int
+override Cronwatch.AlertDetails.Slow.ToString() -> string!
+override Cronwatch.AlertDetails.Slow.ToValue() -> Cronwatch.JsObject!
+override Cronwatch.AlertDetails.ToString() -> string!
+override Cronwatch.AlertType.GetHashCode() -> int
+override Cronwatch.AlertType.ToString() -> string!
+override Cronwatch.Alerts.BugsnagChannel.ToString() -> string!
+override Cronwatch.Alerts.BugsnagOptions.ToString() -> string!
+override Cronwatch.Alerts.DatadogChannel.ToString() -> string!
+override Cronwatch.Alerts.DatadogOptions.ToString() -> string!
+override Cronwatch.Alerts.DiscordChannel.ToString() -> string!
+override Cronwatch.Alerts.DiscordOptions.ToString() -> string!
+override Cronwatch.Alerts.HoneybadgerChannel.ToString() -> string!
+override Cronwatch.Alerts.HoneybadgerOptions.ToString() -> string!
+override Cronwatch.Alerts.HttpClientTransport.ToString() -> string!
+override Cronwatch.Alerts.MailgunChannel.ToString() -> string!
+override Cronwatch.Alerts.MailgunOptions.ToString() -> string!
+override Cronwatch.Alerts.NewRelicChannel.ToString() -> string!
+override Cronwatch.Alerts.NewRelicOptions.ToString() -> string!
+override Cronwatch.Alerts.PostmarkChannel.ToString() -> string!
+override Cronwatch.Alerts.PostmarkOptions.ToString() -> string!
+override Cronwatch.Alerts.ResendChannel.ToString() -> string!
+override Cronwatch.Alerts.ResendOptions.ToString() -> string!
+override Cronwatch.Alerts.RollbarChannel.ToString() -> string!
+override Cronwatch.Alerts.RollbarOptions.ToString() -> string!
+override Cronwatch.Alerts.SendGridChannel.ToString() -> string!
+override Cronwatch.Alerts.SendGridOptions.ToString() -> string!
+override Cronwatch.Alerts.SentryChannel.ToString() -> string!
+override Cronwatch.Alerts.SentryOptions.ToString() -> string!
+override Cronwatch.Alerts.SesChannel.ToString() -> string!
+override Cronwatch.Alerts.SesOptions.ToString() -> string!
+override Cronwatch.Alerts.SlackChannel.ToString() -> string!
+override Cronwatch.Alerts.SlackOptions.ToString() -> string!
+override Cronwatch.Alerts.TransportRequest.ToString() -> string!
+override Cronwatch.Alerts.TransportResponse.ToString() -> string!
+override Cronwatch.Alerts.TwilioChannel.ToString() -> string!
+override Cronwatch.Alerts.TwilioOptions.ToString() -> string!
+override Cronwatch.Alerts.WebhookChannel.ToString() -> string!
+override Cronwatch.Alerts.WebhookOptions.ToString() -> string!
+override Cronwatch.Bridge.Entry.ToString() -> string!
+override Cronwatch.Bridge.FireTimeChecks.ToString() -> string!
+override Cronwatch.Bridge.Watch.ToString() -> string!
+override Cronwatch.BudgetBreach.Equals(object? obj) -> bool
+override Cronwatch.BudgetBreach.GetHashCode() -> int
+override Cronwatch.BudgetBreach.ToString() -> string!
+override Cronwatch.ChannelContext.ToString() -> string!
+override Cronwatch.CheckResult.Equals(object? obj) -> bool
+override Cronwatch.CheckResult.GetHashCode() -> int
+override Cronwatch.CheckResult.ToString() -> string!
+override Cronwatch.Condition.GetHashCode() -> int
+override Cronwatch.Condition.ToString() -> string!
+override Cronwatch.ConsoleChannel.ToString() -> string!
+override Cronwatch.CronSecret.ToString() -> string!
+override Cronwatch.CronwatchClient.ToString() -> string!
+override Cronwatch.CronwatchOptions.ToString() -> string!
+override Cronwatch.Definition.Equals(object? obj) -> bool
+override Cronwatch.Definition.GetHashCode() -> int
+override Cronwatch.Definition.ToString() -> string!
+override Cronwatch.Duration.Equals(object? obj) -> bool
+override Cronwatch.Duration.GetHashCode() -> int
+override Cronwatch.Duration.ToString() -> string!
+override Cronwatch.Expect.ToString() -> string!
+override Cronwatch.Job.ToString() -> string!
+override Cronwatch.JobContext.ToString() -> string!
+override Cronwatch.JobHealth.GetHashCode() -> int
+override Cronwatch.JobHealth.ToString() -> string!
+override Cronwatch.JobOptions.ToString() -> string!
+override Cronwatch.JobState.Equals(object? obj) -> bool
+override Cronwatch.JobState.GetHashCode() -> int
+override Cronwatch.JobState.ToString() -> string!
+override Cronwatch.JobStats.Equals(object? obj) -> bool
+override Cronwatch.JobStats.GetHashCode() -> int
+override Cronwatch.JobStats.ToString() -> string!
+override Cronwatch.JobSummary.Equals(object? obj) -> bool
+override Cronwatch.JobSummary.GetHashCode() -> int
+override Cronwatch.JobSummary.ToString() -> string!
+override Cronwatch.JobWithRuns.Equals(object? obj) -> bool
+override Cronwatch.JobWithRuns.GetHashCode() -> int
+override Cronwatch.JobWithRuns.ToString() -> string!
+override Cronwatch.JsObject.Equals(object? obj) -> bool
+override Cronwatch.JsObject.GetHashCode() -> int
+override Cronwatch.JsObject.ToString() -> string!
+override Cronwatch.Metrics.Equals(object? obj) -> bool
+override Cronwatch.Metrics.GetHashCode() -> int
+override Cronwatch.Metrics.ToString() -> string!
+override Cronwatch.ObservedRun.ToString() -> string!
+override Cronwatch.PgCron.PgCronJob.Equals(object? obj) -> bool
+override Cronwatch.PgCron.PgCronJob.GetHashCode() -> int
+override Cronwatch.PgCron.PgCronJob.ToString() -> string!
+override Cronwatch.PgCron.PgCronOptions.ToString() -> string!
+override Cronwatch.PgCron.PgCronRow.Equals(object? obj) -> bool
+override Cronwatch.PgCron.PgCronRow.GetHashCode() -> int
+override Cronwatch.PgCron.PgCronRow.ToString() -> string!
+override Cronwatch.PgCron.PgCronSource.ToString() -> string!
+override Cronwatch.Run.Equals(object? obj) -> bool
+override Cronwatch.Run.GetHashCode() -> int
+override Cronwatch.Run.ToString() -> string!
+override Cronwatch.RunHandle.ToString() -> string!
+override Cronwatch.RunOptions.ToString() -> string!
+override Cronwatch.RunStatus.GetHashCode() -> int
+override Cronwatch.RunStatus.ToString() -> string!
+override Cronwatch.SqlStore.ToString() -> string!
+override Cronwatch.StartOptions.ToString() -> string!
+override Cronwatch.StoredJob.Equals(object? obj) -> bool
+override Cronwatch.StoredJob.GetHashCode() -> int
+override Cronwatch.StoredJob.ToString() -> string!
+override Cronwatch.Triage.AnthropicTriage.ToString() -> string!
+override Cronwatch.Triage.AnthropicTriageOptions.ToString() -> string!
+override Cronwatch.TriageContext.Equals(object? obj) -> bool
+override Cronwatch.TriageContext.GetHashCode() -> int
+override Cronwatch.TriageContext.ToString() -> string!
+override Cronwatch.ValueList<T>.Equals(object? obj) -> bool
+override Cronwatch.ValueList<T>.GetHashCode() -> int
+override Cronwatch.ValueList<T>.ToString() -> string!
+override Cronwatch.ValueMap<TKey, TValue>.Equals(object? obj) -> bool
+override Cronwatch.ValueMap<TKey, TValue>.GetHashCode() -> int
+override Cronwatch.ValueMap<TKey, TValue>.ToString() -> string!
+override Cronwatch.Web.DashboardToken.ToString() -> string!
+override Cronwatch.Web.Handler.ToString() -> string!
+override Cronwatch.Web.HandlerOptions.ToString() -> string!
+override Cronwatch.Web.HandlerSecret.ToString() -> string!
+override Cronwatch.Web.Routes.ToString() -> string!
+override Cronwatch.Web.RoutesOptions.ToString() -> string!
+override Cronwatch.Web.WebRequest.ToString() -> string!
+override Cronwatch.Web.WebResponse.ToString() -> string!
+override sealed Cronwatch.AlertDetails.Failure.Equals(Cronwatch.AlertDetails? other) -> bool
+override sealed Cronwatch.AlertDetails.Missed.Equals(Cronwatch.AlertDetails? other) -> bool
+override sealed Cronwatch.AlertDetails.OverBudget.Equals(Cronwatch.AlertDetails? other) -> bool
+override sealed Cronwatch.AlertDetails.Recovered.Equals(Cronwatch.AlertDetails? other) -> bool
+override sealed Cronwatch.AlertDetails.Slow.Equals(Cronwatch.AlertDetails? other) -> bool
+static Cronwatch.Alert.FromJson(string! text) -> Cronwatch.Alert!
+static Cronwatch.Alert.FromValue(object? v) -> Cronwatch.Alert!
+static Cronwatch.Alert.operator !=(Cronwatch.Alert? left, Cronwatch.Alert? right) -> bool
+static Cronwatch.Alert.operator ==(Cronwatch.Alert? left, Cronwatch.Alert? right) -> bool
+static Cronwatch.AlertDetails.Failure.operator !=(Cronwatch.AlertDetails.Failure? left, Cronwatch.AlertDetails.Failure? right) -> bool
+static Cronwatch.AlertDetails.Failure.operator ==(Cronwatch.AlertDetails.Failure? left, Cronwatch.AlertDetails.Failure? right) -> bool
+static Cronwatch.AlertDetails.Missed.operator !=(Cronwatch.AlertDetails.Missed? left, Cronwatch.AlertDetails.Missed? right) -> bool
+static Cronwatch.AlertDetails.Missed.operator ==(Cronwatch.AlertDetails.Missed? left, Cronwatch.AlertDetails.Missed? right) -> bool
+static Cronwatch.AlertDetails.OverBudget.operator !=(Cronwatch.AlertDetails.OverBudget? left, Cronwatch.AlertDetails.OverBudget? right) -> bool
+static Cronwatch.AlertDetails.OverBudget.operator ==(Cronwatch.AlertDetails.OverBudget? left, Cronwatch.AlertDetails.OverBudget? right) -> bool
+static Cronwatch.AlertDetails.Recovered.operator !=(Cronwatch.AlertDetails.Recovered? left, Cronwatch.AlertDetails.Recovered? right) -> bool
+static Cronwatch.AlertDetails.Recovered.operator ==(Cronwatch.AlertDetails.Recovered? left, Cronwatch.AlertDetails.Recovered? right) -> bool
+static Cronwatch.AlertDetails.Slow.operator !=(Cronwatch.AlertDetails.Slow? left, Cronwatch.AlertDetails.Slow? right) -> bool
+static Cronwatch.AlertDetails.Slow.operator ==(Cronwatch.AlertDetails.Slow? left, Cronwatch.AlertDetails.Slow? right) -> bool
+static Cronwatch.AlertDetails.operator !=(Cronwatch.AlertDetails? left, Cronwatch.AlertDetails? right) -> bool
+static Cronwatch.AlertDetails.operator ==(Cronwatch.AlertDetails? left, Cronwatch.AlertDetails? right) -> bool
+static Cronwatch.AlertType.Failed.get -> Cronwatch.AlertType
+static Cronwatch.AlertType.Missed.get -> Cronwatch.AlertType
+static Cronwatch.AlertType.Of(Cronwatch.Condition condition) -> Cronwatch.AlertType
+static Cronwatch.AlertType.OverBudget.get -> Cronwatch.AlertType
+static Cronwatch.AlertType.Recovered.get -> Cronwatch.AlertType
+static Cronwatch.AlertType.Slow.get -> Cronwatch.AlertType
+static Cronwatch.AlertType.Stuck.get -> Cronwatch.AlertType
+static Cronwatch.AlertType.implicit operator Cronwatch.AlertType(string! value) -> Cronwatch.AlertType
+static Cronwatch.AlertType.operator !=(Cronwatch.AlertType left, Cronwatch.AlertType right) -> bool
+static Cronwatch.AlertType.operator ==(Cronwatch.AlertType left, Cronwatch.AlertType right) -> bool
+static Cronwatch.Alerts.Discord.Webhook(string! webhookUrl) -> Cronwatch.Alerts.DiscordChannel!
+static Cronwatch.Alerts.Slack.Webhook(string! webhookUrl) -> Cronwatch.Alerts.SlackChannel!
+static Cronwatch.Alerts.WebhookChannel.Signature(string! secret, string! body) -> string!
+static Cronwatch.Bridge.ScheduleException.NeverFires(string! why) -> Cronwatch.Bridge.ScheduleException!
+static Cronwatch.Bridge.SchedulerBridge.AppName(string? fallback = null) -> string!
+static Cronwatch.Bridge.SchedulerBridge.AppTag(string! tag, string! app) -> string!
+static Cronwatch.Bridge.SchedulerBridge.CheckFires(Cronwatch.Bridge.FireTimes! runs, string! expr, string! zone, string! where, string! scheduler, bool daily, long now) -> void
+static Cronwatch.Bridge.SchedulerBridge.Definition(Cronwatch.CronwatchClient! cw, string! name, Cronwatch.JobOptions! options) -> Cronwatch.Definition!
+static Cronwatch.Bridge.SchedulerBridge.EveryText(System.TimeSpan interval) -> string!
+static Cronwatch.Bridge.SchedulerBridge.OptionsOf(Cronwatch.Definition! def) -> Cronwatch.JobOptions!
+static Cronwatch.Bridge.SchedulerBridge.SyncWithinAsync(Cronwatch.CronwatchClient! cw, System.TimeSpan limit, string! where, System.Func<System.Threading.Tasks.Task!>! sync) -> System.Threading.Tasks.Task<bool>!
+static Cronwatch.Bridge.SchedulerBridge.Unscheduled(Cronwatch.Definition! def) -> Cronwatch.JobOptions!
+static Cronwatch.Bridge.SchedulerBridge.ValidName(string! name) -> bool
+static Cronwatch.Bridge.SchedulerBridge.Walking(System.Func<long, long?>! next, string! scheduler) -> Cronwatch.Bridge.FireTimes!
+static Cronwatch.BudgetBreach.operator !=(Cronwatch.BudgetBreach? left, Cronwatch.BudgetBreach? right) -> bool
+static Cronwatch.BudgetBreach.operator ==(Cronwatch.BudgetBreach? left, Cronwatch.BudgetBreach? right) -> bool
+static Cronwatch.CheckResult.operator !=(Cronwatch.CheckResult? left, Cronwatch.CheckResult? right) -> bool
+static Cronwatch.CheckResult.operator ==(Cronwatch.CheckResult? left, Cronwatch.CheckResult? right) -> bool
+static Cronwatch.Condition.All.get -> System.Collections.Generic.IReadOnlyList<Cronwatch.Condition>!
+static Cronwatch.Condition.Failed.get -> Cronwatch.Condition
+static Cronwatch.Condition.Missed.get -> Cronwatch.Condition
+static Cronwatch.Condition.OverBudget.get -> Cronwatch.Condition
+static Cronwatch.Condition.Slow.get -> Cronwatch.Condition
+static Cronwatch.Condition.Stuck.get -> Cronwatch.Condition
+static Cronwatch.Condition.implicit operator Cronwatch.Condition(string! value) -> Cronwatch.Condition
+static Cronwatch.Condition.operator !=(Cronwatch.Condition left, Cronwatch.Condition right) -> bool
+static Cronwatch.Condition.operator ==(Cronwatch.Condition left, Cronwatch.Condition right) -> bool
+static Cronwatch.CronSecret.None.get -> Cronwatch.CronSecret!
+static Cronwatch.CronSecret.implicit operator Cronwatch.CronSecret!(string! secret) -> Cronwatch.CronSecret!
+static Cronwatch.CronwatchCli.RunAsync(System.Func<Cronwatch.CronwatchClient!>! factory, System.Collections.Generic.IReadOnlyList<string!>! args, System.IO.TextWriter! stdout, System.IO.TextWriter! stderr, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+static Cronwatch.CronwatchClient.Current.get -> Cronwatch.JobContext?
+static Cronwatch.CronwatchClient.Version.get -> string!
+static Cronwatch.CustomChannel.Create(string! name, System.Func<Cronwatch.Alert!, Cronwatch.ChannelContext!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! send) -> Cronwatch.IChannel!
+static Cronwatch.Definition.FromJson(string! text) -> Cronwatch.Definition!
+static Cronwatch.Definition.Of(Cronwatch.JsObject! fields) -> Cronwatch.Definition!
+static Cronwatch.Duration.FromMilliseconds(double milliseconds) -> Cronwatch.Duration
+static Cronwatch.Duration.implicit operator Cronwatch.Duration(System.TimeSpan span) -> Cronwatch.Duration
+static Cronwatch.Duration.implicit operator Cronwatch.Duration(double milliseconds) -> Cronwatch.Duration
+static Cronwatch.Duration.implicit operator Cronwatch.Duration(string! text) -> Cronwatch.Duration
+static Cronwatch.Duration.operator !=(Cronwatch.Duration left, Cronwatch.Duration right) -> bool
+static Cronwatch.Duration.operator ==(Cronwatch.Duration left, Cronwatch.Duration right) -> bool
+static Cronwatch.Expect.Contains(string! text) -> Cronwatch.Expect!
+static Cronwatch.Expect.Matches(string! source, string! flags = "") -> Cronwatch.Expect!
+static Cronwatch.Expect.That(System.Func<string!, bool>! check) -> Cronwatch.Expect!
+static Cronwatch.Expect.implicit operator Cronwatch.Expect!(string! text) -> Cronwatch.Expect!
+static Cronwatch.JobHealth.Failing.get -> Cronwatch.JobHealth
+static Cronwatch.JobHealth.Healthy.get -> Cronwatch.JobHealth
+static Cronwatch.JobHealth.Late.get -> Cronwatch.JobHealth
+static Cronwatch.JobHealth.NeverRan.get -> Cronwatch.JobHealth
+static Cronwatch.JobHealth.Silenced.get -> Cronwatch.JobHealth
+static Cronwatch.JobHealth.Stuck.get -> Cronwatch.JobHealth
+static Cronwatch.JobHealth.implicit operator Cronwatch.JobHealth(string! value) -> Cronwatch.JobHealth
+static Cronwatch.JobHealth.operator !=(Cronwatch.JobHealth left, Cronwatch.JobHealth right) -> bool
+static Cronwatch.JobHealth.operator ==(Cronwatch.JobHealth left, Cronwatch.JobHealth right) -> bool
+static Cronwatch.JobState.FromJson(string! text) -> Cronwatch.JobState!
+static Cronwatch.JobState.FromValue(object? v) -> Cronwatch.JobState!
+static Cronwatch.JobState.Initial(string! job) -> Cronwatch.JobState!
+static Cronwatch.JobState.operator !=(Cronwatch.JobState? left, Cronwatch.JobState? right) -> bool
+static Cronwatch.JobState.operator ==(Cronwatch.JobState? left, Cronwatch.JobState? right) -> bool
+static Cronwatch.JobStats.operator !=(Cronwatch.JobStats? left, Cronwatch.JobStats? right) -> bool
+static Cronwatch.JobStats.operator ==(Cronwatch.JobStats? left, Cronwatch.JobStats? right) -> bool
+static Cronwatch.JobSummary.operator !=(Cronwatch.JobSummary? left, Cronwatch.JobSummary? right) -> bool
+static Cronwatch.JobSummary.operator ==(Cronwatch.JobSummary? left, Cronwatch.JobSummary? right) -> bool
+static Cronwatch.JobWithRuns.operator !=(Cronwatch.JobWithRuns? left, Cronwatch.JobWithRuns? right) -> bool
+static Cronwatch.JobWithRuns.operator ==(Cronwatch.JobWithRuns? left, Cronwatch.JobWithRuns? right) -> bool
+static Cronwatch.Json.Copy(object? value) -> object?
+static Cronwatch.Json.Kind(object? v) -> string!
+static Cronwatch.Json.Parse(string! text) -> object?
+static Cronwatch.Json.ParseObject(string! text) -> Cronwatch.JsObject!
+static Cronwatch.Json.Quote(string! s) -> string!
+static Cronwatch.Json.Stringify(object? value) -> string!
+static Cronwatch.Json.TryNumber(object? v, out double n) -> bool
+static Cronwatch.Metrics.Empty.get -> Cronwatch.Metrics!
+static Cronwatch.Metrics.FromValue(object? v) -> Cronwatch.Metrics!
+static Cronwatch.Metrics.Lenient(object? v) -> Cronwatch.Metrics!
+static Cronwatch.Metrics.Of(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, double>>! values) -> Cronwatch.Metrics!
+static Cronwatch.PgCron.PgCronJob.operator !=(Cronwatch.PgCron.PgCronJob? left, Cronwatch.PgCron.PgCronJob? right) -> bool
+static Cronwatch.PgCron.PgCronJob.operator ==(Cronwatch.PgCron.PgCronJob? left, Cronwatch.PgCron.PgCronJob? right) -> bool
+static Cronwatch.PgCron.PgCronRow.operator !=(Cronwatch.PgCron.PgCronRow? left, Cronwatch.PgCron.PgCronRow? right) -> bool
+static Cronwatch.PgCron.PgCronRow.operator ==(Cronwatch.PgCron.PgCronRow? left, Cronwatch.PgCron.PgCronRow? right) -> bool
+static Cronwatch.PgCron.PgCronSource.DefaultJobName(Cronwatch.PgCron.PgCronJob! job) -> string!
+static Cronwatch.PgCron.PgCronSource.ToRun(Cronwatch.PgCron.PgCronRow! row, string! job, string! idPrefix, long fallbackAt) -> Cronwatch.Run?
+static Cronwatch.PgCron.PgCronSource.ToSchedule(string! schedule) -> string?
+static Cronwatch.Redaction.None.get -> System.Func<string!, string!>!
+static Cronwatch.Run.FromJson(string! text) -> Cronwatch.Run!
+static Cronwatch.Run.FromValue(object? v) -> Cronwatch.Run!
+static Cronwatch.Run.Running(string! id, string! job, long startedAt, string! trigger) -> Cronwatch.Run!
+static Cronwatch.Run.operator !=(Cronwatch.Run? left, Cronwatch.Run? right) -> bool
+static Cronwatch.Run.operator ==(Cronwatch.Run? left, Cronwatch.Run? right) -> bool
+static Cronwatch.RunStatus.Failed.get -> Cronwatch.RunStatus
+static Cronwatch.RunStatus.Ok.get -> Cronwatch.RunStatus
+static Cronwatch.RunStatus.Running.get -> Cronwatch.RunStatus
+static Cronwatch.RunStatus.Timeout.get -> Cronwatch.RunStatus
+static Cronwatch.RunStatus.implicit operator Cronwatch.RunStatus(string! value) -> Cronwatch.RunStatus
+static Cronwatch.RunStatus.operator !=(Cronwatch.RunStatus left, Cronwatch.RunStatus right) -> bool
+static Cronwatch.RunStatus.operator ==(Cronwatch.RunStatus left, Cronwatch.RunStatus right) -> bool
+static Cronwatch.SqlStore.For(System.Data.Common.DbDataSource! dataSource) -> Cronwatch.SqlStore!
+static Cronwatch.SqlStore.MySql(System.Data.Common.DbDataSource! dataSource) -> Cronwatch.SqlStore!
+static Cronwatch.SqlStore.Postgres(System.Data.Common.DbDataSource! dataSource) -> Cronwatch.SqlStore!
+static Cronwatch.SqlStore.Sqlite(System.Data.Common.DbDataSource! dataSource) -> Cronwatch.SqlStore!
+static Cronwatch.StoreTesting.FinishOnce.RunAsync(System.Func<Cronwatch.StoreTesting.FinishOnce.IShared!>! shared) -> System.Threading.Tasks.Task!
+static Cronwatch.StoreTesting.ForeignRows.CheckOverForeignRowsAsync(Cronwatch.IStore! store, string! prefix, System.Func<string!, System.Threading.Tasks.Task!>! sql) -> System.Threading.Tasks.Task!
+static Cronwatch.StoreTesting.ForeignRows.CronOverForeignRowAsync(Cronwatch.IStore! store, string! prefix, string! startedAt, System.Func<string!, System.Threading.Tasks.Task!>! sql) -> System.Threading.Tasks.Task!
+static Cronwatch.StoreTesting.ForeignRows.FarStarts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+static Cronwatch.StoreTesting.StoreContract.NewRun(string! id, string! job, Cronwatch.RunStatus status, long startedAt) -> Cronwatch.Run!
+static Cronwatch.StoreTesting.StoreContract.RunAsync(Cronwatch.IStore! store) -> System.Threading.Tasks.Task!
+static Cronwatch.StoreTesting.StoreReplay.ForeignVersionsAsync(string! fixture, Cronwatch.IStore! store, System.Func<string!, System.Threading.Tasks.Task!>! writeRaw) -> System.Threading.Tasks.Task<int>!
+static Cronwatch.StoreTesting.StoreReplay.RunAsync(string! fixture, System.Func<Cronwatch.IStore!>! fresh) -> System.Threading.Tasks.Task<int>!
+static Cronwatch.StoredJob.operator !=(Cronwatch.StoredJob? left, Cronwatch.StoredJob? right) -> bool
+static Cronwatch.StoredJob.operator ==(Cronwatch.StoredJob? left, Cronwatch.StoredJob? right) -> bool
+static Cronwatch.TriageContext.operator !=(Cronwatch.TriageContext? left, Cronwatch.TriageContext? right) -> bool
+static Cronwatch.TriageContext.operator ==(Cronwatch.TriageContext? left, Cronwatch.TriageContext? right) -> bool
+static Cronwatch.ValueList<T>.Empty.get -> Cronwatch.ValueList<T>!
+static Cronwatch.ValueList<T>.Of(System.Collections.Generic.IEnumerable<T>! items) -> Cronwatch.ValueList<T>!
+static Cronwatch.ValueList<T>.Of(params System.ReadOnlySpan<T> items) -> Cronwatch.ValueList<T>!
+static Cronwatch.ValueList<T>.implicit operator Cronwatch.ValueList<T>!(T[]! items) -> Cronwatch.ValueList<T>!
+static Cronwatch.ValueMap<TKey, TValue>.Empty.get -> Cronwatch.ValueMap<TKey, TValue>!
+static Cronwatch.ValueMap<TKey, TValue>.Of(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>! entries) -> Cronwatch.ValueMap<TKey, TValue>!
+static Cronwatch.Web.DashboardToken.None.get -> Cronwatch.Web.DashboardToken!
+static Cronwatch.Web.DashboardToken.implicit operator Cronwatch.Web.DashboardToken!(string! token) -> Cronwatch.Web.DashboardToken!
+static Cronwatch.Web.HandlerSecret.None.get -> Cronwatch.Web.HandlerSecret!
+static Cronwatch.Web.HandlerSecret.implicit operator Cronwatch.Web.HandlerSecret!(string! secret) -> Cronwatch.Web.HandlerSecret!
+static Cronwatch.Web.WebAdapters.FormBody(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, string!>>! fields) -> byte[]!
+static Cronwatch.Web.WebAdapters.Target(string! rawTarget) -> string!
+static Cronwatch.Web.WebResponse.Carrying(object! result, int status) -> Cronwatch.Web.WebResponse!
+static readonly Cronwatch.Bridge.SchedulerBridge.SyncTimeout -> System.TimeSpan
+static readonly Cronwatch.Bridge.Watch.SaveTimeout -> System.TimeSpan
+virtual Cronwatch.AlertDetails.EqualityContract.get -> System.Type!
+virtual Cronwatch.AlertDetails.Equals(Cronwatch.AlertDetails? other) -> bool
+virtual Cronwatch.AlertDetails.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual Cronwatch.Bridge.FireTimes.Invoke(long start, long? end) -> System.Collections.Generic.IReadOnlyList<long>!
+virtual Cronwatch.Web.WebBodyReader.Invoke(int limit, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<byte[]!>!
+~override Cronwatch.AlertType.Equals(object obj) -> bool
+~override Cronwatch.Condition.Equals(object obj) -> bool
+~override Cronwatch.JobHealth.Equals(object obj) -> bool
+~override Cronwatch.RunStatus.Equals(object obj) -> bool

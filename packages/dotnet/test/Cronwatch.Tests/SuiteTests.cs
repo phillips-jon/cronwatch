@@ -59,10 +59,11 @@ public class SuiteTests
         string assets = Path.Combine(Fixtures.Repo, "packages", "dotnet", "src", "Cronwatch", "obj", "project.assets.json");
         Assert.True(File.Exists(assets), "the core has not been restored: " + assets);
         var root = Json.ParseObject(File.ReadAllText(assets));
-        // The trimming analyzers' build tasks, which IsAotCompatible brings, are the build's own and
-        // never reach a package.
+        // The trimming analyzers' build tasks, which IsAotCompatible brings, and the public API
+        // analyzer (Directory.Build.targets, PrivateAssets="all") are the build's own and never
+        // reach a package.
         var libraries = (root.Get("libraries") as JsObject)?.Keys ?? [];
-        Assert.DoesNotContain(libraries, l => !l.StartsWith("Microsoft.NET.ILLink.Tasks/", StringComparison.Ordinal));
+        Assert.DoesNotContain(libraries, l => !l.StartsWith("Microsoft.NET.ILLink.Tasks/", StringComparison.Ordinal) && !l.StartsWith("Microsoft.CodeAnalysis.PublicApiAnalyzers/", StringComparison.Ordinal));
         string project = File.ReadAllText(Path.Combine(Fixtures.Repo, "packages", "dotnet", "src", "Cronwatch", "Cronwatch.csproj"));
         Assert.DoesNotContain("PackageReference", project, StringComparison.Ordinal);
         Assert.DoesNotContain("FrameworkReference", project, StringComparison.Ordinal);

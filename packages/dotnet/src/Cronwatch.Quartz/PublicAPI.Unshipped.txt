@@ -1,0 +1,36 @@
+#nullable enable
+Cronwatch.Quartz.CronwatchCheckJob
+Cronwatch.Quartz.CronwatchCheckJob.CronwatchCheckJob() -> void
+Cronwatch.Quartz.CronwatchCheckJob.Execute(Quartz.IJobExecutionContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Cronwatch.Quartz.CronwatchQuartz
+Cronwatch.Quartz.CronwatchQuartz.Client.get -> Cronwatch.CronwatchClient!
+Cronwatch.Quartz.CronwatchQuartz.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Cronwatch.Quartz.CronwatchQuartz.SettleAsync(System.TimeSpan timeout) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.Quartz.CronwatchQuartz.SyncAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Cronwatch.Quartz.CronwatchQuartz.Watch.get -> Cronwatch.Bridge.Watch!
+Cronwatch.Quartz.CronwatchQuartzOptions
+Cronwatch.Quartz.CronwatchQuartzOptions.App.get -> string?
+Cronwatch.Quartz.CronwatchQuartzOptions.App.set -> void
+Cronwatch.Quartz.CronwatchQuartzOptions.CheckEvery.get -> System.TimeSpan
+Cronwatch.Quartz.CronwatchQuartzOptions.CheckEvery.set -> void
+Cronwatch.Quartz.CronwatchQuartzOptions.CronwatchQuartzOptions() -> void
+Cronwatch.Quartz.CronwatchQuartzOptions.JobDefaults.get -> Cronwatch.JobOptions?
+Cronwatch.Quartz.CronwatchQuartzOptions.JobDefaults.set -> void
+Cronwatch.Quartz.CronwatchQuartzOptions.Jobs.get -> System.Collections.Generic.IDictionary<string!, Cronwatch.JobOptions!>!
+Cronwatch.Quartz.CronwatchQuartzOptions.ReadEvery.get -> System.TimeSpan
+Cronwatch.Quartz.CronwatchQuartzOptions.ReadEvery.set -> void
+Cronwatch.Quartz.CronwatchQuartzOptions.ScheduleCheck.get -> bool
+Cronwatch.Quartz.CronwatchQuartzOptions.ScheduleCheck.set -> void
+Cronwatch.Quartz.QuartzBuilderExtensions
+Cronwatch.Quartz.QuartzContextExtensions
+const Cronwatch.Quartz.CronwatchQuartz.Recovered = "Quartz recovered the job after its node stopped" -> string!
+const Cronwatch.Quartz.CronwatchQuartz.Tag = "quartz" -> string!
+const Cronwatch.Quartz.CronwatchQuartz.Trigger = "quartz" -> string!
+override Cronwatch.Quartz.CronwatchQuartz.ToString() -> string!
+override Cronwatch.Quartz.CronwatchQuartzOptions.ToString() -> string!
+static Cronwatch.Quartz.CronwatchQuartz.ScheduleCheckAsync(Quartz.IScheduler! scheduler, System.TimeSpan? every = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+static Cronwatch.Quartz.CronwatchQuartz.WatchAsync(Cronwatch.CronwatchClient! cw, Quartz.IScheduler! scheduler, Cronwatch.Quartz.CronwatchQuartzOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Quartz.CronwatchQuartz!>!
+static Cronwatch.Quartz.QuartzBuilderExtensions.UseCronwatch(this Quartz.IQuartzBuilder! builder, Cronwatch.CronwatchClient! cw, System.Action<Cronwatch.Quartz.CronwatchQuartzOptions!>? configure = null) -> Quartz.IQuartzBuilder!
+static Cronwatch.Quartz.QuartzBuilderExtensions.UseCronwatch(this Quartz.IQuartzBuilder! builder, System.Action<Cronwatch.Quartz.CronwatchQuartzOptions!>? configure = null) -> Quartz.IQuartzBuilder!
+static Cronwatch.Quartz.QuartzContextExtensions.CronwatchRun(this Quartz.IJobExecutionContext! context) -> Cronwatch.ObservedRun?
+static readonly Cronwatch.Quartz.CronwatchQuartz.CheckJobKey -> Quartz.JobKey!

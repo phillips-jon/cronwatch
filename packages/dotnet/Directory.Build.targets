@@ -9,4 +9,19 @@
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)src/Cronwatch/Web/Assets/icons/icon-192.png" Pack="true" PackagePath="icon.png" Visible="false" />
   </ItemGroup>
+
+  <!-- Each package's public surface is written down beside it: what a release
+       shipped in PublicAPI.Shipped.txt, what was added since in
+       PublicAPI.Unshipped.txt, and anything public that neither lists fails
+       the build (RS0016), as does a line for something no longer there
+       (RS0017). The analyzer runs at build time only and is no dependency of
+       any package. After a change to the surface, `dotnet format analyzers`
+       on the package's project, given the diagnostics RS0016 and RS0017,
+       writes its lines into PublicAPI.Unshipped.txt; a release moves them
+       into PublicAPI.Shipped.txt. -->
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
 </Project>
