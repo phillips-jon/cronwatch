@@ -316,6 +316,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         Task<RunHandle> shared = _starting.GetOrAdd(key, mine.Task);
         if (ReferenceEquals(shared, mine.Task))
         {
+            Abandon(mine.Task);
             // Let go of before anyone is answered, so a start with this id once answered reads the
             // stored run rather than joining this finished start.
             _ = Spawn(async () =>

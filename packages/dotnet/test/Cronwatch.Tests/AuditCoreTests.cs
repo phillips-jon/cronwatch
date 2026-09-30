@@ -166,6 +166,65 @@ public class AuditCoreTests
         Assert.Equal(long.MaxValue, (await m.Store.GetStateAsync("counted"))!.ConsecutiveFailures);
     }
 
+    [Fact]
+    public async Task A_channel_that_throws_after_its_deadline_leaves_no_unobserved_task_exception()
+    {
+        const string Marker = "thrown after the deadline, audit probe";
+        var unobserved = new List<Exception>();
+        EventHandler<UnobservedTaskExceptionEventArgs> handler = (sender, e) =>
+        {
+            if (e.Exception.Flatten().InnerExceptions.Any(x => x.Message == Marker))
+            {
+                lock (unobserved)
+                {
+                    unobserved.Add(e.Exception);
+                }
+            }
+        };
+        TaskScheduler.UnobservedTaskException += handler;
+        try
+        {
+            var threw = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var late = Channel.Create("late", async (a, ctx, ct) =>
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    threw.TrySetResult();
+                    throw new System.IO.IOException(Marker);
+                }
+            });
+            await using (var m = Make(channels: [late], timings: new Timings { Channel = TimeSpan.FromSeconds(1) }))
+            {
+                var failing = Quietly(() => m.Cw.RunAsync("late-channel", (j, ct) => throw new InvalidOperationException("x")));
+                await Eventually("the run to be recorded", () =>
+                {
+                    m.Clock.Advance(1000);
+                    return failing.IsCompleted;
+                });
+                await failing;
+                await threw.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            }
+            for (int i = 0; i < 3; i++)
+            {
+                await Task.Delay(50);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+            lock (unobserved)
+            {
+                Assert.Empty(unobserved);
+            }
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= handler;
+        }
+    }
+
     private sealed class Registering : ISource
     {
         public string Name => "registering";

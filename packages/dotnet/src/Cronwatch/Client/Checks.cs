@@ -36,6 +36,8 @@ public sealed partial class CronwatchClient
         if (shared == null)
         {
             shared = mine;
+            // Every caller may stop waiting before a failed check ends.
+            Abandon(mine.Task);
             _ = Spawn(async () =>
             {
                 try

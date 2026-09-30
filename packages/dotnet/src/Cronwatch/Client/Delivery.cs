@@ -187,15 +187,17 @@ public sealed partial class CronwatchClient
         string where = "alert channel " + channel.Name;
         var context = new ChannelContext(e => Report(e, where), _transport);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(_closing.Token);
+        Task? send = null;
         try
         {
-            Task send = channel.SendAsync(alert, context, cts.Token);
+            send = channel.SendAsync(alert, context, cts.Token);
             await send.WaitAsync(Timings.Channel, _time).ConfigureAwait(false);
             Count(alert, "sent", channel.Name);
             return true;
         }
         catch (TimeoutException)
         {
+            Abandon(send!);
             await cts.CancelAsync().ConfigureAwait(false);
             Report("timed out after " + (long)Timings.Channel.TotalMilliseconds + "ms", where);
         }

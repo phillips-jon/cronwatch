@@ -378,13 +378,26 @@ public sealed partial class CronwatchClient
         Task<T> task = WithoutFlow(() => Task.Run(work));
         _inFlight.TryAdd(task, 0);
         _ = task.ContinueWith(
-            static (t, state) => ((ConcurrentDictionary<Task, byte>)state!).TryRemove(t, out _),
+            static (t, state) =>
+            {
+                // Observed here, so a task whose caller stopped waiting never reaches the app's
+                // UnobservedTaskException handler (an error tracker's) when it later fails.
+                _ = t.Exception;
+                ((ConcurrentDictionary<Task, byte>)state!).TryRemove(t, out _);
+            },
             _inFlight,
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
         return task;
     }
+
+    /// <summary>Observes a task given up on, so its later failure is not reported as unobserved.</summary>
+    internal static void Abandon(Task task) => _ = task.ContinueWith(
+        static t => _ = t.Exception,
+        CancellationToken.None,
+        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+        TaskScheduler.Default);
 
     /// <summary>Runs <paramref name="start"/> with the execution context's flow suppressed.</summary>
     internal static T WithoutFlow<T>(Func<T> start)
