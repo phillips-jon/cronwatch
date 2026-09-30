@@ -1,0 +1,39 @@
+{
+  "comment": "Store calls replayed by the Node SDK's SQLite store and by the Go, Rust and Java ports' SQL stores (a copy of the Ruby and Python tests' fixture); both must leave the same rows and read them back the same. Key order is the SDK's.",
+  "ops": [
+    { "op": "upsertJob", "now": 1767605400000, "definition": { "grace": "15m", "timezone": "Europe/London", "schedule": "0 2 * * *", "budget": { "cost": 2, "tokens": 150000 }, "failuresBeforeAlert": 2, "tags": ["reports", "nightly"], "description": "Writes the \"nightly\" report\nto S3", "name": "nightly-report", "expect": "contains \"Report written\"" } },
+    { "op": "upsertJob", "now": 1767605400001, "definition": { "name": "every-5", "schedule": "every 5m", "timeout": "2m", "maxDuration": "90s" } },
+    { "op": "upsertJob", "now": 1767605400002, "definition": { "name": "B" } },
+    { "op": "upsertJob", "now": 1767605400003, "definition": { "name": "_under" } },
+    { "op": "upsertJob", "now": 1767605400004, "definition": { "name": "zeta", "futureField": { "nested": [1, 2.5, null, true], "text": "café ☃ 😀" } } },
+    { "op": "upsertJob", "now": 1767605400005, "definition": { "name": "nightly-report", "schedule": "0 3 * * *", "tags": [], "expect": "matches /ok\\s+done/i" } },
+    { "op": "upsertJob", "now": 1767605400006, "definition": { "name": "gone" } },
+
+    { "op": "insertRun", "run": { "id": "r-1", "job": "nightly-report", "status": "running", "startedAt": 1767605000000, "finishedAt": null, "durationMs": null, "error": null, "output": null, "metrics": {}, "trigger": "run" } },
+    { "op": "updateRun", "run": { "id": "r-1", "job": "nightly-report", "status": "ok", "startedAt": 1767605000000, "finishedAt": 1767605012345, "durationMs": 12345, "error": null, "output": "Report written: s3://bucket/2026-01-05.csv\nrows: 1204\n line separator, tab\tand \"quotes\" \\ backslash 😀", "metrics": { "cost": 1.2, "tokens": 140211, "ratio": 0.30000000000000004, "tiny": 1e-7, "huge": 1e21, "neg": -3.5, "zero": 0, "üml": 7 }, "trigger": "run" } },
+    { "op": "insertRun", "run": { "id": "r-2", "job": "nightly-report", "status": "failed", "startedAt": 1767606000000, "finishedAt": 1767606000500, "durationMs": 500, "error": "Error: boom\n    at run (job.js:1:1)", "output": null, "metrics": { "cost": 0.05 }, "trigger": "http" } },
+    { "op": "insertRun", "run": { "id": "r-3", "job": "nightly-report", "status": "running", "startedAt": 1767606000000, "finishedAt": null, "durationMs": null, "error": null, "output": null, "metrics": {}, "trigger": "active_job" } },
+    { "op": "insertRun", "run": { "id": "r-4", "job": "every-5", "status": "timeout", "startedAt": 1767600000000, "finishedAt": 1767600300000, "durationMs": 300000, "error": "Still running after 2 minutes; marked as timed out", "output": "", "metrics": {}, "trigger": "run" } },
+    { "op": "insertRun", "run": { "id": "r-5", "job": "every-5", "status": "running", "startedAt": 1767606000000, "finishedAt": null, "durationMs": null, "error": null, "output": null, "metrics": {}, "trigger": "run" } },
+    { "op": "insertRun", "run": { "id": "r-6", "job": "B", "status": "ok", "startedAt": 1767500000000, "finishedAt": 1767500000001, "durationMs": 1, "error": null, "output": "x", "metrics": { "n": 1 }, "trigger": "run" } },
+    { "op": "insertRun", "run": { "id": "r-7", "job": "B", "status": "ok", "startedAt": 1767400000000, "finishedAt": 1767400000001, "durationMs": 1, "error": null, "output": null, "metrics": {}, "trigger": "run" } },
+    { "op": "insertRun", "run": { "id": "r-8", "job": "gone", "status": "running", "startedAt": 1767606000000, "finishedAt": null, "durationMs": null, "error": null, "output": null, "metrics": {}, "trigger": "run" } },
+    { "op": "updateRun", "run": { "id": "no-such-run", "job": "nightly-report", "status": "ok", "startedAt": 1, "finishedAt": 2, "durationMs": 1, "error": null, "output": "never stored", "metrics": {}, "trigger": "run" } },
+
+    { "op": "setState", "state": { "job": "nightly-report", "open": { "failed": 1767606000500 }, "consecutiveFailures": 1, "silencedUntil": null, "lastAlertAt": null } },
+    { "op": "setState", "state": { "job": "nightly-report", "open": { "failed": 1767606000500, "over_budget": 1767605012345 }, "consecutiveFailures": 2, "silencedUntil": 1767700000000, "lastAlertAt": 1767606000600, "pendingRecovery": ["missed", "slow"], "undelivered": [
+      { "type": "failed", "run": { "id": "r-2", "job": "nightly-report", "status": "failed", "startedAt": 1767606000000, "finishedAt": 1767606000500, "durationMs": 500, "error": "Error: boom", "output": null, "metrics": { "cost": 0.05 }, "trigger": "http" }, "details": { "consecutiveFailures": 2, "threshold": 2 }, "job": "nightly-report", "definition": { "name": "nightly-report", "schedule": "0 3 * * *" }, "title": "nightly-report failed", "message": "Error: boom\nFailed 2 times in a row.", "at": 1767606000600, "triage": "The S3 bucket policy changed at 01:58." },
+      { "type": "over_budget", "run": null, "details": { "breaches": [{ "metric": "cost", "value": 2.5, "limit": 2, "basis": "budget" }] }, "job": "nightly-report", "definition": { "name": "nightly-report" }, "title": "nightly-report went over budget", "message": "cost 2.5 over 2", "at": 1767606000601 },
+      { "type": "missed", "run": null, "details": { "dueAt": 1767578400000, "deadline": 1767579300000, "graceMs": 900000, "lastRunAt": null }, "job": "nightly-report", "definition": { "name": "nightly-report" }, "title": "nightly-report missed", "message": "No run.", "at": 1767579300001 },
+      { "type": "recovered", "run": null, "details": { "after": ["missed", "failed"] }, "job": "nightly-report", "definition": { "name": "nightly-report" }, "title": "nightly-report recovered", "message": "Back to normal.", "at": 1767579300002 }
+    ] } },
+    { "op": "setState", "state": { "job": "every-5", "open": {}, "consecutiveFailures": 0, "silencedUntil": null, "lastAlertAt": 1767600300000, "pendingRecovery": [] } },
+    { "op": "setState", "state": { "job": "gone", "open": { "stuck": 5 }, "consecutiveFailures": 0, "silencedUntil": null, "lastAlertAt": null } },
+    { "op": "deleteJob", "name": "gone" },
+    { "op": "prune", "before": 1767450000000 }
+  ],
+  "read": {
+    "jobs": ["nightly-report", "every-5", "B", "_under", "zeta", "gone", "none"],
+    "runs": ["r-1", "r-2", "r-3", "r-4", "r-5", "r-6", "r-7", "r-8", "no-such-run"]
+  }
+}
