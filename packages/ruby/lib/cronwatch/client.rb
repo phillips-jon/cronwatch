@@ -326,6 +326,9 @@ module Cronwatch
       input = run.is_a?(Run) ? run : Run.from_h(run.is_a?(Hash) ? run.to_h { |k, v| [Naming.camel(k), v] } : run)
       declared = @registry.synchronize { @definitions[input.job] }
       raise ArgumentError, "record_run: job \"#{input.job}\" is not declared; call job first" unless declared
+      if input.id.to_s.include?("\0")
+        raise ArgumentError, "record_run: run ids cannot contain a NUL character (job \"#{input.job}\")"
+      end
 
       sync(declared)
       run = input.dup
@@ -991,6 +994,8 @@ module Cronwatch
         got = id.is_a?(String) ? "#{JS.length16(id)} characters" : id.class.to_s
         raise ArgumentError, "job \"#{job}\": #{method}() needs a run id of 1 to 200 characters (got #{got})"
       end
+      # Postgres refuses NUL in text, so no store could hold such an id.
+      raise ArgumentError, "job \"#{job}\": #{method}() cannot take a run id containing a NUL character" if id.include?("\0")
       return unless id.start_with?(RESERVED_RUN_ID_PREFIX)
 
       raise ArgumentError, "job \"#{job}\": #{method}() cannot take a run id starting with \"#{RESERVED_RUN_ID_PREFIX}\", " \

@@ -41,8 +41,10 @@ module Cronwatch
     # prefix:   put before every job name, to keep them apart from your own ("db:"). Also keeps run ids apart.
     # job_name: a callable giving the CronWatch name for a Job. Default its jobname with anything other than
     #           letters, digits, ".", "_", ":" and "-" turned into "-", or "pg_cron:<jobid>" when it has none.
-    #           The prefix goes in front either way.
-    # options:  grace, timeout, max_duration, expect and the rest, for every job (a hash) or per job (a callable
+    #           The prefix goes in front either way. One that raises or returns no name, like a `jobs` or
+    #           `options` callable that raises, is reported once and fails only that job, which keeps its last
+    #           declaration until the callable works again.
+    # options: grace, timeout, max_duration, expect and the rest, for every job (a hash) or per job (a callable
     #           given a Job). The schedule and timezone always come from pg_cron.
     # timezone: the timezone pg_cron reads its cron expressions in. Default the server's cron.timezone, read from
     #           pg_settings, which shows it only to roles with pg_read_all_settings; UTC (pg_cron's default) is
@@ -110,6 +112,8 @@ module Cronwatch
         @retired = Set.new
         @scanned = false
         @warned = Set.new
+        # Jobids whose callback failed, reported once until it works again.
+        @failing = Set.new
         @name = "pg_cron"
       end
 
@@ -269,8 +273,7 @@ module Cronwatch
                                    "scheduled: connect as that role, or give this one BYPASSRLS.")
         end
         all = rows.map { |r| job_from(r) }
-        jobs = all.select { |job| picks?(job) }
-        names, definitions = declare(host, jobs, timezone, recording)
+        names, definitions = declare(host, all, timezone, recording)
         retire_unused(host, names, definitions, all)
         return [] if !recording || names.empty?
 
@@ -316,18 +319,60 @@ module Cronwatch
         /\A\d{1,15}\z/.match?(rest) ? rest.to_i : nil
       end
 
-      # Declares each job. A paused one (active = false) keeps its failures but loses its schedule, so it is not missed.
-      # Returns [{ jobid => name }, { jobid => definition as declared }].
-      def declare(host, jobs, timezone, recording)
+      # Declares each job picked. A paused one (active = false) keeps its failures but loses its schedule, so it
+      # is not missed. Returns [{ jobid => name }, { jobid => definition as declared }].
+      def declare(host, all, timezone, recording)
         names = {}
         definitions = {}
         used = Set.new
-        jobs.each do |job|
-          name = @prefix + (@job_name ? @job_name.call(job).to_s : PgCron.job_name(job))
+        # A callback of the app's (jobs, job_name, options) that raised, or a job_name that gave no name, fails
+        # only its job, as a bad row does: reported once until it works again, and the job carries on as last
+        # declared (skipped when it never was), so its runs are still copied.
+        trouble = lambda do |job, what|
+          unless @failing.include?(job.jobid)
+            @failing << job.jobid
+            host.on_error(RuntimeError.new("pg_cron job #{job.jobid}: #{what}; it keeps its last declaration until that works"),
+                          "source pg_cron")
+          end
+          last = @known[job.jobid]
+          next if last.nil? || used.include?(last[:name])
+
+          names[job.jobid] = last[:name]
+          definitions[job.jobid] = last[:definition]
+          used << last[:name]
+        end
+        all.each do |job|
+          begin
+            picked = picks?(job)
+          rescue StandardError => e
+            trouble.call(job, "the jobs callback raised #{e.class}: #{e.message}")
+            next
+          end
+          unless picked
+            @failing.delete(job.jobid)
+            next
+          end
+          begin
+            base = @job_name ? @job_name.call(job) : PgCron.job_name(job)
+          rescue StandardError => e
+            trouble.call(job, "job_name raised #{e.class}: #{e.message}")
+            next
+          end
+          unless base.is_a?(String) || base.is_a?(Symbol)
+            trouble.call(job, "job_name returned #{base.nil? ? "nil" : base.class}, not a name")
+            next
+          end
+          begin
+            extra = (@options.respond_to?(:call) ? @options.call(job) : @options) || {}
+            extra = extra.to_h.transform_keys(&:to_sym).except(*SCHEDULE_ONLY)
+          rescue StandardError => e
+            trouble.call(job, "the options callback raised #{e.class}: #{e.message}")
+            next
+          end
+          @failing.delete(job.jobid)
+          name = @prefix + base.to_s
           name = "#{name}:#{job.jobid}" if used.include?(name)
           used << name
-          extra = (@options.respond_to?(:call) ? @options.call(job) : @options) || {}
-          extra = extra.to_h.transform_keys(&:to_sym).except(*SCHEDULE_ONLY)
           schedule = job.active && recording ? PgCron.schedule(job.schedule) : nil
           definition = {
             description: "pg_cron job #{job.jobid} in #{job.database} as #{job.username}#{job.active ? "" : " (paused)"}",

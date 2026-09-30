@@ -28,7 +28,7 @@ module Cronwatch
           existing = @jobs[definition.name]
           @jobs[definition.name] = StoredJob.new(
             name: definition.name,
-            definition: clone(definition, JobDefinition),
+            definition: kept(definition, JobDefinition),
             created_at: existing ? existing.created_at : now,
             updated_at: now,
           )
@@ -62,7 +62,7 @@ module Cronwatch
         sync do
           raise "run #{run.id} already exists" if @runs.key?(run.id)
 
-          @runs[run.id] = clone(run, Run)
+          @runs[run.id] = kept_run(run)
           @order[run.id] = (@seq += 1)
         end
         nil
@@ -125,7 +125,7 @@ module Cronwatch
       end
 
       def set_state(state)
-        sync { @states[state.job] = clone(state, JobState) }
+        sync { @states[state.job] = kept(state, JobState) }
         nil
       end
 
@@ -136,7 +136,7 @@ module Cronwatch
         sync do
           next false unless Evaluate.state_version(@states[state.job]) == expected_version
 
-          @states[state.job] = clone(state, JobState)
+          @states[state.job] = kept(state, JobState)
           true
         end
       end
@@ -161,7 +161,7 @@ module Cronwatch
 
       # `existing` with the fields an update writes taken from `run`.
       def finished_fields(existing, run)
-        copy = clone(run, Run)
+        copy = kept_run(run)
         existing.dup.tap do |r|
           r.status = copy.status
           r.finished_at = copy.finished_at
@@ -180,6 +180,21 @@ module Cronwatch
       # caller holds is shared and values read back as any store returns them.
       def clone(value, type)
         type.from_h(JS.parse(JS.json(value.to_h)))
+      end
+
+      # Text is held as the SQL stores write it, without U+0000, so every
+      # store reads back the same. Identifiers are held as given.
+      def kept(value, type)
+        type.from_h(JS.parse(Output.strip_json_nul(JS.json(value.to_h))))
+      end
+
+      def kept_run(run)
+        clone(run, Run).tap do |copy|
+          copy.trigger = Output.strip_nul(copy.trigger.to_s)
+          copy.output = copy.output && Output.strip_nul(copy.output)
+          copy.error = copy.error && Output.strip_nul(copy.error)
+          copy.metrics = JS.parse(Output.strip_json_nul(JS.json(copy.metrics || {})))
+        end
       end
     end
   end

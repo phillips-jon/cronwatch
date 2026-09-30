@@ -180,7 +180,7 @@ module Cronwatch
 
       def upsert_job(definition, now)
         definition = JobDefinition.from_h(definition)
-        write(:upsert_job, [definition.name, JS.json(definition.to_h), now, now])
+        write(:upsert_job, [definition.name, json_text(definition.to_h), now, now])
         nil
       end
 
@@ -205,14 +205,14 @@ module Cronwatch
 
       def insert_run(run)
         write(:insert_run, [run.id, run.job, run.status.to_s, run.started_at, run.finished_at, run.duration_ms,
-                            run.error, run.output, JS.json(run.metrics || {}), run.trigger])
+                            text(run.error), text(run.output), json_text(run.metrics || {}), text(run.trigger)])
         nil
       end
 
       # A run that is gone (its job was forgotten) stays gone.
       def update_run(run)
-        write(:update_run, [run.status.to_s, run.finished_at, run.duration_ms, run.error, run.output,
-                            JS.json(run.metrics || {}), run.id])
+        write(:update_run, [run.status.to_s, run.finished_at, run.duration_ms, text(run.error), text(run.output),
+                            json_text(run.metrics || {}), run.id])
         nil
       end
 
@@ -222,8 +222,8 @@ module Cronwatch
         statuses = Array(from_statuses).map(&:to_s)
         return false if statuses.empty?
 
-        binds = [run.status.to_s, run.finished_at, run.duration_ms, run.error, run.output,
-                 JS.json(run.metrics || {}), run.id, *statuses]
+        binds = [run.status.to_s, run.finished_at, run.duration_ms, text(run.error), text(run.output),
+                 json_text(run.metrics || {}), run.id, *statuses]
         changed = with_connection { |conn| conn.exec_update(update_run_if_sql(conn, statuses.length), NAME, binds) }
         changed.to_i.positive?
       end
@@ -253,7 +253,7 @@ module Cronwatch
       end
 
       def set_state(state)
-        write(:set_state, [state.job, JS.json(state.to_h)])
+        write(:set_state, [state.job, json_text(state.to_h)])
         nil
       end
 
@@ -262,10 +262,10 @@ module Cronwatch
       # Returns whether it wrote. This is what keeps two processes sharing the
       # database (Ruby or Node) from overwriting each other's updates.
       def compare_and_set_state(state, expected_version)
-        text = JS.json(state.to_h)
+        state_text = json_text(state.to_h)
         changed =
-          if expected_version.zero? then write(:cas_insert, [state.job, text])
-          else write(:cas_update, [text, state.job, expected_version])
+          if expected_version.zero? then write(:cas_insert, [state.job, state_text])
+          else write(:cas_update, [state_text, state.job, expected_version])
           end
         changed.to_i.positive?
       end
@@ -395,6 +395,19 @@ module Cronwatch
 
       # SQLite hands back JSON as TEXT; Postgres drivers may hand back JSONB
       # parsed or as text, and BIGINT as a string.
+      # Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses
+      # the whole row, so every dialect writes text without it: a run's
+      # trigger, output, error and metric names, and every key and string of
+      # a definition and a state. Identifiers (a job's name, a run's id) are
+      # written as given; the client refuses one with a NUL before it gets here.
+      def text(value)
+        value.nil? ? nil : Output.strip_nul(value.to_s)
+      end
+
+      def json_text(value)
+        Output.strip_json_nul(JS.json(value))
+      end
+
       def json(value)
         js_numbers(value.is_a?(String) ? JS.parse(value) : value)
       end

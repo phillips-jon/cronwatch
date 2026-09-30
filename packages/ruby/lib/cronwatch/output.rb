@@ -137,6 +137,16 @@ module Cronwatch
       text.include?("\0") ? text.delete("\0") : text
     end
 
+    # Removes every U+0000 from JSON text, keys and strings alike, by dropping
+    # each \u0000 escape (a NUL can appear in JSON no other way). Escapes are
+    # read left to right in pairs, so an escaped backslash followed by "u0000"
+    # is left as it is.
+    def strip_json_nul(json)
+      return json unless json.include?("\\u0000")
+
+      json.gsub(/\\(u0000|.)/m) { Regexp.last_match(1) == "u0000" ? "" : Regexp.last_match(0) }
+    end
+
     # "Name: message" and the first five backtrace lines, each written as
     # "    at <line>" like the frames of a JavaScript stack, capped like output.
     # An exception that stops the thread rather than reporting a problem

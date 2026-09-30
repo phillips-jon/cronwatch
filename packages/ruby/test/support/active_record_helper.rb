@@ -458,6 +458,13 @@ module ActiveRecordStoreTests
     assert_equal "beforeafter", run.output
     assert_match(/\ARuntimeError: badbyte/, run.error)
     assert_equal 1, store.get_state("nul").consecutive_failures, "the state, with its alert, was written too"
+    # So are a trigger, metric names and a definition's text.
+    nul2 = cw.job("nul2", description: "a\0b", tags: ["t\0"], budget: { "c\0" => 5 })
+    nul2.run(trigger: "cr\0on") { |job| job.metric("ro\0ws", 2) }
+    second = cw.runs("nul2").first
+    assert_equal [:ok, "cron", { "rows" => 2 }], [second.status, second.trigger, second.metrics]
+    definition = store.get_job("nul2").definition
+    assert_equal ["ab", ["t"], { "c" => 5 }], [definition.description, definition.tags, definition.budget.transform_keys(&:to_s)]
   end
 
   def test_a_client_on_the_store_records_runs_and_alerts
