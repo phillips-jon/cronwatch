@@ -13,7 +13,9 @@
 # cronwatch-apalis, whose floor sqlx 0.9 sets) and on stable (everything), with
 # rustfmt and clippy, and on macOS and Windows; each feature alone, the
 # docs, the packages and the lowest versions the manifests allow are
-# checked, and the fuzz targets built. The MCP server is driven against each port's
+# checked, and the fuzz targets built. The Java build's tests run on JDK 21, its
+# floor, and the newest JDK, with Error Prone, and Spotless and the core's jar
+# checked on the newest. The MCP server is driven against each port's
 # dashboard. One Node, one Ruby, one Python, one PHP and one Go entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
 # site's links are checked.
@@ -1207,3 +1209,61 @@ jobs:
         run: |
           MIX_ENV=test mix compile --warnings-as-errors
           mix test
+
+  java:
+    name: java (JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { java: "21", newest: false }
+          - { java: "27", newest: true }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # Builds the SDK (for the croner parity and Node compatibility tests),
+      # then fails if conformance/ or the dashboard fixture is stale.
+      - run: npm run check:conformance
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      # The local repository and the wrapper's Maven, by the JDK and the POMs.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.m2/wrapper
+          key: maven-jdk${{ matrix.java }}-${{ hashFiles('packages/java/**/pom.xml', 'packages/java/.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: maven-jdk${{ matrix.java }}-
+      - name: Spotless
+        if: matrix.newest
+        working-directory: packages/java
+        run: ./mvnw -B spotless:check
+      # Error Prone and -Xlint with warnings as errors, the Enforcer rules
+      # (no dependency in the core, Java 21 bytecode, one version of each
+      # dependency), and every test, with TZ=UTC as the fixtures are made.
+      - name: ./mvnw verify
+        working-directory: packages/java
+        run: ./mvnw -B verify
+      # The core's jar holds its classes, module-info, resources and
+      # META-INF, and nothing from the tests or conformance/.
+      - name: The jar's files
+        if: matrix.newest
+        working-directory: packages/java/cronwatch
+        run: |
+          jar=$(ls target/cronwatch-*.jar)
+          unzip -Z1 "$jar" | sort > "$RUNNER_TEMP/jar.txt"
+          (cd target/test-classes && find . -type f | sed 's|^\./||' | sort) > "$RUNNER_TEMP/tests.txt"
+          if comm -12 "$RUNNER_TEMP/jar.txt" "$RUNNER_TEMP/tests.txt" | grep .; then
+            echo "$jar holds test files"
+            exit 1
+          fi
+          if grep -v -E '^(META-INF/|module-info\.class$|dev/$|dev/cronwatch/)' "$RUNNER_TEMP/jar.txt"; then
+            echo "$jar holds files it should not"
+            exit 1
+          fi

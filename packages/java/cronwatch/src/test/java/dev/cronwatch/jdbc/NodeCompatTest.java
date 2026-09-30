@@ -5,8 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import dev.cronwatch.CheckResult;
+import dev.cronwatch.Cronwatch;
 import dev.cronwatch.Definition;
 import dev.cronwatch.Fixtures;
+import dev.cronwatch.Job;
+import dev.cronwatch.JobOptions;
 import dev.cronwatch.JobState;
 import dev.cronwatch.Run;
 import dev.cronwatch.StoredJob;
@@ -24,7 +28,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -377,6 +383,55 @@ class NodeCompatTest {
       assertTrue(nodeCas(file, v(1, 5, "old"), 0).written(), "Node writes over it");
       JobState old = s.getState("old");
       assertEquals(1L, old == null ? null : old.version());
+    }
+  }
+
+  /**
+   * A Java client finishes a run of a job Node wrote and checks every job; then a Node client takes
+   * a turn on the same file; each reads the other's run and state, and the Java client checks again
+   * with nothing to report.
+   */
+  @Test
+  void nodeCarriesOnFromJavaAndJavaFromNode() throws Exception {
+    Path file = dir.resolve("turns.db");
+    node("write", file, "cw_", fixturePath.toString());
+    AtomicLong clock = new AtomicLong(1_767_606_100_000L);
+    List<String> errors = new CopyOnWriteArrayList<>();
+    SqlStore s = store(file, "cw_");
+    try (Cronwatch cw =
+        Cronwatch.builder()
+            .store(s)
+            .alerts(List.of())
+            .noCronSecret()
+            .clock(clock::get)
+            .onError((where, e) -> errors.add(where + ": " + e.getMessage()))
+            .noShutdownHook()
+            .build()) {
+      Job job =
+          cw.job(
+              "every-5",
+              JobOptions.builder().schedule("every 5m").timeout("2m").maxDuration("90s"));
+      job.run(ctx -> ctx.log("from java"));
+      clock.addAndGet(10 * 60_000);
+      CheckResult result = cw.check();
+      assertTrue(
+          result.jobs().stream().anyMatch(j -> j.name().equals("nightly-report")),
+          "checked " + result.jobs().size());
+      assertEquals("from java", Objects.requireNonNull(s.lastRun("every-5")).output());
+      String raw = node("read", file, "cw_", fixturePath.toString());
+      JsObject view = Json.parseObject(raw);
+      Object last = ((JsObject) Objects.requireNonNull(view.get("last"))).get("every-5");
+      assertEquals("from java", ((JsObject) Objects.requireNonNull(last)).get("output"));
+      assertEquals(raw, javaRead(s), "after Java's turn, Java and Node read the file differently");
+
+      clock.addAndGet(10 * 60_000);
+      String nodeRun = node("run", file, "cw_", Long.toString(clock.get()));
+      assertTrue(nodeRun.contains("\"every-5\""), "node run " + nodeRun);
+      assertEquals("from node", Objects.requireNonNull(s.lastRun("every-5")).output());
+      assertEquals(
+          node("read", file, "cw_", fixturePath.toString()), javaRead(s), "after Node's turn");
+      assertFalse(cw.check().jobs().isEmpty(), "no jobs checked");
+      assertTrue(errors.isEmpty(), "errors: " + errors);
     }
   }
 }

@@ -62,6 +62,11 @@ const VERSIONED = [
   // The Hex package's version lives in mix.exs alone; Cronwatch.version/0
   // reads it from the application's spec.
   { file: "packages/elixir/mix.exs", pattern: /^(\s*@version ")([^"]+)(")/m },
+  // The Maven build's version lives in the parent POM's <revision> alone:
+  // every module's version is ${revision}, the flatten plugin writes it into
+  // the POMs that are published, and Cronwatch.VERSION is read from a
+  // resource Maven filters with it.
+  { file: "packages/java/pom.xml", pattern: /^(\s*<revision>)([^<]+)(<\/revision>)/m },
   { file: "skills/cronwatch/SKILL.md", pattern: /^(version: )(\S+)()$/m },
 ];
 
@@ -126,6 +131,12 @@ const PUBLISH = [
   // and its docs from the pushed tag, with a package-scoped API key, once
   // HEX_ENABLED is true (packages/elixir/DESIGN.md, Package name and releases).
   { dir: "packages/elixir", commands: (v) => [`# packages/elixir: the pushed tag v${v} is published to Hex, with its docs, by .github/workflows/hex.yml (once HEX_ENABLED is true); by hand, (cd packages/elixir && mix hex.publish)`] },
+  // Maven Central reads the artifacts from the bundle the release profile
+  // uploads to the Central Publisher Portal, so they need no tag of their
+  // own. By hand for now, with a signing key and a Portal token in
+  // ~/.m2/settings.xml; the deployment is checked in the Portal before it is
+  // published (packages/java/DESIGN.md, Releasing). java.yml comes later.
+  { dir: "packages/java", commands: (v) => [`# packages/java: published to Maven Central by hand for now, (cd packages/java && ./mvnw -B -P release deploy), then check the validated deployment of ${v} in the Central Publisher Portal and press Publish (packages/java/DESIGN.md, Releasing)`] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */
