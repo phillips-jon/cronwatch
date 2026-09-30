@@ -5,24 +5,31 @@ import {
   BASELINE_WINDOW,
   emptyState,
   hasFullBaseline,
+  holdAlerts,
   isSilenced,
   isStuck,
+  MAX_UNDELIVERED,
   normalizeState,
   onCheck,
   onRunFinish,
   onRunStart,
+  recordSent,
+  releaseSending,
   runDuration,
+  SEND_LEASE_MS,
+  silenceEnd,
   staleAlert,
   stateVersion,
   summarize,
   timeoutMs,
   unevaluableSummary,
 } from "./evaluate.js";
+import type { Evaluation } from "./evaluate.js";
 import { composeAlert } from "./format.js";
 import { constantTimeEqual, json } from "./http.js";
 import { createRecorder } from "./job.js";
 import type { JobContext } from "./job.js";
-import { capOutput, errorMessage, OUTPUT_CAP, redactSecrets, stripNul } from "./output.js";
+import { capOutput, describeError, OUTPUT_CAP, redactAndCap, redactSecrets } from "./output.js";
 import { parseSchedule } from "./schedule.js";
 import { checkExpectation, toStored } from "./serialize.js";
 import { createRoutes } from "./routes/index.js";
@@ -31,7 +38,6 @@ import { memory } from "./stores/memory.js";
 import type {
   Alert,
   AlertChannel,
-  AlertDraft,
   CheckResult,
   Condition,
   Duration,
@@ -226,8 +232,6 @@ const TRIAGE_TIMEOUT_MS = 25_000;
 /** How long one channel may take to send one alert. */
 const CHANNEL_TIMEOUT_MS = 15_000;
 const PRUNE_INTERVAL_MS = 60 * 60_000;
-/** Undelivered alerts kept per job for retry; the oldest go first. */
-const MAX_UNDELIVERED = 20;
 /**
  * Wall-clock time one check spends retrying undelivered alerts, across every
  * job. Once it is spent the rest wait for the next check.
@@ -274,13 +278,14 @@ function validateDefinition(def: JobDefinition): void {
   }
 }
 
-function sameState(a: JobState, b: JobState): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+/** Alerts written with the state that opened their conditions, and how many older ones the queue let go. */
+interface Held {
+  alerts: Alert[];
+  dropped: number;
 }
 
-/** Identifies an alert across retries. */
-function alertKey(alert: Alert): string {
-  return `${alert.type}|${alert.at}|${alert.run?.id ?? ""}`;
+function sameState(a: JobState, b: JobState): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export class CronWatch {
@@ -467,18 +472,49 @@ export class CronWatch {
    * that replaced it, never its own over it, and one forgotten since writes
    * its own. The writes of one name take turns, in the order they were asked
    * for, so one still under way cannot land after a later one; and a name
-   * declared again while its write was under way is still to be written.
+   * declared again while its write was under way is still to be written. A
+   * name is marked as written only while that same declaration stands, so a
+   * forget that lands during the write (deleting the row after it) leaves
+   * the name to be written again, as does one forgotten before it.
+   *
+   * With `confirm`, as a run starts, a name already written is read back:
+   * another process may have forgotten the job since, and a job still
+   * declared here comes back on its next run.
    */
-  private async sync(definition: JobDefinition): Promise<void> {
+  private async sync(definition: JobDefinition, confirm = false): Promise<void> {
     await this.ensureReady();
     const name = definition.name;
-    if (this.synced.has(name)) return;
+    if (this.synced.has(name)) {
+      if (!confirm || (await this.store.getJob(name))) return;
+      this.synced.delete(name);
+    }
     await this.serial(name, async () => {
       if (this.synced.has(name)) return;
       const standing = this.definitions.get(name) ?? definition;
       await this.store.upsertJob(toStored(standing), this.now());
-      if ((this.definitions.get(name) ?? standing) === standing) this.synced.add(name);
+      if (this.definitions.get(name) === standing) this.synced.add(name);
     }, this.syncing);
+  }
+
+  /**
+   * Every stored job, once each declaration has been written. A job declared
+   * here that the store no longer has was forgotten by another process after
+   * this one wrote it: it is written again, as its next run would, so it is
+   * checked and shown while any process still declares it.
+   */
+  private async storedJobs(): Promise<StoredJob[]> {
+    for (const definition of this.definitions.values()) await this.sync(definition);
+    const jobs = await this.store.listJobs();
+    const listed = new Set(jobs.map((job) => job.name));
+    const missing = [...this.definitions.values()].filter((definition) => !listed.has(definition.name));
+    if (missing.length === 0) return jobs;
+    for (const definition of missing) {
+      // Not one forgotten here meanwhile.
+      if (this.definitions.get(definition.name) !== definition) continue;
+      this.synced.delete(definition.name);
+      await this.sync(definition);
+    }
+    return this.store.listJobs();
   }
 
   /**
@@ -561,7 +597,7 @@ export class CronWatch {
     };
     let recorded = false;
     try {
-      await this.sync(definition);
+      await this.sync(definition, true);
       await this.store.insertRun({ ...run });
       recorded = true;
     } catch (e) {
@@ -592,7 +628,7 @@ export class CronWatch {
     run.finishedAt = finishedAt;
     run.durationMs = runDuration(startedAt, finishedAt);
     run.metrics = recorder.metrics();
-    run.output = recorder.output() ?? (typeof result === "string" ? capOutput(result) : null);
+    run.output = recorder.output() ?? (typeof result === "string" ? result : null);
     this.conclude(definition, run, result, error, threw, recorder.expectText() ?? (typeof result === "string" ? result : null));
 
     await started;
@@ -607,12 +643,13 @@ export class CronWatch {
 
   /**
    * Sets a finished run's status and error from how it ended, then redacts
-   * its output and error. Shared by execute() and RunHandle.finish().
+   * its output and error and caps them, in that order. Shared by execute()
+   * and RunHandle.finish().
    */
   private conclude(definition: JobDefinition, run: Run, result: unknown, error: unknown, threw: boolean, expectText: string | null): void {
     if (threw) {
       run.status = "failed";
-      run.error = errorMessage(error);
+      run.error = describeError(error);
     } else if (result instanceof Response && result.status >= 400) {
       run.status = "failed";
       run.error = `HTTP ${result.status}${result.statusText ? ` ${result.statusText}` : ""}`;
@@ -626,9 +663,10 @@ export class CronWatch {
       }
     }
     // Redacted after the expect check, so a rule can still match what was
-    // logged. NULs go last, so not even a custom redact can store one.
-    if (run.output !== null) run.output = stripNul(this.redact(run.output));
-    if (run.error !== null) run.error = stripNul(this.redact(run.error));
+    // logged, and before the cap, so the cut cannot keep half a secret. NULs
+    // go last, so not even a custom redact can store one.
+    if (run.output !== null) run.output = redactAndCap(run.output, this.redact);
+    if (run.error !== null) run.error = redactAndCap(run.error, this.redact);
   }
 
   /**
@@ -731,7 +769,7 @@ export class CronWatch {
     };
     let recorded = false;
     try {
-      await this.sync(definition);
+      await this.sync(definition, true);
       await this.store.insertRun({ ...run });
       recorded = true;
     } catch (e) {
@@ -843,14 +881,15 @@ export class CronWatch {
         const result = typeof outcome === "string" ? outcome : failed ? undefined : outcome?.result;
         const error = failed ? (outcome as { error: unknown }).error : undefined;
         const finishedAt = self.now();
-        const added = recorder.output() ?? (typeof result === "string" ? capOutput(result) : null);
+        const added = recorder.output() ?? (typeof result === "string" ? result : null);
         const run: Run = {
           ...from,
           status: "running",
           finishedAt,
           durationMs: runDuration(from.startedAt, finishedAt),
           error: null,
-          output: joinOutput(from.output, added),
+          // Capped by conclude(), after it is redacted.
+          output: joinLines(from.output, added),
           metrics: { ...from.metrics, ...recorder.metrics() },
         };
         const expectText = joinLines(head, joinLines(from.output, recorder.expectText() ?? (typeof result === "string" ? result : null)));
@@ -902,7 +941,7 @@ export class CronWatch {
             self.report(new Error(`run ${id} of ${name} belongs to job "${stored.job}"; ignored`), `flushing ${name}`);
             return;
           }
-          const output = lines === null ? stored.output : joinOutput(stored.output, stripNul(self.redact(lines)));
+          const output = lines === null ? stored.output : joinOutput(stored.output, redactAndCap(lines, self.redact));
           // Only over a row still running, so a flush never undoes a finish written meanwhile.
           if (!(await self.writeRunIf({ ...stored, output, metrics: { ...stored.metrics, ...metrics } }, ["running"]))) return putBack();
           const text = taken.expectText();
@@ -929,13 +968,20 @@ export class CronWatch {
    * alone and reported. A finished run is judged as if it had been wrapped
    * here (expect, failures, duration, budgets) and its output and error are
    * redacted the same way; one finishing after a check marked it timeout is
-   * judged only when it succeeded, as RunHandle.finish() does. Returns the
-   * alerts it sent.
+   * judged only when it succeeded, as RunHandle.finish() does. A metric that
+   * is not a finite number throws before anything is written, as
+   * job.metric() does. Returns the alerts it sent.
    */
   async recordRun(input: Run, options: RecordRunOptions = {}): Promise<Alert[]> {
     const declared = this.definitions.get(input.job);
     if (!declared) throw new Error(`recordRun: job "${input.job}" is not declared; call job() first`);
     if (input.id.includes("\u0000")) throw new Error(`recordRun: run ids cannot contain a NUL character (job "${input.job}")`);
+    // Refused as job.metric() refuses them: a store keeps NaN and Infinity as null.
+    for (const [metric, value] of Object.entries(input.metrics ?? {})) {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw new Error(`recordRun: metric "${metric}" must be a finite number (job "${input.job}", run "${input.id}")`);
+      }
+    }
     await this.sync(declared);
     const run: Run = { ...input, metrics: { ...input.metrics } };
     if (run.status === "ok") {
@@ -945,8 +991,8 @@ export class CronWatch {
         run.error = unmet;
       }
     }
-    if (run.output !== null) run.output = stripNul(this.redact(capOutput(run.output)));
-    if (run.error !== null) run.error = stripNul(this.redact(capOutput(run.error)));
+    if (run.output !== null) run.output = redactAndCap(run.output, this.redact);
+    if (run.error !== null) run.error = redactAndCap(run.error, this.redact);
     const evaluate = options.evaluate !== false;
     const definition = toStored(declared);
 
@@ -984,22 +1030,44 @@ export class CronWatch {
 
   /**
    * Evaluate a finished run (ok, failed, or timed out by a check), already
-   * written, against the job's state and send what that produces. Never throws.
+   * written, against the job's state and send what that produces. The
+   * alerts are written with that state (see outbox()). Never throws.
    */
   private async finishRun(definition: StoredJobDefinition, run: Run, now: number): Promise<Alert[]> {
-    let drafts: AlertDraft[];
+    let held: Held;
     try {
       let history: Run[] | null = null;
-      ({ result: drafts } = await this.updateState(run.job, async (previous) => {
+      ({ result: held } = await this.updateState(run.job, async (previous) => {
         history ??= await this.history(run);
-        const settled = applySilence(previous, onRunFinish(definition, run, previous, history, now), now);
-        return { state: settled.state, result: settled.alerts };
+        return this.outbox(applySilence(previous, onRunFinish(definition, run, previous, history, now), now), definition, now);
       }));
     } catch (e) {
       this.onError(e, `evaluating ${run.job}`);
       return [];
     }
-    return this.dispatch(drafts, definition, now);
+    this.reportDropped(run.job, held.dropped);
+    return this.dispatch(run.job, held.alerts, now);
+  }
+
+  /**
+   * An evaluation as it is written: its drafts composed into alerts and held
+   * in the same state (holdAlerts), so the write that opens a condition also
+   * keeps its alerts, and a process that stops before sending them does not
+   * lose them. Called inside updateState(), so it only computes.
+   */
+  private outbox(settled: Evaluation, definition: StoredJobDefinition, now: number): { state: JobState; result: Held } {
+    const alerts = settled.alerts.map((draft) => composeAlert(draft, definition, now));
+    const { state, dropped } = holdAlerts(settled.state, alerts, this.now() + SEND_LEASE_MS, this.deferDelivery);
+    return { state, result: { alerts, dropped } };
+  }
+
+  /** Reports alerts let go because a job's queue was full. */
+  private reportDropped(name: string, dropped: number): void {
+    if (dropped <= 0) return;
+    this.report(
+      new Error(`${dropped} undelivered alert${dropped === 1 ? "" : "s"} for ${name} dropped: only the newest ${MAX_UNDELIVERED} are kept for retry`),
+      `alert queue for ${name}`,
+    );
   }
 
   /**
@@ -1045,11 +1113,15 @@ export class CronWatch {
 
     // Runs that never reported back. One that cannot be judged (its job's
     // stored timeout no longer parses, say) is reported and skipped.
-    for (const run of await this.store.runningRuns()) {
+    for (const listed of await this.store.runningRuns()) {
       try {
-        const declared = this.definitions.get(run.job);
-        const definition = declared ? toStored(declared) : (await this.store.getJob(run.job))?.definition;
-        if (!definition || !isStuck(definition, run, now)) continue;
+        const declared = this.definitions.get(listed.job);
+        const definition = declared ? toStored(declared) : (await this.store.getJob(listed.job))?.definition;
+        if (!definition || !isStuck(definition, listed, now)) continue;
+        // Read again just before the write: lines and metrics flushed since the
+        // list was read (while earlier stuck runs were sent, say) are kept.
+        const run = await this.store.getRun(listed.id);
+        if (!run || run.status !== "running" || run.job !== listed.job) continue;
         const timeout = timeoutMs(definition);
         run.status = "timeout";
         run.finishedAt = now;
@@ -1059,7 +1131,7 @@ export class CronWatch {
         if (!(await this.writeRunIf(run, ["running"]))) continue;
         alerts.push(...(await this.finishRun(definition, run, now)));
       } catch (e) {
-        this.onError(e, `checking ${run.job}`);
+        this.onError(e, `checking ${listed.job}`);
       }
     }
 
@@ -1067,18 +1139,22 @@ export class CronWatch {
     // as failing (see unevaluableSummary) and does not stop the others.
     const jobs: JobSummary[] = [];
     const retries = { spentMs: 0 };
-    for (const stored of await this.store.listJobs()) {
+    for (const stored of await this.storedJobs()) {
       try {
         const recent = await this.store.listRuns(stored.name, BASELINE_WINDOW);
         let nextExpectedAt: number | null = null;
-        const { state, result: drafts } = await this.updateState(stored.name, (previous) => {
+        const { state, result: held } = await this.updateState(stored.name, (previous) => {
           const evaluation = onCheck(stored.definition, stored, recent[0] ?? null, previous, now);
           nextExpectedAt = evaluation.nextExpectedAt;
           const settled = applySilence(previous, evaluation, now);
-          return { state: settled.state, result: settled.alerts };
+          // Alerts a process stopped sending part way go back to the retry queue.
+          const released = releaseSending(settled.state, this.now());
+          const out = this.outbox({ state: released.state, alerts: settled.alerts }, stored.definition, now);
+          return { state: out.state, result: { alerts: out.result.alerts, dropped: released.dropped + out.result.dropped } };
         });
+        this.reportDropped(stored.name, held.dropped);
         alerts.push(...(await this.retryUndelivered(stored.name, state, now, retries)));
-        alerts.push(...(await this.dispatch(drafts, stored.definition, now)));
+        alerts.push(...(await this.dispatch(stored.name, held.alerts, now)));
         jobs.push(summarize(stored, recent, state, nextExpectedAt, now));
       } catch (e) {
         this.onError(e, `checking ${stored.name}`);
@@ -1128,17 +1204,18 @@ export class CronWatch {
   /** Every job's summary with its newest `limit` runs, read together. What the dashboard shows. */
   async jobsWithRuns(limit = 20): Promise<{ job: JobSummary; runs: Run[] }[]> {
     await this.ensureReady();
-    for (const definition of this.definitions.values()) await this.sync(definition);
+    const jobs = await this.storedJobs();
     const now = this.now();
     const out: { job: JobSummary; runs: Run[] }[] = [];
-    for (const stored of await this.store.listJobs()) out.push(await this.snapshot(stored, now, clampLimit(limit, 20, 0)));
+    for (const stored of jobs) out.push(await this.snapshot(stored, now, clampLimit(limit, 20, 0)));
     return out;
   }
 
+  /** A job's summary, or null for one the store does not have. One declared here and forgotten elsewhere is written again, as storedJobs() does. */
   async jobSummary(name: string): Promise<JobSummary | null> {
     await this.ensureReady();
     const definition = this.definitions.get(name);
-    if (definition) await this.sync(definition);
+    if (definition) await this.sync(definition, true);
     const stored = await this.store.getJob(name);
     if (!stored) return null;
     return (await this.snapshot(stored, this.now(), 0)).job;
@@ -1155,10 +1232,13 @@ export class CronWatch {
     return this.store.getRun(id);
   }
 
-  /** Stop alerts for a job for a while. State keeps updating underneath. */
+  /**
+   * Stop alerts for a job for a while. State keeps updating underneath. The
+   * end is a whole millisecond, held at 2^53 - 1 (see silenceEnd).
+   */
   async silence(name: string, duration: Duration): Promise<JobState> {
     const ms = parseDuration(duration, "silence duration");
-    return this.patchState(name, (state) => { state.silencedUntil = this.now() + ms; });
+    return this.patchState(name, (state) => { state.silencedUntil = silenceEnd(this.now(), ms); });
   }
 
   async unsilence(name: string): Promise<JobState> {
@@ -1176,7 +1256,11 @@ export class CronWatch {
     return state;
   }
 
-  /** Remove a job and its runs from the store. A job still declared in code comes back on its next run. */
+  /**
+   * Remove a job and its runs from the store. A job still declared in code
+   * comes back: here on its next run, and in any other process that declares
+   * it on its next run there, or at that process's next check or dashboard read.
+   */
   async forget(name: string): Promise<void> {
     await this.ensureReady();
     this.definitions.delete(name);
@@ -1219,33 +1303,37 @@ export class CronWatch {
     this.firstTick = null;
   }
 
+  /**
+   * Stop the interval, wait for a check already under way (bounded by its
+   * own channel, triage and retry timeouts; what it throws was reported to
+   * whoever started it), then close the store, so that check neither writes
+   * after the store is closed nor loses the alerts it would queue.
+   */
   async close(): Promise<void> {
     this.stop();
+    if (this.checking) await this.checking.catch(() => {});
     if (this.store.close) await this.store.close();
   }
 
   /**
-   * Compose, triage and send each draft. The state was saved before this
-   * (updateState), so a slow channel holds up nothing else; afterwards only
-   * the delivery fields are written back, onto a fresh read of the state.
+   * Triage and send each alert the outbox holds (see outbox()). The state,
+   * with the alerts in it, was saved before this, so a slow channel holds up
+   * nothing else; afterwards only the delivery fields are written back, onto
+   * a fresh read of the state, and the alerts leave `sending`. Triage is made
+   * here, never stored with the held alert: the write that opens a condition
+   * cannot wait for it, and a retry triages an alert that has none. With
+   * deliver: "check" the alerts were queued for a check elsewhere instead.
    */
-  private async dispatch(drafts: AlertDraft[], definition: StoredJobDefinition, now: number): Promise<Alert[]> {
-    if (drafts.length === 0) return [];
-    const composed: Alert[] = [];
+  private async dispatch(name: string, alerts: Alert[], now: number): Promise<Alert[]> {
+    if (alerts.length === 0 || this.deferDelivery) return alerts;
     const delivered: Alert[] = [];
     const failed: Alert[] = [];
-    for (const draft of drafts) {
-      const alert = composeAlert(draft, definition, now);
-      if (this.deferDelivery) {
-        failed.push(alert);
-      } else {
-        if (this.triage && alert.type !== "recovered") await this.addTriage(alert, TRIAGE_TIMEOUT_MS);
-        (await this.deliver(alert) ? delivered : failed).push(alert);
-      }
-      composed.push(alert);
+    for (const alert of alerts) {
+      if (this.triage && alert.type !== "recovered") await this.addTriage(alert, TRIAGE_TIMEOUT_MS);
+      (await this.deliver(alert) ? delivered : failed).push(alert);
     }
-    await this.recordDelivery(definition.name, delivered, failed, [], now);
-    return composed;
+    await this.recordDelivery(name, delivered, failed, [], now);
+    return alerts;
   }
 
   /**
@@ -1278,28 +1366,18 @@ export class CronWatch {
 
   /**
    * Mark delivered alerts done, drop stale ones, and keep failed ones for the
-   * next check. A failed alert replaces its stored copy, so a triage made on
-   * this attempt is kept. lastAlertAt moves only on a delivery.
+   * next check, taking them all out of `sending` (recordSent). A failed alert
+   * replaces its stored copy, so a triage made on this attempt is kept.
+   * lastAlertAt moves only on a delivery. When this write fails, alerts
+   * still in `sending` are retried once their lease runs out.
    */
   private async recordDelivery(name: string, delivered: Alert[], failed: Alert[], dropped: Alert[], now: number): Promise<void> {
     try {
       const { result: trimmed } = await this.updateState(name, (previous) => {
-        const state = normalizeState(previous, name);
-        const done = new Set([...delivered, ...dropped].map(alertKey));
-        const retried = new Map(failed.map((a) => [alertKey(a), a]));
-        const kept = state.undelivered!.filter((a) => !done.has(alertKey(a))).map((a) => retried.get(alertKey(a)) ?? a);
-        const known = new Set(kept.map(alertKey));
-        kept.push(...failed.filter((a) => !known.has(alertKey(a))));
-        state.undelivered = kept.slice(-MAX_UNDELIVERED);
-        if (delivered.length > 0) state.lastAlertAt = now;
-        return { state, result: Math.max(0, kept.length - MAX_UNDELIVERED) };
+        const { state, dropped: letGo } = recordSent(normalizeState(previous, name), delivered, failed, dropped, now);
+        return { state, result: letGo };
       });
-      if (trimmed > 0) {
-        this.onError(
-          new Error(`${trimmed} undelivered alert${trimmed === 1 ? "" : "s"} for ${name} dropped: only the newest ${MAX_UNDELIVERED} are kept for retry`),
-          `alert queue for ${name}`,
-        );
-      }
+      this.reportDropped(name, trimmed);
     } catch (e) {
       this.onError(e, `recording alert delivery for ${name}`);
     }

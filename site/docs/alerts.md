@@ -7,7 +7,7 @@ group: Reference
 
 # Alerts
 
-Pass any number of channels. Every alert goes to every channel at once; a channel that throws, or takes longer than 15 seconds, is reported through `onError` and never blocks the others. If no channel accepts an alert, each later check tries it again, once, until one does (see [Limits](/docs/limits/)).
+Pass any number of channels. Every alert goes to every channel at once; a channel that throws, or takes longer than 15 seconds, is reported through `onError` and never blocks the others. If no channel accepts an alert, each later check tries it again, once, until one does. An alert is stored with the state that opens its condition before it is sent, so one whose process dies mid-send is sent by a later check (see [Limits](/docs/limits/)).
 
 ## Slack
 

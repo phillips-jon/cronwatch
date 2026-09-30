@@ -111,7 +111,7 @@ test("an update that keeps losing gives up and reports, and the run still finish
  * so a test can declare the job again, or ask for another write, while that
  * one is under way.
  */
-function heldUpsert(store: Store) {
+function heldUpsert(store: Store, options: { afterWrite?: boolean } = {}) {
   let release!: () => void;
   let entered!: () => void;
   const gate = new Promise<void>((r) => { release = r; });
@@ -120,16 +120,70 @@ function heldUpsert(store: Store) {
   const wrapped: Store = {
     ...store,
     async upsertJob(definition, now) {
+      if (options.afterWrite) await store.upsertJob(definition, now);
       if (!held) {
         held = true;
         entered();
         await gate;
       }
-      await store.upsertJob(definition, now);
+      if (!options.afterWrite) await store.upsertJob(definition, now);
     },
   };
   return { store: wrapped, waiting, release };
 }
+
+test("a forget that lands while a job's first write is under way leaves it to be written on its next run", async () => {
+  const inner = memory();
+  // The write lands, then waits: the forget deletes the row it wrote.
+  const { store, waiting, release } = heldUpsert(inner, { afterWrite: true });
+  const cw = cronwatch({ store, alerts: [capture()], cronSecret: null });
+  const handle = cw.job("nightly", { schedule: "every 5m" });
+  const first = handle.run(async () => {});
+  await waiting;
+  await cw.forget("nightly");
+  release();
+  await first;
+  assert.equal(await inner.getJob("nightly"), null, "forgotten after it was written");
+  await handle.run(async () => {});
+  assert.equal((await inner.getJob("nightly"))!.definition.schedule, "every 5m", "its next run brings it back");
+  assert.deepEqual((await cw.jobs()).map((j) => j.name), ["nightly"]);
+});
+
+test("a job forgotten by another process comes back in a long-lived one that still declares it", async () => {
+  const store = memory();
+  const worker = cronwatch({ store, alerts: [capture()], cronSecret: null });
+  const web = cronwatch({ store, alerts: [capture()], cronSecret: null });
+  const nightly = worker.job("nightly", { schedule: "every 5m" });
+  await nightly.run(async () => {});
+  const forgotten = async () => {
+    await web.forget("nightly");
+    assert.equal(await store.getJob("nightly"), null);
+  };
+
+  // Its next run writes it again, so the run is not left without its job.
+  await forgotten();
+  await nightly.run(async () => {});
+  assert.equal((await store.getJob("nightly"))!.definition.schedule, "every 5m");
+  assert.equal((await web.runs("nightly")).length, 1);
+
+  // So does a started run, a check, the board and the job's page in the process that declares it.
+  await forgotten();
+  const handle = await nightly.start();
+  assert.ok(await store.getJob("nightly"));
+  await handle.finish();
+  await forgotten();
+  await worker.check();
+  assert.ok(await store.getJob("nightly"));
+  await forgotten();
+  assert.deepEqual((await worker.jobs()).map((job) => job.name), ["nightly"]);
+  await forgotten();
+  assert.equal((await worker.jobSummary("nightly"))!.definition.schedule, "every 5m");
+
+  // A process that never declared it does not bring it back.
+  await forgotten();
+  await web.check();
+  assert.deepEqual(await web.jobs(), []);
+});
 
 test("a handle kept from an earlier declaration writes the one that stands, not its own", async () => {
   const store = memory();

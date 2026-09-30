@@ -1,4 +1,4 @@
-import { capOutput, OUTPUT_CAP } from "./output.js";
+import { OUTPUT_CAP } from "./output.js";
 import type { Run } from "./types.js";
 
 /** What a job function receives. */
@@ -17,6 +17,10 @@ export interface JobContext {
 
 export interface RunRecorder {
   context: JobContext;
+  /**
+   * The lines still held (past 64 KB the oldest are let go), joined and not
+   * yet capped: the client redacts them first, then caps them (redactAndCap).
+   */
   output(): string | null;
   /**
    * What an expect rule is checked against: everything logged, or when that
@@ -60,7 +64,7 @@ export function createRecorder(run: Run): RunRecorder {
       }
       lines.push(line);
       size += line.length + 1;
-      // Drop from the front once well past the cap; capOutput trims exactly at the end.
+      // Drop from the front once well past the cap; redactAndCap trims exactly at the end.
       while (size > 64 * 1024 && lines.length > 1) {
         size -= lines.shift()!.length + 1;
         dropped = true;
@@ -79,7 +83,7 @@ export function createRecorder(run: Run): RunRecorder {
 
   return {
     context,
-    output: () => (lines.length === 0 ? null : capOutput(lines.join("\n"))),
+    output: () => (lines.length === 0 ? null : lines.join("\n")),
     expectText: () => {
       if (lines.length === 0) return null;
       const all = lines.join("\n");

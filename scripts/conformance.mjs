@@ -25,9 +25,16 @@ import { anthropic } from "../packages/sdk/dist/anthropic.js";
 import { formatDuration, formatRelative } from "../packages/sdk/src/duration.ts";
 import { expectation, nextFire, parseSchedule, runCovers } from "../packages/sdk/src/schedule.ts";
 import {
+  alertKey,
   applySilence,
   emptyState,
   formatNumber,
+  holdAlerts,
+  MAX_UNDELIVERED,
+  queueUndelivered,
+  recordSent,
+  releaseSending,
+  SEND_LEASE_MS,
   isStuck,
   jobHealth,
   muteOpens,
@@ -37,6 +44,7 @@ import {
   onRunStart,
   isSilenced,
   runDuration,
+  silenceEnd,
   staleAlert,
   stateVersion,
   summarize,
@@ -44,7 +52,8 @@ import {
   unevaluableSummary,
 } from "../packages/sdk/src/evaluate.ts";
 import { median, percentile } from "../packages/sdk/src/stats.ts";
-import { capOutput, errorMessage, OUTPUT_CAP, redactSecrets } from "../packages/sdk/src/output.ts";
+import { capOutput, errorMessage, OUTPUT_CAP, REDACT_EDGE, redactAndCap, redactSecrets } from "../packages/sdk/src/output.ts";
+import { embedDescription } from "../packages/sdk/src/alerts/discord.ts";
 import { createRecorder } from "../packages/sdk/src/job.ts";
 import { checkExpectation, toStored } from "../packages/sdk/src/serialize.ts";
 import { errorBody } from "../packages/sdk/src/alerts/shared.ts";
@@ -1030,11 +1039,92 @@ function healthCases() {
   ];
   const staleCases = staleInputs.map(([alert, s]) => ({ alert, state: s, stale: staleAlert(alert, s) }));
 
+  // When a silence ends: the duration as silence() takes it (parsed as
+  // duration.json has it), added to now as a whole millisecond and held at
+  // 2^53 - 1, however long the silence asked for.
+  const silenceEnds = [
+    ["1h", T0], [0, T0], [1.5, T0], ["1.5s", T0], [0.999, T0], ["99999999999999999999w", T0], ["9".repeat(63) + "w", T0], [1e300, T0],
+    [MAX, T0], [MAX - T0, T0], [MAX - T0 - 1, T0], [MAX - T0 + 1, T0], ["1h", MAX - 10], [5, MAX], [2 ** 53, 0],
+  ].map(([duration, now]) => ({ duration, now, silencedUntil: silenceEnd(now, sdk.parseDuration(duration)) }));
+
   return {
     jobHealth: jobHealthCases, summarize: summaries, percentile: stats, median: medians, normalizeState: normalized, muteOpens: mutes, isStuck: stuck,
     unevaluableSummary: unevaluable, applySilence: silences, staleAlert: staleCases, runDuration: durations, stateVersion: versions,
-    failureCount: failureCounts,
+    failureCount: failureCounts, silenceEnd: silenceEnds, delivery: deliveryCases(state),
   };
+}
+
+// The outbox and the retry queue, as each write leaves the state. An alert
+// is written into `sending` with the state that opens its condition (or,
+// deliver: "check", straight into `undelivered`); how its send went takes it
+// out again; one whose lease ran out goes to `undelivered` at a check.
+function deliveryCases(state) {
+  const details = {
+    failed: { consecutiveFailures: 1, threshold: 1 },
+    slow: { durationMs: 20_000, thresholdMs: 10_000, basis: "maxDuration" },
+    missed: { dueAt: T0 - 20 * MIN, deadline: T0 - 10 * MIN, graceMs: 10 * MIN, lastRunAt: null },
+    recovered: { after: ["failed"] },
+  };
+  const alert = (type, atMs, runId = null) => ({
+    type, job: "j", definition: { name: "j" }, run: runId === null ? null : sampleRun({ id: runId, job: "j" }), title: `j ${type}`, message: "m", at: atMs,
+    details: details[type],
+  });
+  const a = alert("failed", T0, "r1");
+  const b = alert("slow", T0, "r2");
+  const c = alert("recovered", T0 + MIN, "r3");
+  const d = alert("missed", T0 + 2 * MIN);
+  const many = (n, from = 0) => Array.from({ length: n }, (_, i) => alert("failed", T0 + (from + i) * SEC));
+  const held = (until, x) => ({ until, alert: x });
+
+  const alertKeys = [a, b, c, d, alert("missed", -5), alert("failed", 1.5, "")].map((x) => ({ alert: x, key: alertKey(x) }));
+
+  const normalized = [
+    state({ sending: [] }),
+    state({ sending: [held(T0, a)] }),
+    { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, sending: "nope" },
+    { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, sending: null },
+  ].map((s) => ({ state: s, normalized: clone(normalizeState(s, "j")) }));
+
+  const queued = [
+    [state(), [a]],
+    [state({ undelivered: [a, b] }), [{ ...a, triage: "Look." }, c]],
+    [state({ undelivered: many(19) }), [a, b]],
+    [state({ undelivered: many(25) }), []],
+    [state({ undelivered: many(20) }), many(3, 20)],
+  ].map(([s, alerts]) => ({ state: s, alerts, result: clone(queueUndelivered(s, alerts)) }));
+
+  const holds = [
+    [state(), [], false],
+    [state({ open: { failed: T0 } }), [a], false],
+    [state({ open: { failed: T0 }, sending: [held(T0, d)] }), [a, b], false],
+    [state({ sending: many(19).map((x) => held(T0, x)) }), [a, b], false],
+    [state({ open: { failed: T0 } }), [a], true],
+    [state({ undelivered: many(20) }), [a], true],
+  ].map(([s, alerts, deferred]) => ({ state: s, alerts, until: T0 + SEND_LEASE_MS, deferred, result: clone(holdAlerts(s, alerts, T0 + SEND_LEASE_MS, deferred)) }));
+
+  const now = T0 + SEND_LEASE_MS;
+  const releases = [
+    [state()],
+    [state({ sending: [held(now + 1, a)] })],
+    [state({ sending: [held(now, a)] })],
+    [state({ sending: [held(now - 1, a), held(now + 1, b)] })],
+    [state({ sending: [held(now - 1, a)], undelivered: [{ ...a, triage: null }, d] })],
+    [state({ sending: [{ alert: a }, { until: "x", alert: b }, { until: now - 1 }, null, held(now - 1, c)] })],
+    [state({ sending: many(5).map((x) => held(now - 1, x)), undelivered: many(18, 5) })],
+  ].map(([s]) => ({ state: s, now, result: clone(releaseSending(s, now)) }));
+
+  const at = T0 + 3 * MIN;
+  const sent = [
+    [state({ sending: [held(now, a)] }), [a], [], []],
+    [state({ sending: [held(now, a)] }), [], [{ ...a, triage: "Look." }], []],
+    [state({ sending: [held(now, a), held(now, b)] }), [a], [b], []],
+    [state({ sending: [held(now, d)], undelivered: [a, b] }), [a], [], [b]],
+    [state({ undelivered: [a, b] }), [], [{ ...a, triage: null }], []],
+    [state({ undelivered: many(20) }), [], [a], []],
+    [state({ sending: [held(now, a)], lastAlertAt: 5 }), [], [], []],
+  ].map(([s, delivered, failed, stale]) => ({ state: s, delivered, failed, stale, now: at, result: clone(recordSent(s, delivered, failed, stale, at)) }));
+
+  return { maxUndelivered: MAX_UNDELIVERED, sendLeaseMs: SEND_LEASE_MS, alertKey: alertKeys, normalizeState: normalized, queueUndelivered: queued, holdAlerts: holds, releaseSending: releases, recordSent: sent };
 }
 
 // ---------------------------------------------------------------- output
@@ -1193,9 +1283,36 @@ function outputCases() {
     };
   });
 
+  // Output and errors as stored: redacted with the default patterns, then
+  // capped. Text up to outputCap + redactEdge is redacted whole; longer text
+  // is cut to that many units from its end, redacted, and its first
+  // redactEdge units are never kept.
+  const pemKey = (n) => [["-----BEGIN PRIVATE KEY-----\n", 1], ["QUJDQUJD\n", n], ["-----END PRIVATE KEY-----\n", 1]];
+  const edge = OUTPUT_CAP + REDACT_EDGE;
+  const redactAndCapInputs = [
+    "password=x",
+    "a\u0000b token=abc",
+    long(["x", OUTPUT_CAP], ["\n-----BEGIN PRIVATE KEY-----\n", 1], ["QUJDQUJD\n", 200], ["-----END PRIVATE KEY-----\ndone", 1]),
+    long(["Authorization: Bearer opaqueTOKENvalue1234567890\n", 1], ["y", OUTPUT_CAP - 30]),
+    long(["e", OUTPUT_CAP], [" password=hunter2 ", 1], ["z", OUTPUT_CAP - 12]),
+    long(["a", OUTPUT_CAP]),
+    long(["a", OUTPUT_CAP + 1]),
+    long(["a", edge]),
+    long(["a", edge + 1]),
+    long(["b", 7], ["a", edge]),
+    long(["-----BEGIN PRIVATE KEY-----\n", 1], ["QUJD", 4000], ["\n", 1], ["k", edge - 8000]),
+    long(...pemKey(1800), ...pemKey(1800), ...pemKey(1800), ...pemKey(1800), ...pemKey(1800), ["tail", 1]),
+    long(["password=", 1], ["p", 5000], ["\n", 1], ["q", edge - 3000]),
+    long(["\u{1F600}", edge]),
+    long(["pwd=a ", 20_000]),
+  ];
+  const redactAndCapCases = redactAndCapInputs.map((input) => ({ input, result: digest(redactAndCap(expand(input), redactSecrets)) }));
+
   return {
     outputCap: OUTPUT_CAP,
+    redactEdge: REDACT_EDGE,
     redact: redact.map((input) => ({ input, result: digest(redactSecrets(expand(input))) })),
+    redactAndCap: redactAndCapCases,
     errorMessage: errors,
     expectText: recorder,
   };
@@ -1663,7 +1780,24 @@ function textCutCases(alerts) {
   const long = { ...clone(alerts[0].alert), title: "nightly failed", message: ("a".repeat(152) + "{\n").repeat(12), triage: null };
   const bodies = [1, 3, 10, 12, 0, -1, 2.7, null].map((n) => ({ segments: n, body: digest(smsBody(long, "https://app.example/j", n === null ? Number.NaN : n)) }));
   bodies.push({ segments: 10, link: "long", body: digest(smsBody(long, `https://app.example/${"p".repeat(2000)}`, 10)) });
-  return { textCuts: { errorBodies, subjects, smsSegments: segments, smsBodies: bodies } };
+  // Discord's embed description, held to 4096 UTF-16 units as a whole by
+  // cutting the message's code block (never mid surrogate pair), never the triage.
+  const recipe = (spec) => ({ parts: spec });
+  const descriptionInputs = [
+    [recipe([["Error: short\nline", 1]]), null],
+    [recipe([["Error: long\n", 1], ["```", 1200], ["x", 400], [emoji, 200]]), recipe([["*_`~|[]()<>\\", 100]])],
+    [recipe([[emoji, 1900]]), recipe([["t", 1001]])],
+    [recipe([["```", 1300]]), null],
+    [recipe([["m", 3800]]), recipe([["An ordinary diagnosis. ", 22]])],
+    [recipe([["m", 3800]]), recipe([["t", 275]])],
+    [recipe([["m", 3800]]), recipe([["t", 276]])],
+    [recipe([["m", 3800]]), ""],
+  ];
+  const discordDescriptions = descriptionInputs.map(([message, triage]) => {
+    const alert = { ...clone(alerts[0].alert), message: expand(message), triage: triage === null ? null : typeof triage === "string" ? triage : expand(triage) };
+    return { message, triage, description: digest(embedDescription(alert)) };
+  });
+  return { textCuts: { errorBodies, subjects, smsSegments: segments, smsBodies: bodies, discordDescriptions } };
 }
 
 // ---------------------------------------------------------------- pg_cron

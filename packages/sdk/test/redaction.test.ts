@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cronwatch } from "../src/index.js";
-import { OUTPUT_CAP, redactSecrets } from "../src/output.js";
+import { OUTPUT_CAP, REDACT_EDGE, redactAndCap, redactSecrets } from "../src/output.js";
 import { capture } from "./helpers.js";
 
 test("secrets are redacted from output and errors before they are stored or alerted", async () => {
@@ -115,4 +115,55 @@ test("errors are capped like logged output", async () => {
   const cw = cronwatch({ alerts: [capture()], cronSecret: null });
   await assert.rejects(cw.run("big", async () => { throw new Error("x".repeat(100_000)); }));
   assert.ok((await cw.runs("big"))[0]!.error!.length <= OUTPUT_CAP + 30);
+});
+
+test("a secret split by the 16 KB cut is redacted whole: redaction comes before the cap", async () => {
+  const pem = "-----BEGIN PRIVATE KEY-----\n" + Array.from({ length: 25 }, (_, i) => `${"QUJD".repeat(15)}${String(i).padStart(4, "0")}`).join("\n") + "\n-----END PRIVATE KEY-----";
+  const bearer = "Authorization: Bearer opaqueTOKENvalue1234567890";
+  const cw = cronwatch({ alerts: [capture()], cronSecret: null });
+  // The cut lands inside the key's body, and in a second run just after "Bear".
+  await cw.run("pem", async (job) => { job.log("x".repeat(OUTPUT_CAP)); job.log(pem.slice(0, 900)); job.log(pem.slice(900)); job.log("done"); });
+  const pemOutput = (await cw.runs("pem"))[0]!.output!;
+  assert.doesNotMatch(pemOutput, /QUJD/);
+  assert.match(pemOutput, /\[redacted\]\ndone$/);
+  const tail = "y".repeat(OUTPUT_CAP - 30);
+  await cw.run("bearer", async () => bearer + "\n" + tail);
+  const bearerOutput = (await cw.runs("bearer"))[0]!.output!;
+  assert.doesNotMatch(bearerOutput, /opaqueTOKEN/);
+  assert.ok(bearerOutput.length <= OUTPUT_CAP + "[earlier output trimmed]\n".length);
+
+  // Errors, recorded runs and flushed lines the same way.
+  await assert.rejects(cw.run("thrown", async () => { throw new Error(`${"e".repeat(OUTPUT_CAP)} ${bearer} ${"z".repeat(OUTPUT_CAP - 40)}`); }));
+  assert.doesNotMatch((await cw.runs("thrown"))[0]!.error!, /opaqueTOKEN/);
+  cw.job("imported");
+  await cw.recordRun({ id: "i1", job: "imported", status: "ok", startedAt: 1, finishedAt: 2, durationMs: 1, error: null, output: `${bearer}\n${tail}`, metrics: {}, trigger: "source" });
+  assert.doesNotMatch((await cw.getRun("i1"))!.output!, /opaqueTOKEN/);
+  const handle = await cw.job("flushed").start();
+  handle.log(bearer);
+  handle.log(tail);
+  await handle.flush();
+  assert.doesNotMatch((await cw.getRun(handle.id))!.output!, /opaqueTOKEN/);
+  await handle.finish();
+  assert.doesNotMatch((await cw.getRun(handle.id))!.output!, /opaqueTOKEN/);
+});
+
+test("text past the redaction window never keeps what came right after its cut", () => {
+  // The window starts part way into a key's body, whose header is before it:
+  // the body's rest cannot be told from text, so it is never kept.
+  const body = "QUJD".repeat(4000);
+  const text = "-----BEGIN PRIVATE KEY-----\n" + body + "\n" + "k".repeat(OUTPUT_CAP + REDACT_EDGE - 8000);
+  const kept = redactAndCap(text, redactSecrets);
+  assert.ok(kept.startsWith("[earlier output trimmed]\n"));
+  assert.equal(kept.length, "[earlier output trimmed]\n".length + OUTPUT_CAP);
+  assert.doesNotMatch(kept, /QUJD/);
+
+  // A redaction that shrinks the window cannot pull its first units into view.
+  const shrinking = (t: string) => t.replace(/s{100}/g, "");
+  const shrunk = redactAndCap("QUJD".repeat(100) + "s".repeat(OUTPUT_CAP + REDACT_EDGE), shrinking);
+  assert.equal(shrunk, "[earlier output trimmed]\n");
+
+  // Short text is redacted whole, then capped as before; NULs go either side of redact.
+  assert.equal(redactAndCap("password=x", redactSecrets), "password=[redacted]");
+  assert.equal(redactAndCap("a\u0000b", (t) => `${t}\u0000`), "ab");
+  assert.equal(redactAndCap("x".repeat(OUTPUT_CAP + 5), redactSecrets), "[earlier output trimmed]\n" + "x".repeat(OUTPUT_CAP));
 });

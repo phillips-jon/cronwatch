@@ -3,12 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { cronwatch, memory } from "../src/index.js";
+import { cronwatch, custom, memory } from "../src/index.js";
 import pg from "pg";
 import { postgres } from "../src/stores/postgres.js";
 import { sqlite } from "../src/stores/sqlite.js";
 import type { Store } from "../src/types.js";
-import { capture, clock, flaky, HOUR, MIN } from "./helpers.js";
+import { capture, clock, flaky, HOUR, MIN, settle } from "./helpers.js";
 
 function make(options: Parameters<typeof cronwatch>[0] = {}) {
   const c = clock();
@@ -202,6 +202,63 @@ test("a run never finished is marked stuck after the job's timeout", async () =>
   assert.equal(stored!.status, "timeout");
   assert.match(stored!.error!, /Still running after 30m/);
   assert.deepEqual(alerts.types(), ["stuck"]);
+});
+
+test("close waits for a check under way before it closes the store", async () => {
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const sending = new Promise<void>((r) => { entered = r; });
+  const events: string[] = [];
+  const held = custom("held", async () => { entered(); await gate; events.push("sent"); });
+  const inner = memory();
+  const store: Store = { ...inner, close: async () => { events.push("closed"); } };
+  const { cw, c } = make({ alerts: [held], store });
+  await cw.job("callback", { timeout: "30m" }).start();
+  c.advance(31 * MIN);
+  const check = cw.check();
+  await sending;
+  let closed = false;
+  const closing = cw.close().then(() => { closed = true; });
+  await settle();
+  assert.equal(closed, false, "still waiting on the check");
+  assert.deepEqual(events, []);
+  release();
+  await closing;
+  assert.deepEqual(events, ["sent", "closed"]);
+  assert.deepEqual((await check).alerts.map((a) => a.type), ["stuck"]);
+  // With no check under way it closes straight away.
+  await cw.close();
+  assert.deepEqual(events, ["sent", "closed", "closed"]);
+});
+
+test("lines flushed while a check marks earlier runs stuck are kept on the run it marks next", async () => {
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const sending = new Promise<void>((r) => { entered = r; });
+  const held = custom("held", async () => { entered(); await gate; });
+  const { cw, c } = make({ alerts: [held] });
+  const first = await cw.job("first", { timeout: "30m" }).start();
+  c.advance(1000);
+  const second = await cw.job("second", { timeout: "30m" }).start();
+  second.log("early line");
+  second.metric("rows", 1);
+  await second.flush();
+  c.advance(31 * MIN);
+  const check = cw.check();
+  // The first stuck run's alert is being sent; the second is still running, and flushes.
+  await sending;
+  second.log("important progress line");
+  second.metric("rows", 2);
+  await second.flush();
+  release();
+  await check;
+  const stored = (await cw.getRun(second.id))!;
+  assert.equal(stored.status, "timeout");
+  assert.equal(stored.output, "early line\nimportant progress line");
+  assert.deepEqual(stored.metrics, { rows: 2 });
+  assert.equal((await cw.getRun(first.id))!.status, "timeout");
 });
 
 test("a late success after a timeout mark closes stuck and recovers; a late failure does not count twice", async () => {

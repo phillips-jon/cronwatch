@@ -40,6 +40,7 @@ export type {
   JobSummary,
   Run,
   RunStatus,
+  SendingAlert,
   Store,
   StoredJob,
   StoredJobDefinition,

@@ -8,6 +8,7 @@ import { parseDuration } from "./duration.js";
 import { expectation, nextFire, parseSchedule } from "./schedule.js";
 import { median, percentile } from "./stats.js";
 import type {
+  Alert,
   AlertDraft,
   BudgetBreach,
   Condition,
@@ -50,6 +51,16 @@ export function runDuration(startedAt: number, finishedAt: number): number {
 }
 
 /**
+ * When a silence of `ms` from `now` ends: a whole millisecond, never past
+ * MAX_DURATION_MS (2^53 - 1), however long the silence asked for. Every port
+ * sharing the store reads it back unchanged, where a larger number could
+ * wrap to a time long past and send alerts during the silence.
+ */
+export function silenceEnd(now: number, ms: number): number {
+  return Math.min(now + Math.floor(Math.min(ms, MAX_DURATION_MS)), MAX_DURATION_MS);
+}
+
+/**
  * The version a stored state counts as for compareAndSetState: its
  * `version` when that is a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
  * else 0, as when it is absent. The SQL stores read it the same way, so a
@@ -78,17 +89,115 @@ export function emptyState(job: string): JobState {
   return { job, open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, pendingRecovery: [], undelivered: [] };
 }
 
-/** A stored state with every field present, or a fresh one. State written by an older version lacks the newer fields. */
+/**
+ * A stored state with every field present, or a fresh one. State written by
+ * an older version lacks the newer fields. `sending` is the exception: it is
+ * there only while it holds an alert (see holdAlerts).
+ */
 export function normalizeState(state: JobState | null, job: string): JobState {
   if (!state) return emptyState(job);
+  const { sending, ...rest } = state;
   return {
     ...emptyState(job),
-    ...state,
+    ...rest,
     open: { ...state.open },
     consecutiveFailures: failureCount(state),
     pendingRecovery: [...(state.pendingRecovery ?? [])],
     undelivered: [...(state.undelivered ?? [])],
+    ...(Array.isArray(sending) && sending.length > 0 ? { sending: [...sending] } : {}),
   };
+}
+
+// ---------------------------------------------------------------- delivery
+
+/** Alerts kept per job for retry, and per job being sent; past it the oldest go. */
+export const MAX_UNDELIVERED = 20;
+
+/**
+ * How long an alert in `sending` is left to the process sending it. Longer
+ * than any send takes: at most three alerts go out together, each with 25
+ * seconds of triage and 15 of channels.
+ */
+export const SEND_LEASE_MS = 5 * 60_000;
+
+/** Identifies an alert across retries, and in `sending`. */
+export function alertKey(alert: Pick<Alert, "type" | "at" | "run">): string {
+  return `${alert.type}|${alert.at}|${alert.run?.id ?? ""}`;
+}
+
+/** Keeps the newest `max` of `list`, and says how many went. */
+function newest<T>(list: T[], max: number): { kept: T[]; dropped: number } {
+  return { kept: list.slice(-max), dropped: Math.max(0, list.length - max) };
+}
+
+/**
+ * `alerts` added to the undelivered queue: one with the same key as a queued
+ * alert replaces it where it stands, the rest go at the end, and only the
+ * newest MAX_UNDELIVERED stay. `dropped` counts those let go.
+ */
+export function queueUndelivered(state: JobState, alerts: Alert[]): { state: JobState; dropped: number } {
+  const next = cloneState(state);
+  const byKey = new Map(alerts.map((alert) => [alertKey(alert), alert]));
+  const queue = next.undelivered!.map((alert) => byKey.get(alertKey(alert)) ?? alert);
+  const known = new Set(queue.map(alertKey));
+  queue.push(...alerts.filter((alert) => !known.has(alertKey(alert))));
+  const { kept, dropped } = newest(queue, MAX_UNDELIVERED);
+  next.undelivered = kept;
+  return { state: next, dropped };
+}
+
+/**
+ * The outbox. Alerts just composed are written with the state that opens
+ * their condition, before any is sent, so a process that stops part way does
+ * not lose them: into `sending`, each with its lease ending at `until`, when
+ * this process sends them, or (deliver: "check") straight into the
+ * undelivered queue for a check elsewhere. `dropped` counts alerts let go
+ * past MAX_UNDELIVERED.
+ */
+export function holdAlerts(state: JobState, alerts: Alert[], until: number, deferred: boolean): { state: JobState; dropped: number } {
+  if (alerts.length === 0) return { state, dropped: 0 };
+  if (deferred) return queueUndelivered(state, alerts);
+  const next = cloneState(state);
+  const { kept, dropped } = newest([...(next.sending ?? []), ...alerts.map((alert) => ({ until, alert }))], MAX_UNDELIVERED);
+  next.sending = kept;
+  return { state: next, dropped };
+}
+
+/**
+ * Alerts in `sending` whose lease ran out by `now`: the process sending them
+ * stopped before it recorded how the send went. They go to the undelivered
+ * queue, where the retry sends them (with triage, which is never stored with
+ * them here) or drops them as stale. An entry that is not an object with an
+ * alert is dropped; one without a numeric `until` counts as run out.
+ */
+export function releaseSending(state: JobState, now: number): { state: JobState; dropped: number } {
+  const sending = state.sending ?? [];
+  const lapsed = sending.filter((entry) => !(typeof entry?.until === "number" && entry.until > now));
+  if (lapsed.length === 0) return { state, dropped: 0 };
+  const held = sending.filter((entry) => !lapsed.includes(entry));
+  return queueUndelivered(
+    { ...state, sending: held },
+    lapsed.filter((entry) => typeof entry?.alert === "object" && entry.alert !== null).map((entry) => entry.alert),
+  );
+}
+
+/**
+ * How a send went. Delivered and stale (`dropped`) alerts leave the queue;
+ * failed ones replace their queued copy, so a triage made on this attempt is
+ * kept, or join the queue. Every one of them leaves `sending`. lastAlertAt
+ * moves only on a delivery. `dropped` in the result counts alerts let go
+ * past MAX_UNDELIVERED.
+ */
+export function recordSent(state: JobState, delivered: Alert[], failed: Alert[], stale: Alert[], now: number): { state: JobState; dropped: number } {
+  const next = cloneState(state);
+  const done = new Set([...delivered, ...stale].map(alertKey));
+  next.undelivered = next.undelivered!.filter((alert) => !done.has(alertKey(alert)));
+  const sent = new Set([...delivered, ...failed, ...stale].map(alertKey));
+  const held = (next.sending ?? []).filter((entry) => !(typeof entry?.alert === "object" && entry.alert !== null && sent.has(alertKey(entry.alert))));
+  if (held.length > 0) next.sending = held;
+  else delete next.sending;
+  if (delivered.length > 0) next.lastAlertAt = now;
+  return queueUndelivered(next, failed);
 }
 
 function cloneState(state: JobState): JobState {

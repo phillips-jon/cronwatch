@@ -110,6 +110,14 @@ export interface JobState {
   /** Alerts that no channel accepted. Each check retries them once. */
   undelivered?: Alert[];
   /**
+   * The outbox: alerts written with the state that opened their condition,
+   * while the process that wrote them sends them. Each leaves once that
+   * process records how the send went; one still here after `until` (the
+   * process stopped part way) goes to `undelivered` at the next check.
+   * Absent when empty, and in state written before this field existed.
+   */
+  sending?: SendingAlert[];
+  /**
    * Goes up by one on every write, so a store can refuse a write made from a
    * stale read (see Store.compareAndSetState). Absent counts as 0.
    */
@@ -167,6 +175,12 @@ interface AlertBase {
 export type Alert = {
   [K in AlertType]: AlertBase & { type: K; details: AlertDetails[K] };
 }[AlertType];
+
+/** An alert in JobState.sending: `until` (epoch milliseconds) is when its sender's lease runs out. */
+export interface SendingAlert {
+  until: number;
+  alert: Alert;
+}
 
 /** What the client hands a channel with each alert. */
 export interface ChannelContext {

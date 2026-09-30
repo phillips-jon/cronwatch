@@ -95,10 +95,10 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 | `jobsWithRuns(limit = 20)` | every job's summary with its newest `limit` runs, read together: `{ job, runs }[]` |
 | `jobSummary(name)`, `getRun(id)` | |
 | `runs(name, limit = 50)` | newest first; `limit` is truncated to a whole number from 1 to 500 |
-| `silence(name, duration)`, `unsilence(name)` | |
-| `forget(name)` | remove a job and its runs from the store |
+| `silence(name, duration)`, `unsilence(name)` | the silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
+| `forget(name)` | remove a job and its runs from the store. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `definedJobs()` | the definitions declared in this process |
-| `close()` | stop the interval and close the store |
+| `close()` | stop the interval, wait for a check already under way, then close the store |
 | `resumeRun(name, runId)` | `job(name).resume(runId)` for a job declared in this process; rejects for one that is not |
 | `recordRun(run, { evaluate? })` | record a run that happened outside this process, for a source; see [below](#recordrun) |
 
@@ -120,6 +120,7 @@ The development sign-in line names the host only when `origin` is set or the fir
 `cw.recordRun(run, { evaluate? })` records a run that happened outside this process, for a [source](#exports).
 
 - Its job must be declared first.
+- Every metric must be a finite number, as with `job.metric()`; one that is not (`NaN`, `Infinity`, text) throws and nothing is recorded.
 - Runs are keyed by id: a new one is inserted, a stored one still running is updated when this one is not, and anything else is left alone, so recording the same run twice changes nothing.
 - A finished run is judged as if it had been wrapped here (`expect`, failures, duration, budgets) and redacted the same way.
 - `evaluate: false` stores it without judging it, for history imported on first sight.

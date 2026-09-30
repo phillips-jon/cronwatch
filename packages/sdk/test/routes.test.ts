@@ -14,6 +14,26 @@ function app(token: string | null = "tok") {
   return { cw, c, routes, get, auth };
 }
 
+test("a run whose metrics hold something other than a finite number still shows its job's page", async () => {
+  const { cw, c, get, auth } = app();
+  cw.job("imported");
+  await assert.rejects(
+    cw.recordRun({ id: "nan", job: "imported", status: "ok", startedAt: c.now(), finishedAt: c.now(), durationMs: 0, error: null, output: null, metrics: { rows: Number.NaN }, trigger: "source" }),
+    /recordRun: metric "rows" must be a finite number/,
+  );
+  assert.equal(await cw.getRun("nan"), null, "nothing is written");
+  // As a foreign row, or a store that kept NaN as null, may hold them.
+  await cw.store.insertRun({
+    id: "odd", job: "imported", status: "ok", startedAt: c.now(), finishedAt: c.now(), durationMs: 0, error: null, output: null, trigger: "source",
+    metrics: { rows: null, label: "abc", cost: 1.25, n: 3 } as unknown as Record<string, number>,
+  });
+  const res = await get("/cronwatch/jobs/imported", { headers: auth });
+  assert.equal(res.status, 200);
+  const page = await res.text();
+  assert.match(page, /<span class="k">cost<\/span> 1\.2500<\/span><span><span class="k">n<\/span> 3</);
+  assert.doesNotMatch(page, /class="k">(rows|label)</);
+});
+
 test("everything needs the token", async () => {
   const { get } = app();
   assert.equal((await get("/cronwatch")).status, 401);
