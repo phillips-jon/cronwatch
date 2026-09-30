@@ -136,6 +136,16 @@ defmodule Cronwatch.Store.PostgresTest do
     {EctoStore, h} = store
     {:ok, st} = EctoStore.get_state(h, "nul")
     assert st.consecutive_failures == 1, "the state, with its alert, was written too"
+
+    # So are a trigger, metric names and a definition's text.
+    {:ok, _} =
+      Cronwatch.job("nul2", description: "a\0b", tags: ["t\0"], budget: %{"c\0" => 5}, instance: cw)
+
+    :ok = Cronwatch.run("nul2", fn j -> Cronwatch.metric(j, "ro\0ws", 2) end, trigger: "cr\0on", instance: cw)
+    [second] = Cronwatch.runs!("nul2", 10, instance: cw)
+    assert {second.status, second.trigger, JS.stringify(second.metrics)} == {"ok", "cron", ~s({"rows":2})}
+    {:ok, job} = EctoStore.get_job(h, "nul2")
+    assert JS.stringify(job.definition) == ~s({"name":"nul2","tags":["t"],"budget":{"c":5},"description":"ab"})
     assert Agent.get(errors, & &1) == []
   end
 

@@ -31,6 +31,19 @@ defmodule Cronwatch.Output do
   def strip_nul(s), do: if(String.contains?(s, <<0>>), do: String.replace(s, <<0>>, ""), else: s)
 
   @doc """
+  Removes every U+0000 from JSON text, keys and strings alike, by dropping
+  each `\\u0000` escape (a NUL can appear in JSON no other way). Escapes are
+  read left to right in pairs, so an escaped backslash followed by `u0000`
+  is left as it is (the SDK's `stripJsonNul`).
+  """
+  @spec strip_json_nul(String.t()) :: String.t()
+  def strip_json_nul(json) do
+    if String.contains?(json, "\\u0000"),
+      do: Regex.replace(~r/\\(u0000|[\s\S])/, json, fn escape, next -> if next == "u0000", do: "", else: escape end),
+      else: json
+  end
+
+  @doc """
   Removes NULs, then keeps the last 16 KB of code units behind a line saying
   the rest was trimmed (the SDK's `capOutput`). A cut through a surrogate pair
   leaves U+FFFD, the character JavaScript's lone half becomes once written

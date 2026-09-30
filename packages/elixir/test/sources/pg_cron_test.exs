@@ -219,6 +219,87 @@ defmodule Cronwatch.Sources.PgCronTest do
     assert count == 29
   end
 
+  test "a pick, job_name or options function that fails fails only its job, reported once" do
+    c = Clock.new()
+    cron = FakeCron.new()
+    for {id, name} <- [{1, "one"}, {2, "two"}, {3, "three"}, {4, "four"}], do: FakeCron.job(cron, id, name, "0 * * * *")
+    {:ok, broken} = Agent.start_link(fn -> MapSet.new() end)
+    fault? = fn what, id -> Agent.get(broken, &MapSet.member?(&1, {what, id})) end
+    set = fn faults -> Agent.update(broken, fn _ -> MapSet.new(faults) end) end
+
+    k =
+      kit(cron,
+        clock: c,
+        store: Stores.memory(),
+        pick: fn j ->
+          if fault?.(:pick, j.job_id), do: raise("pick broke")
+          true
+        end,
+        job_name: fn j ->
+          cond do
+            fault?.(:raise, j.job_id) -> raise "name broke"
+            fault?.(:throw, j.job_id) -> throw(:no_name)
+            fault?.(nil, j.job_id) -> nil
+            true -> "j-#{j.job_name}"
+          end
+        end,
+        options: fn j ->
+          if fault?.(:options, j.job_id), do: exit(:options_broke)
+          []
+        end
+      )
+
+    names = fn result -> Enum.map(result.jobs, & &1.name) end
+    tail = "; it keeps its last declaration until that works"
+
+    # First sight, with job 1's name function raising and job 2's answering nil: only those two are skipped.
+    set.([{:raise, 1}, {nil, 2}])
+    first = FakeCron.add(cron, 3, "succeeded", @t0 - 60_000, @t0 - 59_000, "ok")
+    assert names.(check(k)) == ["j-four", "j-three"]
+    assert run(k, pid(first)).job == "j-three"
+
+    assert others(k) == [
+             "pg_cron job 1: job_name raised RuntimeError: name broke" <> tail,
+             "pg_cron job 2: job_name returned nil, not a name" <> tail
+           ]
+
+    # Once they work, both are declared; then every function fails for jobs already declared.
+    set.([])
+    assert names.(check(k)) == ["j-four", "j-one", "j-three", "j-two"]
+    set.([{:pick, 1}, {:throw, 2}, {:options, 3}, {nil, 4}])
+    before = length(others(k))
+    one = FakeCron.add(cron, 1, "failed", @t0 + 1000, @t0 + 2000, "ERROR:  one")
+    three = FakeCron.add(cron, 3, "succeeded", @t0 + 1000, @t0 + 2000, "ok")
+    Clock.advance(c, 5000)
+    check(k)
+    result = check(k)
+
+    assert Enum.drop(others(k), before) == [
+             "pg_cron job 1: the pick function raised RuntimeError: pick broke" <> tail,
+             "pg_cron job 2: job_name threw :no_name" <> tail,
+             "pg_cron job 3: the options function exited with :options_broke" <> tail,
+             "pg_cron job 4: job_name returned nil, not a name" <> tail
+           ],
+           "each reported once, over two syncs"
+
+    # Each keeps its name and schedule, is not retired, and its runs are still copied.
+    for s <- result.jobs do
+      assert schedule(s) == "0 * * * *", s.name
+      refute description(s) =~ ~r/no longer|renamed/, s.name
+    end
+
+    assert run(k, pid(one)).job == "j-one"
+    assert run(k, pid(three)).job == "j-three"
+
+    # Working again and then failing again is reported again.
+    set.([])
+    check(k)
+    set.([{:pick, 1}])
+    check(k)
+    assert length(others(k)) == before + 5
+    assert List.last(others(k)) =~ ~r/^pg_cron job 1: the pick function raised/
+  end
+
   test "jobs are declared, history is copied quietly, and imports are idempotent" do
     c = Clock.new()
     cron = FakeCron.new()

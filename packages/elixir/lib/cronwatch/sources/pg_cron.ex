@@ -33,7 +33,10 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
         app's own (`"db:"`). It also keeps run ids apart. Default `""`.
       * `:job_name`: a function of a `Cronwatch.Sources.PgCron.Job` answering
         its CronWatch name. Default `job_name/1`. The prefix goes in front
-        either way.
+        either way. One that raises, throws or exits, or answers no string,
+        like a `:pick` or `:options` function that fails, is reported once
+        and fails only that job, which keeps its last declaration until the
+        function works again.
       * `:options`: job options (`grace`, `timeout`, `max_duration`, `expect`
         and the rest) for every job, or a function of a
         `Cronwatch.Sources.PgCron.Job` answering them per job. The schedule
@@ -457,7 +460,8 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
                 declared: %{},
                 retired: MapSet.new(),
                 scanned: false,
-                warned: MapSet.new()
+                warned: MapSet.new(),
+                failing: MapSet.new()
     end
 
     @st {__MODULE__, :state}
@@ -650,30 +654,18 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       # Declare each job. A paused one (active = false) keeps its failures
       # but loses its schedule, so it is not missed.
       {order, names, definitions, _used} =
-        all
-        |> Enum.filter(&picks?(o, &1))
-        |> Enum.reduce({[], %{}, %{}, MapSet.new()}, fn job, {order, names, definitions, used} ->
-          base = if is_function(o[:job_name], 1), do: o[:job_name].(job), else: job_name(job)
-          name = prefix <> base
-          name = if MapSet.member?(used, name), do: "#{name}:#{job.job_id}", else: name
-          used = MapSet.put(used, name)
-          sched = if job.active and recording, do: schedule(job.schedule)
-          paused = if job.active, do: "", else: " (paused)"
+        Enum.reduce(all, {[], %{}, %{}, MapSet.new()}, fn job, acc ->
+          case settle(o, job) do
+            :skip ->
+              update_st(&%{&1 | failing: MapSet.delete(&1.failing, job.job_id)})
+              acc
 
-          unscheduled_options =
-            [description: "pg_cron job #{job.job_id} in #{job.database} as #{job.username}#{paused}", tags: ["pg_cron"]] ++
-              extra(o, job)
+            {:trouble, what} ->
+              trouble(c, job, what, acc)
 
-          options =
-            if sched, do: unscheduled_options ++ [schedule: sched, timezone: timezone], else: unscheduled_options
-
-          case declare_job(c, job, name, options, sched, unscheduled_options) do
-            {:ok, definition} ->
-              {order ++ [job.job_id], Map.put(names, job.job_id, name), Map.put(definitions, job.job_id, definition),
-               used}
-
-            :error ->
-              {order, names, definitions, used}
+            {:ok, base, extra} ->
+              update_st(&%{&1 | failing: MapSet.delete(&1.failing, job.job_id)})
+              declare_picked(c, job, {prefix <> base, extra}, {recording, timezone}, acc)
           end
         end)
 
@@ -700,6 +692,85 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
         []
       else
         read_runs(o, c, order, names, id_prefix, now)
+      end
+    end
+
+    # The app's functions for one job (pick, job_name, options): :skip when
+    # it is not picked, else its name before the prefix and its options, or
+    # what went wrong when one of them failed.
+    defp settle(o, job) do
+      with {:ok, picked} <- call_back(fn -> picks?(o, job) end, "the pick function"),
+           true <- picked || :skip,
+           {:ok, base} <- call_back(fn -> base_name(o, job) end, "job_name"),
+           :ok <- if(is_binary(base), do: :ok, else: {:trouble, "job_name returned #{returned(base)}, not a name"}),
+           {:ok, extra} <- call_back(fn -> extra(o, job) end, "the options function") do
+        {:ok, base, extra}
+      end
+    end
+
+    defp base_name(o, job), do: if(is_function(o[:job_name], 1), do: o[:job_name].(job), else: job_name(job))
+
+    defp returned(nil), do: "nil"
+    defp returned(other), do: inspect(other)
+
+    defp call_back(fun, what) do
+      {:ok, fun.()}
+    rescue
+      e -> {:trouble, "#{what} raised #{inspect(e.__struct__)}: #{Exception.message(e)}"}
+    catch
+      :throw, value -> {:trouble, "#{what} threw #{inspect(value)}"}
+      :exit, reason -> {:trouble, "#{what} exited with #{inspect(reason)}"}
+    end
+
+    # A function of the app's that failed fails only its job, as a bad row
+    # does: reported once until it works again, and the job carries on as
+    # last declared (skipped when it never was, or when another job took its
+    # name this sync), so its runs are still copied.
+    defp trouble(c, job, what, {order, names, definitions, used} = acc) do
+      unless MapSet.member?(st().failing, job.job_id) do
+        update_st(&%{&1 | failing: MapSet.put(&1.failing, job.job_id)})
+
+        Core.report(
+          c,
+          Error.other("pg_cron job #{job.job_id}: #{what}; it keeps its last declaration until that works"),
+          "source pg_cron"
+        )
+      end
+
+      case st().known[job.job_id] do
+        {name, definition} ->
+          if MapSet.member?(used, name) do
+            acc
+          else
+            {order ++ [job.job_id], Map.put(names, job.job_id, name), Map.put(definitions, job.job_id, definition),
+             MapSet.put(used, name)}
+          end
+
+        nil ->
+          acc
+      end
+    end
+
+    # Declares a job that was picked, under its name with the prefix.
+    defp declare_picked(c, job, {name, extra}, {recording, timezone}, {order, names, definitions, used}) do
+      name = if MapSet.member?(used, name), do: "#{name}:#{job.job_id}", else: name
+      used = MapSet.put(used, name)
+      sched = if job.active and recording, do: schedule(job.schedule)
+      paused = if job.active, do: "", else: " (paused)"
+
+      unscheduled_options =
+        [description: "pg_cron job #{job.job_id} in #{job.database} as #{job.username}#{paused}", tags: ["pg_cron"]] ++
+          extra
+
+      options =
+        if sched, do: unscheduled_options ++ [schedule: sched, timezone: timezone], else: unscheduled_options
+
+      case declare_job(c, job, name, options, sched, unscheduled_options) do
+        {:ok, definition} ->
+          {order ++ [job.job_id], Map.put(names, job.job_id, name), Map.put(definitions, job.job_id, definition), used}
+
+        :error ->
+          {order, names, definitions, used}
       end
     end
 
