@@ -78,11 +78,14 @@ module Cronwatch
 
     FIELDS.each_key { |field| define_method(field) { @fields[field] } }
 
-    def initialize(fields = {}, unreadable: false)
+    # What from_h makes a stored definition that is not a JSON object from.
+    UNREADABLE = {}.freeze
+
+    def initialize(fields = {})
       @fields = {}
       fields.each { |k, v| @fields[k.is_a?(Symbol) ? k : k.to_s] = v }
       @fields.freeze
-      @unreadable = unreadable
+      @unreadable = fields.equal?(UNREADABLE)
       freeze
     end
 
@@ -93,7 +96,7 @@ module Cronwatch
     # failing (see Client#evaluable).
     def self.from_h(hash)
       return hash if hash.is_a?(JobDefinition)
-      return new({}, unreadable: true) unless hash.is_a?(Hash)
+      return new(UNREADABLE) unless hash.is_a?(Hash)
 
       new(hash.each_with_object({}) { |(k, v), out| out[BY_JSON[k.to_s] || k.to_s] = v })
     end
@@ -273,8 +276,14 @@ module Cronwatch
   # `version` goes up by one on every write, so a store can refuse a write
   # made from a stale read (see Stores::Memory#compare_and_set_state). Absent
   # (nil) counts as 0.
+  #
+  # `sending` is the outbox (see Evaluate.hold_alerts): entries of
+  # { "until" => epoch ms, "alert" => Alert }, read leniently, since an entry
+  # a foreign writer left malformed must not make the whole state unreadable:
+  # an entry that is not a Hash, or whose alert is not one, is kept as it
+  # came. nil when there is none; it is never written empty.
   JobState = Struct.new(:job, :open, :consecutive_failures, :silenced_until, :last_alert_at, :pending_recovery,
-                        :undelivered, :version, keyword_init: true) do
+                        :undelivered, :version, :sending, keyword_init: true) do
     include Serializable
 
     def self.from_h(hash)
@@ -282,6 +291,7 @@ module Cronwatch
 
       pending = Naming.fetch(hash, "pendingRecovery")
       undelivered = Naming.fetch(hash, "undelivered")
+      sending = Naming.fetch(hash, "sending")
       new(
         job: Naming.fetch(hash, "job"),
         open: (Naming.fetch(hash, "open") || {}).each_with_object({}) { |(k, v), out| out[k.to_sym] = v },
@@ -291,12 +301,31 @@ module Cronwatch
         pending_recovery: pending&.map(&:to_sym),
         undelivered: undelivered&.map { |a| Alert.from_h(a) },
         version: Naming.fetch(hash, "version"),
+        sending: sending.is_a?(Array) ? sending.map { |entry| JobState.sending_entry(entry) } : sending,
       )
     end
 
+    # One entry of `sending` as read: its alert parsed when it is a Hash
+    # that parses, anything else kept as it came.
+    def self.sending_entry(entry)
+      return entry unless entry.is_a?(Hash)
+
+      entry.to_h do |key, value|
+        next [key.to_s, value] unless key.to_s == "alert" && value.is_a?(Hash)
+
+        parsed = begin
+          Alert.from_h(value)
+        rescue StandardError
+          value
+        end
+        ["alert", parsed]
+      end
+    end
+
     # pendingRecovery, undelivered and version are left out when unset, as in
-    # state written before they existed. The version comes last, where the
-    # SDK's spread of a normalized state puts it.
+    # state written before they existed. The version comes after them, where
+    # the SDK's spread of a normalized state puts it, and `sending` last, and
+    # only while it holds an entry.
     def to_h
       out = {
         "job" => job, "open" => (open || {}).transform_keys(&:to_s), "consecutiveFailures" => consecutive_failures,
@@ -305,6 +334,11 @@ module Cronwatch
       out["pendingRecovery"] = pending_recovery.map(&:to_s) unless pending_recovery.nil?
       out["undelivered"] = undelivered.map(&:to_h) unless undelivered.nil?
       out["version"] = version unless version.nil?
+      if sending.is_a?(Array) && !sending.empty?
+        out["sending"] = sending.map do |entry|
+          entry.is_a?(Hash) ? entry.transform_values { |v| v.is_a?(Alert) ? v.to_h : v } : entry
+        end
+      end
       out
     end
   end

@@ -428,6 +428,63 @@ class ConformanceTest < Minitest::Test
     end
   end
 
+  # ---------------------------------------------------------------- delivery (the outbox)
+
+  DELIVERY = HEALTH["delivery"]
+
+  # The fixtures' alerts are hand-built with their keys in another order
+  # than a composed alert's, which the gem's writer sets; expected results
+  # are compared with each alert written the gem's way.
+  def canonical(result)
+    { "state" => parse_state(result["state"]).to_h, "dropped" => result["dropped"] }
+  end
+
+  def parse_state(hash) = Cronwatch::JobState.from_h(hash)
+
+  def alerts_from(list) = list.map { |a| Cronwatch::Alert.from_h(a) }
+
+  def test_delivery_constants_are_the_sdks
+    assert_equal DELIVERY["maxUndelivered"], Cronwatch::Evaluate::MAX_UNDELIVERED
+    assert_equal DELIVERY["sendLeaseMs"], Cronwatch::Evaluate::SEND_LEASE_MS
+  end
+
+  def test_alert_key
+    each_case(DELIVERY["alertKey"]) { |c| differs(c["key"], Cronwatch::Evaluate.alert_key(Cronwatch::Alert.from_h(c["alert"]))) }
+  end
+
+  def test_normalize_state_keeps_sending_only_while_it_holds_an_entry
+    each_case(DELIVERY["normalizeState"]) do |c|
+      differs(parse_state(c["normalized"]).to_h, Cronwatch::Evaluate.normalize_state(parse_state(c["state"]), "j").to_h)
+    end
+  end
+
+  def test_queue_undelivered
+    each_case(DELIVERY["queueUndelivered"]) do |c|
+      differs(canonical(c["result"]), Cronwatch::Evaluate.queue_undelivered(parse_state(c["state"]), alerts_from(c["alerts"])))
+    end
+  end
+
+  def test_hold_alerts
+    each_case(DELIVERY["holdAlerts"]) do |c|
+      held = Cronwatch::Evaluate.hold_alerts(parse_state(c["state"]), alerts_from(c["alerts"]), c["until"], c["deferred"])
+      differs(canonical(c["result"]), held)
+    end
+  end
+
+  def test_release_sending
+    each_case(DELIVERY["releaseSending"]) do |c|
+      differs(canonical(c["result"]), Cronwatch::Evaluate.release_sending(parse_state(c["state"]), c["now"]))
+    end
+  end
+
+  def test_record_sent
+    each_case(DELIVERY["recordSent"]) do |c|
+      result = Cronwatch::Evaluate.record_sent(parse_state(c["state"]), alerts_from(c["delivered"]), alerts_from(c["failed"]),
+                                               alerts_from(c["stale"]), c["now"])
+      differs(canonical(c["result"]), result)
+    end
+  end
+
   def test_stale_alert
     each_case(HEALTH["staleAlert"]) do |c|
       differs(c["stale"], Cronwatch::Evaluate.stale_alert?(Cronwatch::Alert.from_h(c["alert"]), state_from(c["state"])))

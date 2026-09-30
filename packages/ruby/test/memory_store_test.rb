@@ -73,9 +73,9 @@ module StoreConformance
     undelivered = { "type" => "failed", "run" => nil, "details" => { "consecutiveFailures" => 1 }, "job" => "a",
                     "definition" => { "name" => "a" }, "title" => "a failed", "message" => "boom", "at" => 7 }
     full = { "job" => "a", "open" => { "stuck" => 7 }, "consecutiveFailures" => 1, "silencedUntil" => nil, "lastAlertAt" => 6,
-             "pendingRecovery" => ["missed"], "undelivered" => [undelivered] }
+             "pendingRecovery" => ["missed"], "undelivered" => [undelivered], "sending" => [{ "until" => 8, "alert" => undelivered }] }
     store.set_state(state.call(full))
-    assert_equal Cronwatch::JS.json(full), store.get_state("a").to_json, "pendingRecovery and undelivered round-trip"
+    assert_equal Cronwatch::JS.json(full), store.get_state("a").to_json, "pendingRecovery, undelivered and sending round-trip"
     assert_equal [:missed], store.get_state("a").pending_recovery
     assert_equal :failed, store.get_state("a").undelivered[0].type
 

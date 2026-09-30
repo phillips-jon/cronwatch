@@ -122,9 +122,9 @@ module SqlStoreConformance
     undelivered = { "type" => "failed", "run" => nil, "details" => { "consecutiveFailures" => 1 }, "job" => "a",
                     "definition" => { "name" => "a" }, "title" => "a failed", "message" => "boom", "at" => 7 }
     full = { "job" => "a", "open" => { "stuck" => 7 }, "consecutiveFailures" => 1, "silencedUntil" => nil, "lastAlertAt" => 6,
-             "pendingRecovery" => ["missed"], "undelivered" => [undelivered] }
+             "pendingRecovery" => ["missed"], "undelivered" => [undelivered], "sending" => [{ "until" => 8, "alert" => undelivered }] }
     store.set_state(state.call(full))
-    assert_equal Cronwatch::JS.json(full), store.get_state("a").to_json, "pendingRecovery and undelivered round-trip"
+    assert_equal Cronwatch::JS.json(full), store.get_state("a").to_json, "pendingRecovery, undelivered and sending round-trip"
     store.set_state(state.call("job" => "a", "open" => {}, "consecutiveFailures" => 0, "silencedUntil" => 99, "lastAlertAt" => 6))
 
     store.insert_run(sql_run("r5", "a", :running, 500))

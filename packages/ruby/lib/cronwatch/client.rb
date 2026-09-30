@@ -25,7 +25,7 @@ module Cronwatch
     CHANNEL_TIMEOUT_MS = 15_000
     PRUNE_INTERVAL_MS = 60 * 60_000
     # Undelivered alerts kept per job for retry; the oldest go first.
-    MAX_UNDELIVERED = 20
+    MAX_UNDELIVERED = Evaluate::MAX_UNDELIVERED
     # Wall-clock time one check spends retrying undelivered alerts, across
     # every job. Once it is spent the rest wait for the next check.
     RETRY_BUDGET_MS = 20_000
@@ -808,11 +808,6 @@ module Cronwatch
       end
     end
 
-    # Identifies an alert across retries.
-    def alert_key(alert)
-      "#{alert.type}|#{alert.at}|#{alert.run&.id}"
-    end
-
     # record_run for a run already stored.
     def record_over(definition, stored, run, evaluate)
       if stored.job != run.job
@@ -1103,21 +1098,45 @@ module Cronwatch
     end
 
     # Evaluate a finished run (ok, failed, or timed out by a check), already
-    # written, against the job's state and send what that produces. Never raises.
+    # written, against the job's state and send what that produces. The
+    # alerts are written with that state (see outbox). Never raises.
     def finish_run(definition, run, at)
-      drafts = nil
+      held = nil
       begin
         past = nil
-        _, drafts = update_state(run.job) do |previous|
+        _, held = update_state(run.job) do |previous|
           past ||= history(run)
-          settled = Evaluate.apply_silence(previous, Evaluate.on_run_finish(definition, run, previous, past, at), at)
-          [settled.state, settled.alerts]
+          outbox(Evaluate.apply_silence(previous, Evaluate.on_run_finish(definition, run, previous, past, at), at), definition, at)
         end
       rescue StandardError => e
         report(e, "evaluating #{run.job}")
         return []
       end
-      dispatch(drafts, definition, at)
+      report_dropped(run.job, held.dropped)
+      dispatch(run.job, held.alerts, at)
+    end
+
+    # Alerts written with the state that opened their conditions, and how
+    # many older ones the queue let go.
+    Outbox = Struct.new(:alerts, :dropped)
+
+    # An evaluation as it is written: its drafts composed into alerts and held
+    # in the same state (Evaluate.hold_alerts), so the write that opens a
+    # condition also keeps its alerts, and a process that stops before
+    # sending them does not lose them. Called inside update_state, so it only
+    # computes. Returns `[state, Outbox]`.
+    def outbox(settled, definition, at)
+      alerts = settled.alerts.map { |draft| Format.compose_alert(draft, definition, at) }
+      held = Evaluate.hold_alerts(settled.state, alerts, now + Evaluate::SEND_LEASE_MS, @defer_delivery)
+      [held.state, Outbox.new(alerts, held.dropped)]
+    end
+
+    # Reports alerts let go because a job's queue was full.
+    def report_dropped(name, dropped)
+      return unless dropped.positive?
+
+      report(RuntimeError.new("#{dropped} undelivered alert#{dropped == 1 ? "" : "s"} for #{name} dropped: " \
+                              "only the newest #{Evaluate::MAX_UNDELIVERED} are kept for retry"), "alert queue for #{name}")
     end
 
     # The runs before `run`, newest first, with up to BASELINE_WINDOW
@@ -1182,14 +1201,18 @@ module Cronwatch
         evaluable(stored.name, stored.definition)
         recent = @store.list_runs(stored.name, Evaluate::BASELINE_WINDOW)
         next_expected_at = nil
-        state, drafts = update_state(stored.name) do |previous|
+        state, held = update_state(stored.name) do |previous|
           evaluation = Evaluate.on_check(stored.definition, stored, recent.first, previous, at)
           next_expected_at = evaluation.next_expected_at
           settled = Evaluate.apply_silence(previous, evaluation, at)
-          [settled.state, settled.alerts]
+          # Alerts a process stopped sending part way go back to the retry queue.
+          released = Evaluate.release_sending(settled.state, now)
+          following, out = outbox(Evaluate::Evaluation.new(state: released.state, alerts: settled.alerts), stored.definition, at)
+          [following, Outbox.new(out.alerts, released.dropped + out.dropped)]
         end
+        report_dropped(stored.name, held.dropped)
         alerts.concat(retry_undelivered(stored.name, state, at, retries))
-        alerts.concat(dispatch(drafts, stored.definition, at))
+        alerts.concat(dispatch(stored.name, held.alerts, at))
         jobs << Evaluate.summarize(stored, recent, state, next_expected_at, at)
       rescue StandardError => e
         report(e, "checking #{stored.name}")
@@ -1259,27 +1282,25 @@ module Cronwatch
       state
     end
 
-    # Compose, triage and send each draft. The state was saved before this
-    # (update_state), so a slow channel holds up nothing else; afterwards only
-    # the delivery fields are written back, onto a fresh read of the state.
-    def dispatch(drafts, definition, at)
-      return [] if drafts.empty?
+    # Triage and send each alert the outbox holds (see outbox). The state,
+    # with the alerts in it, was saved before this, so a slow channel holds up
+    # nothing else; afterwards only the delivery fields are written back,
+    # onto a fresh read of the state, and the alerts leave `sending`. Triage
+    # is made here, never stored with the held alert: the write that opens a
+    # condition cannot wait for it, and a retry triages an alert that has
+    # none. With deliver: :check the alerts were queued for a check elsewhere
+    # instead.
+    def dispatch(name, alerts, at)
+      return alerts if alerts.empty? || @defer_delivery
 
-      composed = []
       delivered = []
       failed = []
-      drafts.each do |draft|
-        alert = Format.compose_alert(draft, definition, at)
-        if @defer_delivery
-          failed << alert
-        else
-          add_triage(alert, @triage_timeout_ms) if @triage && alert.type != :recovered
-          (deliver(alert) ? delivered : failed) << alert
-        end
-        composed << alert
+      alerts.each do |alert|
+        add_triage(alert, @triage_timeout_ms) if @triage && alert.type != :recovered
+        (deliver(alert) ? delivered : failed) << alert
       end
-      record_delivery(definition.name, delivered, failed, [], at)
-      composed
+      record_delivery(name, delivered, failed, [], at)
+      alerts
     end
 
     # The wall-clock milliseconds one check has spent retrying, across its jobs.
@@ -1315,24 +1336,16 @@ module Cronwatch
     end
 
     # Mark delivered alerts done, drop stale ones, and keep failed ones for the
-    # next check. A failed alert replaces its stored copy, so a triage made on
-    # this attempt is kept. last_alert_at moves only on a delivery.
+    # next check, taking them all out of `sending` (Evaluate.record_sent). A
+    # failed alert replaces its stored copy, so a triage made on this attempt
+    # is kept. last_alert_at moves only on a delivery. When this write fails,
+    # alerts still in `sending` are retried once their lease runs out.
     def record_delivery(name, delivered, failed, dropped, at)
       _, trimmed = update_state(name) do |previous|
-        state = Evaluate.normalize_state(previous, name)
-        done = (delivered + dropped).map { |a| alert_key(a) }.to_set
-        retried = failed.to_h { |a| [alert_key(a), a] }
-        kept = state.undelivered.reject { |a| done.include?(alert_key(a)) }.map { |a| retried.fetch(alert_key(a), a) }
-        known = kept.map { |a| alert_key(a) }.to_set
-        kept.concat(failed.reject { |a| known.include?(alert_key(a)) })
-        state.undelivered = kept.last(MAX_UNDELIVERED)
-        state.last_alert_at = at if delivered.any?
-        [state, [0, kept.length - MAX_UNDELIVERED].max]
+        held = Evaluate.record_sent(Evaluate.normalize_state(previous, name), delivered, failed, dropped, at)
+        [held.state, held.dropped]
       end
-      if trimmed.positive?
-        report(RuntimeError.new("#{trimmed} undelivered alert#{trimmed == 1 ? "" : "s"} for #{name} dropped: " \
-                                "only the newest #{MAX_UNDELIVERED} are kept for retry"), "alert queue for #{name}")
-      end
+      report_dropped(name, trimmed)
     rescue StandardError => e
       report(e, "recording alert delivery for #{name}")
     end

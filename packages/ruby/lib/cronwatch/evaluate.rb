@@ -74,11 +74,14 @@ module Cronwatch
                    pending_recovery: [], undelivered: [])
     end
 
-    # A stored state with every field present, or a fresh one. State written by an older version lacks the newer fields.
+    # A stored state with every field present, or a fresh one. State written
+    # by an older version lacks the newer fields. `sending` is the exception:
+    # it is there only while it holds an alert (see hold_alerts).
     def normalize_state(state, job)
       return empty_state(job) if state.nil?
 
       state = JobState.from_h(state)
+      sending = state.sending
       JobState.new(
         job: state.job.nil? ? job : state.job,
         open: (state.open || {}).dup,
@@ -88,7 +91,100 @@ module Cronwatch
         pending_recovery: (state.pending_recovery || []).dup,
         undelivered: (state.undelivered || []).dup,
         version: state.version,
+        sending: sending.is_a?(Array) && !sending.empty? ? sending.dup : nil,
       )
+    end
+
+    # ---------------------------------------------------------------- delivery
+
+    # Alerts kept per job for retry, and per job being sent; past it the oldest go.
+    MAX_UNDELIVERED = 20
+
+    # How long an alert in `sending` is left to the process sending it.
+    # Longer than any send takes: at most three alerts go out together, each
+    # with 25 seconds of triage and 15 of channels.
+    SEND_LEASE_MS = 5 * 60_000
+
+    # A state and how many alerts the queue let go to make it.
+    Held = Struct.new(:state, :dropped, keyword_init: true) do
+      def to_h = { "state" => state.to_h, "dropped" => dropped }
+    end
+
+    # Identifies an alert across retries, and in `sending`. `at` is printed
+    # as JavaScript prints a number.
+    def alert_key(alert)
+      at = alert.at
+      "#{alert.type}|#{at.is_a?(Numeric) ? JS.number(at) : at}|#{alert.run&.id}"
+    end
+
+    # `alerts` added to the undelivered queue: one with the same key as a
+    # queued alert replaces it where it stands, the rest go at the end, and
+    # only the newest MAX_UNDELIVERED stay. `dropped` counts those let go.
+    def queue_undelivered(state, alerts)
+      following = clone_state(state)
+      by_key = alerts.to_h { |alert| [alert_key(alert), alert] }
+      queue = following.undelivered.map { |alert| by_key.fetch(alert_key(alert), alert) }
+      known = queue.to_set { |alert| alert_key(alert) }
+      queue.concat(alerts.reject { |alert| known.include?(alert_key(alert)) })
+      following.undelivered = queue.last(MAX_UNDELIVERED)
+      Held.new(state: following, dropped: [0, queue.length - MAX_UNDELIVERED].max)
+    end
+
+    # The outbox. Alerts just composed are written with the state that opens
+    # their condition, before any is sent, so a process that stops part way
+    # does not lose them: into `sending`, each with its lease ending at
+    # `until_at`, when this process sends them, or (deliver: :check) straight
+    # into the undelivered queue for a check elsewhere. `dropped` counts
+    # alerts let go past MAX_UNDELIVERED.
+    def hold_alerts(state, alerts, until_at, deferred)
+      return Held.new(state: state, dropped: 0) if alerts.empty?
+      return queue_undelivered(state, alerts) if deferred
+
+      following = clone_state(state)
+      entries = (following.sending || []) + alerts.map { |alert| { "until" => until_at, "alert" => alert } }
+      following.sending = entries.last(MAX_UNDELIVERED)
+      Held.new(state: following, dropped: [0, entries.length - MAX_UNDELIVERED].max)
+    end
+
+    # Alerts in `sending` whose lease ran out by `now`: the process sending
+    # them stopped before it recorded how the send went. They go to the
+    # undelivered queue, where the retry sends them (with triage, which is
+    # never stored with them here) or drops them as stale. An entry that is
+    # not a Hash with an alert is dropped; one without a numeric `until`
+    # counts as run out.
+    def release_sending(state, now)
+      sending = state.sending.is_a?(Array) ? state.sending : []
+      lapsed, held = sending.partition { |entry| !(entry.is_a?(Hash) && entry["until"].is_a?(Numeric) && entry["until"] > now) }
+      return Held.new(state: state, dropped: 0) if lapsed.empty?
+
+      kept = state.dup
+      kept.sending = held
+      queue_undelivered(kept, lapsed.filter_map { |entry| sending_alert(entry) })
+    end
+
+    # How a send went. Delivered and stale alerts leave the queue; failed
+    # ones replace their queued copy, so a triage made on this attempt is
+    # kept, or join the queue. Every one of them leaves `sending`.
+    # last_alert_at moves only on a delivery. `dropped` counts alerts let go
+    # past MAX_UNDELIVERED.
+    def record_sent(state, delivered, failed, stale, now)
+      following = clone_state(state)
+      done = (delivered + stale).to_set { |alert| alert_key(alert) }
+      following.undelivered = following.undelivered.reject { |alert| done.include?(alert_key(alert)) }
+      sent = (delivered + failed + stale).to_set { |alert| alert_key(alert) }
+      held = (following.sending || []).reject do |entry|
+        alert = sending_alert(entry)
+        alert && sent.include?(alert_key(alert))
+      end
+      following.sending = held.empty? ? nil : held
+      following.last_alert_at = now if delivered.any?
+      queue_undelivered(following, failed)
+    end
+
+    # The alert of an entry of `sending`, or nil when it has none, or one
+    # that did not parse as an alert (which could not be sent either).
+    def sending_alert(entry)
+      entry.is_a?(Hash) && entry["alert"].is_a?(Alert) ? entry["alert"] : nil
     end
 
     def clone_state(state)
