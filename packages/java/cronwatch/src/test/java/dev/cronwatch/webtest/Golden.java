@@ -1,4 +1,4 @@
-package dev.cronwatch.web;
+package dev.cronwatch.webtest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -7,13 +7,12 @@ import dev.cronwatch.Alert;
 import dev.cronwatch.Channel;
 import dev.cronwatch.ChannelContext;
 import dev.cronwatch.Cronwatch;
-import dev.cronwatch.Fixtures;
 import dev.cronwatch.Job;
 import dev.cronwatch.JobOptions;
 import dev.cronwatch.Run;
-import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
+import dev.cronwatch.web.Request;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -43,7 +42,7 @@ public final class Golden {
   private Golden() {}
 
   /** 2026-01-05 09:30:00 UTC, a Monday: golden.json's t0. */
-  public static final long T0 = Js.dateUtc(2026, 0, 5, 9, 30, 0, 0);
+  public static final long T0 = 1_767_605_400_000L;
 
   private static final long MIN = 60_000;
   private static final long HOUR = 3_600_000;
@@ -80,9 +79,15 @@ public final class Golden {
     return out;
   }
 
+  /** The repository's root, which Surefire passes as {@code cronwatch.repo}. */
+  public static Path repo() {
+    String dir = System.getProperty("cronwatch.repo");
+    return (dir == null ? Path.of("../../..") : Path.of(dir)).toAbsolutePath().normalize();
+  }
+
   /** The captures, in order. */
   public static List<Capture> captures() {
-    Path path = Fixtures.repo().resolve("packages/ruby/test/web/golden.json");
+    Path path = repo().resolve("packages/ruby/test/web/golden.json");
     JsObject golden;
     try {
       golden = Json.parseObject(Files.readString(path, StandardCharsets.UTF_8));
@@ -270,6 +275,27 @@ public final class Golden {
       byte[] body,
       Ids ids,
       Set<String> ignored) {
+    compare(c, status, headers, body, ids, ignored, false);
+  }
+
+  /** A media type as a servlet container writes it back: no space after its {@code ;}. */
+  private static String packed(String type) {
+    return type.replace("; ", ";");
+  }
+
+  /**
+   * {@link #compare}, with {@code packedTypes} for a servlet container, which writes {@code
+   * content-type} back without the space after its {@code ;} ({@code text/html;charset=utf-8}, the
+   * same media type), as Tomcat and Jetty both do.
+   */
+  public static void compare(
+      Capture c,
+      int status,
+      List<Map.Entry<String, String>> headers,
+      byte[] body,
+      Ids ids,
+      Set<String> ignored,
+      boolean packedTypes) {
     String label = c.label();
     Map<String, String> got = new HashMap<>();
     for (Map.Entry<String, String> h : headers) {
@@ -287,6 +313,10 @@ public final class Golden {
     Map<String, String> want = new HashMap<>();
     for (Map.Entry<String, String> h : c.responseHeaders()) {
       want.put(h.getKey(), h.getValue());
+    }
+    if (packedTypes) {
+      want.computeIfPresent("content-type", (k, v) -> packed(v));
+      got.computeIfPresent("content-type", (k, v) -> packed(v));
     }
     assertEquals(want, got, label + ": headers");
     if (!text.equals(c.responseBody())) {
@@ -336,6 +366,13 @@ public final class Golden {
    */
   public static int throughServer(Seeded seeded, int port, Set<String> ignored, Set<String> refused)
       throws IOException {
+    return throughServer(seeded, port, ignored, refused, false);
+  }
+
+  /** {@link #throughServer}, with {@code packedTypes} for a servlet container (see compare). */
+  public static int throughServer(
+      Seeded seeded, int port, Set<String> ignored, Set<String> refused, boolean packedTypes)
+      throws IOException {
     Ids ids = new Ids();
     int matched = 0;
     for (Capture c : captures()) {
@@ -345,7 +382,7 @@ public final class Golden {
         assertEquals(400, a.status(), c.label() + ": refused by the server");
         continue;
       }
-      compare(c, a.status(), a.headers(), a.body(), ids, ignored);
+      compare(c, a.status(), a.headers(), a.body(), ids, ignored, packedTypes);
       matched++;
     }
     assertEquals(List.of(), seeded.errors(), "errors reported");

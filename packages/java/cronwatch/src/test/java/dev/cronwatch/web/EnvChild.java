@@ -258,10 +258,13 @@ public final class EnvChild {
    * The Spring starter's fallback: an environment from the app's profiles, when no variable says.
    */
   private static void profileFallback() {
-    try (Cronwatch cw = client()) {
-      dev.cronwatch.internal.core.WebAccess.hooks().environmentFallback(cw, "dev");
-      Routes routes = cw.routes();
-      assertTrue(routes.token() != null, "a development token from the fallback");
+    try (Cronwatch cw =
+        Cronwatch.builder().noCronSecret().noShutdownHook().environment("dev").build()) {
+      assertTrue(cw.routes().token() != null, "a development token from the fallback");
+    }
+    try (Cronwatch cw =
+        Cronwatch.builder().noCronSecret().noShutdownHook().environment("prod").build()) {
+      assertNull(cw.routes().token(), "locked in production");
     }
   }
 }

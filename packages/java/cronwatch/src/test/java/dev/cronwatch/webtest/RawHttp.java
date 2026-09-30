@@ -1,4 +1,4 @@
-package dev.cronwatch.web;
+package dev.cronwatch.webtest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -71,11 +71,16 @@ public final class RawHttp {
       }
       head.append("connection: close\r\n\r\n");
       OutputStream out = socket.getOutputStream();
-      out.write(head.toString().getBytes(StandardCharsets.ISO_8859_1));
-      if (body != null) {
-        out.write(body);
+      try {
+        out.write(head.toString().getBytes(StandardCharsets.ISO_8859_1));
+        if (body != null) {
+          out.write(body);
+        }
+        out.flush();
+      } catch (IOException e) {
+        // A server may answer (a 413) and close before it has read the whole body; its answer is
+        // still there to read.
       }
-      out.flush();
       return read(socket.getInputStream(), method.equals("HEAD"));
     }
   }

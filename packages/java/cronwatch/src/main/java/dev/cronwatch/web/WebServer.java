@@ -5,7 +5,6 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsExchange;
-import dev.cronwatch.internal.web.Text;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -76,7 +75,7 @@ public final class WebServer {
     URI uri = exchange.getRequestURI();
     String raw = uri.getRawPath() == null ? "/" : uri.getRawPath();
     String query = uri.getRawQuery();
-    String target = Text.utf8OrAsIs(query == null ? raw : raw + "?" + query);
+    String target = Adapters.target(raw, query);
     Request.Builder b =
         Request.builder(exchange.getRequestMethod(), target).tls(exchange instanceof HttpsExchange);
     String context = exchange.getHttpContext().getPath();

@@ -3,6 +3,7 @@ package dev.cronwatch.web;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.sun.net.httpserver.HttpServer;
+import dev.cronwatch.webtest.Golden;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.List;

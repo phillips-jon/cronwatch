@@ -83,8 +83,8 @@ public final class Cronwatch implements AutoCloseable {
   /** Set the first time a handler of this client refuses a request for want of a secret. */
   private final AtomicBoolean refusedNoSecret = new AtomicBoolean();
 
-  /** The environment when no variable names one: the Spring starter's, from the app's profiles. */
-  private volatile @Nullable String environmentFallback;
+  /** The environment when no variable names one: the builder's, such as the Spring starter's. */
+  private final @Nullable String environmentFallback;
 
   static {
     WebAccess.install(
@@ -97,11 +97,6 @@ public final class Cronwatch implements AutoCloseable {
           @Override
           public String environment(Cronwatch cw) {
             return Env.environment(cw.environmentFallback);
-          }
-
-          @Override
-          public void environmentFallback(Cronwatch cw, @Nullable String environment) {
-            cw.environmentFallback = environment;
           }
 
           @Override
@@ -125,8 +120,9 @@ public final class Cronwatch implements AutoCloseable {
         });
   }
 
-  private Cronwatch(Core core, boolean shutdownHook) {
+  private Cronwatch(Core core, boolean shutdownHook, @Nullable String environmentFallback) {
     this.core = core;
+    this.environmentFallback = environmentFallback;
     this.delivery = new Delivery(core);
     this.runs = new Runs(core, delivery);
     this.checks = new Checks(this, core, runs, delivery);
@@ -811,9 +807,21 @@ public final class Cronwatch implements AutoCloseable {
     private @Nullable ErrorHandler onError;
     private @Nullable LongSupplier clock;
     private boolean shutdownHook = true;
+    private @Nullable String environment;
     final Core.Timings timings = new Core.Timings();
 
     private Builder() {}
+
+    /**
+     * The environment to read when neither {@code CRONWATCH_ENV} nor {@code APP_ENV} is set, as
+     * they are read ({@code dev}, {@code local}, {@code test} and {@code testing} are development):
+     * the Spring Boot starter gives the app's active profile. In development the dashboard makes a
+     * token of its own and a job's handler runs without a secret.
+     */
+    public Builder environment(String name) {
+      this.environment = Objects.requireNonNull(name, "name");
+      return this;
+    }
 
     /**
      * Where jobs, runs and state live. The default is a {@link MemoryStore}, which forgets on
@@ -1000,7 +1008,7 @@ public final class Cronwatch implements AutoCloseable {
               handler,
               clock == null ? System::currentTimeMillis : clock,
               timings);
-      return new Cronwatch(core, shutdownHook);
+      return new Cronwatch(core, shutdownHook, environment);
     }
 
     /** Names what is set, never a secret's value. */

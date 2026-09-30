@@ -10,6 +10,7 @@ import dev.cronwatch.Cronwatch;
 import dev.cronwatch.JobSummary;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
+import dev.cronwatch.webtest.Golden;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;

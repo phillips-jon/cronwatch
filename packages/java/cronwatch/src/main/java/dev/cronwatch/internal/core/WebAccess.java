@@ -36,11 +36,8 @@ public final class WebAccess {
     /** {@code cw.silence(name, ms)} for a duration already read. */
     JobState silence(Cronwatch cw, String name, double ms);
 
-    /** The environment as the client reads it, the starter's fallback included. */
+    /** The environment as the client reads it, the builder's fallback included. */
     String environment(Cronwatch cw);
-
-    /** Sets the environment a client falls back to when no variable names one. */
-    void environmentFallback(Cronwatch cw, @Nullable String environment);
 
     /** Whether the client was built with {@code noCronSecret()}. */
     boolean secretOptOut(Cronwatch cw);
