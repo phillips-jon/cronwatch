@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.quartz.CronScheduleBuilder;
@@ -385,6 +386,68 @@ class CronwatchQuartzTest {
       await("the job ran", () -> CALLS.containsKey("after"));
       assertTrue(cw.runs("after", 5).isEmpty(), "not recorded after close");
     } finally {
+      scheduler.shutdown(true);
+    }
+  }
+
+  /** Set by the test that uses {@link Gated}: said when it starts, and what it waits for. */
+  static volatile CountDownLatch gatedStarted = new CountDownLatch(1);
+
+  static volatile CountDownLatch gatedGate = new CountDownLatch(1);
+
+  /** Runs until the test lets it go. */
+  public static final class Gated implements Job {
+    @Override
+    public void execute(JobExecutionContext ctx) throws JobExecutionException {
+      call(ctx);
+      gatedStarted.countDown();
+      try {
+        gatedGate.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new JobExecutionException(e);
+      }
+    }
+  }
+
+  /**
+   * The .NET port's case: a watch closed while a firing runs (a Spring context closing without the
+   * JVM stopping) keeps its job listener until that firing ends, so its run is closed, not left to
+   * be reported stuck.
+   */
+  @Test
+  void closingWhileAFiringRunsStillClosesItsRun() throws Exception {
+    gatedStarted = new CountDownLatch(1);
+    gatedGate = new CountDownLatch(1);
+    MemoryStore store = new MemoryStore();
+    List<String> errors = Quartzes.errors();
+    Scheduler scheduler = Quartzes.ram();
+    try (Cronwatch cw = Quartzes.client(store, errors)) {
+      CronwatchQuartz q = CronwatchQuartz.watch(cw, scheduler);
+      scheduler.start();
+      scheduler.scheduleJob(detail(Gated.class, "long", "DEFAULT", "long"), once("long"));
+      gatedStarted.await();
+      assertEquals(RunStatus.RUNNING, cw.runs("long", 5).get(0).status());
+      q.close();
+      assertEquals(
+          1,
+          scheduler.getListenerManager().getJobListeners().size(),
+          "the listener stays while the firing runs");
+      assertNull(scheduler.getContext().get(CronwatchQuartz.CONTEXT_KEY));
+      gatedGate.countDown();
+      await("the run closed", () -> cw.runs("long", 5).get(0).status().equals(RunStatus.OK));
+      await(
+          "the listener taken off",
+          () -> {
+            try {
+              return scheduler.getListenerManager().getJobListeners().isEmpty();
+            } catch (org.quartz.SchedulerException e) {
+              throw new IllegalStateException(e);
+            }
+          });
+      assertEquals(List.of(), errors);
+    } finally {
+      gatedGate.countDown();
       scheduler.shutdown(true);
     }
   }
