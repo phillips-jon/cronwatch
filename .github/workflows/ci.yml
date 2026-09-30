@@ -1231,6 +1231,8 @@ jobs:
       matrix:
         include:
           - { java: "21", newest: false }
+          # The current long-term release, for the tests alone.
+          - { java: "25", newest: false }
           - { java: "27", newest: true }
     # The databases for SqlStore's server tests, as the elixir, go and rust
     # jobs have them.
@@ -1339,7 +1341,57 @@ jobs:
               echo "$jar holds files it should not"
               exit 1
             fi
+            if ! grep -q -x 'META-INF/LICENSE' "$RUNNER_TEMP/jar.txt"; then
+              echo "$jar has no META-INF/LICENSE"
+              exit 1
+            fi
           done
+      # The sources and javadoc jars Maven Central asks for, as the release
+      # profile builds them: doclint's checks (all but "missing") with
+      # warnings as errors, and only the exported packages documented.
+      - name: The javadoc
+        if: matrix.newest
+        working-directory: packages/java
+        run: |
+          ./mvnw -B -P release -Dmaven.test.skip=true package
+          if unzip -Z1 cronwatch/target/cronwatch-*-javadoc.jar | grep -q internal; then
+            echo "the javadoc documents dev.cronwatch.internal"
+            exit 1
+          fi
+
+  # The suite on macOS and Windows, with no database and without the built
+  # SDK, so the server tests, the croner parity check and the SQLite file
+  # shared with Node skip, as they say: the JDK's zones, paths and line
+  # endings.
+  java-platforms:
+    name: java (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # The dashboard's assets and the fixtures are compared byte for byte,
+      # so Windows checks them out as committed, without CRLF.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "27"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.m2/wrapper
+          key: maven-${{ matrix.os }}-${{ hashFiles('packages/java/**/pom.xml', 'packages/java/.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: maven-${{ matrix.os }}-
+      - name: ./mvnw verify
+        working-directory: packages/java
+        run: ./mvnw -B verify
 
   # The scheduler integrations' tests (the starter's dev.cronwatch.spring, the
   # Quartz module's and the JobRunr module's) against the oldest and the newest
