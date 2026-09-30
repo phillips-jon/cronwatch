@@ -16,6 +16,9 @@ public sealed partial class CronwatchClient
     internal const long TimerMaxMs = (1L << 31) - 1;
 
     private TaskCompletionSource<CheckResult>? _checking;
+
+    /// <summary>Whether a check is in flight, for the tests.</summary>
+    internal bool Checking => Volatile.Read(ref _checking) != null;
     private long _lastPruneAt;
     private readonly Lock _intervalLock = new();
     private ITimer? _interval;

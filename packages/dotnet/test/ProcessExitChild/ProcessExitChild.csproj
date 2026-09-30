@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Not packed: a program the process-exit test runs as a child, which
+       opens a run on a SQLite file and exits the process while the run's
+       function is still going. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CA2007;CA1849;CA2000</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Cronwatch/Cronwatch.csproj" />
+  </ItemGroup>
+</Project>
