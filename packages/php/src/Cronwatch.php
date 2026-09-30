@@ -46,7 +46,7 @@ final class Cronwatch
     public const TRIAGE_TIMEOUT_MS = 25_000;
     public const PRUNE_INTERVAL_MS = 60 * 60_000;
     /** Undelivered alerts kept per job for retry; the oldest go first. */
-    public const MAX_UNDELIVERED = 20;
+    public const MAX_UNDELIVERED = Evaluate::MAX_UNDELIVERED;
     /** Wall-clock time one check spends retrying undelivered alerts, across every job. */
     public const RETRY_BUDGET_MS = 20_000;
     /** Reads and writes of one job's state before an update gives up on a store that keeps changing under it. */
@@ -1272,7 +1272,8 @@ final class Cronwatch
 
     /**
      * Evaluate a finished run (ok, failed, or timed out by a check), already
-     * written, against the job's state and send what that produces. Never throws.
+     * written, against the job's state and send what that produces. The
+     * alerts are written with that state (see outbox()). Never throws.
      *
      * @return list<Alert>
      */
@@ -1280,17 +1281,46 @@ final class Cronwatch
     {
         $history = null;
         try {
-            [, $drafts] = $this->updateState($run->job, function (JobState $previous) use ($definition, $run, $at, $startPending, &$history): array {
+            [, $held] = $this->updateState($run->job, function (JobState $previous) use ($definition, $run, $at, $startPending, &$history): array {
                 $history ??= $this->history($run);
                 $started = $startPending ? Evaluate::onRunStart($previous) : $previous;
                 $settled = Evaluate::applySilence($previous, Evaluate::onRunFinish($definition, $run, $started, $history, $at), $at);
-                return [$settled->state, $settled->alerts];
+                return $this->outbox($settled, $definition, $at);
             });
         } catch (\Throwable $error) {
             $this->report($error, "evaluating {$run->job}");
             return [];
         }
-        return $this->dispatch($drafts, $definition, $at);
+        $this->reportDropped($run->job, $held['dropped']);
+        return $this->dispatch($run->job, $held['alerts'], $at);
+    }
+
+    /**
+     * An evaluation as it is written: its drafts composed into alerts and
+     * held in the same state (Evaluate::holdAlerts), so the write that opens
+     * a condition also keeps its alerts, and a process that stops before
+     * sending them does not lose them. Called inside updateState(), so it
+     * only computes.
+     *
+     * @return array{JobState, array{alerts: list<Alert>, dropped: int}}
+     */
+    private function outbox(Evaluation $settled, JobDefinition $definition, int|float $at): array
+    {
+        $alerts = array_map(fn (AlertDraft $draft) => Format::composeAlert($draft, $definition, $at), $settled->alerts);
+        $held = Evaluate::holdAlerts($settled->state, $alerts, $this->now() + Evaluate::SEND_LEASE_MS, $this->deferDelivery);
+        return [$held['state'], ['alerts' => $alerts, 'dropped' => $held['dropped']]];
+    }
+
+    /** Reports alerts let go because a job's queue was full. */
+    private function reportDropped(string $name, int $dropped): void
+    {
+        if ($dropped <= 0) {
+            return;
+        }
+        $this->report(
+            new \RuntimeException("{$dropped} undelivered alert" . ($dropped === 1 ? '' : 's') . " for {$name} dropped: only the newest " . self::MAX_UNDELIVERED . ' are kept for retry'),
+            "alert queue for {$name}",
+        );
     }
 
     /**
@@ -1365,14 +1395,18 @@ final class Cronwatch
             try {
                 $recent = $this->store->listRuns($stored->name, Evaluate::BASELINE_WINDOW);
                 $nextExpectedAt = null;
-                [$state, $drafts] = $this->updateState($stored->name, function (JobState $previous) use ($stored, $recent, $at, &$nextExpectedAt): array {
+                [$state, $held] = $this->updateState($stored->name, function (JobState $previous) use ($stored, $recent, $at, &$nextExpectedAt): array {
                     $evaluation = Evaluate::onCheck($stored->definition, $stored, $recent[0] ?? null, $previous, $at);
                     $nextExpectedAt = $evaluation->nextExpectedAt;
                     $settled = Evaluate::applySilence($previous, $evaluation, $at);
-                    return [$settled->state, $settled->alerts];
+                    // Alerts a process stopped sending part way go back to the retry queue.
+                    $released = Evaluate::releaseSending($settled->state, $this->now());
+                    [$next, $out] = $this->outbox(new Evaluation($released['state'], $settled->alerts), $stored->definition, $at);
+                    return [$next, ['alerts' => $out['alerts'], 'dropped' => $released['dropped'] + $out['dropped']]];
                 });
+                $this->reportDropped($stored->name, $held['dropped']);
                 array_push($alerts, ...$this->retryUndelivered($stored->name, $state, $at, $spent));
-                array_push($alerts, ...$this->dispatch($drafts, $stored->definition, $at));
+                array_push($alerts, ...$this->dispatch($stored->name, $held['alerts'], $at));
                 $jobs[] = Evaluate::summarize($stored, $recent, $state, $nextExpectedAt, $at);
             } catch (\Throwable $error) {
                 $this->report($error, "checking {$stored->name}");
@@ -1424,52 +1458,48 @@ final class Cronwatch
     }
 
     /**
-     * Compose, triage and send each draft. The state was saved before this
-     * (updateState), so only the delivery fields are written back afterwards,
-     * onto a fresh read of the state.
+     * Triage and send each alert the outbox holds (see outbox()). The state,
+     * with the alerts in it, was saved before this, so afterwards only the
+     * delivery fields are written back, onto a fresh read of the state, and
+     * the alerts leave `sending`. Triage is made here, never stored with the
+     * held alert: the write that opens a condition cannot wait for it, and a
+     * retry triages an alert that has none. With deliver: "check" the alerts
+     * were queued for a check elsewhere instead.
      *
-     * @param list<AlertDraft> $drafts
+     * @param list<Alert> $alerts
      * @return list<Alert>
      */
-    private function dispatch(array $drafts, JobDefinition $definition, int|float $at): array
+    private function dispatch(string $name, array $alerts, int|float $at): array
     {
-        if ($drafts === []) {
-            return [];
+        if ($alerts === [] || $this->deferDelivery) {
+            return $alerts;
         }
-        if (!$this->deferDelivery) {
-            self::holdOn();
-        }
-        $composed = [];
+        self::holdOn();
         $delivered = [];
         $failed = [];
-        foreach ($drafts as $draft) {
-            $alert = Format::composeAlert($draft, $definition, $at);
-            if ($this->deferDelivery) {
-                $failed[] = $alert;
-            } else {
-                if ($this->triage !== null && $alert->type !== AlertType::RECOVERED) {
-                    $this->addTriage($alert, self::TRIAGE_TIMEOUT_MS);
-                }
-                if ($this->deliver($alert)) {
-                    $delivered[] = $alert;
-                } else {
-                    $failed[] = $alert;
-                }
+        foreach ($alerts as $alert) {
+            if ($this->triage !== null && $alert->type !== AlertType::RECOVERED) {
+                $this->addTriage($alert, self::TRIAGE_TIMEOUT_MS);
             }
-            $composed[] = $alert;
+            if ($this->deliver($alert)) {
+                $delivered[] = $alert;
+            } else {
+                $failed[] = $alert;
+            }
         }
-        $this->recordDelivery((string) $definition->get('name'), $delivered, $failed, [], $at);
-        return $composed;
+        $this->recordDelivery($name, $delivered, $failed, [], $at);
+        return $alerts;
     }
 
     /**
      * Alerts are about to go out, one channel after another (triage up to 25
      * seconds, each channel up to 10), perhaps from a web request (a handler,
-     * the dashboard's check, WordPress's wp-cron.php). The condition is saved
-     * open already, so a request cut short now (max_execution_time, the
-     * caller hanging up) would lose the alert for good. Outside the command
-     * line the request is kept going: a caller that hangs up no longer stops
-     * it, and a time limit is moved on to leave two minutes for delivery.
+     * the dashboard's check, WordPress's wp-cron.php). They are saved in the
+     * state already, so a request cut short now (max_execution_time, the
+     * caller hanging up) leaves them to a check once their lease runs out,
+     * five minutes on. Outside the command line the request is kept going, so
+     * they go out now: a caller that hangs up no longer stops it, and a time
+     * limit is moved on to leave two minutes for delivery.
      */
     private static function holdOn(): void
     {
@@ -1526,16 +1556,13 @@ final class Cronwatch
         return $delivered;
     }
 
-    /** Identifies an alert across retries. */
-    private static function alertKey(Alert $alert): string
-    {
-        return $alert->type . '|' . Js::number($alert->at) . '|' . ($alert->run?->id ?? '');
-    }
-
     /**
      * Mark delivered alerts done, drop stale ones, and keep failed ones for
-     * the next check. A failed alert replaces its stored copy, so a triage
-     * made on this attempt is kept. lastAlertAt moves only on a delivery.
+     * the next check, taking them all out of `sending`
+     * (Evaluate::recordSent). A failed alert replaces its stored copy, so a
+     * triage made on this attempt is kept. lastAlertAt moves only on a
+     * delivery. When this write fails, alerts still in `sending` are retried
+     * once their lease runs out.
      *
      * @param list<Alert> $delivered
      * @param list<Alert> $failed
@@ -1545,43 +1572,10 @@ final class Cronwatch
     {
         try {
             [, $trimmed] = $this->updateState($name, function (JobState $previous) use ($name, $delivered, $failed, $dropped, $at): array {
-                $state = Evaluate::normalizeState($previous, $name);
-                $done = [];
-                foreach ([...$delivered, ...$dropped] as $alert) {
-                    $done[self::alertKey($alert)] = true;
-                }
-                $retried = [];
-                foreach ($failed as $alert) {
-                    $retried[self::alertKey($alert)] = $alert;
-                }
-                $kept = [];
-                foreach ($state->undelivered ?? [] as $alert) {
-                    $key = self::alertKey($alert);
-                    if (!isset($done[$key])) {
-                        $kept[] = $retried[$key] ?? $alert;
-                    }
-                }
-                $known = [];
-                foreach ($kept as $alert) {
-                    $known[self::alertKey($alert)] = true;
-                }
-                foreach ($failed as $alert) {
-                    if (!isset($known[self::alertKey($alert)])) {
-                        $kept[] = $alert;
-                    }
-                }
-                $state->undelivered = array_slice($kept, -self::MAX_UNDELIVERED);
-                if ($delivered !== []) {
-                    $state->lastAlertAt = $at;
-                }
-                return [$state, max(0, count($kept) - self::MAX_UNDELIVERED)];
+                $sent = Evaluate::recordSent(Evaluate::normalizeState($previous, $name), $delivered, $failed, $dropped, $at);
+                return [$sent['state'], $sent['dropped']];
             });
-            if ($trimmed > 0) {
-                $this->report(
-                    new \RuntimeException("{$trimmed} undelivered alert" . ($trimmed === 1 ? '' : 's') . " for {$name} dropped: only the newest " . self::MAX_UNDELIVERED . ' are kept for retry'),
-                    "alert queue for {$name}",
-                );
-            }
+            $this->reportDropped($name, $trimmed);
         } catch (\Throwable $error) {
             $this->report($error, "recording alert delivery for {$name}");
         }

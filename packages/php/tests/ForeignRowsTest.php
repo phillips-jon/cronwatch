@@ -83,6 +83,56 @@ final class ForeignRowsTest extends TestCase
         }
     }
 
+    /**
+     * A state whose times, conditions and queued alerts hold values of the
+     * wrong kind: each reads as absent, so the job is still checked, its
+     * failures still alert, and silence and unsilence still work.
+     */
+    #[DataProvider('stores')]
+    public function testAStateWithOddValuesIsStillEvaluatedAndCanBeSilenced(string $kind): void
+    {
+        $why = Backend::unavailable($kind);
+        if ($why !== null) {
+            $this->markTestSkipped($why);
+        }
+        $backend = Backend::make($kind);
+        try {
+            $store = $backend->open();
+            $store->init();
+            $store->upsertJob(JobDefinition::fromJson(['name' => 'odd']), 1);
+            $p = $backend->tables();
+            $alert = '{"type":"failed","job":"odd","definition":{"name":"odd"},"run":"r","title":7,"message":null,"at":"x","triage":5,"details":{}}';
+            $state = '{"job":"odd","open":{},"consecutiveFailures":0,"silencedUntil":"soon","lastAlertAt":"x","pendingRecovery":[1,"failed",null],"undelivered":["x",' . $alert . ']}';
+            $backend->pdo()->exec("INSERT INTO {$p}state (job, state) VALUES ('odd', '{$state}')");
+            $sent = [];
+            $capture = new Custom('capture', function (Alert $alert) use (&$sent): void {
+                $sent[] = $alert->type;
+            });
+            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: false, onError: function (\Throwable $e): void {
+                throw $e;
+            });
+            $read = $store->getState('odd');
+            $this->assertNull($read->silencedUntil);
+            $this->assertNull($read->lastAlertAt);
+            $this->assertSame(['failed'], $read->pendingRecovery);
+            $this->assertCount(1, $read->undelivered);
+            $this->assertSame([0, null, true], [$read->undelivered[0]->at, $read->undelivered[0]->triage, $read->undelivered[0]->triageTried]);
+            $cw->check();
+            $this->assertSame('never_ran', $cw->jobSummary('odd')->health);
+            $this->assertNotNull($cw->silence('odd', '1h')->silencedUntil);
+            $this->assertNull($cw->unsilence('odd')->silencedUntil);
+            try {
+                $cw->run('odd', function (): never {
+                    throw new \RuntimeException('boom');
+                });
+            } catch (\RuntimeException) {
+            }
+            $this->assertContains('failed', $sent);
+        } finally {
+            $backend->done();
+        }
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function farCronStarts(): iterable
     {

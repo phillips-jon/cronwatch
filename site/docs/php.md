@@ -240,7 +240,7 @@ $alerts = [
 ];
 ```
 
-Every alert goes to every channel, one after another. A channel that throws goes to `onError` as `alert channel <name>` and never stops the others; each request has a ten second deadline, so a hung webhook holds a check for at most that long.
+Every alert goes to every channel, one after another. A channel that throws goes to `onError` as `alert channel <name>` and never stops the others; each request has a ten second deadline, so a hung webhook holds a check for at most that long. An alert is stored with the state that opens its condition before it is sent, so one whose process ends mid-send (a time limit, a deploy, a kill) is sent by a check after five minutes: once, or twice if a channel took it just before the process ended.
 
 A channel implements `Cronwatch\Alerts\AlertChannel` (`name()` and `send(Alert $alert, ChannelContext $context)`, which throws when the alert went nowhere), or is any callable, which is named `custom`. A callable that takes two arguments gets the `ChannelContext` too, whose `onError()` reports a problem that did not stop the alert (one of several recipients refusing it, say).
 
