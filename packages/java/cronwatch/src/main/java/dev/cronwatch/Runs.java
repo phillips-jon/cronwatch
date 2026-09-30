@@ -50,16 +50,18 @@ final class Runs {
     final JobDef def;
     final Run run;
     final Recorder recorder;
-    final boolean recorded;
+
+    /** The write of the run's row, true once it is there; the hook waits for it. */
+    final Future<Boolean> begun;
 
     /** The recording once the function has returned, which the hook waits for rather than fail. */
     volatile @Nullable Future<Run> recording;
 
-    OpenRun(JobDef def, Run run, Recorder recorder, boolean recorded) {
+    OpenRun(JobDef def, Run run, Recorder recorder, Future<Boolean> begun) {
       this.def = def;
       this.run = run;
       this.recorder = recorder;
-      this.recorded = recorded;
+      this.begun = begun;
     }
   }
 
@@ -217,8 +219,20 @@ final class Runs {
     Run run =
         Run.running(
             id == null ? UUID.randomUUID().toString() : id, def.name(), startedAt, options.trigger);
-    // The start is written on the client's thread: an interrupt of the caller cannot cut it.
-    boolean recorded = Core.awaitUninterruptibly(core.submit(() -> beginRun(def, run)));
+    // The start is written on the client's thread: an interrupt of the caller cannot cut it. The
+    // shutdown hook is told of the run before its row is written, so a JVM that stops once the row
+    // is there always finds it: the hook waits for the write and records the run failed.
+    Recorder recorder = new Recorder();
+    Future<Boolean> begun = core.submit(() -> beginRun(def, run));
+    OpenRun open = new OpenRun(def, run, recorder, begun);
+    core.open.put(run.id(), open);
+    boolean recorded;
+    try {
+      recorded = Core.awaitUninterruptibly(begun);
+    } catch (RuntimeException | Error e) {
+      core.open.remove(run.id(), open);
+      throw e;
+    }
     // Closing missed and stuck happens beside the job, which never waits on it. A run that may be
     // given back closes them only once it is known not to be: one taken back must leave the state
     // as it was, or a job overdue would have missed closed by each attempt given back and opened
@@ -226,7 +240,6 @@ final class Runs {
     Future<?> closing =
         recorded && !options.mayTakeBack ? core.submit(() -> closeOnStart(def.name())) : null;
 
-    Recorder recorder = new Recorder();
     JobContext context =
         new JobContext(
             def.name(),
@@ -258,9 +271,7 @@ final class Runs {
       // The client was closed: the run is still recorded, with no timeout of its own.
       o.timer = null;
     }
-    OpenRun open = new OpenRun(def, run, recorder, recorded);
     o.open = open;
-    core.open.put(run.id(), open);
     o.previous = CurrentRun.set(context);
     o.saved = Mdc.put(def.name(), run.id());
     return o;
@@ -801,7 +812,8 @@ final class Runs {
    * The shutdown hook's work: each run whose function is still running in this process is recorded
    * failed ({@link #SHUTDOWN_ERROR}), written only over a row still running so a function that
    * finishes on its own meanwhile wins, and judged; a run whose function has returned has its
-   * recording waited for. All at once, within the shutdown budget.
+   * recording waited for, and one whose row is still being written has that write waited for first.
+   * All at once, within the shutdown budget, the hook's thread waiting on each.
    */
   void shutdown() {
     long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(core.timings.shutdownMs);
@@ -810,9 +822,6 @@ final class Runs {
       Future<Run> recording = o.recording;
       if (recording != null) {
         work.add(recording);
-        continue;
-      }
-      if (!o.recorded) {
         continue;
       }
       work.add(core.submit(() -> failOpen(o)));
@@ -832,6 +841,10 @@ final class Runs {
   }
 
   private @Nullable Void failOpen(OpenRun o) {
+    // A run opening as the JVM stops: its row is waited for, and one never written is left alone.
+    if (!Core.awaitUninterruptibly(o.begun)) {
+      return null;
+    }
     // The hook and a close() during the shutdown may both get here: one records the run.
     if (!core.open.remove(o.run.id(), o)) {
       return null;
