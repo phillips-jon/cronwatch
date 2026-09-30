@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- Listed in the Craft Plugin Store.
 - The plugin has its own icon, in Settings, Plugins and in the Control Panel's navigation.
 
 ### Changed
@@ -10,6 +11,7 @@
 - The plugin's documentation link goes to the Craft CMS page of the docs, not the docs' front page.
 
 ### Fixed
+- From the library: an alert is saved in the same write that records the failure, so a process killed before the alert went out no longer loses it; output is redacted before it is shortened; webhook URLs and keys are kept out of the stack traces of failed alert sends.
 - A watched command run by another that catches its exception is recorded as failed, and its caller finishes, instead of both being left running and later reported stuck.
 - `POST /cronwatch/api/check` declares the jobs only once the token is checked, so a caller without it gets 401, not the site's error page when the store is down.
 - An alert sent from a web request no longer takes its link's host from the request's `Host` header where `@web` is not configured; it uses the primary site's URL, or goes without a link.

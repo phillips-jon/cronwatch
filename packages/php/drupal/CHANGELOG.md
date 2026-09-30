@@ -11,6 +11,7 @@ All notable changes to the CronWatch module for Drupal, newest first. Each relea
 - `$settings['cronwatch_base_url']`, the site's address for the links in alerts.
 
 ### Fixed
+- From the library: an alert is saved in the same write that records the failure, so a process killed before the alert went out no longer loses it; output is redacted before it is shortened; webhook URLs and keys are kept out of the stack traces of failed alert sends.
 - A `description` given in a queue worker's `#[Cronwatch\Watch]` is now shown, instead of being replaced by the module's default ("Items of the ... queue").
 - One job with options the library refuses (from `hook_cronwatch_job_options_alter()`, a worker's `#[Cronwatch\Watch]` or an imported schedule) no longer stops every check: it is reported and declared with fewer options, and its runs are still recorded.
 - A module with two `hook_cron` methods (Drupal 11.1 and newer) is one run per cron run, failed if either threw, instead of a failure and a recovery each time.
