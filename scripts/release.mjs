@@ -22,6 +22,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { addMarkdownChangelog, addReadmeChangelog, today } from "./changelogs.mjs";
 
 /** Every place the release version lives. Each pattern captures (before)(version)(after). */
 const VERSIONED = [
@@ -78,25 +79,14 @@ const VERSIONED = [
 ];
 
 /**
- * The WordPress plugin's readme keeps a changelog, one "= X.Y.Z =" section
- * per release, newest first; the plugin directory shows it, so a released
- * section is history and is never rewritten. A release adds its own section:
- * a "= Unreleased =" section written ahead (the notes the release carries)
- * becomes "= X.Y.Z =", and without one a section saying the plugin carries
- * the library's release goes on top, with a reminder to write better notes.
+ * The changelogs a release writes its section into (scripts/changelogs.mjs):
+ * the WordPress plugin's readme, whose "= Unreleased =" becomes "= X.Y.Z =",
+ * and the Craft plugin's and Drupal module's CHANGELOG.md, whose
+ * "## Unreleased" becomes "## X.Y.Z - <today>". A file with no notes written
+ * ahead gets a placeholder section, with a reminder to write better notes.
  */
-const CHANGELOG = "packages/php/wordpress/readme.txt";
-
-/** The readme with the new version's changelog section: see CHANGELOG. Returns [text, what changed, whether notes were written ahead]. */
-function addChangelog(text, next) {
-  const heading = (v) => new RegExp(`^= ${v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} =$`, "m");
-  if (heading(next).test(text)) return [text, `= ${next} = is already there`, true];
-  if (/^= Unreleased =$/m.test(text)) return [text.replace(/^= Unreleased =$/m, `= ${next} =`), `= Unreleased = -> = ${next} =`, true];
-  const at = text.search(/^= \d+\.\d+\.\d+[^=]* =$/m);
-  if (at < 0 || !/^== Changelog ==$/m.test(text.slice(0, at))) fail(`${CHANGELOG}: no "= X.Y.Z =" section under "== Changelog ==" to add ${next} above`);
-  const entry = `= ${next} =\n\n* Carries version ${next} of the CronWatch library.\n\n`;
-  return [text.slice(0, at) + entry + text.slice(at), `+ = ${next} = (a placeholder entry: write the plugin's notes)`, false];
-}
+const README_CHANGELOG = "packages/php/wordpress/readme.txt";
+const MARKDOWN_CHANGELOGS = ["packages/php/craft/CHANGELOG.md", "packages/php/drupal/CHANGELOG.md"];
 
 /** How each package ships, printed after the release commit, in order. Given the semver and the RubyGems version. */
 const PUBLISH = [
@@ -293,7 +283,7 @@ function planEdits(current, next) {
 
 /** Tracked files, outside the table and the regenerated ones, that still mention the old version. */
 function strays(current) {
-  const skip = new Set([...VERSIONED.map((row) => row.file), "package-lock.json", "scripts/release.mjs"]);
+  const skip = new Set([...VERSIONED.map((row) => row.file), ...MARKDOWN_CHANGELOGS, "package-lock.json", "scripts/release.mjs"]);
   let out = "";
   try {
     out = git("grep", "-n", "-F", current, "--", ".", ":!conformance/", ":!package-lock.json");
@@ -367,12 +357,25 @@ if (git("tag", "--list", tag) !== "") fail(`tag ${tag} already exists`);
 
 const edits = planEdits(current, next);
 {
-  const readme = edits.get(CHANGELOG);
-  if (!readme) fail(`${CHANGELOG} is not in VERSIONED`);
-  const [after, change, written] = addChangelog(readme.after, next);
-  readme.after = after;
-  readme.lines.push([`Changelog`, change]);
-  if (!written) console.log(`Note: ${CHANGELOG} has no "= Unreleased =" section, so the release adds a placeholder changelog entry; edit it before tagging, or write the notes under "= Unreleased =" next time.\n`);
+  const readme = edits.get(README_CHANGELOG);
+  if (!readme) fail(`${README_CHANGELOG} is not in VERSIONED`);
+  const date = today();
+  const changes = [[README_CHANGELOG, readme, (text) => addReadmeChangelog(text, next, README_CHANGELOG), '"= Unreleased ="']];
+  for (const file of MARKDOWN_CHANGELOGS) {
+    if (!edits.has(file)) { const text = read(file); edits.set(file, { before: text, after: text, lines: [] }); }
+    changes.push([file, edits.get(file), (text) => addMarkdownChangelog(text, next, date, file), '"## Unreleased"']);
+  }
+  for (const [file, edit, add, heading] of changes) {
+    let result;
+    try {
+      result = add(edit.after);
+    } catch (error) {
+      fail(error.message);
+    }
+    edit.after = result.text;
+    edit.lines.push([`Changelog`, result.change]);
+    if (!result.written) console.log(`Note: ${file} has no ${heading} section, so the release adds a placeholder changelog entry; edit it before tagging, or write the notes under ${heading} next time.\n`);
+  }
 }
 const ruby = options.skipRuby ? null : findRuby();
 const uv = !options.skipPython && hasUv();

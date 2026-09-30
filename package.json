@@ -14,8 +14,9 @@
   "scripts": {
     "check:dashes": "node scripts/check-dashes.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run check:dashes && npm test --workspaces --if-present && npm run test:contact",
+    "test": "npm run check:dashes && npm test --workspaces --if-present && npm run test:contact && npm run test:scripts",
     "test:contact": "node --test deploy/contact/server.test.mjs",
+    "test:scripts": "node --test scripts/changelogs.test.mjs",
     "build": "npm run check:dashes && npm run build --workspaces --if-present",
     "build:site": "npm run build --workspace site",
     "dev:site": "npm run dev --workspace site",
