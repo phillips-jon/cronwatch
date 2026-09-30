@@ -471,9 +471,9 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         return output;
     }
 
-    /// <summary>Every job's summary with its newest runs (at most 500).</summary>
+    /// <summary>Every job's summary with its newest runs (20 by default, at most 500).</summary>
     /// <exception cref="CronwatchException">When the store fails.</exception>
-    public Task<IReadOnlyList<JobWithRuns>> JobsWithRunsAsync(int limit, CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<JobWithRuns>> JobsWithRunsAsync(int limit = 20, CancellationToken cancellationToken = default) =>
         Spawn(() => JobsWithRunsNowAsync(limit)).WaitAsync(cancellationToken);
 
     /// <summary>A job's summary, or null when the store does not know it.</summary>
@@ -481,9 +481,9 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     public Task<JobSummary?> JobSummaryAsync(string name, CancellationToken cancellationToken = default) =>
         Spawn(() => JobSummaryNowAsync(name)).WaitAsync(cancellationToken);
 
-    /// <summary>A job's newest runs, from 1 to 500 of them.</summary>
+    /// <summary>A job's newest runs, from 1 to 500 of them (50 by default).</summary>
     /// <exception cref="CronwatchException">When the store fails.</exception>
-    public Task<IReadOnlyList<Run>> RunsAsync(string name, int limit = 20, CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<Run>> RunsAsync(string name, int limit = 50, CancellationToken cancellationToken = default) =>
         Spawn(async () =>
         {
             await EnsureReadyAsync().ConfigureAwait(false);

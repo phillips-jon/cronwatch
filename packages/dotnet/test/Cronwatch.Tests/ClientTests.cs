@@ -363,4 +363,19 @@ public class ClientTests
         Assert.Single(r.Alerts);
         Assert.Empty((await cw.Store.GetStateAsync("q"))!.Undelivered!);
     }
+
+    [Fact]
+    public async Task The_reads_take_the_sdks_default_limits()
+    {
+        // client.ts: runs(name, limit = 50) and jobsWithRuns(limit = 20).
+        await using var m = Make();
+        var job = m.Cw.Job("many", new JobOptions { Schedule = "@hourly" });
+        for (int i = 0; i < 60; i++)
+        {
+            await job.RunAsync((_, _) => Task.CompletedTask);
+            m.Clock.Advance(1_000);
+        }
+        Assert.Equal(50, (await m.Cw.RunsAsync("many")).Count);
+        Assert.Equal(20, Assert.Single(await m.Cw.JobsWithRunsAsync()).Runs.Count);
+    }
 }
