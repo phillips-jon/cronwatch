@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  dev.cronwatch:cronwatch-servlet, the dashboard and a job's handler as a
-  Jakarta Servlet Filter and Servlet, for Servlet 6.0 or newer (Tomcat 10.1,
-  Jetty 12, Undertow 2.3, any Jakarta EE 10 or 11 server). The servlet API
-  is provided, as the container brings it; Jetty is the tests' alone.
+  Not published: the dashboard's golden replay (the seed of
+  packages/ruby/test/web/golden.mjs, the captures and their comparison) and
+  a raw HTTP/1.1 client, which the core's replay and every adapter's tests
+  share, with the replay through the JDK's own server as its own tests.
+  A module of its own rather than the core's tests jar, so a build that
+  skips the tests, and a release, never need it.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -16,22 +18,25 @@
     <version>${revision}</version>
   </parent>
 
-  <artifactId>cronwatch-servlet</artifactId>
+  <artifactId>cronwatch-webtest</artifactId>
   <packaging>jar</packaging>
 
-  <name>CronWatch for servlet containers</name>
-  <description>The CronWatch dashboard and a job's HTTP handler as a Jakarta Servlet filter and servlet, for Tomcat, Jetty, Undertow and any Jakarta EE 10 or 11 server.</description>
+  <name>CronWatch web tests (not published)</name>
+  <description>The dashboard's golden replay, shared by the adapters' tests.</description>
+
+  <properties>
+    <maven.deploy.skip>true</maven.deploy.skip>
+  </properties>
 
   <dependencies>
     <dependency>
       <groupId>dev.cronwatch</groupId>
       <artifactId>cronwatch</artifactId>
-      <version>${revision}</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>jakarta.servlet</groupId>
-      <artifactId>jakarta.servlet-api</artifactId>
-      <scope>provided</scope>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.jspecify</groupId>
@@ -40,12 +45,6 @@
     </dependency>
 
     <dependency>
-      <groupId>dev.cronwatch</groupId>
-      <artifactId>cronwatch-webtest</artifactId>
-      <version>${revision}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
@@ -53,11 +52,6 @@
     <dependency>
       <groupId>org.junit.platform</groupId>
       <artifactId>junit-platform-launcher</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty.ee10</groupId>
-      <artifactId>jetty-ee10-servlet</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

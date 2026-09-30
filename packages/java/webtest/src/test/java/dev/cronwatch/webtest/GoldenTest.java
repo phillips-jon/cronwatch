@@ -1,9 +1,12 @@
-package dev.cronwatch.web;
+package dev.cronwatch.webtest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.sun.net.httpserver.HttpServer;
-import dev.cronwatch.webtest.Golden;
+import dev.cronwatch.web.Response;
+import dev.cronwatch.web.Routes;
+import dev.cronwatch.web.RoutesOptions;
+import dev.cronwatch.web.WebServer;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -19,7 +22,7 @@ import org.junit.jupiter.api.Test;
  * captures whose target is not a URI itself). The servlet filter and the Spring Boot starter replay
  * it through their own servers.
  */
-class RoutesGoldenTest {
+class GoldenTest {
   @Test
   void theRoutesMatchTheSdkStraightIntoHandle() {
     Golden.Seeded seeded = Golden.seed();

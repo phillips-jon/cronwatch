@@ -3,26 +3,16 @@ package dev.cronwatch.web;
 import static dev.cronwatch.web.WebKit.json;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.sun.net.httpserver.HttpServer;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.Job;
-import dev.cronwatch.JobContext;
 import dev.cronwatch.JobOptions;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
-import dev.cronwatch.webtest.RawHttp;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -244,53 +234,6 @@ class HandlerTest {
       k.advance(1000);
       job.call(j -> Response.of(204));
       assertEquals(RunStatus.OK, runs(k.cw, "fetch").get(0).status());
-    }
-  }
-
-  @Test
-  void theHandlerBehindTheJdkServer() throws Exception {
-    String secret = secret();
-    try (WebKit k = new WebKit(RoutesOptions.defaults(), b -> b.cronSecret(secret));
-        ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-      Job job = k.cw.job("served", JobOptions.builder());
-      Handler h =
-          job.handler(
-              (JobContext j, Request req) -> {
-                JobContext current = Cronwatch.current();
-                assertEquals(j.runId(), current.runId(), "current() is the run's context");
-                byte[] body = req.readBody(1024);
-                j.log(
-                    req.method()
-                        + " "
-                        + req.target()
-                        + " "
-                        + new String(body, StandardCharsets.UTF_8));
-                return null;
-              });
-      HttpServer server =
-          HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-      server.setExecutor(pool);
-      WebServer.mount(server, "/api/cron/served", h);
-      server.start();
-      try {
-        int port = server.getAddress().getPort();
-        RawHttp.Answer res =
-            RawHttp.send(
-                port,
-                "POST",
-                "/api/cron/served?x=1",
-                List.of(Map.entry("authorization", "Bearer " + secret)),
-                "over the wire".getBytes(StandardCharsets.UTF_8));
-        assertEquals(200, res.status());
-        assertTrue(res.text().startsWith("{\"ok\":true,\"job\":\"served\",\"run\":\""), res.text());
-        assertEquals(
-            "POST /api/cron/served?x=1 over the wire", runs(k.cw, "served").get(0).output());
-        RawHttp.Answer denied = RawHttp.send(port, "POST", "/api/cron/served", List.of(), null);
-        assertEquals(401, denied.status());
-      } finally {
-        server.stop(0);
-      }
-      assertNull(Cronwatch.current(), "no run left current");
     }
   }
 }

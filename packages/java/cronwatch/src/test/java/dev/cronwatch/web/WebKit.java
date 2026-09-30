@@ -10,7 +10,6 @@ import dev.cronwatch.Cronwatch;
 import dev.cronwatch.JobSummary;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
-import dev.cronwatch.webtest.Golden;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -28,7 +27,9 @@ import org.jspecify.annotations.Nullable;
  * a full URL as a server would hand it over.
  */
 final class WebKit implements AutoCloseable {
-  static final long T0 = Golden.T0;
+  /** 2026-01-05 09:30:00 UTC, golden.json's t0. */
+  static final long T0 = 1_767_605_400_000L;
+
   static final long MIN = 60_000;
   static final long HOUR = 3_600_000;
 

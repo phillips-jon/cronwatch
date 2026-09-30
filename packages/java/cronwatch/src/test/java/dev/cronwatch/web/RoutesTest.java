@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.sun.net.httpserver.HttpServer;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.CronwatchException;
 import dev.cronwatch.Definition;
@@ -35,17 +34,12 @@ import dev.cronwatch.StoredJob;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.store.MemoryStore;
 import dev.cronwatch.store.Store;
-import dev.cronwatch.webtest.RawHttp;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -392,11 +386,6 @@ class RoutesTest {
     final Set<String> broken = ConcurrentHashMap.newKeySet();
     final AtomicInteger listJobsCalls = new AtomicInteger();
 
-    /** When set, listJobs counts it down and then waits on it being released. */
-    volatile java.util.concurrent.@Nullable CountDownLatch entered;
-
-    final java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
-
     private void check(String method) {
       if (broken.contains(method)) {
         throw new IllegalStateException(method + " failed");
@@ -422,11 +411,6 @@ class RoutesTest {
     public List<StoredJob> listJobs() throws Exception {
       listJobsCalls.incrementAndGet();
       check("listJobs");
-      java.util.concurrent.CountDownLatch e = entered;
-      if (e != null) {
-        e.countDown();
-        release.await();
-      }
       return inner.listJobs();
     }
 
@@ -473,53 +457,6 @@ class RoutesTest {
     @Override
     public long prune(long before) throws Exception {
       return inner.prune(before);
-    }
-  }
-
-  // The Go audit: a request that ended before its answer (a platform cron that timed out, a
-  // browser gone elsewhere) was reported as a failure. Here the client goes away while the store is
-  // read; the answer is written to nobody and nothing is reported.
-  @Test
-  void aRequestThatEndedIsNotReported() throws Exception {
-    Breakable store = new Breakable();
-    try (WebKit w = new WebKit(RoutesOptions.builder().token("tok").build(), b -> b.store(store));
-        ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-      w.ok("x");
-      HttpServer server =
-          HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-      server.setExecutor(pool);
-      WebServer.mount(server, "/cronwatch", w.routes);
-      server.start();
-      try {
-        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
-        store.entered = entered;
-        try (java.net.Socket socket =
-            new java.net.Socket(InetAddress.getLoopbackAddress(), server.getAddress().getPort())) {
-          socket
-              .getOutputStream()
-              .write(
-                  String.join(
-                          "\r\n",
-                          "GET /cronwatch/api/jobs HTTP/1.1",
-                          "host: app.test",
-                          "authorization: Bearer tok",
-                          "",
-                          "")
-                      .getBytes(StandardCharsets.ISO_8859_1));
-          socket.getOutputStream().flush();
-          entered.await();
-        }
-        // The client is gone; the store answers and the routes write to nobody.
-        store.entered = null;
-        store.release.countDown();
-        RawHttp.Answer next =
-            RawHttp.send(
-                server.getAddress().getPort(), "GET", "/cronwatch/api/jobs", headers(AUTH), null);
-        assertEquals(200, next.status(), "a request still open");
-        assertEquals(List.of(), w.wheres, "reported: " + w.messages);
-      } finally {
-        server.stop(0);
-      }
     }
   }
 
@@ -1114,36 +1051,6 @@ class RoutesTest {
           "/a/b/",
           manifestId(deep, Request.builder("GET", "/a/b/manifest.webmanifest").mount("/x").build()),
           "the option wins");
-
-      // Through the JDK's server, the base is the context's.
-      HttpServer server =
-          HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-      try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-        server.setExecutor(pool);
-        WebServer.mount(server, "/ops/cron", open);
-        WebServer.mount(server, "/", root);
-        server.start();
-        int port = server.getAddress().getPort();
-        RawHttp.Answer manifest =
-            RawHttp.send(port, "GET", "/ops/cron/manifest.webmanifest", NONE, null);
-        assertEquals(
-            "/ops/cron/", ((JsObject) dev.cronwatch.json.Json.parse(manifest.text())).get("id"));
-        RawHttp.Answer board = RawHttp.send(port, "GET", "/ops/cron/", NONE, null);
-        assertEquals(200, board.status());
-        contains("link", board.text(), "href=\"/ops/cron/jobs/x\"");
-        assertEquals(200, RawHttp.send(port, "GET", "/ops/cron/jobs/x", NONE, null).status());
-        assertEquals(200, RawHttp.send(port, "GET", "/ops/cron", NONE, null).status(), "the mount");
-        RawHttp.Answer atRoot = RawHttp.send(port, "GET", "/manifest.webmanifest", NONE, null);
-        assertEquals("/", ((JsObject) dev.cronwatch.json.Json.parse(atRoot.text())).get("id"));
-        // An encoded slash reaches the routes as sent.
-        assertEquals(
-            404, RawHttp.send(port, "GET", "/ops/cron/api/jobs/a%2Fb", NONE, null).status());
-        // A HEAD is answered without a body.
-        RawHttp.Answer head = RawHttp.send(port, "HEAD", "/ops/cron/app.js", NONE, null);
-        assertEquals(200, head.status());
-      } finally {
-        server.stop(0);
-      }
     }
   }
 

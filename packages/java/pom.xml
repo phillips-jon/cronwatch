@@ -43,6 +43,7 @@
 
   <modules>
     <module>cronwatch</module>
+    <module>webtest</module>
     <module>cronwatch-servlet</module>
     <module>cronwatch-spring-boot-starter</module>
     <module>webserver</module>
@@ -396,6 +397,7 @@
               <excludeArtifacts>
                 <artifact>cronwatch-parent</artifact>
                 <artifact>cronwatch-webserver</artifact>
+                <artifact>cronwatch-webtest</artifact>
               </excludeArtifacts>
             </configuration>
           </plugin>

@@ -77,28 +77,6 @@
     </resources>
 
     <plugins>
-      <!--
-        The tests' jar, dev.cronwatch.webtest alone: the golden replay and
-        the raw HTTP client, which the servlet and Spring Boot adapters'
-        tests replay through their own servers. Never deployed.
-      -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>test-jar</id>
-            <goals>
-              <goal>test-jar</goal>
-            </goals>
-            <configuration>
-              <includes>
-                <include>dev/cronwatch/webtest/**</include>
-              </includes>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
@@ -126,25 +104,4 @@
       </plugin>
     </plugins>
   </build>
-
-  <profiles>
-    <!-- The tests' jar is never published: a release builds without it. -->
-    <profile>
-      <id>release</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-jar-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>test-jar</id>
-                <phase>none</phase>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 </project>
