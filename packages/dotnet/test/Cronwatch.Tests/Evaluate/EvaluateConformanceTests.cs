@@ -159,7 +159,6 @@ public class EvaluateConformanceTests
     // Plays every scenario, answering the names of those that need a cron schedule.
     private static List<string> Replay(Fixtures.Failures fails, out int played)
     {
-        EvaluateTestDeps.Bind();
         var f = Fixtures.Load("evaluate");
         var scenarios = Fixtures.Objects(f, "scenarios");
         Assert.Equal(50, scenarios.Count);
@@ -176,16 +175,11 @@ public class EvaluateConformanceTests
                 string what = name + ": event " + i++ + " (" + Fixtures.String(ev, "op") + ")";
                 try
                 {
-                    var got = sim.Play(ev);
+                    var got = EvaluateDeps.InZone(TimeZoneInfo.Utc, () => sim.Play(ev));
                     if (got != null)
                     {
                         fails.Same(what, got, ev.Get("expect"));
                     }
-                }
-                catch (EvaluateTestDeps.CronNotBoundException)
-                {
-                    cron = true;
-                    break;
                 }
                 catch (Exception e)
                 {
@@ -211,19 +205,8 @@ public class EvaluateConformanceTests
         var fails = new Fixtures.Failures();
         var skipped = Replay(fails, out int played);
         Assert.True(played > 0, "no scenarios replayed");
-        Assert.Equal(50, played + skipped.Count);
+        Assert.Equal(50, played);
+        Assert.Empty(skipped);
         fails.Check("evaluate");
-    }
-
-    [Fact]
-    public void Scenarios_on_a_cron_schedule_play_as_the_sdk_plays_them()
-    {
-        var fails = new Fixtures.Failures();
-        var skipped = Replay(fails, out _);
-        fails.Check("evaluate");
-        if (skipped.Count > 0)
-        {
-            Assert.Skip(skipped.Count + " of 50 scenarios need cron schedules, which wait for the croner port: " + string.Join("; ", skipped));
-        }
     }
 }

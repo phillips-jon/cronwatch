@@ -453,7 +453,7 @@ internal static class Evaluate
     /// anything another writer put there.
     /// </summary>
     /// <exception cref="ArgumentException">When the schedule cannot be read.</exception>
-    public static object ParsedSchedule(Definition def)
+    public static ParsedSchedule ScheduleOf(Definition def)
     {
         if (def.Get("schedule") is not string text)
         {
@@ -505,7 +505,7 @@ internal static class Evaluate
             return new CheckOutcome(new Evaluation(next.ToState(), alerts), null, null);
         }
 
-        object parsed = ParsedSchedule(def);
+        ParsedSchedule parsed = ScheduleOf(def);
         double grace = GraceMs(def);
         long? lastRunAt = lastRun?.StartedAt;
         var exp = EvaluateDeps.Expectation(parsed, lastRunAt, stored.CreatedAt, grace);

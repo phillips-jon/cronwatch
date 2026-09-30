@@ -13,7 +13,6 @@ public class FormatConformanceTests
     [Fact]
     public void Alerts_are_the_sdks_text()
     {
-        EvaluateTestDeps.Bind();
         var f = Fixtures.Load("format");
         var fails = new Fixtures.Failures();
         var alerts = Fixtures.Objects(f, "alerts");

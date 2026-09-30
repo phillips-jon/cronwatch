@@ -56,7 +56,6 @@ public class HealthConformanceTests
     [Fact]
     public void Every_case_answers_as_the_sdk_answers()
     {
-        EvaluateTestDeps.Bind();
         var f = Fixtures.Load("health");
         var fails = new Fixtures.Failures();
         int cases = 0;
