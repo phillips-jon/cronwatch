@@ -1,0 +1,114 @@
+# A release tag -> the Java build in packages/java published to Maven Central
+# (dev.cronwatch:cronwatch, cronwatch-servlet, cronwatch-quartz,
+# cronwatch-jobrunr and cronwatch-spring-boot-starter): the release profile
+# builds the sources and javadoc jars, signs every file, and uploads the
+# bundle to the Central Publisher Portal, which publishes it once it has
+# validated it. Maven Central has no trusted publishing
+# (packages/java/DESIGN.md, Releasing), so this takes a Portal user token and
+# a signing key from the environment's secrets; when Central ships it, this
+# moves to OIDC and the token is revoked. Can also be started by hand for a
+# tag. The first release is published by hand; this is for the ones after.
+#
+# Stays off until the repository variable MAVEN_ENABLED is "true". Before
+# that, here: create the environment "maven" (Settings, Environments) with
+# required reviewers, since a release on Central cannot be taken back, and
+# add to it, as environment secrets and never repository secrets:
+#   CENTRAL_TOKEN_USERNAME and CENTRAL_TOKEN_PASSWORD: a user token generated
+#     in the Central Publisher Portal (central.sonatype.com, View Account,
+#     Generate User Token) for this workflow alone, by the account that holds
+#     the verified namespace dev.cronwatch. The token is a pair, a name and
+#     a password, and is revoked in the Portal.
+#   MAVEN_GPG_PRIVATE_KEY: the armoured signing subkey alone, exported with
+#     `gpg --armor --export-secret-subkeys <the subkey's id>!`, so the
+#     primary key never leaves the owner's machine. Its public half must be
+#     on keys.openpgp.org or keyserver.ubuntu.com, where Central looks for it.
+#   MAVEN_GPG_PASSPHRASE: that key's passphrase.
+# Then set the repository variable MAVEN_ENABLED to true.
+#
+# A run that fails before the upload can be started again. Central takes a
+# version once: if a run fails after the upload, look at the deployment in
+# the Portal before starting another, and drop a failed one there.
+name: Maven Central
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to publish (v0.9.0, say)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maven
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: vars.MAVEN_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: maven
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          persist-credentials: false
+      - name: Check the tag is the build's version
+        working-directory: packages/java
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          # The build's version must be the tag's, or Central would list a
+          # release the tag does not name.
+          version="$(sed -n 's/^ *<revision>\(.*\)<\/revision>$/\1/p' pom.xml | head -1)"
+          if [ "v$version" != "$TAG" ]; then echo "packages/java is $version, the tag is $TAG"; exit 1; fi
+      # The newest entry ci.yml tests, the one whose javadoc it checks; the
+      # bytecode is Java 21's whatever the JDK. The action writes
+      # ~/.m2/settings.xml with the server "central" (the release profile's
+      # publishingServerId) reading its name and password from the two
+      # variables named, which only the deploy step sets, and imports the
+      # signing key into a GNUPGHOME of its own, removed when the job ends.
+      # maven-gpg-plugin reads the passphrase from MAVEN_GPG_PASSPHRASE.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "27"
+          server-id: central
+          server-username-env-var: CENTRAL_TOKEN_USERNAME
+          server-password-env-var: CENTRAL_TOKEN_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase-env-var: MAVEN_GPG_PASSPHRASE
+      # Said here rather than after the build: a missing secret is an empty
+      # string, and the key's fingerprint is in the log beside the release.
+      - name: Check the key and the token are there
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: |
+          for name in CENTRAL_TOKEN_USERNAME CENTRAL_TOKEN_PASSWORD MAVEN_GPG_PASSPHRASE; do
+            if [ -z "${!name}" ]; then echo "the maven environment has no secret $name"; exit 1; fi
+          done
+          gpg --list-secret-keys --with-subkey-fingerprint
+          if ! gpg --list-secret-keys --with-colons | grep -q '^ssb:'; then
+            echo "no signing subkey was imported: is MAVEN_GPG_PRIVATE_KEY set in the maven environment?"
+            exit 1
+          fi
+      # The tests (the database ones skip, as they say), the sources and
+      # javadoc jars, a signature on every file, and the bundle uploaded;
+      # the two properties make the Portal publish the deployment once it has
+      # validated it and make the build wait until it is published, so a
+      # green run is a release on Central. webserver, webtest and the example
+      # are left out of the bundle by the profile.
+      - name: ./mvnw -P release deploy
+        working-directory: packages/java
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: ./mvnw -B -P release deploy -Dcronwatch.autoPublish=true -Dcronwatch.waitUntil=published
