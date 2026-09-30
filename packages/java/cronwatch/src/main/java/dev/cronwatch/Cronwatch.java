@@ -693,7 +693,8 @@ public final class Cronwatch implements AutoCloseable {
    * Stops the interval, waits up to five seconds for sends and recordings in flight, then
    * interrupts what is left, removes the shutdown hook, and closes the store. A servlet container
    * or Spring context should call it when the app stops, so no thread of the client's holds the
-   * app's class loader.
+   * app's class loader. Called while the JVM stops (a Spring context closing from its own hook), it
+   * first records the runs still open as the shutdown hook would, before the store is let go.
    */
   @Override
   public void close() {
@@ -702,7 +703,10 @@ public final class Cronwatch implements AutoCloseable {
       try {
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
       } catch (IllegalStateException e) {
-        // The JVM is already stopping; the hook runs.
+        // The JVM is already stopping: an app's own hook (a Spring context closing) is closing the
+        // client beside this one's, and will let the store's pool go next. The runs still open are
+        // recorded now, before the store goes; the hook finds them done.
+        runs.shutdown();
       }
     }
     core.timer.shutdownNow();

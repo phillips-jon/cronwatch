@@ -491,7 +491,8 @@ final class Runs {
             null,
             output,
             recorder.metrics());
-    finished = conclude(def, finished, failure, expectText, timedOut);
+    Concluded concluded = concludeGuarded(def, finished, failure, expectText, timedOut);
+    finished = concluded.run();
     if (closing != null) {
       try {
         Core.awaitUninterruptibly(closing);
@@ -508,7 +509,42 @@ final class Runs {
     } catch (RuntimeException e) {
       core.report(e, "recording " + name);
     }
+    Error error = concluded.error();
+    if (error != null) {
+      throw error;
+    }
     return finished;
+  }
+
+  /** A run concluded, and an {@code Error} the app's own code threw meanwhile, to throw again. */
+  record Concluded(Run run, @Nullable Error error) {}
+
+  /**
+   * {@link #conclude}, where the app's own code it calls (an expect predicate, a redact) may throw:
+   * the run is then failed with that throw as its error, redacted the default way, so it is still
+   * recorded rather than left running. An {@code Error} is handed back to be thrown again once the
+   * run is recorded.
+   */
+  Concluded concludeGuarded(
+      JobDef def,
+      Run run,
+      @Nullable String failure,
+      @Nullable String expectText,
+      boolean timedOut) {
+    try {
+      return new Concluded(conclude(def, run, failure, expectText, timedOut), null);
+    } catch (RuntimeException | Error t) {
+      String output = run.output();
+      Run failed =
+          run.finished(
+              timedOut ? RunStatus.TIMEOUT : RunStatus.FAILED,
+              run.finishedAt(),
+              run.durationMs(),
+              Output.stripNul(Output.redactSecrets(errorText(t))),
+              output == null ? null : Output.stripNul(Output.redactSecrets(output)),
+              run.metrics());
+      return new Concluded(failed, t instanceof Error e ? e : null);
+    }
   }
 
   /**
@@ -790,6 +826,10 @@ final class Runs {
   }
 
   private @Nullable Void failOpen(OpenRun o) {
+    // The hook and a close() during the shutdown may both get here: one records the run.
+    if (!core.open.remove(o.run.id(), o)) {
+      return null;
+    }
     String name = o.def.name();
     long now = core.now();
     Run run = o.run;

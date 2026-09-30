@@ -55,6 +55,18 @@ class ShutdownHookTest {
     assertEquals("Shutdown: the JVM stopped while the run was in progress", run.error());
   }
 
+  /**
+   * A Spring context closing at shutdown closes the client and then its pool, beside the client's
+   * own hook: the client's close fails the runs still open before it lets the store go.
+   */
+  @Test
+  void aClientClosedWhileTheJvmStopsRecordsItsOpenRunFirst(@TempDir Path dir) throws Exception {
+    List<Run> runs = runInChild(dir, "context");
+    assertEquals(1, runs.size());
+    assertEquals(RunStatus.FAILED, runs.get(0).status());
+    assertEquals("Shutdown: the JVM stopped while the run was in progress", runs.get(0).error());
+  }
+
   @Test
   void withoutTheHookTheRunIsLeftRunning(@TempDir Path dir) throws Exception {
     List<Run> runs = runInChild(dir, "nohook");

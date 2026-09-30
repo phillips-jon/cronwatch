@@ -388,12 +388,18 @@ public final class RunHandle implements AutoCloseable {
         expected = resultText;
       }
       String expectText = joinLines(earlier, joinLines(from.output(), expected));
-      run = runs.conclude(def, run, failure, expectText, false);
+      Runs.Concluded concluded = runs.concludeGuarded(def, run, failure, expectText, false);
+      run = concluded.run();
       String why;
       try {
         why = runs.recordFinish(def, run, recorded, finishedAt);
       } catch (RuntimeException e) {
         return retryable(e);
+      }
+      Error error = concluded.error();
+      if (error != null) {
+        // Recorded: the app's own code threw it, and it is thrown again as it came.
+        throw error;
       }
       if (why != null) {
         ignored(why);

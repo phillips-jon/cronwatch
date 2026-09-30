@@ -114,7 +114,19 @@ final class Core {
   final ConcurrentHashMap<String, CompletableFuture<RunHandle>> starting =
       new ConcurrentHashMap<>();
 
-  private final ConcurrentHashMap<String, ReentrantLock> jobLocks = new ConcurrentHashMap<>();
+  /** A job's update lock and how many callers hold it or wait for it. */
+  private static final class JobLock {
+    final ReentrantLock lock = new ReentrantLock(true);
+    int users;
+  }
+
+  /**
+   * Each job's update lock while anyone holds it or waits for it: let go of once idle, as the SDK
+   * drops a job's queue, so names that come and go (a silence of any name, pg_cron's jobs) do not
+   * keep a lock each for good.
+   */
+  private final ConcurrentHashMap<String, JobLock> jobLocks = new ConcurrentHashMap<>();
+
   private final ReentrantLock readyLock = new ReentrantLock();
   private boolean ready;
 
@@ -344,7 +356,15 @@ final class Core {
    */
   <P, R> Changed<R> updateState(
       String job, StoreCall<P> prepare, BiFunction<JobState, P, Changed<R>> change) {
-    ReentrantLock lock = jobLocks.computeIfAbsent(job, k -> new ReentrantLock(true));
+    JobLock held =
+        jobLocks.compute(
+            job,
+            (k, l) -> {
+              JobLock out = l == null ? new JobLock() : l;
+              out.users++;
+              return out;
+            });
+    ReentrantLock lock = held.lock;
     lock.lock();
     try {
       P prepared = call(prepare);
@@ -371,7 +391,18 @@ final class Core {
       }
     } finally {
       lock.unlock();
+      release(job);
     }
+  }
+
+  /** One user fewer of a job's update lock, dropped once it has none. */
+  private void release(String job) {
+    jobLocks.computeIfPresent(job, (k, l) -> --l.users == 0 ? null : l);
+  }
+
+  /** How many jobs' update locks are held or waited on now. */
+  int lockedJobs() {
+    return jobLocks.size();
   }
 
   /** {@link #updateState} with nothing to prepare. */
