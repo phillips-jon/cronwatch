@@ -7,7 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
-    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Hangfire.InMemory" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Cronwatch.Hangfire/Cronwatch.Hangfire.csproj" />

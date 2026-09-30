@@ -6,6 +6,9 @@
     <PackageId>Cronwatch.Hangfire</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Description>CronWatch for Hangfire 1.8: every attempt of a job recorded as a run, recurring jobs declared on their crons, and the check as a recurring job.</Description>
+    <!-- Hangfire serializes jobs with Newtonsoft.Json by reflection, so neither
+         it nor this package is AOT compatible. -->
   </PropertyGroup>
   <ItemGroup>
     <None Include="../../README.md" Pack="true" PackagePath="/" />
@@ -14,5 +17,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Cronwatch/Cronwatch.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Hangfire.Core" />
+    <PackageReference Include="Cronos" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 </Project>
