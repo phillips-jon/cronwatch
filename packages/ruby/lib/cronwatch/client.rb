@@ -316,9 +316,10 @@ module Cronwatch
     # alone and reported. A finished run is judged as if it had been wrapped
     # here (expect, failures, duration, budgets) and its output and error are
     # redacted the same way; one finishing after a check marked it timeout is
-    # judged only when it succeeded, as RunHandle#finish does. `evaluate:
-    # false` stores it without judging it, for history imported on first
-    # sight. Returns the alerts it sent.
+    # judged only when it succeeded, as RunHandle#finish does. A metric that
+    # is not a finite number raises ArgumentError before anything is written,
+    # as JobContext#metric does. `evaluate: false` stores it without judging
+    # it, for history imported on first sight. Returns the alerts it sent.
     #
     # `run` is a Cronwatch::Run, or a hash of its fields (camelCase or snake_case keys).
     def record_run(run, evaluate: true)
@@ -328,6 +329,16 @@ module Cronwatch
       raise ArgumentError, "record_run: job \"#{input.job}\" is not declared; call job first" unless declared
       if input.id.to_s.include?("\0")
         raise ArgumentError, "record_run: run ids cannot contain a NUL character (job \"#{input.job}\")"
+      end
+      # Refused as JobContext#metric refuses them: a store keeps NaN and Infinity as null.
+      unless input.metrics.nil? || input.metrics.is_a?(Hash)
+        raise ArgumentError, "record_run: metrics must be a Hash of numbers (job \"#{input.job}\", run \"#{input.id}\")"
+      end
+
+      (input.metrics || {}).each do |metric, value|
+        next if value.is_a?(Numeric) && value.real? && JS.finite?(value)
+
+        raise ArgumentError, "record_run: metric \"#{metric}\" must be a finite number (job \"#{input.job}\", run \"#{input.id}\")"
       end
 
       sync(declared)
@@ -1084,7 +1095,10 @@ module Cronwatch
       @store.running_runs.each do |run|
         declared = @registry.synchronize { @definitions[run.job] }
         definition = declared ? Serialize.to_stored(declared) : @store.get_job(run.job)&.definition
-        next if definition.nil? || !Evaluate.stuck?(definition, run, at)
+        next if definition.nil?
+
+        evaluable(run.job, definition)
+        next unless Evaluate.stuck?(definition, run, at)
 
         timeout = Evaluate.timeout_ms(definition)
         run.status = :timeout
@@ -1106,6 +1120,7 @@ module Cronwatch
       jobs = []
       retries = RetryBudget.new(0)
       @store.list_jobs.each do |stored|
+        evaluable(stored.name, stored.definition)
         recent = @store.list_runs(stored.name, Evaluate::BASELINE_WINDOW)
         next_expected_at = nil
         state, drafts = update_state(stored.name) do |previous|
@@ -1142,6 +1157,7 @@ module Cronwatch
       recent = []
       begin
         recent = @store.list_runs(stored.name, [count, Evaluate::BASELINE_WINDOW].max)
+        evaluable(stored.name, stored.definition)
         state = read_state(stored.name)
         next_expected_at = Evaluate.on_check(stored.definition, stored, recent.first, state, at).next_expected_at
         JobWithRuns.new(job: Evaluate.summarize(stored, recent, state, next_expected_at, at), runs: recent.first(count))
@@ -1149,6 +1165,13 @@ module Cronwatch
         report(e, "reading #{stored.name}")
         JobWithRuns.new(job: unevaluable(stored, at), runs: recent.first(count))
       end
+    end
+
+    # Raises for a stored definition that was not a JSON object (see
+    # JobDefinition.from_h), so that one job is reported and shown as
+    # failing, and the others are checked as usual.
+    def evaluable(name, definition)
+      raise ArgumentError, "job \"#{name}\": its stored definition is not a JSON object" if definition.unreadable?
     end
 
     # The summary of a job whose evaluation failed, from whatever can still be read.

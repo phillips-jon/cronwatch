@@ -826,6 +826,20 @@ class ClientTest < Minitest::Test
     refute_match(/opaqueTOKEN/, cw.get_run(handle.id).output)
   end
 
+  def test_record_run_refuses_a_metric_that_is_no_finite_number_and_stores_nothing
+    cw, = make
+    cw.job("imported")
+    base = { id: "m1", job: "imported", status: "ok", started_at: 1, finished_at: 2, duration_ms: 1, error: nil, output: nil,
+             trigger: "source" }
+    [Float::NAN, Float::INFINITY, nil, "3"].each do |value|
+      error = assert_raises(ArgumentError) { cw.record_run(base.merge(metrics: { rows: value })) }
+      assert_equal 'record_run: metric "rows" must be a finite number (job "imported", run "m1")', error.message
+    end
+    assert_nil cw.get_run("m1")
+    cw.record_run(base.merge(metrics: { rows: 3 }))
+    assert_equal({ "rows" => 3 }, cw.get_run("m1").metrics)
+  end
+
   def test_text_past_the_redaction_window_never_keeps_what_came_right_after_its_cut
     cap = Cronwatch::Output::CAP
     edge = Cronwatch::Output::REDACT_EDGE

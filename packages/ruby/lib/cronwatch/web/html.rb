@@ -242,7 +242,7 @@ module Cronwatch
 
       # Object.entries: integer-like keys first, ascending, then the rest in insertion order.
       def entries(hash)
-        return [] if hash.nil?
+        return [] unless hash.is_a?(Hash)
 
         JS.object_keys(hash).map { |k| [k.to_s, hash[k]] }
       end
@@ -456,7 +456,8 @@ module Cronwatch
             truthy?(run.error) ? %(<details class="out error" open><summary>error</summary><pre>#{h(run.error)}</pre></details>) : "",
             truthy?(run.output) ? %(<details class="out"#{run.status.to_s == "ok" ? "" : " open"}><summary>output</summary><pre>#{h(run.output)}</pre></details>) : "",
           ].join
-          metrics = entries(run.metrics).map do |k, v|
+          # A foreign row may hold a metric that is no finite number (null, text); it is left out.
+          metrics = entries(run.metrics).select { |_, v| v.is_a?(Numeric) && v.real? && JS.finite?(v) }.map do |k, v|
             %(<span><span class="k">#{h(k)}</span> #{h(JS.integer?(v) ? v : to_fixed(v, 4))}</span>)
           end.join
           took = run.duration_ms.nil? ? %(<span class="muted">running</span>) : h(Duration.format(run.duration_ms))

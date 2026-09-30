@@ -78,21 +78,33 @@ module Cronwatch
 
     FIELDS.each_key { |field| define_method(field) { @fields[field] } }
 
-    def initialize(fields = {})
+    def initialize(fields = {}, unreadable: false)
       @fields = {}
       fields.each { |k, v| @fields[k.is_a?(Symbol) ? k : k.to_s] = v }
       @fields.freeze
+      @unreadable = unreadable
       freeze
     end
 
+    # A stored definition that is not a JSON object (null, a string, a
+    # number, written by hand or by something else) reads as an empty one
+    # marked unreadable, so the one row does not stop every other job being
+    # listed; a check or a dashboard read reports that job and shows it as
+    # failing (see Client#evaluable).
     def self.from_h(hash)
       return hash if hash.is_a?(JobDefinition)
+      return new({}, unreadable: true) unless hash.is_a?(Hash)
 
       new(hash.each_with_object({}) { |(k, v), out| out[BY_JSON[k.to_s] || k.to_s] = v })
     end
 
     def [](field)
       @fields[field]
+    end
+
+    # True for a stored definition that was not a JSON object. See from_h.
+    def unreadable?
+      @unreadable
     end
 
     def key?(field)
@@ -152,7 +164,7 @@ module Cronwatch
         duration_ms: Naming.fetch(hash, "durationMs"),
         error: Naming.fetch(hash, "error"),
         output: Naming.fetch(hash, "output"),
-        metrics: (Naming.fetch(hash, "metrics") || {}).transform_keys(&:to_s),
+        metrics: Run.metrics_from(Naming.fetch(hash, "metrics")),
         trigger: Naming.fetch(hash, "trigger", "run"),
       )
     end
@@ -161,8 +173,14 @@ module Cronwatch
       {
         "id" => id, "job" => job, "status" => status.to_s, "startedAt" => started_at, "finishedAt" => finished_at,
         "durationMs" => duration_ms, "error" => error, "output" => output,
-        "metrics" => (metrics || {}).transform_keys(&:to_s), "trigger" => trigger,
+        "metrics" => Run.metrics_from(metrics), "trigger" => trigger,
       }
+    end
+
+    # Stored metrics as a Hash with string keys. Anything else (a string or
+    # an array a foreign or corrupted row holds) reads as none.
+    def self.metrics_from(value)
+      value.is_a?(Hash) ? value.transform_keys(&:to_s) : {}
     end
 
     def running? = status == :running

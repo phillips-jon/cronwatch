@@ -430,12 +430,20 @@ module Cronwatch
       end
 
       def row_to_job(row)
-        StoredJob.new(name: row["name"], definition: JobDefinition.from_h(json(row["definition"])),
+        StoredJob.new(name: row["name"], definition: JobDefinition.from_h(definition_json(row["definition"])),
                       created_at: int(row["created_at"]), updated_at: int(row["updated_at"]))
       end
 
+      # A definition that does not parse (nested past JSON.parse's limit, say)
+      # reads as nil, which JobDefinition.from_h marks unreadable.
+      def definition_json(value)
+        json(value)
+      rescue ::JSON::ParserError
+        nil
+      end
+
       def row_to_run(row)
-        metrics = row["metrics"].nil? ? {} : json(row["metrics"])
+        metrics = row["metrics"].nil? ? {} : Run.metrics_from(json(row["metrics"]))
         Run.new(id: row["id"], job: row["job"], status: row["status"].to_sym, started_at: int(row["started_at"]),
                 finished_at: int(row["finished_at"]), duration_ms: int(row["duration_ms"]), error: row["error"],
                 output: row["output"], metrics: metrics, trigger: row["trigger"])

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../support/active_record_helper"
+require_relative "../web/helpers"
 
 class ActiveRecordStoreSqliteMemoryTest < Minitest::Test
   include ActiveRecordStoreTests
@@ -55,6 +56,58 @@ class ActiveRecordStoreOptionsTest < Minitest::Test
     assert_raises(Cronwatch::Stores::ActiveRecord::UnsupportedAdapter) { Cronwatch::Stores::ActiveRecord.create_tables!(mysql) }
     assert_equal :postgres, Cronwatch::Stores::ActiveRecord.dialect("PostGIS")
     assert_equal :sqlite, Cronwatch::Stores::ActiveRecord.dialect("SQLite")
+  end
+end
+
+# Rows a foreign or hand-edited writer left: one bad row is that job's
+# problem, never every job's.
+class ActiveRecordStoreForeignRowsTest < Minitest::Test
+  include ActiveRecordStoreHarness
+  include WebHelpers
+
+  def database = :sqlite_file
+
+  def test_a_job_whose_stored_definition_is_not_an_object_is_reported_and_the_others_carry_on
+    prefix = ARSupport.prefix
+    store = make_store(prefix: prefix)
+    errors = []
+    cw, clock, = make(store: store, on_error: ->(e, where) { errors << [where, e.message] })
+    cw.job("good", schedule: "every 1h").run { nil }
+    with_conn do |conn|
+      conn.execute("INSERT INTO #{prefix}jobs VALUES ('null-def', 'null', 0, 0)")
+      conn.execute("INSERT INTO #{prefix}jobs VALUES ('text-def', '\"x\"', 0, 0)")
+      conn.execute("INSERT INTO #{prefix}jobs VALUES ('deep-def', '#{"[" * 200}#{"]" * 200}', 0, 0)")
+    end
+    clock.advance(2 * HOUR)
+    result = cw.check
+    by_name = result.jobs.to_h { |j| [j.name, j.health] }
+    assert_equal({ "deep-def" => :failing, "good" => :late, "null-def" => :failing, "text-def" => :failing }, by_name)
+    assert_equal ["checking deep-def", "checking null-def", "checking text-def"], errors.map(&:first).sort
+    assert_equal 4, cw.jobs.length
+    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch")
+    assert_equal 200, send_request(web, "GET", "/cronwatch/api/jobs", BEARER).status
+    assert_equal 200, send_request(web, "GET", "/cronwatch/", BEARER).status
+  end
+
+  def test_a_run_whose_metrics_are_not_an_object_or_hold_no_number_still_shows_on_its_job_page
+    prefix = ARSupport.prefix
+    store = make_store(prefix: prefix)
+    cw, = make(store: store)
+    cw.job("good").run { nil }
+    with_conn do |conn|
+      conn.execute("INSERT INTO #{prefix}runs (id, job, status, started_at, metrics) VALUES ('r1', 'good', 'ok', 1, '\"x\"')")
+      conn.execute("INSERT INTO #{prefix}runs (id, job, status, started_at, metrics) VALUES ('r2', 'good', 'ok', 2, '[1]')")
+      conn.execute("INSERT INTO #{prefix}runs (id, job, status, started_at, metrics) " \
+                   "VALUES ('r3', 'good', 'ok', 3, '{\"rows\":null,\"label\":\"abc\",\"cost\":1.25,\"n\":3}')")
+    end
+    assert_equal({}, store.get_run("r1").metrics)
+    assert_equal({}, store.get_run("r2").metrics)
+    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch")
+    page = send_request(web, "GET", "/cronwatch/jobs/good", BEARER)
+    assert_equal 200, page.status
+    assert_includes page.body, %(<span class="metrics"><span><span class="k">cost</span> 1.2500</span><span><span class="k">n</span> 3</span></span>)
+    refute_includes page.body, %(<span class="k">rows</span>)
+    refute_includes page.body, %(<span class="k">label</span>)
   end
 end
 
