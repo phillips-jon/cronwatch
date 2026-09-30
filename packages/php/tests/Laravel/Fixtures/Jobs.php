@@ -145,3 +145,55 @@ final class LimitedJob implements ShouldQueue
         Cronwatch::current()?->log('done');
     }
 }
+
+/**
+ * Fails, is skipped by its middleware without being released (Skip, as
+ * WithoutOverlapping and RateLimited do with ->dontRelease()), or works,
+ * as $mode says.
+ */
+#[Watch(name: 'skippable', failuresBeforeAlert: 1)]
+final class SkippableJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable;
+
+    public static string $mode = 'ok';
+
+    public function middleware(): array
+    {
+        return [\Illuminate\Queue\Middleware\Skip::when(fn () => self::$mode === 'skip')];
+    }
+
+    public function handle(): void
+    {
+        if (self::$mode === 'fail') {
+            throw new \RuntimeException('it broke');
+        }
+        Cronwatch::current()?->log('worked');
+    }
+}
+
+/** A watched job with its description in the attribute. */
+#[Watch(name: 'described-by-attribute', description: 'Sends the nightly digest')]
+final class AttributeDescribedJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable;
+
+    public function handle(): void
+    {
+    }
+}
+
+/** A watched job with its description from a static cronwatch(). */
+final class MethodDescribedJob implements ShouldQueue, ShouldBeWatched
+{
+    use Dispatchable, InteractsWithQueue, Queueable;
+
+    public static function cronwatch(): array
+    {
+        return ['name' => 'described-by-method', 'description' => 'Rebuilds the search index'];
+    }
+
+    public function handle(): void
+    {
+    }
+}
