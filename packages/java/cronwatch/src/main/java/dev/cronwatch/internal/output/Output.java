@@ -29,6 +29,37 @@ public final class Output {
     return text.indexOf('\0') < 0 ? text : text.replace("\0", "");
   }
 
+  /** {@link #stripNul} for a text that may be null. */
+  public static @Nullable String stripNulOrNull(@Nullable String text) {
+    return text == null ? null : stripNul(text);
+  }
+
+  /**
+   * Removes every U+0000 from JSON text, keys and strings alike, by dropping each {@code \u0000}
+   * escape (a NUL can appear in JSON no other way). Escapes are read left to right in pairs, so an
+   * escaped backslash followed by {@code u0000} is left as it is.
+   */
+  public static String stripJsonNul(String json) {
+    if (!json.contains("\\u0000")) {
+      return json;
+    }
+    StringBuilder out = new StringBuilder(json.length());
+    int i = 0;
+    while (i < json.length()) {
+      char c = json.charAt(i);
+      if (c != '\\' || i + 1 >= json.length()) {
+        out.append(c);
+        i++;
+      } else if (json.startsWith("u0000", i + 1)) {
+        i += 6;
+      } else {
+        out.append(c).append(json.charAt(i + 1));
+        i += 2;
+      }
+    }
+    return out.toString();
+  }
+
   /**
    * Removes NULs, then keeps the last {@link #OUTPUT_CAP} code units behind a line saying the rest
    * was trimmed. A cut through a surrogate pair keeps the lone half, as JavaScript does; it becomes

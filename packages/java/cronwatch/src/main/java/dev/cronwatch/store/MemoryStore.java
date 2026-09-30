@@ -2,9 +2,12 @@ package dev.cronwatch.store;
 
 import dev.cronwatch.Definition;
 import dev.cronwatch.JobState;
+import dev.cronwatch.Metrics;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
+import dev.cronwatch.internal.output.Output;
+import dev.cronwatch.json.Json;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,6 +42,42 @@ public final class MemoryStore implements Store {
   /** An empty in-memory store. */
   public MemoryStore() {}
 
+  // Text is held as the SQL store writes it, without U+0000, so every store reads back the same:
+  // a run's trigger, output, error and metric names, and every key and string of a definition and
+  // a state. Identifiers are held as given.
+
+  private static Definition kept(Definition definition) {
+    String json = definition.toJson();
+    String clean = Output.stripJsonNul(json);
+    return clean.equals(json) ? definition : Definition.fromJson(clean);
+  }
+
+  private static JobState kept(JobState state) {
+    String json = state.toJson();
+    String clean = Output.stripJsonNul(json);
+    return clean.equals(json) ? state : JobState.fromJson(clean);
+  }
+
+  private static Metrics kept(Metrics metrics) {
+    String json = metrics.toJson();
+    String clean = Output.stripJsonNul(json);
+    return clean.equals(json) ? metrics : Metrics.lenient(Json.parse(clean));
+  }
+
+  private static Run kept(Run run) {
+    return new Run(
+        run.id(),
+        run.job(),
+        run.status(),
+        run.startedAt(),
+        run.finishedAt(),
+        run.durationMs(),
+        Output.stripNulOrNull(run.error()),
+        Output.stripNulOrNull(run.output()),
+        kept(run.metrics()),
+        Output.stripNul(run.trigger()));
+  }
+
   @Override
   public void upsertJob(Definition definition, long now) {
     lock.lock();
@@ -46,7 +85,7 @@ public final class MemoryStore implements Store {
       String name = definition.name();
       StoredJob existing = jobs.get(name);
       long createdAt = existing == null ? now : existing.createdAt();
-      jobs.put(name, new StoredJob(name, definition, createdAt, now));
+      jobs.put(name, new StoredJob(name, kept(definition), createdAt, now));
     } finally {
       lock.unlock();
     }
@@ -98,7 +137,7 @@ public final class MemoryStore implements Store {
       if (runs.containsKey(run.id())) {
         throw new IllegalStateException("run " + run.id() + " already exists");
       }
-      runs.put(run.id(), new Entry(run, ++seq));
+      runs.put(run.id(), new Entry(kept(run), ++seq));
     } finally {
       lock.unlock();
     }
@@ -151,7 +190,12 @@ public final class MemoryStore implements Store {
   /** The fields a finish changes, written onto a stored run. */
   private static Run finish(Run existing, Run run) {
     return existing.finished(
-        run.status(), run.finishedAt(), run.durationMs(), run.error(), run.output(), run.metrics());
+        run.status(),
+        run.finishedAt(),
+        run.durationMs(),
+        Output.stripNulOrNull(run.error()),
+        Output.stripNulOrNull(run.output()),
+        kept(run.metrics()));
   }
 
   @Override
@@ -212,7 +256,7 @@ public final class MemoryStore implements Store {
   public void setState(JobState state) {
     lock.lock();
     try {
-      states.put(state.job(), state);
+      states.put(state.job(), kept(state));
     } finally {
       lock.unlock();
     }
@@ -227,7 +271,7 @@ public final class MemoryStore implements Store {
       if (version != expected) {
         return false;
       }
-      states.put(state.job(), state);
+      states.put(state.job(), kept(state));
       return true;
     } finally {
       lock.unlock();

@@ -360,6 +360,15 @@ public final class Cronwatch implements AutoCloseable {
               + id.length()
               + " characters)");
     }
+    // Postgres refuses NUL in text, so no store could hold such an id.
+    if (id.indexOf('\0') >= 0) {
+      throw CronwatchException.invalid(
+          "job "
+              + Json.quote(job)
+              + ": "
+              + method
+              + "() cannot take a run id containing a NUL character");
+    }
     if (id.startsWith(RESERVED_RUN_ID_PREFIX)) {
       throw CronwatchException.invalid(
           "job "

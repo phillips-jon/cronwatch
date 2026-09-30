@@ -198,6 +198,26 @@ class PostgresStoreTest extends ServerStoreTests {
       JobState st = store.getState("nul");
       assertNotNull(st);
       assertEquals(1, st.consecutiveFailures(), "the state, with its alert, was written too");
+      // So are a trigger, metric names and a definition's text.
+      cw.job(
+              "nul2",
+              dev.cronwatch.JobOptions.builder()
+                  .description("a\u0000b")
+                  .tags("t\u0000")
+                  .budget("c\u0000", 5))
+          .run(
+              dev.cronwatch.RunOptions.defaults().withTrigger("cr\u0000on"),
+              j -> j.metric("ro\u0000ws", 2));
+      Run second = cw.runs("nul2", 10).get(0);
+      assertEquals(RunStatus.OK, second.status());
+      assertEquals("cron", second.trigger());
+      assertEquals(java.util.Map.of("rows", 2.0), second.metrics().asMap());
+      StoredJob stored = store.getJob("nul2");
+      assertNotNull(stored);
+      Definition def = stored.definition();
+      assertEquals("ab", def.description());
+      assertEquals(List.of("t"), def.tags());
+      assertEquals("{\"c\":5}", Json.stringify(def.get("budget")));
       assertEquals(List.of(), errors);
     }
   }

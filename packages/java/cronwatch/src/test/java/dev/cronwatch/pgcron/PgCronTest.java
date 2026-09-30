@@ -268,6 +268,113 @@ class PgCronTest {
     k.close();
   }
 
+  static List<String> storedNames(Store store) throws Exception {
+    List<String> out = new ArrayList<>();
+    for (dev.cronwatch.StoredJob j : store.listJobs()) {
+      out.add(j.name());
+    }
+    return out;
+  }
+
+  @Test
+  void aPickJobNameOrOptionsFunctionThatFailsFailsOnlyItsJobReportedOnce() throws Exception {
+    AtomicLong clock = new AtomicLong(T0);
+    FakeCron cron = new FakeCron();
+    cron.job(1, "one", "0 * * * *");
+    cron.job(2, "two", "0 * * * *");
+    cron.job(3, "three", "0 * * * *");
+    cron.job(4, "four", "0 * * * *");
+    java.util.Set<String> broken = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    MemoryStore store = new MemoryStore();
+    PgCronOptions options =
+        PgCronOptions.builder()
+            .pick(
+                j -> {
+                  if (broken.contains("pick:" + j.jobId())) {
+                    throw new IllegalStateException("pick broke");
+                  }
+                  return true;
+                })
+            .jobName(
+                j -> {
+                  if (broken.contains("throw:" + j.jobId())) {
+                    throw new IllegalStateException("name broke");
+                  }
+                  if (broken.contains("null:" + j.jobId())) {
+                    return null;
+                  }
+                  return "j-" + j.jobName();
+                })
+            .options(
+                j -> {
+                  if (broken.contains("options:" + j.jobId())) {
+                    throw new IllegalStateException("options broke");
+                  }
+                  return JobOptions.builder();
+                })
+            .build();
+    String tail = "; it keeps its last declaration until that works";
+    try (Kit k = kit(store, clock, PgCron.source(cron, options))) {
+      // First sight, with job 1's name function throwing and job 2's giving null: only those two
+      // are skipped.
+      broken.add("throw:1");
+      broken.add("null:2");
+      FakeCron.Detail first = cron.add(3, "succeeded", T0 - 60_000, T0 - 59_000, "ok");
+      k.cw.check();
+      assertEquals(List.of("j-four", "j-three"), storedNames(store));
+      assertEquals("j-three", getRun(k, "pgcron:" + first.runId).job());
+      assertEquals(
+          List.of(
+              "pg_cron job 1: jobName threw IllegalStateException: name broke" + tail,
+              "pg_cron job 2: jobName returned null, not a name" + tail),
+          k.others());
+
+      // Once they work, both are declared; then every function fails in turn for jobs already
+      // declared.
+      broken.clear();
+      k.cw.check();
+      assertEquals(List.of("j-four", "j-one", "j-three", "j-two"), storedNames(store));
+      broken.add("pick:1");
+      broken.add("null:2");
+      broken.add("options:3");
+      broken.add("throw:4");
+      k.errors.clear();
+      FakeCron.Detail one = cron.add(1, "failed", T0 + 1000, T0 + 2000, "ERROR:  one");
+      FakeCron.Detail three = cron.add(3, "succeeded", T0 + 1000, T0 + 2000, "ok");
+      clock.addAndGet(5000);
+      k.cw.check();
+      k.cw.check();
+      assertEquals(
+          List.of(
+              "pg_cron job 1: the jobs callback threw IllegalStateException: pick broke" + tail,
+              "pg_cron job 2: jobName returned null, not a name" + tail,
+              "pg_cron job 3: the options callback threw IllegalStateException: options broke"
+                  + tail,
+              "pg_cron job 4: jobName threw IllegalStateException: name broke" + tail),
+          k.others(),
+          "each reported once, over two syncs");
+      // Each keeps its name and schedule, is not retired, and its runs are still copied.
+      for (dev.cronwatch.StoredJob stored : store.listJobs()) {
+        assertEquals("0 * * * *", stored.definition().schedule(), stored.name());
+        String description = String.valueOf(stored.definition().description());
+        assertFalse(
+            description.contains("no longer") || description.contains("renamed"), description);
+      }
+      assertEquals("j-one", getRun(k, "pgcron:" + one.runId).job());
+      assertEquals("j-three", getRun(k, "pgcron:" + three.runId).job());
+
+      // Working again and then failing again is reported again.
+      broken.clear();
+      k.cw.check();
+      broken.add("pick:1");
+      k.cw.check();
+      assertEquals(5, k.others().size());
+      assertTrue(
+          k.others().get(4).startsWith("pg_cron job 1: the jobs callback threw"),
+          k.others().toString());
+    }
+  }
+
   static Run getRun(Kit k, String id) {
     Run r = k.cw.getRun(id);
     assertNotNull(r, id);

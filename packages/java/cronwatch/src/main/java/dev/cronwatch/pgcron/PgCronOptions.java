@@ -141,7 +141,10 @@ public final class PgCronOptions {
     /**
      * The CronWatch name for a job. Default {@link PgCron#jobName}: its jobname with anything other
      * than letters, digits, {@code .}, {@code _}, {@code :} and {@code -} turned into {@code -}, or
-     * {@code pg_cron:<jobid>} when it has none. The prefix goes in front either way.
+     * {@code pg_cron:<jobid>} when it has none. The prefix goes in front either way. One that
+     * throws or returns null, like a {@code pick} or {@code options} function that throws, is
+     * reported once and fails only that job, which keeps its last declaration until the function
+     * works again.
      */
     public Builder jobName(Function<PgCronJob, String> jobName) {
       this.jobName = Objects.requireNonNull(jobName, "jobName");

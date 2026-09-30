@@ -146,6 +146,24 @@ class StartFinishTest {
         assertThrows(CronwatchException.class, () -> job.start(StartOptions.id("pgcron:1")))
             .getMessage()
             .contains("which the pg_cron source uses"));
+    // No store could hold a NUL (Postgres refuses it), so such an id is refused wherever one is
+    // taken.
+    assertTrue(
+        assertThrows(CronwatchException.class, () -> job.start(StartOptions.id("01HX\u0000run")))
+            .getMessage()
+            .contains("start() cannot take a run id containing a NUL character"));
+    assertTrue(
+        assertThrows(CronwatchException.class, () -> job.resume("01HX\u0000run"))
+            .getMessage()
+            .contains("resume() cannot take a run id containing a NUL character"));
+    Run nul =
+        new Run(
+            "x\u0000y", "inngest-fn", RunStatus.OK, 1, 2L, 1L, null, null, Metrics.empty(), "run");
+    assertTrue(
+        assertThrows(CronwatchException.class, () -> m.cw().recordRun(nul))
+            .getMessage()
+            .contains("recordRun: run ids cannot contain a NUL character"));
+    assertEquals(1, m.cw().runs("inngest-fn", 50).size());
   }
 
   /** Two clients over one store, or over two stores on one SQLite file. */

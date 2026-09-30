@@ -8,6 +8,7 @@ import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
 import dev.cronwatch.internal.js.Js;
+import dev.cronwatch.internal.output.Output;
 import dev.cronwatch.internal.sql.Dialect;
 import dev.cronwatch.internal.sql.Sql;
 import dev.cronwatch.json.JsObject;
@@ -543,6 +544,12 @@ public final class SqlStore implements Store {
         });
   }
 
+  /*
+   * Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the whole row, so every
+   * dialect writes text without it: a run's trigger, output, error and metric names, and every key
+   * and string of a definition and a state. Identifiers (a job's name, a run's id) are written as
+   * given; the client refuses one with a NUL before it gets here.
+   */
   private static List<Param> insertRunParams(Run r) {
     return List.of(
         new Text(r.id()),
@@ -551,10 +558,10 @@ public final class SqlStore implements Store {
         new Int(r.startedAt()),
         new Int(r.finishedAt()),
         new Int(r.durationMs()),
-        new Text(r.error()),
-        new Text(r.output()),
-        new JsonText(r.metrics().toJson()),
-        new Text(r.trigger()));
+        new Text(Output.stripNulOrNull(r.error())),
+        new Text(Output.stripNulOrNull(r.output())),
+        new JsonText(Output.stripJsonNul(r.metrics().toJson())),
+        new Text(Output.stripNul(r.trigger())));
   }
 
   private static List<Param> updateRunParams(Run r) {
@@ -562,9 +569,9 @@ public final class SqlStore implements Store {
         new Text(r.status().value()),
         new Int(r.finishedAt()),
         new Int(r.durationMs()),
-        new Text(r.error()),
-        new Text(r.output()),
-        new JsonText(r.metrics().toJson()),
+        new Text(Output.stripNulOrNull(r.error())),
+        new Text(Output.stripNulOrNull(r.output())),
+        new JsonText(Output.stripJsonNul(r.metrics().toJson())),
         new Text(r.id()));
   }
 
@@ -599,7 +606,7 @@ public final class SqlStore implements Store {
         sql.upsertJob,
         List.of(
             new Text(definition.name()),
-            new JsonText(definition.toJson()),
+            new JsonText(Output.stripJsonNul(definition.toJson())),
             new Int(now),
             new Int(now)));
   }
@@ -731,12 +738,14 @@ public final class SqlStore implements Store {
 
   @Override
   public void setState(JobState state) throws SQLException {
-    run(sql.setState, List.of(new Text(state.job()), new JsonText(state.toJson())));
+    run(
+        sql.setState,
+        List.of(new Text(state.job()), new JsonText(Output.stripJsonNul(state.toJson()))));
   }
 
   @Override
   public boolean compareAndSetState(JobState state, long expected) throws SQLException {
-    String body = state.toJson();
+    String body = Output.stripJsonNul(state.toJson());
     if (dialect == Dialect.MYSQL && expected == 0) {
       return casFromZero(state, body);
     }

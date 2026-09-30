@@ -712,6 +712,12 @@ final class Runs {
               + dev.cronwatch.json.Json.quote(input.job())
               + " is not declared; call job first");
     }
+    if (input.id().indexOf('\0') >= 0) {
+      throw CronwatchException.invalid(
+          "recordRun: run ids cannot contain a NUL character (job "
+              + dev.cronwatch.json.Json.quote(input.job())
+              + ")");
+    }
     core.sync(def);
     Run run = input;
     if (run.status().equals(RunStatus.OK)) {
