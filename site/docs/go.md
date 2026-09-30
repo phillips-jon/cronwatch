@@ -335,7 +335,7 @@ It reads through anything with `QueryContext`: a `*sql.DB`, `*sql.Conn` or `*sql
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `Expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off. An `Expect` rule is checked before redaction, so it still sees what was logged.
 
 ```go
 cardNumber := regexp.MustCompile(`\b\d{4}(?:[ -]?\d{4}){3}\b`)
@@ -411,14 +411,14 @@ The client:
 | `Start(every)`, `Stop()` | check in a goroutine; the interval is at least five seconds |
 | `Jobs(ctx)`, `JobsWithRuns(ctx, limit)`, `JobSummary(ctx, name)` | summaries, without alerting |
 | `Runs(ctx, name, limit)`, `GetRun(ctx, id)` | newest first; `limit` is 1 to 500 |
-| `Silence(ctx, name, d)`, `Unsilence(ctx, name)` | stop alerts for a while; state keeps updating underneath |
-| `Forget(ctx, name)` | remove a job and its runs |
+| `Silence(ctx, name, d)`, `Unsilence(ctx, name)` | stop alerts for a while; state keeps updating underneath. The end is a whole millisecond, held at 2^53 - 1 |
+| `Forget(ctx, name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `ResumeRun(ctx, name, runID)` | `Resume` for a job declared in this process |
-| `RecordRun(ctx, run, options...)` | record a run that happened elsewhere, for a source; returns the alerts it sent |
+| `RecordRun(ctx, run, options...)` | record a run that happened elsewhere, for a source; returns the alerts it sent. A metric that is not a finite number is refused before anything is written |
 | `SyncJob(ctx, name)` | write a declaration to the store now, unless it already holds it |
 | `Routes(options...)`, `MustRoutes` | the dashboard and JSON API |
-| `DefinedJobs()` | the definitions declared in this process |
-| `Close()` | stop the goroutine and close the store |
+| `DefinedJobs()`, `Declares(name)` | the definitions declared in this process, and whether one of that name is |
+| `Close()` | stop the goroutine, wait for a check already under way, then close the store |
 | `Store()`, `Now()`, `CronSecret()` | the client's store, its clock in epoch milliseconds, and the cron secret (`""` when none is set), for a source or an integration of your own |
 | `ReportError(err, where)` | hand an error to the error handler, as the client reports its own |
 

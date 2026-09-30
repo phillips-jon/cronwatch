@@ -150,6 +150,13 @@ River keeps a periodic job's schedule to itself, so `w.PeriodicJob` stands in fo
 
 `w.CheckWorker()` is the worker for the check job (kind `cronwatch_check`, one attempt, since the next check repeats a failed one), and `w.CheckPeriodicJob(5 * time.Minute)` schedules it; River's leader inserts it once for the whole deployment. Each check first declares again without its schedule any job of this app's that no periodic job holds any more. A worker process that makes no periodic jobs finds each job's definition in the store, so give every process of one app the same periodic jobs, as River asks you to anyway, and the same app name.
 
+Periodic jobs changed while the client runs are followed through the watcher. One made again by `w.PeriodicJob` with the `ID` of an earlier one replaces it (after River's `Remove` or `Clear`, with a new schedule, say). One taken out of River's bundle is taken out of the watcher's too, beside the bundle's own call, and loses its schedule at once, so it is never reported missed:
+
+```go
+client.PeriodicJobs().RemoveByID("nightly-report")
+w.RemoveByID("nightly-report") // also w.Remove(periodicJob) and w.Clear()
+```
+
 River 0.44.1 is the oldest supported. River 0.45 and newer need Go 1.26.
 
 ## Asynq
