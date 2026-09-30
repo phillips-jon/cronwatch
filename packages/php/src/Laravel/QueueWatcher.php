@@ -23,7 +23,11 @@ use Illuminate\Contracts\Container\Container;
  *   did not run, so its run is taken back (Cronwatch::discardExecution):
  *   no row is left, nothing is judged or alerted, and failuresBeforeAlert
  *   counts on across it. A release after an exception is the exception's
- *   failed attempt, as Celery's retry is.
+ *   failed attempt, as Celery's retry is. A job a middleware skips without
+ *   releasing it (WithoutOverlapping or RateLimited ->dontRelease(), Skip)
+ *   is deleted unrun, and its run is taken back the same way: a pipe on the
+ *   command bus, which runs only once the job's own middleware let it
+ *   through, notes each attempt that reached its handler.
  * - JobExceptionOccurred and JobFailed end it failed with the exception,
  *   whichever comes first; JobTimedOut ends it failed before the worker
  *   kills itself.
@@ -49,6 +53,10 @@ final class QueueWatcher
     private array $handles = [];
     /** @var array<string, bool> */
     private array $watched = [];
+    /** @var array<int, bool> spl_object_id(queue job) => whether its handler was reached, for the jobs that can tell */
+    private array $reached = [];
+    /** The command bus pipe that notes a handler reached. */
+    private ?\Closure $pipe = null;
 
     public function __construct(private readonly Container $app)
     {
@@ -152,6 +160,45 @@ final class QueueWatcher
         $base = is_string($base) && $base !== '' ? $base : (method_exists($job, 'getJobId') ? $job->getJobId() : null);
         $id = is_scalar($base) && (string) $base !== '' && strlen((string) $base) <= 150 ? $base . ':' . bin2hex(random_bytes(6)) : null;
         $this->open[spl_object_id($job)] = $this->cw()->startExecution($handle->definition, self::TRIGGER, $id, mayDiscard: true);
+        if ($this->tellsReached($job, $class)) {
+            $this->reached[spl_object_id($job)] = false;
+        }
+    }
+
+    /**
+     * Whether this attempt will say when its handler is reached: a job class
+     * run by Laravel's CallQueuedHandler, which gives the command its queue
+     * job (InteractsWithQueue), on Laravel's own command bus, which then
+     * carries the pipe. The pipe is put back if the app set the bus's pipes
+     * since.
+     */
+    private function tellsReached(object $job, string $class): bool
+    {
+        try {
+            $payload = method_exists($job, 'payload') ? $job->payload() : [];
+            if (($payload['job'] ?? null) !== 'Illuminate\\Queue\\CallQueuedHandler@call' || ($payload['data']['commandName'] ?? null) !== $class
+                || !in_array(\Illuminate\Queue\InteractsWithQueue::class, class_uses_recursive($class), true)) {
+                return false;
+            }
+            $bus = $this->app->make(\Illuminate\Contracts\Bus\Dispatcher::class);
+            if (!$bus instanceof \Illuminate\Bus\Dispatcher) {
+                return false;
+            }
+            $this->pipe ??= function (object $command, \Closure $next): mixed {
+                $queued = $command->job ?? null;
+                if (is_object($queued) && isset($this->reached[spl_object_id($queued)])) {
+                    $this->reached[spl_object_id($queued)] = true;
+                }
+                return $next($command);
+            };
+            $pipes = (fn (): array => $this->pipes)->call($bus);
+            if (!in_array($this->pipe, $pipes, true)) {
+                $bus->pipeThrough([...$pipes, $this->pipe]);
+            }
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function processed(object $event): void
@@ -167,6 +214,10 @@ final class QueueWatcher
             // a deliberate release): the attempt did not happen, so its run is
             // taken back, neither a failure nor a success.
             $this->discard($job);
+        } elseif (($this->reached[spl_object_id($job)] ?? true) === false) {
+            // Deleted without its handler running (a middleware's
+            // dontRelease(), Skip): no attempt happened either.
+            $this->discard($job);
         } else {
             $this->end($job, null);
         }
@@ -179,7 +230,7 @@ final class QueueWatcher
         if ($key === null) {
             return;
         }
-        unset($this->open[$id]);
+        unset($this->open[$id], $this->reached[$id]);
         $this->cw()->discardExecution($key);
     }
 
@@ -204,7 +255,7 @@ final class QueueWatcher
         if ($key === null) {
             return;
         }
-        unset($this->open[$id]);
+        unset($this->open[$id], $this->reached[$id]);
         $this->cw()->finishExecution($key, null, $error, $error !== null);
     }
 }

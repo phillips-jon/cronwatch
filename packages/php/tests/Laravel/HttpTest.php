@@ -154,6 +154,37 @@ final class HttpTest extends TestCase
         $this->assertSame('queued', $array->getContent());
     }
 
+    public function testAnAlertSentInsideARequestLinksToAppUrlNotTheRequestsHost(): void
+    {
+        $this->app['config']->set('app.url', 'https://ops.example');
+        $this->app['config']->set('cronwatch.alerts.slack', 'https://hooks.slack.test/services/T/B/x');
+        $http = new \Cronwatch\Tests\Support\FakeHttp();
+        \Cronwatch\Alerts\Transport::set($http);
+        try {
+            Route::get('/breaks', function () {
+                try {
+                    app(Cronwatch::class)->job('sync-orders')->run(fn () => throw new \RuntimeException('down'));
+                } catch (\RuntimeException) {
+                }
+                return 'done';
+            });
+            $this->get('http://evil.example/breaks')->assertOk();
+            $this->assertCount(1, $http->requests);
+            $body = $http->requests[0]['body'];
+            $this->assertStringContainsString('https://ops.example/cronwatch/jobs/sync-orders', $body);
+            $this->assertStringNotContainsString('evil.example', $body);
+
+            // The dashboard on a domain of its own links there, in app.url's scheme.
+            $this->app['config']->set('cronwatch.dashboard.domain', 'cron.ops.example');
+            $this->app->forgetInstance(Cronwatch::class);
+            $this->get('http://evil.example/breaks')->assertOk();
+            $this->assertCount(2, $http->requests);
+            $this->assertStringContainsString('https://cron.ops.example/cronwatch/jobs/sync-orders', $http->requests[1]['body']);
+        } finally {
+            \Cronwatch\Alerts\Transport::set(null);
+        }
+    }
+
     public function testAnHttpClientResponseIsARunOutcome(): void
     {
         $cw = $this->client();

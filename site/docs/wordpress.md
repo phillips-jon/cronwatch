@@ -23,7 +23,7 @@ It needs WordPress 6.1 or newer, PHP 8.2 or newer, and MySQL 5.7.8 or MariaDB 10
 
 ## What is watched
 
-Every WP-Cron event becomes a job, with nothing to configure. A run starts just before WordPress runs the event's callbacks and ends after the last, from wp-cron.php or `wp cron event run`; what the callbacks print is kept as its output (and still printed).
+Every WP-Cron event becomes a job, with nothing to configure. A run starts just before WordPress runs the event's callbacks and ends after the last, from wp-cron.php or `wp cron event run`; what the callbacks print is kept as its output (its end, as much as a run keeps) and still printed, as it is printed.
 
 - A recurring event is a job named `wp:<hook>`, expected every interval of its recurrence: `hourly` is `every 1h`, `twicedaily` `every 12h`, `daily` `every 1d`, `weekly` `every 7d`, and a schedule a plugin adds through `cron_schedules` its own interval. One scheduled with arguments is `wp:<hook>:<key>`, the key the first 8 characters of WordPress's own key for those arguments, so the same hook with two sets of arguments is two jobs.
 - Single events (`wp_schedule_single_event`, such as a scheduled post's publishing) are one job per hook, with no schedule: they are one-offs, so a failure is reported but there is no cadence to miss. If WP-Cron stops running altogether, the recurring events WordPress itself schedules (`wp_version_check` and the rest) are reported missed, which is how you find out.
@@ -103,7 +103,8 @@ add_filter( 'cronwatch_watch_event', function ( bool $watch, string $hook, array
     return $watch && ! str_starts_with( $hook, 'woocommerce_cleanup_' );
 }, 10, 4 );
 
-// A job's options (grace, timeout, maxDuration, failuresBeforeAlert, description, tags).
+// A job's options (grace, timeout, maxDuration, failuresBeforeAlert, description, tags). Options CronWatch
+// refuses (a timeout of "2 hours") are written to the error log, and the job keeps its own.
 add_filter( 'cronwatch_job_options', function ( array $options, string $hook ) {
     if ( 'my_nightly_import' === $hook ) {
         $options['timeout'] = '2h';

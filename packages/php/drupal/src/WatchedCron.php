@@ -18,7 +18,10 @@ use Psr\Log\NullLogger;
  * took the cron lock) and the check after it; invokeCronHandlers() is
  * core's, line for line (the same order, the same logging, the same
  * \Exception caught so one module cannot stop the others), with each
- * module's hook_cron recorded as a run of its own. An \Error, which core
+ * module's hook_cron recorded as a run of its own. A module with several
+ * implementations (Drupal 11.1 and newer, #[Hook('cron')] on more than one
+ * method) is one run: started before its first, finished after its last,
+ * failed with the first exception any of them threw. An \Error, which core
  * does not catch, is recorded and thrown on, as core throws it.
  *
  * CronWatch never stops cron: when the recorder cannot be had or fails,
@@ -55,6 +58,13 @@ class WatchedCron extends Cron {
     }
     $recorder->cronStarted();
 
+    // How many implementations each module has, so its run ends after the last.
+    $remaining = [];
+    $this->moduleHandler->invokeAllWith('cron', function (callable $hook, string $module) use (&$remaining): void {
+      $remaining[$module] = ($remaining[$module] ?? 0) + 1;
+    });
+    $runs = [];
+
     $module_previous = '';
 
     // If detailed logging isn't enabled, don't log individual execution times.
@@ -62,7 +72,7 @@ class WatchedCron extends Cron {
     $logger = $time_logging_enabled ? $this->logger : new NullLogger();
 
     // Iterate through the modules calling their cron handlers (if any):
-    $this->moduleHandler->invokeAllWith('cron', function (callable $hook, string $module) use (&$module_previous, $logger, $recorder) {
+    $this->moduleHandler->invokeAllWith('cron', function (callable $hook, string $module) use (&$module_previous, &$remaining, &$runs, $logger, $recorder) {
       if (!$module_previous) {
         $logger->info('Starting execution of @module_cron().', [
           '@module' => $module,
@@ -76,24 +86,26 @@ class WatchedCron extends Cron {
         ]);
       }
       Timer::start('cron_' . $module);
-      $key = $recorder->hookStarted($module);
+      if (!array_key_exists($module, $runs)) {
+        $runs[$module] = ['key' => $recorder->hookStarted($module), 'error' => NULL];
+      }
 
       // Do not let an exception thrown by one module disturb another.
       try {
         $hook();
       }
       catch (\Exception $e) {
-        $recorder->hookFinished($key, $module, $e);
-        $key = NULL;
+        $runs[$module]['error'] ??= $e;
         Error::logException($this->logger, $e);
       }
       catch (\Throwable $e) {
         // Core lets an \Error end the cron run; it is recorded first.
-        $recorder->hookFinished($key, $module, $e);
+        $recorder->hookFinished($runs[$module]['key'], $module, $runs[$module]['error'] ?? $e);
         throw $e;
       }
-      if ($key !== NULL) {
-        $recorder->hookFinished($key, $module, NULL);
+      $remaining[$module] = ($remaining[$module] ?? 1) - 1;
+      if ($remaining[$module] <= 0) {
+        $recorder->hookFinished($runs[$module]['key'], $module, $runs[$module]['error']);
       }
 
       Timer::stop('cron_' . $module);

@@ -125,15 +125,29 @@ final class ClientFactory
         return $channels;
     }
 
-    /** A link to the job's page in the dashboard, for the channels that show one, when the dashboard is mounted. */
+    /**
+     * A link to the job's page in the dashboard, for the channels that show
+     * one, when the dashboard is mounted. It starts from app.url (or the
+     * dashboard's domain, in app.url's scheme), never from the request that
+     * happens to send the alert, whose Host header a visitor chooses.
+     */
     private function link(): ?\Closure
     {
         $dashboard = $this->config()['dashboard'] ?? [];
-        if (!is_array($dashboard) || empty($dashboard['enabled']) || !function_exists('url')) {
+        if (!is_array($dashboard) || empty($dashboard['enabled'])) {
+            return null;
+        }
+        $base = rtrim(trim((string) $this->app->make('config')->get('app.url', '')), '/');
+        $domain = $dashboard['domain'] ?? null;
+        if (is_string($domain) && trim($domain) !== '' && !str_contains($domain, '{')) {
+            $scheme = parse_url($base, PHP_URL_SCHEME);
+            $base = (is_string($scheme) && $scheme !== '' ? $scheme : 'https') . '://' . trim($domain, " \t/");
+        }
+        if ($base === '') {
             return null;
         }
         $path = trim((string) ($dashboard['path'] ?? 'cronwatch'), '/');
-        return fn (Alert $alert): string => url(($path === '' ? '' : "{$path}/") . 'jobs/' . rawurlencode($alert->job));
+        return fn (Alert $alert): string => $base . '/' . ($path === '' ? '' : "{$path}/") . 'jobs/' . rawurlencode($alert->job);
     }
 
     private static function filled(mixed $value): bool

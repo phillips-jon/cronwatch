@@ -35,7 +35,9 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  *
  * /cronwatch/api/... is the JSON API for @cronwatch/mcp, with the
  * dashboard's token ($settings['cronwatch_token'] in settings.php, else
- * CRONWATCH_TOKEN). Without a token it is not there (404).
+ * CRONWATCH_TOKEN). Without a token it is not there (404). A check through
+ * it declares every job first, and only once the token is right: a caller
+ * without it gets the dashboard's 401 having made nothing run.
  */
 final class DashboardController extends ControllerBase {
 
@@ -135,11 +137,28 @@ final class DashboardController extends ControllerBase {
     if ($at === FALSE) {
       throw new NotFoundHttpException();
     }
-    if (strtoupper($request->getMethod()) === 'POST' && str_ends_with(rtrim($inner->path, '/'), '/cronwatch/api/check')) {
+    $cw = $this->recorder->client();
+    $check = strtoupper($request->getMethod()) === 'POST' && str_ends_with(rtrim($inner->path, '/'), '/cronwatch/api/check');
+    if ($check && self::signedIn($request, $token, $cw->cronSecret)) {
       $this->recorder->prepare();
     }
-    $dashboard = new Dashboard($this->recorder->client(), token: $token, basePath: substr($inner->path, 0, $at) . '/cronwatch');
+    $dashboard = new Dashboard($cw, token: $token, basePath: substr($inner->path, 0, $at) . '/cronwatch');
     return HttpFoundation::toResponse($dashboard->handle($inner));
+  }
+
+  /**
+   * Whether a request to /api/check carries what the dashboard will let in.
+   *
+   * The token or the client's cron secret as a bearer, or the dashboard's
+   * cookie, compared in constant time; the dashboard checks again.
+   */
+  private static function signedIn(Request $request, string $token, ?string $cronSecret): bool {
+    $authorization = (string) $request->headers->get('authorization', '');
+    if (preg_match('/^Bearer\s+(.+)$/is', $authorization, $m) === 1) {
+      return hash_equals($token, $m[1]) || ($cronSecret !== NULL && hash_equals($cronSecret, $m[1]));
+    }
+    $cookie = $request->cookies->get(Dashboard::COOKIE);
+    return is_string($cookie) && hash_equals(Dashboard::cookieValue($token), $cookie);
   }
 
   /**

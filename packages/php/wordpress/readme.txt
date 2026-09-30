@@ -65,7 +65,7 @@ CronWatch finds missed runs with a check every five minutes, which it schedules 
 
 * `cronwatch_alerts` (filter): the list of alert channels (the email, Slack and webhook ones the settings made). Add any object implementing `Cronwatch\Alerts\AlertChannel`, or a callable taking the `Cronwatch\Alert`.
 * `cronwatch_watch_event` (filter): return false to leave an event unwatched. Given `true`, the hook, its arguments and its recurrence name (null for a single event).
-* `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence.
+* `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence. Options CronWatch refuses are written to the error log, and the job keeps its own.
 * `cronwatch_client_args` (filter): the arguments the library's client is made with (its store, alert channels, default grace and error handler).
 * `cronwatch_reject_unsafe_urls` (filter): whether an alert URL may not reach a private address or an unusual port (WordPress's `reject_unsafe_urls`). True on a multisite network, where a site's administrators may not be the network's, and false otherwise; given the URL's origin.
 * `cronwatch_log( ...$parts )`, or `do_action( 'cronwatch_log', ...$parts )`: a line for the output of the event running now.

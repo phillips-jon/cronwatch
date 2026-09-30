@@ -1,0 +1,5 @@
+name: CronWatch two cron hooks
+type: module
+description: A module with two hook_cron methods, for the CronWatch tests (Drupal 11.1 and newer).
+package: Testing
+core_version_requirement: ^11.1

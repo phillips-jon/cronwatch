@@ -439,6 +439,47 @@ final class WordPressTest extends TestCase
         $this->assertMatchesRegularExpression('/^cronwatch: checked \d+ jobs, sent \d+ alerts?$/', trim(self::must(['cronwatch', 'check'])));
     }
 
+    public function testTheJobOptionsFilterAppliesAndAResultTheLibraryRefusesStopsNothing(): void
+    {
+        self::inWp('delete_option("cwt_now"); echo json_encode(true);');
+        self::schedule('cwt_ok', [['hourly', []]]);
+        self::schedule('cwt_single', [[null, ['filtered']]]);
+        self::inWp('update_option("cwt_job_options", ["cwt_ok" => ["grace" => "5m", "description" => "Filtered"], "cwt_single" => ["timeout" => "2 hours"]], false); echo json_encode(true);');
+        try {
+            $line = trim(self::must(['cronwatch', 'check']));
+            $this->assertMatchesRegularExpression('/^cronwatch: checked \d+ jobs, sent \d+ alerts?$/', $line);
+            $ok = self::definition('wp:cwt_ok');
+            $this->assertSame(['5m', 'Filtered'], [$ok['grace'], $ok['description']], 'the filter\'s options');
+            $single = self::definition('wp:cwt_single');
+            $this->assertArrayNotHasKey('timeout', $single, 'the refused options left out');
+            $this->assertSame('WP-Cron hook cwt_single, single events', $single['description'], 'its own options instead');
+
+            $before = count(self::runs('wp:cwt_single'));
+            self::must(['cron', 'event', 'run', 'cwt_single']);
+            $this->assertCount($before + 1, self::runs('wp:cwt_single'), 'its runs are still recorded');
+            $this->assertSame(['ok', 'single filtered'], [self::lastRun('wp:cwt_single')['status'], self::lastRun('wp:cwt_single')['output']]);
+        } finally {
+            self::inWp('delete_option("cwt_job_options"); echo json_encode(true);');
+        }
+    }
+
+    public function testAnEventsOutputIsPassedOnAsItIsWrittenAndOnlyItsEndKept(): void
+    {
+        self::schedule('cwt_big', [[null, []]]);
+        [$code, $out] = self::wp(['cron', 'event', 'run', 'cwt_big']);
+        $this->assertSame(0, $code);
+        $this->assertGreaterThan(32 * 1024 * 1024, strlen($out), 'all of it passed on');
+        $this->assertStringContainsString("32767 x", $out);
+        $this->assertStringContainsString("the end\n", $out);
+        $held = (int) self::inWp('echo json_encode((int) get_option("cwt_big_memory"));');
+        $this->assertLessThan(4 * 1024 * 1024, $held, 'the 32 MB went on as it was written, not held in memory');
+        $run = self::lastRun('wp:cwt_big');
+        $this->assertSame('ok', $run['status']);
+        $this->assertStringStartsWith("[earlier output trimmed]\n", $run['output']);
+        $this->assertStringEndsWith("x\nthe end", $run['output']);
+        $this->assertLessThan(20 * 1024, strlen($run['output']));
+    }
+
     public function testAnEventThatIsNoLongerScheduledLosesItsSchedule(): void
     {
         self::inWp('delete_option("cwt_now"); echo json_encode(true);');

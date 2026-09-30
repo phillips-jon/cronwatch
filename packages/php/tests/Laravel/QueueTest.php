@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Cronwatch\Tests\Laravel;
 
 use Cronwatch\Cronwatch;
+use Cronwatch\Tests\Laravel\Fixtures\AttributeDescribedJob;
 use Cronwatch\Tests\Laravel\Fixtures\FlakyJob;
 use Cronwatch\Tests\Laravel\Fixtures\InterfaceJob;
 use Cronwatch\Tests\Laravel\Fixtures\LimitedJob;
+use Cronwatch\Tests\Laravel\Fixtures\MethodDescribedJob;
 use Cronwatch\Tests\Laravel\Fixtures\OptedOutJob;
 use Cronwatch\Tests\Laravel\Fixtures\PlainQueuedJob;
 use Cronwatch\Tests\Laravel\Fixtures\ReleasingJob;
+use Cronwatch\Tests\Laravel\Fixtures\SkippableJob;
 use Cronwatch\Tests\Laravel\Fixtures\WatchedQueuedJob;
 use Orchestra\Testbench\Attributes\DefineEnvironment;
 
@@ -123,6 +126,60 @@ final class QueueTest extends TestCase
         $this->assertSame([['ok', 'done']], array_map(fn ($r) => [$r->status, $r->output], $cw->runs('rate-limited')));
         $this->assertSame([], $this->capture->types());
         $this->assertSame([], $this->errors);
+    }
+
+    public function testAJobItsMiddlewareSkipsWithoutReleasingLeavesNoRun(): void
+    {
+        $cw = $this->client();
+        $statuses = fn () => array_map(fn ($r) => $r->status, $cw->runs('skippable'));
+        SkippableJob::$mode = 'fail';
+        SkippableJob::dispatch();
+        $this->work();
+        $this->work();
+        $this->work();
+        $this->assertSame(['failed', 'failed', 'failed'], $statuses());
+        $this->assertSame(['failed'], $this->capture->types());
+
+        SkippableJob::$mode = 'skip';
+        SkippableJob::dispatch();
+        $this->work();
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('jobs')->count(), 'Laravel deleted the skipped job');
+        $this->assertSame(['failed', 'failed', 'failed'], $statuses(), 'the skipped attempt is taken back');
+        $this->assertSame(['failed'], $this->capture->types(), 'a skip is not a recovery');
+
+        SkippableJob::$mode = 'ok';
+        SkippableJob::dispatch();
+        $this->work();
+        $this->assertSame(['ok', 'failed', 'failed', 'failed'], $statuses());
+        $this->assertSame('worked', $cw->runs('skippable')[0]->output);
+        $this->assertSame(['failed', 'recovered'], $this->capture->types());
+
+        // On the sync queue too, and a bus pipe the app sets later is kept with CronWatch's.
+        $this->app['config']->set('queue.default', 'sync');
+        $seen = [];
+        $bus = $this->app->make(\Illuminate\Contracts\Bus\Dispatcher::class);
+        $bus->pipeThrough([function ($command, $next) use (&$seen) {
+            $seen[] = $command::class;
+            return $next($command);
+        }]);
+        SkippableJob::$mode = 'skip';
+        SkippableJob::dispatch();
+        SkippableJob::$mode = 'ok';
+        SkippableJob::dispatch();
+        $this->assertSame(['ok', 'ok', 'failed', 'failed', 'failed'], $statuses());
+        $this->assertSame([SkippableJob::class], $seen, 'the app\'s pipe still runs');
+        $this->assertSame([], $this->errors);
+    }
+
+    public function testAWatchedJobsOwnDescriptionWins(): void
+    {
+        $cw = $this->client();
+        AttributeDescribedJob::dispatch();
+        MethodDescribedJob::dispatch();
+        $this->work(2);
+        $this->assertSame('Sends the nightly digest', $cw->store->getJob('described-by-attribute')->definition->get('description'));
+        $this->assertSame('Rebuilds the search index', $cw->store->getJob('described-by-method')->definition->get('description'));
+        $this->assertSame('Queued job ' . InterfaceJob::class, (new \Cronwatch\Laravel\QueueWatcher($this->app))->definition(InterfaceJob::class)[1]['description'], 'the default, for a job with none');
     }
 
     public function testATakenBackRunLeavesMissedOpenAndAlertedOnce(): void

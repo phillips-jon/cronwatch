@@ -232,13 +232,24 @@ final class Plugin
     /**
      * Declares one job, with the cronwatch_job_options filter applied. The
      * library's defaults (grace from the settings) fill what it leaves out.
+     * Options from the filter the library refuses ("2 hours" for a timeout)
+     * are reported, and the job is declared with its own options instead,
+     * so one bad filter result never stops a check or a run's recording.
      *
      * @param array{hook: string, args: array, recurrence: ?string, interval: ?int} $job
      */
     private static function declare(Cronwatch $cw, string $name, array $job): \Cronwatch\Job\JobHandle
     {
-        $options = apply_filters('cronwatch_job_options', Jobs::options($job), $job['hook'], $job['args'], $job['recurrence']);
-        return $cw->job($name, is_array($options) ? $options : Jobs::options($job));
+        $own = Jobs::options($job);
+        try {
+            $options = apply_filters('cronwatch_job_options', $own, $job['hook'], $job['args'], $job['recurrence']);
+            if (is_array($options)) {
+                return $cw->job($name, $options);
+            }
+        } catch (\Throwable $error) {
+            self::report($error, "job {$name}");
+        }
+        return $cw->job($name, $own);
     }
 
     /**
@@ -273,7 +284,11 @@ final class Plugin
         $cw = self::client();
         $jobs = self::cronJobs();
         foreach ($jobs as $name => $job) {
-            self::declare($cw, $name, $job);
+            try {
+                self::declare($cw, $name, $job);
+            } catch (\Throwable $error) {
+                self::report($error, "job {$name}");
+            }
         }
         foreach ($cw->store->listJobs() as $stored) {
             $definition = $stored->definition;

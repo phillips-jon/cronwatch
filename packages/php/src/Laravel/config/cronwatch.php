@@ -84,6 +84,12 @@ return [
         // Schedule `cronwatch:check` in the app's own scheduler.
         'check' => env('CRONWATCH_SCHEDULE_CHECK', true),
         'check_cron' => env('CRONWATCH_CHECK_CRON', '*/5 * * * *'),
+        // A command that sends its output nowhere (Laravel's default) records
+        // none. On, its output goes to a temporary file of CronWatch's own for
+        // the run instead, and the run keeps the last 256 KB. The file holds
+        // all of it until the run ends, so a command that writes a lot needs
+        // the disk space.
+        'capture_output' => env('CRONWATCH_CAPTURE_OUTPUT', false),
     ],
 
     // Queued jobs marked #[Cronwatch\Watch] or implementing

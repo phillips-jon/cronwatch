@@ -199,6 +199,8 @@ final class CraftTest extends TestCase
                     'cwt/task/hello' => ['schedule' => '0 3 * * *', 'timezone' => 'UTC'],
                     'cwt/task/fail' => true,
                     'cwt/task/boom' => ['name' => 'cwt-boom', 'description' => 'The command that breaks'],
+                    'cwt/task/nested' => true,
+                    'cwt/task/inner' => true,
                 ],
                 'queueJobs' => [cwt\jobs\Flaky::class => true],
             ];
@@ -547,6 +549,18 @@ final class CraftTest extends TestCase
         $this->assertSame([['failed', 'craft:cwt:task:fail'], ['failed', 'cwt-boom']], array_map(fn ($a) => [$a['type'], $a['job']], self::alerts()));
     }
 
+    public function testANestedCommandThatThrowsFailsAndItsCallerFinishes(): void
+    {
+        self::clearAlerts();
+        $this->assertStringContainsString('caught: cwt inner broke', self::must(['cwt/task/nested']));
+        $nested = self::last('craft:cwt:task:nested');
+        $this->assertSame('ok', $nested['status'], 'the caller carried on and finished');
+        $inner = self::last('craft:cwt:task:inner');
+        $this->assertSame('failed', $inner['status']);
+        $this->assertSame('Threw an exception that craft cwt/task/nested, which ran it, caught', $inner['error']);
+        $this->assertSame([['failed', 'craft:cwt:task:inner']], array_map(fn ($a) => [$a['type'], $a['job']], self::alerts()));
+    }
+
     public function testACommandWithTheBehaviorIsWatched(): void
     {
         self::must(['cwt/behaved']);
@@ -587,6 +601,35 @@ final class CraftTest extends TestCase
         $this->assertSame(2, self::definition('cwt-marked')['failuresBeforeAlert']);
         $this->assertSame('The marked job', self::definition('cwt-marked')['description'], "the attribute's description wins");
         $this->assertSame('Queue job cwt\jobs\Flaky', self::definition($name)['description']);
+    }
+
+    public function testAlertLinksNeverTakeTheHostOfAVisitorsRequest(): void
+    {
+        // A site as Craft makes one: @web not set, so Craft takes it from each
+        // request, and the queue run by the Control Panel's queue runner.
+        $general = self::$root . '/config/general.php';
+        $before = (string) file_get_contents($general);
+        file_put_contents($general, str_replace(
+            ["->runQueueAutomatically(false)", ", '@web' => craft\\helpers\\App::env('PRIMARY_SITE_URL')"],
+            ["->runQueueAutomatically(true)", ''],
+            $before,
+        ));
+        self::stopServer();
+        self::clearAlerts();
+        self::must(['cwt/task/push', 'link', '2']);
+        try {
+            // A queue job run in a request whose Host a visitor chose.
+            [$status] = self::http('GET', '/actions/queue/run', null, ['Host' => 'cronwatch-login.example']);
+            $this->assertSame(200, $status);
+            $alerts = self::alerts();
+            $this->assertSame([['failed', 'cwt.jobs.Flaky']], array_map(fn ($a) => [$a['type'], $a['job']], $alerts));
+            $this->assertStringStartsWith('http://127.0.0.1:' . self::$port . '/', $alerts[0]['link'], 'the primary site\'s host');
+            $this->assertStringContainsString('cronwatch?job=cwt.jobs.Flaky', $alerts[0]['link']);
+        } finally {
+            file_put_contents($general, $before);
+            self::stopServer();
+            self::must(['queue/release', 'all']);
+        }
     }
 
     public function testTheCheckCommand(): void
@@ -680,6 +723,25 @@ final class CraftTest extends TestCase
             $this->assertStringContainsString('"name":"craft:cwt:task:hello"', $body);
             [$status] = self::http('GET', '/cronwatch/api/jobs', null, ['Authorization' => 'Bearer wrong']);
             $this->assertSame(401, $status);
+
+            // A check is prepared (the jobs declared, the jobs table read) only for a caller with the token:
+            // with the table unreadable, anyone else still gets the 401, not the error preparing it would raise.
+            $pdo = self::pdo();
+            $jobs = self::table('jobs');
+            $pdo->exec("ALTER TABLE {$jobs} RENAME TO {$jobs}_kept");
+            $pdo->exec("CREATE VIEW {$jobs} AS SELECT 1 AS unreadable");
+            try {
+                [$status] = self::http('POST', '/cronwatch/api/check', null, ['Authorization' => 'Bearer wrong']);
+                $this->assertSame(401, $status);
+                [$status] = self::http('POST', '/cronwatch/api/check');
+                $this->assertSame(401, $status);
+            } finally {
+                $pdo->exec("DROP VIEW {$jobs}");
+                $pdo->exec("ALTER TABLE {$jobs}_kept RENAME TO {$jobs}");
+            }
+            [$status, , $body] = self::http('POST', '/cronwatch/api/check', null, ['Authorization' => "Bearer {$token}"]);
+            $this->assertSame(200, $status, $body);
+            $this->assertStringContainsString('"ok":true', $body);
         } finally {
             file_put_contents($config, $before);
         }

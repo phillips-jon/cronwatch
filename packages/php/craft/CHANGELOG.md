@@ -10,6 +10,9 @@
 - The plugin's documentation link goes to the Craft CMS page of the docs, not the docs' front page.
 
 ### Fixed
+- A watched command run by another that catches its exception is recorded as failed, and its caller finishes, instead of both being left running and later reported stuck.
+- `POST /cronwatch/api/check` declares the jobs only once the token is checked, so a caller without it gets 401, not the site's error page when the store is down.
+- An alert sent from a web request no longer takes its link's host from the request's `Host` header where `@web` is not configured; it uses the primary site's URL, or goes without a link.
 - A `description` given to a command or queue job (in `config/cronwatch.php`, on the `WatchCommand` behavior or in `#[Cronwatch\Watch]`) is now shown, instead of being replaced by the plugin's default.
 
 ## 0.9.0 - 2026-09-30

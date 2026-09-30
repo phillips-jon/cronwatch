@@ -104,6 +104,7 @@ final class ScheduleTest extends TestCase
     public function testScheduleRunRecordsCallbacksAndShellCommands(): void
     {
         $cw = $this->client();
+        $this->app['config']->set('cronwatch.schedule.capture_output', true);
         $schedule = $this->schedule();
         $schedule->call(function () {
             Cronwatch::current()->log('pruned 3 tokens');
@@ -129,6 +130,43 @@ final class ScheduleTest extends TestCase
         $this->assertSame(['failed', 'failed', 'failed'], $this->capture->types());
         foreach ($schedule->events() as $event) {
             $this->assertSame($event->getDefaultOutput(), $event->output, 'the output setting is put back');
+        }
+    }
+
+    public function testACommandSendingItsOutputNowhereRecordsNoneUnlessCaptureIsOn(): void
+    {
+        $cw = $this->client();
+        $event = $this->schedule()->exec('echo discarded')->everyMinute()->cronwatch(['name' => 'discards']);
+        $this->artisan('schedule:run')->assertExitCode(0);
+        $run = $cw->runs('discards')[0];
+        $this->assertSame(['ok', null], [$run->status, $run->output], 'the output went where the task sent it');
+        $this->assertSame($event->getDefaultOutput(), $event->output);
+    }
+
+    public function testOutputFilesLeftByRunsThatNeverEndedAreSwept(): void
+    {
+        $cw = $this->client();
+        $this->app['config']->set('cronwatch.schedule.capture_output', true);
+        $stale = [(string) tempnam(sys_get_temp_dir(), 'cronwatch-schedule-'), storage_path('framework/schedule-cronwatch-' . sha1('killed') . '.log')];
+        $fresh = [(string) tempnam(sys_get_temp_dir(), 'cronwatch-schedule-'), storage_path('framework/schedule-cronwatch-' . sha1('running') . '.log')];
+        foreach ([...$stale, ...$fresh] as $file) {
+            file_put_contents($file, 'left behind');
+        }
+        foreach ($stale as $file) {
+            touch($file, time() - 2 * 86400);
+        }
+        try {
+            $this->schedule()->exec('echo captured')->everyMinute()->cronwatch(['name' => 'captures']);
+            $this->artisan('schedule:run')->assertExitCode(0);
+            $this->assertSame('captured', $cw->runs('captures')[0]->output);
+            foreach ($stale as $file) {
+                $this->assertFileDoesNotExist($file);
+            }
+            foreach ($fresh as $file) {
+                $this->assertFileExists($file, 'a file under a day old may be a run still going');
+            }
+        } finally {
+            array_map(fn (string $file) => @unlink($file), [...$stale, ...$fresh]);
         }
     }
 
@@ -198,6 +236,7 @@ final class ScheduleTest extends TestCase
     public function testABackgroundTaskIsFinishedByScheduleFinish(): void
     {
         $cw = $this->client();
+        $this->app['config']->set('cronwatch.schedule.capture_output', true);
         $event = $this->schedule()->exec("sh -c 'echo in the background; exit 2'")->everyMinute()->runInBackground()->cronwatch(['name' => 'background']);
         $this->artisan('schedule:run')->assertExitCode(0);
         $this->assertSame('running', $cw->runs('background')[0]->status);
@@ -211,6 +250,45 @@ final class ScheduleTest extends TestCase
         $run = $cw->runs('background')[0];
         $this->assertSame(['failed', 'Exited with code 2', 'in the background'], [$run->status, $run->error, $run->output]);
         $this->assertFileDoesNotExist($file);
+    }
+
+    public function testABackgroundTaskThatRanPastItsTimeoutIsStillFinished(): void
+    {
+        $cw = $this->client();
+        $event = $this->schedule()->exec('backup')->daily()->runInBackground()->withoutOverlapping()->cronwatch(['name' => 'backup', 'timeout' => '1h']);
+        $watcher = $this->app->make(\Cronwatch\Laravel\ScheduleWatcher::class);
+        $file = storage_path('framework/schedule-cronwatch-' . sha1($event->mutexName()) . '.log');
+        $starting = function () use ($watcher, $event): void {
+            $watcher->starting(new \Illuminate\Console\Events\ScheduledTaskStarting($event));
+            $event->output = $event->getDefaultOutput();
+        };
+        $finish = function (int $code, string $output) use ($event, $file): void {
+            file_put_contents($file, $output);
+            $this->artisan('schedule:finish', ['id' => $event->mutexName(), 'code' => $code])->assertExitCode(0);
+        };
+        $statuses = fn () => array_map(fn ($r) => $r->status, $cw->runs('backup'));
+
+        // A run past its timeout, marked by a check, then ending 30 minutes later.
+        $starting();
+        $this->clock->advance(90 * 60_000);
+        $this->artisan('cronwatch:check')->assertExitCode(0);
+        $this->assertSame(['timeout'], $statuses());
+        $this->assertSame(['stuck'], $this->capture->types());
+        $finish(1, 'disk full');
+        $run = $cw->runs('backup')[0];
+        $this->assertSame(['failed', 'Exited with code 1', 'disk full'], [$run->status, $run->error, $run->output]);
+
+        // One that died, marked timeout and never finished, is not given a later run's finish.
+        $this->clock->advance(60_000);
+        $starting();
+        $this->clock->advance(90 * 60_000);
+        $this->artisan('cronwatch:check')->assertExitCode(0);
+        $this->clock->advance(60_000);
+        $starting();
+        $finish(0, 'backed up');
+        $this->assertSame(['ok', 'timeout', 'failed'], $statuses());
+        $this->assertSame('backed up', $cw->runs('backup')[0]->output);
+        $this->assertSame([], $this->errors);
     }
 
     public function testAScheduledQueuedJobIsRecordedByTheQueueNotTheScheduler(): void

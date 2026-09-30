@@ -13,7 +13,8 @@ use yii\base\Event;
 /**
  * Fixtures for the Craft plugin's tests: console commands (cwt/task/...,
  * cwt/behaved), queue jobs, and an alert channel that appends every alert
- * to storage/runtime/cwt-alerts.json.
+ * to storage/runtime/cwt-alerts.json, with the link the plugin's channels
+ * would give it.
  */
 final class Module extends \yii\base\Module
 {
@@ -26,7 +27,7 @@ final class Module extends \yii\base\Module
             $event->channels[] = function (Alert $alert): void {
                 $file = Craft::getAlias('@storage/runtime/cwt-alerts.json');
                 $alerts = is_file($file) ? (array) json_decode((string) file_get_contents($file), true) : [];
-                $alerts[] = ['type' => $alert->type, 'job' => $alert->job, 'title' => $alert->title];
+                $alerts[] = ['type' => $alert->type, 'job' => $alert->job, 'title' => $alert->title, 'link' => Plugin::getInstance()->getRecorder()->jobUrl($alert->job)];
                 file_put_contents($file, json_encode($alerts));
             };
         });

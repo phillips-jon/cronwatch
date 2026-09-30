@@ -46,7 +46,9 @@ use Symfony\Component\Scheduler\Trigger\TriggerInterface;
  * "every 1h30m"), and a JitterTrigger its inner trigger's; a trigger that
  * does not fire at fixed times (ExcludeTimeTrigger, CallbackTrigger, a
  * calendar interval such as "1 month") leaves the job without a schedule,
- * reported once. Two messages with one name on different schedules are
+ * reported once. So does a PeriodicalTrigger outside its window: before
+ * its `from` (it has not started) or once its `until` has passed (it has
+ * ended, and fires no more). Two messages with one name on different schedules are
  * one job without a schedule.
  *
  * @internal
@@ -370,6 +372,11 @@ final class ScheduledMessages
      */
     private function timing(string $name, TriggerInterface $trigger): ?array
     {
+        $outside = self::outsideWindow($trigger, $this->cw()->now());
+        if ($outside !== null) {
+            $this->reportOnce(new \RuntimeException("the trigger \"{$trigger}\" {$outside}, so the job is watched without a schedule"), "declaring {$name}");
+            return null;
+        }
         try {
             $timing = self::scheduleOf($trigger);
         } catch (\Throwable) {
@@ -394,6 +401,30 @@ final class ScheduledMessages
         if ($trigger instanceof PeriodicalTrigger) {
             $seconds = (int) (fn () => $this->intervalInSeconds ?? 0)->call($trigger);
             return $seconds > 0 ? ['schedule' => 'every ' . \Cronwatch\Duration::interval($seconds)] : null;
+        }
+        return null;
+    }
+
+    /**
+     * Why a PeriodicalTrigger does not fire now, going by its `from` and
+     * `until`: "starts at <time>" or "ended at <time>"; null for any other
+     * trigger, or one inside its window.
+     */
+    public static function outsideWindow(TriggerInterface $trigger, int|float $nowMs): ?string
+    {
+        while ($trigger instanceof JitterTrigger) {
+            $trigger = $trigger->inner();
+        }
+        if (!$trigger instanceof PeriodicalTrigger) {
+            return null;
+        }
+        [$from, $until] = (fn (): array => [$this->from ?? null, $this->until ?? null])->call($trigger);
+        $now = $nowMs / 1000;
+        if ($until instanceof \DateTimeInterface && (float) $until->format('U.u') <= $now) {
+            return 'ended at ' . $until->format(\DateTimeInterface::ATOM);
+        }
+        if ($from instanceof \DateTimeInterface && (float) $from->format('U.u') > $now) {
+            return 'starts at ' . $from->format(\DateTimeInterface::ATOM);
         }
         return null;
     }

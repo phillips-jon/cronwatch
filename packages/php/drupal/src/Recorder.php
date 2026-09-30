@@ -19,6 +19,7 @@ use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Mail\MailManagerInterface;
+use Drupal\Core\Site\Settings;
 use Drupal\Core\Queue\QueueWorkerManagerInterface;
 use Drupal\Core\Url;
 use Psr\Log\LoggerInterface;
@@ -160,10 +161,25 @@ final class Recorder {
 
   /**
    * The dashboard's page for a job, for alert links.
+   *
+   * The site's address is $settings['cronwatch_base_url'] when set. Else it
+   * is the request's, only where the host is known good: under Drush (its
+   * --uri) or with $settings['trusted_host_patterns'], which Drupal checks
+   * each request's host against. Otherwise (Automated Cron after a
+   * visitor's request, on a site that trusts any host) the host is the
+   * visitor's to choose, and the alert goes without a link.
    */
   public function jobUrl(string $job): string {
+    $options = ['absolute' => TRUE, 'query' => ['job' => $job]];
+    $base = trim((string) Settings::get('cronwatch_base_url', ''));
+    if ($base !== '') {
+      $options['base_url'] = rtrim($base, '/');
+    }
+    elseif (PHP_SAPI !== 'cli' && Settings::get('trusted_host_patterns', []) === []) {
+      return '';
+    }
     try {
-      return Url::fromRoute('cronwatch.dashboard', [], ['absolute' => TRUE, 'query' => ['job' => $job]])->toString(TRUE)->getGeneratedUrl();
+      return Url::fromRoute('cronwatch.dashboard', [], $options)->toString(TRUE)->getGeneratedUrl();
     }
     catch (\Throwable) {
       return '';
@@ -228,13 +244,36 @@ final class Recorder {
   /**
    * Declares a job with hook_cronwatch_job_options_alter() applied.
    *
+   * Options the library refuses (an alter hook's, a worker's #[Watch], a
+   * schedule imported with the configuration) are reported, and the job is
+   * declared with fewer: the module's own options without the alter hooks,
+   * then those without their schedule, so one bad job never stops the
+   * others or its own runs being recorded.
+   *
    * @param array<string, mixed> $options
    *   The job's options.
    * @param array<string, string> $context
    *   What the job is: kind (cron, module or queue) and module or queue.
    */
   private function declare(string $name, array $options, array $context): JobHandle {
-    $this->moduleHandler->alter('cronwatch_job_options', $options, $name, $context);
+    $altered = $options;
+    try {
+      $this->moduleHandler->alter('cronwatch_job_options', $altered, $name, $context);
+      return $this->handles[$name] = $this->client()->job($name, $altered);
+    }
+    catch (\Throwable $error) {
+      $this->safeReport($error, "declaring {$name}");
+    }
+    try {
+      return $this->handles[$name] = $this->client()->job($name, $options);
+    }
+    catch (\Throwable $error) {
+      if (!isset($options['schedule'])) {
+        throw $error;
+      }
+      $this->safeReport($error, "declaring {$name}");
+    }
+    unset($options['schedule'], $options['timezone']);
     return $this->handles[$name] = $this->client()->job($name, $options);
   }
 
@@ -332,14 +371,23 @@ final class Recorder {
    */
   public function prepare(): Cronwatch {
     $cw = $this->client();
-    $this->cronJob();
+    $declarations = [self::CRON_JOB => fn () => $this->cronJob()];
     foreach ($this->cronModules() as $module) {
-      $this->moduleJob($module);
+      $declarations['drupal:' . $module] = fn () => $this->moduleJob($module);
     }
     foreach ($this->queues->getDefinitions() as $id => $definition) {
       $class = (string) ($definition['cronwatch_class'] ?? '');
       if ($class !== '') {
-        $this->queueJob((string) $id, $class);
+        $declarations['drupal:queue:' . $id] = fn () => $this->queueJob((string) $id, $class);
+      }
+    }
+    // One job the library refuses is reported; the rest are still declared and checked.
+    foreach ($declarations as $name => $declaration) {
+      try {
+        $declaration();
+      }
+      catch (\Throwable $error) {
+        $this->safeReport($error, "declaring {$name}");
       }
     }
     foreach ([self::TAG_CRON, self::TAG_QUEUE] as $tag) {
@@ -373,9 +421,13 @@ final class Recorder {
 
   /**
    * A module's hook_cron is about to run; returns its run's key, or null.
+   *
+   * A module with several implementations (Drupal 11.1's #[Hook('cron')]
+   * methods) is one run, started before the first and finished after the
+   * last (WatchedCron), and a failure of any keeps it failed.
    */
   public function hookStarted(string $module): ?int {
-    $this->modules[$module] = FALSE;
+    $this->modules[$module] ??= FALSE;
     if ($this->cronKey === NULL) {
       return NULL;
     }
