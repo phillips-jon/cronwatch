@@ -122,10 +122,10 @@ const PUBLISH = [
   // crates in dependency order.
   { dir: "packages/rust", commands: (v) => [`# packages/rust: the pushed tag v${v} is published to crates.io by .github/workflows/crates.yml (trusted publishing, once CRATES_ENABLED is true); by hand, (cd packages/rust && cargo publish --workspace --exclude cronwatch-webserver --exclude crontab)`] },
   // Hex reads a package from the tarball `mix hex.publish` uploads, so the
-  // package needs no tag of its own. Published by hand for now
-  // (packages/elixir/DESIGN.md, Package name and releases); hex.yml, on the
-  // pushed tag, comes with the site pass.
-  { dir: "packages/elixir", commands: (v) => [`# packages/elixir: published to Hex by hand for now, as ${v}: (cd packages/elixir && mix hex.publish)`] },
+  // package needs no tag of its own. .github/workflows/hex.yml publishes it
+  // and its docs from the pushed tag, with a package-scoped API key, once
+  // HEX_ENABLED is true (packages/elixir/DESIGN.md, Package name and releases).
+  { dir: "packages/elixir", commands: (v) => [`# packages/elixir: the pushed tag v${v} is published to Hex, with its docs, by .github/workflows/hex.yml (once HEX_ENABLED is true); by hand, (cd packages/elixir && mix hex.publish)`] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */

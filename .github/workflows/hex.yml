@@ -1,0 +1,73 @@
+# A release tag -> packages/elixir published to Hex as cronwatch, with its
+# documentation to HexDocs. Hex has no trusted publishing yet
+# (packages/elixir/DESIGN.md, Package name and releases), so this takes an
+# API key from the environment's secret; when Hex ships it, this moves to
+# OIDC and the key is revoked. Can also be started by hand for a tag.
+#
+# Stays off until the repository variable HEX_ENABLED is "true". Before
+# that, on hex.pm (signed in as the package's owner): Dashboard, Keys,
+# generate a key named cronwatch-ci whose only permission is the package
+# cronwatch (under Packages; not API read or write, which would reach every
+# package the account owns), with an expiry if you want one, and copy it.
+# A package key can publish that package's releases and docs and nothing
+# else; Hex asks no one-time code of an API key. Then here: create the
+# environment "hex" (Settings, Environments), optionally with required
+# reviewers so each publish waits for a click, add the key to it as the
+# environment secret HEX_API_KEY (never a repository secret), and set the
+# repository variable HEX_ENABLED to true.
+name: Hex
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag to publish (v0.8.1, say)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hex
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: vars.HEX_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: hex
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          persist-credentials: false
+      - name: Check the tag is the package's version
+        working-directory: packages/elixir
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          # The package's version must be the tag's, or Hex would list a
+          # release the tag does not name.
+          version="$(sed -n 's/^ *@version "\(.*\)"$/\1/p' mix.exs)"
+          if [ "v$version" != "$TAG" ]; then echo "packages/elixir is $version, the tag is $TAG"; exit 1; fi
+      # The newest entry ci.yml tests; setup-beam installs Hex with them.
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          elixir-version: "1.20"
+          otp-version: "29"
+      - name: mix deps.get
+        working-directory: packages/elixir
+        run: mix deps.get
+      # Publishes the package, then builds the docs with ex_doc (a dev
+      # dependency, so MIX_ENV stays dev) and publishes them to HexDocs.
+      # Hex reads the key from HEX_API_KEY; --yes answers its prompts.
+      - name: mix hex.publish
+        working-directory: packages/elixir
+        env:
+          MIX_ENV: dev
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        run: mix hex.publish --yes
