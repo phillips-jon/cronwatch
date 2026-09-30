@@ -445,16 +445,20 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       must(c(store, :set_state, [state(plain)]))
       same_json("state", json_of(must(c(store, :get_state, ["a"])), &JobState.to_json/1), plain)
 
+      alert =
+        ~s({"type":"failed","run":null,"details":) <>
+          ~s({"consecutiveFailures":1,"threshold":1},"job":"a","definition":{"name":"a"},"title":"a failed",) <>
+          ~s("message":"boom","at":7)
+
       full =
         ~s({"job":"a","open":{"stuck":7},"consecutiveFailures":1,"silencedUntil":null,"lastAlertAt":6,) <>
-          ~s("pendingRecovery":["missed"],"undelivered":[{"type":"failed","run":null,"details":) <>
-          ~s({"consecutiveFailures":1,"threshold":1},"job":"a","definition":{"name":"a"},"title":"a failed",) <>
-          ~s("message":"boom","at":7,"triage":null}]})
+          ~s("pendingRecovery":["missed"],"undelivered":[#{alert},"triage":null}],) <>
+          ~s("sending":[{"until":8,"alert":#{alert}}}]})
 
       must(c(store, :set_state, [state(full)]))
 
       same_json(
-        "pendingRecovery and undelivered round-trip",
+        "pendingRecovery, undelivered and sending round-trip",
         json_of(must(c(store, :get_state, ["a"])), &JobState.to_json/1),
         full
       )

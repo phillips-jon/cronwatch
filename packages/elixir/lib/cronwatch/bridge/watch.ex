@@ -339,14 +339,24 @@ defmodule Cronwatch.Bridge.Watch do
 
   def handle_call({:report_once, message, where}, _from, s), do: {:reply, :ok, report_once_in(s, message, where)}
 
+  # A job forgotten since (the dashboard's Forget) is no longer declared in
+  # the instance. One the scheduler still has is declared again, so its run
+  # writes it back with its schedule; a fallback's is let go, so the next
+  # fallback reads the store again.
   def handle_call({:job, name}, _from, s) do
-    found =
-      case s.jobs do
-        %{^name => d} -> d.job
-        _ -> Map.get(s.fallback, name)
-      end
+    declared? = Runs.job(s.instance, name) != nil
 
-    {:reply, found, s}
+    case s.jobs do
+      %{^name => d} ->
+        unless declared?, do: Runs.declare(s.instance, d.job)
+        {:reply, d.job, s}
+
+      _ ->
+        case s.fallback do
+          %{^name => job} when declared? -> {:reply, job, s}
+          _ -> {:reply, nil, %{s | fallback: Map.delete(s.fallback, name)}}
+        end
+    end
   end
 
   def handle_call({:declares?, name}, _from, s), do: {:reply, Map.has_key?(s.jobs, name), s}
@@ -509,8 +519,11 @@ defmodule Cronwatch.Bridge.Watch do
       {:ok, job} ->
         key = JS.stringify(job.definition)
 
-        case s.jobs do
-          %{^name => %{key: ^key} = d} ->
+        # Unchanged only while the instance still declares it: a job
+        # forgotten since (the dashboard's Forget) is declared again, or a
+        # check would take it for an entry gone from the scheduler.
+        case {s.jobs, Runs.job(c.name, name)} do
+          {%{^name => %{key: ^key} = d}, %Job{}} ->
             %{s | jobs: Map.put(s.jobs, name, %{d | current: d.current or current})}
 
           _ ->

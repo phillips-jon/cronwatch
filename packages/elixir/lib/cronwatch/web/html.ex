@@ -326,6 +326,10 @@ defmodule Cronwatch.Web.HTML do
   # others to four places.
   defp metric_text(v), do: if(JS.integer?(v), do: num(v), else: to_fixed(v, 4))
 
+  defp metric_pairs(%Object{} = metrics), do: Object.to_list(metrics)
+  defp metric_pairs(metrics) when is_map(metrics) and not is_struct(metrics), do: Enum.to_list(metrics)
+  defp metric_pairs(_), do: []
+
   defp run_row(run, now) do
     error =
       if run.error in [nil, ""],
@@ -342,8 +346,9 @@ defmodule Cronwatch.Web.HTML do
 
     detail = error <> output
 
+    # A foreign row may hold a metric that is no finite number (null, text); it is left out.
     metrics =
-      for {name, value} <- Object.to_list(run.metrics), into: "" do
+      for {name, value} <- metric_pairs(run.metrics), is_number(value), into: "" do
         ~s(<span><span class="k">#{h(name)}</span> #{h(metric_text(value))}</span>)
       end
 

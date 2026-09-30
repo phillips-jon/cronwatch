@@ -216,7 +216,7 @@ end
  ]}
 ```
 
-Giving `alerts:` replaces the default console channel, and `alerts: []` sends nothing. Every alert goes to every channel at once, each in a task of its own with 15 seconds to finish; a send past its time is killed, its socket with it, and a channel that fails or raises goes to the error handler (as `alert channel <name>`) and never holds up the others. `Cronwatch.Alerts.fun(name, f)` wraps a function of the alert (or of the alert and a `Cronwatch.ChannelContext`) answering `:ok` or `{:error, reason}`; a channel of your own implements the `Cronwatch.Channel` behaviour (`init/1`, `name/1` and `send/3`). `Cronwatch.Alerts.Console` writes through `Logger`, `Logger.info` for a recovery and `Logger.error` for anything else, so the line carries your Logger's format and metadata.
+Giving `alerts:` replaces the default console channel, and `alerts: []` sends nothing. Every alert goes to every channel at once, each in a task of its own with 15 seconds to finish; a send past its time is killed, its socket with it, and a channel that fails or raises goes to the error handler (as `alert channel <name>`) and never holds up the others. An alert is stored with the state that opens its condition before it is sent, so one whose node dies mid-send is sent by a later check, once, or twice if a channel took it just before the node died (see [Limits](/docs/limits/)). Stopping the instance waits for a check under way before the store and the rest of the instance stop. `Cronwatch.Alerts.fun(name, f)` wraps a function of the alert (or of the alert and a `Cronwatch.ChannelContext`) answering `:ok` or `{:error, reason}`; a channel of your own implements the `Cronwatch.Channel` behaviour (`init/1`, `name/1` and `send/3`). `Cronwatch.Alerts.Console` writes through `Logger`, `Logger.info` for a recovery and `Logger.error` for anything else, so the line carries your Logger's format and metadata.
 
 ### Email, SMS and error trackers
 
@@ -279,7 +279,7 @@ It reads through a Postgres Ecto repo on the database pg_cron runs in (its `cron
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent anywhere, they are redacted. The default blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks: the patterns are the SDK's, run by an engine with JavaScript's semantics, so every case the SDK's tests hold gives the same bytes. An `expect` rule is checked before redaction, so it still sees what was logged. Redaction runs before the cap, so the cut never keeps the rest of a secret whose label it cut off.
 
 ```elixir
 redact: false  # keep output as logged
@@ -361,9 +361,9 @@ The functions, each taking `instance:` among its options:
 | `jobs()`, `jobs_with_runs(limit)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, d)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath |
-| `forget(name)` | remove a job and its runs |
+| `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `start(job, options)`, `resume(job, id)`, `resume_run(name, id)` | runs that span calls |
-| `record_run(run, options)` | record a run that happened elsewhere, for a source; answers the alerts it sent |
+| `record_run(run, options)` | record a run that happened elsewhere, for a source; answers the alerts it sent; a metric that is not a finite number is refused and nothing is recorded |
 | `sync_job(name)` | write a declaration to the store now, unless it already holds it |
 | `defined_jobs()` | the jobs declared in this instance |
 

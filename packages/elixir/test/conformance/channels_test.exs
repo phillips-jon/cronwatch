@@ -17,6 +17,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
   alias Cronwatch.ChannelContext
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
+  alias Cronwatch.JS.Units
   alias Cronwatch.Test.Conformance
   alias Cronwatch.Test.RecordingTransport, as: Rec
 
@@ -121,10 +122,61 @@ defmodule Cronwatch.Conformance.ChannelsTest do
           if got == field(c, "body"), do: [], else: ["errorBody(#{inspect(field(c, "text"))}): #{inspect(got)}"]
         end)
 
+    failures =
+      failures ++
+        Enum.flat_map(list(field(f, "textCuts"), "discordDescriptions"), fn c ->
+          triage = if t = field(c, "triage"), do: expand(t)
+          alert = %{first | message: expand(field(c, "message")), triage: triage}
+          got = JS.stringify(digest(Units.to_string(Discord.embed_description(alert))))
+
+          if got == JS.stringify(field(c, "description")),
+            do: [],
+            else: ["discord description #{JS.stringify(field(c, "message"))}: #{got}"]
+        end)
+
     assert failures == [], "channels.json: #{length(failures)} cases differ:\n" <> Enum.join(failures, "\n")
 
-    count = length(list(f, "sends")) + length(list(f, "failures")) + length(list(field(f, "textCuts"), "errorBodies"))
-    assert count == 90 + 18 + 6
+    count =
+      length(list(f, "sends")) + length(list(f, "failures")) + length(list(field(f, "textCuts"), "errorBodies")) +
+        length(list(field(f, "textCuts"), "discordDescriptions"))
+
+    assert count == 90 + 18 + 6 + 8
+  end
+
+  test "Discord's description is held to 4096 as a whole, the message cut and the triage whole" do
+    {_, first} = alerts(Conformance.fixture("channels"))
+
+    message =
+      "Error: long\n" <>
+        String.duplicate("```", 1200) <> String.duplicate("x", 400) <> String.duplicate("\u{1F600}", 200)
+
+    triage = String.duplicate("*_`~|[]()<>\\", 100)
+    d = Discord.embed_description(%{first | message: message, triage: triage})
+    text = Units.to_string(d)
+
+    assert Units.length(d) == 4096
+    escaped = String.replace(String.slice(triage, 0, 1000), ~r/[\\`*_~|\[\]()<>]/, "\\\\\\0")
+    assert String.ends_with?(text, "\n**Triage:** " <> escaped)
+    assert String.starts_with?(text, "```\nError: long\n")
+    assert length(String.split(text, "```")) == 3
+
+    # Emoji at the cut: never half a surrogate pair.
+    d =
+      Discord.embed_description(%{
+        first
+        | message: String.duplicate("\u{1F600}", 1900),
+          triage: String.duplicate("t", 1001)
+      })
+
+    assert Units.length(d) <= 4096
+    refute Enum.any?(Units.segments(d), &match?({:lone, _}, &1))
+  end
+
+  # The fixture's recipe for long text: a string, or {parts: [[piece, times], ...]} joined.
+  defp expand(s) when is_binary(s), do: s
+
+  defp expand(%Object{} = o) do
+    o |> Object.get("parts") |> Enum.map_join(fn [piece, times] -> String.duplicate(piece, times) end)
   end
 
   test "conformance/channels.json: URLs read as Node's new URL reads them" do

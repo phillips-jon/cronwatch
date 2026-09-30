@@ -1,22 +1,18 @@
 defmodule Cronwatch.Delivery do
   @moduledoc false
-  # Composing, triaging, sending and queueing alerts (client.ts dispatch,
-  # retryUndelivered, recordDelivery, deliver and addTriage).
+  # Composing, triaging, sending and queueing alerts (client.ts outbox,
+  # dispatch, retryUndelivered, recordDelivery, deliver and addTriage).
 
-  alias Cronwatch.Alert
   alias Cronwatch.ChannelContext
   alias Cronwatch.Config
   alias Cronwatch.Core
   alias Cronwatch.Evaluate
   alias Cronwatch.Format
-  alias Cronwatch.JS.Object
   alias Cronwatch.Telemetry
 
   # How long one channel may take to send one alert.
   @channel_timeout 15_000
   @triage_timeout 25_000
-  # Undelivered alerts kept per job for retry; the oldest go first.
-  @max_undelivered 20
   # Wall-clock time one check spends retrying undelivered alerts, across
   # every job.
   @retry_budget 20_000
@@ -30,34 +26,63 @@ defmodule Cronwatch.Delivery do
   defp retry_budget, do: limit(:retry_budget, @retry_budget)
 
   @doc """
-  Composes, triages and sends each draft. The state was saved before this, so
-  a slow channel holds up nothing else; afterwards only the delivery fields
-  are written back, onto a fresh read of the state. Answers the alerts.
+  An evaluation as it is written, inside `Cronwatch.Core.update_state!/3`
+  (so it only computes): its drafts composed into alerts and held in the
+  same state (`Cronwatch.Evaluate.hold_alerts/4`), so the write that opens a
+  condition also keeps its alerts, and a process that stops before sending
+  them does not lose them. Answers `{state, {alerts, dropped}}`.
   """
-  def dispatch(_c, [], _definition, _now), do: []
+  def outbox(%Config{} = c, state, drafts, definition, now) do
+    alerts = Enum.map(drafts, &Format.compose_alert(&1, definition, now))
+    until = Core.now(c) + Evaluate.send_lease_ms()
+    {state, dropped} = Evaluate.hold_alerts(state, alerts, until, c.deliver == :check)
+    {state, {alerts, dropped}}
+  end
 
-  def dispatch(%Config{} = c, drafts, definition, now) do
-    {composed, delivered, failed} =
-      Enum.reduce(drafts, {[], [], []}, fn draft, {composed, delivered, failed} ->
-        alert = Format.compose_alert(draft, definition, now)
+  @doc "Reports alerts let go because a job's queue was full."
+  def report_dropped(_c, _name, dropped) when dropped <= 0, do: :ok
 
-        if c.deliver == :check do
-          Telemetry.alert(:queued, meta(c, alert, nil))
-          {composed ++ [alert], delivered, failed ++ [alert]}
+  def report_dropped(c, name, dropped) do
+    Core.report(
+      c,
+      Cronwatch.Error.other(
+        "#{dropped} undelivered alert#{if dropped == 1, do: "", else: "s"} for #{name} dropped: " <>
+          "only the newest #{Evaluate.max_undelivered()} are kept for retry"
+      ),
+      "alert queue for #{name}"
+    )
+  end
+
+  @doc """
+  Triages and sends each alert the outbox holds (see `outbox/5`). The state,
+  with the alerts in it, was saved before this, so a slow channel holds up
+  nothing else; afterwards only the delivery fields are written back, onto a
+  fresh read of the state, and the alerts leave `sending`. Triage is made
+  here, never stored with the held alert. With `deliver: :check` the alerts
+  were queued for a check elsewhere instead. Answers the alerts.
+  """
+  def dispatch(_c, _name, [], _now), do: []
+
+  def dispatch(%Config{deliver: :check} = c, _name, alerts, _now) do
+    for alert <- alerts, do: Telemetry.alert(:queued, meta(c, alert, nil))
+    alerts
+  end
+
+  def dispatch(%Config{} = c, name, alerts, now) do
+    {sent, delivered, failed} =
+      Enum.reduce(alerts, {[], [], []}, fn alert, {sent, delivered, failed} ->
+        alert = if c.triage && alert.type != "recovered", do: add_triage(c, alert, triage_timeout()), else: alert
+
+        if deliver(c, alert) do
+          {sent ++ [alert], delivered ++ [alert], failed}
         else
-          alert = if c.triage && alert.type != "recovered", do: add_triage(c, alert, triage_timeout()), else: alert
-
-          if deliver(c, alert) do
-            {composed ++ [alert], delivered ++ [alert], failed}
-          else
-            Telemetry.alert(:queued, meta(c, alert, nil))
-            {composed ++ [alert], delivered, failed ++ [alert]}
-          end
+          Telemetry.alert(:queued, meta(c, alert, nil))
+          {sent ++ [alert], delivered, failed ++ [alert]}
         end
       end)
 
-    record_delivery(c, Object.get(definition, "name"), delivered, failed, [], now)
-    composed
+    record_delivery(c, name, delivered, failed, [], now)
+    sent
   end
 
   @doc """
@@ -105,40 +130,18 @@ defmodule Cronwatch.Delivery do
     end
   end
 
-  defp key(%Alert{} = a), do: {a.type, a.at, if(a.run, do: a.run.id, else: "")}
-
   # Marks delivered alerts done, drops stale ones, and keeps failed ones for
-  # the next check. A failed alert replaces its stored copy, so a triage made
-  # on this attempt is kept. last_alert_at moves only on a delivery.
+  # the next check, taking them all out of `sending` (record_sent). A failed
+  # alert replaces its stored copy, so a triage made on this attempt is kept.
+  # last_alert_at moves only on a delivery. When this write fails, alerts
+  # still in `sending` are retried once their lease runs out.
   defp record_delivery(c, name, delivered, failed, dropped, now) do
     {_, trimmed} =
       Core.update_state!(c, name, fn previous ->
-        state = Evaluate.normalize_state(previous, name)
-        done = MapSet.new(delivered ++ dropped, &key/1)
-        retried = Map.new(failed, &{key(&1), &1})
-
-        kept =
-          state.undelivered
-          |> Enum.reject(&MapSet.member?(done, key(&1)))
-          |> Enum.map(&Map.get(retried, key(&1), &1))
-
-        known = MapSet.new(kept, &key/1)
-        kept = kept ++ Enum.reject(failed, &MapSet.member?(known, key(&1)))
-        state = %{state | undelivered: Enum.take(kept, -@max_undelivered)}
-        state = if delivered != [], do: %{state | last_alert_at: now}, else: state
-        {state, max(0, length(kept) - @max_undelivered)}
+        Evaluate.record_sent(Evaluate.normalize_state(previous, name), delivered, failed, dropped, now)
       end)
 
-    if trimmed > 0 do
-      Core.report(
-        c,
-        Cronwatch.Error.other(
-          "#{trimmed} undelivered alert#{if trimmed == 1, do: "", else: "s"} for #{name} dropped: " <>
-            "only the newest #{@max_undelivered} are kept for retry"
-        ),
-        "alert queue for #{name}"
-      )
-    end
+    report_dropped(c, name, trimmed)
   rescue
     e -> Core.report(c, e, "recording alert delivery for #{name}")
   end

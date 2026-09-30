@@ -166,6 +166,53 @@ defmodule Cronwatch.BridgeTest do
              ~s|{"description":"A scheduled task (no longer scheduled)","tags":["reports","gocron","gocron:billing"],"grace":"5m","budget":{"cost":2},"name":"nightly"}|
   end
 
+  test "a job forgotten while the scheduler still runs it comes back with its schedule" do
+    %{cw: cw} = make(alerts: [])
+    w = watch(cw, "oban", "billing", "Oban")
+    nightly = entry("MyApp.Nightly", "Oban crontab entry for MyApp.Nightly", "0 2 * * *", timezone: "UTC")
+    Watch.declare(w, [nightly])
+    Watch.settle(w)
+    scheduled = ~s({"schedule":"0 2 * * *","timezone":"UTC","tags":["oban","oban:billing"],"name":"MyApp.Nightly"})
+    assert stored(cw, "MyApp.Nightly") == scheduled
+
+    # The dashboard's Forget, then the job's next run and the check worker's sync.
+    Cronwatch.forget!("MyApp.Nightly", instance: cw)
+    Cronwatch.run(Watch.job(w, "MyApp.Nightly"), fn _ -> :ok end)
+    Watch.declare(w, [nightly])
+    Watch.settle(w)
+    assert Watch.unschedule(w) == {:ok, []}, "not taken for an entry gone from the crontab"
+    assert stored(cw, "MyApp.Nightly") == scheduled
+    assert JS.stringify(Cronwatch.Runs.job(cw, "MyApp.Nightly").definition) == scheduled
+
+    # Forgotten with no run in between: the sync alone brings it back.
+    Cronwatch.forget!("MyApp.Nightly", instance: cw)
+    Watch.declare(w, [nightly])
+    Watch.settle(w)
+    assert Watch.unschedule(w) == {:ok, []}
+    assert stored(cw, "MyApp.Nightly") == scheduled
+  end
+
+  test "a fallback's job forgotten here is declared again from the store" do
+    store = Stores.memory()
+    %{cw: scheduler} = shared(store)
+    Cronwatch.job!("report", schedule: "0 2 * * *", tags: ["river", "river:billing"], instance: scheduler)
+    Cronwatch.check!(instance: scheduler)
+    before = stored(scheduler, "report")
+
+    %{cw: worker} = shared(store)
+    w = watch(worker, "river", "billing", "River")
+    Watch.declare(w, [entry("other", "x", "0 3 * * *")])
+    job = Watch.fallback(w, "report", [])
+    Cronwatch.forget!("report", instance: worker)
+    assert Watch.job(w, "report") == nil, "not the declaration forgotten"
+    Cronwatch.check!(instance: scheduler)
+    again = Watch.fallback(w, "report", [])
+    assert JS.stringify(again.definition) == JS.stringify(job.definition)
+    Cronwatch.run(again, fn _ -> :ok end)
+    assert Watch.unschedule(w) == {:ok, []}
+    assert stored(worker, "report") == before
+  end
+
   test "unschedule takes only this app's jobs" do
     store = Stores.memory()
     %{cw: earlier} = shared(store)

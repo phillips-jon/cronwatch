@@ -240,10 +240,139 @@ defmodule Cronwatch.Conformance.CoreTest do
         same(acc, "failureCount #{i} failed", got, field(c, "failed"))
       end)
 
+    fails =
+      f
+      |> list("silenceEnd")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        {:ok, ms} = Cronwatch.Options.duration_ms(field(c, "duration"), "silence duration")
+        same(acc, "silenceEnd #{i}", Evaluate.silence_end(field(c, "now"), ms), field(c, "silencedUntil"))
+      end)
+
     assert length(list(f, "runDuration")) >= 8 and length(list(f, "stateVersion")) >= 17 and
-             length(list(f, "failureCount")) >= 19
+             length(list(f, "failureCount")) >= 19 and length(list(f, "silenceEnd")) == 15
 
     check!(fails, "health")
+  end
+
+  # A delivery case's result, {state, dropped}, as the SDK writes it. The
+  # fixture's alerts are in the order the script built them, so both sides
+  # go through the port's writer: the key order is the writer's, the values
+  # are compared whole.
+  defp held({%JobState{} = s, dropped}), do: %Object{pairs: [{"state", JobState.to_value(s)}, {"dropped", dropped}]}
+
+  defp held(%Object{} = want) do
+    %Object{pairs: [{"state", JobState.to_value(state(field(want, "state")))}, {"dropped", field(want, "dropped")}]}
+  end
+
+  defp alerts(list) do
+    Enum.map(list, fn v ->
+      {:ok, a} = Alert.from_value(v)
+      a
+    end)
+  end
+
+  test "health.json: the alert outbox (delivery)" do
+    d = field(fixture("health"), "delivery")
+    assert field(d, "maxUndelivered") == Evaluate.max_undelivered()
+    assert field(d, "sendLeaseMs") == Evaluate.send_lease_ms()
+
+    fails =
+      d
+      |> list("alertKey")
+      |> Enum.with_index()
+      |> Enum.reduce(failures(), fn {c, i}, acc ->
+        [alert] = alerts([field(c, "alert")])
+        at = field(field(c, "alert"), "at")
+
+        # An alert's `at` is read as a whole number (see DESIGN.md), so a
+        # foreign one with a fraction is keyed by its whole part.
+        want =
+          if is_float(at),
+            do: String.replace(field(c, "key"), JS.format_number(at), "#{trunc(at)}"),
+            else: field(c, "key")
+
+        same(acc, "alertKey #{i}", Evaluate.alert_key(alert), want)
+      end)
+
+    fails =
+      d
+      |> list("normalizeState")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        got = JobState.to_value(Evaluate.normalize_state(state(field(c, "state")), "j"))
+        same(acc, "normalizeState #{i}", got, JobState.to_value(state(field(c, "normalized"))))
+      end)
+
+    fails =
+      d
+      |> list("queueUndelivered")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        got = Evaluate.queue_undelivered(state(field(c, "state")), alerts(list(c, "alerts")))
+        same(acc, "queueUndelivered #{i}", held(got), held(field(c, "result")))
+      end)
+
+    fails =
+      d
+      |> list("holdAlerts")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        got =
+          Evaluate.hold_alerts(
+            state(field(c, "state")),
+            alerts(list(c, "alerts")),
+            field(c, "until"),
+            field(c, "deferred")
+          )
+
+        same(acc, "holdAlerts #{i}", held(got), held(field(c, "result")))
+      end)
+
+    fails =
+      d
+      |> list("releaseSending")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        got = Evaluate.release_sending(state(field(c, "state")), field(c, "now"))
+        same(acc, "releaseSending #{i}", held(got), held(field(c, "result")))
+      end)
+
+    fails =
+      d
+      |> list("recordSent")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        got =
+          Evaluate.record_sent(
+            state(field(c, "state")),
+            alerts(list(c, "delivered")),
+            alerts(list(c, "failed")),
+            alerts(list(c, "stale")),
+            field(c, "now")
+          )
+
+        same(acc, "recordSent #{i}", held(got), held(field(c, "result")))
+      end)
+
+    counts =
+      for k <- ~w(alertKey normalizeState queueUndelivered holdAlerts releaseSending recordSent), do: length(list(d, k))
+
+    assert counts == [6, 4, 5, 6, 7, 7]
+    check!(fails, "health")
+  end
+
+  test "a state holding sending reads and writes back as it was, a malformed entry included" do
+    text =
+      ~s({"job":"j","open":{},"consecutiveFailures":0,"silencedUntil":null,"lastAlertAt":null,) <>
+        ~s("pendingRecovery":[],"undelivered":[],"sending":[{"until":5},null,"x",{"until":"y","alert":7}],"version":2})
+
+    {:ok, s} = JobState.from_json(text)
+    assert JobState.to_json(s) == text
+    assert {released, 0} = Evaluate.release_sending(s, 4)
+    assert released.sending == [hd(s.sending)], "only the entry whose lease runs is kept"
+    assert {gone, 0} = Evaluate.release_sending(s, 5)
+    refute Object.has_key?(JobState.to_value(gone), "sending")
   end
 
   # scripts/conformance.mjs's Sim: one job, its runs (each with the order it

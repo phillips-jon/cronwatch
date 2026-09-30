@@ -15,7 +15,6 @@ defmodule Cronwatch.Lines do
 
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
-  alias Cronwatch.Output
 
   @cap 16 * 1024
   @window 64 * 1024
@@ -125,9 +124,13 @@ defmodule Cronwatch.Lines do
     }
   end
 
-  @doc "What the run stores as its output: the lines kept, capped. nil when nothing was logged."
+  @doc """
+  The lines still held (past 64 KB the oldest are let go), joined and not
+  yet capped: the run's output is redacted first, then capped
+  (`Cronwatch.Output.redact_and_cap/2`). nil when nothing was logged.
+  """
   def output(%{lines: []}), do: nil
-  def output(%{lines: lines}), do: Output.cap(Enum.join(lines, "\n"))
+  def output(%{lines: lines}), do: Enum.join(lines, "\n")
 
   @doc """
   What an expect rule is checked against: everything logged, or when that ran

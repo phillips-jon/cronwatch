@@ -64,6 +64,9 @@ defmodule Cronwatch.Runs do
   """
   def mark_synced(instance, job), do: GenServer.call(server(instance), {:synced, job}, :infinity)
 
+  @doc "Marks the declared job as still to be written: another process forgot it."
+  def unmark_synced(instance, name), do: GenServer.call(server(instance), {:unsynced, name}, :infinity)
+
   ## Flags
 
   @doc "Sets a flag, answering whether it was newly set."
@@ -167,6 +170,12 @@ defmodule Cronwatch.Runs do
       end
 
     {:reply, marked, s}
+  end
+
+  def handle_call({:unsynced, name}, _from, s) do
+    t = table(s.instance, :jobs)
+    if :ets.member(t, name), do: :ets.update_element(t, name, {3, false})
+    {:reply, :ok, s}
   end
 
   def handle_call({:register, id, pid, info, timeout_ms}, _from, s) do

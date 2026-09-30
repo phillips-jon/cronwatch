@@ -11,7 +11,6 @@ defmodule Cronwatch.Check do
   alias Cronwatch.Error
   alias Cronwatch.Evaluate
   alias Cronwatch.JS.Object
-  alias Cronwatch.Output
   alias Cronwatch.Run
   alias Cronwatch.Runs
   alias Cronwatch.Serialize
@@ -64,21 +63,25 @@ defmodule Cronwatch.Check do
     # Each job on its own: one that cannot be evaluated is reported, shown as
     # failing and does not stop the others.
     {jobs, alerts, _spent} =
-      Enum.reduce(Core.store!(c, :list_jobs, []), {[], alerts, 0}, fn stored, {jobs, alerts, spent} ->
+      Enum.reduce(stored_jobs!(c), {[], alerts, 0}, fn stored, {jobs, alerts, spent} ->
         try do
           recent = Core.store!(c, :list_runs, [stored.name, Evaluate.baseline_window()])
 
-          {state, {drafts, next}} =
+          {state, {{held, dropped}, next}} =
             Core.update_state!(c, stored.name, fn previous ->
               {:ok, {evaluation, next, _due}} =
                 ok!(Evaluate.on_check(stored.definition, stored, List.first(recent), previous, now))
 
               {state, drafts} = Evaluate.apply_silence(previous, evaluation, now)
-              {state, {drafts, next}}
+              # Alerts a process stopped sending part way go back to the retry queue.
+              {state, released} = Evaluate.release_sending(state, Core.now(c))
+              {state, {held, dropped}} = Delivery.outbox(c, state, drafts, stored.definition, now)
+              {state, {{held, released + dropped}, next}}
             end)
 
+          Delivery.report_dropped(c, stored.name, dropped)
           {retried, spent} = Delivery.retry_undelivered(c, stored.name, state, now, spent)
-          sent = Delivery.dispatch(c, drafts, stored.definition, now)
+          sent = Delivery.dispatch(c, stored.name, held, now)
           {:ok, summary} = ok!(Evaluate.summarize(stored, recent, state, next, now))
           {jobs ++ [summary], alerts ++ retried ++ sent, spent}
         rescue
@@ -106,6 +109,30 @@ defmodule Cronwatch.Check do
     %CheckResult{checked_at: now, jobs: jobs, alerts: alerts, pruned: pruned}
   end
 
+  # Every stored job, once each declaration has been written. A job declared
+  # here that the store no longer has was forgotten by another process after
+  # this one wrote it: it is written again, as its next run would, so it is
+  # checked and shown while any process still declares it.
+  defp stored_jobs!(c) do
+    for job <- Runs.jobs(c.name), do: Core.sync!(c, job)
+    jobs = Core.store!(c, :list_jobs, [])
+    listed = MapSet.new(jobs, & &1.name)
+
+    case Enum.reject(Runs.jobs(c.name), &MapSet.member?(listed, &1.name)) do
+      [] ->
+        jobs
+
+      missing ->
+        # Not one forgotten here meanwhile.
+        for job <- missing, Runs.job(c.name, job.name) == job do
+          Runs.unmark_synced(c.name, job.name)
+          Core.sync!(c, job)
+        end
+
+        Core.store!(c, :list_jobs, [])
+    end
+  end
+
   defp last_prune(c) do
     case :ets.lookup(Runs.table(c.name, :flags), :last_prune) do
       [{_, at}] -> at
@@ -121,21 +148,25 @@ defmodule Cronwatch.Check do
     _, _ -> inspect(module)
   end
 
-  defp stuck(c, run, now) do
-    job = Runs.job(c.name, run.job)
+  defp stuck(c, listed, now) do
+    job = Runs.job(c.name, listed.job)
 
     definition =
       if job do
         job.definition
       else
-        case Core.store!(c, :get_job, [run.job]) do
+        case Core.store!(c, :get_job, [listed.job]) do
           nil -> nil
           stored -> stored.definition
         end
       end
 
+    # Read again just before the write: lines and metrics flushed since the
+    # list was read (while earlier stuck runs were sent, say) are kept.
     with %Object{} <- definition,
-         {:ok, true} <- ok!(Evaluate.stuck?(definition, run, now)) do
+         {:ok, true} <- ok!(Evaluate.stuck?(definition, listed, now)),
+         %Run{status: "running", job: job_name} = run when job_name == listed.job <-
+           Core.store!(c, :get_run, [listed.id]) do
       {:ok, timeout} = ok!(Evaluate.timeout_ms(definition))
 
       run = %{
@@ -153,7 +184,7 @@ defmodule Cronwatch.Check do
     end
   rescue
     e ->
-      Core.report(c, e, "checking #{run.job}")
+      Core.report(c, e, "checking #{listed.job}")
       []
   end
 
@@ -210,16 +241,19 @@ defmodule Cronwatch.Check do
   @doc "Every job's summary with its newest `limit` runs."
   def jobs_with_runs!(c, limit) do
     Core.ensure_ready!(c)
-    for job <- Runs.jobs(c.name), do: Core.sync!(c, job)
+    jobs = stored_jobs!(c)
     now = Core.now(c)
     limit = clamp_limit(limit, 20, 0)
-    for stored <- Core.store!(c, :list_jobs, []), do: snapshot(c, stored, now, limit)
+    for stored <- jobs, do: snapshot(c, stored, now, limit)
   end
 
-  @doc "A job's summary, or nil."
+  @doc """
+  A job's summary, or nil for one the store does not have. One declared
+  here and forgotten elsewhere is written again, as a check does.
+  """
   def job_summary!(c, name) do
     Core.ensure_ready!(c)
-    if job = Runs.job(c.name, name), do: Core.sync!(c, job)
+    if job = Runs.job(c.name, name), do: Core.sync!(c, job, true)
 
     case Core.store!(c, :get_job, [name]) do
       nil -> nil
@@ -239,6 +273,11 @@ defmodule Cronwatch.Check do
     Core.store!(c, :get_run, [id])
   end
 
+  defp metric_pairs(nil), do: []
+  defp metric_pairs(%Object{} = metrics), do: Object.to_list(metrics)
+  defp metric_pairs(metrics) when is_map(metrics) and not is_struct(metrics), do: Enum.to_list(metrics)
+  defp metric_pairs(_), do: []
+
   # A whole number in range, or the fallback for anything that is not a
   # number.
   defp clamp_limit(limit, fallback, min) do
@@ -256,7 +295,12 @@ defmodule Cronwatch.Check do
     state
   end
 
-  @doc "Removes a job and its runs from the store; a job still declared comes back on its next run."
+  @doc """
+  Removes a job and its runs from the store. A job still declared in code
+  comes back: here on its next run, and in any other process that declares
+  it on its next run there, or at that process's next check or dashboard
+  read.
+  """
   def forget!(c, name) do
     Core.ensure_ready!(c)
     Runs.undeclare(c.name, name)
@@ -278,6 +322,14 @@ defmodule Cronwatch.Check do
       raise Error.invalid("record_run: run ids cannot contain a NUL character (job #{Cronwatch.JS.quote(input.job)})")
     end
 
+    # Refused as metric/3 refuses them: a store keeps NaN and Infinity as null.
+    for {metric, value} <- metric_pairs(input.metrics), not (is_number(value) and Cronwatch.Duration.double?(value)) do
+      raise Error.invalid(
+              "record_run: metric #{Cronwatch.JS.quote(to_string(metric))} must be a finite number " <>
+                "(job #{Cronwatch.JS.quote(input.job)}, run #{Cronwatch.JS.quote(input.id)})"
+            )
+    end
+
     Core.sync!(c, declared)
 
     run =
@@ -292,8 +344,8 @@ defmodule Cronwatch.Check do
 
     run = %{
       run
-      | output: run.output && Core.clean(c, Output.cap(run.output)),
-        error: run.error && Core.clean(c, Output.cap(run.error))
+      | output: Core.clean(c, run.output),
+        error: Core.clean(c, run.error)
     }
 
     definition = declared.definition

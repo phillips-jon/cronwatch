@@ -7,6 +7,13 @@ defmodule Cronwatch.Checker do
   # job half checked. A crash in the check is that check's error; the next
   # call starts a new one. Each tick asks for a check without waiting on it,
   # as setInterval does, so a tick while a long check runs shares that check.
+  #
+  # When the instance stops, the interval stops and a check under way is
+  # waited for before the rest of the instance (the task supervisor it runs
+  # under, the locks, the store) is stopped: the SDK's close(). The wait is
+  # bounded by the check's own limits (15 seconds a channel, 25 of triage,
+  # 20 of retries), so the child's shutdown is :infinity; a store call that
+  # hangs would hang the store's own shutdown too.
 
   use GenServer
 
@@ -17,7 +24,7 @@ defmodule Cronwatch.Checker do
   require Logger
 
   @doc false
-  def child_spec(name), do: %{id: __MODULE__, start: {__MODULE__, :start_link, [name]}}
+  def child_spec(name), do: %{id: __MODULE__, start: {__MODULE__, :start_link, [name]}, shutdown: :infinity}
 
   @doc false
   def start_link(name), do: GenServer.start_link(__MODULE__, name, name: server(name))
@@ -36,6 +43,8 @@ defmodule Cronwatch.Checker do
 
   @impl true
   def init(instance) do
+    # So the instance's shutdown reaches terminate/2, which waits for a check.
+    Process.flag(:trap_exit, true)
     s = %{instance: instance, task: nil, waiting: [], timer: nil, every: nil}
     config = Config.get(instance)
     {:ok, if(config.check_every, do: arm(s, config.check_every, 1_000), else: s)}
@@ -81,6 +90,25 @@ defmodule Cronwatch.Checker do
   end
 
   def handle_info(_msg, s), do: {:noreply, s}
+
+  @impl true
+  def terminate(_reason, %{task: %Task{ref: ref}} = s) do
+    if s.timer, do: Process.cancel_timer(s.timer)
+
+    # Whoever waits on it gets its answer; one no one waits on is reported.
+    receive do
+      {^ref, result} ->
+        Process.demonitor(ref, [:flush])
+        finish(s, result)
+
+      {:DOWN, ^ref, :process, _, reason} ->
+        finish(s, {:error, Error.other("the check stopped: #{Exception.format_exit(reason)}", reason)})
+    end
+
+    :ok
+  end
+
+  def terminate(_reason, _s), do: :ok
 
   defp arm(s, every, first) do
     if s.timer, do: Process.cancel_timer(s.timer)

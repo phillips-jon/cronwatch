@@ -6,7 +6,13 @@ defmodule Cronwatch.JobState do
   `{condition, since}` pairs. `pending_recovery` holds the conditions that
   alerted and have since closed, waiting for the recovered alert the next
   successful run sends; `undelivered` the alerts no channel accepted. Both are
-  `nil` for a state written before the fields existed. `version` goes up by
+  `nil` for a state written before the fields existed. `sending` is the
+  outbox: the alerts written with the state that opened their condition while
+  the process that wrote them sends them, each a map of `until` (when that
+  process's lease runs out, epoch milliseconds) and `alert` (nil for an entry
+  that holds none), and `value` (the entry as stored, written back as it is
+  when it holds no alert); it is `nil` when it holds nothing, and the key is
+  then left out. `version` goes up by
   one on every write (see `c:Cronwatch.Store.compare_and_set_state/3`), `nil`
   for a state written before versions, which counts as 0. `extra` keeps the
   keys after the known ones, in stored order (`version` and any a newer
@@ -25,6 +31,7 @@ defmodule Cronwatch.JobState do
             last_alert_at: nil,
             pending_recovery: [],
             undelivered: nil,
+            sending: nil,
             version: nil,
             extra: []
 
@@ -36,11 +43,28 @@ defmodule Cronwatch.JobState do
           last_alert_at: integer() | nil,
           pending_recovery: [String.t()] | nil,
           undelivered: [Alert.t()] | nil,
+          sending: [sending()] | nil,
           version: integer() | nil,
           extra: [{String.t(), JS.value()}]
         }
 
-  @known ["job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered"]
+  @typedoc "An alert in the outbox (`sending`), as `Cronwatch.Evaluate.hold_alerts/4` writes it."
+  @type sending :: %{until: term(), alert: Alert.t() | nil, value: JS.value()}
+
+  @known [
+    "job",
+    "open",
+    "consecutiveFailures",
+    "silencedUntil",
+    "lastAlertAt",
+    "pendingRecovery",
+    "undelivered",
+    "sending"
+  ]
+
+  @doc "An outbox entry: `alert`, left to this process to send until `until`."
+  @spec sending(Alert.t(), integer()) :: sending()
+  def sending(%Alert{} = alert, until), do: %{until: until, alert: alert, value: nil}
 
   @doc "A new state for a job: nothing open, no failures."
   @spec new(String.t()) :: t()
@@ -102,6 +126,8 @@ defmodule Cronwatch.JobState do
 
     head = if s.pending_recovery, do: head ++ [{"pendingRecovery", s.pending_recovery}], else: head
     head = if s.undelivered, do: head ++ [{"undelivered", Enum.map(s.undelivered, &Alert.to_value/1)}], else: head
+    # Only while it holds an alert: never written as [].
+    head = if s.sending in [nil, []], do: head, else: head ++ [{"sending", Enum.map(s.sending, &sending_value/1)}]
     o = %Object{pairs: head}
 
     {o, wrote} =
@@ -115,6 +141,26 @@ defmodule Cronwatch.JobState do
 
     if s.version != nil and not wrote, do: Object.put(o, "version", s.version), else: o
   end
+
+  defp sending_value(%{alert: %Alert{} = alert, until: until}),
+    do: %Object{pairs: [{"until", until}, {"alert", Alert.to_value(alert)}]}
+
+  defp sending_value(%{value: value}), do: value
+
+  # Read leniently, as releaseSending treats an entry: one that is not an
+  # object, or holds no alert, or whose `until` is not a number, is kept as
+  # it is (and let go when the lease is checked), never a failed read.
+  defp read_sending(%Object{} = o) do
+    alert =
+      case Alert.from_value(Object.get(o, "alert")) do
+        {:ok, alert} -> alert
+        {:error, _} -> nil
+      end
+
+    %{until: Object.get(o, "until"), alert: alert, value: o}
+  end
+
+  defp read_sending(value), do: %{until: nil, alert: nil, value: value}
 
   @doc "The SDK's JSON."
   @spec to_json(t()) :: String.t()
@@ -160,6 +206,12 @@ defmodule Cronwatch.JobState do
           nil
       end
 
+    sending =
+      case Object.get(o, "sending") do
+        [_ | _] = list -> Enum.map(list, &read_sending/1)
+        _ -> nil
+      end
+
     extra = Enum.reject(o.pairs, fn {k, _} -> k in @known end)
 
     {:ok,
@@ -171,6 +223,7 @@ defmodule Cronwatch.JobState do
        last_alert_at: Read.nullable_int(o, "lastAlertAt"),
        pending_recovery: pending,
        undelivered: undelivered,
+       sending: sending,
        version: read_version(Object.get(o, "version")),
        extra: extra
      }}

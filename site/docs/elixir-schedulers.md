@@ -26,7 +26,7 @@ A release that a crontab runs needs no integration: see [a crontab](#a-crontab) 
 
 ### Retries
 
-For Oban, every attempt is a run of its own. An attempt that fails (an error, a raise, `{:error, reason}`, or a `{:cancel, reason}` the worker gives up with) is a failed run with its cause, so failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failures_before_alert: 3` counts failed attempts in a row. An attempt that snoozes did not fail and did not do its work: its run is taken back, so nothing is judged, no alert is sent and the failures in a row are left as they were. If the job was due, its schedule reports it missed. Taking a run back needs a store with `delete_run_if`, which the memory store and `Cronwatch.Store.Ecto` have.
+For Oban, every attempt is a run of its own. An attempt that fails (an error, a raise, `{:error, reason}`, or a `{:cancel, reason}` the worker gives up with) is a failed run with its cause, so failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failures_before_alert: 3` counts failed attempts in a row. An attempt that snoozes did not fail and did not do its work: its run is taken back, so nothing is judged, no alert is sent and the failures in a row are left as they were. If the job was due, its schedule reports it missed. Taking a run back needs a store with `delete_run_if`, which the memory store and `Cronwatch.Store.Ecto` have; with a store of your own without it, the snooze is kept as an `ok` run, still not judged.
 
 ### The check
 
