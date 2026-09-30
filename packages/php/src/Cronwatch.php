@@ -1329,11 +1329,17 @@ final class Cronwatch
 
         // Runs that never reported back. One that cannot be judged (its job's
         // stored timeout no longer parses, say) is reported and skipped.
-        foreach ($this->store->runningRuns() as $run) {
+        foreach ($this->store->runningRuns() as $listed) {
             try {
-                $declared = $this->definitions[$run->job] ?? null;
-                $judged = $declared !== null ? Serialize::toStored($declared) : $this->store->getJob($run->job)?->definition;
-                if ($judged === null || !Evaluate::isStuck($judged, $run, $at)) {
+                $declared = $this->definitions[$listed->job] ?? null;
+                $judged = $declared !== null ? Serialize::toStored($declared) : $this->store->getJob($listed->job)?->definition;
+                if ($judged === null || !Evaluate::isStuck($judged, $listed, $at)) {
+                    continue;
+                }
+                // Read again just before the write: lines and metrics flushed since the
+                // list was read (while earlier stuck runs were sent, say) are kept.
+                $run = $this->store->getRun($listed->id);
+                if ($run === null || $run->status !== RunStatus::RUNNING || $run->job !== $listed->job) {
                     continue;
                 }
                 $timeout = Evaluate::timeoutMs($judged);
@@ -1347,7 +1353,7 @@ final class Cronwatch
                 }
                 array_push($alerts, ...$this->finishRun($judged, $run, $at));
             } catch (\Throwable $error) {
-                $this->report($error, "checking {$run->job}");
+                $this->report($error, "checking {$listed->job}");
             }
         }
 

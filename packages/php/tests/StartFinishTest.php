@@ -214,6 +214,34 @@ final class StartFinishTest extends TestCase
         $this->assertSame(['stuck'], $this->capture->types());
     }
 
+    public function testLinesFlushedWhileACheckMarksEarlierRunsStuckAreKeptOnTheRunItMarksNext(): void
+    {
+        $second = null;
+        $sent = 0;
+        // While the first stuck run's alert is being sent, the second is still running, and flushes.
+        $held = new \Cronwatch\Alerts\Custom('held', function () use (&$second, &$sent): void {
+            if ($sent++ === 0) {
+                $second->log('important progress line');
+                $second->metric('rows', 2);
+                $second->flush();
+            }
+        });
+        $cw = $this->make(['alerts' => [$held]]);
+        $first = $cw->job('first', ['timeout' => '30m'])->start();
+        $this->clock->advance(1000);
+        $second = $cw->job('second', ['timeout' => '30m'])->start();
+        $second->log('early line');
+        $second->metric('rows', 1);
+        $second->flush();
+        $this->clock->advance(31 * self::MIN);
+        $cw->check();
+        $stored = $cw->getRun($second->id);
+        $this->assertSame('timeout', $stored->status);
+        $this->assertSame("early line\nimportant progress line", $stored->output);
+        $this->assertSame(['rows' => 2], $stored->metrics);
+        $this->assertSame('timeout', $cw->getRun($first->id)->status);
+    }
+
     public function testALateSuccessAfterATimeoutMarkClosesStuckAndRecoversALateFailureDoesNotCountTwice(): void
     {
         $cw = $this->make();
