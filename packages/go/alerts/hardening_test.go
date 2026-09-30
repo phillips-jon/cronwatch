@@ -523,15 +523,72 @@ func TestAJSONBodyCutThroughASurrogatePairKeepsTheLoneHalf(t *testing.T) {
 	if !strings.Contains(body, strings.Repeat("a", 2899)+"\\ud83d```") || !strings.Contains(body, strings.Repeat("b", 2989)+"\\ud83d\"") {
 		t.Fatalf("the lone half is not JSON.stringify's: %s", body[len(body)-80:])
 	}
-	a.Message, a.Triage = strings.Repeat("c", 3799)+"\U0001F600", ptr(strings.Repeat("d", 999)+"\U0001F600")
+	// Discord's description holds both parts to 4096 together, so each is
+	// sent with a short other part to reach its own cap.
+	a.Message, a.Triage = strings.Repeat("c", 3799)+"\U0001F600", nil
 	ch, _ = Discord(DiscordOptions{WebhookURL: "https://discord.example/api/webhooks/1/x", HTTPClient: &http.Client{Transport: rec}})
 	rec.reset(204, "")
 	if err := ch.Send(bg, a, cronwatch.ChannelContext{}); err != nil {
 		t.Fatal(err)
 	}
 	body = rec.taken()[0].body
-	if !strings.Contains(body, strings.Repeat("c", 3799)+"\\ud83d\\n```") || !strings.Contains(body, strings.Repeat("d", 999)+"\\ud83d\"") {
+	if !strings.Contains(body, strings.Repeat("c", 3799)+"\\ud83d\\n```") {
 		t.Fatalf("the lone half is not JSON.stringify's: %s", body)
+	}
+	a.Message, a.Triage = "short", ptr(strings.Repeat("d", 999)+"\U0001F600")
+	rec.reset(204, "")
+	if err := ch.Send(bg, a, cronwatch.ChannelContext{}); err != nil {
+		t.Fatal(err)
+	}
+	body = rec.taken()[0].body
+	if !strings.Contains(body, strings.Repeat("d", 999)+"\\ud83d\"") {
+		t.Fatalf("the lone half is not JSON.stringify's: %s", body)
+	}
+}
+
+func TestDiscordHoldsTheWholeDescriptionTo4096(t *testing.T) {
+	rec := &recorder{}
+	ch, _ := Discord(DiscordOptions{WebhookURL: "https://discord.example/api/webhooks/1/x", HTTPClient: &http.Client{Transport: rec}})
+	a := sample(t)
+	a.Message = "Error: long\n" + strings.Repeat("```", 1200) + strings.Repeat("x", 400) + strings.Repeat("\U0001F600", 200)
+	tri := strings.Repeat("*_`~|[]()<>\\", 100)
+	a.Triage = &tri
+	rec.reset(204, "")
+	if err := ch.Send(bg, a, cronwatch.ChannelContext{}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := js.Parse(rec.taken()[0].body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	embeds, _ := v.(*js.Object).Get("embeds")
+	description, _ := embeds.([]any)[0].(*js.Object).Get("description")
+	d := description.(string)
+	if n := js.Length16(d); n != 4096 {
+		t.Fatalf("description is %d units", n)
+	}
+	if !strings.HasSuffix(d, "\n**Triage:** "+escapeMarkdown(tri[:1000])) {
+		t.Error("the triage is not whole")
+	}
+	if !strings.HasPrefix(d, "```\nError: long\n") || strings.Count(d, "```") != 2 {
+		t.Errorf("fences: %d", strings.Count(d, "```"))
+	}
+
+	// Emoji at the cut: never half a surrogate pair.
+	a.Message, a.Triage = strings.Repeat("\U0001F600", 1900), ptr(strings.Repeat("t", 1001))
+	rec.reset(204, "")
+	if err := ch.Send(bg, a, cronwatch.ChannelContext{}); err != nil {
+		t.Fatal(err)
+	}
+	body := rec.taken()[0].body
+	if strings.Contains(body, `\ud83d`) {
+		t.Fatal("a lone half was left at the cut")
+	}
+	v, _ = js.Parse(body)
+	embeds, _ = v.(*js.Object).Get("embeds")
+	description, _ = embeds.([]any)[0].(*js.Object).Get("description")
+	if n := js.Length16(description.(string)); n > 4096 {
+		t.Fatalf("description is %d units", n)
 	}
 }
 

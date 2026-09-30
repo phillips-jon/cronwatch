@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	cronwatch "cronwatch.dev/go"
 )
@@ -233,6 +235,98 @@ func TestARunNeverFinishedIsMarkedStuck(t *testing.T) {
 		t.Error(*stored.Error)
 	}
 	sameList(t, "alerts", k.alerts.Types(), []string{"stuck"})
+}
+
+func TestLinesFlushedWhileACheckMarksEarlierRunsStuckAreKept(t *testing.T) {
+	entered, gate := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	held := cronwatch.ChannelFunc("held", func(context.Context, cronwatch.Alert) error {
+		once.Do(func() { close(entered); <-gate })
+		return nil
+	})
+	k := newKit(t, cronwatch.WithAlerts(held))
+	first := must[*cronwatch.RunHandle](t)(k.cw.MustJob("first", cronwatch.Timeout("30m")).Start(bg))
+	k.c.Advance(1000)
+	second := must[*cronwatch.RunHandle](t)(k.cw.MustJob("second", cronwatch.Timeout("30m")).Start(bg))
+	second.Log("early line")
+	check(t, second.Metric("rows", 1))
+	second.Flush(bg)
+	k.c.Advance(31 * MIN)
+	done := make(chan struct{})
+	go func() { defer close(done); _, _ = k.cw.Check(bg) }()
+	// The first stuck run's alert is being sent; the second is still running, and flushes.
+	<-entered
+	second.Log("important progress line")
+	check(t, second.Metric("rows", 2))
+	second.Flush(bg)
+	close(gate)
+	<-done
+	stored := must[*cronwatch.Run](t)(k.cw.GetRun(bg, second.ID()))
+	eq(t, "status", stored.Status, cronwatch.StatusTimeout)
+	eq(t, "output", *stored.Output, "early line\nimportant progress line")
+	eq(t, "metrics", jsonOf(stored.Metrics), `{"rows":2}`)
+	eq(t, "first", must[*cronwatch.Run](t)(k.cw.GetRun(bg, first.ID())).Status, cronwatch.StatusTimeout)
+}
+
+// closeWatched is a memory store that notes when it is closed.
+type closeWatched struct {
+	*cronwatch.MemoryStore
+	note func(string)
+}
+
+func (s *closeWatched) Close() error {
+	s.note("close")
+	return s.MemoryStore.Close()
+}
+
+func TestCloseWaitsForACheckUnderWayBeforeItClosesTheStore(t *testing.T) {
+	for _, by := range []string{"a caller", "the interval"} {
+		t.Run(by, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var mu sync.Mutex
+				order := []string{}
+				note := func(what string) {
+					mu.Lock()
+					defer mu.Unlock()
+					order = append(order, what)
+				}
+				entered, gate := make(chan struct{}), make(chan struct{})
+				var once sync.Once
+				held := cronwatch.ChannelFunc("held", func(context.Context, cronwatch.Alert) error {
+					once.Do(func() { close(entered); <-gate })
+					note("send")
+					return nil
+				})
+				store := &closeWatched{MemoryStore: cronwatch.NewMemoryStore(), note: note}
+				k := newKit(t, cronwatch.WithStore(store), cronwatch.WithAlerts(held))
+				must[*cronwatch.RunHandle](t)(k.cw.MustJob("callback", cronwatch.Timeout("30m")).Start(bg))
+				k.c.Advance(31 * MIN)
+				var wg sync.WaitGroup
+				if by == "a caller" {
+					wg.Go(func() { _, _ = k.cw.Check(bg) })
+				} else {
+					k.cw.Start(time.Minute)
+					time.Sleep(2 * time.Second)
+				}
+				<-entered
+				closed := make(chan error, 1)
+				wg.Go(func() { closed <- k.cw.Close() })
+				synctest.Wait()
+				select {
+				case <-closed:
+					t.Fatal("Close returned while the check was sending")
+				default:
+				}
+				mu.Lock()
+				sameList(t, "nothing yet", order, []string{})
+				mu.Unlock()
+				close(gate)
+				wg.Wait()
+				check(t, <-closed)
+				sameList(t, "order", order, []string{"send", "close"})
+			})
+		})
+	}
 }
 
 func TestALateSuccessAfterATimeoutMarkRecovers(t *testing.T) {

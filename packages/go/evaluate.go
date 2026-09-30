@@ -44,7 +44,9 @@ func emptyState(job string) JobState {
 }
 
 // normalizeState is a stored state with every field present, or a fresh
-// one. State written by an older version lacks the newer fields.
+// one. State written by an older version lacks the newer fields. Sending is
+// the exception: it is there only while it holds an alert (see holdAlerts),
+// and then last, after any key another writer added.
 func normalizeState(state *JobState, job string) JobState {
 	if state == nil {
 		return emptyState(job)
@@ -63,7 +65,157 @@ func normalizeState(state *JobState, job string) JobState {
 	if s.Undelivered == nil {
 		s.Undelivered = []Alert{}
 	}
+	tail := s.tail[:0:0]
+	for _, k := range s.tail {
+		if k != "sending" {
+			tail = append(tail, k)
+		}
+	}
+	delete(s.extra, "sending")
+	if len(s.Sending) > 0 {
+		tail = append(tail, "sending")
+	} else {
+		s.Sending = nil
+	}
+	s.tail = tail
 	return s
+}
+
+// ---------------------------------------------------------------- delivery
+
+// sendLeaseMs is how long an alert in Sending is left to the process
+// sending it. Longer than any send takes: at most three alerts go out
+// together, each with 25 seconds of triage and 15 of channels.
+const sendLeaseMs = 5 * 60_000
+
+// alertKey identifies an alert across retries, and in Sending.
+func alertKey(a Alert) string {
+	id := ""
+	if a.Run != nil {
+		id = a.Run.ID
+	}
+	at := strconv.FormatInt(a.At, 10)
+	if raw, ok := a.at().(float64); ok {
+		at = js.FormatNumber(raw)
+	}
+	return string(a.Type) + "|" + at + "|" + id
+}
+
+// queueUndelivered adds alerts to the undelivered queue: one with the same
+// key as a queued alert replaces it where it stands, the rest go at the
+// end, and only the newest maxUndelivered stay. It returns how many went.
+func queueUndelivered(state JobState, alerts []Alert) (JobState, int) {
+	next := cloneState(state)
+	byKey := map[string]Alert{}
+	for _, a := range alerts {
+		byKey[alertKey(a)] = a
+	}
+	queue := []Alert{}
+	known := map[string]bool{}
+	for _, a := range next.Undelivered {
+		key := alertKey(a)
+		if r, ok := byKey[key]; ok {
+			a = r
+		}
+		queue = append(queue, a.clone())
+		known[key] = true
+	}
+	for _, a := range alerts {
+		if !known[alertKey(a)] {
+			queue = append(queue, a.clone())
+		}
+	}
+	dropped := max(0, len(queue)-maxUndelivered)
+	next.Undelivered = queue[dropped:]
+	return next, dropped
+}
+
+// holdAlerts is the outbox. Alerts just composed are written with the
+// state that opens their condition, before any is sent, so a process that
+// stops part way does not lose them: into Sending, each with its lease
+// ending at until, when this process sends them, or (deferred, the
+// client's DeliverAtCheck) straight into the undelivered queue for a check
+// elsewhere. It returns how many alerts past maxUndelivered went.
+func holdAlerts(state JobState, alerts []Alert, until int64, deferred bool) (JobState, int) {
+	if len(alerts) == 0 {
+		return state, 0
+	}
+	if deferred {
+		return queueUndelivered(state, alerts)
+	}
+	next := cloneState(state)
+	list := next.Sending
+	for _, a := range alerts {
+		list = append(list, SendingAlert{Until: until, Alert: a.clone()})
+	}
+	dropped := max(0, len(list)-maxUndelivered)
+	next.Sending = list[dropped:]
+	return next, dropped
+}
+
+// releaseSending takes the alerts in Sending whose lease ran out by now
+// (the process sending them stopped before it recorded how the send went)
+// to the undelivered queue, where the retry sends them (with triage, which
+// is never stored with them there) or drops them as stale. An entry with no
+// alert is dropped; one with no number for until counts as run out.
+func releaseSending(state JobState, now int64) (JobState, int) {
+	var held []SendingAlert
+	var released []Alert
+	lapsed := false
+	for _, e := range state.Sending {
+		if !e.lapsed(now) {
+			held = append(held, e)
+			continue
+		}
+		lapsed = true
+		if !e.noAlert {
+			released = append(released, e.Alert)
+		}
+	}
+	if !lapsed {
+		return state, 0
+	}
+	next := state.clone()
+	next.Sending = held
+	return queueUndelivered(next, released)
+}
+
+// recordSent is how a send went. Delivered and stale alerts leave the
+// queue; failed ones replace their queued copy, so a triage made on this
+// attempt is kept, or join the queue. Every one of them leaves Sending.
+// LastAlertAt moves only on a delivery. It returns how many alerts past
+// maxUndelivered went.
+func recordSent(state JobState, delivered, failed, stale []Alert, now int64) (JobState, int) {
+	next := cloneState(state)
+	done := map[string]bool{}
+	sent := map[string]bool{}
+	for _, list := range [][]Alert{delivered, stale} {
+		for _, a := range list {
+			done[alertKey(a)] = true
+			sent[alertKey(a)] = true
+		}
+	}
+	for _, a := range failed {
+		sent[alertKey(a)] = true
+	}
+	queue := []Alert{}
+	for _, a := range next.Undelivered {
+		if !done[alertKey(a)] {
+			queue = append(queue, a)
+		}
+	}
+	next.Undelivered = queue
+	var held []SendingAlert
+	for _, e := range next.Sending {
+		if e.noAlert || !sent[alertKey(e.Alert)] {
+			held = append(held, e)
+		}
+	}
+	next.Sending = held
+	if len(delivered) > 0 {
+		next.LastAlertAt = ptr(now)
+	}
+	return queueUndelivered(next, failed)
 }
 
 func cloneState(s JobState) JobState { return normalizeState(&s, s.Job) }
@@ -467,6 +619,18 @@ func isStuck(def Definition, run Run, now int64) (bool, error) {
 // integer JavaScript holds exactly, which every port and store reads back
 // unchanged (the SDK's MAX_DURATION_MS).
 const maxDurationMs = 9007199254740991
+
+// silenceEnd is when a silence of ms milliseconds from now ends: a whole
+// millisecond, never past maxDurationMs (2^53 - 1), however long the silence
+// asked for, worked out without wrapping an int64. Every port sharing the
+// store reads it back unchanged.
+func silenceEnd(now int64, ms float64) int64 {
+	d := int64(math.Floor(min(ms, maxDurationMs)))
+	if now >= maxDurationMs-d {
+		return maxDurationMs
+	}
+	return now + d
+}
 
 // runDuration is how long a run took, from startedAt to finishedAt: 0 when
 // it started later, and never more than maxDurationMs (the SDK's

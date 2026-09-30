@@ -136,6 +136,17 @@ func TestHandlerAResponseReturnedWithAnErrorIsNotTheAnswer(t *testing.T) {
 	res = serve(wrote, "GET", "http://x/", nil, "")
 	status(t, "its own answer", res, 202)
 	eq(t, "closed too", closed, 2)
+
+	// A failure status the function wrote itself, with a response returned beside it.
+	wroteFailure := cronwatch.HandlerValue(job, func(ctx context.Context, j *cronwatch.JobContext, w http.ResponseWriter, r *http.Request) (*http.Response, error) {
+		w.WriteHeader(http.StatusBadGateway)
+		return upstream(), nil
+	})
+	k.c.Advance(1000)
+	res = serve(wroteFailure, "GET", "http://x/", nil, "")
+	status(t, "its own failure", res, 502)
+	eq(t, "closed as well", closed, 3)
+	eq(t, "the run failed with it", *runs(t, k.cw, "h")[0].Error, "HTTP 502 Bad Gateway")
 }
 
 func TestHandlerFailsClosedWithoutASecretOutsideDevelopment(t *testing.T) {

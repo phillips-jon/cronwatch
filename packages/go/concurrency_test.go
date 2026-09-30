@@ -224,6 +224,94 @@ func TestAHandleWhoseJobWasForgottenWritesItsOwnDefinition(t *testing.T) {
 	eq(t, "schedule", scheduleOf(t, k.cw.Store(), "a"), "every 5m")
 }
 
+// heldAfterUpsert is a store whose first write of a job's definition lands
+// and then waits until the returned function lets it go, so a test can
+// forget the job after its row is written and before the write returns.
+type heldAfterUpsert struct {
+	*testStore
+	once sync.Once
+	gate chan struct{}
+}
+
+func (s *heldAfterUpsert) UpsertJob(ctx context.Context, d cronwatch.Definition, now int64) error {
+	err := s.testStore.UpsertJob(ctx, d, now)
+	s.once.Do(func() { <-s.gate })
+	return err
+}
+
+func TestAForgetDuringAJobsFirstWriteLeavesItToBeWrittenOnItsNextRun(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		store := &heldAfterUpsert{testStore: newTestStore(), gate: make(chan struct{})}
+		k := newKit(t, cronwatch.WithStore(store))
+		job := k.cw.MustJob("nightly", cronwatch.Schedule("every 5m"))
+		var wg sync.WaitGroup
+		wg.Go(func() { _ = job.Run(bg, ok) })
+		synctest.Wait()
+		check(t, k.cw.Forget(bg, "nightly"))
+		close(store.gate)
+		wg.Wait()
+		if must[*cronwatch.StoredJob](t)(store.inner.GetJob(bg, "nightly")) != nil {
+			t.Fatal("the row the forget deleted is back")
+		}
+		check(t, job.Run(bg, ok))
+		eq(t, "its next run brings it back", scheduleOf(t, store.inner, "nightly"), "every 5m")
+		names := []string{}
+		for _, j := range must[[]cronwatch.JobSummary](t)(k.cw.Jobs(bg)) {
+			names = append(names, j.Name)
+		}
+		sameList(t, "jobs", names, []string{"nightly"})
+	})
+}
+
+func TestAJobForgottenByAnotherProcessComesBackInOneThatStillDeclaresIt(t *testing.T) {
+	store := cronwatch.NewMemoryStore()
+	worker := cronwatch.MustNew(cronwatch.WithStore(store), cronwatch.WithAlerts(&captureOf{}), cronwatch.WithoutCronSecret())
+	web := cronwatch.MustNew(cronwatch.WithStore(store), cronwatch.WithAlerts(&captureOf{}), cronwatch.WithoutCronSecret())
+	nightly := worker.MustJob("nightly", cronwatch.Schedule("every 5m"))
+	check(t, nightly.Run(bg, ok))
+	forgotten := func() {
+		t.Helper()
+		check(t, web.Forget(bg, "nightly"))
+		if must[*cronwatch.StoredJob](t)(store.GetJob(bg, "nightly")) != nil {
+			t.Fatal("not forgotten")
+		}
+	}
+	stored := func(what string) {
+		t.Helper()
+		eq(t, what, scheduleOf(t, store, "nightly"), "every 5m")
+	}
+
+	// Its next run writes it again, so the run is not left without its job.
+	forgotten()
+	check(t, nightly.Run(bg, ok))
+	stored("after a run")
+	eq(t, "runs", len(must[[]cronwatch.Run](t)(web.Runs(bg, "nightly", 50))), 1)
+
+	// So does a started run, a check, the board and the job's page in the process that declares it.
+	forgotten()
+	handle := must[*cronwatch.RunHandle](t)(nightly.Start(bg))
+	stored("after a start")
+	handle.Finish(bg)
+	forgotten()
+	must[*cronwatch.CheckResult](t)(worker.Check(bg))
+	stored("after a check")
+	forgotten()
+	jobs := must[[]cronwatch.JobSummary](t)(worker.Jobs(bg))
+	if len(jobs) != 1 || jobs[0].Name != "nightly" {
+		t.Errorf("the board: %v", jobs)
+	}
+	forgotten()
+	one := must[*cronwatch.JobSummary](t)(worker.JobSummary(bg, "nightly"))
+	if one == nil || one.Definition.Schedule() != "every 5m" {
+		t.Errorf("the job's page: %v", one)
+	}
+
+	// A process that never declared it does not bring it back.
+	forgotten()
+	must[*cronwatch.CheckResult](t)(web.Check(bg))
+	eq(t, "the other process's board", len(must[[]cronwatch.JobSummary](t)(web.Jobs(bg))), 0)
+}
+
 func TestADeclarationMadeWhileTheEarlierOneIsWrittenIsStillToBeWritten(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		store, release := heldUpsert()

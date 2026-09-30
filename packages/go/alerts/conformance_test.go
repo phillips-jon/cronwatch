@@ -86,6 +86,21 @@ func alertOf(t *testing.T, v any) cronwatch.Alert {
 	return a
 }
 
+// expand is the fixture's recipe for long text: a string, or
+// { parts: [[piece, times], ...] } joined.
+func expand(spec any) string {
+	if s, ok := spec.(string); ok {
+		return s
+	}
+	var b strings.Builder
+	parts, _ := field(spec.(*js.Object), "parts").([]any)
+	for _, p := range parts {
+		pair := p.([]any)
+		b.WriteString(strings.Repeat(pair[0].(string), int(pair[1].(float64))))
+	}
+	return b.String()
+}
+
 // digest is the fixture's form of a text: itself up to 400 UTF-16 code
 // units, else its length and the SHA-256 of its UTF-8.
 func digest(s string) any {
@@ -421,6 +436,27 @@ func TestConformanceChannels(t *testing.T) {
 			}
 			if g, w := js.Stringify(digest(smsBody(long, link, segments))), js.Stringify(field(c, "body")); g != w {
 				t.Errorf("smsBody with %v segments: %s, want %s", field(c, "segments"), g, w)
+			}
+			count++
+		}
+		descriptions := objects(field(cuts, "discordDescriptions"))
+		if len(descriptions) == 0 {
+			t.Error("no discordDescriptions cases")
+		}
+		for i, c := range descriptions {
+			a := first
+			a.Message = expand(field(c, "message"))
+			a.Triage, a.TriageTried = nil, false
+			switch v := field(c, "triage").(type) {
+			case nil:
+			case string:
+				a.Triage, a.TriageTried = &v, true
+			default:
+				s := expand(v)
+				a.Triage, a.TriageTried = &s, true
+			}
+			if g, w := js.Stringify(digest(embedDescription(a))), js.Stringify(field(c, "description")); g != w {
+				t.Errorf("discordDescriptions %d: %s, want %s", i, g, w)
 			}
 			count++
 		}

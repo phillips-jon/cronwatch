@@ -7,6 +7,7 @@ package cronwatch
 // shell, and works without its one script.
 
 import (
+	"math"
 	"strings"
 
 	"cronwatch.dev/go/internal/js"
@@ -328,6 +329,10 @@ func jobPage(job JobSummary, runs []Run, now int64, base string, complete bool) 
 		}
 		var metrics strings.Builder
 		for _, m := range run.Metrics {
+			// A foreign row, or a store that kept NaN, may hold a metric that is no finite number; it is left out.
+			if math.IsNaN(m.Value) || math.IsInf(m.Value, 0) {
+				continue
+			}
 			metrics.WriteString(`<span><span class="k">` + h(m.Name) + `</span> ` + h(metricText(m.Value)) + `</span>`)
 		}
 		took := `<span class="muted">running</span>`

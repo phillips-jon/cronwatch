@@ -223,7 +223,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	startedAt := c.now()
 	run := Run{ID: newID(), Job: name, Status: StatusRunning, StartedAt: startedAt, Metrics: Metrics{}, Trigger: trigger}
 	recorded := false
-	if err := c.sync(sctx, def); err != nil {
+	if err := c.sync(sctx, def, true); err != nil {
 		c.report(err, "recording "+name)
 	} else if err := c.store.InsertRun(sctx, run.clone()); err != nil {
 		c.report(err, "recording "+name)
@@ -293,7 +293,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	run.Output = rec.Output()
 	resultText, isText := out.result.(string)
 	if run.Output == nil && isText && !out.panicked && out.err == nil {
-		run.Output = ptr(output.CapOutput(resultText))
+		run.Output = ptr(resultText)
 	}
 	expectText := rec.ExpectText()
 	if expectText == nil && isText && !out.panicked && out.err == nil {
@@ -304,7 +304,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	case out.panicked:
 		failure = &panicText
 	case out.err != nil:
-		failure = ptr(output.ErrorMessage(out.err))
+		failure = ptr(output.DescribeError(out.err))
 	}
 	c.conclude(def, &run, out.result, failure, expectText)
 	out.run = run
@@ -351,11 +351,6 @@ func msDuration(ms float64) time.Duration {
 	return math.MaxInt64
 }
 
-// laterBy is t plus ms milliseconds, with ms held at schedule.MaxIntervalMs
-// so the sum cannot wrap: a silence "for" any length ends in some 285,000
-// years at most.
-func laterBy(t int64, ms float64) int64 { return t + int64(min(ms, schedule.MaxIntervalMs)) }
-
 // discardRun takes back a run still running (DiscardWhen) and says whether
 // the caller is done with it. A store that is not a RunDeleter, or that
 // fails, is reported and the run is finished as it ended, so it is not left
@@ -393,8 +388,8 @@ func httpFailure(result any) (string, bool) {
 }
 
 // conclude sets a finished run's status and error from how it ended, then
-// redacts its output and error. failure is the error text of a function
-// that failed, or nil.
+// redacts its output and error and caps them, in that order. failure is the
+// error text of a function that failed, not yet capped, or nil.
 func (c *Client) conclude(def *jobDef, run *Run, result any, failure *string, expectText *string) {
 	if failure != nil {
 		run.Status = StatusFailed
@@ -409,12 +404,13 @@ func (c *Client) conclude(def *jobDef, run *Run, result any, failure *string, ex
 		run.Status = StatusOK
 	}
 	// Redacted after the expect check, so a rule can still match what was
-	// logged. NULs go last, so not even a custom redact can store one.
+	// logged, and before the cap, so the cut cannot keep half a secret. NULs
+	// go last, so not even a custom redact can store one.
 	if run.Output != nil {
-		run.Output = ptr(output.StripNul(c.redact(*run.Output)))
+		run.Output = ptr(output.RedactAndCap(*run.Output, c.redact))
 	}
 	if run.Error != nil {
-		run.Error = ptr(output.StripNul(c.redact(*run.Error)))
+		run.Error = ptr(output.RedactAndCap(*run.Error, c.redact))
 	}
 }
 
@@ -425,7 +421,7 @@ func (c *Client) conclude(def *jobDef, run *Run, result any, failure *string, ex
 func (c *Client) recordFinish(ctx context.Context, def *jobDef, run *Run, recorded bool, finishedAt int64) (string, error) {
 	if !recorded {
 		// The start was never written; the store may be back by now.
-		if err := c.sync(ctx, def); err != nil {
+		if err := c.sync(ctx, def, false); err != nil {
 			return "", err
 		}
 		err := c.store.InsertRun(ctx, run.clone())
@@ -498,31 +494,34 @@ func (c *Client) claimFinish(ctx context.Context, run Run) (late bool, ignored s
 
 // finishRun evaluates a finished run (ok, failed, or timed out by a
 // check), already written, against the job's state, and sends what that
-// produces. Never fails: problems go to the error handler.
+// produces. The alerts are written with that state (see outbox). Never
+// fails: problems go to the error handler.
 func (c *Client) finishRun(ctx context.Context, def Definition, run Run, now int64) []Alert {
 	var history []Run
 	var historyErr error
 	read := false
-	_, drafts, err := updateState(ctx, c, run.Job, func(previous JobState) (JobState, []alertDraft, error) {
+	_, out, err := updateState(ctx, c, run.Job, func(previous JobState) (JobState, held, error) {
 		if !read {
 			history, historyErr = c.history(ctx, run)
 			read = true
 		}
 		if historyErr != nil {
-			return JobState{}, nil, historyErr
+			return JobState{}, held{}, historyErr
 		}
 		e, err := onRunFinish(def, run, previous, history, now)
 		if err != nil {
-			return JobState{}, nil, err
+			return JobState{}, held{}, err
 		}
 		settled := applySilence(previous, e, now)
-		return settled.state, settled.alerts, nil
+		state, out := c.outbox(settled.state, settled.alerts, def, now)
+		return state, out, nil
 	})
 	if err != nil {
 		c.report(err, "evaluating "+run.Job)
 		return []Alert{}
 	}
-	return c.dispatch(ctx, drafts, def, now)
+	c.reportDropped(run.Job, out.dropped)
+	return c.dispatch(ctx, run.Job, out.alerts, now)
 }
 
 // history is the runs before run, newest first, with up to baselineWindow
@@ -568,8 +567,9 @@ func WithoutEvaluation() RecordOption { return func(r *recordConfig) { r.skipEva
 // whose write lands evaluates it, and the other reports it as already
 // finished. A stored run of another job is left alone and reported. A
 // finished run is judged as if it had been wrapped here (expect, failures,
-// duration, budgets) and its output and error are redacted the same way.
-// Returns the alerts it sent.
+// duration, budgets) and its output and error are redacted the same way. A
+// metric that is not a finite number is refused before anything is
+// written, as JobContext.Metric refuses it. Returns the alerts it sent.
 func (c *Client) RecordRun(ctx context.Context, input Run, options ...RecordOption) ([]Alert, error) {
 	var cfg recordConfig
 	for _, o := range options {
@@ -582,7 +582,14 @@ func (c *Client) RecordRun(ctx context.Context, input Run, options ...RecordOpti
 	if strings.Contains(input.ID, "\x00") {
 		return nil, fmt.Errorf("recordRun: run ids cannot contain a NUL character (job %s)", js.Quote(input.Job))
 	}
-	if err := c.sync(ctx, def); err != nil {
+	// Refused as JobContext.Metric refuses them: a store keeps NaN and
+	// infinities as null, or refuses them.
+	for _, m := range input.Metrics {
+		if math.IsNaN(m.Value) || math.IsInf(m.Value, 0) {
+			return nil, fmt.Errorf("recordRun: metric %s must be a finite number (job %s, run %s)", js.Quote(m.Name), js.Quote(input.Job), js.Quote(input.ID))
+		}
+	}
+	if err := c.sync(ctx, def, false); err != nil {
 		return nil, err
 	}
 	run := input.clone()
@@ -593,10 +600,10 @@ func (c *Client) RecordRun(ctx context.Context, input Run, options ...RecordOpti
 		}
 	}
 	if run.Output != nil {
-		run.Output = ptr(output.StripNul(c.redact(output.CapOutput(*run.Output))))
+		run.Output = ptr(output.RedactAndCap(*run.Output, c.redact))
 	}
 	if run.Error != nil {
-		run.Error = ptr(output.StripNul(c.redact(output.CapOutput(*run.Error))))
+		run.Error = ptr(output.RedactAndCap(*run.Error, c.redact))
 	}
 	evaluate := !cfg.skipEvaluation
 

@@ -68,6 +68,8 @@ type declared struct {
 	job *cronwatch.Job
 	// key is the definition's JSON, to tell a changed declaration.
 	key string
+	// options declared it, to declare it again after a forget.
+	options []cronwatch.JobOption
 	// entry is still in the scheduler.
 	current bool
 }
@@ -275,7 +277,10 @@ func (w *Watch) declare(name, where string, options []cronwatch.JobOption, curre
 	key := js.Stringify(cronwatch.DescribeJob(name, options...))
 	w.mu.Lock()
 	d, ok := w.jobs[name]
-	if ok && d.key == key {
+	// Unchanged, and still declared: a job forgotten since (the dashboard's
+	// forget) is declared again, or its next run would write it back and
+	// Unschedule take it for an entry gone.
+	if ok && d.key == key && w.cw.Declares(name) {
 		d.current = d.current || current
 		w.mu.Unlock()
 		return
@@ -288,9 +293,9 @@ func (w *Watch) declare(name, where string, options []cronwatch.JobOption, curre
 	}
 	w.mu.Lock()
 	if d, ok := w.jobs[name]; ok {
-		d.job, d.key, d.current = job, key, d.current || current
+		d.job, d.key, d.options, d.current = job, key, options, d.current || current
 	} else {
-		w.jobs[name] = &declared{job: job, key: key, current: current}
+		w.jobs[name] = &declared{job: job, key: key, options: options, current: current}
 	}
 	w.mu.Unlock()
 	w.save(name)
@@ -369,14 +374,42 @@ func appendDuration(options []cronwatch.JobOption, text func(string) cronwatch.J
 func (w *Watch) Unschedule(ctx context.Context) ([]string, error) {
 	w.mu.Lock()
 	seen := w.seen
-	mine := make([]string, 0, len(w.jobs))
-	for name := range w.jobs {
-		mine = append(mine, name)
-	}
 	w.mu.Unlock()
 	if !seen {
 		return nil, nil
 	}
+	// A job whose entry the scheduler still has, forgotten since (the
+	// dashboard's forget), is declared again first, so it keeps its
+	// schedule rather than being taken for an entry gone.
+	w.declaring.Lock()
+	w.mu.Lock()
+	mine := make([]string, 0, len(w.jobs))
+	var forgotten []string
+	for name, d := range w.jobs {
+		mine = append(mine, name)
+		if d.current && !w.cw.Declares(name) {
+			forgotten = append(forgotten, name)
+		}
+	}
+	w.mu.Unlock()
+	slices.Sort(forgotten)
+	for _, name := range forgotten {
+		w.mu.Lock()
+		d := w.jobs[name]
+		where, options, key := js.Quote(name), d.options, d.key
+		w.mu.Unlock()
+		job, err := w.cw.Job(name, options...)
+		if err != nil {
+			w.ReportOnce(err, "declaring "+where)
+			continue
+		}
+		w.mu.Lock()
+		if d := w.jobs[name]; d != nil && d.key == key {
+			d.job = job
+		}
+		w.mu.Unlock()
+	}
+	w.declaring.Unlock()
 	// This process's own declarations are written back where the store
 	// holds something else: another process of the app (an older release
 	// still up during a deploy) may have taken the schedule out of a job it

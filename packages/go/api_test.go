@@ -4,8 +4,13 @@ package cronwatch_test
 // and a definition's field order under functional options.
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"log/slog"
 	"math"
 	"net/http"
 	"regexp"
@@ -205,6 +210,93 @@ func TestRedaction(t *testing.T) {
 	custom := newKit(t, cronwatch.WithRedact(strings.ToUpper))
 	check(t, custom.cw.Run(bg, "r", func(_ context.Context, j *cronwatch.JobContext) error { j.Log("quiet"); return nil }))
 	eq(t, "custom", *runs(t, custom.cw, "r")[0].Output, "QUIET")
+}
+
+func TestASecretSplitByTheCutIsRedactedWhole(t *testing.T) {
+	const cap = 16 * 1024
+	var body []string
+	for i := range 25 {
+		body = append(body, strings.Repeat("QUJD", 15)+fmt.Sprintf("%04d", i))
+	}
+	pem := "-----BEGIN PRIVATE KEY-----\n" + strings.Join(body, "\n") + "\n-----END PRIVATE KEY-----"
+	bearer := "Authorization: Bearer opaqueTOKENvalue1234567890"
+	k := newKit(t)
+	// The cut lands inside the key's body, and in a second run just after "Bear".
+	check(t, k.cw.Run(bg, "pem", func(_ context.Context, j *cronwatch.JobContext) error {
+		j.Log(strings.Repeat("x", cap))
+		j.Log(pem[:900])
+		j.Log(pem[900:])
+		j.Log("done")
+		return nil
+	}))
+	out := *runs(t, k.cw, "pem")[0].Output
+	if strings.Contains(out, "QUJD") || !strings.HasSuffix(out, "[redacted]\ndone") {
+		t.Errorf("pem: %q", out[len(out)-200:])
+	}
+	tail := strings.Repeat("y", cap-30)
+	if _, err := cronwatch.RunValue(bg, k.cw.MustJob("bearer"), func(context.Context, *cronwatch.JobContext) (string, error) {
+		return bearer + "\n" + tail, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if out := *runs(t, k.cw, "bearer")[0].Output; strings.Contains(out, "opaqueTOKEN") || len(out) > cap+len("[earlier output trimmed]\n") {
+		t.Errorf("bearer: %q", out[:80])
+	}
+
+	// Errors, recorded runs and flushed lines the same way.
+	_ = k.cw.Run(bg, "thrown", func(context.Context, *cronwatch.JobContext) error {
+		return errors.New(strings.Repeat("e", cap) + " " + bearer + " " + strings.Repeat("z", cap-40))
+	})
+	if e := *runs(t, k.cw, "thrown")[0].Error; strings.Contains(e, "opaqueTOKEN") {
+		t.Error("thrown: the token was kept")
+	}
+	k.cw.MustJob("imported")
+	if _, err := k.cw.RecordRun(bg, cronwatch.Run{ID: "i1", Job: "imported", Status: cronwatch.StatusOK, StartedAt: 1, FinishedAt: ptr(int64(2)), DurationMs: ptr(int64(1)),
+		Output: ptr(bearer + "\n" + tail), Metrics: cronwatch.Metrics{}, Trigger: "source"}); err != nil {
+		t.Fatal(err)
+	}
+	if r := must[*cronwatch.Run](t)(k.cw.GetRun(bg, "i1")); strings.Contains(*r.Output, "opaqueTOKEN") {
+		t.Error("recordRun: the token was kept")
+	}
+	h := must[*cronwatch.RunHandle](t)(k.cw.MustJob("flushed").Start(bg))
+	h.Log(bearer)
+	h.Log(tail)
+	h.Flush(bg)
+	if r := must[*cronwatch.Run](t)(k.cw.GetRun(bg, h.ID())); strings.Contains(*r.Output, "opaqueTOKEN") {
+		t.Error("flush: the token was kept")
+	}
+	h.Finish(bg)
+	if r := must[*cronwatch.Run](t)(k.cw.GetRun(bg, h.ID())); strings.Contains(*r.Output, "opaqueTOKEN") {
+		t.Error("finish: the token was kept")
+	}
+}
+
+func TestPrintingAClientOrRoutesShowsNoSecret(t *testing.T) {
+	const secret, token = "cron-secret-4f9a2b7c", "dashboard-token-8e1d3a6f"
+	cw := cronwatch.MustNew(cronwatch.WithCronSecret(secret))
+	cw.MustJob("nightly")
+	routes := must[*cronwatch.Routes](t)(cw.Routes(cronwatch.WithToken(token)))
+	sum := sha256.Sum256([]byte("cronwatch-cookie:" + token))
+	cookie := hex.EncodeToString(sum[:])
+	var logged bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logged, nil))
+	logger.Info("ready", "client", cw, "routes", routes)
+	jsonLogged := &bytes.Buffer{}
+	slog.New(slog.NewJSONHandler(jsonLogged, nil)).Info("ready", "client", cw, "routes", routes)
+	outputs := []string{logged.String(), jsonLogged.String()}
+	for _, format := range []string{"%v", "%+v", "%#v", "%s"} {
+		outputs = append(outputs, fmt.Sprintf(format, cw), fmt.Sprintf(format, routes))
+	}
+	for _, out := range outputs {
+		for _, s := range []string{secret, token, cookie} {
+			if strings.Contains(out, s) {
+				t.Errorf("printed a secret: %s", out)
+			}
+		}
+	}
+	eq(t, "client", cw.String(), "cronwatch.Client{jobs: 1, store: *cronwatch.MemoryStore, cron secret: set}")
+	eq(t, "routes", routes.String(), "cronwatch.Routes{base: found from the mount, token: set}")
+	contains(t, "slog", logged.String(), "client.jobs=1")
 }
 
 func TestNewAndWithStoreValidate(t *testing.T) {

@@ -317,6 +317,34 @@ func TestJobsAreDeclaredHistoryIsCopiedQuietlyAndImportsAreIdempotent(t *testing
 	same(t, "its history is kept", len(k.runs(t, "db:nightly-vacuum", 100)), 20)
 }
 
+// The review: the source declared a job again only when its settings
+// changed, so after the dashboard's forget every later run was refused as
+// not declared until the process restarted.
+func TestAJobForgottenFromTheDashboardIsDeclaredAgainAndItsRunsRecorded(t *testing.T) {
+	c := storetest.NewClock(T0)
+	cron := newFakeCron()
+	cron.job(1, name("vacuum"), "0 3 * * *", true)
+	cron.add(1, "succeeded", T0-5000, T0-4000, "VACUUM")
+	k := newKit(t, cron, c, cronwatch.NewMemoryStore(), pgcron.Options{})
+	k.check(t)
+	if err := k.cw.Forget(bg, "vacuum"); err != nil {
+		t.Fatal(err)
+	}
+	cron.add(1, "succeeded", T0-3000, T0-2000, "VACUUM")
+	cron.add(1, "failed", T0-1000, T0, "ERROR:  boom")
+	c.Advance(1000)
+	result := k.check(t)
+	sameList(t, "errors", k.others(), nil)
+	same(t, "jobs", len(result.Jobs), 1)
+	same(t, "schedule", summary(result, "vacuum").Definition.Schedule(), "0 3 * * *")
+	var ids []string
+	for _, r := range k.runs(t, "vacuum", 50) {
+		ids = append(ids, r.ID)
+	}
+	sameList(t, "the runs after the forget", ids, []string{"pgcron:3", "pgcron:2"})
+	same(t, "declared", k.cw.Declares("vacuum"), true)
+}
+
 func TestAJobsOptionsApplyAndAScheduleItCannotReadIsReported(t *testing.T) {
 	cron := newFakeCron()
 	cron.job(1, name("odd"), "not a schedule", true)

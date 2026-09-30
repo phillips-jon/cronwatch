@@ -108,10 +108,12 @@ func (w *Watch) Fallback(ctx context.Context, name string, options []cronwatch.J
 		w.mu.Unlock()
 		return d.job
 	}
-	if job, ok := w.fallback[name]; ok {
+	// Not one forgotten since (the dashboard's forget): that is made again.
+	if job, ok := w.fallback[name]; ok && w.cw.Declares(name) {
 		w.mu.Unlock()
 		return job
 	}
+	delete(w.fallback, name)
 	w.mu.Unlock()
 	made := w.tagged(name, options)
 	summary, err := w.cw.JobSummary(ctx, name)
@@ -129,7 +131,7 @@ func (w *Watch) Fallback(ctx context.Context, name string, options []cronwatch.J
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if existing, ok := w.fallback[name]; ok {
+	if existing, ok := w.fallback[name]; ok && w.cw.Declares(name) {
 		return existing
 	}
 	w.fallback[name] = job

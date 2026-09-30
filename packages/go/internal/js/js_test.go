@@ -48,6 +48,32 @@ func TestQuote(t *testing.T) {
 	}
 }
 
+func TestCut16Lone(t *testing.T) {
+	pair := "\U0001F600"
+	lone := Head16Lone(pair, 1) // the high half alone
+	if Length16Lone(lone) != 1 || Length16Lone("a"+pair) != 3 {
+		t.Fatalf("lengths %d %d", Length16Lone(lone), Length16Lone("a"+pair))
+	}
+	cases := []struct {
+		in   string
+		max  int
+		want string
+	}{
+		{"abc", 3, "abc"},
+		{"abcd", 3, "abc"},
+		{"ab" + pair, 3, "ab"}, // the cut lands inside the pair: back off one
+		{"a" + pair + "b", 3, "a" + pair},
+		{"ab" + lone + "c", 3, "ab"}, // a lone high half at max - 1 goes too
+		{"a" + lone + "bc", 3, "a" + lone + "b"},
+		{"ab" + lone, 3, "ab" + lone}, // under the limit, kept as it is
+	}
+	for _, c := range cases {
+		if got := Cut16Lone(c.in, c.max); got != c.want {
+			t.Errorf("Cut16Lone(%q, %d) = %q, want %q", c.in, c.max, got, c.want)
+		}
+	}
+}
+
 func TestUTF16(t *testing.T) {
 	s := "a\U0001F600b"
 	if Length16(s) != 4 {

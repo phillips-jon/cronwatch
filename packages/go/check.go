@@ -83,7 +83,7 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 		alerts = append(alerts, found...)
 	}
 	for _, def := range c.declaredAll() {
-		if err := c.sync(ctx, def); err != nil {
+		if err := c.sync(ctx, def, false); err != nil {
 			return nil, err
 		}
 	}
@@ -114,6 +114,13 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 			if err != nil || !stuck {
 				return err
 			}
+			// Read again just before the write: lines and metrics flushed since
+			// the list was read (while earlier stuck runs were sent, say) are kept.
+			fresh, err := c.store.GetRun(ctx, run.ID)
+			if err != nil || fresh == nil || fresh.Status != StatusRunning || fresh.Job != run.Job {
+				return err
+			}
+			run := *fresh
 			timeout, _ := timeoutMs(def)
 			run.Status = StatusTimeout
 			run.FinishedAt = ptr(now)
@@ -135,7 +142,7 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 	// as failing (see unevaluableSummary) and does not stop the others.
 	jobs := []JobSummary{}
 	var spent time.Duration
-	stored, err := c.store.ListJobs(ctx)
+	stored, err := c.storedJobs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -173,20 +180,25 @@ func (c *Client) checkJob(ctx context.Context, job StoredJob, now int64, spent *
 		last = &recent[0]
 	}
 	var nextExpectedAt *int64
-	state, drafts, err := updateState(ctx, c, job.Name, func(previous JobState) (JobState, []alertDraft, error) {
-		out, err := onCheck(job.Definition, job, last, previous, now)
+	state, out, err := updateState(ctx, c, job.Name, func(previous JobState) (JobState, held, error) {
+		checked, err := onCheck(job.Definition, job, last, previous, now)
 		if err != nil {
-			return JobState{}, nil, err
+			return JobState{}, held{}, err
 		}
-		nextExpectedAt = out.nextExpectedAt
-		settled := applySilence(previous, out.evaluation, now)
-		return settled.state, settled.alerts, nil
+		nextExpectedAt = checked.nextExpectedAt
+		settled := applySilence(previous, checked.evaluation, now)
+		// Alerts a process stopped sending part way go back to the retry queue.
+		released, dropped := releaseSending(settled.state, c.now())
+		state, out := c.outbox(released, settled.alerts, job.Definition, now)
+		out.dropped += dropped
+		return state, out, nil
 	})
 	if err != nil {
 		return JobSummary{}, nil, err
 	}
+	c.reportDropped(job.Name, out.dropped)
 	alerts := c.retryUndelivered(ctx, job.Name, state, now, spent)
-	alerts = append(alerts, c.dispatch(ctx, drafts, job.Definition, now)...)
+	alerts = append(alerts, c.dispatch(ctx, job.Name, out.alerts, now)...)
 	summary, err := summarize(job, recent, state, nextExpectedAt, now)
 	return summary, alerts, err
 }
@@ -263,16 +275,11 @@ func (c *Client) JobsWithRuns(ctx context.Context, limit int) ([]JobWithRuns, er
 	if err := c.ensureReady(ctx); err != nil {
 		return nil, err
 	}
-	for _, def := range c.declaredAll() {
-		if err := c.sync(ctx, def); err != nil {
-			return nil, err
-		}
-	}
-	now := c.now()
-	stored, err := c.store.ListJobs(ctx)
+	stored, err := c.storedJobs(ctx)
 	if err != nil {
 		return nil, err
 	}
+	now := c.now()
 	out := []JobWithRuns{}
 	for _, job := range stored {
 		out = append(out, c.snapshot(ctx, job, now, clampLimit(limit, 0)))
@@ -281,12 +288,14 @@ func (c *Client) JobsWithRuns(ctx context.Context, limit int) ([]JobWithRuns, er
 }
 
 // JobSummary is one job's summary, or nil when the store does not know it.
+// One declared here and forgotten elsewhere is written again, as a check
+// or a dashboard read writes it.
 func (c *Client) JobSummary(ctx context.Context, name string) (*JobSummary, error) {
 	if err := c.ensureReady(ctx); err != nil {
 		return nil, err
 	}
 	if def, ok := c.declared(name); ok {
-		if err := c.sync(ctx, def); err != nil {
+		if err := c.sync(ctx, def, true); err != nil {
 			return nil, err
 		}
 	}
@@ -322,7 +331,7 @@ func (c *Client) Silence(ctx context.Context, name string, d time.Duration) (Job
 	if err != nil {
 		return JobState{}, err
 	}
-	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(laterBy(c.now(), ms)) })
+	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(silenceEnd(c.now(), ms)) })
 }
 
 // Unsilence ends a silence.
@@ -345,7 +354,9 @@ func (c *Client) patchState(ctx context.Context, name string, change func(*JobSt
 }
 
 // Forget removes a job and its runs from the store. A job still declared
-// in code comes back on its next run.
+// in code comes back: here on its next run, and in any other process that
+// declares it on its next run there, or at that process's next check or
+// dashboard read.
 func (c *Client) Forget(ctx context.Context, name string) error {
 	if err := c.ensureReady(ctx); err != nil {
 		return err
@@ -386,11 +397,18 @@ func (c *Client) Start(every time.Duration) {
 		fmt.Fprintln(Stderr, `[cronwatch] Start() was called with DeliverAtCheck, so these checks send no alerts. Another process must run checks with DeliverNow (the default) to send them.`)
 	}
 	c.warnMu.Unlock()
-	stop := make(chan struct{})
-	c.stop = stop
+	stop, ticking := make(chan struct{}), make(chan struct{})
+	c.stop, c.ticking = stop, ticking
 	delay := firstCheckDelay
 	go func() {
+		defer close(ticking)
 		tick := func() {
+			// A tick that fired as Stop was called starts nothing.
+			select {
+			case <-stop:
+				return
+			default:
+			}
 			if _, err := c.Check(context.Background()); err != nil {
 				c.report(err, "check")
 			}
@@ -412,18 +430,40 @@ func (c *Client) Start(every time.Duration) {
 	}()
 }
 
-// Stop stops the interval Start began. A check in flight finishes.
-func (c *Client) Stop() {
+// Stop stops the interval Start began. A check in flight finishes; Close
+// waits for it.
+func (c *Client) Stop() { c.stopTicking() }
+
+// stopTicking is Stop, returning a channel closed once the interval's
+// goroutine has returned (with the check it was running), or nil when
+// there was none.
+func (c *Client) stopTicking() chan struct{} {
 	c.timerMu.Lock()
 	defer c.timerMu.Unlock()
-	if c.stop != nil {
-		close(c.stop)
-		c.stop = nil
+	if c.stop == nil {
+		return nil
 	}
+	close(c.stop)
+	ticking := c.ticking
+	c.stop, c.ticking = nil, nil
+	return ticking
 }
 
-// Close stops the interval and closes the store.
+// Close stops the interval, waits for a check already under way (the
+// interval's, or one a caller began: bounded by its own channel, triage and
+// retry timeouts; what it returns went to whoever started it), then closes
+// the store, so that check neither writes after the store is closed nor
+// loses the alerts it would queue. Call it from outside a check (not from a
+// channel or a source), since it waits for the check to end.
 func (c *Client) Close() error {
-	c.Stop()
+	if ticking := c.stopTicking(); ticking != nil {
+		<-ticking
+	}
+	c.checkMu.Lock()
+	call := c.checking
+	c.checkMu.Unlock()
+	if call != nil {
+		<-call.done
+	}
 	return c.store.Close()
 }

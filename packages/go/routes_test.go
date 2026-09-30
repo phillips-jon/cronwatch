@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -215,6 +216,30 @@ func TestRoutesPagesRenderAndTheAPIAnswers(t *testing.T) {
 	status(t, "nope", w.get("/cronwatch/nope", auth), 404)
 }
 
+func TestRoutesARunWhoseMetricsAreNoFiniteNumbersStillShowsItsJobPage(t *testing.T) {
+	w := newWeb(t, nil)
+	w.cw.MustJob("imported")
+	now := w.c.Now()
+	_, err := w.cw.RecordRun(bg, cronwatch.Run{ID: "nan", Job: "imported", Status: cronwatch.StatusOK, StartedAt: now, FinishedAt: ptr(now), DurationMs: ptr(int64(0)),
+		Metrics: cronwatch.Metrics{{Name: "rows", Value: math.NaN()}}, Trigger: "source"})
+	if err == nil || err.Error() != `recordRun: metric "rows" must be a finite number (job "imported", run "nan")` {
+		t.Fatalf("recordRun: %v", err)
+	}
+	if r := must[*cronwatch.Run](t)(w.cw.GetRun(bg, "nan")); r != nil {
+		t.Fatal("a refused run was written")
+	}
+	// As a store that kept NaN, or a foreign row, may hold them.
+	check(t, w.cw.Store().InsertRun(bg, cronwatch.Run{ID: "odd", Job: "imported", Status: cronwatch.StatusOK, StartedAt: now, FinishedAt: ptr(now), DurationMs: ptr(int64(0)), Trigger: "source",
+		Metrics: cronwatch.Metrics{{Name: "rows", Value: math.NaN()}, {Name: "label", Value: math.Inf(1)}, {Name: "cost", Value: 1.25}, {Name: "n", Value: 3}}}))
+	page := w.get("/cronwatch/jobs/imported", auth)
+	status(t, "job page", page, 200)
+	html := page.Body.String()
+	contains(t, "finite metrics", html, `<span class="k">cost</span> 1.2500</span><span><span class="k">n</span> 3<`)
+	if strings.Contains(html, `class="k">rows<`) || strings.Contains(html, `class="k">label<`) {
+		t.Error("a metric that is no finite number was shown")
+	}
+}
+
 func TestRoutesNamesBreakAfterTheirSeparatorsOnlyAsText(t *testing.T) {
 	w := newWeb(t, nil)
 	name := "wp:store_sync.inventory--eu"
@@ -245,8 +270,17 @@ func TestRoutesAPIWrites(t *testing.T) {
 	silenced := decode(t, post("/cronwatch/api/jobs/s/silence", `{"for":"2h"}`))
 	eq(t, "until", silenced["state"].(map[string]any)["silencedUntil"].(float64), float64(T0+2*HOUR))
 	eq(t, "health", summary(t, w.cw, "s").Health, cronwatch.HealthSilenced)
+	endless := decode(t, post("/cronwatch/api/jobs/s/silence", `{"for":"99999999999999999999w"}`))
+	eq(t, "held at 2^53 - 1", endless["state"].(map[string]any)["silencedUntil"].(float64), float64(9007199254740991))
 	un := decode(t, post("/cronwatch/api/jobs/s/unsilence", ""))
 	eq(t, "unsilenced", un["state"].(map[string]any)["silencedUntil"], any(nil))
+	// A silence an older SDK wrote past int64 still reads as a silence.
+	var far cronwatch.JobState
+	check(t, far.UnmarshalJSON([]byte(`{"job":"s","open":{},"consecutiveFailures":0,"silencedUntil":6.048e+28,"lastAlertAt":null}`)))
+	eq(t, "read past int64", *far.SilencedUntil, int64(math.MaxInt64))
+	check(t, w.cw.Store().SetState(bg, far))
+	eq(t, "still silenced", summary(t, w.cw, "s").Health, cronwatch.HealthSilenced)
+	check(t, w.cw.Store().SetState(bg, cronwatch.JobState{Job: "s"}))
 	status(t, "ghost", post("/cronwatch/api/jobs/nope/silence", `{"for":"1h"}`), 404)
 	status(t, "delete", w.send("DELETE", "/cronwatch/api/jobs/s", auth, ""), 200)
 	if summary(t, w.cw, "s") != nil {
@@ -843,6 +877,25 @@ func TestRoutesBasePath(t *testing.T) {
 	eq(t, "StripPrefix inside a pattern", through(func(m *http.ServeMux) {
 		m.Handle("/x/", http.StripPrefix("/x/y", open))
 	}, "/x/y/manifest.webmanifest"), "/x/y/")
+
+	// A wildcard segment is the request's own text: it never adds attributes
+	// to the sign-in cookie.
+	signIn := func(target string) string {
+		mux := http.NewServeMux()
+		mux.Handle("/t/{tenant}/cron/", must[*cronwatch.Routes](t)(cw.Routes(cronwatch.WithToken("tok"))))
+		server := httptest.NewServer(mux)
+		defer server.Close()
+		client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		res, err := client.Get(server.URL + target)
+		check(t, err)
+		res.Body.Close()
+		return res.Header.Get("Set-Cookie")
+	}
+	set := signIn("/t/x;Domain=example.com;SameSite=None;y/cron/?token=tok")
+	if !strings.Contains(set, "; Path=/; HttpOnly") || strings.Contains(set, "Domain") || strings.Contains(set, "SameSite=None") {
+		t.Errorf("a crafted segment reached the cookie: %s", set)
+	}
+	contains(t, "a plain tenant keeps its path", signIn("/t/acme/cron/?token=tok"), "; Path=/t/acme/cron; HttpOnly")
 
 	// The pages link under the base found, and the job links resolve.
 	mux := http.NewServeMux()

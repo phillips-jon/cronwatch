@@ -10,7 +10,7 @@ import (
 )
 
 // window is how much logged text a recorder holds, in code units, before
-// it drops lines from the front. CapOutput trims exactly at the end, so
+// it drops lines from the front. RedactAndCap trims exactly at the end, so
 // this only bounds memory: well past the cap, so the kept tail is whole.
 const window = 64 * 1024
 
@@ -54,7 +54,7 @@ func (r *Recorder) Log(parts ...any) {
 	r.lines = append(r.lines, line)
 	r.lengths = append(r.lengths, n)
 	r.size += n + 1
-	// Drop from the front once well past the cap; CapOutput trims exactly at the end.
+	// Drop from the front once well past the cap; RedactAndCap trims exactly at the end.
 	for r.size > window && len(r.lines) > 1 {
 		r.size -= r.lengths[0] + 1
 		r.lines = r.lines[1:]
@@ -63,15 +63,16 @@ func (r *Recorder) Log(parts ...any) {
 	}
 }
 
-// Output is what the run stores as its output: the lines kept, capped. Nil
-// when nothing was logged.
+// Output is the lines still held (past the window the oldest are let go),
+// joined and not yet capped: the client redacts them first, then caps them
+// (RedactAndCap). Nil when nothing was logged.
 func (r *Recorder) Output() *string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.lines) == 0 {
 		return nil
 	}
-	s := CapOutput(strings.Join(r.lines, "\n"))
+	s := strings.Join(r.lines, "\n")
 	return &s
 }
 

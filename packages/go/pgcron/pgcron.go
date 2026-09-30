@@ -505,6 +505,10 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 	}
 
 	// Declare each job. A paused one (active = false) keeps its failures but loses its schedule, so it is not missed.
+	// One forgotten since it was declared (the dashboard's forget) is declared again, though
+	// unchanged: RecordRun takes runs only of a declared job. A host that cannot say (not a
+	// *cronwatch.Client) is taken to keep every job the source declared.
+	declares, canTell := host.(interface{ Declares(name string) bool })
 	var order []int64
 	names := map[int64]string{}
 	definitions := map[int64]cronwatch.Definition{}
@@ -582,7 +586,7 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 		}
 		definition := cronwatch.DescribeJob(name, options...)
 		key := keyOf(definition)
-		if s.declaredKeys[name] != key {
+		if s.declaredKeys[name] != key || (canTell && !declares.Declares(name)) {
 			if _, err := host.Job(name, options...); err != nil {
 				if schedule == "" {
 					host.ReportError(err, "source pg_cron: job "+strconv.FormatInt(j.JobID, 10))

@@ -200,6 +200,28 @@ type testStore struct {
 	// cas, when set, replaces CompareAndSetState.
 	cas   func(cronwatch.JobState, int64) (bool, error)
 	calls map[string]int
+	// gone, once kill is called, is what every call waits on, as for a
+	// process that died: nothing it asks of the store completes until the
+	// test buries it (closes gone), and then each call fails.
+	gone chan struct{}
+}
+
+// kill makes every later call wait until bury, then fail.
+func (s *testStore) kill() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gone == nil {
+		s.gone = make(chan struct{})
+	}
+}
+
+// bury lets the calls a kill held go, each failing.
+func (s *testStore) bury() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gone != nil {
+		close(s.gone)
+	}
 }
 
 func newTestStore() *testStore {
@@ -262,7 +284,12 @@ func (s *testStore) enter(name string) error {
 	fn := s.hooks[name]
 	delete(s.hooks, name)
 	broken := s.broken[name]
+	gone := s.gone
 	s.mu.Unlock()
+	if gone != nil {
+		<-gone
+		return fmt.Errorf("store gone: %s", name)
+	}
 	if fn != nil {
 		fn()
 	}

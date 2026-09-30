@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"math/big"
 	"net/http"
@@ -121,6 +122,43 @@ type Routes struct {
 	origin     string
 	trustProxy bool
 	announce   sync.Once
+}
+
+// String names the routes and where they are mounted, and says whether a
+// token is set, never the token or its cookie: fmt and loggers print a
+// value's fields otherwise.
+func (rt *Routes) String() string {
+	if rt == nil {
+		return "cronwatch.Routes(nil)"
+	}
+	base := "found from the mount"
+	if rt.base != nil {
+		base = strconv.Quote(*rt.base)
+	}
+	return "cronwatch.Routes{base: " + base + ", token: " + secretState(rt.token != "") + "}"
+}
+
+// GoString is String, for %#v.
+func (rt *Routes) GoString() string { return rt.String() }
+
+// LogValue is what log/slog writes for the routes: String's fields.
+func (rt *Routes) LogValue() slog.Value {
+	if rt == nil {
+		return slog.StringValue("cronwatch.Routes(nil)")
+	}
+	base := ""
+	if rt.base != nil {
+		base = *rt.base
+	}
+	return slog.GroupValue(slog.String("base", base), slog.String("token", secretState(rt.token != "")))
+}
+
+// secretState is how a secret is printed: whether it is set.
+func secretState(set bool) string {
+	if set {
+		return "set"
+	}
+	return "none"
 }
 
 // Routes is the dashboard and its JSON API as an http.Handler, the SDK's
@@ -334,6 +372,24 @@ func (rt *Routes) basePath(r *http.Request, full string) string {
 	return DefaultBasePath
 }
 
+// cookiePath is the sign-in cookie's Path: the base, or "/" when the base is
+// the root or holds a character that has no place in a cookie attribute
+// (";", ",", a space or control, anything past ASCII). A base found from a
+// ServeMux wildcard is the request's own text, so a crafted link could
+// otherwise add attributes (Domain=...) to a cookie that is as good as the
+// token.
+func cookiePath(base string) string {
+	if base == "" {
+		return "/"
+	}
+	for i := 0; i < len(base); i++ {
+		if c := base[i]; c <= ' ' || c >= 0x7f || c == ';' || c == ',' {
+			return "/"
+		}
+	}
+	return base
+}
+
 // ServeHTTP answers one request as the SDK's routes answer it. A store
 // failure (or a panic) is reported to the client's error handler as
 // "routes" and answered 500.
@@ -523,7 +579,7 @@ func runsLimit(value string, present bool) int {
 // silenceFor silences a job for ms milliseconds, a value the SDK's
 // parseDuration read.
 func (c *Client) silenceFor(ctx context.Context, name string, ms float64) (JobState, error) {
-	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(laterBy(c.now(), ms)) })
+	return c.patchState(ctx, name, func(s *JobState) { s.SilencedUntil = ptr(silenceEnd(c.now(), ms)) })
 }
 
 // boardLanes are the board's timeline lanes, the first boardLanes jobs. The
@@ -637,12 +693,8 @@ func (rt *Routes) serve(r *http.Request, pathname, path, rawQuery, base string, 
 			if strings.HasPrefix(publicOrigin, "https:") {
 				secure = "; Secure"
 			}
-			cookiePath := base
-			if cookiePath == "" {
-				cookiePath = "/"
-			}
 			return redirectAnswer(pathname+search, [2]string{"Set-Cookie",
-				tokenCookie + "=" + rt.cookie + "; Path=" + cookiePath + "; HttpOnly; SameSite=Lax; Max-Age=" + strconv.Itoa(cookieMaxAge) + secure}), nil
+				tokenCookie + "=" + rt.cookie + "; Path=" + cookiePath(base) + "; HttpOnly; SameSite=Lax; Max-Age=" + strconv.Itoa(cookieMaxAge) + secure}), nil
 		}
 	}
 

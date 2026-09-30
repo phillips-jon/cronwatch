@@ -41,10 +41,7 @@ func Discord(o DiscordOptions) (cronwatch.Channel, error) {
 	return &channel{name: "discord", send: func(ctx context.Context, a cronwatch.Alert, _ cronwatch.ChannelContext) error {
 		title := js.WellFormed(a.Title)
 		link := js.WellFormed(linkFor(o.Link, a))
-		description := "```\n" + codeBlockSafe(js.Head16Lone(a.Message, 3800)) + "\n```"
-		if t := triage(a); t != "" {
-			description += "\n**Triage:** " + escapeMarkdown(js.Head16Lone(t, 1000))
-		}
+		description := embedDescription(a)
 		embed := js.NewObject("title", title)
 		if link != "" {
 			embed.Set("url", link)
@@ -68,6 +65,24 @@ func Discord(o DiscordOptions) (cronwatch.Channel, error) {
 		}
 		return nil
 	}}, nil
+}
+
+// discordDescriptionMax is the longest embed description Discord takes. The
+// title (under 256) and it stay well inside the embed's 6000.
+const discordDescriptionMax = 4096
+
+// embedDescription is the message in a code block, then the triage. Each
+// part has its own cap, and escaping can grow both, so the whole is held to
+// discordDescriptionMax (in UTF-16 code units) by cutting the message's
+// block, never the triage: Discord refuses a longer one on every retry.
+func embedDescription(a cronwatch.Alert) string {
+	tail := ""
+	if t := triage(a); t != "" {
+		tail = "\n**Triage:** " + escapeMarkdown(js.Head16Lone(t, 1000))
+	}
+	fences := len("```\n") + len("\n```")
+	block := js.Cut16Lone(codeBlockSafe(js.Head16Lone(a.Message, 3800)), discordDescriptionMax-fences-js.Length16Lone(tail))
+	return "```\n" + block + "\n```" + tail
 }
 
 // escapeMarkdown escapes the characters Discord reads as markdown, links

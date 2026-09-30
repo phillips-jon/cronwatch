@@ -99,7 +99,12 @@ func HandlerValue[T any](job *Job, fn func(ctx context.Context, job *JobContext,
 		return c.execute(r.Context(), job.def, func(ctx context.Context, jc *JobContext) (any, error) {
 			v, err := fn(ctx, jc, w, r)
 			if w.status >= 400 {
-				// What the function wrote is the outcome, as a response it returned would be.
+				// What the function wrote is the outcome, as a response it
+				// returned would be. A response it returned as well is closed
+				// unread, as one beside any answer it wrote is.
+				if res, ok := any(v).(*http.Response); ok && res != nil && res.Body != nil {
+					_ = res.Body.Close()
+				}
 				return &http.Response{StatusCode: w.status, Status: strconv.Itoa(w.status) + " " + http.StatusText(w.status)}, err
 			}
 			return v, err
