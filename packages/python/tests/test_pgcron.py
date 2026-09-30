@@ -215,6 +215,26 @@ def test_jobs_are_declared_history_is_copied_quietly_and_imports_are_idempotent(
     assert len(cw.runs("db:nightly-vacuum", 100)) == 20, "its history is kept"
 
 
+def test_a_job_forgotten_from_the_dashboard_is_declared_again_and_its_later_runs_recorded() -> None:
+    clock = Clock()
+    cron = FakeCron()
+    cron.job(1, "vacuum", "0 3 * * *")
+    cron.add(1, "succeeded", T0 - 5000, T0 - 4000, "VACUUM")
+    errors: list[str] = []
+    cw = client(cron, clock, errors=errors, capture=Capture())
+    cw.check()
+    cw.forget("vacuum")
+    cron.add(1, "succeeded", T0 - 3000, T0 - 2000, "VACUUM")
+    cron.add(1, "failed", T0 - 1000, T0, "ERROR:  boom")
+    clock.advance(1000)
+    result = cw.check()
+    assert errors == []
+    assert [j.name for j in result.jobs] == ["vacuum"]
+    assert result.jobs[0].definition.schedule == "0 3 * * *"
+    assert [r.id for r in cw.runs("vacuum")] == ["pgcron:3", "pgcron:2"], "the runs after the forget"
+    assert [d.name for d in cw.defined_jobs()] == ["vacuum"]
+
+
 def test_job_options_apply_and_an_unreadable_schedule_is_reported() -> None:
     import re
 
