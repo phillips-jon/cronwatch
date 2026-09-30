@@ -90,6 +90,10 @@ class ScheduledTest {
     @Scheduled(cron = "-")
     public void disabled() {}
 
+    // Spring reads ? as *; croner reads it as a day field named, every day.
+    @Scheduled(cron = "0 0 2 1 * ?", zone = "UTC")
+    public void monthly() {}
+
     @Scheduled(cron = "0 0 3 * * *", zone = "UTC")
     @CronwatchJob(
         name = "nightly-report",
@@ -206,6 +210,11 @@ class ScheduledTest {
           "{\"schedule\":\"every 1h30m\"," + tags + ",\"name\":\"Declared.delay\"}",
           stored(store, "Declared.delay"));
       assertNull(store.getJob("Declared.disabled"), "cron = \"-\" schedules nothing");
+      assertEquals(
+          "{\"schedule\":\"0 0 2 1 * *\",\"timezone\":\"UTC\","
+              + tags
+              + ",\"name\":\"Declared.monthly\"}",
+          stored(store, "Declared.monthly"));
       assertEquals(
           "{\"schedule\":\"0 0 3 * * *\",\"timezone\":\"UTC\",\"grace\":\"15m\",\"tags\":[\"reports\","
               + "\"spring-scheduled\",\"spring-scheduled:billing\"],\"name\":\"nightly-report\","

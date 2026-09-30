@@ -323,8 +323,7 @@ public final class CronwatchScheduling
     switch (s.kind()) {
       case CRON -> {
         try {
-          check(label, s.cron(), s.zone(), now);
-          schedule = s.cron();
+          schedule = check(label, s.cron(), s.zone(), now);
           zone = s.zone();
         } catch (ScheduleException e) {
           problem = e.getMessage();
@@ -351,10 +350,11 @@ public final class CronwatchScheduling
   }
 
   /**
-   * Checks a {@code @Scheduled} cron against Spring's own fire times in its zone, as CronWatch
-   * would read it in the same zone.
+   * A {@code @Scheduled} cron as CronWatch reads it, checked against Spring's own fire times in its
+   * zone: as written, but for a {@code ?} in a field, which Spring reads as {@code *} and croner as
+   * a day field named (every day, and either day field matching), so it is declared as {@code *}.
    */
-  private static void check(String label, String cron, String zone, long now)
+  private static String check(String label, String cron, String zone, long now)
       throws ScheduleException {
     CronExpression spring;
     ZoneId tz;
@@ -380,7 +380,14 @@ public final class CronwatchScheduling
               return next == null ? null : next.toInstant().toEpochMilli();
             },
             SCHEDULER);
-    Bridge.checkFires(fires, cron, zone, "cronwatch: " + label, SCHEDULER, daily(cron), now);
+    String declared = cron.trim();
+    if (!declared.startsWith("@")) {
+      List<String> fields = new ArrayList<>(List.of(declared.split("\\s+", -1)));
+      fields.replaceAll(f -> f.equals("?") ? "*" : f);
+      declared = String.join(" ", fields);
+    }
+    Bridge.checkFires(fires, declared, zone, "cronwatch: " + label, SCHEDULER, daily(cron), now);
+    return declared;
   }
 
   /** A cron that names no day or month, which meets every clock change of one kind alike. */
