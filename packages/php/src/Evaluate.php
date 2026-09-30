@@ -39,6 +39,20 @@ final class Evaluate
     }
 
     /**
+     * When a silence of `ms` from `now` ends (silenceEnd): a whole
+     * millisecond, never past MAX_DURATION_MS (2^53 - 1), however long the
+     * silence asked for. Every port sharing the store reads it back
+     * unchanged, where a larger number could wrap to a time long past and
+     * send alerts during the silence.
+     */
+    public static function silenceEnd(int|float $now, int|float $ms): int|float
+    {
+        $whole = $ms >= self::MAX_DURATION_MS ? self::MAX_DURATION_MS : (int) floor($ms);
+        $end = $now + $whole;
+        return $end >= self::MAX_DURATION_MS ? self::MAX_DURATION_MS : $end;
+    }
+
+    /**
      * The version a stored state counts as for compareAndSetState
      * (stateVersion): a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
      * else 0, as when it is absent. The SQL stores read it the same way, so a

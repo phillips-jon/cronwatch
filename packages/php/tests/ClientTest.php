@@ -174,6 +174,15 @@ final class ClientTest extends TestCase
         $this->assertSame(['missed'], $this->capture->types());
     }
 
+    public function testASilenceEndsOnAWholeMillisecondHeldAtTheLargestSafeInteger(): void
+    {
+        $cw = $this->make();
+        $cw->job('quiet');
+        $this->assertSame(9007199254740991, $cw->silence('quiet', '99999999999999999999w')->silencedUntil);
+        $this->assertSame(9007199254740991, $cw->silence('quiet', 1e300)->silencedUntil);
+        $this->assertSame(self::T0 + 1, $cw->silence('quiet', 1.5)->silencedUntil);
+    }
+
     public function testCheckMarksARunThatNeverFinishedAsStuck(): void
     {
         // A process killed mid-run leaves its run running; another process's check finds it.

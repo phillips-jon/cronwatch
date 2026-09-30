@@ -398,12 +398,15 @@ final class Cronwatch
         return $this->store->getRun($id);
     }
 
-    /** Stop alerts for a job for a while. State keeps updating underneath. */
+    /**
+     * Stop alerts for a job for a while. State keeps updating underneath. The
+     * end is a whole millisecond, held at 2^53 - 1 (see Evaluate::silenceEnd).
+     */
     public function silence(string $name, mixed $duration): JobState
     {
         $ms = Duration::parse($duration, 'silence duration');
         return $this->patchState($name, function (JobState $state) use ($ms): void {
-            $state->silencedUntil = $this->now() + $ms;
+            $state->silencedUntil = Evaluate::silenceEnd($this->now(), $ms);
         });
     }
 

@@ -371,6 +371,14 @@ final class ConformanceTest extends TestCase
         });
     }
 
+    public function testSilenceEnd(): void
+    {
+        $this->eachCase(self::fixture('health.json')->silenceEnd, fn (\stdClass $c) => self::differs(
+            $c->silencedUntil,
+            Evaluate::silenceEnd($c->now, Duration::parse($c->duration, 'silence duration')),
+        ));
+    }
+
     public function testStaleAlert(): void
     {
         $this->eachCase(self::fixture('health.json')->staleAlert, fn (\stdClass $c) => self::differs($c->stale, Evaluate::staleAlert(Alert::fromJson($c->alert), self::state($c->state))));

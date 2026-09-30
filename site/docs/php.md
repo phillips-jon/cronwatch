@@ -392,7 +392,7 @@ The client:
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
 | `jobs()`, `jobsWithRuns($limit = 20)`, `jobSummary($name)` | summaries, without alerting |
 | `runs($name, $limit = 50)`, `getRun($id)` | newest first; `limit` is 1 to 500 |
-| `silence($name, '2h')`, `unsilence($name)` | stop alerts for a while; state keeps updating underneath |
+| `silence($name, '2h')`, `unsilence($name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
 | `forget($name)` | remove a job and its runs |
 | `resumeRun($name, $id)` | `job($name)->resume($id)` for a job declared in this process |
 | `recordRun($run, evaluate: true)` | record a run that happened elsewhere, for a source; a metric that is not a finite number throws and nothing is recorded; returns the alerts it sent |
