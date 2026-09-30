@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *   cron = {"time" = 5}
  * )
  */
-#[Watch(name: 'cwt-marked', grace: '1h', failuresBeforeAlert: 2)]
+#[Watch(name: 'cwt-marked', description: 'Marks each item', grace: '1h', failuresBeforeAlert: 2)]
 final class Marked extends QueueWorkerBase implements ContainerFactoryPluginInterface {
 
   public function __construct(array $configuration, $plugin_id, $plugin_definition, private readonly StateInterface $state) {

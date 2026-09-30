@@ -540,6 +540,38 @@ final class DrupalTest extends TestCase
         $this->assertSame(['failed', 'recovered'], array_column(self::alerts(), 'type'));
     }
 
+    public function testAModuleWithTwoCronHooksIsOneRunOfItsJob(): void
+    {
+        $version = (string) self::inDrupal('echo json_encode(\Drupal::VERSION);');
+        if (version_compare($version, '11.1', '<')) {
+            $this->markTestSkipped("a module has one hook_cron before Drupal 11.1 (this is {$version})");
+        }
+        self::copy(__DIR__ . '/fixtures/cwt_twice', self::$web . '/modules/custom/cwt_twice');
+        $this->must(['pm:install', 'cwt_twice', '-y']);
+        try {
+            self::setState('cwt.alerts', []);
+            self::setState('cwt.twice_mode', 'throw');
+            $this->must(['cron']);
+            $this->must(['cron']);
+            $runs = self::runs('drupal:cwt_twice');
+            $this->assertSame(['failed', 'failed'], array_column($runs, 'status'), 'one run per cron run, failed by its first hook');
+            $this->assertStringStartsWith('RuntimeException: the first cron hook broke', (string) $runs[1]['error']);
+            $this->assertStringContainsString('first ran', (string) $runs[1]['output']);
+            $this->assertStringContainsString('second ran', (string) $runs[1]['output']);
+            $this->assertStringContainsString('failed: cwt_twice', (string) self::last('drupal:cron')['output']);
+            $twice = fn (): array => array_values(array_column(array_filter(self::alerts(), fn ($a) => $a['job'] === 'drupal:cwt_twice'), 'type'));
+            $this->assertSame(['failed'], $twice(), 'one alert, not one and a recovery each cron run');
+
+            self::setState('cwt.twice_mode', 'ok');
+            $this->must(['cron']);
+            $this->assertSame(['failed', 'failed', 'ok'], array_column(self::runs('drupal:cwt_twice'), 'status'));
+            $this->assertSame(['failed', 'recovered'], $twice());
+        } finally {
+            self::setState('cwt.twice_mode', 'ok');
+            $this->must(['pm:uninstall', 'cwt_twice', '-y']);
+        }
+    }
+
     public function testAnErrorEndsTheCronRunAsCoreLetsIt(): void
     {
         self::setState('cwt.cron_mode', 'error');
@@ -571,6 +603,31 @@ final class DrupalTest extends TestCase
         $this->must(['cronwatch:check']);
         $this->assertArrayNotHasKey('schedule', self::definition('drupal:cron'), 'no schedule when cron has none');
         $this->must(['config:set', 'automated_cron.settings', 'interval', '10800', '-y']);
+    }
+
+    public function testOneJobTheLibraryRefusesStopsNothingElse(): void
+    {
+        // A schedule the settings form never saw (a configuration import), and an alter hook's bad option.
+        $this->must(['config:set', 'cronwatch.settings', 'schedule', 'every monday', '-y']);
+        self::setState('cwt.bad_options', ['drupal:cwt_fixtures' => ['grace' => 'ten minutes']]);
+        try {
+            $line = trim($this->must(['cronwatch:check']));
+            $this->assertMatchesRegularExpression('/^cronwatch: checked \d+ jobs, sent \d+ alerts?$/', $line);
+            $this->assertArrayNotHasKey('schedule', self::definition('drupal:cron'), 'declared without the schedule it refused');
+            $this->assertSame('hook_cron of the cwt_fixtures module', self::definition('drupal:cwt_fixtures')['description'], 'declared without the alter hooks');
+            $cron = count(self::runs('drupal:cron'));
+            $mine = count(self::runs('drupal:cwt_fixtures'));
+            $this->must(['cron']);
+            $this->assertCount($cron + 1, self::runs('drupal:cron'), 'the cron run is still recorded');
+            $this->assertSame('ok', self::last('drupal:cron')['status']);
+            $this->assertCount($mine + 1, self::runs('drupal:cwt_fixtures'));
+        } finally {
+            self::setState('cwt.bad_options', []);
+            $this->must(['config:set', 'cronwatch.settings', 'schedule', '', '-y']);
+        }
+        $this->must(['cronwatch:check']);
+        $this->assertSame('every 3h', self::definition('drupal:cron')['schedule']);
+        $this->assertSame('The fixture module', self::definition('drupal:cwt_fixtures')['description']);
     }
 
     public function testTheCheckReportsCronMissedAndTheNextRunRecovers(): void
@@ -634,6 +691,7 @@ final class DrupalTest extends TestCase
         $this->assertSame(['ok'], array_column($marked, 'status'), 'a worker with #[Watch] is watched unlisted');
         $this->assertSame('marked one', $marked[0]['output']);
         $definition = self::definition('cwt-marked');
+        $this->assertSame('Marks each item', $definition['description'], 'the worker\'s own description wins');
         $this->assertSame('1h', $definition['grace']);
         $this->assertSame(2, $definition['failuresBeforeAlert']);
 
@@ -718,6 +776,43 @@ final class DrupalTest extends TestCase
         $this->assertSame('ok', end($runs)['status']);
     }
 
+    public function testAlertLinksNeverTakeTheHostOfAVisitorsRequest(): void
+    {
+        $settings = self::$web . '/sites/default/settings.php';
+        @chmod(dirname($settings), 0755);
+        @chmod($settings, 0644);
+        // A site that trusts any host, with Automated Cron running after a visitor's request.
+        file_put_contents($settings, "\$settings['trusted_host_patterns'] = [];\n", FILE_APPEND);
+        self::stopServer();
+        try {
+            self::setState('cwt.alerts', []);
+            self::setState('cwt.cron_mode', 'throw');
+            self::setState('system.cron_last', 0);
+            [$status] = self::http('GET', '/user/login', null, ['Host' => 'cronwatch-login.example']);
+            $this->assertSame(200, $status);
+            $alerts = self::alerts();
+            $this->assertSame([['failed', 'drupal:cwt_fixtures']], array_map(fn ($a) => [$a['type'], $a['job']], $alerts));
+            $this->assertSame('', $alerts[0]['link'], 'no link rather than one to the visitor\'s host');
+
+            // With the site's address set, the link is there.
+            file_put_contents($settings, "\$settings['cronwatch_base_url'] = 'https://site.example/sub/';\n", FILE_APPEND);
+            self::stopServer();
+            self::setState('cwt.cron_mode', 'ok');
+            self::setState('system.cron_last', 0);
+            [$status] = self::http('GET', '/user/password', null, ['Host' => 'cronwatch-login.example']);
+            $this->assertSame(200, $status);
+            $alerts = self::alerts();
+            $this->assertSame('recovered', $alerts[1]['type']);
+            $this->assertSame('https://site.example/sub/admin/reports/cronwatch?job=drupal%3Acwt_fixtures', $alerts[1]['link']);
+        } finally {
+            file_put_contents($settings, "\$settings['trusted_host_patterns'] = ['^127\\.0\\.0\\.1\$'];\n\$settings['cronwatch_base_url'] = NULL;\n", FILE_APPEND);
+            self::stopServer();
+            self::setState('cwt.cron_mode', 'ok');
+        }
+        // Under Drush, the link is the site's --uri.
+        $this->assertSame('http://127.0.0.1:' . self::$port . '/admin/reports/cronwatch?job=x', self::inDrupal("echo json_encode(\\Drupal::service('cronwatch.recorder')->jobUrl('x'));"));
+    }
+
     public function testTheJsonApiNeedsAToken(): void
     {
         [$status] = self::http('GET', '/cronwatch/api/jobs');
@@ -737,6 +832,19 @@ final class DrupalTest extends TestCase
         $this->assertStringContainsString('"job":"drupal:cron"', $body);
         [$status] = self::http('GET', '/cronwatch/api/jobs', null, ['Authorization' => 'Bearer wrong']);
         $this->assertSame(401, $status);
+
+        // A check is prepared (every job declared) only for a caller with the token.
+        $declared = fn (): int => (int) self::inDrupal("echo json_encode(\\Drupal::state()->get('cwt.declared', 0));");
+        $before = $declared();
+        [$status] = self::http('POST', '/cronwatch/api/check', null, ['Authorization' => 'Bearer wrong']);
+        $this->assertSame(401, $status);
+        [$status] = self::http('POST', '/cronwatch/api/check');
+        $this->assertSame(401, $status);
+        $this->assertSame($before, $declared(), 'nothing was declared for a caller without the token');
+        [$status, , $body] = self::http('POST', '/cronwatch/api/check', null, ['Authorization' => "Bearer {$token}"]);
+        $this->assertSame(200, $status);
+        $this->assertStringContainsString('"ok":true', $body);
+        $this->assertGreaterThan($before, $declared());
     }
 
     public function testUninstallDropsTheTables(): void

@@ -5,8 +5,10 @@
  * Fixtures for the CronWatch module's tests.
  *
  * State keys steer them: cwt.cron_mode ("ok", "throw" or "error") picks what
- * this module's hook_cron does, and every alert CronWatch sends is appended
- * to cwt.alerts.
+ * this module's hook_cron does, every alert CronWatch sends is appended to
+ * cwt.alerts (with the link the module's channels would give it),
+ * cwt.bad_options (job name => options) is merged into those jobs' options,
+ * and cwt.declared counts the times the job options were altered.
  */
 
 declare(strict_types=1);
@@ -36,7 +38,7 @@ function cwt_fixtures_cronwatch_alerts_alter(array &$channels): void {
   $channels[] = function (Alert $alert): void {
     $state = \Drupal::state();
     $alerts = $state->get('cwt.alerts', []);
-    $alerts[] = ['type' => $alert->type, 'job' => $alert->job, 'title' => $alert->title];
+    $alerts[] = ['type' => $alert->type, 'job' => $alert->job, 'title' => $alert->title, 'link' => \Drupal::service('cronwatch.recorder')->jobUrl($alert->job)];
     $state->set('cwt.alerts', $alerts);
   };
 }
@@ -45,7 +47,13 @@ function cwt_fixtures_cronwatch_alerts_alter(array &$channels): void {
  * Implements hook_cronwatch_job_options_alter().
  */
 function cwt_fixtures_cronwatch_job_options_alter(array &$options, string $name, array $context): void {
+  $state = \Drupal::state();
+  $state->set('cwt.declared', (int) $state->get('cwt.declared', 0) + 1);
   if ($name === 'drupal:cwt_fixtures') {
     $options['description'] = 'The fixture module';
+  }
+  $bad = $state->get('cwt.bad_options', []);
+  if (isset($bad[$name])) {
+    $options = $bad[$name] + $options;
   }
 }

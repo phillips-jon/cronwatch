@@ -25,7 +25,7 @@ Then, under Configuration, System, CronWatch, say where alerts go and send a tes
 Drupal runs every module's `hook_cron` from its cron service, whatever starts it: Automated Cron after a page, `drush cron`, or a system cron requesting `/cron/<key>`. The module records:
 
 - **`drupal:cron`**: the whole cron run, with the trigger `"cron"`. Its output lists the modules that ran and those that failed. A run that finds cron already locked by another records nothing.
-- **`drupal:<module>`**: each module's `hook_cron` in it, with what it logged and the exception it threw. Drupal carries on past a module's exception, so that module's run fails and the others and the cron run do not; an `\Error` fails both the module's run and the cron run, which Drupal lets it end.
+- **`drupal:<module>`**: each module's `hook_cron` in it, with what it logged and the exception it threw. Drupal carries on past a module's exception, so that module's run fails and the others and the cron run do not; an `\Error` fails both the module's run and the cron run, which Drupal lets it end. A module with more than one `hook_cron` (Drupal 11.1 and newer, `#[Hook('cron')]` on several methods) is one run, failed if any of them threw.
 
 Only `drupal:cron` has a schedule, since every `hook_cron` runs on every cron run: giving each module the site's schedule would turn a cron that stopped into one missed alert per module. The schedule is the one under the settings (what your crontab does: `*/15 * * * *`, or `every 1h`), else Automated Cron's interval (`every 3h` by default, since Automated Cron runs cron after the first request once the interval has passed), else none; the settings page says which. The module jobs report failures, slow runs and stuck runs. All are tagged `drupal-cron`. A module uninstalled keeps its history and is never reported missed.
 
@@ -115,6 +115,14 @@ function mymodule_cronwatch_alerts_alter(array &$channels): void {
   $channels[] = new \Cronwatch\Alerts\Discord(getenv('DISCORD_WEBHOOK_URL'));
 }
 ```
+
+The links in alerts go to the job's page on the dashboard, at the site's address. Set it in `settings.php` (with the subdirectory when the site is in one):
+
+```php
+$settings['cronwatch_base_url'] = 'https://example.com';
+```
+
+Without it, the address is that of the request cron ran in, but only where Drupal has checked its host (`trusted_host_patterns`) or under Drush (its `--uri`). A site that trusts any host sends alerts without a link, since Automated Cron runs after a visitor's request, whose host the visitor chose.
 
 The settings are configuration, exported with the site's; keep a credential out of the export by setting it in `settings.php`:
 

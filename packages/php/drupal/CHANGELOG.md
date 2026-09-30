@@ -7,8 +7,15 @@ All notable changes to the CronWatch module for Drupal, newest first. Each relea
 ### Changed
 - `composer.json` points its documentation link at the Drupal page of the docs, not the docs' front page.
 
+### Added
+- `$settings['cronwatch_base_url']`, the site's address for the links in alerts.
+
 ### Fixed
 - A `description` given in a queue worker's `#[Cronwatch\Watch]` is now shown, instead of being replaced by the module's default ("Items of the ... queue").
+- One job with options the library refuses (from `hook_cronwatch_job_options_alter()`, a worker's `#[Cronwatch\Watch]` or an imported schedule) no longer stops every check: it is reported and declared with fewer options, and its runs are still recorded.
+- A module with two `hook_cron` methods (Drupal 11.1 and newer) is one run per cron run, failed if either threw, instead of a failure and a recovery each time.
+- `POST /cronwatch/api/check` declares the jobs only once the token is checked.
+- Alert links no longer take their host from a visitor's request on a site without `trusted_host_patterns`; they use `$settings['cronwatch_base_url']`, or go without a link.
 
 ## 0.9.0 - 2026-09-30
 

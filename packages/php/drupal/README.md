@@ -62,6 +62,7 @@ The JSON API that [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mc
 
 - `$settings['cronwatch_database']`: the `$databases` key to keep the tables in (default `default`).
 - `$settings['cronwatch_token']`: the JSON API's token.
+- `$settings['cronwatch_base_url']`: the site's address for the links in alerts (`https://example.com`, with the subdirectory when the site is in one). Without it, alerts link to the address of the request that ran cron when `trusted_host_patterns` is set or under Drush, and go without a link otherwise.
 
 ## Ultimate Cron
 
