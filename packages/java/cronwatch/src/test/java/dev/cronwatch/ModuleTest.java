@@ -16,8 +16,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The core as a named module: it exports its API packages and none of {@code internal}, requires
- * nothing beyond the JDK but statically, and resolves and runs as a module with none of its
- * optional libraries present. The tests themselves run on the class path, as most apps do.
+ * nothing beyond the JDK but statically (and of the JDK only {@code java.net.http} at run time),
+ * and resolves and runs as a module with none of its optional libraries present. The tests
+ * themselves run on the class path, as most apps do.
  */
 class ModuleTest {
   private static final Path CLASSES = Path.of("target/classes");
@@ -37,10 +38,13 @@ class ModuleTest {
     assertEquals(
         Set.of(
             "dev.cronwatch",
+            "dev.cronwatch.alerts",
             "dev.cronwatch.jdbc",
             "dev.cronwatch.json",
+            "dev.cronwatch.pgcron",
             "dev.cronwatch.store",
             "dev.cronwatch.storetest",
+            "dev.cronwatch.triage",
             "dev.cronwatch.web"),
         exported);
   }
@@ -52,8 +56,11 @@ class ModuleTest {
       assertTrue(
           jdk || r.modifiers().contains(ModuleDescriptor.Requires.Modifier.STATIC),
           "a module that is not the JDK's is required at run time: " + r);
+      // java.net.http is the channels' default transport, which a modular app that sends alerts
+      // would otherwise have to add itself.
       assertTrue(
           r.name().equals("java.base")
+              || r.name().equals("java.net.http")
               || r.modifiers().contains(ModuleDescriptor.Requires.Modifier.STATIC),
           "required at run time: " + r);
     }

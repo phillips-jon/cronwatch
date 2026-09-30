@@ -1,6 +1,7 @@
 package dev.cronwatch;
 
 import dev.cronwatch.Core.JobDef;
+import dev.cronwatch.alerts.Transport;
 import dev.cronwatch.internal.core.CurrentRun;
 import dev.cronwatch.internal.core.WebAccess;
 import dev.cronwatch.internal.duration.Durations;
@@ -409,14 +410,17 @@ public final class Cronwatch implements AutoCloseable {
     CompletableFuture<RunHandle> shared = core.starting.putIfAbsent(key, mine);
     if (shared == null) {
       shared = mine;
+      // Let go of before anyone is answered, so a start with this id once answered reads the
+      // stored run rather than joining this finished start.
       core.spawn(
           () -> {
             try {
-              mine.complete(recordStart(def, options.trigger, id));
-            } catch (Throwable t) {
-              mine.completeExceptionally(t);
-            } finally {
+              RunHandle handle = recordStart(def, options.trigger, id);
               core.starting.remove(key, mine);
+              mine.complete(handle);
+            } catch (Throwable t) {
+              core.starting.remove(key, mine);
+              mine.completeExceptionally(t);
             }
           },
           "starting " + def.name());
@@ -741,6 +745,10 @@ public final class Cronwatch implements AutoCloseable {
     } catch (Exception e) {
       core.report(e, "closing the store");
     }
+    // The client's own transport only: one the app gave is the app's to close.
+    if (core.transport instanceof LazyTransport own) {
+      own.close();
+    }
   }
 
   // ---- the dashboard
@@ -796,6 +804,7 @@ public final class Cronwatch implements AutoCloseable {
     private final List<Channel> channels = new ArrayList<>(List.of(new Console()));
     private boolean defaultChannels = true;
     private @Nullable Triage triage;
+    private @Nullable Transport transport;
     private final List<Source> sources = new ArrayList<>();
     private boolean secretGiven;
     private @Nullable String cronSecret;
@@ -853,6 +862,17 @@ public final class Cronwatch implements AutoCloseable {
     /** Adds a short diagnosis to every alert except recoveries. */
     public Builder triage(Triage triage) {
       this.triage = Objects.requireNonNull(triage, "triage");
+      return this;
+    }
+
+    /**
+     * Sends every channel's and triage's requests (those whose options name no transport of their
+     * own) through {@code transport}: an app's own HTTP client, a proxy, a trust store. The default
+     * is a {@link dev.cronwatch.alerts.JdkTransport} the client makes on its first send and closes
+     * with itself; one given here is the app's to close.
+     */
+    public Builder transport(Transport transport) {
+      this.transport = Objects.requireNonNull(transport, "transport");
       return this;
     }
 
@@ -997,6 +1017,7 @@ public final class Cronwatch implements AutoCloseable {
               store == null,
               channels,
               triage,
+              transport == null ? new LazyTransport() : transport,
               sources,
               secret == null || secret.isEmpty() ? null : secret,
               optOut,

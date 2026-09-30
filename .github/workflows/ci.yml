@@ -1218,6 +1218,33 @@ jobs:
         include:
           - { java: "21", newest: false }
           - { java: "27", newest: true }
+    # The databases for SqlStore's server tests, as the elixir, go and rust
+    # jobs have them.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: pw
+          MYSQL_DATABASE: cw
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -ppw" --health-interval 5s --health-timeout 5s --health-retries 20
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+          MARIADB_DATABASE: cw
+        ports: ["3307:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -1228,6 +1255,22 @@ jobs:
       # Builds the SDK (for the croner parity and Node compatibility tests),
       # then fails if conformance/ or the dashboard fixture is stale.
       - run: npm run check:conformance
+      # A second Postgres with pg_cron, for the pg_cron source's tests against
+      # the real extension, as the other jobs start it, on the newest entry.
+      - name: Start Postgres with pg_cron
+        if: matrix.newest
+        run: |
+          docker run -d --name pgcron -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=cw -p 5433:5432 postgres:16 \
+            bash -c 'apt-get update -qq && apt-get install -y -qq postgresql-16-cron > /dev/null && exec docker-entrypoint.sh postgres -c shared_preload_libraries=pg_cron -c cron.database_name=cw'
+          for _ in $(seq 1 90); do
+            if [ "$(docker exec pgcron psql postgres://postgres:pw@127.0.0.1:5432/cw -tAc 'show shared_preload_libraries' 2>/dev/null)" = "pg_cron" ]; then
+              echo "CRONWATCH_TEST_PGCRON=postgres://postgres:pw@127.0.0.1:5433/cw" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs pgcron
+          exit 1
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -1246,9 +1289,14 @@ jobs:
         run: ./mvnw -B spotless:check
       # Error Prone and -Xlint with warnings as errors, the Enforcer rules
       # (no dependency in the core, Java 21 bytecode, one version of each
-      # dependency), and every test, with TZ=UTC as the fixtures are made.
+      # dependency), and every test, with TZ=UTC as the fixtures are made:
+      # SqlStore on the three servers, and pg_cron on the newest entry.
       - name: ./mvnw verify
         working-directory: packages/java
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+          CRONWATCH_TEST_MYSQL: mysql://root:pw@127.0.0.1:3306/cw
+          CRONWATCH_TEST_MARIADB: mysql://root:pw@127.0.0.1:3307/cw
         run: ./mvnw -B verify
       # @cronwatch/mcp's tools against the Java dashboard, served by
       # packages/java/webserver (the JDK's HttpServer), built with the wrapper

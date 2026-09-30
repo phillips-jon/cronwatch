@@ -1,14 +1,15 @@
 package dev.cronwatch;
 
+import dev.cronwatch.alerts.Transport;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Adds a short diagnosis to every alert except recoveries. Claude triage over plain HTTP comes in a
- * later release; any function can be one. It runs on a virtual thread of the client's and is waited
- * on for 25 seconds, then interrupted; a throw, a timeout or an empty answer is no diagnosis, and
- * triage is not tried again for that alert.
+ * Adds a short diagnosis to every alert except recoveries: Claude triage ({@code
+ * dev.cronwatch.triage.Anthropic}) or any function. It runs on a virtual thread of the client's and
+ * is waited on for 25 seconds, then interrupted; a throw, a timeout or an empty answer is no
+ * diagnosis, and triage is not tried again for that alert.
  */
 @FunctionalInterface
 public interface Triage {
@@ -24,12 +25,23 @@ public interface Triage {
    *
    * @param alert the alert to diagnose
    * @param recentRuns the job's five newest runs
+   * @param transport the client's transport, which Claude triage sends through unless its options
+   *     name one of its own
    */
-  record Context(Alert alert, List<Run> recentRuns) {
+  record Context(Alert alert, List<Run> recentRuns, Transport transport) {
     /** Keeps an unmodifiable copy. */
     public Context {
       Objects.requireNonNull(alert, "alert");
       recentRuns = List.copyOf(recentRuns);
+      Objects.requireNonNull(transport, "transport");
+    }
+
+    /**
+     * A context outside a client (a test): a {@code JdkTransport} is made on the first send through
+     * it.
+     */
+    public Context(Alert alert, List<Run> recentRuns) {
+      this(alert, recentRuns, new LazyTransport());
     }
   }
 }

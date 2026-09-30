@@ -1,5 +1,6 @@
 package dev.cronwatch;
 
+import dev.cronwatch.alerts.Transport;
 import dev.cronwatch.internal.evaluate.Evaluate;
 import dev.cronwatch.internal.evaluate.Expect;
 import dev.cronwatch.internal.output.Output;
@@ -86,6 +87,10 @@ final class Core {
   final boolean defaultStore;
   final List<Channel> channels;
   final @Nullable Triage triage;
+
+  /** Where channels and triage send, unless their options name a transport of their own. */
+  final Transport transport;
+
   final List<Source> sources;
   final @Nullable String cronSecret;
   final boolean secretOptOut;
@@ -125,6 +130,7 @@ final class Core {
       boolean defaultStore,
       List<Channel> channels,
       @Nullable Triage triage,
+      Transport transport,
       List<Source> sources,
       @Nullable String cronSecret,
       boolean secretOptOut,
@@ -140,6 +146,7 @@ final class Core {
     this.defaultStore = defaultStore;
     this.channels = List.copyOf(channels);
     this.triage = triage;
+    this.transport = transport;
     this.sources = List.copyOf(sources);
     this.cronSecret = cronSecret;
     this.secretOptOut = secretOptOut;

@@ -235,6 +235,19 @@ public final class JobOptions {
     return this;
   }
 
+  /**
+   * The definition these options declare under {@code name}, before the client's defaults: the
+   * fields in the order given, then the name, then the expect rule as it is stored ({@code contains
+   * "..."}, {@code matches /.../}, {@code custom function}). A source compares it with the one it
+   * declared last, to declare a job again only when it changed, as the Go port's {@code
+   * DescribeJob}. The options are not checked here; {@link Cronwatch#job} checks them.
+   */
+  public Definition describe(String name) {
+    JsObject out = fields.copy();
+    out.set("name", name);
+    return Expect.toStored(out, expect);
+  }
+
   /** The fields given, as the definition would hold them before defaults and the name. */
   @Override
   public String toString() {
