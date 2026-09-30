@@ -140,15 +140,20 @@ const PUBLISH = [
   { dir: "packages/elixir", commands: (v) => [`# packages/elixir: the pushed tag v${v} is published to Hex, with its docs, by .github/workflows/hex.yml (once HEX_ENABLED is true); by hand, (cd packages/elixir && mix hex.publish)`] },
   // Maven Central reads the artifacts from the bundle the release profile
   // uploads to the Central Publisher Portal, so they need no tag of their
-  // own. By hand for now, with a signing key and a Portal token in
-  // ~/.m2/settings.xml; the deployment is checked in the Portal before it is
-  // published (packages/java/DESIGN.md, Releasing). java.yml comes later.
-  { dir: "packages/java", commands: (v) => [`# packages/java: published to Maven Central by hand for now, (cd packages/java && ./mvnw -B -P release deploy), then check the validated deployment of ${v} in the Central Publisher Portal and press Publish (packages/java/DESIGN.md, Releasing)`] },
+  // own. The first release is published by hand, with a signing key and a
+  // Portal token in ~/.m2/settings.xml, and checked in the Portal before it
+  // is published; after it, .github/workflows/java.yml publishes the pushed
+  // tag, with a Portal token and a signing subkey from the maven
+  // environment, once MAVEN_ENABLED is true (packages/java/DESIGN.md,
+  // Releasing).
+  { dir: "packages/java", commands: (v) => [`# packages/java: the pushed tag v${v} is published to Maven Central by .github/workflows/java.yml (once MAVEN_ENABLED is true, which it is not for the first release); by hand, (cd packages/java && ./mvnw -B -P release deploy), then check the validated deployment of ${v} in the Central Publisher Portal and press Publish (packages/java/DESIGN.md, Releasing)`] },
   // NuGet reads each package from the .nupkg pushed to it, so the solution
-  // needs no tag of its own. By hand for now, the core first so no package is
-  // listed before one it needs; nuget.yml, with trusted publishing, comes
-  // later (packages/dotnet/DESIGN.md, Releasing).
-  { dir: "packages/dotnet", commands: (v) => [`# packages/dotnet: published to nuget.org by hand for now, (cd packages/dotnet && dotnet pack -c Release -o artifacts && dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key <a key scoped to Cronwatch*>), after checking each package's files for ${v} (packages/dotnet/DESIGN.md, Releasing)`] },
+  // needs no tag of its own. .github/workflows/nuget.yml packs the five
+  // packages from the pushed tag and, once its reviewer approves, pushes
+  // them with trusted publishing, the core first so no package is listed
+  // before one it needs, once NUGET_ENABLED is true
+  // (packages/dotnet/DESIGN.md, Releasing).
+  { dir: "packages/dotnet", commands: (v) => [`# packages/dotnet: the pushed tag v${v} is published to nuget.org by .github/workflows/nuget.yml (trusted publishing, once NUGET_ENABLED is true); by hand, (cd packages/dotnet && dotnet pack -c Release -o artifacts/packages && bash scripts/check-packages.sh artifacts/packages && for p in Cronwatch Cronwatch.Hosting Cronwatch.AspNetCore Cronwatch.Hangfire Cronwatch.Quartz; do dotnet nuget push artifacts/packages/$p.${v}.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate --api-key <a key scoped to Cronwatch*>; done)`] },
 ];
 
 /** Files the built gem must carry, and prefixes it must not. */
