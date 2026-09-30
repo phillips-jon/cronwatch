@@ -179,6 +179,33 @@ class ChannelHardeningTest {
   }
 
   @Test
+  void aBodyOfEmptyChunksIsLetGoAtTheDeadline() throws Exception {
+    // A transport of the app's own whose body answers empty chunks for ever, never blocking: the
+    // read gives up at the deadline and closes the answer, rather than spin on its own thread.
+    java.util.concurrent.atomic.AtomicBoolean closed =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    Transport empty =
+        request ->
+            new Response(
+                200,
+                new Response.Body() {
+                  @Override
+                  public byte[] next() {
+                    return new byte[0];
+                  }
+
+                  @Override
+                  public void close() {
+                    closed.set(true);
+                  }
+                });
+    Post.Answer answer = Post.fetch(empty, 200, "https://hooks.example.com/in", List.of(), "{}");
+    assertEquals(200, answer.status());
+    assertEquals("", answer.body());
+    assertTrue(Await.until(closed::get), "the answer was closed");
+  }
+
+  @Test
   void aChannelStopsWaitingAtItsDeadline() throws Exception {
     try (TestServer hang = TestServer.start(r -> new TestServer.Hang())) {
       Post.timeoutForTests(500);

@@ -331,7 +331,9 @@ public final class Post {
         return;
       }
       ByteArrayOutputStream out = new ByteArrayOutputStream();
-      while (out.size() < MAX_BODY) {
+      // Given up on once the caller has (a body of empty chunks that never blocks would otherwise
+      // spin here for good).
+      while (out.size() < MAX_BODY && !abandoned.get()) {
         byte[] chunk = r.body().next();
         if (chunk == null) {
           break;
