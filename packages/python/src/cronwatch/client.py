@@ -1320,7 +1320,9 @@ class Cronwatch:
                 self._update_state(name, lambda before: (on_run_start(before), None))
             except Exception as error:
                 self._report(error, f"starting {name}")
-        return RunHandle(self, definition, run.id, run, recorded, None)
+        handle = RunHandle(self, definition, run.id, run, recorded, None)
+        handle._opened = True
+        return handle
 
     def _resume_handle(self, definition: JobDefinition, run_id: str) -> RunHandle:
         """job.resume() and resume_run(). A store that cannot be read is reported, and finish() reads it again."""
