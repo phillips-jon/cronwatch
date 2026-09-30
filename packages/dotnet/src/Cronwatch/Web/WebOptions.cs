@@ -70,11 +70,11 @@ public sealed class RoutesOptions
     /// </summary>
     public bool TrustProxy { get; init; }
 
-    /// <summary>Says whether a token is set, never the token.</summary>
+    /// <summary>Says whether a token is set, never the token, and the origin without any credentials in it.</summary>
     public override string ToString() =>
         "RoutesOptions(token " + (Token == null ? "CRONWATCH_TOKEN" : Token.Value == null ? "none" : "set")
         + (BasePath == null ? "" : ", basePath " + BasePath)
-        + (Origin == null ? "" : ", origin " + Origin)
+        + (Origin == null ? "" : ", origin " + (Internal.Origins.Bare(Origin) ?? "set"))
         + (TrustProxy ? ", trustProxy" : "") + ")";
 }
 

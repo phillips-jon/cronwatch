@@ -150,11 +150,14 @@ public sealed class WebRequest
         return data;
     }
 
-    /// <summary>Names the method, the path and the header names; the query and every value are left out.</summary>
+    /// <summary>
+    /// Names the method, the path and the header names; the query, every value, and the scheme and
+    /// authority of a target in the absolute form (which can carry credentials) are left out.
+    /// </summary>
     public override string ToString()
     {
-        int q = Target.IndexOf('?', StringComparison.Ordinal);
-        string path = q < 0 ? Target : Target[..q] + "?...";
+        var (p, query) = Requests.Target(Target);
+        string path = query.Length == 0 && Target.IndexOf('?', StringComparison.Ordinal) < 0 ? p : p + "?...";
         var names = new List<string>(_headers.Count);
         foreach (var h in _headers)
         {

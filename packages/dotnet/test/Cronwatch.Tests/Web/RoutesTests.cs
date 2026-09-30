@@ -832,5 +832,13 @@ public class RoutesTests
         Assert.DoesNotContain(token, handler.ToString(), StringComparison.Ordinal);
         WebResponse r = new WebResponse(200).WithHeader("set-cookie", "cronwatch_token=" + token).WithBody(token);
         Assert.DoesNotContain(token, r.ToString(), StringComparison.Ordinal);
+        // A URL's credentials: an origin given with them, and a target in the absolute form.
+        var withUser = new RoutesOptions { Token = "tok", Origin = "https://ops:" + token + "@app.example" };
+        Assert.DoesNotContain(token, withUser.ToString(), StringComparison.Ordinal);
+        await using var o = new WebKit(withUser);
+        Assert.Contains("origin https://app.example", o.Routes.ToString(), StringComparison.Ordinal);
+        var absolute = new WebRequest("GET", "http://ops:" + token + "@app.example/cronwatch/");
+        Assert.DoesNotContain(token, absolute.ToString(), StringComparison.Ordinal);
+        Assert.Equal("/cronwatch/", absolute.Path);
     }
 }
