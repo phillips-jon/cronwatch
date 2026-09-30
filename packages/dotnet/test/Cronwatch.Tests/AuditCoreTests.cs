@@ -185,7 +185,7 @@ public class AuditCoreTests
         try
         {
             var threw = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var late = Channel.Create("late", async (a, ctx, ct) =>
+            var late = CustomChannel.Create("late", async (a, ctx, ct) =>
             {
                 try
                 {
