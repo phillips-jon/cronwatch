@@ -12,6 +12,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
   alias Cronwatch.Alerts.Discord
   alias Cronwatch.Alerts.Post
   alias Cronwatch.Alerts.Slack
+  alias Cronwatch.Alerts.URL
   alias Cronwatch.Alerts.Webhook
   alias Cronwatch.ChannelContext
   alias Cronwatch.JS
@@ -124,6 +125,32 @@ defmodule Cronwatch.Conformance.ChannelsTest do
 
     count = length(list(f, "sends")) + length(list(f, "failures")) + length(list(field(f, "textCuts"), "errorBodies"))
     assert count == 90 + 18 + 6
+  end
+
+  test "conformance/channels.json: URLs read as Node's new URL reads them" do
+    cases = list(Conformance.fixture("channels"), "urls")
+
+    failures =
+      Enum.flat_map(cases, fn c ->
+        want =
+          cond do
+            field(c, "invalid") -> "invalid"
+            field(c, "other") -> "other " <> field(c, "other")
+            true -> "#{field(c, "url")} user? #{field(c, "username") != "" or field(c, "password") != ""}"
+          end
+
+        got =
+          case URL.parse(field(c, "input")) do
+            {:ok, u} -> "#{URL.to_string(u)} user? #{u.user?}"
+            {:other, scheme} -> "other " <> scheme
+            :error -> "invalid"
+          end
+
+        if got == want, do: [], else: ["#{JS.stringify(field(c, "input"))}: node #{want}, elixir #{got}"]
+      end)
+
+    assert failures == [], "channels.json: #{length(failures)} URLs differ:\n" <> Enum.join(failures, "\n")
+    assert length(cases) > 700
   end
 
   test "a channel is refused without its URL, in Elixir's words" do

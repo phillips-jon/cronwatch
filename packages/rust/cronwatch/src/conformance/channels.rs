@@ -403,3 +403,39 @@ async fn conformance_channels() {
     assert_eq!(count, total);
     eprintln!("channels.json: {count} cases replayed");
 }
+
+/// The fixture's URLs, each read as Node's `new URL` reads it: the href
+/// without its user name and password, those as WHATWG encodes them, another
+/// scheme, or no URL.
+#[test]
+fn conformance_urls() {
+    let f = fixture("channels");
+    let cases = objects(&f, "urls");
+    let mut wrong = Vec::new();
+    for c in &cases {
+        let input = text(c, "input");
+        let want = if field(c, "invalid").as_bool() == Some(true) {
+            "invalid".to_string()
+        } else if let Some(other) = field(c, "other").as_str() {
+            format!("other {other}")
+        } else {
+            format!("{} user {} password {}", text(c, "url"), text(c, "username"), text(c, "password"))
+        };
+        let got = match crate::alerts::post::parse(input) {
+            Err(_) => "invalid".to_string(),
+            Ok(u) if !u.is_special() || u.scheme() == "file" => format!("other {}", u.scheme()),
+            Ok(mut u) => {
+                let (user, password) = (u.username().to_string(), u.password().unwrap_or("").to_string());
+                // Always allowed on a special URL with a host.
+                let _ = u.set_username("");
+                let _ = u.set_password(None);
+                format!("{} user {user} password {password}", u.as_str())
+            }
+        };
+        if got != want {
+            wrong.push(format!("{input:?}: node {want}, rust {got}"));
+        }
+    }
+    assert!(wrong.is_empty(), "channels.json: {} URLs differ:\n{}", wrong.len(), wrong.join("\n"));
+    assert!(cases.len() > 700);
+}
