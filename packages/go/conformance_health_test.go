@@ -5,6 +5,7 @@ package cronwatch
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	"cronwatch.dev/go/internal/js"
@@ -47,6 +48,107 @@ func fixtureStored(t *testing.T, v any) StoredJob {
 	}
 	return StoredJob{Name: field(o, "name").(string), Definition: def, CreatedAt: int64(field(o, "createdAt").(float64)), UpdatedAt: int64(field(o, "updatedAt").(float64))}
 }
+
+// sorted is a JSON value with every object's keys in order, for comparing
+// alerts, whose key order is the fixture's own and not a writer's.
+func sorted(v any) any {
+	switch t := v.(type) {
+	case *js.Object:
+		keys := append([]string(nil), t.Keys()...)
+		sort.Strings(keys)
+		out := &js.Object{}
+		for _, k := range keys {
+			x, _ := t.Get(k)
+			out.Set(k, sorted(x))
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, e := range t {
+			out[i] = sorted(e)
+		}
+		return out
+	}
+	return v
+}
+
+// sameState compares a delivery result: the state's own keys in the
+// fixture's order (the writer controls those), and everything in it
+// whatever its key order.
+func sameState(t *testing.T, what string, state JobState, dropped int, want any) {
+	t.Helper()
+	w := want.(*js.Object)
+	got := js.NewObject("state", state.JSValue(), "dropped", dropped)
+	if sameJSON(t, what, sorted(got), sorted(w)) {
+		gotKeys := state.JSValue().(*js.Object).Keys()
+		wantKeys := field(w, "state").(*js.Object).Keys()
+		sameJSON(t, what+" key order", gotKeys, wantKeys)
+	}
+}
+
+func fixtureAlerts(t *testing.T, v any) []Alert {
+	out := []Alert{}
+	list, _ := v.([]any)
+	for _, a := range list {
+		alert, err := alertFrom(a)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, alert)
+	}
+	return out
+}
+
+func TestConformanceDelivery(t *testing.T) {
+	f := field(fixture(t, "health"), "delivery").(*js.Object)
+	if int(field(f, "maxUndelivered").(float64)) != maxUndelivered || int64(field(f, "sendLeaseMs").(float64)) != sendLeaseMs {
+		t.Fatalf("constants: %v %v", field(f, "maxUndelivered"), field(f, "sendLeaseMs"))
+	}
+	count := 0
+	for i, c := range objects(f, "alertKey") {
+		a, err := alertFrom(field(c, "alert"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := alertKey(a); got != field(c, "key") {
+			t.Errorf("alertKey %d: %q, want %q", i, got, field(c, "key"))
+		}
+		sameJSON(t, fmt.Sprintf("alertKey %d written back", i), sorted(a.JSValue()), sorted(field(c, "alert")))
+		count++
+	}
+	for i, c := range objects(f, "normalizeState") {
+		s := normalizeState(ptr(fixtureState(t, field(c, "state"))), "j")
+		sameJSON(t, fmt.Sprintf("normalizeState %d", i), sorted(s.JSValue()), sorted(field(c, "normalized")))
+		sameJSON(t, fmt.Sprintf("normalizeState %d key order", i), s.JSValue().(*js.Object).Keys(), field(c, "normalized").(*js.Object).Keys())
+		count++
+	}
+	for i, c := range objects(f, "queueUndelivered") {
+		s, dropped := queueUndelivered(fixtureState(t, field(c, "state")), fixtureAlerts(t, field(c, "alerts")))
+		sameState(t, fmt.Sprintf("queueUndelivered %d", i), s, dropped, field(c, "result"))
+		count++
+	}
+	for i, c := range objects(f, "holdAlerts") {
+		s, dropped := holdAlerts(fixtureState(t, field(c, "state")), fixtureAlerts(t, field(c, "alerts")), int64(field(c, "until").(float64)), field(c, "deferred").(bool))
+		sameState(t, fmt.Sprintf("holdAlerts %d", i), s, dropped, field(c, "result"))
+		count++
+	}
+	for i, c := range objects(f, "releaseSending") {
+		s, dropped := releaseSending(fixtureState(t, field(c, "state")), caseNow(c))
+		sameState(t, fmt.Sprintf("releaseSending %d", i), s, dropped, field(c, "result"))
+		count++
+	}
+	for i, c := range objects(f, "recordSent") {
+		s, dropped := recordSent(fixtureState(t, field(c, "state")), fixtureAlerts(t, field(c, "delivered")), fixtureAlerts(t, field(c, "failed")),
+			fixtureAlerts(t, field(c, "stale")), caseNow(c))
+		sameState(t, fmt.Sprintf("recordSent %d", i), s, dropped, field(c, "result"))
+		count++
+	}
+	if count < 30 {
+		t.Errorf("only %d delivery cases", count)
+	}
+}
+
+func caseNow(c *js.Object) int64 { return int64(field(c, "now").(float64)) }
 
 func numbers(v any) []float64 {
 	out := []float64{}

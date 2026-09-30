@@ -494,31 +494,34 @@ func (c *Client) claimFinish(ctx context.Context, run Run) (late bool, ignored s
 
 // finishRun evaluates a finished run (ok, failed, or timed out by a
 // check), already written, against the job's state, and sends what that
-// produces. Never fails: problems go to the error handler.
+// produces. The alerts are written with that state (see outbox). Never
+// fails: problems go to the error handler.
 func (c *Client) finishRun(ctx context.Context, def Definition, run Run, now int64) []Alert {
 	var history []Run
 	var historyErr error
 	read := false
-	_, drafts, err := updateState(ctx, c, run.Job, func(previous JobState) (JobState, []alertDraft, error) {
+	_, out, err := updateState(ctx, c, run.Job, func(previous JobState) (JobState, held, error) {
 		if !read {
 			history, historyErr = c.history(ctx, run)
 			read = true
 		}
 		if historyErr != nil {
-			return JobState{}, nil, historyErr
+			return JobState{}, held{}, historyErr
 		}
 		e, err := onRunFinish(def, run, previous, history, now)
 		if err != nil {
-			return JobState{}, nil, err
+			return JobState{}, held{}, err
 		}
 		settled := applySilence(previous, e, now)
-		return settled.state, settled.alerts, nil
+		state, out := c.outbox(settled.state, settled.alerts, def, now)
+		return state, out, nil
 	})
 	if err != nil {
 		c.report(err, "evaluating "+run.Job)
 		return []Alert{}
 	}
-	return c.dispatch(ctx, drafts, def, now)
+	c.reportDropped(run.Job, out.dropped)
+	return c.dispatch(ctx, run.Job, out.alerts, now)
 }
 
 // history is the runs before run, newest first, with up to baselineWindow

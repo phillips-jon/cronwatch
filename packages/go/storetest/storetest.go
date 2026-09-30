@@ -270,12 +270,13 @@ func Run(t *testing.T, newStore func(t *testing.T) cronwatch.Store) {
 	s, err = store.GetState(ctx, "a")
 	must(err)
 	sameJSON(t, "state", s, `{"job":"a","open":{},"consecutiveFailures":0,"silencedUntil":99,"lastAlertAt":6}`)
+	alert := `{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"a","definition":{"name":"a"},"title":"a failed","message":"boom","at":7`
 	full := `{"job":"a","open":{"stuck":7},"consecutiveFailures":1,"silencedUntil":null,"lastAlertAt":6,"pendingRecovery":["missed"],"undelivered":[` +
-		`{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"a","definition":{"name":"a"},"title":"a failed","message":"boom","at":7,"triage":null}]}`
+		alert + `,"triage":null}],"sending":[{"until":8,"alert":` + alert + `}}]}`
 	must(store.SetState(ctx, state(t, full)))
 	s, err = store.GetState(ctx, "a")
 	must(err)
-	sameJSON(t, "pendingRecovery and undelivered round-trip", s, full)
+	sameJSON(t, "pendingRecovery, undelivered and sending round-trip", s, full)
 	must(store.SetState(ctx, state(t, `{"job":"a","open":{},"consecutiveFailures":0,"silencedUntil":99,"lastAlertAt":6}`)))
 
 	// CompareAndSetState writes only over the version it was told to expect.

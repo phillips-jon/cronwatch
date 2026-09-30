@@ -180,20 +180,25 @@ func (c *Client) checkJob(ctx context.Context, job StoredJob, now int64, spent *
 		last = &recent[0]
 	}
 	var nextExpectedAt *int64
-	state, drafts, err := updateState(ctx, c, job.Name, func(previous JobState) (JobState, []alertDraft, error) {
-		out, err := onCheck(job.Definition, job, last, previous, now)
+	state, out, err := updateState(ctx, c, job.Name, func(previous JobState) (JobState, held, error) {
+		checked, err := onCheck(job.Definition, job, last, previous, now)
 		if err != nil {
-			return JobState{}, nil, err
+			return JobState{}, held{}, err
 		}
-		nextExpectedAt = out.nextExpectedAt
-		settled := applySilence(previous, out.evaluation, now)
-		return settled.state, settled.alerts, nil
+		nextExpectedAt = checked.nextExpectedAt
+		settled := applySilence(previous, checked.evaluation, now)
+		// Alerts a process stopped sending part way go back to the retry queue.
+		released, dropped := releaseSending(settled.state, c.now())
+		state, out := c.outbox(released, settled.alerts, job.Definition, now)
+		out.dropped += dropped
+		return state, out, nil
 	})
 	if err != nil {
 		return JobSummary{}, nil, err
 	}
+	c.reportDropped(job.Name, out.dropped)
 	alerts := c.retryUndelivered(ctx, job.Name, state, now, spent)
-	alerts = append(alerts, c.dispatch(ctx, drafts, job.Definition, now)...)
+	alerts = append(alerts, c.dispatch(ctx, job.Name, out.alerts, now)...)
 	summary, err := summarize(job, recent, state, nextExpectedAt, now)
 	return summary, alerts, err
 }

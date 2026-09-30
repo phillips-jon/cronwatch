@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 )
 
@@ -110,43 +109,66 @@ type SourceHost interface {
 
 var _ SourceHost = (*Client)(nil)
 
-// alertKey identifies an alert across retries.
-func alertKey(a Alert) string {
-	id := ""
-	if a.Run != nil {
-		id = a.Run.ID
-	}
-	return string(a.Type) + "|" + strconv.FormatInt(a.At, 10) + "|" + id
+// held is the alerts written with the state that opened their conditions,
+// and how many older ones the queue let go.
+type held struct {
+	alerts  []Alert
+	dropped int
 }
 
-// dispatch composes, triages and sends each draft. The state was saved
-// before this (updateState), so a slow channel holds up nothing else;
-// afterwards only the delivery fields are written back, onto a fresh read
-// of the state.
-func (c *Client) dispatch(ctx context.Context, drafts []alertDraft, def Definition, now int64) []Alert {
-	composed := []Alert{}
-	if len(drafts) == 0 {
-		return composed
+// outbox is an evaluation as it is written: its drafts composed into alerts
+// and held in the same state (holdAlerts), so the write that opens a
+// condition also keeps its alerts, and a process that stops before sending
+// them does not lose them. Called inside updateState, so it only computes.
+func (c *Client) outbox(state JobState, drafts []alertDraft, def Definition, now int64) (JobState, held) {
+	alerts := make([]Alert, len(drafts))
+	for i, d := range drafts {
+		alerts[i] = composeAlert(d, def, now)
 	}
+	next, dropped := holdAlerts(state, alerts, c.now()+sendLeaseMs, c.deferDelivery)
+	return next, held{alerts, dropped}
+}
+
+// reportDropped reports alerts let go because a job's queue was full.
+func (c *Client) reportDropped(name string, dropped int) {
+	if dropped <= 0 {
+		return
+	}
+	plural := "s"
+	if dropped == 1 {
+		plural = ""
+	}
+	c.report(fmt.Errorf("%d undelivered alert%s for %s dropped: only the newest %d are kept for retry", dropped, plural, name, maxUndelivered), "alert queue for "+name)
+}
+
+// dispatch triages and sends each alert the outbox holds (see outbox). The
+// state, with the alerts in it, was saved before this, so a slow channel
+// holds up nothing else; afterwards only the delivery fields are written
+// back, onto a fresh read of the state, and the alerts leave Sending.
+// Triage is made here, never stored with the held alert: the write that
+// opens a condition cannot wait for it, and a retry triages an alert that
+// has none. With DeliverAtCheck the alerts were queued for a check
+// elsewhere instead.
+func (c *Client) dispatch(ctx context.Context, name string, alerts []Alert, now int64) []Alert {
+	if len(alerts) == 0 || c.deferDelivery {
+		return alerts
+	}
+	sent := make([]Alert, len(alerts))
 	var delivered, failed []Alert
-	for _, draft := range drafts {
-		alert := composeAlert(draft, def, now)
-		if c.deferDelivery {
-			failed = append(failed, alert)
-		} else {
-			if c.triage != nil && alert.Type != AlertRecovered {
-				c.addTriage(ctx, &alert, triageTimeout)
-			}
-			if c.deliver(ctx, alert) {
-				delivered = append(delivered, alert)
-			} else {
-				failed = append(failed, alert)
-			}
+	for i, alert := range alerts {
+		alert = alert.clone()
+		if c.triage != nil && alert.Type != AlertRecovered {
+			c.addTriage(ctx, &alert, triageTimeout)
 		}
-		composed = append(composed, alert)
+		if c.deliver(ctx, alert) {
+			delivered = append(delivered, alert)
+		} else {
+			failed = append(failed, alert)
+		}
+		sent[i] = alert
 	}
-	c.recordDelivery(ctx, def.Name(), delivered, failed, nil, now)
-	return composed
+	c.recordDelivery(ctx, name, delivered, failed, nil, now)
+	return sent
 }
 
 // retryUndelivered sends the alerts no channel accepted last time, once
@@ -195,59 +217,21 @@ func (c *Client) retryUndelivered(ctx context.Context, name string, state JobSta
 }
 
 // recordDelivery marks delivered alerts done, drops stale ones, and keeps
-// failed ones for the next check. A failed alert replaces its stored copy,
-// so a triage made on this attempt is kept. LastAlertAt moves only on a
-// delivery.
-func (c *Client) recordDelivery(ctx context.Context, name string, delivered, failed, dropped []Alert, now int64) {
+// failed ones for the next check, taking them all out of Sending
+// (recordSent). A failed alert replaces its stored copy, so a triage made
+// on this attempt is kept. LastAlertAt moves only on a delivery. When this
+// write fails, alerts still in Sending are retried once their lease runs
+// out.
+func (c *Client) recordDelivery(ctx context.Context, name string, delivered, failed, stale []Alert, now int64) {
 	_, trimmed, err := updateState(ctx, c, name, func(previous JobState) (JobState, int, error) {
-		state := normalizeState(&previous, name)
-		done := map[string]bool{}
-		for _, a := range delivered {
-			done[alertKey(a)] = true
-		}
-		for _, a := range dropped {
-			done[alertKey(a)] = true
-		}
-		retried := map[string]Alert{}
-		for _, a := range failed {
-			retried[alertKey(a)] = a
-		}
-		kept := []Alert{}
-		known := map[string]bool{}
-		for _, a := range state.Undelivered {
-			key := alertKey(a)
-			if done[key] {
-				continue
-			}
-			if r, ok := retried[key]; ok {
-				a = r
-			}
-			kept = append(kept, a.clone())
-			known[key] = true
-		}
-		for _, a := range failed {
-			if !known[alertKey(a)] {
-				kept = append(kept, a.clone())
-			}
-		}
-		trimmed := max(0, len(kept)-maxUndelivered)
-		state.Undelivered = kept[trimmed:]
-		if len(delivered) > 0 {
-			state.LastAlertAt = ptr(now)
-		}
-		return state, trimmed, nil
+		state, dropped := recordSent(normalizeState(&previous, name), delivered, failed, stale, now)
+		return state, dropped, nil
 	})
 	if err != nil {
 		c.report(err, "recording alert delivery for "+name)
 		return
 	}
-	if trimmed > 0 {
-		plural := "s"
-		if trimmed == 1 {
-			plural = ""
-		}
-		c.report(fmt.Errorf("%d undelivered alert%s for %s dropped: only the newest %d are kept for retry", trimmed, plural, name, maxUndelivered), "alert queue for "+name)
-	}
+	c.reportDropped(name, trimmed)
 }
 
 // deliver sends to every channel at once. True when at least one accepted

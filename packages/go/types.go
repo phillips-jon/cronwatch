@@ -327,6 +327,74 @@ type OpenCondition struct {
 	Since     int64
 }
 
+// SendingAlert is an alert in JobState.Sending.
+type SendingAlert struct {
+	// Until is when the sender's lease runs out, in epoch milliseconds.
+	Until int64
+	// Alert is the alert as composed, without triage (never stored here).
+	Alert Alert
+
+	// An entry another writer stored that is not {until: a number, alert:
+	// an alert} is kept as it was (raw), and released at the next check:
+	// one with no number for until counts as run out, and one with no
+	// alert is dropped.
+	raw     any
+	noUntil bool
+	noAlert bool
+}
+
+// lapsed is whether the entry's lease ran out by now.
+func (e SendingAlert) lapsed(now int64) bool { return e.noUntil || e.Until <= now }
+
+func (e SendingAlert) clone() SendingAlert {
+	c := e
+	c.Alert = e.Alert.clone()
+	c.raw = js.CloneValue(e.raw)
+	return c
+}
+
+func (e SendingAlert) jsValue() any {
+	if e.raw != nil || e.noUntil || e.noAlert {
+		return js.CloneValue(e.raw)
+	}
+	return js.NewObject("until", e.Until, "alert", e.Alert.JSValue())
+}
+
+// sendingFrom reads an entry of "sending" leniently, as releaseSending
+// treats one: a malformed entry never makes the state unreadable.
+func sendingFrom(v any) SendingAlert {
+	o, ok := v.(*js.Object)
+	if !ok {
+		return SendingAlert{raw: v, noUntil: true, noAlert: true}
+	}
+	var e SendingAlert
+	if f, ok := get(o, "until").(float64); ok {
+		// A whole millisecond compares with now as the number does.
+		switch {
+		case f >= math.MaxInt64:
+			e.Until = math.MaxInt64
+		case f <= math.MinInt64:
+			e.Until = math.MinInt64
+		default:
+			e.Until = int64(math.Ceil(f))
+		}
+		if f != math.Trunc(f) {
+			e.raw = o.Clone()
+		}
+	} else {
+		e.noUntil = true
+	}
+	if a, err := alertFrom(get(o, "alert")); err == nil {
+		e.Alert = a
+	} else {
+		e.noAlert = true
+	}
+	if e.noUntil || e.noAlert {
+		e.raw = o.Clone()
+	}
+	return e
+}
+
 // JobState is what the checks remember about a job between runs.
 type JobState struct {
 	Job string
@@ -342,15 +410,22 @@ type JobState struct {
 	PendingRecovery []Condition
 	// Alerts no channel accepted, each retried once per check. Nil is absent.
 	Undelivered []Alert
+	// The outbox: alerts written with the state that opened their
+	// condition, while the process that wrote them sends them. Each leaves
+	// once that process records how the send went; one still here after its
+	// Until (the process stopped part way) goes to Undelivered at the next
+	// check. Nil is absent, as it is when empty and in state written before
+	// the field existed.
+	Sending []SendingAlert
 	// Goes up by one on every write (see Store.CompareAndSetState). Nil is
 	// a state written before versions, which counts as 0, as does a
 	// version outside 0 to 2^53 - 1. One that is not a whole number (a
 	// foreign row's 1.5 or "x") reads as nil.
 	Version *int64
 
-	// Keys after the known ones, in stored order: "version" and any a newer
-	// writer added (their values in extra), so a state is written back as
-	// the SDK's spread would write it.
+	// Keys after the known ones, in stored order: "version", "sending" and
+	// any a newer writer added (their values in extra), so a state is
+	// written back as the SDK's spread would write it.
 	tail  []string
 	extra map[string]any
 }
@@ -394,6 +469,12 @@ func (s JobState) clone() JobState {
 			c.Undelivered[i] = a.clone()
 		}
 	}
+	if s.Sending != nil {
+		c.Sending = make([]SendingAlert, len(s.Sending))
+		for i, e := range s.Sending {
+			c.Sending[i] = e.clone()
+		}
+	}
 	c.Version = copyInt(s.Version)
 	c.tail = append([]string(nil), s.tail...)
 	if s.extra != nil {
@@ -427,18 +508,35 @@ func (s JobState) JSValue() any {
 		}
 		o.Set("undelivered", list)
 	}
-	wroteVersion := false
+	sending := func() any {
+		list := make([]any, len(s.Sending))
+		for i, e := range s.Sending {
+			list[i] = e.jsValue()
+		}
+		return list
+	}
+	wroteVersion, wroteSending := false, false
 	for _, k := range s.tail {
-		if k == "version" {
+		switch k {
+		case "version":
 			if s.Version != nil {
 				o.Set("version", *s.Version)
 				wroteVersion = true
 			}
 			continue
+		case "sending":
+			if s.Sending != nil {
+				o.Set("sending", sending())
+				wroteSending = true
+				continue
+			}
 		}
 		if v, ok := s.extra[k]; ok {
 			o.Set(k, v)
 		}
+	}
+	if s.Sending != nil && !wroteSending {
+		o.Set("sending", sending())
 	}
 	if s.Version != nil && !wroteVersion {
 		o.Set("version", *s.Version)
@@ -495,6 +593,17 @@ func stateFrom(v any) (JobState, error) {
 			continue
 		}
 		s.tail = append(s.tail, k)
+		if k == "sending" {
+			// Read leniently (sendingFrom); anything but a list is kept as
+			// it was, until normalizeState drops it.
+			if list, ok := get(o, "sending").([]any); ok {
+				s.Sending = make([]SendingAlert, len(list))
+				for i, e := range list {
+					s.Sending[i] = sendingFrom(e)
+				}
+				continue
+			}
+		}
 		if k == "version" {
 			// A whole number is kept as it is (version() counts one outside
 			// 0 to 2^53 - 1 as 0); anything else (a foreign row's 1.5 or
@@ -622,6 +731,10 @@ type Alert struct {
 	Triage      *string
 	TriageTried bool
 	At          int64
+
+	// rawAt is a stored at that is not a whole number (a foreign row's),
+	// written back and keyed as it was.
+	rawAt *float64
 }
 
 func (a Alert) clone() Alert {
@@ -660,11 +773,19 @@ func (a Alert) JSValue() any {
 		details = a.Details.jsValue()
 	}
 	o := js.NewObject("type", string(a.Type), "run", run, "details", details, "job", a.Job,
-		"definition", a.Definition.JSValue(), "title", a.Title, "message", a.Message, "at", a.At)
+		"definition", a.Definition.JSValue(), "title", a.Title, "message", a.Message, "at", a.at())
 	if a.TriageTried || a.Triage != nil {
 		o.Set("triage", strOrNull(a.Triage))
 	}
 	return o
+}
+
+// at is the alert's time as stored: At, or a foreign row's fraction.
+func (a Alert) at() any {
+	if a.rawAt != nil && int64(*a.rawAt) == a.At {
+		return *a.rawAt
+	}
+	return a.At
 }
 
 // MarshalJSON writes the SDK's JSON.
@@ -679,6 +800,9 @@ func alertFrom(v any) (Alert, error) {
 		return Alert{}, fmt.Errorf("an alert must be an object, not %s", kind(v))
 	}
 	a := Alert{Type: AlertType(str(o, "type")), Job: str(o, "job"), Title: str(o, "title"), Message: str(o, "message"), At: integer(o, "at")}
+	if f, ok := get(o, "at").(float64); ok && f != math.Trunc(f) {
+		a.rawAt = &f
+	}
 	if r := get(o, "run"); r != nil {
 		// A queued alert's run keeps the metrics that are numbers, as a
 		// stored run row does, so one another writer stored otherwise
