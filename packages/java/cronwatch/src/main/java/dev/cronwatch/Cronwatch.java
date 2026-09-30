@@ -440,7 +440,7 @@ public final class Cronwatch implements AutoCloseable {
         Run.running(id == null ? UUID.randomUUID().toString() : id, name, core.now(), trigger);
     boolean recorded;
     try {
-      core.sync(def);
+      core.sync(def, true);
       Core.call(
           () -> {
             core.store.insertRun(run);
@@ -533,9 +533,12 @@ public final class Cronwatch implements AutoCloseable {
    * marked timeout by a check) is finished when this one is not running, and anything else is left
    * alone, so recording the same run twice changes nothing. When two processes record the same
    * finish, only the one whose write lands evaluates it. A finished run is judged as if it had been
-   * wrapped here, and its output and error are redacted the same way. Returns the alerts it sent.
+   * wrapped here, and its output and error are redacted the same way. A metric that is not a finite
+   * number throws before anything is written, as {@link JobContext#metric} does. Returns the alerts
+   * it sent.
    *
-   * @throws CronwatchException when the job is not declared, or the store fails
+   * @throws CronwatchException when the job is not declared, for a metric that is not a finite
+   *     number, or when the store fails
    */
   public List<Alert> recordRun(Run run) {
     return recordRun(run, true);
@@ -657,8 +660,9 @@ public final class Cronwatch implements AutoCloseable {
   }
 
   /**
-   * Removes a job, its runs and its state from the store. A job still declared in code comes back
-   * on its next run.
+   * Removes a job, its runs and its state from the store. A job still declared in code comes back:
+   * here on its next run, and in any other process that declares it on its next run there, or at
+   * that process's next check or dashboard read.
    *
    * @throws CronwatchException when the store fails
    */

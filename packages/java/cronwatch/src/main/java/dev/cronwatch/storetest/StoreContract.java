@@ -278,10 +278,12 @@ public final class StoreContract {
             + "\"lastAlertAt\":6,\"pendingRecovery\":[\"missed\"],\"undelivered\":[{\"type\":\"failed\","
             + "\"run\":null,\"details\":{\"consecutiveFailures\":1,\"threshold\":1},\"job\":\"a\","
             + "\"definition\":{\"name\":\"a\"},\"title\":\"a failed\",\"message\":\"boom\",\"at\":7,"
-            + "\"triage\":null}]}";
+            + "\"triage\":null}],\"sending\":[{\"until\":8,\"alert\":{\"type\":\"failed\","
+            + "\"run\":null,\"details\":{\"consecutiveFailures\":1,\"threshold\":1},\"job\":\"a\","
+            + "\"definition\":{\"name\":\"a\"},\"title\":\"a failed\",\"message\":\"boom\",\"at\":7}}]}";
     must("setState", () -> store.setState(state(full)));
     sameJson(
-        "pendingRecovery and undelivered round-trip",
+        "pendingRecovery, undelivered and sending round-trip",
         json(get("getState", () -> store.getState("a"))),
         full);
     must("setState", () -> store.setState(state(plain)));

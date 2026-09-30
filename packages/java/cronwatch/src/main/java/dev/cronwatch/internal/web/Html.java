@@ -447,7 +447,11 @@ public final class Html {
       }
       StringBuilder metrics = new StringBuilder();
       for (Map.Entry<String, @Nullable Object> m : run.metrics().toValue().entries()) {
-        double value = m.getValue() instanceof Number x ? x.doubleValue() : Double.NaN;
+        // A store may hand back a metric that is no finite number (a foreign row); it is left out.
+        if (!(m.getValue() instanceof Number x) || !Double.isFinite(x.doubleValue())) {
+          continue;
+        }
+        double value = x.doubleValue();
         metrics
             .append("<span><span class=\"k\">")
             .append(escapeHtml(m.getKey()))

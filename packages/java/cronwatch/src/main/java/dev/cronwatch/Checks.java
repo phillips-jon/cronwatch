@@ -2,12 +2,13 @@ package dev.cronwatch;
 
 import dev.cronwatch.Core.JobDef;
 import dev.cronwatch.internal.evaluate.Evaluate;
-import dev.cronwatch.internal.evaluate.Evaluate.AlertDraft;
 import dev.cronwatch.internal.evaluate.Evaluate.CheckOutcome;
 import dev.cronwatch.internal.evaluate.Evaluate.Evaluation;
 import dev.cronwatch.internal.evaluate.MutableState;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
@@ -121,7 +122,7 @@ final class Checks {
     // not stop the others.
     List<JobSummary> jobs = new ArrayList<>();
     Delivery.Budget budget = new Delivery.Budget();
-    for (StoredJob job : Core.call(core.store::listJobs)) {
+    for (StoredJob job : storedJobs()) {
       try {
         jobs.add(checkJob(job, now, budget, alerts::addAll));
       } catch (RuntimeException e) {
@@ -144,19 +145,25 @@ final class Checks {
   }
 
   /** A running run marked timed out once it has gone on past its job's timeout, and judged. */
-  private void checkRunning(Run run, long now, Consumer<List<Alert>> alerts) {
-    JobDef declared = core.declared(run.job());
+  private void checkRunning(Run listed, long now, Consumer<List<Alert>> alerts) {
+    JobDef declared = core.declared(listed.job());
     Definition def;
     if (declared != null) {
       def = declared.stored();
     } else {
-      StoredJob stored = Core.call(() -> core.store.getJob(run.job()));
+      StoredJob stored = Core.call(() -> core.store.getJob(listed.job()));
       if (stored == null) {
         return;
       }
       def = stored.definition();
     }
-    if (!Evaluate.isStuck(def, run, now)) {
+    if (!Evaluate.isStuck(def, listed, now)) {
+      return;
+    }
+    // Read again just before the write: lines and metrics flushed since the list was read (while
+    // earlier stuck runs were sent, say) are kept.
+    Run run = Core.call(() -> core.store.getRun(listed.id()));
+    if (run == null || !run.status().equals(RunStatus.RUNNING) || !run.job().equals(listed.job())) {
       return;
     }
     Run marked =
@@ -179,17 +186,25 @@ final class Checks {
     List<Run> recent = Core.call(() -> core.store.listRuns(job.name(), Evaluate.BASELINE_WINDOW));
     Run last = recent.isEmpty() ? null : recent.get(0);
     Long[] nextExpectedAt = {null};
-    Core.Changed<List<AlertDraft>> out =
+    Core.Changed<Delivery.Held> out =
         core.updateState(
             job.name(),
             previous -> {
               CheckOutcome o = Evaluate.onCheck(job.definition(), job, last, previous, now);
               nextExpectedAt[0] = o.nextExpectedAt();
               Evaluation settled = Evaluate.applySilence(previous, o.evaluation(), now);
-              return new Core.Changed<>(settled.state(), settled.alerts());
+              // Alerts a process stopped sending part way go back to the retry queue.
+              Evaluate.Queued released = Evaluate.releaseSending(settled.state(), core.now());
+              Core.Changed<Delivery.Held> held =
+                  delivery.outbox(released.state(), settled.alerts(), job.definition(), now);
+              return new Core.Changed<>(
+                  held.state(),
+                  new Delivery.Held(
+                      held.result().alerts(), released.dropped() + held.result().dropped()));
             });
+    delivery.reportDropped(job.name(), out.result().dropped());
     alerts.accept(delivery.retryUndelivered(job.name(), out.state(), now, budget));
-    alerts.accept(delivery.dispatch(out.result(), job.definition(), now));
+    alerts.accept(delivery.dispatch(job.name(), out.result().alerts(), now));
     return Evaluate.summarize(job, recent, out.state(), nextExpectedAt[0], now);
   }
 
@@ -235,14 +250,42 @@ final class Checks {
     return Math.min(500, Math.max(min, limit));
   }
 
-  List<JobWithRuns> jobsWithRuns(int limit) {
-    core.ensureReady();
+  /**
+   * Every stored job, once each declaration has been written. A job declared here that the store no
+   * longer has was forgotten by another process after this one wrote it: it is written again, as
+   * its next run would, so it is checked and shown while any process still declares it.
+   */
+  private List<StoredJob> storedJobs() {
     for (JobDef def : core.declaredAll()) {
       core.sync(def);
     }
+    List<StoredJob> jobs = Core.call(core.store::listJobs);
+    Set<String> listed = new HashSet<>();
+    for (StoredJob job : jobs) {
+      listed.add(job.name());
+    }
+    boolean missing = false;
+    for (JobDef def : core.declaredAll()) {
+      if (listed.contains(def.name())) {
+        continue;
+      }
+      missing = true;
+      // Not one forgotten here meanwhile.
+      if (core.declared(def.name()) != def) {
+        continue;
+      }
+      core.unmark(def.name());
+      core.sync(def);
+    }
+    return missing ? Core.call(core.store::listJobs) : jobs;
+  }
+
+  List<JobWithRuns> jobsWithRuns(int limit) {
+    core.ensureReady();
+    List<StoredJob> jobs = storedJobs();
     long now = core.now();
     List<JobWithRuns> out = new ArrayList<>();
-    for (StoredJob job : Core.call(core.store::listJobs)) {
+    for (StoredJob job : jobs) {
       out.add(snapshot(job, now, clampLimit(limit, 0)));
     }
     return out;
@@ -252,7 +295,7 @@ final class Checks {
     core.ensureReady();
     JobDef def = core.declared(name);
     if (def != null) {
-      core.sync(def);
+      core.sync(def, true);
     }
     StoredJob stored = Core.call(() -> core.store.getJob(name));
     return stored == null ? null : snapshot(stored, core.now(), 0).job();
@@ -269,18 +312,12 @@ final class Checks {
   }
 
   /**
-   * Silences a job for {@code ms} milliseconds. The end is a whole millisecond, held at 2^53 ms
-   * past now, since state times are {@code long}s.
+   * Silences a job for {@code ms} milliseconds. The end is a whole millisecond, held at 2^53 - 1
+   * ({@link Evaluate#silenceEnd}).
    */
   JobState silence(String name, double ms) {
-    long now = core.now();
-    long until = saturatingAdd(now, (long) Math.min(ms, (double) Evaluate.MAX_DURATION_MS));
+    long until = Evaluate.silenceEnd(core.now(), ms);
     return patchState(name, s -> s.silencedUntil = until);
-  }
-
-  private static long saturatingAdd(long a, long b) {
-    long r = a + b;
-    return ((a ^ r) & (b ^ r)) < 0 ? (a < 0 ? Long.MIN_VALUE : Long.MAX_VALUE) : r;
   }
 
   JobState unsilence(String name) {
@@ -301,8 +338,8 @@ final class Checks {
   }
 
   /**
-   * Removes a job and its runs from the store; a job still declared in code comes back on its next
-   * run.
+   * Removes a job and its runs from the store; a job still declared in code comes back: on its next
+   * run, or at the next check or dashboard read of a process that declares it.
    */
   void forget(String name) {
     core.ensureReady();

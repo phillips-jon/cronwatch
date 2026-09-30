@@ -236,6 +236,16 @@ final class Support {
     /** Counted down when the {@code upsertJob} that waits on {@link #upsertGate} is entered. */
     final CountDownLatch upsertEntered = new CountDownLatch(1);
 
+    /**
+     * Waited on once the first {@code upsertJob} after it is set has written, and in no later one.
+     */
+    final AtomicReference<@Nullable CountDownLatch> upsertAfterGate = new AtomicReference<>();
+
+    /**
+     * Counted down when the {@code upsertJob} that waits on {@link #upsertAfterGate} has written.
+     */
+    final CountDownLatch upsertWritten = new CountDownLatch(1);
+
     Wrapped(Store inner) {
       this.inner = inner;
     }
@@ -268,6 +278,11 @@ final class Support {
         held.await();
       }
       inner.upsertJob(definition, now);
+      CountDownLatch after = upsertAfterGate.getAndSet(null);
+      if (after != null) {
+        upsertWritten.countDown();
+        after.await();
+      }
     }
 
     @Override

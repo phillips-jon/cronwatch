@@ -11,6 +11,7 @@ import dev.cronwatch.JobState;
 import dev.cronwatch.JobSummary;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
+import dev.cronwatch.SendingAlert;
 import dev.cronwatch.StoredJob;
 import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.duration.Schedules;
@@ -19,8 +20,11 @@ import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -93,6 +97,23 @@ public final class Evaluate {
   }
 
   /**
+   * When a silence of {@code ms} from {@code now} ends: a whole millisecond, never past {@link
+   * #MAX_DURATION_MS} (2^53 - 1), however long the silence asked for. Every port sharing the store
+   * reads it back unchanged, where a larger number could wrap to a time long past and send alerts
+   * during the silence.
+   */
+  public static long silenceEnd(long now, double ms) {
+    long whole = (long) Math.floor(Math.min(ms, (double) MAX_DURATION_MS));
+    long end;
+    try {
+      end = Math.addExact(now, whole);
+    } catch (ArithmeticException e) {
+      end = whole > 0 ? Long.MAX_VALUE : Long.MIN_VALUE;
+    }
+    return Math.min(end, MAX_DURATION_MS);
+  }
+
+  /**
    * The version a stored state's {@code version} value counts as for {@code compareAndSetState}: a
    * JSON number that is a whole number from 0 to 2^53 - 1, else 0.
    */
@@ -155,6 +176,151 @@ public final class Evaluate {
 
   private static MutableState cloneState(JobState s) {
     return MutableState.of(normalizeState(s, s.job()));
+  }
+
+  // ---- delivery
+
+  /** Alerts kept per job for retry, and per job being sent; past it the oldest go. */
+  public static final int MAX_UNDELIVERED = 20;
+
+  /**
+   * How long an alert in {@code sending} is left to the process sending it. Longer than any send
+   * takes: at most three alerts go out together, each with 25 seconds of triage and 15 of channels.
+   */
+  public static final long SEND_LEASE_MS = 5 * 60_000;
+
+  /** A state as a delivery step leaves it, and how many alerts it let go past the cap. */
+  public record Queued(JobState state, int dropped) {}
+
+  /** Identifies an alert across retries, and in {@code sending}. */
+  public static String alertKey(Alert alert) {
+    Run run = alert.run();
+    return alert.type().value() + "|" + alert.at() + "|" + (run == null ? "" : run.id());
+  }
+
+  /** The newest {@code max} of {@code list}. */
+  private static <T> List<T> newest(List<T> list, int max) {
+    return new ArrayList<>(list.subList(Math.max(0, list.size() - max), list.size()));
+  }
+
+  /**
+   * {@code alerts} added to the undelivered queue: one with the same key as a queued alert replaces
+   * it where it stands, the rest go at the end, and only the newest {@link #MAX_UNDELIVERED} stay.
+   * {@code dropped} counts those let go.
+   */
+  public static Queued queueUndelivered(JobState state, List<Alert> alerts) {
+    MutableState next = cloneState(state);
+    Map<String, Alert> byKey = new HashMap<>();
+    for (Alert a : alerts) {
+      byKey.put(alertKey(a), a);
+    }
+    List<Alert> queue = new ArrayList<>();
+    Set<String> known = new HashSet<>();
+    for (Alert a : next.queued()) {
+      String key = alertKey(a);
+      queue.add(byKey.getOrDefault(key, a));
+      known.add(key);
+    }
+    for (Alert a : alerts) {
+      if (!known.contains(alertKey(a))) {
+        queue.add(a);
+      }
+    }
+    next.undelivered = newest(queue, MAX_UNDELIVERED);
+    return new Queued(next.toState(), Math.max(0, queue.size() - MAX_UNDELIVERED));
+  }
+
+  /**
+   * The outbox. Alerts just composed are written with the state that opens their condition, before
+   * any is sent, so a process that stops part way does not lose them: into {@code sending}, each
+   * with its lease ending at {@code until}, when this process sends them, or ({@code deferred},
+   * {@code Deliver.AT_CHECK}) straight into the undelivered queue for a check elsewhere. {@code
+   * dropped} counts alerts let go past {@link #MAX_UNDELIVERED}.
+   */
+  public static Queued holdAlerts(
+      JobState state, List<Alert> alerts, long until, boolean deferred) {
+    if (alerts.isEmpty()) {
+      return new Queued(state, 0);
+    }
+    if (deferred) {
+      return queueUndelivered(state, alerts);
+    }
+    MutableState next = cloneState(state);
+    List<SendingAlert> sending = next.sending == null ? new ArrayList<>() : next.sending;
+    for (Alert a : alerts) {
+      sending.add(new SendingAlert(until, a));
+    }
+    next.sending = newest(sending, MAX_UNDELIVERED);
+    return new Queued(next.toState(), Math.max(0, sending.size() - MAX_UNDELIVERED));
+  }
+
+  /**
+   * Alerts in {@code sending} whose lease ran out by {@code now}: the process sending them stopped
+   * before it recorded how the send went. They go to the undelivered queue, where the retry sends
+   * them (with triage, which is never stored with them here) or drops them as stale. An entry
+   * without an alert is let go; one without a {@code until} counts as run out.
+   */
+  public static Queued releaseSending(JobState state, long now) {
+    List<SendingAlert> sending = state.sending() == null ? List.of() : state.sending();
+    List<SendingAlert> held = new ArrayList<>();
+    List<Alert> lapsed = new ArrayList<>();
+    boolean any = false;
+    for (SendingAlert s : sending) {
+      Long until = s.until();
+      if (until != null && until > now) {
+        held.add(s);
+        continue;
+      }
+      any = true;
+      Alert a = s.alert();
+      if (a != null) {
+        lapsed.add(a);
+      }
+    }
+    if (!any) {
+      return new Queued(state, 0);
+    }
+    MutableState next = MutableState.of(state);
+    next.sending = held;
+    return queueUndelivered(next.toState(), lapsed);
+  }
+
+  /**
+   * How a send went. Delivered and stale alerts leave the queue; failed ones replace their queued
+   * copy, so a triage made on this attempt is kept, or join the queue. Every one of them leaves
+   * {@code sending}. {@code lastAlertAt} moves only on a delivery. {@code dropped} counts alerts
+   * let go past {@link #MAX_UNDELIVERED}.
+   */
+  public static Queued recordSent(
+      JobState state, List<Alert> delivered, List<Alert> failed, List<Alert> stale, long now) {
+    MutableState next = cloneState(state);
+    Set<String> done = new HashSet<>();
+    for (Alert a : delivered) {
+      done.add(alertKey(a));
+    }
+    for (Alert a : stale) {
+      done.add(alertKey(a));
+    }
+    next.undelivered =
+        new ArrayList<>(next.queued().stream().filter(a -> !done.contains(alertKey(a))).toList());
+    Set<String> sent = new HashSet<>(done);
+    for (Alert a : failed) {
+      sent.add(alertKey(a));
+    }
+    List<SendingAlert> held = new ArrayList<>();
+    if (next.sending != null) {
+      for (SendingAlert s : next.sending) {
+        Alert a = s.alert();
+        if (a == null || !sent.contains(alertKey(a))) {
+          held.add(s);
+        }
+      }
+    }
+    next.sending = held;
+    if (!delivered.isEmpty()) {
+      next.lastAlertAt = now;
+    }
+    return queueUndelivered(next.toState(), failed);
   }
 
   private static boolean openCondition(MutableState s, Condition c, long now) {

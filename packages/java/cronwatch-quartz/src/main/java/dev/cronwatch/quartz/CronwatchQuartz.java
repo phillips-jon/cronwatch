@@ -146,6 +146,15 @@ public final class CronwatchQuartz implements AutoCloseable {
   private boolean dirty;
   private boolean closed;
 
+  /**
+   * Firings opening or open now, whose end the listeners must still hear: Quartz tells only the
+   * listeners it holds when a job ends that it was executed, so they stay until these end.
+   */
+  private int firings;
+
+  /** Whether the listeners are still on the scheduler. */
+  private boolean listening = true;
+
   /** A cron trigger's reading as it was checked, the schedule to declare or the problem. */
   private record Checked(@Nullable String schedule, @Nullable String problem) {}
 
@@ -303,9 +312,9 @@ public final class CronwatchQuartz implements AutoCloseable {
   }
 
   /**
-   * Stops watching: the listeners are taken off the scheduler, so no firing is recorded from now
-   * on, and its jobs are no longer read. A run open now is still closed when its job ends. Leaves
-   * the client and the scheduler running.
+   * Stops watching: no firing is recorded from now on, its jobs are no longer read, and the
+   * listeners are taken off the scheduler, once the firings open now have ended, so their runs are
+   * still closed when their jobs end. Leaves the client and the scheduler running.
    */
   @Override
   public void close() {
@@ -317,22 +326,56 @@ public final class CronwatchQuartz implements AutoCloseable {
       lock.unlock();
     }
     try {
-      scheduler.getListenerManager().removeJobListener(LISTENER);
-      scheduler.getListenerManager().removeSchedulerListener(changes);
       if (scheduler.getContext().get(CONTEXT_KEY) == this) {
         scheduler.getContext().remove(CONTEXT_KEY);
       }
     } catch (SchedulerException e) {
       cw.reportError(e, "quartz");
     }
+    letGo();
   }
 
-  private boolean isClosed() {
+  /** A firing about to open a run, unless the watch is closed: false then. */
+  private boolean beginFiring() {
     lock.lock();
     try {
-      return closed;
+      if (closed) {
+        return false;
+      }
+      firings++;
+      return true;
     } finally {
       lock.unlock();
+    }
+  }
+
+  /** A firing ended (or opened nothing); the listeners go once the watch is closed and none is. */
+  private void endFiring() {
+    lock.lock();
+    try {
+      firings--;
+    } finally {
+      lock.unlock();
+    }
+    letGo();
+  }
+
+  /** Takes the listeners off the scheduler once the watch is closed and no firing is open. */
+  private void letGo() {
+    lock.lock();
+    try {
+      if (!closed || firings > 0 || !listening) {
+        return;
+      }
+      listening = false;
+    } finally {
+      lock.unlock();
+    }
+    try {
+      scheduler.getListenerManager().removeJobListener(LISTENER);
+      scheduler.getListenerManager().removeSchedulerListener(changes);
+    } catch (SchedulerException e) {
+      cw.reportError(e, "quartz");
     }
   }
 
@@ -651,11 +694,13 @@ public final class CronwatchQuartz implements AutoCloseable {
 
     @Override
     public void jobToBeExecuted(JobExecutionContext ctx) {
+      // Counted before it opens, so a close meanwhile keeps the listener that will hear its end.
+      if (!beginFiring()) {
+        return;
+      }
+      boolean opened = false;
       // A throw here would stop Quartz running the job, so nothing leaves.
       try {
-        if (isClosed()) {
-          return;
-        }
         JobKey key = ctx.getJobDetail().getKey();
         if (key.equals(CHECK_JOB)) {
           return;
@@ -677,8 +722,13 @@ public final class CronwatchQuartz implements AutoCloseable {
         }
         ObservedRun run = job.open(RunOptions.trigger(TRIGGER).withId(runId(ctx)));
         ctx.put(RUN_KEY, run);
+        opened = true;
       } catch (RuntimeException e) {
         cw.reportError(e, "quartz");
+      } finally {
+        if (!opened) {
+          endFiring();
+        }
       }
     }
 
@@ -694,7 +744,11 @@ public final class CronwatchQuartz implements AutoCloseable {
           return;
         }
         ctx.put(RUN_KEY, null);
-        run.close(failureOf(e));
+        try {
+          run.close(failureOf(e));
+        } finally {
+          endFiring();
+        }
       } catch (RuntimeException ex) {
         cw.reportError(ex, "quartz");
       }
@@ -746,7 +800,11 @@ public final class CronwatchQuartz implements AutoCloseable {
             && p.getJobExecutionContext() != null
             && p.getJobExecutionContext().get(RUN_KEY) instanceof ObservedRun run) {
           p.getJobExecutionContext().put(RUN_KEY, null);
-          run.takeBack();
+          try {
+            run.takeBack();
+          } finally {
+            endFiring();
+          }
         }
       } catch (RuntimeException e) {
         cw.reportError(e, "quartz");

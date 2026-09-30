@@ -6,7 +6,6 @@ import dev.cronwatch.internal.core.Mdc;
 import dev.cronwatch.internal.core.Recorder;
 import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.evaluate.Evaluate;
-import dev.cronwatch.internal.evaluate.Evaluate.AlertDraft;
 import dev.cronwatch.internal.evaluate.Evaluate.Evaluation;
 import dev.cronwatch.internal.evaluate.Expect;
 import dev.cronwatch.internal.output.Output;
@@ -225,7 +224,9 @@ final class Runs {
     Recorder recorder = new Recorder();
     Future<Boolean> begun = core.submit(() -> beginRun(def, run));
     OpenRun open = new OpenRun(def, run, recorder, begun);
-    core.open.put(run.id(), open);
+    // An id given again while its first run is open (a message delivered twice) leaves the first on
+    // the list: this one's row is refused, and the hook has nothing of its own to record.
+    boolean listed = core.open.putIfAbsent(run.id(), open) == null;
     boolean recorded;
     try {
       recorded = Core.awaitUninterruptibly(begun);
@@ -271,7 +272,7 @@ final class Runs {
       // The client was closed: the run is still recorded, with no timeout of its own.
       o.timer = null;
     }
-    o.open = open;
+    o.open = listed ? open : null;
     o.previous = CurrentRun.set(context);
     o.saved = Mdc.put(def.name(), run.id());
     return o;
@@ -363,7 +364,15 @@ final class Runs {
       core.report(e, "recording " + def.name());
       return run;
     } finally {
-      core.open.remove(run.id());
+      unlist(o);
+    }
+  }
+
+  /** Takes a run off the shutdown hook's list, only when it is the one listed under its id. */
+  private void unlist(Opened o) {
+    OpenRun open = o.open;
+    if (open != null) {
+      core.open.remove(o.run.id(), open);
     }
   }
 
@@ -392,7 +401,7 @@ final class Runs {
       back = Core.awaitUninterruptibly(core.submit(() -> discardRun(o.run)));
     }
     if (back) {
-      core.open.remove(o.run.id());
+      unlist(o);
     }
     return back;
   }
@@ -433,13 +442,16 @@ final class Runs {
     return true;
   }
 
-  /** A throwable as a failed run's error: {@code Name: message} and five frames, capped. */
+  /**
+   * A throwable as a failed run's error: {@code Name: message} and five frames, not yet capped: it
+   * is redacted first, then capped ({@link Output#redactAndCap}).
+   */
   static String errorText(Throwable t) {
     try {
-      return Output.errorMessage(t);
+      return Output.describeError(t);
     } catch (RuntimeException e) {
       // A throwable whose getMessage throws must not leave its run running.
-      return Output.errorMessage(t.getClass().getSimpleName(), "", List.of());
+      return Output.describeError(t.getClass().getSimpleName(), "", List.of());
     }
   }
 
@@ -448,7 +460,7 @@ final class Runs {
    */
   private boolean beginRun(JobDef def, Run run) {
     try {
-      core.sync(def);
+      core.sync(def, true);
       Core.call(
           () -> {
             core.store.insertRun(run);
@@ -488,7 +500,7 @@ final class Runs {
     long finishedAt = core.now();
     String output = recorder.output();
     if (output == null && failure == null && resultText != null) {
-      output = Output.cap(resultText);
+      output = resultText;
     }
     String expectText = recorder.expectText();
     if (expectText == null && failure == null) {
@@ -551,17 +563,17 @@ final class Runs {
               timedOut ? RunStatus.TIMEOUT : RunStatus.FAILED,
               run.finishedAt(),
               run.durationMs(),
-              Output.stripNul(Output.redactSecrets(errorText(t))),
-              output == null ? null : Output.stripNul(Output.redactSecrets(output)),
+              Output.redactAndCap(errorText(t), Output::redactSecrets),
+              Output.redactAndCapOrNull(output, Output::redactSecrets),
               run.metrics());
       return new Concluded(failed, t instanceof Error e ? e : null);
     }
   }
 
   /**
-   * Sets a finished run's status and error from how it ended, then redacts its output and error.
-   * {@code failure} is the error text of a function that failed; with {@code timedOut}, the run is
-   * marked as a check would mark a stuck one.
+   * Sets a finished run's status and error from how it ended, then redacts its output and error and
+   * caps them, in that order. {@code failure} is the error text of a function that failed; with
+   * {@code timedOut}, the run is marked as a check would mark a stuck one.
    */
   Run conclude(
       JobDef def,
@@ -582,15 +594,16 @@ final class Runs {
       status = unmet == null ? RunStatus.OK : RunStatus.FAILED;
       error = unmet;
     }
-    // Redacted after the expect check, so a rule can still match what was logged. NULs go last,
-    // so not even a custom redact can store one.
+    // Redacted after the expect check, so a rule can still match what was logged, and before the
+    // cap, so the cut cannot keep half a secret. NULs go last, so not even a custom redact can
+    // store one.
     String output = run.output();
     return run.finished(
         status,
         run.finishedAt(),
         run.durationMs(),
-        error == null ? null : Output.stripNul(core.redact(error)),
-        output == null ? null : Output.stripNul(core.redact(output)),
+        Output.redactAndCapOrNull(error, core::redact),
+        Output.redactAndCapOrNull(output, core::redact),
         run.metrics());
   }
 
@@ -666,24 +679,25 @@ final class Runs {
    * job's state, and sends what that produces. Never throws: problems go to the error handler.
    */
   List<Alert> finishRun(Definition def, Run run, long now) {
-    List<AlertDraft> drafts;
+    Delivery.Held held;
     try {
-      drafts =
-          core.<List<Run>, List<AlertDraft>>updateState(
+      held =
+          core.<List<Run>, Delivery.Held>updateState(
                   run.job(),
                   () -> history(run),
                   (previous, history) -> {
                     Evaluation settled =
                         Evaluate.applySilence(
                             previous, Evaluate.onRunFinish(def, run, previous, history, now), now);
-                    return new Core.Changed<>(settled.state(), settled.alerts());
+                    return delivery.outbox(settled.state(), settled.alerts(), def, now);
                   })
               .result();
     } catch (RuntimeException e) {
       core.report(e, "evaluating " + run.job());
       return List.of();
     }
-    return delivery.dispatch(drafts, def, now);
+    delivery.reportDropped(run.job(), held.dropped());
+    return delivery.dispatch(run.job(), held.alerts(), now);
   }
 
   /**
@@ -729,6 +743,19 @@ final class Runs {
               + dev.cronwatch.json.Json.quote(input.job())
               + ")");
     }
+    // Refused as job.metric() refuses them: a store keeps NaN and Infinity as null.
+    for (var m : input.metrics().toValue().entries()) {
+      if (!(m.getValue() instanceof Number n) || !Double.isFinite(n.doubleValue())) {
+        throw CronwatchException.invalid(
+            "recordRun: metric "
+                + dev.cronwatch.json.Json.quote(m.getKey())
+                + " must be a finite number (job "
+                + dev.cronwatch.json.Json.quote(input.job())
+                + ", run "
+                + dev.cronwatch.json.Json.quote(input.id())
+                + ")");
+      }
+    }
     core.sync(def);
     Run run = input;
     if (run.status().equals(RunStatus.OK)) {
@@ -740,8 +767,8 @@ final class Runs {
     String output = run.output();
     String error = run.error();
     run =
-        run.withOutput(output == null ? null : Output.stripNul(core.redact(Output.cap(output))))
-            .withError(error == null ? null : Output.stripNul(core.redact(Output.cap(error))));
+        run.withOutput(Output.redactAndCapOrNull(output, core::redact))
+            .withError(Output.redactAndCapOrNull(error, core::redact));
     Run toWrite = run;
     Run stored = Core.call(() -> core.store.getRun(toWrite.id()));
     if (stored != null) {
@@ -859,7 +886,7 @@ final class Runs {
             now,
             Evaluate.runDuration(run.startedAt(), now),
             Output.stripNul(core.redact(SHUTDOWN_ERROR)),
-            output == null ? null : Output.stripNul(core.redact(output)),
+            Output.redactAndCapOrNull(output, core::redact),
             o.recorder.metrics());
     try {
       if (core.writeRunIf(failed, List.of(RunStatus.RUNNING))) {

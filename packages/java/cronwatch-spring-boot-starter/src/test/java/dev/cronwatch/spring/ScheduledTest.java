@@ -338,6 +338,75 @@ class ScheduledTest {
     scheduling.handler().onStop(context);
   }
 
+  /** An interface two scheduled beans implement, as advised beans behind JDK proxies are seen. */
+  public interface SyncTask {
+    void sync();
+  }
+
+  /** One of the two. */
+  public static class OrdersSync implements SyncTask {
+    @Override
+    @Scheduled(cron = "0 0 * * * *", zone = "UTC")
+    public void sync() {}
+  }
+
+  /** The other. */
+  public static class InvoicesSync implements SyncTask {
+    @Override
+    @Scheduled(cron = "0 30 * * * *", zone = "UTC")
+    public void sync() {}
+  }
+
+  /**
+   * With {@code spring.aop.proxy-target-class=false}, Spring observes an advised bean's invocation
+   * with the JDK proxy's class, which every bean with its interfaces shares, and the interface's
+   * method: one bean alone behind it is found, and two are reported once and credited to neither,
+   * never both to whichever was found first.
+   */
+  @Test
+  void anInvocationThroughAJdkProxyIsCreditedOnlyWhenOneBeanFits() throws Exception {
+    Apps.Errors errors = new Apps.Errors();
+    Class<?> proxyClass =
+        java.lang.reflect.Proxy.newProxyInstance(
+                SyncTask.class.getClassLoader(),
+                new Class<?>[] {SyncTask.class},
+                (proxy, method, args) -> null)
+            .getClass();
+    java.lang.reflect.Method sync = SyncTask.class.getMethod("sync");
+    try (Cronwatch cw =
+        Cronwatch.builder()
+            .store(new MemoryStore())
+            .alerts(List.of())
+            .noShutdownHook()
+            .onError(errors)
+            .build()) {
+      ScheduledMethods one = new ScheduledMethods();
+      one.postProcessAfterInitialization(new OrdersSync(), "orders");
+      CronwatchScheduling alone =
+          new CronwatchScheduling(cw, one, new CronwatchProperties(), "billing", null, false);
+      alone.declare();
+      CronwatchScheduling.Target found = alone.target(proxyClass, sync);
+      assertNotNull(found);
+      assertEquals("OrdersSync.sync", found.name());
+
+      ScheduledMethods two = new ScheduledMethods();
+      two.postProcessAfterInitialization(new OrdersSync(), "orders");
+      two.postProcessAfterInitialization(new InvoicesSync(), "invoices");
+      CronwatchScheduling both =
+          new CronwatchScheduling(cw, two, new CronwatchProperties(), "billing", null, false);
+      both.declare();
+      assertNull(both.target(proxyClass, sync));
+      assertNull(both.target(proxyClass, sync));
+      List<String> reported = errors.seen.stream().filter(e -> e.contains("JDK proxy")).toList();
+      assertEquals(1, reported.size(), errors.joined());
+      assertTrue(reported.get(0).contains("spring.aop.proxy-target-class=true"), reported.get(0));
+      // The beans' own classes are still told apart.
+      CronwatchScheduling.Target orders = both.target(OrdersSync.class, sync);
+      assertNotNull(orders);
+      assertEquals("OrdersSync.sync", orders.name());
+    }
+  }
+
   @Test
   void theCronwatchJobAnnotationIsFoundOnTheMethod() throws Exception {
     List<ScheduledMethods.Found> found;

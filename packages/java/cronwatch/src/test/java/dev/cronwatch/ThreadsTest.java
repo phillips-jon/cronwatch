@@ -328,4 +328,69 @@ class ThreadsTest {
     store.broken.clear();
     assertEquals(1, m.cw().check().jobs().size());
   }
+
+  /** What the shutdown hook does as the JVM stops, run here without stopping it. */
+  private static void runTheShutdownHook(Cronwatch cw) throws ReflectiveOperationException {
+    java.lang.reflect.Field field = Cronwatch.class.getDeclaredField("runs");
+    field.setAccessible(true);
+    ((Runs) field.get(cw)).shutdown();
+  }
+
+  /**
+   * The .NET port's case: a run id given again while its first run is open (a message delivered
+   * twice) leaves the first on the shutdown hook's list, whichever function returns first.
+   */
+  @Test
+  void aRunIdGivenAgainWhileItsFirstRunIsOpenLeavesTheFirstForTheShutdownHook() throws Exception {
+    for (boolean secondEndsFirst : List.of(false, true)) {
+      Wrapped store = new Wrapped();
+      Made m = Support.make(b -> b.store(store));
+      Job job = m.cw().job("dup");
+      RunOptions same = RunOptions.trigger("queue").withId("same");
+      CountDownLatch entered = new CountDownLatch(1);
+      CountDownLatch enteredAgain = new CountDownLatch(1);
+      CountDownLatch gate = new CountDownLatch(1);
+      CountDownLatch secondGate = new CountDownLatch(1);
+      Thread first =
+          Support.background(
+              () ->
+                  job.run(
+                      same,
+                      j -> {
+                        entered.countDown();
+                        gate.await();
+                      }));
+      entered.await();
+      Thread second =
+          Support.background(
+              () ->
+                  job.run(
+                      same,
+                      j -> {
+                        enteredAgain.countDown();
+                        secondGate.await();
+                      }));
+      enteredAgain.await();
+      if (secondEndsFirst) {
+        // Its finish is written over the first's row; the first stays listed all the same.
+        secondGate.countDown();
+        second.join();
+        java.lang.reflect.Field field = Cronwatch.class.getDeclaredField("core");
+        field.setAccessible(true);
+        Runs.OpenRun listed = ((Core) field.get(m.cw())).open.get("same");
+        assertNotNull(listed, "the first run is still listed");
+        assertTrue(listed.begun.get(), "and it is the first, whose row was written");
+      } else {
+        runTheShutdownHook(m.cw());
+        Run run = store.inner.getRun("same");
+        assertNotNull(run);
+        assertEquals(RunStatus.FAILED, run.status());
+        assertEquals(Runs.SHUTDOWN_ERROR, run.error());
+      }
+      gate.countDown();
+      secondGate.countDown();
+      first.join();
+      second.join();
+    }
+  }
 }

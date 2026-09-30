@@ -29,7 +29,9 @@ import dev.cronwatch.Job;
 import dev.cronwatch.JobHealth;
 import dev.cronwatch.JobOptions;
 import dev.cronwatch.JobState;
+import dev.cronwatch.Metrics;
 import dev.cronwatch.Run;
+import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.store.MemoryStore;
@@ -386,6 +388,9 @@ class RoutesTest {
     final Set<String> broken = ConcurrentHashMap.newKeySet();
     final AtomicInteger listJobsCalls = new AtomicInteger();
 
+    /** Every run listed is handed back with these metrics, when set, as a foreign row may hold. */
+    volatile @Nullable Metrics oddMetrics;
+
     private void check(String method) {
       if (broken.contains(method)) {
         throw new IllegalStateException(method + " failed");
@@ -436,7 +441,16 @@ class RoutesTest {
 
     @Override
     public List<Run> listRuns(String job, int limit) throws Exception {
-      return inner.listRuns(job, limit);
+      Metrics odd = oddMetrics;
+      if (odd == null) {
+        return inner.listRuns(job, limit);
+      }
+      return inner.listRuns(job, limit).stream()
+          .map(
+              r ->
+                  r.finished(
+                      r.status(), r.finishedAt(), r.durationMs(), r.error(), r.output(), odd))
+          .toList();
     }
 
     @Override
@@ -457,6 +471,50 @@ class RoutesTest {
     @Override
     public long prune(long before) throws Exception {
       return inner.prune(before);
+    }
+  }
+
+  @Test
+  void aRunWhoseMetricsHoldSomethingOtherThanAFiniteNumberStillShowsItsJobsPage() {
+    Breakable store = new Breakable();
+    try (WebKit w = new WebKit(RoutesOptions.builder().token("tok").build(), b -> b.store(store))) {
+      w.cw.job("imported");
+      Run nan =
+          new Run(
+              "nan",
+              "imported",
+              RunStatus.OK,
+              T0,
+              T0,
+              0L,
+              null,
+              null,
+              Metrics.empty().with("rows", Double.NaN),
+              "source");
+      CronwatchException e = assertThrows(CronwatchException.class, () -> w.cw.recordRun(nan));
+      assertEquals(
+          "recordRun: metric \"rows\" must be a finite number (job \"imported\", run \"nan\")",
+          e.getMessage());
+      assertNull(w.cw.getRun("nan"), "nothing is written");
+      // As a foreign row, or a store of the app's own, may hand one back.
+      w.cw.recordRun(
+          new Run(
+              "odd", "imported", RunStatus.OK, T0, T0, 0L, null, null, Metrics.empty(), "source"));
+      store.oddMetrics =
+          Metrics.empty()
+              .with("rows", Double.NaN)
+              .with("cost", 1.25)
+              .with("n", 3)
+              .with("far", Double.POSITIVE_INFINITY);
+      Response res = w.get("/cronwatch/jobs/imported", headers(AUTH));
+      status("page", res, 200);
+      String page = res.text();
+      contains(
+          "page",
+          page,
+          "<span class=\"k\">cost</span> 1.2500</span><span><span class=\"k\">n</span> 3<");
+      assertFalse(page.contains("class=\"k\">rows<"), "rows is left out");
+      assertFalse(page.contains("class=\"k\">far<"), "far is left out");
     }
   }
 

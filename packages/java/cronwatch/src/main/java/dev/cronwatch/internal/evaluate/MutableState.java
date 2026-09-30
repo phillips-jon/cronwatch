@@ -3,6 +3,7 @@ package dev.cronwatch.internal.evaluate;
 import dev.cronwatch.Alert;
 import dev.cronwatch.Condition;
 import dev.cronwatch.JobState;
+import dev.cronwatch.SendingAlert;
 import dev.cronwatch.json.JsObject;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -23,6 +24,7 @@ public final class MutableState {
   public @Nullable List<Alert> undelivered;
   public @Nullable Long version;
   public final JsObject extra;
+  public @Nullable List<SendingAlert> sending;
 
   private MutableState(JobState s) {
     job = s.job();
@@ -34,6 +36,7 @@ public final class MutableState {
     undelivered = s.undelivered() == null ? null : new ArrayList<>(s.undelivered());
     version = s.version();
     extra = s.extra();
+    sending = s.sending() == null ? null : new ArrayList<>(s.sending());
   }
 
   /** A changeable copy of the state. */
@@ -72,6 +75,7 @@ public final class MutableState {
         pendingRecovery,
         undelivered,
         version,
-        extra);
+        extra,
+        sending);
   }
 }

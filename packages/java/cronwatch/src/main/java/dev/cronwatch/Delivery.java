@@ -3,65 +3,86 @@ package dev.cronwatch;
 import dev.cronwatch.internal.evaluate.Evaluate;
 import dev.cronwatch.internal.evaluate.Evaluate.AlertDraft;
 import dev.cronwatch.internal.evaluate.Format;
-import dev.cronwatch.internal.evaluate.MutableState;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Sending alerts: channels, triage, and the queue of alerts no channel accepted, retried once per
- * check (the SDK's {@code dispatch}, {@code retryUndelivered}, {@code recordDelivery}, {@code
- * deliver} and {@code addTriage}).
+ * Sending alerts: the outbox, channels, triage, and the queue of alerts no channel accepted,
+ * retried once per check (the SDK's {@code outbox}, {@code dispatch}, {@code retryUndelivered},
+ * {@code recordDelivery}, {@code deliver} and {@code addTriage}).
  */
 final class Delivery {
-  /** Undelivered alerts kept per job for retry; the oldest go first. */
-  static final int MAX_UNDELIVERED = 20;
-
   private final Core core;
 
   Delivery(Core core) {
     this.core = core;
   }
 
-  /** Identifies an alert across retries. */
-  private static String alertKey(Alert a) {
-    Run run = a.run();
-    return a.type().value() + "|" + a.at() + "|" + (run == null ? "" : run.id());
+  /** Alerts written with the state that opened their conditions, and how many the queue let go. */
+  record Held(List<Alert> alerts, int dropped) {}
+
+  /**
+   * An evaluation as it is written: its drafts composed into alerts and held in the same state
+   * ({@code holdAlerts}), so the write that opens a condition also keeps its alerts, and a process
+   * that stops before sending them does not lose them. Called inside {@code updateState}, so it
+   * only computes.
+   */
+  Core.Changed<Held> outbox(JobState state, List<AlertDraft> drafts, Definition def, long now) {
+    List<Alert> alerts = new ArrayList<>(drafts.size());
+    for (AlertDraft draft : drafts) {
+      alerts.add(Format.composeAlert(draft, def, now));
+    }
+    Evaluate.Queued held =
+        Evaluate.holdAlerts(state, alerts, core.now() + Evaluate.SEND_LEASE_MS, core.deferDelivery);
+    return new Core.Changed<>(held.state(), new Held(alerts, held.dropped()));
+  }
+
+  /** Reports alerts let go because a job's queue was full. */
+  void reportDropped(String name, int dropped) {
+    if (dropped <= 0) {
+      return;
+    }
+    core.report(
+        dropped
+            + " undelivered alert"
+            + (dropped == 1 ? "" : "s")
+            + " for "
+            + name
+            + " dropped: only the newest "
+            + Evaluate.MAX_UNDELIVERED
+            + " are kept for retry",
+        "alert queue for " + name);
   }
 
   /**
-   * Composes, triages and sends each draft. The state was saved before this, so a slow channel
-   * holds up nothing else; afterwards only the delivery fields are written back, onto a fresh read
-   * of the state.
+   * Triages and sends each alert the outbox holds (see {@link #outbox}). The state, with the alerts
+   * in it, was saved before this, so a slow channel holds up nothing else; afterwards only the
+   * delivery fields are written back, onto a fresh read of the state, and the alerts leave {@code
+   * sending}. Triage is made here, never stored with the held alert: the write that opens a
+   * condition cannot wait for it, and a retry triages an alert that has none. With {@code
+   * Deliver.AT_CHECK} the alerts were queued for a check elsewhere instead.
    */
-  List<Alert> dispatch(List<AlertDraft> drafts, Definition def, long now) {
-    List<Alert> composed = new ArrayList<>();
-    if (drafts.isEmpty()) {
-      return composed;
+  List<Alert> dispatch(String name, List<Alert> alerts, long now) {
+    if (alerts.isEmpty() || core.deferDelivery) {
+      return alerts;
     }
+    List<Alert> sent = new ArrayList<>();
     List<Alert> delivered = new ArrayList<>();
     List<Alert> failed = new ArrayList<>();
-    for (AlertDraft draft : drafts) {
-      Alert alert = Format.composeAlert(draft, def, now);
-      if (core.deferDelivery) {
-        failed.add(alert);
-      } else {
-        if (core.triage != null && !alert.type().equals(AlertType.RECOVERED)) {
-          alert = addTriage(alert, core.timings.triageMs);
-        }
-        (deliver(alert) ? delivered : failed).add(alert);
+    for (Alert held : alerts) {
+      Alert alert = held;
+      if (core.triage != null && !alert.type().equals(AlertType.RECOVERED)) {
+        alert = addTriage(alert, core.timings.triageMs);
       }
-      composed.add(alert);
+      (deliver(alert) ? delivered : failed).add(alert);
+      sent.add(alert);
     }
-    recordDelivery(def.name(), delivered, failed, List.of(), now);
-    return composed;
+    recordDelivery(name, delivered, failed, List.of(), now);
+    return sent;
   }
 
   /** The retry budget one check shares across its jobs, in wall-clock milliseconds. */
@@ -93,8 +114,8 @@ final class Delivery {
       }
       long started = System.nanoTime();
       Alert alert = a;
-      // An alert queued by a process that delivers at check time was never triaged. One that was
-      // tried is not tried again.
+      // An alert queued by a process that delivers at check time, or released from a process that
+      // stopped while sending it, was never triaged. One that was tried is not tried again.
       if (core.triage != null
           && !alert.type().equals(AlertType.RECOVERED)
           && !alert.triageTried()) {
@@ -108,9 +129,10 @@ final class Delivery {
   }
 
   /**
-   * Marks delivered alerts done, drops stale ones, and keeps failed ones for the next check. A
-   * failed alert replaces its stored copy, so a triage made on this attempt is kept. {@code
-   * lastAlertAt} moves only on a delivery.
+   * Marks delivered alerts done, drops stale ones, and keeps failed ones for the next check, taking
+   * them all out of {@code sending} ({@code recordSent}). A failed alert replaces its stored copy,
+   * so a triage made on this attempt is kept. {@code lastAlertAt} moves only on a delivery. When
+   * this write fails, alerts still in {@code sending} are retried once their lease runs out.
    */
   private void recordDelivery(
       String name, List<Alert> delivered, List<Alert> failed, List<Alert> dropped, long now) {
@@ -119,53 +141,12 @@ final class Delivery {
           core.updateState(
               name,
               previous -> {
-                MutableState state = MutableState.of(Evaluate.normalizeState(previous, name));
-                Set<String> done = new HashSet<>();
-                for (Alert a : delivered) {
-                  done.add(alertKey(a));
-                }
-                for (Alert a : dropped) {
-                  done.add(alertKey(a));
-                }
-                Map<String, Alert> retried = new HashMap<>();
-                for (Alert a : failed) {
-                  retried.put(alertKey(a), a);
-                }
-                List<Alert> kept = new ArrayList<>();
-                Set<String> known = new HashSet<>();
-                for (Alert a : state.queued()) {
-                  String key = alertKey(a);
-                  if (done.contains(key)) {
-                    continue;
-                  }
-                  kept.add(retried.getOrDefault(key, a));
-                  known.add(key);
-                }
-                for (Alert a : failed) {
-                  if (!known.contains(alertKey(a))) {
-                    kept.add(a);
-                  }
-                }
-                int trimmed = Math.max(0, kept.size() - MAX_UNDELIVERED);
-                state.undelivered = new ArrayList<>(kept.subList(trimmed, kept.size()));
-                if (!delivered.isEmpty()) {
-                  state.lastAlertAt = now;
-                }
-                return new Core.Changed<>(state.toState(), trimmed);
+                Evaluate.Queued sent =
+                    Evaluate.recordSent(
+                        Evaluate.normalizeState(previous, name), delivered, failed, dropped, now);
+                return new Core.Changed<>(sent.state(), sent.dropped());
               });
-      int trimmed = out.result();
-      if (trimmed > 0) {
-        core.report(
-            trimmed
-                + " undelivered alert"
-                + (trimmed == 1 ? "" : "s")
-                + " for "
-                + name
-                + " dropped: only the newest "
-                + MAX_UNDELIVERED
-                + " are kept for retry",
-            "alert queue for " + name);
-      }
+      reportDropped(name, out.result());
     } catch (RuntimeException e) {
       core.report(e, "recording alert delivery for " + name);
     }

@@ -420,6 +420,15 @@ class ChannelsConformanceTest {
           c.get("body"));
       count++;
     }
+    for (JsObject c : Fixtures.objects(cuts, "discordDescriptions")) {
+      @Nullable String triage = c.get("triage") == null ? null : Fixtures.expand(c.get("triage"));
+      Alert a = withText(first, first.title(), Fixtures.expand(c.get("message")), triage);
+      failures.same(
+          "discord description of " + Json.stringify(c.get("message")),
+          Fixtures.digest(Discord.embedDescription(a)),
+          c.get("description"));
+      count++;
+    }
 
     failures.check("channels");
     // Every case of the fixture, so a case added there is not skipped here.
@@ -428,7 +437,8 @@ class ChannelsConformanceTest {
       total += Fixtures.objects(f, key).size();
     }
     total += Fixtures.objects(partial, "cases").size();
-    for (String key : List.of("errorBodies", "subjects", "smsSegments", "smsBodies")) {
+    for (String key :
+        List.of("errorBodies", "subjects", "smsSegments", "smsBodies", "discordDescriptions")) {
       total += Fixtures.objects(cuts, key).size();
     }
     assertEquals(total, count);

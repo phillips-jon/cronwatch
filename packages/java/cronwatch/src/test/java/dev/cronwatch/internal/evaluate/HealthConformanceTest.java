@@ -7,6 +7,7 @@ import dev.cronwatch.Fixtures;
 import dev.cronwatch.JobState;
 import dev.cronwatch.Run;
 import dev.cronwatch.StoredJob;
+import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.evaluate.Evaluate.AlertDraft;
 import dev.cronwatch.internal.evaluate.Evaluate.Evaluation;
 import dev.cronwatch.json.JsObject;
@@ -245,7 +246,129 @@ class HealthConformanceTest {
           new JsObject().set("state", out.state().toValue()).set("alerts", alerts),
           c.get("failed"));
     }
-    assertTrue(cases == 164, "health.json cases: " + cases);
+    i = 0;
+    for (JsObject c : Fixtures.objects(f, "silenceEnd")) {
+      cases++;
+      Object d = c.get("duration");
+      double ms =
+          d instanceof String s
+              ? Durations.parse(s, "silence duration")
+              : Durations.parse(((Number) d).doubleValue(), "silence duration");
+      fails.same(
+          "silenceEnd " + i++ + " " + Json.stringify(d),
+          Evaluate.silenceEnd(Fixtures.integer(c, "now"), ms),
+          c.get("silencedUntil"));
+    }
+    assertTrue(cases == 179, "health.json cases: " + cases);
+    fails.check("health");
+  }
+
+  /** A value with every object's keys sorted, for results whose alerts Java writes in its order. */
+  private static @Nullable Object canon(@Nullable Object v) {
+    if (v instanceof JsObject o) {
+      JsObject out = new JsObject();
+      o.entries().stream()
+          .sorted(java.util.Map.Entry.comparingByKey())
+          .forEach(e -> out.set(e.getKey(), canon(e.getValue())));
+      return out;
+    }
+    if (v instanceof List<?> list) {
+      List<Object> out = new ArrayList<>();
+      for (Object x : list) {
+        out.add(canon(x));
+      }
+      return out;
+    }
+    return v;
+  }
+
+  private static List<Alert> alerts(@Nullable Object v) {
+    List<Alert> out = new ArrayList<>();
+    for (Object a : (List<?>) v) {
+      out.add(Alert.fromValue(a));
+    }
+    return out;
+  }
+
+  private static JsObject queued(Evaluate.Queued q) {
+    return new JsObject().set("state", q.state().toValue()).set("dropped", q.dropped());
+  }
+
+  /** {@code health.json}'s {@code delivery}: the outbox's pure functions. */
+  @Test
+  void theOutboxAnswersAsTheSdkAnswers() {
+    JsObject d = Fixtures.object(Fixtures.load("health"), "delivery");
+    Fixtures.Failures fails = new Fixtures.Failures();
+    fails.same("maxUndelivered", Evaluate.MAX_UNDELIVERED, d.get("maxUndelivered"));
+    fails.same("sendLeaseMs", Evaluate.SEND_LEASE_MS, d.get("sendLeaseMs"));
+    int cases = 0;
+    int i = 0;
+    for (JsObject c : Fixtures.objects(d, "alertKey")) {
+      cases++;
+      // An alert's time is a whole millisecond here (DESIGN.md), so a fractional one is read as its
+      // whole part and its key follows.
+      JsObject raw = Fixtures.object(c, "alert");
+      double at = Fixtures.number(raw, "at");
+      String want = Fixtures.string(c, "key");
+      if (at != Math.floor(at)) {
+        want = want.replace(Json.stringify(raw.get("at")), Long.toString((long) at));
+      }
+      fails.same("alertKey " + i++, Evaluate.alertKey(Alert.fromValue(raw)), want);
+    }
+    i = 0;
+    for (JsObject c : Fixtures.objects(d, "normalizeState")) {
+      cases++;
+      fails.same(
+          "delivery normalizeState " + i++,
+          canon(Evaluate.normalizeState(state(c.get("state")), "j").toValue()),
+          canon(c.get("normalized")));
+    }
+    i = 0;
+    for (JsObject c : Fixtures.objects(d, "queueUndelivered")) {
+      cases++;
+      fails.same(
+          "queueUndelivered " + i++,
+          canon(queued(Evaluate.queueUndelivered(state(c.get("state")), alerts(c.get("alerts"))))),
+          canon(c.get("result")));
+    }
+    i = 0;
+    for (JsObject c : Fixtures.objects(d, "holdAlerts")) {
+      cases++;
+      fails.same(
+          "holdAlerts " + i++,
+          canon(
+              queued(
+                  Evaluate.holdAlerts(
+                      state(c.get("state")),
+                      alerts(c.get("alerts")),
+                      Fixtures.integer(c, "until"),
+                      Boolean.TRUE.equals(c.get("deferred"))))),
+          canon(c.get("result")));
+    }
+    i = 0;
+    for (JsObject c : Fixtures.objects(d, "releaseSending")) {
+      cases++;
+      fails.same(
+          "releaseSending " + i++,
+          canon(queued(Evaluate.releaseSending(state(c.get("state")), Fixtures.integer(c, "now")))),
+          canon(c.get("result")));
+    }
+    i = 0;
+    for (JsObject c : Fixtures.objects(d, "recordSent")) {
+      cases++;
+      fails.same(
+          "recordSent " + i++,
+          canon(
+              queued(
+                  Evaluate.recordSent(
+                      state(c.get("state")),
+                      alerts(c.get("delivered")),
+                      alerts(c.get("failed")),
+                      alerts(c.get("stale")),
+                      Fixtures.integer(c, "now")))),
+          canon(c.get("result")));
+    }
+    assertTrue(cases == 35, "delivery cases: " + cases);
     fails.check("health");
   }
 }

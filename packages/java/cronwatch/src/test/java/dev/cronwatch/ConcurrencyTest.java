@@ -2,6 +2,7 @@ package dev.cronwatch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -208,6 +209,63 @@ class ConcurrencyTest {
     m.cw().forget("a");
     handle.run(j -> {});
     assertEquals("every 5m", schedule(store, "a"));
+  }
+
+  @Test
+  void aForgetThatLandsWhileAJobsFirstWriteIsUnderWayLeavesItToBeWrittenOnItsNextRun()
+      throws Exception {
+    MemoryStore inner = new MemoryStore();
+    Wrapped store = new Wrapped(inner);
+    CountDownLatch gate = new CountDownLatch(1);
+    store.upsertAfterGate.set(gate);
+    Support.Made m = Support.make(b -> b.store(store));
+    Job handle = m.cw().job("a", every5m());
+    Thread run = Support.background(() -> handle.run(j -> {}));
+    // The row is written and the write not yet done when the forget lands.
+    store.upsertWritten.await();
+    m.cw().forget("a");
+    gate.countDown();
+    run.join();
+    assertNull(inner.getJob("a"), "the forget stands");
+    handle.run(j -> {});
+    assertEquals("every 5m", schedule(inner, "a"));
+  }
+
+  @Test
+  void aJobForgottenByAnotherProcessComesBackInALongLivedOneThatStillDeclaresIt() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Support.Made declaring = Support.make(b -> b.store(store));
+    Support.Made forgetting = Support.make(b -> b.store(store));
+    Job job = declaring.cw().job("a", every5m());
+    job.run(j -> {});
+    assertEquals("every 5m", schedule(store, "a"));
+
+    forgetting.cw().forget("a");
+    job.run(j -> {});
+    assertEquals("every 5m", schedule(store, "a"), "its next run");
+
+    forgetting.cw().forget("a");
+    job.start().finish();
+    assertEquals("every 5m", schedule(store, "a"), "a run started");
+
+    forgetting.cw().forget("a");
+    declaring.cw().check();
+    assertEquals("every 5m", schedule(store, "a"), "a check");
+
+    forgetting.cw().forget("a");
+    assertEquals(List.of("a"), declaring.cw().jobs().stream().map(JobSummary::name).toList());
+    assertEquals("every 5m", schedule(store, "a"), "the board");
+
+    forgetting.cw().forget("a");
+    assertNotNull(declaring.cw().jobSummary("a"));
+    assertEquals("every 5m", schedule(store, "a"), "a job's summary");
+
+    // The forgetting process never declared it, so its own check does not bring it back.
+    forgetting.cw().forget("a");
+    forgetting.cw().check();
+    assertNull(store.getJob("a"));
+    declaring.cw().close();
+    forgetting.cw().close();
   }
 
   @Test

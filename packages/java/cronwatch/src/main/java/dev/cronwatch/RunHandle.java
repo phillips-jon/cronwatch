@@ -215,7 +215,7 @@ public final class RunHandle implements AutoCloseable {
       String output =
           lines == null
               ? stored.output()
-              : joinOutput(stored.output(), Output.stripNul(core.redact(lines)));
+              : joinOutput(stored.output(), Output.redactAndCap(lines, core::redact));
       Run next =
           stored.finished(
               stored.status(),
@@ -373,7 +373,7 @@ public final class RunHandle implements AutoCloseable {
       long finishedAt = core.now();
       String added = rec.output();
       if (added == null && resultText != null) {
-        added = Output.cap(resultText);
+        added = resultText;
       }
       Run run =
           from.finished(
@@ -381,7 +381,8 @@ public final class RunHandle implements AutoCloseable {
               finishedAt,
               Evaluate.runDuration(from.startedAt(), finishedAt),
               null,
-              joinOutput(from.output(), added),
+              // Capped by conclude, after it is redacted.
+              joinLines(from.output(), added),
               from.metrics().merged(rec.metrics()));
       String expected = rec.expectText();
       if (expected == null) {
