@@ -164,4 +164,11 @@ public class RoutesEnvTests
     {
         await Child("environmentFallback");
     }
+
+    [Fact]
+    public async Task The_environment_given_outranks_dotnets_variables_and_those_follow_aspnet_cores_order()
+    {
+        await Child("givenOverDotNet", ("ASPNETCORE_ENVIRONMENT", "Development"), ("DOTNET_ENVIRONMENT", "Development"));
+        await Child("dotNetOrder", ("ASPNETCORE_ENVIRONMENT", "Production"), ("DOTNET_ENVIRONMENT", "Development"));
+    }
 }

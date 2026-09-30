@@ -19,19 +19,39 @@ internal static class CurrentRun
 }
 
 /// <summary>
-/// The environment, read in one place: the first of <c>CRONWATCH_ENV</c>, <c>APP_ENV</c>,
-/// <c>DOTNET_ENVIRONMENT</c> and <c>ASPNETCORE_ENVIRONMENT</c> that is set, lowercased, with the
-/// ports' aliases (<c>prod</c> is production; <c>dev</c>, <c>local</c>, <c>test</c> and
-/// <c>testing</c> are development); else the fallback the app gave; else unset, which is not
-/// development.
+/// The environment, read in one place: <c>CRONWATCH_ENV</c> or <c>APP_ENV</c> when one is set;
+/// else the environment the app gave (<see cref="CronwatchOptions.Environment"/>, under
+/// <c>AddCronwatch</c> its <c>Cronwatch:Environment</c> or the host's own environment, which
+/// <c>--environment</c> sets); else .NET's <c>ASPNETCORE_ENVIRONMENT</c> or
+/// <c>DOTNET_ENVIRONMENT</c>, in ASP.NET Core's order; else unset, which is not development. Each
+/// is lowercased, with the ports' aliases (<c>prod</c> is production; <c>dev</c>, <c>local</c>,
+/// <c>test</c> and <c>testing</c> are development). A stale .NET variable never outranks the
+/// environment a host resolved or the app named.
 /// </summary>
 internal static class Env
 {
-    private static readonly string[] Variables = ["CRONWATCH_ENV", "APP_ENV", "DOTNET_ENVIRONMENT", "ASPNETCORE_ENVIRONMENT"];
+    private static readonly string[] Own = ["CRONWATCH_ENV", "APP_ENV"];
+
+    private static readonly string[] DotNet = ["ASPNETCORE_ENVIRONMENT", "DOTNET_ENVIRONMENT"];
 
     public static string Environment(string? fallback = null)
     {
-        foreach (string name in Variables)
+        string? own = First(Own);
+        if (own != null)
+        {
+            return own;
+        }
+        string given = fallback == null ? "" : Normalize(fallback);
+        if (given.Length > 0)
+        {
+            return given;
+        }
+        return First(DotNet) ?? "";
+    }
+
+    private static string? First(string[] variables)
+    {
+        foreach (string name in variables)
         {
             string? value = System.Environment.GetEnvironmentVariable(name);
             if (value == null)
@@ -44,7 +64,7 @@ internal static class Env
                 return v;
             }
         }
-        return fallback == null ? "" : Normalize(fallback);
+        return null;
     }
 
     private static string Normalize(string value)

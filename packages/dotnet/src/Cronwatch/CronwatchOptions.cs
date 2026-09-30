@@ -138,8 +138,10 @@ public sealed class CronwatchOptions
     public bool ProcessExitHook { get; init; } = true;
 
     /// <summary>
-    /// The environment when none of <c>CRONWATCH_ENV</c>, <c>APP_ENV</c>,
-    /// <c>DOTNET_ENVIRONMENT</c> and <c>ASPNETCORE_ENVIRONMENT</c> is set.
+    /// The environment when neither <c>CRONWATCH_ENV</c> nor <c>APP_ENV</c> is set; it outranks
+    /// .NET's <c>ASPNETCORE_ENVIRONMENT</c> and <c>DOTNET_ENVIRONMENT</c>, which are read, in that
+    /// order, only without it. Under <c>AddCronwatch</c> it is <c>Cronwatch:Environment</c>, else
+    /// the host's own environment.
     /// </summary>
     public string? Environment { get; init; }
 
