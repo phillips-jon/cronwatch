@@ -25,8 +25,11 @@ namespace Cronwatch.Hangfire;
 /// <remarks>
 /// A server filter (<see cref="CronwatchHangfireFilter"/>, added to
 /// <see cref="GlobalJobFilters.Filters"/>) opens a run as Hangfire is about to perform a job
-/// (trigger <c>hangfire</c>, id <c>hangfire:&lt;app&gt;:&lt;job id&gt;:&lt;retry count&gt;</c>) and
-/// closes it when Hangfire says the job was performed, so each retry is a run of its own.
+/// (trigger <c>hangfire</c>, id <c>hangfire:&lt;app&gt;:&lt;job id&gt;:&lt;attempt&gt;</c>, the attempt
+/// counted from 0 in the job parameter <see cref="AttemptParameter"/>) and closes it when Hangfire
+/// says the job was performed, so each retry, and each requeue, is a run of its own. One
+/// integration watches Hangfire in a process, since its filters are global: starting another
+/// stops the one before.
 /// <see cref="CronwatchClient.Current"/> and <c>job.Log</c> work inside the job's method. A job its
 /// server's shutdown stops is given back, as Hangfire puts it back in its queue; one whose type or
 /// arguments no longer load is recorded failed from its state change. Recurring jobs are read from
@@ -42,6 +45,12 @@ public sealed class CronwatchHangfire : IDisposable
 
     /// <summary>The trigger of the runs it records.</summary>
     public const string Trigger = "hangfire";
+
+    /// <summary>
+    /// The job parameter that counts the attempts CronWatch has seen of a job, the last part of
+    /// each run's id.
+    /// </summary>
+    public const string AttemptParameter = "CronwatchAttempt";
 
     /// <summary>The check's recurring job id, whose runs are never a job.</summary>
     public const string CheckJobId = "cronwatch-check";
@@ -64,15 +73,20 @@ public sealed class CronwatchHangfire : IDisposable
         _options = options;
         Watch = new Watch(cw, Tag, options.App, Scheduler);
         Filter = new CronwatchHangfireFilter(this);
+        // One integration per process: Hangfire's filters are global, so an earlier one left in
+        // place (a host built again in the same process) would open every attempt a second time,
+        // under the same id, on a client that may be disposed.
+        Interlocked.Exchange(ref s_active, null)?.Dispose();
         GlobalJobFilters.Filters.Add(Filter);
-        Volatile.Write(ref s_active, this);
         _reading = CronwatchClient_WithoutFlow(ReadLoopAsync);
+        Volatile.Write(ref s_active, this);
     }
 
     /// <summary>
     /// Watches Hangfire: the filter is added to <see cref="GlobalJobFilters.Filters"/>, so every
     /// attempt from now on is recorded, and the recurring jobs are read now and every minute.
-    /// Call it before the server starts. <see cref="Dispose"/> stops it.
+    /// Call it before the server starts. <see cref="Dispose"/> stops it, and so does starting
+    /// another in the same process.
     /// </summary>
     public static CronwatchHangfire Start(CronwatchClient cw, CronwatchHangfireOptions? options = null)
     {
@@ -295,8 +309,8 @@ public sealed class CronwatchHangfire : IDisposable
     /// The run's id: the app and the job's attempt, since a job id is unique only within one
     /// storage and two apps may share a CronWatch store.
     /// </summary>
-    internal string RunId(string jobId, int retryCount) =>
-        "hangfire:" + Watch.AppSlug + ":" + jobId + ":" + retryCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    internal string RunId(string jobId, int attempt) =>
+        "hangfire:" + Watch.AppSlug + ":" + jobId + ":" + attempt.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>The job a run of <paramref name="name"/> belongs to: declared from a recurring job, else declared from the store.</summary>
     internal async Task<CronwatchJob?> JobAsync(string name)

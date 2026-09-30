@@ -57,8 +57,12 @@ public sealed class CronwatchHangfireFilter : JobFilterAttribute, IServerFilter,
             {
                 return;
             }
-            int retry = context.GetJobParameter<int>("RetryCount", true);
-            var options = new RunOptions { Trigger = CronwatchHangfire.Trigger, Id = _integration.RunId(context.BackgroundJob.Id, retry), MayTakeBack = true };
+            // Counted by the integration, not Hangfire's RetryCount, which stays as it was when a
+            // job is requeued from the dashboard or fetched again after its worker died, so a
+            // second attempt at one retry count would take the first's id and go unrecorded.
+            int attempt = context.GetJobParameter<int>(CronwatchHangfire.AttemptParameter, true);
+            context.SetJobParameter(CronwatchHangfire.AttemptParameter, attempt + 1);
+            var options = new RunOptions { Trigger = CronwatchHangfire.Trigger, Id = _integration.RunId(context.BackgroundJob.Id, attempt), MayTakeBack = true };
             ObservedRun run = job.OpenAsync(options, context.CancellationToken.ShutdownToken).GetAwaiter().GetResult();
             context.Items[RunKey] = run;
             context.Items[CurrentKey] = run.MakeCurrent();
@@ -150,10 +154,11 @@ public sealed class CronwatchHangfireFilter : JobFilterAttribute, IServerFilter,
             {
                 return;
             }
-            int retry = context.GetJobParameter<int>("RetryCount", true);
+            int attempt = context.GetJobParameter<int>(CronwatchHangfire.AttemptParameter, true);
+            context.SetJobParameter(CronwatchHangfire.AttemptParameter, attempt + 1);
             Exception cause = failed.Exception is JobLoadException { InnerException: { } inner } ? inner : failed.Exception;
             string error = cause.GetType().Name + ": " + cause.Message;
-            _integration.RecordLoadFailure(name, _integration.RunId(context.BackgroundJob.Id, retry), error);
+            _integration.RecordLoadFailure(name, _integration.RunId(context.BackgroundJob.Id, attempt), error);
         }
         catch (Exception e)
         {

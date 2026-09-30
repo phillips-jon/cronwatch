@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -232,6 +233,42 @@ public class HangfireTests
         h.Client.Enqueue(() => TestJobs.Look("stopped"));
         await Eventually("the jobs run", () => Task.FromResult(TestJobs.Seen.ContainsKey("stopped")));
         Assert.Empty(await h.RunsAsync("import"));
+    }
+
+    [Fact]
+    public async Task A_job_requeued_after_it_ran_is_a_run_of_its_own()
+    {
+        await using var h = new Harness(workers: 1);
+        string id = h.Client.Enqueue(() => TestJobs.Import());
+        await Eventually("the first run", async () => (await h.RunsAsync("import")).Any(r => r.Status == RunStatus.Ok));
+        h.Client.Requeue(id);
+        await Eventually("the requeued run", async () => (await h.RunsAsync("import")).Count(r => r.Status == RunStatus.Ok) == 2);
+        Assert.Empty(h.Errors);
+    }
+
+    [Fact]
+    public async Task Watching_again_in_one_process_takes_the_earlier_filter_off()
+    {
+        await using var h = new Harness(workers: 1);
+        // A second host in the same process (a test server, a host built again) watches Hangfire
+        // with a client of its own on the same store, after the first host's client was disposed.
+        await h.Cw.DisposeAsync();
+        var errors = new ConcurrentQueue<string>();
+        await using var cw = new CronwatchClient(new CronwatchOptions
+        {
+            Store = h.Store,
+            Alerts = [],
+            ProcessExitHook = false,
+            OnError = (e, where) => errors.Enqueue(where + ": " + e.Message),
+            OnWarning = _ => { },
+        });
+        using var again = CronwatchHangfire.Start(cw, new CronwatchHangfireOptions { App = "billing", Storage = h.Storage });
+        Assert.DoesNotContain(GlobalJobFilters.Filters, f => ReferenceEquals(f.Instance, h.Integration.Filter));
+        string id = h.Client.Enqueue(() => TestJobs.Import());
+        await Eventually("the run", async () => (await cw.RunsAsync("import")).Any(r => r.Status == RunStatus.Ok));
+        Assert.Equal("hangfire:billing:" + id + ":0", Assert.Single(await cw.RunsAsync("import")).Id);
+        Assert.Empty(errors);
+        Assert.Empty(h.Errors);
     }
 
     [Fact]
