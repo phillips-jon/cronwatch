@@ -97,7 +97,7 @@ module Cronwatch
   # Collects a run's output and metrics while its block runs.
   class RunRecorder
     # Lines are dropped from the front once the output is well past the cap;
-    # Output.cap trims it exactly at the end.
+    # Output.redact_and_cap trims it exactly at the end.
     KEEP = 64 * 1024
 
     attr_reader :context, :signal
@@ -136,8 +136,11 @@ module Cronwatch
       @lock.synchronize { @metrics[name] = value }
     end
 
+    # The lines still held (past 64 KB the oldest are let go), joined and not
+    # yet capped: the client redacts them first, then caps them
+    # (Output.redact_and_cap).
     def output
-      @lock.synchronize { @lines.empty? ? nil : Output.cap(@lines.join("\n")) }
+      @lock.synchronize { @lines.empty? ? nil : @lines.join("\n") }
     end
 
     # What an expect rule is checked against: everything logged, or when that

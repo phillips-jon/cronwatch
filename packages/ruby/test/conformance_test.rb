@@ -446,6 +446,12 @@ class ConformanceTest < Minitest::Test
     each_case(OUTPUT["redact"]) { |c| differs(c["result"], digest(Cronwatch::Output.redact_secrets(expand(c["input"])))) }
   end
 
+  def test_redact_and_cap
+    assert_equal OUTPUT["redactEdge"], Cronwatch::Output::REDACT_EDGE
+    redact = Cronwatch::Output.method(:redact_secrets)
+    each_case(OUTPUT["redactAndCap"]) { |c| differs(c["result"], digest(Cronwatch::Output.redact_and_cap(expand(c["input"]), redact))) }
+  end
+
   def test_error_message
     each_case(OUTPUT["errorMessage"]) do |c|
       error =
@@ -702,6 +708,15 @@ class ConformanceTest < Minitest::Test
       link = c["link"] == "long" ? "https://app.example/#{"p" * 2000}" : "https://app.example/j"
       segments = c["segments"].nil? ? Float::NAN : c["segments"]
       differs(c["body"], digest(Cronwatch::Alerts::Twilio.sms_body(long, link, segments)))
+    end
+  end
+
+  def test_discord_descriptions
+    alert = CHANNELS["alerts"][0]["alert"]
+    each_case(TEXT_CUTS["discordDescriptions"]) do |c|
+      triage = c["triage"].nil? ? nil : expand(c["triage"])
+      description = Cronwatch::Alerts::Discord.embed_description(Cronwatch::Alert.from_h(alert.merge("message" => expand(c["message"]), "triage" => triage)))
+      differs(c["description"], digest(description))
     end
   end
 

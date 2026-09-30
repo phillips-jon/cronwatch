@@ -129,7 +129,30 @@ module Cronwatch
       text = strip_nul(utf8(text))
       return text if JS.length16(text) <= CAP
 
-      "[earlier output trimmed]\n#{JS.tail16(text, CAP)}"
+      "#{TRIMMED}#{JS.tail16(text, CAP)}"
+    end
+
+    TRIMMED = "[earlier output trimmed]\n"
+
+    # How much text before the kept tail redaction reads, and never keeps:
+    # three times the longest secret a default pattern can match (a PEM
+    # key's 16 KB body with its header and footer, under CAP + 1024), since a
+    # replacement grows what it replaces at most threefold.
+    REDACT_EDGE = 3 * (CAP + 1024)
+
+    # Output or an error as it is stored: redacted, then capped like cap, so
+    # the cut cannot fall inside a secret and keep what follows its label.
+    # Text of at most CAP + REDACT_EDGE units is redacted whole. Longer text
+    # is cut to that many units from its end first, and after redacting, the
+    # first REDACT_EDGE units are never kept: a secret whose label fell before
+    # that cut is left out with them. NULs go before and after `redact`.
+    def redact_and_cap(text, redact)
+      clean = strip_nul(utf8(text))
+      return cap(redact.call(clean)) if JS.length16(clean) <= CAP + REDACT_EDGE
+
+      redacted = strip_nul(utf8(redact.call(JS.tail16(clean, CAP + REDACT_EDGE))))
+      length = JS.length16(redacted)
+      "#{TRIMMED}#{JS.tail16(redacted, [[CAP, length - REDACT_EDGE].min, 0].max)}"
     end
 
     # Removes every U+0000.
@@ -149,6 +172,7 @@ module Cronwatch
 
     # "Name: message" and the first five backtrace lines, each written as
     # "    at <line>" like the frames of a JavaScript stack, capped like output.
+    # The client stores describe_error through redact_and_cap instead.
     # An exception that stops the thread rather than reporting a problem
     # (Interrupt, SystemExit, Sidekiq::Shutdown, a Timeout) is written
     # "Interrupted: <class>", with its message when it says more.

@@ -232,7 +232,7 @@ module Cronwatch
       run.duration_ms = Evaluate.run_duration(started_at, finished_at)
       run.metrics = recorder.metrics
       returned = result.is_a?(String) ? Output.utf8(result) : nil
-      run.output = recorder.output || (returned && Output.cap(returned))
+      run.output = recorder.output || returned
 
       conclude(definition, run, result, error, threw, recorder.expect_text || returned, failure: failure)
       begin
@@ -343,8 +343,8 @@ module Cronwatch
           run.error = unmet
         end
       end
-      run.output = Output.strip_nul(@redact.call(Output.cap(run.output))) unless run.output.nil?
-      run.error = Output.strip_nul(@redact.call(Output.cap(run.error))) unless run.error.nil?
+      run.output = Output.redact_and_cap(run.output, @redact) unless run.output.nil?
+      run.error = Output.redact_and_cap(run.error, @redact) unless run.error.nil?
       definition = Serialize.to_stored(declared)
 
       stored = @store.get_run(run.id)
@@ -795,11 +795,12 @@ module Cronwatch
     end
 
     # Sets a finished run's status and error from how it ended, then redacts
-    # its output and error. Shared by execute and RunHandle#finish.
+    # its output and error and caps them, in that order. Shared by execute
+    # and RunHandle#finish.
     def conclude(definition, run, result, error, threw, expect_text, failure: nil)
       if threw
         run.status = :failed
-        run.error = Output.error_message(error)
+        run.error = Output.describe_error(error)
       elsif (problem = failure&.call(result))
         run.status = :failed
         run.error = Output.utf8(problem.to_s)
@@ -813,9 +814,10 @@ module Cronwatch
         end
       end
       # Redacted after the expect check, so a rule can still match what was
-      # logged. NULs go last, so not even a custom redact can store one.
-      run.output = Output.strip_nul(@redact.call(run.output)) unless run.output.nil?
-      run.error = Output.strip_nul(@redact.call(run.error)) unless run.error.nil?
+      # logged, and before the cap, so the cut cannot keep half a secret. NULs
+      # go last, so not even a custom redact can store one.
+      run.output = Output.redact_and_cap(run.output, @redact) unless run.output.nil?
+      run.error = Output.redact_and_cap(run.error, @redact) unless run.error.nil?
     end
 
     # Writes a finished run and evaluates it. `recorded` says whether its
@@ -955,13 +957,14 @@ module Cronwatch
       failed, result, error = RunHandle.read_outcome(outcome)
       finished_at = now
       returned = result.is_a?(String) ? Output.utf8(result) : nil
-      added = recorder.output || (returned && Output.cap(returned))
+      added = recorder.output || returned
       run = from.dup
       run.status = :running
       run.finished_at = finished_at
       run.duration_ms = Evaluate.run_duration(from.started_at, finished_at)
       run.error = nil
-      run.output = join_output(from.output, added)
+      # Capped by conclude, after it is redacted.
+      run.output = join_lines(from.output, added)
       run.metrics = (from.metrics || {}).merge(recorder.metrics)
       expect_text = join_lines(head, join_lines(from.output, recorder.expect_text || returned))
       conclude(definition, run, result, error, failed, expect_text)
@@ -998,7 +1001,7 @@ module Cronwatch
       end
 
       updated = stored.dup
-      updated.output = join_output(stored.output, Output.strip_nul(@redact.call(lines))) unless lines.nil?
+      updated.output = join_output(stored.output, Output.redact_and_cap(lines, @redact)) unless lines.nil?
       updated.metrics = (stored.metrics || {}).merge(metrics)
       write_run_if(updated, [:running])
     rescue StandardError => e

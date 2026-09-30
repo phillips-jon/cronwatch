@@ -789,6 +789,64 @@ class ClientTest < Minitest::Test
     assert error.start_with?("[earlier output trimmed]\n")
   end
 
+  def test_a_secret_split_by_the_16_kb_cut_is_redacted_whole_redaction_comes_before_the_cap
+    cap = Cronwatch::Output::CAP
+    pem = "-----BEGIN PRIVATE KEY-----\n#{Array.new(25) { |i| "#{"QUJD" * 15}#{i.to_s.rjust(4, "0")}" }.join("\n")}\n-----END PRIVATE KEY-----"
+    bearer = "Authorization: Bearer opaqueTOKENvalue1234567890"
+    cw, = make
+    # The cut lands inside the key's body, and in a second run just after "Bea".
+    cw.run("pem") do |job|
+      job.log("x" * cap)
+      job.log(pem[0, 900])
+      job.log(pem[900..])
+      job.log("done")
+    end
+    pem_output = cw.runs("pem").first.output
+    refute_match(/QUJD/, pem_output)
+    assert_match(/\[redacted\]\ndone\z/, pem_output)
+    tail = "y" * (cap - 30)
+    cw.run("bearer") { "#{bearer}\n#{tail}" }
+    bearer_output = cw.runs("bearer").first.output
+    refute_match(/opaqueTOKEN/, bearer_output)
+    assert_operator bearer_output.length, :<=, cap + "[earlier output trimmed]\n".length
+
+    # Errors, recorded runs and flushed lines the same way.
+    assert_raises(RuntimeError) { cw.run("thrown") { raise "#{"e" * cap} #{bearer} #{"z" * (cap - 40)}" } }
+    refute_match(/opaqueTOKEN/, cw.runs("thrown").first.error)
+    cw.job("imported")
+    cw.record_run({ id: "i1", job: "imported", status: "ok", started_at: 1, finished_at: 2, duration_ms: 1, error: nil,
+                    output: "#{bearer}\n#{tail}", metrics: {}, trigger: "source" })
+    refute_match(/opaqueTOKEN/, cw.get_run("i1").output)
+    handle = cw.job("flushed").start
+    handle.log(bearer)
+    handle.log(tail)
+    handle.flush
+    refute_match(/opaqueTOKEN/, cw.get_run(handle.id).output)
+    handle.finish
+    refute_match(/opaqueTOKEN/, cw.get_run(handle.id).output)
+  end
+
+  def test_text_past_the_redaction_window_never_keeps_what_came_right_after_its_cut
+    cap = Cronwatch::Output::CAP
+    edge = Cronwatch::Output::REDACT_EDGE
+    trimmed = "[earlier output trimmed]\n"
+    redact = Cronwatch::Output.method(:redact_secrets)
+    text = "-----BEGIN PRIVATE KEY-----\n#{"QUJD" * 4000}\n#{"k" * (cap + edge - 8000)}"
+    kept = Cronwatch::Output.redact_and_cap(text, redact)
+    assert kept.start_with?(trimmed)
+    assert_equal trimmed.length + cap, kept.length
+    refute_match(/QUJD/, kept)
+
+    # A redaction that shrinks the window cannot pull its first units into view.
+    shrinking = ->(t) { t.gsub("s" * 100, "") }
+    assert_equal trimmed, Cronwatch::Output.redact_and_cap(("QUJD" * 100) + ("s" * (cap + edge)), shrinking)
+
+    # Short text is redacted whole, then capped as before; NULs go either side of redact.
+    assert_equal "password=[redacted]", Cronwatch::Output.redact_and_cap("password=x", redact)
+    assert_equal "ab", Cronwatch::Output.redact_and_cap("a\0b", ->(t) { "#{t}\0" })
+    assert_equal "#{trimmed}#{"x" * cap}", Cronwatch::Output.redact_and_cap("x" * (cap + 5), redact)
+  end
+
   def test_pruning_keeps_each_jobs_newest_run_so_a_monthly_job_is_not_reported_missed
     cw, clock, alerts = make(retention: "30d")
     clock.now = Time.utc(2026, 1, 1).to_i * 1000
