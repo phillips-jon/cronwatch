@@ -37,7 +37,7 @@ The CronWatch menu in wp-admin opens the dashboard, for administrators: every ev
 
 CronWatch speaks the same small JSON API in every language it runs in, and [@cronwatch/mcp](https://www.npmjs.com/package/@cronwatch/mcp) lets Claude and other AI assistants read it: which events are failing, what a run printed, silencing one for the night. The API is off until you turn it on under CronWatch, Settings, with a token; the page then shows the address and the line that adds it to Claude Code. Only requests that carry the token are answered, and only the API is exposed: the dashboard stays in wp-admin.
 
-CronWatch is the WordPress plugin of [the CronWatch library](https://cronwatch.dev/), which also watches jobs in Node, Ruby, Python, PHP, Go and Rust apps and keeps the same tables in every language.
+CronWatch is the WordPress plugin of [the CronWatch library](https://cronwatch.dev/), which also watches jobs in TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET apps and keeps the same tables in every language.
 
 = Why a check that runs on page visits misses a quiet site =
 
