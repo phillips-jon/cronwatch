@@ -132,6 +132,25 @@ def test_dashboard_and_job_pages_render_json_api_answers() -> None:
     assert send(web, "GET", "/cronwatch/nope", BEARER).status == 404
 
 
+def test_a_run_whose_metrics_hold_something_other_than_a_finite_number_still_shows_its_jobs_page() -> None:
+    cw, c, web = app()
+    cw.job("imported")
+    nan = Run(id="nan", job="imported", status="ok", started_at=c.now(), finished_at=c.now(), duration_ms=0, trigger="source", metrics={"rows": float("nan")})
+    with pytest.raises(ValueError, match='^record_run: metric "rows" must be a finite number \\(job "imported", run "nan"\\)$'):
+        cw.record_run(nan)
+    assert cw.get_run("nan") is None, "nothing is written"
+    for value in (float("inf"), None, "3"):
+        with pytest.raises(ValueError, match="must be a finite number"):
+            cw.record_run(Run(id="bad", job="imported", status="ok", started_at=c.now(), trigger="source", metrics={"rows": value}))  # type: ignore[dict-item]
+    # As a foreign row, or a store that kept NaN as null, may hold them.
+    cw.store.insert_run(Run(id="odd", job="imported", status="ok", started_at=c.now(), finished_at=c.now(), duration_ms=0, trigger="source",
+                            metrics={"rows": None, "label": "abc", "cost": 1.25, "n": 3}))  # type: ignore[dict-item]  # fmt: skip
+    res = send(web, "GET", "/cronwatch/jobs/imported", BEARER)
+    assert res.status == 200
+    assert '<span class="k">cost</span> 1.2500</span><span><span class="k">n</span> 3<' in res.text
+    assert not re.search(r'class="k">(rows|label)<', res.text)
+
+
 def test_check_silence_unsilence_and_forget_over_the_api() -> None:
     cw, _, web = app()
     cw.run("s", lambda ctx: None)

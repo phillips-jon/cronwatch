@@ -717,3 +717,140 @@ def test_a_declarations_write_waits_for_the_earlier_ones_so_the_later_one_stays(
     later.join(5)
     assert inner.get_job("a").definition.schedule == "every 5m"
     assert summaries[0].definition.schedule == "every 5m"
+
+
+class HeldUpsertAfterWrite:
+    """A store whose first write of a job's definition lands, then waits
+    until it is let go, so a forget can delete the row it wrote meanwhile."""
+
+    def __init__(self, inner: Any) -> None:
+        self.entered = threading.Event()
+        self.release = threading.Event()
+        self._held = False
+
+        def upsert_job(definition: JobDefinition, now: int) -> None:
+            inner.upsert_job(definition, now)
+            if not self._held:
+                self._held = True
+                self.entered.set()
+                assert self.release.wait(5)
+
+        self.store = Wrapped(inner, upsert_job=upsert_job)
+
+
+def test_a_forget_that_lands_while_a_jobs_first_write_is_under_way_leaves_it_to_be_written_on_its_next_run() -> None:
+    inner = MemoryStore()
+    held = HeldUpsertAfterWrite(inner)
+    cw, _, _ = make(store=held.store)
+    handle = cw.job("nightly", schedule="every 5m")
+    first = threading.Thread(target=lambda: handle.run(lambda ctx: None))
+    first.start()
+    assert held.entered.wait(5)
+    cw.forget("nightly")
+    held.release.set()
+    first.join(5)
+    assert inner.get_job("nightly") is None, "forgotten after it was written"
+    handle.run(lambda ctx: None)
+    assert inner.get_job("nightly").definition.schedule == "every 5m", "its next run brings it back"
+    assert [j.name for j in cw.jobs()] == ["nightly"]
+
+
+def test_a_job_forgotten_by_another_process_comes_back_in_a_long_lived_one_that_still_declares_it() -> None:
+    store = MemoryStore()
+    worker, _, _ = make(store=store)
+    web, _, _ = make(store=store)
+    nightly = worker.job("nightly", schedule="every 5m")
+    nightly.run(lambda ctx: None)
+
+    def forgotten() -> None:
+        web.forget("nightly")
+        assert store.get_job("nightly") is None
+
+    # Its next run writes it again, so the run is not left without its job.
+    forgotten()
+    nightly.run(lambda ctx: None)
+    assert store.get_job("nightly").definition.schedule == "every 5m"
+    assert len(web.runs("nightly")) == 1
+
+    # So does a started run, a check, the board and the job's page in the process that declares it.
+    forgotten()
+    handle = nightly.start()
+    assert store.get_job("nightly") is not None
+    handle.finish()
+    forgotten()
+    worker.check()
+    assert store.get_job("nightly") is not None
+    forgotten()
+    assert [job.name for job in worker.jobs()] == ["nightly"]
+    forgotten()
+    assert worker.job_summary("nightly").definition.schedule == "every 5m"
+
+    # A process that never declared it does not bring it back.
+    forgotten()
+    web.check()
+    assert web.jobs() == []
+
+
+PEM = "-----BEGIN PRIVATE KEY-----\n" + "\n".join(f"{'QUJD' * 15}{i:04d}" for i in range(25)) + "\n-----END PRIVATE KEY-----"
+BEARER = "Authorization: Bearer opaqueTOKENvalue1234567890"
+
+
+def test_a_secret_split_by_the_16_kb_cut_is_redacted_whole_redaction_comes_before_the_cap() -> None:
+    from cronwatch.output import OUTPUT_CAP
+
+    cw, _, _ = make()
+
+    # The cut lands inside the key's body, and in a second run just after "Bear".
+    def pem(ctx: Any) -> None:
+        ctx.log("x" * OUTPUT_CAP)
+        ctx.log(PEM[:900])
+        ctx.log(PEM[900:])
+        ctx.log("done")
+
+    cw.run("pem", pem)
+    pem_output = cw.runs("pem")[0].output
+    assert "QUJD" not in pem_output
+    assert pem_output.endswith("[redacted]\ndone")
+    tail = "y" * (OUTPUT_CAP - 30)
+    cw.run("bearer", lambda ctx: BEARER + "\n" + tail)
+    bearer_output = cw.runs("bearer")[0].output
+    assert "opaqueTOKEN" not in bearer_output
+    assert len(bearer_output) <= OUTPUT_CAP + len("[earlier output trimmed]\n")
+
+    # Errors, recorded runs and flushed lines the same way.
+    with pytest.raises(RuntimeError):
+        cw.run("thrown", boom(f"{'e' * OUTPUT_CAP} {BEARER} {'z' * (OUTPUT_CAP - 40)}"))
+    assert "opaqueTOKEN" not in cw.runs("thrown")[0].error
+    cw.job("imported")
+    cw.record_run(Run(id="i1", job="imported", status="ok", started_at=1, finished_at=2, duration_ms=1, output=f"{BEARER}\n{tail}", trigger="source"))
+    assert "opaqueTOKEN" not in cw.get_run("i1").output
+    handle = cw.job("flushed").start()
+    handle.log(BEARER)
+    handle.log(tail)
+    handle.flush()
+    assert "opaqueTOKEN" not in cw.get_run(handle.id).output
+    handle.finish()
+    assert "opaqueTOKEN" not in cw.get_run(handle.id).output
+
+
+def test_text_past_the_redaction_window_never_keeps_what_came_right_after_its_cut() -> None:
+    import re
+
+    from cronwatch.output import OUTPUT_CAP, REDACT_EDGE, redact_and_cap, redact_secrets
+
+    # The window starts part way into a key's body, whose header is before it:
+    # the body's rest cannot be told from text, so it is never kept.
+    text = "-----BEGIN PRIVATE KEY-----\n" + "QUJD" * 4000 + "\n" + "k" * (OUTPUT_CAP + REDACT_EDGE - 8000)
+    kept = redact_and_cap(text, redact_secrets)
+    assert kept.startswith("[earlier output trimmed]\n")
+    assert len(kept) == len("[earlier output trimmed]\n") + OUTPUT_CAP
+    assert "QUJD" not in kept
+
+    # A redaction that shrinks the window cannot pull its first units into view.
+    shrunk = redact_and_cap("QUJD" * 100 + "s" * (OUTPUT_CAP + REDACT_EDGE), lambda t: re.sub("s{100}", "", t))
+    assert shrunk == "[earlier output trimmed]\n"
+
+    # Short text is redacted whole, then capped as before; NULs go either side of redact.
+    assert redact_and_cap("password=x", redact_secrets) == "password=[redacted]"
+    assert redact_and_cap("a\x00b", lambda t: t + "\x00") == "ab"
+    assert redact_and_cap("x" * (OUTPUT_CAP + 5), redact_secrets) == "[earlier output trimmed]\n" + "x" * OUTPUT_CAP

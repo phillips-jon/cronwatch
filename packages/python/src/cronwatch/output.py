@@ -46,7 +46,33 @@ def cap_output(text: str) -> str:
     clean = strip_nul(text)
     if _js.length16(clean) <= OUTPUT_CAP:
         return clean
-    return "[earlier output trimmed]\n" + _js.tail16(clean, OUTPUT_CAP)
+    return TRIMMED + _js.tail16(clean, OUTPUT_CAP)
+
+
+TRIMMED = "[earlier output trimmed]\n"
+
+#: How much text before the kept tail redaction reads, and never keeps: three
+#: times the longest secret a default pattern can match (a PEM key's 16 KB
+#: body with its header and footer, under OUTPUT_CAP + 1024), since a
+#: replacement grows what it replaces at most threefold.
+REDACT_EDGE = 3 * (OUTPUT_CAP + 1024)
+
+
+def redact_and_cap(text: str, redact: Callable[[str], str]) -> str:
+    """Output or an error as it is stored: redacted, then capped like
+    cap_output, so the cut cannot fall inside a secret and keep what follows
+    its label. Text of at most OUTPUT_CAP + REDACT_EDGE UTF-16 units is
+    redacted whole. Longer text is cut to that many units from its end first,
+    and after redacting, the first REDACT_EDGE units are never kept: a secret
+    whose label fell before that cut is left out with them. NULs go before
+    and after `redact`."""
+    clean = strip_nul(_js.well_formed(text))
+    window = OUTPUT_CAP + REDACT_EDGE
+    if _js.length16(clean) <= window:
+        return cap_output(redact(clean))
+    redacted = strip_nul(redact(_js.tail16(clean, window)))
+    length = _js.length16(redacted)
+    return TRIMMED + _js.tail16(redacted, length - max(length - OUTPUT_CAP, REDACT_EDGE))
 
 
 def error_message(error: Any) -> str:

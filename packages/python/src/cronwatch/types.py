@@ -358,6 +358,53 @@ class Alert:
         return out
 
 
+class _Missing:
+    def __repr__(self) -> str:
+        return "missing"
+
+
+#: A key a stored entry did not have, so it is written back without it.
+MISSING: Any = _Missing()
+
+
+@dataclass
+class SendingAlert:
+    """An alert in JobState.sending, the outbox: ``until`` (epoch
+    milliseconds) is when its sender's lease runs out. Read leniently, as a
+    check releases it: an entry with no numeric ``until`` counts as run out,
+    and one whose ``alert`` is not an object is dropped then, so a malformed
+    entry never makes the whole state unreadable. A key the entry lacked is
+    MISSING, and stays left out when it is written back."""
+
+    until: Any
+    alert: Any
+
+    @classmethod
+    def from_json(cls, entry: Any) -> Any:
+        """A stored entry: a SendingAlert for an object, anything else as it came."""
+        if isinstance(entry, SendingAlert) or not isinstance(entry, Mapping):
+            return entry
+        alert = entry.get("alert", MISSING)
+        if isinstance(alert, Mapping):
+            try:
+                alert = Alert.from_dict(alert)
+            except Exception:  # noqa: BLE001, an alert that cannot be read is left as it came
+                pass
+        return cls(until=entry.get("until", MISSING), alert=alert)
+
+    def to_dict(self) -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        if self.until is not MISSING:
+            out["until"] = self.until
+        if self.alert is not MISSING:
+            out["alert"] = self.alert.to_dict() if isinstance(self.alert, Alert) else self.alert
+        return out
+
+
+def _sending_to_json(entry: Any) -> Any:
+    return entry.to_dict() if isinstance(entry, SendingAlert) else entry
+
+
 @dataclass
 class JobState:
     """A job's state. ``version`` goes up by one on every write, so a store can
@@ -375,6 +422,10 @@ class JobState:
     pending_recovery: list[Condition | str] | None = None
     #: Alerts that no channel accepted. Each check retries them once.
     undelivered: list[Alert] | None = None
+    #: The outbox: alerts written with the state that opened their condition,
+    #: while the process that wrote them sends them (see SendingAlert). None
+    #: when empty: the key is never written as an empty list.
+    sending: list[Any] | None = None
     version: int | None = None
 
     @classmethod
@@ -383,6 +434,7 @@ class JobState:
             return data
         pending = _get(data, "pendingRecovery")
         undelivered = _get(data, "undelivered")
+        sending = _get(data, "sending")
         return cls(
             job=_get(data, "job"),
             open={_enum(Condition, k): v for k, v in (_get(data, "open") or {}).items()},
@@ -391,12 +443,14 @@ class JobState:
             last_alert_at=_get(data, "lastAlertAt"),
             pending_recovery=None if pending is None else [_enum(Condition, c) for c in pending],
             undelivered=None if undelivered is None else [Alert.from_dict(a) for a in undelivered],
+            sending=[SendingAlert.from_json(e) for e in sending] if isinstance(sending, list) and sending else None,
             version=_get(data, "version"),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """pendingRecovery, undelivered and version are left out when unset, as
-        in state written before they existed. The version comes last, where the
+        """pendingRecovery, undelivered, sending and version are left out when
+        unset, as in state written before they existed (sending also when
+        empty). The version comes last, where the
         SDK's spread of a normalized state puts it."""
         out: dict[str, Any] = {
             "job": self.job,
@@ -409,6 +463,8 @@ class JobState:
             out["pendingRecovery"] = [str(c) for c in self.pending_recovery]
         if self.undelivered is not None:
             out["undelivered"] = [a.to_dict() for a in self.undelivered]
+        if self.sending:
+            out["sending"] = [_sending_to_json(e) for e in self.sending]
         if self.version is not None:
             out["version"] = self.version
         return out
@@ -422,6 +478,7 @@ class JobState:
             last_alert_at=self.last_alert_at,
             pending_recovery=None if self.pending_recovery is None else list(self.pending_recovery),
             undelivered=None if self.undelivered is None else list(self.undelivered),
+            sending=None if self.sending is None else list(self.sending),
             version=self.version,
         )
 

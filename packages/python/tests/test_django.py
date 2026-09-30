@@ -216,6 +216,32 @@ def test_settings_take_dotted_paths_and_refuse_unknown_keys() -> None:
         assert cwdjango.client() is cronwatch.client(), "no client options: the process's client"
 
 
+MADE: list[Any] = []
+
+
+def counted_store() -> MemoryStore:
+    """A STORE factory that counts the stores it makes, as one opening a connection pool would."""
+    MADE.append("store")
+    return MemoryStore()
+
+
+def counted_channel() -> Any:
+    MADE.append("channel")
+    return cronwatch.Console()
+
+
+def test_the_client_made_from_the_settings_is_made_once_and_its_factories_run_once() -> None:
+    MADE.clear()
+    options = {"TOKEN": "tok", "STORE": "test_django.counted_store", "ALERTS": ["test_django.counted_channel"], "CRON_SECRET": None}
+    with override_settings(CRONWATCH=options):
+        first = cwdjango.client()
+        for _ in range(5):
+            assert cwdjango.client() is first
+        assert Client().get(f"{BASE}/api/jobs", **BEARER).status_code == 200
+        assert cwdjango.client() is first
+        assert MADE == ["store", "channel"], "one store and one channel, however often client() is called"
+
+
 def test_the_dashboard_answers_under_django_asgi_too() -> None:
     cw = fixed()
     with override_settings(CRONWATCH={"CLIENT": cw, "TOKEN": "tok"}):

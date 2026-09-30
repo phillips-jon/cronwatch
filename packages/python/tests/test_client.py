@@ -235,6 +235,22 @@ def test_silence_swallows_alerts_and_nothing_opens_underneath_unsilence_alerts_a
     assert alerts.types() == ["failed"]
 
 
+def test_a_silence_ends_on_a_whole_millisecond_never_past_2_to_the_53_minus_1() -> None:
+    cw, c, _ = make()
+    cw.job("long")
+    top = 2**53 - 1
+    assert cw.silence("long", "99999999999999999999w").silenced_until == top
+    assert cw.silence("long", 1e300).silenced_until == top
+    assert cw.silence("long", 1.5).silenced_until == c.now() + 1
+    from helpers import send
+
+    web = cw.routes(token=None, base_path="/cronwatch")
+    res = send(web, "POST", "/cronwatch/api/jobs/long/silence", {"content-type": "application/json"}, '{"for":"99999999999999999999w"}')
+    assert res.status == 200
+    assert res.json()["state"]["silencedUntil"] == top
+    assert cw.store.get_state("long").silenced_until == top
+
+
 def test_triage_output_is_attached_to_failure_alerts_and_never_blocks_them() -> None:
     cw, _, alerts = make(triage=lambda ctx: f"Probably {ctx.alert.job}'s database.")
     with pytest.raises(RuntimeError):

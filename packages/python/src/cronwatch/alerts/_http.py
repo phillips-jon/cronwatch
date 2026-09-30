@@ -12,6 +12,7 @@ from __future__ import annotations
 import http.client
 import re
 import socket
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -23,6 +24,11 @@ from .._js import well_formed
 
 #: Seconds a request may take, as the SDK's AbortSignal.timeout(10_000).
 TIMEOUT = 10.0
+
+#: The most of an answer's body kept (1 MiB): a channel reads 200 characters
+#: of a refusal, and a hostile or broken endpoint could otherwise send hundreds
+#: of megabytes within the deadline. Reading stops there.
+MAX_BODY = 1_048_576
 
 _AROUND = re.compile(r"^[ \t\r\n]+|[ \t\r\n]+\Z")
 # What the URL parser drops before it reads a URL: C0 controls and spaces around it, tabs and line breaks anywhere.
@@ -94,16 +100,107 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class _Deadline:
+    """One request's deadline, kept by a timer: when it passes, every socket
+    the request opened is shut, so a read waiting on it ends however the
+    server paces what it sends (a status line and headers a line at a time
+    included, which a per-read timeout never catches). finish() says whether
+    the request ended in time, and once it has, the timer no longer shuts
+    anything."""
+
+    def __init__(self, seconds: float) -> None:
+        self._lock = threading.Lock()
+        self._sockets: list[socket.socket] = []
+        self._expired = False
+        self._finished = False
+        self._timer = threading.Timer(max(seconds, 0.0), self._expire)
+        self._timer.daemon = True
+        self._timer.start()
+
+    @property
+    def expired(self) -> bool:
+        with self._lock:
+            return self._expired
+
+    def watch(self, sock: socket.socket) -> None:
+        with self._lock:
+            if not self._expired:
+                self._sockets.append(sock)
+                return
+        _shut(sock)
+
+    def _expire(self) -> None:
+        with self._lock:
+            if self._finished:
+                return
+            self._expired = True
+            sockets = list(self._sockets)
+        for sock in sockets:
+            _shut(sock)
+
+    def finish(self) -> bool:
+        """Ends the watch: True when the request ended before the deadline."""
+        self._timer.cancel()
+        with self._lock:
+            self._finished = True
+            return not self._expired
+
+
+def _shut(sock: socket.socket) -> None:
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+
+
+def _watched(http_class: Any, deadline: _Deadline) -> Any:
+    """`http_class` (http.client's HTTPConnection or HTTPSConnection) with each
+    socket it opens handed to `deadline` as soon as it is connected, before
+    any TLS handshake."""
+
+    class Watched(http_class):  # type: ignore[misc, valid-type]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            create = self._create_connection
+
+            def create_connection(*a: Any, **k: Any) -> socket.socket:
+                sock = create(*a, **k)
+                deadline.watch(sock)
+                return sock
+
+            self._create_connection = create_connection
+
+    return Watched
+
+
+class _HTTPHandler(urllib.request.HTTPHandler):
+    def __init__(self, deadline: _Deadline) -> None:
+        super().__init__()
+        self._deadline = deadline
+
+    def do_open(self, http_class: Any, req: Any, **kwargs: Any) -> Any:
+        return super().do_open(_watched(http_class, self._deadline), req, **kwargs)
+
+
+class _HTTPSHandler(urllib.request.HTTPSHandler):
+    def __init__(self, deadline: _Deadline) -> None:
+        super().__init__()
+        self._deadline = deadline
+
+    def do_open(self, http_class: Any, req: Any, **kwargs: Any) -> Any:
+        return super().do_open(_watched(http_class, self._deadline), req, **kwargs)
+
+
 class UrllibHTTP:
     """The default: urllib.request, no redirects followed, one deadline for
-    the whole request. Past the deadline before an answer it raises
-    RequestTimeout; past it while the body is still arriving it returns the
-    answer with an empty body, as the SDK's channels treat a body they could
-    not read. ``timeout`` (seconds) is for tests."""
+    the whole request, from connecting to the last byte of the body. Past the
+    deadline before an answer it raises RequestTimeout; past it while the
+    body is still arriving it returns the answer with an empty body, as the
+    SDK's channels treat a body they could not read. The body kept is at most
+    MAX_BODY bytes. ``timeout`` (seconds) is for tests."""
 
     def __init__(self, timeout: float = TIMEOUT) -> None:
         self.timeout = timeout
-        self._opener = urllib.request.build_opener(_NoRedirect())
 
     def post(self, url: str, body: str, headers: dict[str, str]) -> Response:
         deadline = time.monotonic() + self.timeout
@@ -115,21 +212,36 @@ class UrllibHTTP:
                 # http.client's own error would quote the value, which may be a credential.
                 raise ValueError(f"the {name!r} header has a line break or control character in it")
             request.add_header(name, text)
+        watch = _Deadline(deadline - time.monotonic())
+        opener = urllib.request.build_opener(_NoRedirect(), _HTTPHandler(watch), _HTTPSHandler(watch))
         try:
-            response = self._opener.open(request, timeout=_remaining(deadline))
-        except urllib.error.HTTPError as error:
-            return Response(error.code, _read(error.fp, deadline))
-        except (TimeoutError, socket.timeout) as error:
-            raise RequestTimeout() from error
-        except urllib.error.URLError as error:
-            if isinstance(error.reason, (TimeoutError, socket.timeout)):
-                raise RequestTimeout() from error
-            raise
-        except (http.client.InvalidURL, ValueError):
-            # Their messages quote the URL, whose path or query may be the credential.
-            raise ValueError(f"cannot post to {_origin_of(target)}: the URL is not valid") from None
-        with response:
-            return Response(response.status, _read(response, deadline))
+            try:
+                response = opener.open(request, timeout=_remaining(deadline))
+            except urllib.error.HTTPError as error:
+                try:
+                    if watch.expired:
+                        # The headers ended only because the deadline shut the socket.
+                        raise RequestTimeout() from None
+                    return Response(error.code, _read(error.fp, watch))
+                finally:
+                    error.close()
+            except (http.client.InvalidURL, ValueError):
+                # Their messages quote the URL, whose path or query may be the credential.
+                raise ValueError(f"cannot post to {_origin_of(target)}: the URL is not valid") from None
+            except (OSError, http.client.HTTPException) as error:
+                # Past the deadline the timer shut the socket, which surfaces as
+                # whatever the read then saw (a reset, a closed connection).
+                reason = error.reason if isinstance(error, urllib.error.URLError) else error
+                if watch.expired or isinstance(reason, (TimeoutError, socket.timeout)):
+                    raise RequestTimeout() from error
+                raise
+            with response:
+                if watch.expired:
+                    # The headers ended only because the deadline shut the socket.
+                    raise RequestTimeout()
+                return Response(response.status, _read(response, watch))
+        finally:
+            watch.finish()
 
 
 def _remaining(deadline: float) -> float:
@@ -137,30 +249,26 @@ def _remaining(deadline: float) -> float:
     return max(deadline - time.monotonic(), 0.001)
 
 
-def _socket(response: Any) -> socket.socket | None:
-    """The socket under an http.client response, to bound each read by the deadline."""
-    raw = getattr(getattr(response, "fp", None), "raw", None)
-    sock = getattr(raw, "_sock", None)
-    return sock if isinstance(sock, socket.socket) else None
-
-
-def _read(response: Any, deadline: float) -> str:
-    """The body, read in chunks until the deadline; "" when it passes first."""
+def _read(response: Any, watch: _Deadline) -> str:
+    """The body, at most MAX_BODY bytes of it, read until the answer ends or
+    the deadline passes; "" when the deadline passes first. A response that
+    has read its whole body (by its length) closes itself, and a read after
+    that gives nothing, which ends the loop."""
     if response is None:
         return ""
     chunks: list[bytes] = []
-    sock = _socket(response)
+    size = 0
     try:
-        while True:
-            if time.monotonic() >= deadline:
-                return ""
-            if sock is not None:
-                sock.settimeout(_remaining(deadline))
-            chunk = response.read1(65536) if hasattr(response, "read1") else response.read()
+        while size < MAX_BODY:
+            chunk = response.read1(65536) if hasattr(response, "read1") else response.read(65536)
             if not chunk:
                 break
+            chunk = chunk[: MAX_BODY - size]
             chunks.append(chunk)
-    except (TimeoutError, socket.timeout, OSError):
+            size += len(chunk)
+    except (OSError, http.client.HTTPException):
+        return ""
+    if not watch.finish():
         return ""
     return text(b"".join(chunks))
 

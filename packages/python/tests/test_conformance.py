@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from cronwatch import _js, alerts, duration, evaluate, output, schedule, serialize
-from cronwatch.alerts import twilio
+from cronwatch.alerts import discord, twilio
 from cronwatch.alerts._shared import error_body
 from cronwatch.alerts.email import compose as compose_email
 from cronwatch.format import compose_alert
@@ -422,6 +422,78 @@ def test_failure_count() -> None:
     each_case(HEALTH["failureCount"], check)
 
 
+def test_silence_end() -> None:
+    each_case(
+        HEALTH["silenceEnd"],
+        lambda c: differs(c["silencedUntil"], evaluate.silence_end(c["now"], duration.parse_duration(c["duration"], "silence duration"))),
+    )
+
+
+DELIVERY = HEALTH["delivery"]
+
+
+def test_delivery_constants_are_the_sdks() -> None:
+    assert DELIVERY["maxUndelivered"] == evaluate.MAX_UNDELIVERED
+    assert DELIVERY["sendLeaseMs"] == evaluate.SEND_LEASE_MS
+
+
+def delivered(result: evaluate.Delivery) -> str:
+    """The result as JSON with the state's keys in order. An alert's keys are
+    sorted on both sides: the fixture's alerts are written by hand, in an
+    order no writer of either SDK uses (compose_alert's is held by format.json)."""
+    return _js.dumps({"state": result.state.to_dict(), "dropped": result.dropped})
+
+
+def same_delivery(expected: Any, actual: str) -> str | None:
+    def canonical(value: Any) -> Any:
+        if isinstance(value, dict):
+            items = sorted(value.items()) if "title" in value and "at" in value else value.items()
+            return {k: canonical(v) for k, v in items}
+        if isinstance(value, list):
+            return [canonical(v) for v in value]
+        return value
+
+    return differs(_js.dumps(canonical(expected)), _js.dumps(canonical(json.loads(actual))))
+
+
+def test_alert_key() -> None:
+    each_case(DELIVERY["alertKey"], lambda c: differs(c["key"], evaluate.alert_key(Alert.from_dict(c["alert"]))))
+
+
+def test_delivery_normalize_state() -> None:
+    each_case(
+        DELIVERY["normalizeState"],
+        lambda c: same_delivery({"state": c["normalized"], "dropped": 0}, delivered(evaluate.Delivery(evaluate.normalize_state(state_from(c["state"]), "j"), 0))),
+    )
+
+
+def test_queue_undelivered() -> None:
+    each_case(
+        DELIVERY["queueUndelivered"],
+        lambda c: same_delivery(c["result"], delivered(evaluate.queue_undelivered(JobState.from_dict(c["state"]), [Alert.from_dict(a) for a in c["alerts"]]))),
+    )
+
+
+def test_hold_alerts() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        alerts_ = [Alert.from_dict(a) for a in c["alerts"]]
+        return same_delivery(c["result"], delivered(evaluate.hold_alerts(JobState.from_dict(c["state"]), alerts_, c["until"], c["deferred"])))
+
+    each_case(DELIVERY["holdAlerts"], check)
+
+
+def test_release_sending() -> None:
+    each_case(DELIVERY["releaseSending"], lambda c: same_delivery(c["result"], delivered(evaluate.release_sending(JobState.from_dict(c["state"]), c["now"]))))
+
+
+def test_record_sent() -> None:
+    def check(c: dict[str, Any]) -> str | None:
+        lists = [[Alert.from_dict(a) for a in c[key]] for key in ("delivered", "failed", "stale")]
+        return same_delivery(c["result"], delivered(evaluate.record_sent(JobState.from_dict(c["state"]), *lists, c["now"])))
+
+    each_case(DELIVERY["recordSent"], check)
+
+
 def test_stale_alert() -> None:
     each_case(HEALTH["staleAlert"], lambda c: differs(c["stale"], evaluate.stale_alert(Alert.from_dict(c["alert"]), state_from(c["state"]))))  # type: ignore[arg-type]
 
@@ -452,6 +524,11 @@ def test_output_cap_is_the_sdks() -> None:
 
 def test_redact_secrets() -> None:
     each_case(OUTPUT["redact"], lambda c: differs(c["result"], digest(output.redact_secrets(expand(c["input"])))))
+
+
+def test_redact_and_cap() -> None:
+    assert OUTPUT["redactEdge"] == output.REDACT_EDGE
+    each_case(OUTPUT["redactAndCap"], lambda c: differs(c["result"], digest(output.redact_and_cap(expand(c["input"]), output.redact_secrets))))
 
 
 def test_error_message(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -835,6 +912,16 @@ def test_email_subjects_cut_on_a_code_point() -> None:
         return differs(c["subject"], compose_email(alert, from_="a@example.com", to=["b@example.com"], subject_prefix=c["subjectPrefix"]).subject)
 
     each_case(TEXT_CUTS["subjects"], check)
+
+
+def test_discord_descriptions() -> None:
+    first = CHANNELS["alerts"][0]["alert"]
+
+    def check(c: dict[str, Any]) -> str | None:
+        alert = Alert.from_dict({**first, "message": expand(c["message"]), "triage": expand(c["triage"])})
+        return differs(c["description"], digest(discord.embed_description(alert)))
+
+    each_case(TEXT_CUTS["discordDescriptions"], check)
 
 
 def test_sms_segments() -> None:

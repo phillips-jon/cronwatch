@@ -11,10 +11,10 @@ from collections.abc import Mapping
 from typing import Any
 
 from . import _js
-from .output import OUTPUT_CAP, cap_output
+from .output import OUTPUT_CAP
 from .types import Run
 
-#: Lines are dropped from the front once the output is well past the cap; cap_output trims it exactly at the end.
+#: Lines are dropped from the front once the output is well past the cap; redact_and_cap trims it exactly at the end.
 KEEP = 64 * 1024
 
 
@@ -103,8 +103,11 @@ class RunRecorder:
             self._metrics[name] = value
 
     def output(self) -> str | None:
+        """The lines still held (past 64 KB the oldest are let go), joined and
+        not yet capped: the client redacts them first, then caps them
+        (redact_and_cap)."""
         with self._lock:
-            return None if not self._lines else cap_output("\n".join(self._lines))
+            return None if not self._lines else "\n".join(self._lines)
 
     def expect_text(self) -> str | None:
         """What an expect rule is checked against: everything logged, or when

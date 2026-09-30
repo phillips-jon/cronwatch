@@ -9,7 +9,7 @@ from typing import Any
 from .. import _js
 from ..types import Alert
 from ._http import HTTP
-from ._shared import http_or_default, iso, link_for, present, slice16
+from ._shared import cut, http_or_default, iso, link_for, present, slice16
 
 COLOR = {
     "missed": 0xB7791F,
@@ -21,6 +21,9 @@ COLOR = {
 }
 
 _MARKDOWN = re.compile(r"[\\`*_~|\[\]()<>]")
+
+#: The longest embed description Discord takes. The title (under 256) and it stay well inside the embed's 6000.
+DESCRIPTION_MAX = 4096
 
 
 class Discord:
@@ -41,8 +44,7 @@ class Discord:
         embed: dict[str, Any] = {"title": alert.title}
         if url:
             embed["url"] = url
-        triage = f"\n**Triage:** {escape_markdown(slice16(str(alert.triage), 1000))}" if present(alert.triage) else ""
-        embed["description"] = "```\n" + code_block_safe(slice16(alert.message, 3800)) + "\n```" + triage
+        embed["description"] = embed_description(alert)
         embed["color"] = COLOR[str(alert.type)]
         embed["timestamp"] = iso(alert.at)
         payload = {
@@ -55,6 +57,16 @@ class Discord:
         response = self._http.post(self._webhook_url, _js.dumps(payload), {"content-type": "application/json"})
         if not response.ok:
             raise RuntimeError(f"Discord webhook answered {response.status}: {_js.head16(response.body or '', 200)}")
+
+
+def embed_description(alert: Alert) -> str:
+    """The message in a code block, then the triage. Each part has its own
+    cap, and escaping can grow both, so the whole is held to DESCRIPTION_MAX
+    (in UTF-16 units) by cutting the message's block, never the triage:
+    Discord refuses a longer one on every retry."""
+    triage = f"\n**Triage:** {escape_markdown(slice16(str(alert.triage), 1000))}" if present(alert.triage) else ""
+    fences = len("```\n") + len("\n```")
+    return "```\n" + cut(code_block_safe(slice16(alert.message, 3800)), DESCRIPTION_MAX - fences - _js.length16(triage)) + "\n```" + triage
 
 
 def code_block_safe(text: str) -> str:

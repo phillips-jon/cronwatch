@@ -368,7 +368,7 @@ The first argument is a connection string, a psycopg connection or pool, or anyt
 
 ## Redaction
 
-Before a run's output and error are stored, shown or sent anywhere, `redact` rewrites them. The default, `cronwatch.redact_secrets`, blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks. An `expect` rule is checked before redaction, so it still sees what was logged.
+Before a run's output and error are stored, shown or sent anywhere, `redact` rewrites them. The default, `cronwatch.redact_secrets`, blanks values that look like secrets (secret-named pairs, credentials in URLs, authorization headers, private keys, JWTs, webhook URLs, and AWS, GitHub, Slack, Stripe, Google and API key formats), exactly what the SDK's default blanks. Redaction runs before the 16 KB cap, so the cut never keeps the rest of a secret whose label it cut off. An `expect` rule is checked before redaction, so it still sees what was logged.
 
 ```python
 cronwatch.Cronwatch(redact=False)                                            # keep output as logged
@@ -433,12 +433,12 @@ The client:
 | `start(every="1m")`, `stop()` | check in a daemon thread; the interval is at least 5 seconds |
 | `jobs()`, `jobs_with_runs(limit=20)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit=50)`, `get_run(run_id)` | newest first; `limit` is 1 to 500 |
-| `silence(name, "2h")`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath |
-| `forget(name)` | remove a job and its runs |
+| `silence(name, "2h")`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
+| `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resume_run(name, run_id)` | `job(name).resume(run_id)` for a job declared in this process |
-| `record_run(run, evaluate=True)` | record a run that happened elsewhere, for a source; returns the alerts it sent |
+| `record_run(run, evaluate=True)` | record a run that happened elsewhere, for a source; returns the alerts it sent. Every metric must be a finite number, as with `metric()`; one that is not raises `ValueError` and nothing is recorded |
 | `defined_jobs()` | the definitions declared in this process |
-| `close()` | stop the thread and close the store |
+| `close()` | stop the thread, wait for a check already under way, then close the store |
 
 ## Sharing a database with the other languages
 

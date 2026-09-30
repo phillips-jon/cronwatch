@@ -49,6 +49,7 @@ altogether; it is not supported yet.
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import queue
 import re
@@ -92,6 +93,8 @@ TRIGGER = "apscheduler"
 _GENERATED_ID = re.compile(r"[0-9a-f]{32}\Z")
 #: Runs that ended before their submission was heard of, remembered so it starts nothing.
 _DONE_KEPT = 1000
+#: The type of APScheduler's listeners lock (a reentrant lock), taken while a watch's listener is swapped.
+_RLOCK = type(threading.RLock())
 _EVENTS = (
     events.EVENT_SCHEDULER_STARTED
     | events.EVENT_JOB_ADDED
@@ -282,6 +285,7 @@ class SchedulerWatch:
         jobs: Mapping[str, Mapping[str, Any]],
         exclude: Iterable[str],
         options: Mapping[str, Any],
+        previous: SchedulerWatch | None = None,
     ) -> None:
         self.scheduler = scheduler
         self._client = client
@@ -299,9 +303,33 @@ class SchedulerWatch:
         self._events: queue.Queue[Any] = queue.Queue()
         self._closed = False
         self._thread = threading.Thread(target=self._work, name="cronwatch-apscheduler", daemon=True)
-        self._thread.start()
         self._events.put(("declare_all", None))
-        scheduler.add_listener(self._listen, _EVENTS)
+        if previous is None:
+            scheduler.add_listener(self._listen, _EVENTS)
+        else:
+            self._take_over(previous)
+        self._thread.start()
+
+    def _take_over(self, previous: SchedulerWatch) -> None:
+        """Replaces `previous` without losing or doubling an event: its listener
+        and this one's are swapped under the scheduler's listeners lock (which
+        APScheduler holds while it takes the listeners for an event), then
+        everything it heard is recorded, and the runs it has under way, and
+        what it remembers of runs that ended before their submission or were
+        caught up, carry over, so their ends finish them here. This one's
+        thread starts after that, on the events heard since the swap."""
+        lock = getattr(self.scheduler, "_listeners_lock", None)
+        with lock if isinstance(lock, _RLOCK) else contextlib.nullcontext():
+            if not previous._closed:
+                try:
+                    self.scheduler.remove_listener(previous._listen)
+                except Exception:
+                    pass
+            self.scheduler.add_listener(self._listen, _EVENTS)
+        previous.close()
+        self._active.update(previous._active)
+        self._later.update(previous._later)
+        self._done.extend(previous._done)
 
     @property
     def client(self) -> Cronwatch:
@@ -456,7 +484,11 @@ class SchedulerWatch:
             return
         first = (event.job_id, run_times[0])
         for later in run_times[1:]:
-            self._later[(event.job_id, later)] = 1
+            key = (event.job_id, later)
+            if key in self._done:
+                self._done.remove(key)  # it ended (or was skipped) before its submission was heard of
+            else:
+                self._later[key] = 1
         if first in self._done:
             self._done.remove(first)  # it ended before its submission was heard of
             return
@@ -469,8 +501,17 @@ class SchedulerWatch:
         run = self._active.pop(key, None)
         caught_up = self._later.pop(key, None) is not None
         if event.code == events.EVENT_JOB_MISSED:
+            skipped = f"APScheduler skipped the run: it could not start within misfire_grace_time of {event.scheduled_run_time.isoformat()}"
+            if run is None and not caught_up:
+                # APScheduler can report the miss before the submission: the run
+                # is failed now, and the submission that follows starts nothing.
+                handle = self._handle_for(event.job_id, event.jobstore)
+                if handle is None:
+                    return
+                self._done.append(key)
+                run = handle.start(trigger=TRIGGER)
             if run is not None:
-                run.fail(f"APScheduler skipped the run: it could not start within misfire_grace_time of {event.scheduled_run_time.isoformat()}")
+                run.fail(skipped)
             return
         if run is None:
             handle = self._handle_for(event.job_id, event.jobstore)
@@ -498,23 +539,23 @@ def watch(
     **options: Any,
 ) -> SchedulerWatch:
     """Records every job's runs (see the module's docstring). Call it once per
-    scheduler, before or after start(); calling it again replaces the listener.
+    scheduler, before or after start(); calling it again replaces the listener,
+    and the runs the earlier one has under way are finished by the new one.
 
     client:  a Cronwatch, or a function returning one. Default: cronwatch.client(), looked up when used.
     jobs:    {job id: options} per job: Cronwatch.job()'s options and name=.
     exclude: job ids or names to leave alone.
     options: job options (grace, timeout, failures_before_alert, tags...) for every job.
     """
-    made = SchedulerWatch(
-        scheduler,
-        client=client,
-        jobs=jobs or {},
-        exclude=[exclude] if isinstance(exclude, str) else exclude,
-        options=options,
-    )
     with _watches_lock:
         previous = _watches.get(id(scheduler))
+        made = SchedulerWatch(
+            scheduler,
+            client=client,
+            jobs=jobs or {},
+            exclude=[exclude] if isinstance(exclude, str) else exclude,
+            options=options,
+            previous=previous if previous is not None and previous.scheduler is scheduler else None,
+        )
         _watches[id(scheduler)] = made
-    if previous is not None:
-        previous.close()
     return made
