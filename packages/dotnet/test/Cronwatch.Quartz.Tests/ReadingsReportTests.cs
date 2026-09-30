@@ -232,9 +232,9 @@ public class ReadingsReportTests
                     order.Add(library);
                 }
                 counts[what] = counts.GetValueOrDefault(what) + 1;
-                if (what == "other")
+                if (what is "other" or "refused")
                 {
-                    others.Add(library + ": " + six + " in " + zone);
+                    others.Add(what + " by " + library + ": " + (library == "Quartz" ? quartzText : six) + " in " + zone);
                 }
             }
         }
@@ -246,7 +246,7 @@ public class ReadingsReportTests
         }
         foreach (string other in others)
         {
-            output.Append("\n  read otherwise: ").Append(other);
+            output.Append("\n  ").Append(other);
         }
         Console.Out.Write(output.Append('\n').ToString());
         TestContext.Current.SendDiagnosticMessage(output.ToString());
