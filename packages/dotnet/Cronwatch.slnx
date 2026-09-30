@@ -1,9 +1,13 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Cronwatch/Cronwatch.csproj" />
+    <Project Path="src/Cronwatch.Hangfire/Cronwatch.Hangfire.csproj" />
+    <Project Path="src/Cronwatch.Quartz/Cronwatch.Quartz.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Cronwatch.Tests/Cronwatch.Tests.csproj" />
+    <Project Path="test/Cronwatch.Hangfire.Tests/Cronwatch.Hangfire.Tests.csproj" />
+    <Project Path="test/Cronwatch.Quartz.Tests/Cronwatch.Quartz.Tests.csproj" />
     <Project Path="test/ProcessExitChild/ProcessExitChild.csproj" />
   </Folder>
 </Solution>
