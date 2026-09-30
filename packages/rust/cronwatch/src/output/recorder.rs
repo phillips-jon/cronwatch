@@ -1,11 +1,11 @@
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
-use super::{OUTPUT_CAP, cap_output};
+use super::OUTPUT_CAP;
 use crate::js;
 
 /// How much logged text a recorder holds, in code units, before it drops
-/// lines from the front. `cap_output` trims exactly at the end, so this only
+/// lines from the front. `redact_and_cap` trims exactly at the end, so this only
 /// bounds memory: well past the cap, so the kept tail is whole.
 const WINDOW: usize = 64 * 1024;
 
@@ -51,7 +51,7 @@ impl Recorder {
         }
         r.lines.push_back((line, n));
         r.size += n + 1;
-        // Drop from the front once well past the cap; cap_output trims
+        // Drop from the front once well past the cap; redact_and_cap trims
         // exactly at the end.
         while r.size > WINDOW && r.lines.len() > 1 {
             let (_, len) = r.lines.pop_front().expect("more than one line");
@@ -60,14 +60,15 @@ impl Recorder {
         }
     }
 
-    /// What the run stores as its output: the lines kept, capped. `None`
-    /// when nothing was logged.
+    /// The lines still held (past 64 KB the oldest are let go), joined and
+    /// not yet capped: the client redacts them first, then caps them
+    /// (`redact_and_cap`). `None` when nothing was logged.
     pub(crate) fn output(&self) -> Option<String> {
         let r = self.lock();
         if r.lines.is_empty() {
             return None;
         }
-        Some(cap_output(&join(&r.lines)))
+        Some(join(&r.lines))
     }
 
     /// What an expect rule is checked against: everything logged, or when

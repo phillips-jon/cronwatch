@@ -153,6 +153,32 @@ async fn a_job_removed_loses_its_schedule_at_once() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_job_removed_and_added_again_gets_its_schedule_back_at_once() {
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let (cw, errors) = client(store.clone());
+    let watcher = Watcher::new(&cw, options("billing"));
+    let scheduler = JobScheduler::new().await.unwrap();
+    let paused =
+        watcher.job("paused", "0 0 4 * * *", "", |_| async { Ok::<_, Failed>(()) }, JobOptions::new()).unwrap();
+    let following = watcher.follow(&scheduler);
+    let uuid = scheduler.add(paused.clone()).await.unwrap();
+    watcher.wait().await;
+    scheduler.remove(&uuid).await.unwrap();
+    until("the job declared without its schedule", || async {
+        stored(&*store, "paused").await.contains("no longer scheduled")
+    })
+    .await;
+    // Resumed: the same job, the same uuid, with no sync to follow.
+    assert_eq!(scheduler.add(paused).await.unwrap(), uuid);
+    until("the job declared with its schedule again", || async {
+        stored(&*store, "paused").await.contains(r#""schedule":"0 0 4 * * *""#)
+    })
+    .await;
+    assert!(errors.lock().unwrap().is_empty(), "{:?}", errors.lock().unwrap());
+    following.abort();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_sync_finds_a_job_removed_without_following_and_one_another_release_dropped() {
     let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
     // An earlier release scheduled "dropped", which this one does not make.

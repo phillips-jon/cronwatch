@@ -58,11 +58,41 @@ pub(crate) fn cap_output(s: &str) -> String {
     if clean.len() <= OUTPUT_CAP || js::len16(&clean) <= OUTPUT_CAP {
         return clean;
     }
-    format!("[earlier output trimmed]\n{}", js::tail16(&clean, OUTPUT_CAP))
+    format!("{TRIMMED}{}", js::tail16(&clean, OUTPUT_CAP))
+}
+
+const TRIMMED: &str = "[earlier output trimmed]\n";
+
+/// How much text before the kept tail redaction reads, and never keeps:
+/// three times the longest secret a default pattern can match (a PEM key's
+/// 16 KB body with its header and footer, under `OUTPUT_CAP + 1024`), since a
+/// replacement grows what it replaces at most threefold.
+pub(crate) const REDACT_EDGE: usize = 3 * (OUTPUT_CAP + 1024);
+
+/// Output or an error as it is stored (output.ts's `redactAndCap`):
+/// redacted, then capped like `cap_output`, so the cut cannot fall inside a
+/// secret and keep what follows its label. Text of at most `OUTPUT_CAP +
+/// REDACT_EDGE` code units is redacted whole. Longer text is cut to that
+/// many units from its end first, and after redacting, the first
+/// `REDACT_EDGE` units are never kept: a secret whose label fell before that
+/// cut is left out with them. NULs go before and after `redact`.
+pub(crate) fn redact_and_cap(text: &str, redact: impl Fn(&str) -> String) -> String {
+    let clean = strip_nul(text);
+    let window = OUTPUT_CAP + REDACT_EDGE;
+    // Each byte is at most one code unit, so a short text needs no count.
+    let n = if clean.len() <= window { clean.len() } else { js::len16(&clean) };
+    if n <= window {
+        return cap_output(&redact(&clean));
+    }
+    let redacted = strip_nul(&redact(&js::tail16(&clean, window)));
+    let len = js::len16(&redacted);
+    let from = len.saturating_sub(OUTPUT_CAP).max(REDACT_EDGE);
+    format!("{TRIMMED}{}", js::slice16(&redacted, from as i64, len as i64))
 }
 
 /// An error as a JavaScript stack reads: `Name: message`, then up to five
-/// frames, each `    at <frame>`.
+/// frames, each `    at <frame>`. Not capped (output.ts's `describeError`):
+/// a run's error is redacted and then capped (`redact_and_cap`).
 pub(crate) fn describe(name: &str, message: &str, frames: &[String]) -> String {
     let mut b = format!("{name}: {message}");
     for f in frames.iter().take(5) {
@@ -73,7 +103,9 @@ pub(crate) fn describe(name: &str, message: &str, frames: &[String]) -> String {
 }
 
 /// The SDK's `errorMessage` for an error: described, then capped like
-/// output.
+/// output. The client no longer uses it (see `describe`); the conformance
+/// replay holds it.
+#[cfg(test)]
 pub(crate) fn error_message(name: &str, message: &str, frames: &[String]) -> String {
     cap_output(&describe(name, message, frames))
 }

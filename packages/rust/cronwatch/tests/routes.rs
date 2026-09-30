@@ -231,6 +231,50 @@ async fn names_break_after_their_separators_only_as_text() {
 }
 
 #[tokio::test]
+async fn a_silence_ends_on_a_whole_millisecond_never_past_2_to_the_53_less_1() {
+    const MAX: i64 = (1 << 53) - 1;
+    let w = Web::new();
+    w.ok("long").await;
+    assert_eq!(w.k.cw.silence("long", "99999999999999999999w").await.unwrap().silenced_until, Some(MAX));
+    assert_eq!(w.k.cw.silence("long", 1e300).await.unwrap().silenced_until, Some(MAX));
+    assert_eq!(w.k.cw.silence("long", 1.5).await.unwrap().silenced_until, Some(T0 + 1));
+    let res =
+        w.send("POST", "/cronwatch/api/jobs/long/silence", &[AUTH, JSON], r#"{"for":"99999999999999999999w"}"#).await;
+    status("silence", &res, 200);
+    assert_eq!(field(&json(&res), &["state", "silencedUntil"]).as_f64(), Some(MAX as f64));
+}
+
+#[tokio::test]
+async fn a_run_whose_metrics_hold_something_other_than_a_finite_number_still_shows_its_jobs_page() {
+    let w = Web::new();
+    w.k.cw.job("imported", JobOptions::new()).unwrap();
+    // As a foreign row, or a store that kept NaN, may hold them.
+    let mut metrics = cronwatch::Metrics::new();
+    metrics.set("rows", f64::NAN);
+    metrics.set("label", f64::INFINITY);
+    metrics.set("cost", 1.25);
+    metrics.set("n", 3.0);
+    let run = Run {
+        id: "odd".into(),
+        job: "imported".into(),
+        status: cronwatch::RunStatus::Ok,
+        started_at: T0,
+        finished_at: Some(T0),
+        duration_ms: Some(0),
+        error: None,
+        output: None,
+        metrics,
+        trigger: "source".into(),
+    };
+    w.k.cw.store().insert_run(&run).await.unwrap();
+    let res = w.get("/cronwatch/jobs/imported", &[AUTH]).await;
+    status("job page", &res, 200);
+    let page = res.text().into_owned();
+    contains("metrics", &page, r#"<span class="k">cost</span> 1.2500</span><span><span class="k">n</span> 3</span>"#);
+    assert!(!page.contains(r#"class="k">rows<"#) && !page.contains(r#"class="k">label<"#));
+}
+
+#[tokio::test]
 async fn api_writes() {
     let w = Web::new();
     w.ok("s").await;

@@ -4,7 +4,9 @@
 use super::format::{definition, draft_from, draft_value};
 use super::{Failures, field, fixture, int, objects, opt_int};
 use crate::evaluate::{
-    Evaluation, apply_silence, is_stuck, job_health, mute_opens, normalize_state, summarize, unevaluable_summary,
+    Evaluation, MAX_UNDELIVERED, SEND_LEASE_MS, alert_key, apply_silence, hold_alerts, is_stuck, job_health,
+    mute_opens, normalize_state, queue_undelivered, record_sent, release_sending, silence_end, summarize,
+    unevaluable_summary,
 };
 use crate::js::{Object, Value};
 use crate::stats::{median, percentile};
@@ -161,6 +163,94 @@ fn conformance_health() {
             .with("alerts", e.alerts.iter().map(draft_value).collect::<Vec<_>>());
         fails.same(&format!("failureCount {i}, a failed run"), &got.into(), field(c, "failed"));
     }
+    for (i, c) in objects(&f, "silenceEnd").into_iter().enumerate() {
+        cases += 1;
+        let ms = crate::schedule::parse_duration(field(c, "duration"), "silence duration").expect("a duration");
+        let got = silence_end(int(c, "now"), ms);
+        fails.same(&format!("silenceEnd {i}"), &got.into(), field(c, "silencedUntil"));
+    }
+    cases += delivery(field(&f, "delivery").as_object().expect("delivery"), &mut fails);
     assert!(cases > 0, "health.json has no cases");
     fails.check("health");
+}
+
+fn alerts(v: &Value) -> Vec<Alert> {
+    v.as_array().expect("alerts").iter().map(|a| Alert::from_value(a).expect("an alert")).collect()
+}
+
+/// A result `{ state, dropped }`, as the SDK's delivery functions give it.
+fn held((state, dropped): (JobState, usize)) -> Value {
+    Object::new().with("state", state.to_value()).with("dropped", dropped).into()
+}
+
+/// JSON with every object's keys sorted: the fixture's alerts are written in
+/// the order the script built them, a port's in its writer's own.
+fn sorted(v: &Value) -> Value {
+    match v {
+        Value::Object(o) => {
+            let mut keys: Vec<&str> = o.keys().collect();
+            keys.sort_unstable();
+            let mut out = Object::new();
+            for k in keys {
+                out.set(k, sorted(field(o, k)));
+            }
+            Value::Object(out)
+        }
+        Value::Array(list) => Value::Array(list.iter().map(sorted).collect()),
+        other => other.clone(),
+    }
+}
+
+/// `health.json`'s `delivery`: the outbox and the undelivered queue.
+fn delivery(d: &Object, fails: &mut Failures) -> usize {
+    let mut cases = 0;
+    fails.same("maxUndelivered", &MAX_UNDELIVERED.into(), field(d, "maxUndelivered"));
+    fails.same("sendLeaseMs", &SEND_LEASE_MS.into(), field(d, "sendLeaseMs"));
+    for (i, c) in objects(d, "alertKey").into_iter().enumerate() {
+        cases += 1;
+        let alert = Alert::from_value(field(c, "alert")).expect("an alert");
+        let want = field(c, "key").as_str().expect("a key");
+        // An alert's `at` is a whole millisecond here (see DESIGN.md, Where
+        // it cannot match the SDK): a fraction is read as the whole part.
+        let want = if want == "failed|1.5|" { "failed|1|" } else { want };
+        fails.same(&format!("alertKey {i}"), &alert_key(&alert).into(), &want.into());
+    }
+    for (i, c) in objects(d, "normalizeState").into_iter().enumerate() {
+        cases += 1;
+        let got = normalize_state(Some(&state(field(c, "state"))), "j").to_value();
+        fails.same(&format!("delivery normalizeState {i}"), &sorted(&got), &sorted(field(c, "normalized")));
+    }
+    for (i, c) in objects(d, "queueUndelivered").into_iter().enumerate() {
+        cases += 1;
+        let got = held(queue_undelivered(&state(field(c, "state")), &alerts(field(c, "alerts"))));
+        fails.same(&format!("queueUndelivered {i}"), &sorted(&got), &sorted(field(c, "result")));
+    }
+    for (i, c) in objects(d, "holdAlerts").into_iter().enumerate() {
+        cases += 1;
+        let deferred = matches!(field(c, "deferred"), Value::Bool(true));
+        let got = held(hold_alerts(&state(field(c, "state")), &alerts(field(c, "alerts")), int(c, "until"), deferred));
+        fails.same(&format!("holdAlerts {i}"), &sorted(&got), &sorted(field(c, "result")));
+    }
+    for (i, c) in objects(d, "releaseSending").into_iter().enumerate() {
+        cases += 1;
+        let got = held(release_sending(&state(field(c, "state")), int(c, "now")));
+        fails.same(&format!("releaseSending {i}"), &sorted(&got), &sorted(field(c, "result")));
+    }
+    for (i, c) in objects(d, "recordSent").into_iter().enumerate() {
+        cases += 1;
+        let got = held(record_sent(
+            &state(field(c, "state")),
+            &alerts(field(c, "delivered")),
+            &alerts(field(c, "failed")),
+            &alerts(field(c, "stale")),
+            int(c, "now"),
+        ));
+        fails.same(&format!("recordSent {i}"), &sorted(&got), &sorted(field(c, "result")));
+    }
+    let listed = ["alertKey", "normalizeState", "queueUndelivered", "holdAlerts", "releaseSending", "recordSent"];
+    let known = ["maxUndelivered", "sendLeaseMs"];
+    for key in d.keys() {
+        assert!(listed.contains(&key) || known.contains(&key), "health.json's delivery has {key}, not replayed");
+    }
+    cases
 }

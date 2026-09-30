@@ -10,7 +10,7 @@ use crate::schedule::{self, Parsed};
 use crate::stats::{median, percentile};
 use crate::types::{
     Alert, AlertDetails, AlertType, BudgetBreach, Condition, Definition, JobHealth, JobState, JobSummary,
-    MAX_DURATION_MS, OpenCondition, Run, RunStatus, Stats, StoredJob,
+    MAX_DURATION_MS, OpenCondition, Run, RunStatus, SendingAlert, Stats, StoredJob,
 };
 
 /// A state worked out, and the alerts it owes.
@@ -43,7 +43,8 @@ pub(crate) fn empty_state(job: &str) -> JobState {
 }
 
 /// A stored state with every field present, or a fresh one. State written
-/// by an older version lacks the newer fields.
+/// by an older version lacks the newer fields. `sending` is the exception:
+/// it is there only while it holds an alert (see `hold_alerts`).
 pub(crate) fn normalize_state(state: Option<&JobState>, job: &str) -> JobState {
     let Some(state) = state else {
         return empty_state(job);
@@ -55,7 +56,134 @@ pub(crate) fn normalize_state(state: Option<&JobState>, job: &str) -> JobState {
     s.consecutive_failures = s.consecutive_failures.clamp(0, MAX_DURATION_MS);
     s.pending_recovery.get_or_insert_with(Vec::new);
     s.undelivered.get_or_insert_with(Vec::new);
+    if s.sending.as_ref().is_some_and(Vec::is_empty) {
+        s.sending = None;
+    }
     s
+}
+
+/// When a silence of `ms` from `now` ends: a whole millisecond, never past
+/// `MAX_DURATION_MS` (2^53 - 1), however long the silence asked for. Every
+/// port sharing the store reads it back unchanged.
+pub(crate) fn silence_end(now: i64, ms: f64) -> i64 {
+    let ms = ms.min(MAX_DURATION_MS as f64).floor().max(0.0) as i64;
+    now.saturating_add(ms).min(MAX_DURATION_MS)
+}
+
+// ---------------------------------------------------------------- delivery
+
+/// Alerts kept per job for retry, and per job being sent; past it the
+/// oldest go.
+pub(crate) const MAX_UNDELIVERED: usize = 20;
+
+/// How long an alert in `sending` is left to the process sending it, in
+/// milliseconds. Longer than any send takes: at most three alerts go out
+/// together, each with 25 seconds of triage and 15 of channels.
+pub(crate) const SEND_LEASE_MS: i64 = 5 * 60_000;
+
+/// Identifies an alert across retries, and in `sending`.
+pub(crate) fn alert_key(a: &Alert) -> String {
+    format!("{}|{}|{}", a.alert_type, a.at, a.run.as_ref().map_or("", |r| r.id.as_str()))
+}
+
+/// Keeps the newest `MAX_UNDELIVERED` of `list`, and says how many went.
+fn newest<T>(mut list: Vec<T>) -> (Vec<T>, usize) {
+    let dropped = list.len().saturating_sub(MAX_UNDELIVERED);
+    (list.split_off(dropped), dropped)
+}
+
+/// `alerts` added to the undelivered queue: one with the same key as a
+/// queued alert replaces it where it stands, the rest go at the end, and
+/// only the newest `MAX_UNDELIVERED` stay. Also says how many were let go.
+pub(crate) fn queue_undelivered(state: &JobState, alerts: &[Alert]) -> (JobState, usize) {
+    let mut next = clone_state(state);
+    // The last of `alerts` with a key wins, as a Map built from them keeps it.
+    let mut queue: Vec<Alert> = next
+        .undelivered
+        .take()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|a| {
+            let key = alert_key(&a);
+            alerts.iter().rev().find(|b| alert_key(b) == key).cloned().unwrap_or(a)
+        })
+        .collect();
+    let known: std::collections::HashSet<String> = queue.iter().map(alert_key).collect();
+    queue.extend(alerts.iter().filter(|a| !known.contains(&alert_key(a))).cloned());
+    let (kept, dropped) = newest(queue);
+    next.undelivered = Some(kept);
+    (next, dropped)
+}
+
+/// The outbox. Alerts just composed are written with the state that opens
+/// their condition, before any is sent, so a process that stops part way
+/// does not lose them: into `sending`, each with its lease ending at
+/// `until`, when this process sends them, or (`deferred`, for
+/// `Deliver::AtCheck`) straight into the undelivered queue for a check
+/// elsewhere. Also says how many were let go past `MAX_UNDELIVERED`.
+pub(crate) fn hold_alerts(state: &JobState, alerts: &[Alert], until: i64, deferred: bool) -> (JobState, usize) {
+    if alerts.is_empty() {
+        return (state.clone(), 0);
+    }
+    if deferred {
+        return queue_undelivered(state, alerts);
+    }
+    let mut next = clone_state(state);
+    let mut sending = next.sending.take().unwrap_or_default();
+    sending.extend(alerts.iter().map(|a| SendingAlert { until: Some(until), alert: Some(a.clone()) }));
+    let (kept, dropped) = newest(sending);
+    next.sending = Some(kept);
+    (next, dropped)
+}
+
+/// Alerts in `sending` whose lease ran out by `now`: the process sending
+/// them stopped before it recorded how the send went. They go to the
+/// undelivered queue, where the retry sends them (with triage, which is
+/// never stored with them here) or drops them as stale. An entry without an
+/// alert is dropped; one without a numeric `until` counts as run out.
+pub(crate) fn release_sending(state: &JobState, now: i64) -> (JobState, usize) {
+    let sending = state.sending.as_deref().unwrap_or_default();
+    let lapsed = |e: &SendingAlert| !e.until.is_some_and(|until| until > now);
+    if !sending.iter().any(lapsed) {
+        return (state.clone(), 0);
+    }
+    let held: Vec<SendingAlert> = sending.iter().filter(|e| !lapsed(e)).cloned().collect();
+    let released: Vec<Alert> = sending.iter().filter(|e| lapsed(e)).filter_map(|e| e.alert.clone()).collect();
+    let mut next = state.clone();
+    next.sending = (!held.is_empty()).then_some(held);
+    queue_undelivered(&next, &released)
+}
+
+/// How a send went. Delivered and stale alerts leave the queue; failed ones
+/// replace their queued copy, so a triage made on this attempt is kept, or
+/// join the queue. Every one of them leaves `sending`. `last_alert_at` moves
+/// only on a delivery. Also says how many were let go past
+/// `MAX_UNDELIVERED`.
+pub(crate) fn record_sent(
+    state: &JobState,
+    delivered: &[Alert],
+    failed: &[Alert],
+    stale: &[Alert],
+    now: i64,
+) -> (JobState, usize) {
+    let mut next = clone_state(state);
+    let done: std::collections::HashSet<String> = delivered.iter().chain(stale).map(alert_key).collect();
+    if let Some(queue) = next.undelivered.as_mut() {
+        queue.retain(|a| !done.contains(&alert_key(a)));
+    }
+    let sent: std::collections::HashSet<String> = delivered.iter().chain(failed).chain(stale).map(alert_key).collect();
+    let held: Vec<SendingAlert> = next
+        .sending
+        .take()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|e| !e.alert.as_ref().is_some_and(|a| sent.contains(&alert_key(a))))
+        .collect();
+    next.sending = (!held.is_empty()).then_some(held);
+    if !delivered.is_empty() {
+        next.last_alert_at = Some(now);
+    }
+    queue_undelivered(&next, failed)
 }
 
 fn clone_state(s: &JobState) -> JobState {

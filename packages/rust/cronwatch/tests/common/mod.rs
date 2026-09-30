@@ -157,6 +157,8 @@ pub struct TestStore {
     pub holds_upsert: std::sync::atomic::AtomicBool,
     pub upsert_waiting: tokio::sync::Notify,
     pub upsert_release: tokio::sync::Notify,
+    /// `holds_upsert`, but the write lands before it waits.
+    pub holds_after_upsert: std::sync::atomic::AtomicBool,
 }
 
 impl TestStore {
@@ -208,7 +210,12 @@ impl Store for TestStore {
                 self.upsert_waiting.notify_one();
                 self.upsert_release.notified().await;
             }
-            self.inner.upsert_job(d, now).await
+            self.inner.upsert_job(d, now).await?;
+            if self.holds_after_upsert.swap(false, Ordering::SeqCst) {
+                self.upsert_waiting.notify_one();
+                self.upsert_release.notified().await;
+            }
+            Ok(())
         })
     }
     fn get_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<Option<StoredJob>, BoxError>> {
@@ -299,5 +306,150 @@ impl Store for TestStore {
             });
         }
         guarded!(self, "delete_run_if", self.inner.delete_run_if(id, job, status))
+    }
+}
+
+/// A view of one shared memory store for a process of its own (outbox.test.ts
+/// `mortal()`): once `kill()` is called, nothing it asks of the store ever
+/// completes, as when the process is gone. It counts its conditional state
+/// writes, and its `close` is only counted.
+pub struct Mortal {
+    pub inner: Arc<MemoryStore>,
+    dead: std::sync::atomic::AtomicBool,
+    pub state_writes: std::sync::atomic::AtomicUsize,
+    pub closes: std::sync::atomic::AtomicUsize,
+}
+
+impl Mortal {
+    pub fn new(inner: &Arc<MemoryStore>) -> Arc<Mortal> {
+        Arc::new(Mortal {
+            inner: inner.clone(),
+            dead: Default::default(),
+            state_writes: Default::default(),
+            closes: Default::default(),
+        })
+    }
+
+    pub fn kill(&self) {
+        self.dead.store(true, Ordering::SeqCst);
+    }
+}
+
+macro_rules! mortal {
+    ($self:ident, $call:expr) => {{
+        if $self.dead.load(Ordering::SeqCst) {
+            return Box::pin(std::future::pending());
+        }
+        $call
+    }};
+}
+
+impl Store for Mortal {
+    fn init(&self) -> BoxFuture<'_, Result<(), BoxError>> {
+        mortal!(self, self.inner.init())
+    }
+    fn upsert_job<'a>(&'a self, d: &'a Definition, now: i64) -> BoxFuture<'a, Result<(), BoxError>> {
+        mortal!(self, self.inner.upsert_job(d, now))
+    }
+    fn get_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<Option<StoredJob>, BoxError>> {
+        mortal!(self, self.inner.get_job(name))
+    }
+    fn list_jobs(&self) -> BoxFuture<'_, Result<Vec<StoredJob>, BoxError>> {
+        mortal!(self, self.inner.list_jobs())
+    }
+    fn delete_job<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<(), BoxError>> {
+        mortal!(self, self.inner.delete_job(name))
+    }
+    fn insert_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>> {
+        mortal!(self, self.inner.insert_run(run))
+    }
+    fn update_run<'a>(&'a self, run: &'a Run) -> BoxFuture<'a, Result<(), BoxError>> {
+        mortal!(self, self.inner.update_run(run))
+    }
+    fn get_run<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Run>, BoxError>> {
+        mortal!(self, self.inner.get_run(id))
+    }
+    fn list_runs<'a>(&'a self, job: &'a str, limit: usize) -> BoxFuture<'a, Result<Vec<Run>, BoxError>> {
+        mortal!(self, self.inner.list_runs(job, limit))
+    }
+    fn last_run<'a>(&'a self, job: &'a str) -> BoxFuture<'a, Result<Option<Run>, BoxError>> {
+        mortal!(self, self.inner.last_run(job))
+    }
+    fn running_runs(&self) -> BoxFuture<'_, Result<Vec<Run>, BoxError>> {
+        mortal!(self, self.inner.running_runs())
+    }
+    fn get_state<'a>(&'a self, job: &'a str) -> BoxFuture<'a, Result<Option<JobState>, BoxError>> {
+        mortal!(self, self.inner.get_state(job))
+    }
+    fn set_state<'a>(&'a self, state: &'a JobState) -> BoxFuture<'a, Result<(), BoxError>> {
+        mortal!(self, self.inner.set_state(state))
+    }
+    fn prune(&self, before: i64) -> BoxFuture<'_, Result<u64, BoxError>> {
+        mortal!(self, self.inner.prune(before))
+    }
+    fn close(&self) -> BoxFuture<'_, Result<(), BoxError>> {
+        self.closes.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async { Ok(()) })
+    }
+    fn update_run_if<'a>(&'a self, run: &'a Run, from: &'a [RunStatus]) -> BoxFuture<'a, Result<bool, BoxError>> {
+        mortal!(self, self.inner.update_run_if(run, from))
+    }
+    fn compare_and_set_state<'a>(
+        &'a self,
+        state: &'a JobState,
+        expected: i64,
+    ) -> BoxFuture<'a, Result<bool, BoxError>> {
+        mortal!(self, {
+            self.state_writes.fetch_add(1, Ordering::SeqCst);
+            self.inner.compare_and_set_state(state, expected)
+        })
+    }
+    fn delete_run_if<'a>(
+        &'a self,
+        id: &'a str,
+        job: &'a str,
+        status: &'a RunStatus,
+    ) -> BoxFuture<'a, Result<bool, BoxError>> {
+        mortal!(self, self.inner.delete_run_if(id, job, status))
+    }
+}
+
+/// A channel whose sends wait at a gate: `sending` is told when one has
+/// started, and each waits for a permit of `release` before it goes out.
+pub struct Held {
+    pub sending: Arc<tokio::sync::Notify>,
+    pub release: Arc<tokio::sync::Semaphore>,
+    pub sent: Arc<Mutex<Vec<Alert>>>,
+}
+
+impl Held {
+    pub fn new() -> Held {
+        Held {
+            sending: Arc::new(tokio::sync::Notify::new()),
+            release: Arc::new(tokio::sync::Semaphore::new(0)),
+            sent: Arc::default(),
+        }
+    }
+
+    pub fn channel(&self) -> Arc<dyn cronwatch::Channel> {
+        let (sending, release, sent) = (self.sending.clone(), self.release.clone(), self.sent.clone());
+        channel_fn("held", move |alert: Alert| {
+            let (sending, release, sent) = (sending.clone(), release.clone(), sent.clone());
+            async move {
+                sending.notify_one();
+                release.acquire().await.expect("the gate").forget();
+                sent.lock().unwrap().push(alert);
+                Ok(())
+            }
+        })
+    }
+
+    /// Lets every send through, now and later.
+    pub fn open(&self) {
+        self.release.add_permits(1000);
+    }
+
+    pub fn types(&self) -> Vec<String> {
+        alert_types(&self.sent.lock().unwrap())
     }
 }

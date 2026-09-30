@@ -385,3 +385,62 @@ async fn deferred_delivery_queues_alerts_for_a_check_elsewhere() {
     assert_eq!(sender.types(), ["failed"]);
     assert!(sender.state("backup").await.unwrap().undelivered.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn a_secret_split_by_the_16_kb_cut_is_redacted_whole() {
+    const CAP: usize = 16 * 1024;
+    const TRIMMED: &str = "[earlier output trimmed]\n";
+    let body: Vec<String> = (0..25).map(|i| format!("{}{i:04}", "QUJD".repeat(15))).collect();
+    let pem = format!("-----BEGIN PRIVATE KEY-----\n{}\n-----END PRIVATE KEY-----", body.join("\n"));
+    let bearer = "Authorization: Bearer opaqueTOKENvalue1234567890";
+    let k = Kit::new();
+    // The cut lands inside the key's body, and in a second run just after "Bear".
+    let (head, rest) = pem.split_at(900);
+    let (head, rest) = (head.to_string(), rest.to_string());
+    k.cw.run("pem", None, move |j| {
+        j.log("x".repeat(CAP));
+        j.log(head);
+        j.log(rest);
+        j.log("done");
+        std::future::ready(Ok::<_, Boom>(()))
+    })
+    .await
+    .unwrap()
+    .unwrap();
+    let output = k.runs("pem").await[0].output.clone().unwrap();
+    assert!(!output.contains("QUJD"));
+    assert!(output.ends_with("[redacted]\ndone"));
+    let tail = "y".repeat(CAP - 30);
+    let returned = format!("{bearer}\n{tail}");
+    k.cw.run("bearer", None, move |_| std::future::ready(Ok::<_, Boom>(returned))).await.unwrap().unwrap();
+    let output = k.runs("bearer").await[0].output.clone().unwrap();
+    assert!(!output.contains("opaqueTOKEN"));
+    assert!(output.len() <= CAP + TRIMMED.len());
+
+    // Errors, recorded runs and flushed lines the same way.
+    let thrown = format!("{} {bearer} {}", "e".repeat(CAP), "z".repeat(CAP - 40));
+    let _ = k.cw.run("thrown", None, move |_| std::future::ready(Err::<(), _>(thrown))).await.unwrap();
+    assert!(!k.runs("thrown").await[0].error.clone().unwrap().contains("opaqueTOKEN"));
+    k.cw.job("imported", JobOptions::new()).unwrap();
+    let run = cronwatch::Run {
+        id: "i1".into(),
+        job: "imported".into(),
+        status: RunStatus::Ok,
+        started_at: 1,
+        finished_at: Some(2),
+        duration_ms: Some(1),
+        error: None,
+        output: Some(format!("{bearer}\n{tail}")),
+        metrics: Metrics::new(),
+        trigger: "source".into(),
+    };
+    k.cw.record_run(run, cronwatch::RecordOptions::new()).await.unwrap();
+    assert!(!k.cw.get_run("i1").await.unwrap().unwrap().output.unwrap().contains("opaqueTOKEN"));
+    let handle = k.cw.job("flushed", JobOptions::new()).unwrap().start(cronwatch::StartOptions::new()).await.unwrap();
+    handle.log(bearer);
+    handle.log(&tail);
+    handle.flush().await;
+    assert!(!k.cw.get_run(handle.id()).await.unwrap().unwrap().output.unwrap().contains("opaqueTOKEN"));
+    handle.finish().await.expect("finished");
+    assert!(!k.cw.get_run(handle.id()).await.unwrap().unwrap().output.unwrap().contains("opaqueTOKEN"));
+}

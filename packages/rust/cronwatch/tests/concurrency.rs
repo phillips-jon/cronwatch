@@ -399,6 +399,64 @@ async fn a_handle_whose_job_was_forgotten_writes_its_own_definition() {
 }
 
 #[tokio::test]
+async fn a_forget_that_lands_while_a_jobs_first_write_is_under_way_leaves_it_to_be_written_on_its_next_run() {
+    let store = Arc::new(TestStore::default());
+    // The write lands, then waits: the forget deletes the row it wrote.
+    store.holds_after_upsert.store(true, Ordering::SeqCst);
+    let k = Kit::with(|b| b.store_arc(store.clone()));
+    let handle = k.cw.job("nightly", JobOptions::new().schedule("every 5m")).unwrap();
+    let first = run_in_a_task(handle.clone());
+    store.upsert_waiting.notified().await;
+    k.cw.forget("nightly").await.unwrap();
+    store.upsert_release.notify_one();
+    first.await.unwrap();
+    assert!(store.inner.get_job("nightly").await.unwrap().is_none(), "forgotten after it was written");
+    handle.run(|_| async { Ok::<_, Boom>(()) }).await.unwrap();
+    assert_eq!(stored_schedule(&store.inner, "nightly").await, "every 5m", "its next run brings it back");
+    let names: Vec<String> = k.cw.jobs().await.unwrap().into_iter().map(|j| j.name).collect();
+    assert_eq!(names, ["nightly"]);
+}
+
+#[tokio::test]
+async fn a_job_forgotten_by_another_process_comes_back_in_a_long_lived_one_that_still_declares_it() {
+    let store = Arc::new(MemoryStore::new());
+    let worker = Kit::with(|b| b.store_arc(store.clone()));
+    let web = Kit::with(|b| b.store_arc(store.clone()));
+    let nightly = worker.cw.job("nightly", JobOptions::new().schedule("every 5m")).unwrap();
+    nightly.run(|_| async { Ok::<_, Boom>(()) }).await.unwrap();
+    let forgotten = || async {
+        web.cw.forget("nightly").await.unwrap();
+        assert!(store.get_job("nightly").await.unwrap().is_none());
+    };
+
+    // Its next run writes it again, so the run is not left without its job.
+    forgotten().await;
+    nightly.run(|_| async { Ok::<_, Boom>(()) }).await.unwrap();
+    assert_eq!(stored_schedule(&*store, "nightly").await, "every 5m");
+    assert_eq!(web.runs("nightly").await.len(), 1);
+
+    // So does a started run, a check, the board and the job's page in the
+    // process that declares it.
+    forgotten().await;
+    let handle = nightly.start(cronwatch::StartOptions::new()).await.unwrap();
+    assert!(store.get_job("nightly").await.unwrap().is_some());
+    handle.finish().await.expect("finished");
+    forgotten().await;
+    worker.check().await;
+    assert!(store.get_job("nightly").await.unwrap().is_some());
+    forgotten().await;
+    let names: Vec<String> = worker.cw.jobs().await.unwrap().into_iter().map(|j| j.name).collect();
+    assert_eq!(names, ["nightly"]);
+    forgotten().await;
+    assert_eq!(worker.summary("nightly").await.expect("a summary").definition.schedule(), "every 5m");
+
+    // A process that never declared it does not bring it back.
+    forgotten().await;
+    web.check().await;
+    assert!(web.cw.jobs().await.unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn a_declaration_made_while_the_earlier_one_is_being_written_is_still_to_be_written() {
     let (k, store) = held_upsert();
     let run = run_in_a_task(k.cw.job("a", JobOptions::new()).unwrap());

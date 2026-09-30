@@ -139,6 +139,7 @@ opaque_debug!(
 /// For the conformance replay.
 #[cfg(all(test, feature = "alerts"))]
 pub(crate) mod testing {
+    pub(crate) use super::discord::embed_description;
     pub(crate) use super::email::compose_email;
     pub(crate) use super::twilio::{sms_body, sms_segments};
 }

@@ -33,6 +33,10 @@ fn color(t: &AlertType) -> i64 {
     }
 }
 
+/// The longest embed description Discord takes. The title (under 256) and
+/// it stay well inside the embed's 6000.
+pub(crate) const DESCRIPTION_MAX: usize = 4096;
+
 /// Sends alerts to a Discord channel through a webhook.
 pub fn discord(options: DiscordOptions) -> Result<Arc<dyn Channel>, Error> {
     if options.webhook_url.is_empty() {
@@ -51,16 +55,7 @@ impl Channel for Discord {
             let o = &self.0;
             let link = link_for(&o.link, alert);
             let mut lone = LoneJson::new();
-            // codeBlockSafe after the cut, as the SDK does it: it works on
-            // code units, so a lone half at the end passes through.
-            let message = js::head16_units(&alert.message, 3800);
-            let mut description: Vec<u16> = "```\n".encode_utf16().collect();
-            description.extend(code_block_safe_units(&message));
-            description.extend("\n```".encode_utf16());
-            if !triage(alert).is_empty() {
-                description.extend("\n**Triage:** ".encode_utf16());
-                description.extend(escape_markdown_units(&js::head16_units(triage(alert), 1000)));
-            }
+            let description = embed_description(alert);
             let mut embed = Object::new().with("title", alert.title.as_str());
             if !link.is_empty() {
                 embed.set("url", link);
@@ -98,6 +93,43 @@ impl Channel for Discord {
     }
 }
 
+/// The message in a code block, then the triage (discord.ts's
+/// `embedDescription`), as UTF-16 code units, a lone half kept as the SDK
+/// keeps it. Each part has its own cap, and escaping can grow both, so the
+/// whole is held to `DESCRIPTION_MAX` by cutting the message's block, never
+/// the triage: Discord refuses a longer one on every retry.
+pub(crate) fn embed_description(alert: &Alert) -> Vec<u16> {
+    let mut triage_part = Vec::new();
+    if !triage(alert).is_empty() {
+        triage_part.extend("\n**Triage:** ".encode_utf16());
+        triage_part.extend(escape_markdown_units(&js::head16_units(triage(alert), 1000)));
+    }
+    let (open, close) = ("```\n", "\n```");
+    let room = DESCRIPTION_MAX.saturating_sub(open.len() + close.len() + triage_part.len());
+    // codeBlockSafe after the first cut, as the SDK does it: it works on
+    // code units, so a lone half at the end passes through.
+    let message = cut_units(code_block_safe_units(&js::head16_units(&alert.message, 3800)), room);
+    let mut description: Vec<u16> = open.encode_utf16().collect();
+    description.extend(message);
+    description.extend(close.encode_utf16());
+    description.extend(triage_part);
+    description
+}
+
+/// At most `max` code units, one fewer when the last kept would be the high
+/// half of a pair (shared.ts's `cut`).
+fn cut_units(mut units: Vec<u16>, max: usize) -> Vec<u16> {
+    if units.len() <= max {
+        return units;
+    }
+    let mut end = max;
+    if end > 0 && (0xd800..=0xdbff).contains(&units[end - 1]) {
+        end -= 1;
+    }
+    units.truncate(end);
+    units
+}
+
 /// [`code_block_safe`] over code units.
 fn code_block_safe_units(units: &[u16]) -> Vec<u16> {
     let tick = u16::from(b'`');
@@ -130,6 +162,30 @@ fn escape_markdown_units(units: &[u16]) -> Vec<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_full_message_and_triage_fit_discords_limit() {
+        let alert = Alert {
+            alert_type: AlertType::Failed,
+            run: None,
+            details: crate::types::AlertDetails::Failure { consecutive_failures: 1, threshold: 1 },
+            job: "j".into(),
+            definition: Default::default(),
+            title: "j failed".into(),
+            message: "```".repeat(1300),
+            triage: Some("*_`~|[]()<>\\".repeat(100)),
+            triage_tried: true,
+            at: 0,
+        };
+        let description = String::from_utf16(&embed_description(&alert)).unwrap();
+        // The whole triage, escaped: 1000 characters, each one of the escaped.
+        let triage: String = "*_`~|[]()<>\\".repeat(100).chars().take(1000).collect();
+        let escaped: String = triage.chars().flat_map(|c| ['\\', c]).collect();
+        assert_eq!(js::len16(&description), DESCRIPTION_MAX);
+        assert!(description.starts_with("```\n"));
+        assert!(description.ends_with(&format!("\n**Triage:** {escaped}")));
+        assert_eq!(description.matches("```").count(), 2);
+    }
 
     #[test]
     fn markup_is_broken_up_and_escaped() {

@@ -5,9 +5,10 @@
 mod common;
 
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
-use common::{Boom, HOUR, Kit, MIN, T0, TestStore};
-use cronwatch::{JobHealth, JobOptions, Matcher, RecordOptions, Run, RunHandle, RunStatus, StartOptions};
+use common::{Boom, HOUR, Held, Kit, MIN, Mortal, T0, TestStore};
+use cronwatch::{JobHealth, JobOptions, Matcher, MemoryStore, RecordOptions, Run, RunHandle, RunStatus, StartOptions};
 
 /// A test pattern: `wrote <digits> files`.
 struct WroteFiles;
@@ -424,4 +425,82 @@ async fn a_run_id_with_a_nul_is_refused() {
     let err = k.cw.record_run(run, RecordOptions::new()).await.unwrap_err().to_string();
     assert_eq!(err, r#"recordRun: run ids cannot contain a NUL character (job "nul-id")"#);
     assert!(k.cw.runs("nul-id", 10).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn close_waits_for_a_check_under_way_before_it_closes_the_store() {
+    let store = Mortal::new(&Arc::new(MemoryStore::new()));
+    let held = Held::new();
+    let channel = held.channel();
+    let k = Kit::with(|b| b.store_arc(store.clone()).alerts([channel]));
+    k.cw.job("callback", JobOptions::new().timeout("30m")).unwrap().start(StartOptions::new()).await.unwrap();
+    k.advance(31 * MIN);
+    let cw = k.cw.clone();
+    let check = tokio::spawn(async move { cw.check().await.unwrap() });
+    held.sending.notified().await;
+    let cw = k.cw.clone();
+    let closing = tokio::spawn(async move { cw.close().await.unwrap() });
+    settle().await;
+    assert!(!closing.is_finished(), "still waiting on the check");
+    assert_eq!(store.closes.load(Ordering::SeqCst), 0);
+    held.open();
+    closing.await.unwrap();
+    assert_eq!(held.types(), ["stuck"], "sent before the store closed");
+    assert_eq!(store.closes.load(Ordering::SeqCst), 1);
+    assert_eq!(common::alert_types(&check.await.unwrap().alerts), ["stuck"]);
+    // With no check under way it closes straight away.
+    k.cw.close().await.unwrap();
+    assert_eq!(store.closes.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn lines_flushed_while_a_check_marks_earlier_runs_stuck_are_kept_on_the_run_it_marks_next() {
+    let held = Held::new();
+    let channel = held.channel();
+    let k = Kit::with(|b| b.alerts([channel]));
+    let first = k.cw.job("first", JobOptions::new().timeout("30m")).unwrap().start(StartOptions::new()).await.unwrap();
+    k.advance(1000);
+    let second =
+        k.cw.job("second", JobOptions::new().timeout("30m")).unwrap().start(StartOptions::new()).await.unwrap();
+    second.log("early line");
+    second.metric("rows", 1.0).unwrap();
+    second.flush().await;
+    k.advance(31 * MIN);
+    let cw = k.cw.clone();
+    let check = tokio::spawn(async move { cw.check().await.unwrap() });
+    // The first stuck run's alert is being sent; the second is still
+    // running, and flushes.
+    held.sending.notified().await;
+    second.log("important progress line");
+    second.metric("rows", 2.0).unwrap();
+    second.flush().await;
+    held.open();
+    check.await.unwrap();
+    let stored = k.cw.get_run(second.id()).await.unwrap().unwrap();
+    assert_eq!(stored.status, RunStatus::Timeout);
+    assert_eq!(stored.output.as_deref(), Some("early line\nimportant progress line"));
+    assert_eq!(stored.metrics.to_json(), r#"{"rows":2}"#);
+    assert_eq!(k.cw.get_run(first.id()).await.unwrap().unwrap().status, RunStatus::Timeout);
+}
+
+#[tokio::test]
+async fn a_metric_that_is_not_a_finite_number_is_refused_by_record_run() {
+    let k = Kit::new();
+    k.cw.job("imported", JobOptions::new()).unwrap();
+    for bad in [f64::NAN, f64::INFINITY] {
+        let mut run = pg_run("nan", k.now(), RunStatus::Ok);
+        run.job = "imported".into();
+        run.metrics.set("rows", bad);
+        let err = k.cw.record_run(run, RecordOptions::new()).await.unwrap_err().to_string();
+        assert_eq!(err, r#"recordRun: metric "rows" must be a finite number (job "imported", run "nan")"#);
+    }
+    assert!(k.cw.get_run("nan").await.unwrap().is_none(), "nothing is written");
+}
+
+/// Lets every task that can run get as far as it can, on the test's one
+/// thread.
+async fn settle() {
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+    }
 }
