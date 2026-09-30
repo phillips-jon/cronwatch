@@ -678,6 +678,56 @@ class ClientTest < Minitest::Test
     assert_equal [%w[check boom]], errors
   end
 
+  # A source whose sync raises what it is told to, and says each time it is called.
+  class RaisingSource
+    attr_reader :name
+
+    def initialize(error)
+      @name = "raising"
+      @error = error
+      @calls = Queue.new
+    end
+
+    def wait_for_call = @calls.pop
+
+    def sync(_host)
+      @calls.push(true)
+      raise @error
+    end
+  end
+
+  def test_a_check_error_outside_standard_error_in_the_background_is_reported_and_the_thread_keeps_going
+    errors = Queue.new
+    source = RaisingSource.new(LoadError.new("cannot load such file -- pg"))
+    cw, = make(sources: [source], on_error: ->(e, where) { errors.push([where, e.class]) })
+    cw.instance_variable_set(:@first_tick_s, 0.01)
+    cw.start("5s")
+    source.wait_for_call
+    assert_equal ["check", LoadError], errors.pop
+    thread = cw.instance_variable_get(:@ticker).instance_variable_get(:@thread)
+    Thread.pass until thread.status == "sleep" || !thread.alive?
+    assert thread.alive?, "still ticking"
+  ensure
+    cw&.close
+  end
+
+  def test_start_replaces_an_interval_thread_that_ended
+    source = RaisingSource.new(RuntimeError.new("tick"))
+    cw, = make(sources: [source], on_error: ->(*) {})
+    cw.instance_variable_set(:@first_tick_s, 0.01)
+    cw.start("5s")
+    source.wait_for_call
+    ticker = cw.instance_variable_get(:@ticker)
+    thread = ticker.instance_variable_get(:@thread)
+    thread.kill
+    thread.join
+    cw.start("5s")
+    refute_same ticker, cw.instance_variable_get(:@ticker)
+    source.wait_for_call # the new thread's first check
+  ensure
+    cw&.close
+  end
+
   def test_on_error_defaults_to_standard_error_and_a_raising_on_error_is_contained
     _, err = capture_io do
       cw = Cronwatch.new(alerts: [Cronwatch::Alerts::Custom.new("x") { raise "nope" }], cron_secret: nil)

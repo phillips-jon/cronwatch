@@ -494,6 +494,8 @@ module Cronwatch
       after_fork_check
       ms = [5_000, Duration.parse(every, "check interval")].max
       @ticker_lock.synchronize do
+        # One whose thread ended (killed from outside) is replaced.
+        @ticker = nil if @ticker && !@ticker.alive?
         if @ticker
           unless @ticker_ms == ms
             report(ArgumentError.new("start(#{every.inspect}) ignored: already checking every #{Duration.format(@ticker_ms)}; " \
@@ -510,7 +512,10 @@ module Cronwatch
         end
         @ticker = Ticker.new(ms / 1000.0, @first_tick_s) do
           check
-        rescue StandardError => e
+        # Anything, a source's LoadError or a SystemStackError included, is
+        # reported and the next tick comes as usual: the thread must not end
+        # silently and leave missed and stuck unchecked in this process.
+        rescue Exception => e # rubocop:disable Lint/RescueException
           report(e, "check")
         end
       end

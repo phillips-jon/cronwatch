@@ -39,6 +39,11 @@ module Cronwatch
         end
       end
 
+      # False once the thread has ended: stopped, or killed from outside.
+      def alive?
+        @thread.alive?
+      end
+
       # Waits for the thread to end: once stopped, after the tick under way.
       # Returns at once when called from the thread itself.
       def join
