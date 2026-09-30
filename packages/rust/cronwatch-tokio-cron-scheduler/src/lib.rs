@@ -345,7 +345,9 @@ impl Watcher {
 
     /// Follows `scheduler`: a job made here that it removes is declared again
     /// without its schedule at once (with a sync of the store, within 30
-    /// seconds), rather than at the next [`sync`](Self::sync). It spawns a
+    /// seconds), rather than at the next [`sync`](Self::sync), and one it
+    /// adds again after that is declared with its schedule again the same
+    /// way. It spawns a
     /// task on the current tokio runtime (call it inside one, as
     /// `JobScheduler::new` is), which holds the scheduler and so runs until
     /// the returned handle aborts it or the runtime ends:
@@ -362,7 +364,11 @@ impl Watcher {
             loop {
                 tokio::select! {
                     made = created.recv() => match made {
-                        Ok(Ok(uuid)) => watcher.saw(uuid),
+                        Ok(Ok(uuid)) => {
+                            if watcher.saw(uuid) {
+                                watcher.sync_within(&scheduler).await;
+                            }
+                        }
                         Ok(Err(_)) => {}
                         Err(RecvError::Lagged(_)) => watcher.sync_within(&scheduler).await,
                         Err(RecvError::Closed) => return,
@@ -382,11 +388,17 @@ impl Watcher {
         })
     }
 
-    fn saw(&self, uuid: Uuid) {
+    /// Marks a job made here as in the scheduler, and says whether it had
+    /// been removed: one added again (a clone of its `Job` keeps its uuid)
+    /// is to be declared with its schedule again.
+    fn saw(&self, uuid: Uuid) -> bool {
         let mut tracked = lock(&self.shared.tracked);
-        if let Some(t) = tracked.iter_mut().find(|t| t.uuid == uuid) {
-            t.seen = true;
-            t.gone = false;
+        match tracked.iter_mut().find(|t| t.uuid == uuid) {
+            Some(t) => {
+                t.seen = true;
+                std::mem::replace(&mut t.gone, false)
+            }
+            None => false,
         }
     }
 
