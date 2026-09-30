@@ -133,9 +133,14 @@ class AuditTest {
       TimeUnit.MILLISECONDS.sleep(600);
       assertEquals(1, source.syncs.get());
       source.hold = false;
+      long released = System.nanoTime();
       source.release.countDown();
       TimeUnit.MILLISECONDS.sleep(50);
-      assertTrue(source.syncs.get() <= 2, "no burst of the ticks it missed: " + source.syncs);
+      int syncs = source.syncs.get();
+      // One tick per interval that has really passed (a slow machine sleeps longer than asked),
+      // where the ticks it missed would all come at once.
+      long intervals = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - released) / 100;
+      assertTrue(syncs <= 2 + intervals, "no burst of the ticks it missed: " + syncs);
       Support.await("the next tick on the interval", () -> source.syncs.get() >= 2);
       cw.stop();
     }
