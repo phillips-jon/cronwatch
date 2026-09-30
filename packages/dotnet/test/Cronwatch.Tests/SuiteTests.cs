@@ -82,9 +82,15 @@ public class SuiteTests
     {
         // A logger that walks public getters, a debugger's view and a record's ToString must find
         // no secret: the options that hold one read it through an internal getter.
-        var secretish = new[] { "secret", "token", "apikey", "password", "webhook" };
+        // A webhook's URL and Sentry's DSN are credentials too. The one exception is what a
+        // transport is handed to send: it must read the URL and the headers to post them.
+        var secretish = new[] { "secret", "token", "apikey", "password", "webhook", "url", "dsn" };
         foreach (Type t in typeof(CronwatchClient).Assembly.GetExportedTypes())
         {
+            if (t == typeof(Cronwatch.Alerts.TransportRequest))
+            {
+                continue;
+            }
             foreach (PropertyInfo p in t.GetProperties(BindingFlags.Public | BindingFlags.Instance))
             {
                 if (p.GetMethod is not { IsPublic: true })
