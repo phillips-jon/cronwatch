@@ -308,6 +308,37 @@ class RailsGeneratorTest < Minitest::Test
                     'c.store = Cronwatch::Stores::ActiveRecord.new(prefix: "ops_")'
   end
 
+  def test_a_database_points_the_store_where_the_migration_puts_the_tables
+    out, = generate("--database", "cronwatch", "--prefix", "ops_")
+    record = File.read(File.join(@dir, "app/models/cronwatch_record.rb"))
+    assert_includes record, "class CronwatchRecord < ActiveRecord::Base"
+    assert_includes record, "self.abstract_class = true"
+    assert_includes record, "connects_to database: { writing: :cronwatch }"
+    initializer = File.read(File.join(@dir, "config/initializers/cronwatch.rb"))
+    assert_includes initializer, 'c.store = Cronwatch::Stores::ActiveRecord.new(prefix: "ops_", connection_class: "CronwatchRecord")'
+    assert_includes out, "1. Create the tables in the cronwatch database:"
+    assert_includes out, "bin/rails db:migrate\n\n   The store connects through CronwatchRecord (app/models/cronwatch_record.rb),\n"
+
+    # The initializer's store takes its connection from that class once it is used.
+    klass = Class.new(ActiveRecord::Base) { self.abstract_class = true }
+    Object.const_set(:CronwatchRecord, klass)
+    klass.establish_connection(adapter: "sqlite3", database: ":memory:")
+    klass.connection_pool.with_connection { |conn| S.create_tables!(conn, prefix: "ops_") }
+    load File.join(@dir, "config/initializers/cronwatch.rb")
+    Cronwatch.client.job("elsewhere").run { nil }
+    assert_equal 1, klass.connection_pool.with_connection { |conn| conn.select_value("SELECT COUNT(*) FROM ops_runs") }
+    refute ActiveRecord::Base.connection.table_exists?("ops_runs"), "nothing in the primary database"
+  ensure
+    Object.send(:remove_const, :CronwatchRecord) if Object.const_defined?(:CronwatchRecord, false)
+  end
+
+  def test_without_a_database_no_connection_class_is_written
+    out, = generate
+    refute File.exist?(File.join(@dir, "app/models/cronwatch_record.rb"))
+    refute_includes out, "CronwatchRecord"
+    assert_includes out, "1. Create the tables:\n\n     bin/rails db:migrate\n\n2. Monitor a job:"
+  end
+
   def test_a_bad_prefix_is_refused_before_anything_is_written
     _, err = generate("--prefix", "Ops-")
     assert_match(/invalid table prefix "Ops-"/, err)

@@ -74,7 +74,7 @@ bin/rails generate cronwatch:install    # a migration and config/initializers/cr
 bin/rails db:migrate
 ```
 
-The generator takes `--prefix` (table prefix, default `cronwatch_`) and `--database` (the database whose migrations directory gets the migration). The initializer it writes sets the ActiveRecord store, which Rails needs so web, worker and check processes see the same runs:
+The generator takes `--prefix` (table prefix, default `cronwatch_`) and `--database` (the database, from `config/database.yml`, whose migrations directory gets the migration; it also writes `app/models/cronwatch_record.rb`, an abstract class that `connects_to` that database, and names it as the store's `connection_class`, so the store reads the tables where the migration made them). The initializer it writes sets the ActiveRecord store, which Rails needs so web, worker and check processes see the same runs:
 
 ```ruby
 # config/initializers/cronwatch.rb

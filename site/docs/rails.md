@@ -29,7 +29,7 @@ The generator writes two files:
 - `db/migrate/<timestamp>_create_cronwatch_tables.rb`, which creates the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) with the SDK's own statements, so a Node, Python, PHP, Go, Rust, Elixir, Java or .NET process can share them. Running the generator again leaves an existing migration alone.
 - `config/initializers/cronwatch.rb`, which sets the store and the channels.
 
-It takes two options. `--prefix ops_` names the tables `ops_jobs`, `ops_runs` and `ops_state`, in the migration and in the initializer's store; a prefix is lowercase letters, digits and underscores, and a bad one is refused before anything is written. `--database` (or `--db`) puts the migration in that database's migrations directory, in an app with several.
+It takes two options. `--prefix ops_` names the tables `ops_jobs`, `ops_runs` and `ops_state`, in the migration and in the initializer's store; a prefix is lowercase letters, digits and underscores, and a bad one is refused before anything is written. `--database` (or `--db`) puts the migration in that database's migrations directory, in an app with several, and points the store at the same database: it writes `app/models/cronwatch_record.rb`, an abstract `CronwatchRecord` that `connects_to database: { writing: :<name> }`, and the initializer's store takes `connection_class: "CronwatchRecord"`.
 
 Rails needs the store. The web process, each worker and the check all have to see the same runs, and the in-memory store keeps each process's runs to itself (and warns about it in production). Leave the generated store line in.
 

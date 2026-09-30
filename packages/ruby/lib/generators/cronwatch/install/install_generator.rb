@@ -11,8 +11,11 @@ module Cronwatch
     # Writes a migration for the three tables the ActiveRecord store uses
     # (created with the SDK's own DDL, so a Node process can share them) and
     # config/initializers/cronwatch.rb, then prints how to schedule
-    # Cronwatch::CheckJob and mount the dashboard. The templates live in this
-    # file so the gem ships nothing but Ruby.
+    # Cronwatch::CheckJob and mount the dashboard. With --database, the
+    # migration goes to that database and app/models/cronwatch_record.rb, an
+    # abstract class connected to it, is the store's connection_class, so the
+    # store reads the tables where the migration made them. The templates
+    # live in this file so the gem ships nothing but Ruby.
     class InstallGenerator < ::Rails::Generators::Base
       include ::ActiveRecord::Generators::Migration
 
@@ -21,7 +24,10 @@ module Cronwatch
       class_option :prefix, type: :string, default: Cronwatch::Stores::ActiveRecord::DEFAULT_PREFIX,
                             desc: "Table name prefix: lowercase letters, digits and underscores"
       class_option :database, type: :string, aliases: %i[--db],
-                              desc: "The database for the migration, in an app with several"
+                              desc: "The database for the tables, in an app with several (from config/database.yml)"
+
+      # The abstract class --database writes, which the store connects through.
+      RECORD_CLASS = "CronwatchRecord"
 
       def check_prefix
         Cronwatch::Stores::ActiveRecord.table_prefix(options[:prefix])
@@ -39,6 +45,12 @@ module Cronwatch
 
         number = self.class.next_migration_number(absolute)
         create_file File.join(dir, "#{number}_#{migration_name}.rb"), migration
+      end
+
+      def create_connection_class
+        return unless database_name
+
+        create_file "app/models/cronwatch_record.rb", connection_class
       end
 
       def create_initializer
@@ -60,9 +72,33 @@ module Cronwatch
         "create_cronwatch_#{prefix.squeeze("_").delete_prefix("_").delete_suffix("_")}_tables"
       end
 
+      # The --database name, or nil.
+      def database_name
+        name = options[:database].to_s
+        name.empty? ? nil : name
+      end
+
       def store_args
         prefix = options[:prefix]
-        prefix == Cronwatch::Stores::ActiveRecord::DEFAULT_PREFIX ? "" : "(prefix: #{prefix.inspect})"
+        args = []
+        args << "prefix: #{prefix.inspect}" unless prefix == Cronwatch::Stores::ActiveRecord::DEFAULT_PREFIX
+        # Named, not referenced, so the initializer does not load an app class at boot.
+        args << "connection_class: #{RECORD_CLASS.inspect}" if database_name
+        args.empty? ? "" : "(#{args.join(", ")})"
+      end
+
+      def connection_class
+        <<~RUBY
+          # frozen_string_literal: true
+
+          # The #{database_name} database, where CronWatch keeps its tables. The store in
+          # config/initializers/cronwatch.rb connects through this class.
+          class #{RECORD_CLASS} < ActiveRecord::Base
+            self.abstract_class = true
+
+            connects_to database: { writing: :#{database_name} }
+          end
+        RUBY
       end
 
       def migration
@@ -102,7 +138,7 @@ module Cronwatch
           #
           # and run Cronwatch::CheckJob every few minutes to catch the runs that never happen.
           Cronwatch.configure do |c|
-            # Jobs, runs and alert state, in this app's database.
+            # Jobs, runs and alert state, in #{database_name ? "the #{database_name} database (see app/models/cronwatch_record.rb)" : "this app's database"}.
             c.store = Cronwatch::Stores::ActiveRecord.new#{store_args}
 
             # Where alerts go. With none set, they are written to standard error.
@@ -127,14 +163,22 @@ module Cronwatch
         RUBY
       end
 
+      # What the next steps say about --database after the migrate line, or "".
+      def database_step
+        return "" unless database_name
+
+        "\n\n   The store connects through #{RECORD_CLASS} (app/models/cronwatch_record.rb),\n   " \
+          "which connects_to the #{database_name} database named in config/database.yml."
+      end
+
       def next_steps
         <<~TEXT
 
           CronWatch is installed. Next:
 
-          1. Create the tables:
+          1. Create the tables#{database_name ? " in the #{database_name} database" : ""}:
 
-               bin/rails db:migrate
+               bin/rails db:migrate#{database_step}
 
           2. Monitor a job:
 
