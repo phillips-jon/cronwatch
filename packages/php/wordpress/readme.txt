@@ -130,6 +130,14 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
+= Unreleased =
+
+* An alert is saved in the same write that records the failure, so a PHP process killed before the alert went out no longer loses it: the next check sends it.
+* A cron hook whose job options the `cronwatch_job_options` filter made invalid is reported and skipped, instead of stopping the check for every other job.
+* An event's output is passed on as it is written, instead of held in memory until the event ends.
+* Output is redacted before it is shortened, so a secret cut in half at the limit can no longer show.
+* Webhook URLs and keys are kept out of the stack traces of failed alert sends.
+
 = 0.9.0 =
 
 * Carries version 0.9.0 of the CronWatch library.
