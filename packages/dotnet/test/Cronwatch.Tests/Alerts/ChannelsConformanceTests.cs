@@ -226,6 +226,49 @@ public class ChannelsConformanceTests
             return i < 0 ? int.MaxValue : i;
         }).ToList();
 
+    /// <summary>
+    /// Every section of the fixture is one this file replays, so a section added there is not
+    /// skipped here.
+    /// </summary>
+    [Fact]
+    public void Every_section_of_channels_json_is_replayed()
+    {
+        string[] known = ["generatedBy", "sdkVersion", "alerts", "sends", "failures", "providerSends", "providerFailures", "twilioPartial", "textCuts", "urls"];
+        Assert.Equal([], Fixtures.Load("channels").Keys.Where(k => !known.Contains(k, StringComparer.Ordinal)));
+    }
+
+    /// <summary>
+    /// The <c>urls</c> section: each text as Node's <c>new URL</c> reads it, the URL written
+    /// without its credentials, its user name and password as WHATWG encodes them, another scheme,
+    /// or no URL.
+    /// </summary>
+    [Fact]
+    public void Urls_are_read_as_node_reads_them()
+    {
+        List<JsObject> cases = Fixtures.Objects(Fixtures.Load("channels"), "urls");
+        var wrong = new List<string>();
+        foreach (JsObject c in cases)
+        {
+            string input = S(c, "input");
+            string want = c.Get("invalid") is true ? "invalid"
+                : c.Has("other") ? "other " + S(c, "other")
+                : S(c, "url") + " user " + S(c, "username") + " password " + S(c, "password");
+            var (kind, scheme, url) = WhatwgUrl.Parse(input);
+            string got = kind switch
+            {
+                UrlKind.Special => url + " user " + url!.Username + " password " + url.Password,
+                UrlKind.Other => "other " + scheme,
+                _ => "invalid",
+            };
+            if (got != want)
+            {
+                wrong.Add(Json.Stringify(input) + ": node " + want + ", .NET " + got);
+            }
+        }
+        Assert.Equal([], wrong);
+        Assert.True(cases.Count > 700, "the fixture's urls: " + cases.Count);
+    }
+
     [Fact]
     public async Task Every_case_of_channels_json_is_the_sdks()
     {
