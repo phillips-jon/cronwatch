@@ -790,6 +790,10 @@ final class Runs {
   }
 
   private @Nullable Void failOpen(OpenRun o) {
+    // The hook and a close() during the shutdown may both get here: one records the run.
+    if (!core.open.remove(o.run.id(), o)) {
+      return null;
+    }
     String name = o.def.name();
     long now = core.now();
     Run run = o.run;
