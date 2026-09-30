@@ -132,7 +132,7 @@ public class HostingTests
             services.AddLogging();
             if (containerChannel)
             {
-                services.AddSingleton(Channel.Create("registered", (alert, ctx, ct) => Task.CompletedTask));
+                services.AddSingleton(CustomChannel.Create("registered", (alert, ctx, ct) => Task.CompletedTask));
             }
             services.AddCronwatch(o =>
             {
