@@ -213,6 +213,45 @@ final class ScheduleTest extends TestCase
         $this->assertFileDoesNotExist($file);
     }
 
+    public function testABackgroundTaskThatRanPastItsTimeoutIsStillFinished(): void
+    {
+        $cw = $this->client();
+        $event = $this->schedule()->exec('backup')->daily()->runInBackground()->withoutOverlapping()->cronwatch(['name' => 'backup', 'timeout' => '1h']);
+        $watcher = $this->app->make(\Cronwatch\Laravel\ScheduleWatcher::class);
+        $file = storage_path('framework/schedule-cronwatch-' . sha1($event->mutexName()) . '.log');
+        $starting = function () use ($watcher, $event): void {
+            $watcher->starting(new \Illuminate\Console\Events\ScheduledTaskStarting($event));
+            $event->output = $event->getDefaultOutput();
+        };
+        $finish = function (int $code, string $output) use ($event, $file): void {
+            file_put_contents($file, $output);
+            $this->artisan('schedule:finish', ['id' => $event->mutexName(), 'code' => $code])->assertExitCode(0);
+        };
+        $statuses = fn () => array_map(fn ($r) => $r->status, $cw->runs('backup'));
+
+        // A run past its timeout, marked by a check, then ending 30 minutes later.
+        $starting();
+        $this->clock->advance(90 * 60_000);
+        $this->artisan('cronwatch:check')->assertExitCode(0);
+        $this->assertSame(['timeout'], $statuses());
+        $this->assertSame(['stuck'], $this->capture->types());
+        $finish(1, 'disk full');
+        $run = $cw->runs('backup')[0];
+        $this->assertSame(['failed', 'Exited with code 1', 'disk full'], [$run->status, $run->error, $run->output]);
+
+        // One that died, marked timeout and never finished, is not given a later run's finish.
+        $this->clock->advance(60_000);
+        $starting();
+        $this->clock->advance(90 * 60_000);
+        $this->artisan('cronwatch:check')->assertExitCode(0);
+        $this->clock->advance(60_000);
+        $starting();
+        $finish(0, 'backed up');
+        $this->assertSame(['ok', 'timeout', 'failed'], $statuses());
+        $this->assertSame('backed up', $cw->runs('backup')[0]->output);
+        $this->assertSame([], $this->errors);
+    }
+
     public function testAScheduledQueuedJobIsRecordedByTheQueueNotTheScheduler(): void
     {
         $cw = $this->client();

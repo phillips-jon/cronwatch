@@ -6,6 +6,7 @@ namespace Cronwatch\Laravel;
 
 use Cronwatch\Cronwatch;
 use Cronwatch\Js;
+use Cronwatch\Run;
 use Cronwatch\RunStatus;
 use Illuminate\Console\Scheduling\CallbackEvent;
 use Illuminate\Contracts\Container\Container;
@@ -121,7 +122,7 @@ final class ScheduleWatcher
         $this->cw()->finishExecution($run['key'], null, $event->exception, true, $output);
     }
 
-    /** ScheduledBackgroundTaskFinished, in the schedule:finish process: the oldest running run of the task's job is finished. */
+    /** ScheduledBackgroundTaskFinished, in the schedule:finish process: the task's run is found (runToFinish()) and finished. */
     public function backgroundFinished(object $event): void
     {
         $task = $event->task;
@@ -140,17 +141,16 @@ final class ScheduleWatcher
             $output = self::tail($task->output, 0);
         }
         try {
-            $running = array_values(array_filter($cw->runs($handle->name, 50), fn ($run) => $run->status === RunStatus::RUNNING && $run->trigger === self::TRIGGER));
+            $open = self::runToFinish($cw->runs($handle->name, 50));
         } catch (\Throwable $error) {
             $cw->onError($error, "finishing {$handle->name}");
             return;
         }
-        $oldest = end($running);
-        if ($oldest === false) {
+        if ($open === null) {
             return;
         }
         $code = (int) ($task->exitCode ?? 0);
-        $run = $handle->resume($oldest->id);
+        $run = $handle->resume($open->id);
         if ($output !== null && $output !== '') {
             $run->log($output);
         }
@@ -159,6 +159,32 @@ final class ScheduleWatcher
         } else {
             $run->finish();
         }
+    }
+
+    /**
+     * The run a background task's finish belongs to: the oldest of its
+     * scheduled runs still running, else the newest a check has marked
+     * timeout (a task that ran past its timeout and has now ended). A run
+     * still running is taken first, so a timed-out run whose process died is
+     * never given a later run's finish.
+     *
+     * @param list<Run> $runs newest first
+     */
+    private static function runToFinish(array $runs): ?Run
+    {
+        $running = null;
+        $timedOut = null;
+        foreach ($runs as $run) {
+            if ($run->trigger !== self::TRIGGER) {
+                continue;
+            }
+            if ($run->status === RunStatus::RUNNING) {
+                $running = $run;
+            } elseif ($run->status === RunStatus::TIMEOUT) {
+                $timedOut ??= $run;
+            }
+        }
+        return $running ?? $timedOut;
     }
 
     /**
