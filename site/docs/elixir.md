@@ -7,7 +7,7 @@ group: Elixir
 
 # Elixir
 
-The `cronwatch` package is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so an Elixir process can share one database with a Node, Ruby, Python, PHP, Go or Rust process and the [MCP server](/docs/mcp/) works against any of them. This page covers the package itself: a Phoenix app, a worker, a release a crontab runs. Oban and Quantum have a page of their own: [Elixir schedulers](/docs/elixir-schedulers/).
+The `cronwatch` package is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so an Elixir process can share one database with a Node, Ruby, Python, PHP, Go, Rust, Java or .NET process and the [MCP server](/docs/mcp/) works against any of them. This page covers the package itself: a Phoenix app, a worker, a release a crontab runs. Oban and Quantum have a page of their own: [Elixir schedulers](/docs/elixir-schedulers/).
 
 ```elixir
 # mix.exs
@@ -386,7 +386,7 @@ Cronwatch.finish(run)                                         # or Cronwatch.fai
 
 ## Sharing a database with the other languages
 
-The Ecto store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go and Rust stores (the MySQL tables are the PHP, Go and Rust ports'): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and an Elixir client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+The Ecto store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Rust, Java and .NET stores (the MySQL tables are the PHP, Go, Rust, Java and .NET ports'): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and an Elixir client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
@@ -394,4 +394,4 @@ A map given where the SDK keeps an object's order (a `budget`, metrics) is writt
 
 ## Kept in step
 
-The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Elixir tests replay every one, as the Ruby gem's and the Python, PHP, Go and Rust packages' do; the dashboard is checked against the SDK's pages byte for byte, straight into the plug, through a `Plug.Router` under Bandit and through a Phoenix endpoint. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).
+The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Elixir tests replay every one, as the Ruby gem's and the Python, PHP, Go, Rust, Java and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte, straight into the plug, through a `Plug.Router` under Bandit and through a Phoenix endpoint. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).

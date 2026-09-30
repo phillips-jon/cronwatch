@@ -6,10 +6,12 @@ Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails,
 cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch
 for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), cronwatch.dev/go for
 Go (robfig/cron, gocron, River, Asynq), the cronwatch crate for Rust
-(tokio-cron-scheduler, apalis), and the cronwatch package on Hex for Elixir
-(Oban, Quantum). It runs inside my app and writes to my own database. There
-is no hosted service and no account to make; the only key it can use is an
-Anthropic API key, for triage, which is optional.
+(tokio-cron-scheduler, apalis), the cronwatch package on Hex for Elixir
+(Oban, Quantum), dev.cronwatch:cronwatch on Maven Central for Java (Spring
+Boot, Quartz, JobRunr), and the Cronwatch package on NuGet for .NET (ASP.NET
+Core, Hangfire, Quartz.NET). It runs inside my app and writes to my own
+database. There is no hosted service and no account to make; the only key it
+can use is an Anthropic API key, for triage, which is optional.
 
 First decide which steps this project needs:
 - package.json (Node, Next.js or another JavaScript runtime): TypeScript. With
@@ -25,6 +27,12 @@ First decide which steps this project needs:
   scheduler.
 - mix.exs: Elixir. :oban or :quantum among its deps names the scheduler; :phoenix
   is a Phoenix app.
+- pom.xml, build.gradle or build.gradle.kts: Java. spring-boot among its
+  dependencies is a Spring Boot app; org.quartz-scheduler:quartz or
+  org.jobrunr:jobrunr names the scheduler.
+- *.csproj, *.sln or *.slnx: .NET. Hangfire.Core or Quartz among its
+  PackageReferences names the scheduler; Sdk="Microsoft.NET.Sdk.Web" is an
+  ASP.NET Core app.
 If scheduled jobs live in more than one, set up each side where its jobs run;
 they can share one database.
 
@@ -566,6 +574,197 @@ Elixir (Elixir 1.18 or newer on OTP 27 or newer)
    CRON_SECRET if you added a handler, and whichever alert channel you chose.
    Do not invent other names.
 
+Java (Java 21 or newer)
+
+1. Add the library. In a Spring Boot app (3.5 or 4) add the starter, which
+   brings the rest:
+
+   <dependency>
+     <groupId>dev.cronwatch</groupId>
+     <artifactId>cronwatch-spring-boot-starter</artifactId>
+     <version>{{JAVA_VERSION}}</version>
+   </dependency>
+
+   (implementation("dev.cronwatch:cronwatch-spring-boot-starter:{{JAVA_VERSION}}") in
+   build.gradle.kts). Anywhere else add dev.cronwatch:cronwatch, and
+   dev.cronwatch:cronwatch-servlet for a servlet container. Add
+   dev.cronwatch:cronwatch-quartz for Quartz and dev.cronwatch:cronwatch-jobrunr
+   for JobRunr, all at the same version. The core depends on nothing; the
+   SQL store uses the project's own JDBC driver and DataSource.
+
+2. Create one client for the whole app, with a store every instance shares
+   (web, workers and the check must see the same runs).
+
+   Spring Boot: the starter makes the client a bean. It uses SqlStore over
+   the app's one DataSource, every Channel bean as a channel, and
+   cronwatch.* properties; add a channel as a bean:
+
+   @Bean Channel slack(@Value("${SLACK_WEBHOOK_URL}") String url) {
+     return Slack.webhook(url);
+   }
+
+   Anywhere else, build one and close it when the app stops:
+
+   Cronwatch cw = Cronwatch.builder()
+       .store(SqlStore.postgres(dataSource))   // or SqlStore.sqlite, SqlStore.mysql
+       .alert(Slack.webhook(System.getenv("SLACK_WEBHOOK_URL")))
+       .build();
+
+   Other channels in dev.cronwatch.alerts, each made from its options:
+   Discord, Webhook, Resend, Postmark, SendGrid, Mailgun, Ses, Twilio,
+   Sentry, Honeybadger, Datadog, Rollbar, Bugsnag, NewRelic, and
+   Channel.of(name, (alert, ctx) -> { ... }) for a channel of your own.
+   Their options: https://cronwatch.dev/docs/java/
+
+   If the project uses pg_cron, add .source(PgCron.source(dataSource))
+   (a Source bean in Spring Boot). Do not declare those jobs yourself.
+
+3. Watch each scheduled job:
+
+   - Spring @Scheduled: nothing to add. With the starter every @Scheduled
+     method is a job named SimpleClassName.method, on its cron or rate;
+     give it a name and options with @CronwatchJob(name = "nightly-report",
+     grace = "15m") beside @Scheduled. Cronwatch.current().log(...) works
+     inside it. Under ShedLock, only the instance that got the lock records
+     the run.
+   - Quartz: in Spring Boot, adding cronwatch-quartz watches every Scheduler
+     bean. Elsewhere call CronwatchQuartz.watch(cw, scheduler,
+     QuartzOptions.defaults()) and CronwatchQuartz.scheduleCheck(scheduler)
+     before scheduler.start(). Every job with a trigger becomes a job, and
+     each firing a run.
+   - JobRunr: CronwatchJobRunr watcher = CronwatchJobRunr.watch(cw,
+     storageProvider, JobRunrOptions.defaults()), then
+     .withJobFilter(watcher) before .useBackgroundJobServer(), and
+     CronwatchJobRunr.scheduleCheck(jobScheduler). Every recurring job
+     becomes a job and each attempt a run.
+   - Anything else, or a program a crontab runs: declare the job with
+     Job nightly = cw.job("nightly-report", JobOptions.builder()
+     .schedule("0 2 * * *").timezone("UTC").grace("15m")); and wrap the work
+     in nightly.run(job -> { ...; job.log("Report written"); }). What the
+     function throws fails the run and is thrown again; in a crontab
+     program, exit non-zero on it.
+   - A platform that calls a URL: nightly.handler((job, request) -> { ...;
+     return null; }), served with WebServer.mount(server, "/cron/nightly",
+     handler), new CronwatchServlet(handler), or in Spring Boot a
+     FilterRegistrationBean of new CronwatchFilter(handler,
+     "/cron/nightly"). It needs Authorization: Bearer $CRON_SECRET.
+
+4. Run the check every few minutes so missed and stuck runs are noticed:
+   in Spring Boot the starter does it (cronwatch.check-every, a minute by
+   default, once per cluster under ShedLock or a clustered Quartz); the
+   Quartz or JobRunr check job above; cw.start() once in any other
+   long-running process; or, for a program a crontab runs, a second crontab
+   line running a main of the app's own that calls
+   CronwatchCli.main(MyApp::cronwatch, args) with "check", where
+   MyApp.cronwatch() builds the same client and declares the same jobs.
+
+5. Mount the dashboard. In Spring Boot the starter serves it at /cronwatch
+   on Spring MVC or WebFlux (cronwatch.web.path to move it). In a servlet
+   container, add new CronwatchFilter(cw.routes(), "/cronwatch") mapped to
+   /cronwatch and /cronwatch/*. On the JDK's HttpServer,
+   WebServer.mount(server, "/cronwatch", cw.routes()). Outside development
+   it needs CRONWATCH_TOKEN; behind the app's own admin auth, set
+   cronwatch.web.open=true, or pass
+   RoutesOptions.builder().noToken().build() to cw.routes(...).
+
+6. Set the environment variables you referenced: CRONWATCH_TOKEN,
+   CRON_SECRET if you added a handler, and whichever alert channel you chose.
+   Do not invent other names.
+
+.NET (.NET 10 or newer)
+
+1. Add the library for the kind of app this is:
+
+   dotnet add package Cronwatch.AspNetCore   # ASP.NET Core: brings the other two
+   dotnet add package Cronwatch.Hosting      # a worker or other Generic Host app
+   dotnet add package Cronwatch              # a console program a crontab runs
+
+   Add Cronwatch.Hangfire for Hangfire (1.8) and Cronwatch.Quartz for
+   Quartz.NET (4), all at the same version. The core depends on nothing; the
+   SQL store uses the project's own ADO.NET driver (Microsoft.Data.Sqlite,
+   Npgsql or MySqlConnector) through a DbDataSource.
+
+2. Create one client for the whole app, with a store every instance shares
+   (web, workers and the check must see the same runs).
+
+   In a Generic Host or ASP.NET Core app, register it:
+
+   builder.Services.AddCronwatch(o =>
+   {
+       o.Store = SqlStore.Postgres(dataSource);   // or SqlStore.Sqlite, SqlStore.MySql
+       o.Alerts.Add(Slack.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
+   });
+
+   It is a singleton that checks every minute as a hosted service and logs
+   through ILogger; every IChannel registered in the container is a channel
+   too. Anywhere else, make one and dispose it when the program ends:
+
+   await using var cw = new CronwatchClient(new CronwatchOptions
+   {
+       Store = SqlStore.Sqlite(SqliteFactory.Instance.CreateDataSource("Data Source=cronwatch.db")),
+       Alerts = { Slack.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
+   });
+
+   Other channels in Cronwatch.Alerts, each made from its options
+   (new ResendChannel(new ResendOptions { ... })): DiscordChannel,
+   WebhookChannel, ResendChannel, PostmarkChannel, SendGridChannel,
+   MailgunChannel, SesChannel, TwilioChannel, SentryChannel,
+   HoneybadgerChannel, DatadogChannel, RollbarChannel, BugsnagChannel,
+   NewRelicChannel, and CustomChannel.Create(name, (alert, ctx, ct) => ...)
+   for a channel of your own. Their options: https://cronwatch.dev/docs/dotnet/
+
+   If the project uses pg_cron, add new PgCronSource(dataSource) to the
+   client's Sources. Do not declare those jobs yourself.
+
+3. Watch each scheduled job:
+
+   - Hangfire: add .UseCronwatch(services) to the configuration in
+     services.AddHangfire((services, c) => c...), and schedule the check
+     with CronwatchHangfire.ScheduleCheck(recurringJobManager). Every
+     recurring job becomes a job named by its id, on its cron, and each
+     attempt a run, with no change to the jobs;
+     CronwatchClient.Current?.Log(...) works inside them. Mark another job
+     to watch with [CronwatchJob("import")] on its method.
+   - Quartz.NET: add q.UseCronwatch(o => o.ScheduleCheck = true) inside
+     services.AddQuartz(q => ...). Every job with a trigger becomes a job
+     named after its key, and each firing a run.
+   - A BackgroundService or other loop of the app's own: declare the job
+     with its real schedule (Job nightly = cw.Job("nightly-report", new
+     JobOptions { Schedule = "0 2 * * *", Timezone = "UTC", Grace = "15m" }))
+     and wrap each iteration's work in await nightly.RunAsync(async (job, ct)
+     => { ...; job.Log("Report written"); }, stoppingToken). A new job that
+     only needs a cron inside the host can be a class implementing
+     ICronwatchJob, registered with services.AddCronwatchJob<T>(name,
+     options), which runs it on that schedule.
+   - Anything else, or a program a crontab runs: the same RunAsync. What the
+     function throws fails the run and is thrown again; in a crontab
+     program, return 1 on it.
+   - A platform that calls a URL: declare the job, then
+     app.MapCronwatchHandler("/cron/nightly", "nightly-report",
+     async (JobContext job, HttpContext http, CancellationToken ct) => ...).
+     It needs Authorization: Bearer $CRON_SECRET.
+
+4. Run the check every few minutes so missed and stuck runs are noticed:
+   AddCronwatch does it as a hosted service (CheckEvery, a minute by
+   default); with Hangfire or Quartz.NET their check job above runs it once
+   per cluster, so set o.NoCheck = true in AddCronwatch; cw.Start() in any
+   other long-running process; or, for a program a crontab runs, a second
+   crontab line running the app with the arguments "cronwatch check". In a
+   Generic Host app, end Main with return await
+   app.RunCronwatchCommandAsync(args); elsewhere, for args
+   ["cronwatch", .. var rest], return await CronwatchCli.RunAsync(MakeClient,
+   rest, Console.Out, Console.Error), where MakeClient builds the same client
+   and declares the same jobs.
+
+5. Mount the dashboard in ASP.NET Core: app.MapCronwatch("/cronwatch").
+   Outside development it needs CRONWATCH_TOKEN (or Cronwatch:Token in
+   configuration); behind the app's own admin auth, pass
+   new RoutesOptions { Token = DashboardToken.None } as its options.
+
+6. Set the environment variables you referenced: CRONWATCH_TOKEN,
+   CRON_SECRET if you added a handler, and whichever alert channel you chose.
+   Do not invent other names.
+
 Rules for you:
 - Declare every existing scheduled job in this project, not just one. Find them
   in cron config, workflow files, queue schedulers and any crontab.
@@ -577,8 +776,10 @@ Rules for you:
 - If this project already has a dashboard route or auth, mount cw.routes()
   or Cronwatch::Web behind that auth with its token set to null (nil in Ruby,
   None in Python, false in PHP, cronwatch.WithoutToken() in Go,
-  RoutesOptions::new().no_token() in Rust, token: false in Elixir) rather
-  than exposing it.
+  RoutesOptions::new().no_token() in Rust, token: false in Elixir,
+  RoutesOptions.builder().noToken() or cronwatch.web.open=true in Java,
+  new RoutesOptions { Token = DashboardToken.None } in .NET) rather than
+  exposing it.
 - Make sure the process that runs the check knows every job it should expect,
   or a job that never starts at all goes unnoticed. If installs differ, declare
   a job there only where that install runs it.
@@ -592,13 +793,17 @@ Rules for you:
   Finish(ctx), in Go; job.start(StartOptions::new().id(id)).await? and
   job.resume(id).await?, then .finish().await, in Rust;
   Cronwatch.start(job, id: id) and Cronwatch.resume(job, id), then
-  Cronwatch.finish(run), in Elixir).
+  Cronwatch.finish(run), in Elixir; job.start(StartOptions.id(id)) and
+  job.resume(id), then .finish(), in Java;
+  job.StartAsync(new StartOptions { Id = id }) and job.ResumeAsync(id), then
+  FinishAsync(), in .NET).
 - A job that runs where the network or the app's secrets are unavailable gets
   its own client with deliver: "check" (deliver = :check in Ruby,
   deliver="check" in Python, deliver: 'check' in PHP,
   cronwatch.WithDeliver(cronwatch.DeliverAtCheck) in Go,
-  .deliver(Deliver::AtCheck) in Rust, deliver: :check in Elixir) and the same
-  store; the next check sends its alerts.
+  .deliver(Deliver::AtCheck) in Rust, deliver: :check in Elixir,
+  .deliver(Deliver.AT_CHECK) in Java, Deliver = Deliver.AtCheck in .NET) and
+  the same store; the next check sends its alerts.
 
 Docs: https://cronwatch.dev/docs/
 Rails docs: https://cronwatch.dev/docs/rails/
@@ -610,4 +815,6 @@ https://cronwatch.dev/docs/drupal/ and https://cronwatch.dev/docs/craft/
 Go docs: https://cronwatch.dev/docs/go/ and https://cronwatch.dev/docs/go-schedulers/
 Rust docs: https://cronwatch.dev/docs/rust/ and https://cronwatch.dev/docs/rust-schedulers/
 Elixir docs: https://cronwatch.dev/docs/elixir/ and https://cronwatch.dev/docs/elixir-schedulers/
+Java docs: https://cronwatch.dev/docs/java/ and https://cronwatch.dev/docs/java-schedulers/
+.NET docs: https://cronwatch.dev/docs/dotnet/ and https://cronwatch.dev/docs/dotnet-schedulers/
 MCP server for agents: npx -y @cronwatch/mcp, https://cronwatch.dev/docs/mcp/

@@ -49,7 +49,8 @@ export const { GET, POST, DELETE } = cw.routes();
 | [`cronwatch.dev/go`](packages/go) | the Go port for Go apps: jobs, runs and checks with `context` throughout and safe across goroutines, the memory store and a `database/sql` store for SQLite, Postgres, MySQL and MariaDB over the app's own driver, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `job.Handler` as `http.Handler`s, an AWS Lambda adapter, and modules of their own for robfig/cron, gocron, River and Asynq ([its DESIGN.md](packages/go/DESIGN.md)) |
 | [`cronwatch` crate](packages/rust) | the Rust port for Rust services, on tokio: jobs, runs and checks, safe across tasks, the memory store and `cronwatch-sqlx` for SQLite, Postgres, MySQL and MariaDB over the app's own sqlx pool, sharing tables with the SDK byte for byte, the same alert channels and Claude triage, pg_cron jobs, the dashboard and `handler()` framework-free with tower and axum adapters (and so AWS Lambda through `lambda_http`), a blocking client, and crates of their own for tokio-cron-scheduler and apalis ([its DESIGN.md](packages/rust/DESIGN.md)) |
 | [`cronwatch` on Hex](packages/elixir) | the Elixir port for Elixir and Erlang services: an instance in the app's supervision tree, jobs run in the calling process and recorded when it dies, the memory store and an Ecto store for SQLite, Postgres, MySQL and MariaDB over the app's own repo, sharing tables with the SDK byte for byte, the same alert channels and Claude triage over OTP's own sockets, pg_cron jobs, the dashboard and a job's handler as Plugs for a Phoenix router, telemetry events, a release's crontab check, and integrations for Oban and Quantum ([its DESIGN.md](packages/elixir/DESIGN.md)) |
-| [`dev.cronwatch:cronwatch` for Java](packages/java) | the Java port for services on the JVM, built in phases, the first done: jobs, runs in the calling thread and checks, safe across platform and virtual threads, the current run carried across threads, a shutdown hook that records runs a stopping JVM leaves open, the memory store and a JDBC store for SQLite over the app's own `DataSource`, sharing tables with the SDK byte for byte; the other databases, the alert channels, the dashboard and the Spring Boot, `@Scheduled` and Quartz integrations come in the phases that follow, and it is not on Maven Central yet ([its DESIGN.md](packages/java/DESIGN.md)) |
+| [`dev.cronwatch:cronwatch` for Java](packages/java) | the Java port for services on the JVM: jobs run in the calling thread and safe across platform and virtual threads, the current run carried across threads, a shutdown hook that records runs a stopping JVM leaves open, the memory store and a JDBC store for SQLite, Postgres, MySQL and MariaDB over the app's own `DataSource`, sharing tables with the SDK byte for byte, the same alert channels and Claude triage over the JDK's own HTTP client, pg_cron jobs, the dashboard and a job's handler framework-free with adapters for the JDK's server, servlet containers (`cronwatch-servlet`) and Spring MVC and WebFlux, `CronwatchCli` for a crontab's check, a Spring Boot starter that watches every `@Scheduled` method (ShedLock included), and modules of their own for Quartz and JobRunr ([its DESIGN.md](packages/java/DESIGN.md)) |
+| [`Cronwatch` on NuGet](packages/dotnet) | the .NET port for .NET services: jobs run in the caller's flow and safe across threads and tasks, the current run carried across awaits, a process-exit hook that records runs a stopping process leaves open, the memory store and an ADO.NET store for SQLite, Postgres, MySQL and MariaDB over the app's own `DbDataSource`, sharing tables with the SDK byte for byte, the same alert channels and Claude triage over `HttpClient`, pg_cron jobs, the dashboard and a job's handler framework-free with an ASP.NET Core adapter (`Cronwatch.AspNetCore`), the client in the Generic Host with hosted jobs on a cron (`Cronwatch.Hosting`), `CronwatchCli` for a crontab's check, Native AOT support, and packages of their own for Hangfire and Quartz.NET ([its DESIGN.md](packages/dotnet/DESIGN.md)) |
 | [`@cronwatch/mcp`](packages/mcp) | an MCP server so Claude Code, Cursor and other agents can list jobs, read failures, run a check and silence alerts |
 | [`skills/cronwatch`](skills/cronwatch) | a Claude Code skill: how to add monitoring to a job and how to investigate a failure |
 | [`site`](site) | cronwatch.dev, a static landing page and docs |
@@ -68,7 +69,8 @@ export const { GET, POST, DELETE } = cw.routes();
 | Go | `go get cronwatch.dev/go`, and `go get cronwatch.dev/go/robfigcron` (or `/gocron`, `/river`, `/asynq`) for a scheduler | [Go](https://cronwatch.dev/docs/go/), [Go schedulers](https://cronwatch.dev/docs/go-schedulers/), [its README](packages/go/README.md) |
 | Rust | `cargo add cronwatch --features alerts`, `cargo add cronwatch-sqlx --features postgres` (or `sqlite`, `mysql`), `cargo add sqlx --no-default-features --features runtime-tokio,postgres` and `cargo add tokio --features macros,rt-multi-thread`; `cronwatch-tokio-cron-scheduler` or `cronwatch-apalis` for a scheduler | [Rust](https://cronwatch.dev/docs/rust/), [Rust schedulers](https://cronwatch.dev/docs/rust-schedulers/), [its README](packages/rust/README.md) |
 | Elixir | `{:cronwatch, "~> 0.8"}` in `mix.exs`, with the app's Ecto adapter for the SQL store; Oban and Quantum are watched with no other package | [Elixir](https://cronwatch.dev/docs/elixir/), [Elixir schedulers](https://cronwatch.dev/docs/elixir-schedulers/), [its README](packages/elixir/README.md) |
-| Java | not published yet: `./mvnw -B install` in `packages/java` for now, then `dev.cronwatch:cronwatch` (Java 21 or newer), with the app's JDBC driver for the SQL store | [its README](packages/java/README.md) |
+| Java | `dev.cronwatch:cronwatch` (Java 21 or newer), or `dev.cronwatch:cronwatch-spring-boot-starter` in a Spring Boot app; `cronwatch-servlet`, `cronwatch-quartz` and `cronwatch-jobrunr` beside it at the same version, with the app's JDBC driver for the SQL store | [Java](https://cronwatch.dev/docs/java/), [Java schedulers](https://cronwatch.dev/docs/java-schedulers/), [its README](packages/java/README.md) |
+| .NET | `dotnet add package Cronwatch` (.NET 10 or newer), `Cronwatch.Hosting` in a Generic Host app or `Cronwatch.AspNetCore` in an ASP.NET Core app; `Cronwatch.Hangfire` and `Cronwatch.Quartz` beside it at the same version, with the app's ADO.NET driver for the SQL store | [.NET](https://cronwatch.dev/docs/dotnet/), [.NET schedulers](https://cronwatch.dev/docs/dotnet-schedulers/), [its README](packages/dotnet/README.md) |
 
 The SDK depends only on `croner`. The core, the D1 store, the pg_cron source and every alert channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun; the SQLite and Postgres stores and `@cronwatch/sdk/node` need Node. Each driver is an optional peer, installed only when you use its entry point:
 
@@ -119,7 +121,7 @@ npm run check          # dash check, typecheck, tests
 npm run build          # every package and the site
 npm run dev --workspace site    # the site on http://localhost:4321, rebuilding on change
 npm run check:packages # pack both packages and use them from a scratch project (after build)
-npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python, PHP, Go, Rust, Elixir and Java packages
+npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python, PHP, Go, Rust, Elixir, Java and .NET packages
 ```
 
 The gem (Ruby 3.2 or newer), after `npm run build` so its Node compatibility tests can run:
@@ -181,13 +183,22 @@ The Java build (Java 21 or newer, with the Maven wrapper it commits), after `npm
 cd packages/java && ./mvnw -B verify
 ```
 
-It replays `conformance/` too, compiling with Error Prone and `-Xlint:all` with warnings as errors; `./mvnw spotless:apply` formats the code ([its README](packages/java/README.md#testing-this-package) has the rest). CI runs it on JDK 21 and the newest JDK.
+It replays `conformance/` too, compiling with Error Prone and `-Xlint:all` with warnings as errors; `./mvnw spotless:apply` formats the code ([its README](packages/java/README.md#testing-this-package) has the rest). CI runs it on JDK 21 and the newest JDK, and `CRONWATCH_TEST_JAVA=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard.
+
+The .NET solution (.NET 10 or newer, the SDK pinned by `global.json`), after `npm run build` for the same reason:
+
+```bash
+cd packages/dotnet && dotnet test
+CRONWATCH_CULTURE=tr-TR dotnet test    # the suite again under the tr-TR culture, as CI runs it
+```
+
+It replays `conformance/` and the dashboard fixture too, with warnings as errors; `dotnet format` formats the code ([its README](packages/dotnet/README.md#testing-this-package) has the rest). CI runs it on .NET 10 and the newest .NET, on Linux, macOS and Windows, and `CRONWATCH_TEST_DOTNET=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard.
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 
 ## Releasing
 
-Every package shares one version: the SDK, the MCP server, the gem, the Python and PHP packages (the WordPress plugin with them, and the Drupal module and the Craft plugin requiring the library at it), the Go module and its scheduler modules, the Rust crates, the Elixir package, the Java build, and the skill. From a clean `main`:
+Every package shares one version: the SDK, the MCP server, the gem, the Python and PHP packages (the WordPress plugin with them, and the Drupal module and the Craft plugin requiring the library at it), the Go module and its scheduler modules, the Rust crates, the Elixir package, the Java build, the .NET solution, and the skill. From a clean `main`:
 
 ```bash
 npm run release -- 0.8.0 --dry-run   # show every change and command, write nothing

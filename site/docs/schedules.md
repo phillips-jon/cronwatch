@@ -7,7 +7,7 @@ group: Reference
 
 # Schedules, grace and timeouts
 
-Every port applies these rules the same way: TypeScript, Ruby, Python, PHP, Go, Rust and Elixir. The examples use the TypeScript names; each language's page has its own spelling (`cw.check()` is `client.check` in Ruby, for one). In Rails, a job can take its schedule and timezone from Solid Queue or sidekiq-cron instead; see [Schedule the job](/docs/rails/#schedule-the-job).
+Every port applies these rules the same way: TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET. The examples use the TypeScript names; each language's page has its own spelling (`cw.check()` is `client.check` in Ruby, for one). In Rails, a job can take its schedule and timezone from Solid Queue or sidekiq-cron instead; see [Schedule the job](/docs/rails/#schedule-the-job).
 
 ## Schedule syntax
 
@@ -49,7 +49,7 @@ Every run is recorded as `running` when it starts. Normally it is updated to `ok
 
 Inside the process, `job.signal` is an `AbortSignal` that fires when the timeout elapses, so work that can stop early may honour it; nothing is killed for you. In Ruby, `job.aborted?` turns true and `job.signal.check!` raises once the timeout has passed.
 
-In Go the run's `ctx` is cancelled at the timeout, with a cause that names the job; in Rust `job.cancelled()` resolves then; in Elixir `Cronwatch.cancelled?(job)` turns true.
+In Go the run's `ctx` is cancelled at the timeout, with a cause that names the job; in Rust `job.cancelled()` resolves then; in Elixir `Cronwatch.cancelled?(job)` turns true; in Java `job.cancelled()` turns true and what `job.onCancel` registered is called; in .NET the run's `CancellationToken` is cancelled.
 
 ## Next due
 

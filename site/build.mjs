@@ -23,6 +23,13 @@ const DEMO = path.join(SRC, "demo");
 const DIST = path.join(here, "dist");
 const SITE = "https://cronwatch.dev";
 const GITHUB = "https://github.com/phillips-jon/cronwatch";
+/**
+ * Maven has no version range an install line can use, so the Java install
+ * lines name the release: {{JAVA_VERSION}} in the landing page, the prompt
+ * and the docs is the parent POM's <revision>, which scripts/release.mjs bumps.
+ */
+const JAVA_VERSION = /<revision>([^<]+)<\/revision>/.exec(readFileSync(path.join(here, "..", "packages", "java", "pom.xml"), "utf8"))[1];
+const versioned = (text) => text.replace(/\{\{JAVA_VERSION\}\}/g, () => JAVA_VERSION);
 const args = process.argv.slice(2);
 const WATCHING = args.includes("--watch") || args.includes("--serve");
 
@@ -150,7 +157,7 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 ${body}
   </main>
   <footer>
-    <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><a href="https://pypi.org/project/cronwatch-sdk/">PyPI</a><a href="https://packagist.org/packages/cronwatch/cronwatch">Packagist</a><a href="https://pkg.go.dev/cronwatch.dev/go">pkg.go.dev</a><a href="https://crates.io/crates/cronwatch">crates.io</a><a href="https://hex.pm/packages/cronwatch">Hex</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D, or Shift+Ctrl+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
+    <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><a href="https://pypi.org/project/cronwatch-sdk/">PyPI</a><a href="https://packagist.org/packages/cronwatch/cronwatch">Packagist</a><a href="https://pkg.go.dev/cronwatch.dev/go">pkg.go.dev</a><a href="https://crates.io/crates/cronwatch">crates.io</a><a href="https://hex.pm/packages/cronwatch">Hex</a><a href="https://central.sonatype.com/artifact/dev.cronwatch/cronwatch">Maven Central</a><a href="https://www.nuget.org/packages/Cronwatch">NuGet</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D, or Shift+Ctrl+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
     <nav class="legal" aria-label="Site policies"><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/contact/">Contact</a></nav>
     <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>.</p>
   </footer>
@@ -667,7 +674,7 @@ function build() {
   writeFileSync(path.join(DIST, assets.theme), theme);
 
   const pages = readdirSync(DOCS).filter((f) => f.endsWith(".md")).map((file) => {
-    const { meta, body } = frontmatter(readFileSync(path.join(DOCS, file), "utf8"));
+    const { meta, body } = frontmatter(versioned(readFileSync(path.join(DOCS, file), "utf8")));
     const name = file.replace(/\.md$/, "");
     const route = name === "index" ? "/docs/" : `/docs/${name}/`;
     return { name, route, meta, html: curlyApostrophes(marked.parse(body)), order: Number(meta.order ?? 999) };
@@ -684,13 +691,13 @@ function build() {
   writeFileSync(path.join(DIST, assets.search), search);
 
   // Replacer functions, so a $& or $1 in captured text is inserted as written.
-  let landing = readFileSync(path.join(SRC, "landing.html"), "utf8").replace(/\{\{GITHUB\}\}/g, () => GITHUB);
-  const promptHtml = escape(readFileSync(path.join(SRC, "prompt.txt"), "utf8"));
+  let landing = versioned(readFileSync(path.join(SRC, "landing.html"), "utf8")).replace(/\{\{GITHUB\}\}/g, () => GITHUB);
+  const promptHtml = escape(versioned(readFileSync(path.join(SRC, "prompt.txt"), "utf8")));
   landing = landing.replace(/\{\{PROMPT\}\}/g, () => promptHtml);
   for (const [key, value] of Object.entries(demoContent())) landing = landing.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), () => value);
   writeFileSync(path.join(DIST, "index.html"), layout({
     title: "CronWatch",
-    description: "Cron monitoring as a library for TypeScript, Ruby, Python, PHP, Go, Rust and Elixir. Every run recorded in your own database, and an alert when one is missed, fails or gets stuck.",
+    description: "Cron monitoring as a library for TypeScript, Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET. Every run recorded in your own database, and an alert when one is missed, fails or gets stuck.",
     body: landing,
     path: "/",
     kind: "landing",
@@ -742,9 +749,9 @@ ${code ? `  <p class="code" aria-hidden="true">${code}</p>\n` : ""}  <h1>${headi
   const extra = buildPages();
   const goPages = buildGoPages();
 
-  const prompt = readFileSync(path.join(SRC, "prompt.txt"), "utf8");
+  const prompt = versioned(readFileSync(path.join(SRC, "prompt.txt"), "utf8"));
   writeFileSync(path.join(DIST, "prompt.txt"), prompt);
-  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails, cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), cronwatch.dev/go for Go (robfig/cron, gocron, River, Asynq), the cronwatch crate for Rust (tokio-cron-scheduler, apalis), and the cronwatch package on Hex for Elixir (Oban, Quantum). Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nPlatforms: Vercel cron, Next.js, SvelteKit, Nuxt, React Router, NestJS, Strapi, Netlify, Firebase, Convex, Trigger.dev, Inngest, Cloudflare Workers with D1, pg_cron and Supabase Cron, node-cron, BullMQ, GitHub Actions, Rails with ActiveJob, Solid Queue or Sidekiq, Django, Celery and beat, APScheduler, AWS Lambda, Laravel's scheduler and queues, the Symfony Scheduler and Messenger, WordPress's WP-Cron, Drupal cron and queues, Craft CMS console commands and queue jobs, Go's robfig/cron, gocron, River and Asynq, Rust's tokio-cron-scheduler and apalis, Elixir's Oban and Quantum.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nPython docs: ${SITE}/docs/python/, ${SITE}/docs/django/, ${SITE}/docs/celery/\nPHP docs: ${SITE}/docs/php/, ${SITE}/docs/laravel/, ${SITE}/docs/symfony/, ${SITE}/docs/wordpress/, ${SITE}/docs/drupal/, ${SITE}/docs/craft/\nGo docs: ${SITE}/docs/go/, ${SITE}/docs/go-schedulers/\nRust docs: ${SITE}/docs/rust/, ${SITE}/docs/rust-schedulers/\nElixir docs: ${SITE}/docs/elixir/, ${SITE}/docs/elixir-schedulers/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nPyPI: pip install cronwatch-sdk\nPackagist: composer require cronwatch/cronwatch\nGo: go get cronwatch.dev/go\ncrates.io: cargo add cronwatch\nHex: {:cronwatch, \"~> 0.8\"} in mix.exs\nWordPress plugin (not in the wordpress.org directory yet): https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip, installed with wp plugin install <that url> --activate or uploaded in wp-admin\nMCP server: npx -y @cronwatch/mcp\nMCP docs: ${SITE}/docs/mcp/\n`);
+  writeFileSync(path.join(DIST, "llms.txt"), `# CronWatch\n\n> Open source cron and scheduled-job monitoring as a library: @cronwatch/sdk for TypeScript (Node, Cloudflare Workers, Deno, Bun), the cronwatch gem for Ruby and Rails, cronwatch-sdk for Python (Django, Celery, APScheduler), cronwatch/cronwatch for PHP (Laravel, Symfony, WordPress, Drupal, Craft CMS), cronwatch.dev/go for Go (robfig/cron, gocron, River, Asynq), the cronwatch crate for Rust (tokio-cron-scheduler, apalis), the cronwatch package on Hex for Elixir (Oban, Quantum), dev.cronwatch:cronwatch on Maven Central for Java (Spring Boot, Quartz, JobRunr), and the Cronwatch package on NuGet for .NET (ASP.NET Core, Hangfire, Quartz.NET). Runs inside your app, writes to your own database, alerts when a run is missed, fails, gets stuck, runs slow or goes over budget.\n\nPlatforms: Vercel cron, Next.js, SvelteKit, Nuxt, React Router, NestJS, Strapi, Netlify, Firebase, Convex, Trigger.dev, Inngest, Cloudflare Workers with D1, pg_cron and Supabase Cron, node-cron, BullMQ, GitHub Actions, Rails with ActiveJob, Solid Queue or Sidekiq, Django, Celery and beat, APScheduler, AWS Lambda, Laravel's scheduler and queues, the Symfony Scheduler and Messenger, WordPress's WP-Cron, Drupal cron and queues, Craft CMS console commands and queue jobs, Go's robfig/cron, gocron, River and Asynq, Rust's tokio-cron-scheduler and apalis, Elixir's Oban and Quantum, Java's Spring @Scheduled methods (with ShedLock), Quartz and JobRunr, .NET's Hangfire, Quartz.NET and hosted jobs in the Generic Host.\n\nSetup instructions for an agent: ${SITE}/prompt.txt\nDocs: ${SITE}/docs/\nRails docs: ${SITE}/docs/rails/\nPython docs: ${SITE}/docs/python/, ${SITE}/docs/django/, ${SITE}/docs/celery/\nPHP docs: ${SITE}/docs/php/, ${SITE}/docs/laravel/, ${SITE}/docs/symfony/, ${SITE}/docs/wordpress/, ${SITE}/docs/drupal/, ${SITE}/docs/craft/\nGo docs: ${SITE}/docs/go/, ${SITE}/docs/go-schedulers/\nRust docs: ${SITE}/docs/rust/, ${SITE}/docs/rust-schedulers/\nElixir docs: ${SITE}/docs/elixir/, ${SITE}/docs/elixir-schedulers/\nJava docs: ${SITE}/docs/java/, ${SITE}/docs/java-schedulers/\n.NET docs: ${SITE}/docs/dotnet/, ${SITE}/docs/dotnet-schedulers/\nnpm: npm install @cronwatch/sdk\nRubyGems: bundle add cronwatch\nPyPI: pip install cronwatch-sdk\nPackagist: composer require cronwatch/cronwatch\nGo: go get cronwatch.dev/go\ncrates.io: cargo add cronwatch\nHex: {:cronwatch, \"~> 0.8\"} in mix.exs\nMaven Central: dev.cronwatch:cronwatch:${JAVA_VERSION}, or dev.cronwatch:cronwatch-spring-boot-starter:${JAVA_VERSION} in a Spring Boot app\nNuGet: dotnet add package Cronwatch, or Cronwatch.AspNetCore in an ASP.NET Core app\nWordPress plugin (not in the wordpress.org directory yet): https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip, installed with wp plugin install <that url> --activate or uploaded in wp-admin\nMCP server: npx -y @cronwatch/mcp\nMCP docs: ${SITE}/docs/mcp/\n`);
 
   const urls = ["/", ...pages.map((p) => p.route), ...extra.indexed];
   writeFileSync(path.join(DIST, "sitemap.xml"), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${SITE}${u}</loc></url>`).join("\n")}\n</urlset>\n`);
