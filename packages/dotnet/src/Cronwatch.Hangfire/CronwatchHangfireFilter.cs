@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Hangfire.Common;
 using Hangfire.Server;
 using Hangfire.States;
@@ -21,6 +22,7 @@ namespace Cronwatch.Hangfire;
 /// the worker's thread whatever happened, so a pooled worker keeps nothing.
 /// </remarks>
 [DebuggerDisplay("{ToString(),nq}")]
+[SuppressMessage("Naming", "CA1725", Justification = "Hangfire renamed these parameters within 1.8 (filterContext in 1.8.0, context later), so no one name matches every supported release.")]
 public sealed class CronwatchHangfireFilter : JobFilterAttribute, IServerFilter, IElectStateFilter
 {
     private const string RunKey = "cronwatch.run";

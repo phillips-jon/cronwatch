@@ -27,7 +27,17 @@ public class HangfireTests
         await using var h = new Harness(start: false);
         h.Recurring.AddOrUpdate("nightly", () => TestJobs.Nothing(), "0 2 * * *", new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris") });
         h.Recurring.AddOrUpdate("windows", () => TestJobs.Nothing(), "30 6 * * *", new RecurringJobOptions { TimeZone = TimeZoneInfo.FindSystemTimeZoneById("W. Europe Standard Time") });
-        h.Recurring.AddOrUpdate("daily", () => TestJobs.Nothing(), "@daily");
+        // Hangfire reads macros such as @daily with the Cronos it carries in later 1.8 releases;
+        // 1.8.0's Cronos (0.7.1) refuses them, and so does Hangfire.
+        bool macros = true;
+        try
+        {
+            h.Recurring.AddOrUpdate("daily", () => TestJobs.Nothing(), "@daily");
+        }
+        catch (ArgumentException)
+        {
+            macros = false;
+        }
         h.Recurring.AddOrUpdate("question", () => TestJobs.Nothing(), "0 3 ? * *");
         h.Recurring.AddOrUpdate("seconds", () => TestJobs.Nothing(), "*/10 * * * * *");
         // Cronos runs a cron naming both days only when both match; croner, as cron does, when
@@ -37,7 +47,10 @@ public class HangfireTests
         await h.Integration.SyncAsync();
         Assert.Equal("{\"schedule\":\"0 2 * * *\",\"timezone\":\"Europe/Paris\",\"tags\":[\"hangfire\",\"hangfire:billing\"],\"name\":\"nightly\"}", await h.StoredAsync("nightly"));
         Assert.Equal("{\"schedule\":\"30 6 * * *\",\"timezone\":\"Europe/Berlin\",\"tags\":[\"hangfire\",\"hangfire:billing\"],\"name\":\"windows\"}", await h.StoredAsync("windows"));
-        Assert.Equal("{\"schedule\":\"@daily\",\"timezone\":\"UTC\",\"tags\":[\"hangfire\",\"hangfire:billing\"],\"name\":\"daily\"}", await h.StoredAsync("daily"));
+        if (macros)
+        {
+            Assert.Equal("{\"schedule\":\"@daily\",\"timezone\":\"UTC\",\"tags\":[\"hangfire\",\"hangfire:billing\"],\"name\":\"daily\"}", await h.StoredAsync("daily"));
+        }
         Assert.Equal("{\"schedule\":\"0 3 * * *\",\"timezone\":\"UTC\",\"tags\":[\"hangfire\",\"hangfire:billing\"],\"name\":\"question\"}", await h.StoredAsync("question"));
         Assert.Equal("{\"schedule\":\"*/10 * * * * *\",\"timezone\":\"UTC\",\"tags\":[\"hangfire\",\"hangfire:billing\"],\"name\":\"seconds\"}", await h.StoredAsync("seconds"));
         Assert.Equal("{\"tags\":[\"hangfire\",\"hangfire:billing\"],\"name\":\"both\"}", await h.StoredAsync("both"));
