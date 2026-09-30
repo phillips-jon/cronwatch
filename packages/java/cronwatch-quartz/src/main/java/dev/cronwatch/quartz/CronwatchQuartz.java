@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
@@ -46,6 +47,7 @@ import org.quartz.SimpleTrigger;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
+import org.quartz.core.JobExecutionProcessException;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.quartz.listeners.SchedulerListenerSupport;
 
@@ -63,7 +65,8 @@ import org.quartz.listeners.SchedulerListenerSupport;
  *
  * <p>A global {@link JobListener} opens a run in the worker thread when Quartz is about to execute
  * a job (trigger {@code quartz}, id {@code quartz:<app>:<scheduler instance id>:<fire instance
- * id>:<refire count>}) and closes it when Quartz says the job was executed, failed with the {@link
+ * id>:<refire count>}, the instance id given a random part of its own when the job store is not
+ * clustered) and closes it when Quartz says the job was executed, failed with the {@link
  * JobExecutionException} Quartz hands it (its cause, when it has one, is what is written). {@link
  * Cronwatch#current()} and {@code job.log} work inside {@code execute}. A refire ({@code
  * refireImmediately}) is a new run. A vetoed firing, and one {@code @DisallowConcurrentExecution}
@@ -73,13 +76,14 @@ import org.quartz.listeners.SchedulerListenerSupport;
  * {@code reports.nightly} for {@code nightly} in {@code reports}. They are read when the
  * integration starts, again when the scheduler says a job or trigger was added or removed, and
  * every minute besides. A job with one {@link CronTrigger} is declared on its expression in the
- * trigger's zone, checked against Quartz's own fire times ({@link Bridge#checkFires}): one Quartz
- * reads differently (nearly every expression naming a day of the week by number, since Quartz
- * counts from 1 for Sunday) is reported once and watched without a schedule. A {@link
- * SimpleTrigger} repeating forever is declared {@code every <interval>}; any other trigger, a
- * trigger with a {@code Calendar}, or several triggers on different schedules is a job without a
- * schedule. A job removed from the scheduler keeps its runs and is declared again without its
- * schedule, so it is never reported missed.
+ * trigger's zone (a {@code ?} as {@code *}, which croner reads as Quartz reads a {@code ?}),
+ * checked against Quartz's own fire times ({@link Bridge#checkFires}): one Quartz reads differently
+ * (nearly every expression naming a day of the week by number, since Quartz counts from 1 for
+ * Sunday) is reported once and watched without a schedule. A {@link SimpleTrigger} repeating
+ * forever is declared {@code every <interval>}; any other trigger, a trigger with a {@code
+ * Calendar}, or several triggers on different schedules is a job without a schedule. A job removed
+ * from the scheduler keeps its runs and is declared again without its schedule, so it is never
+ * reported missed.
  *
  * <p>In a clustered job store, a job a node was running when it died is fired again on another node
  * with {@code isRecovering()}: that firing first finishes the earlier firing's run, if it is still
@@ -117,6 +121,17 @@ public final class CronwatchQuartz implements AutoCloseable {
   private final QuartzOptions options;
   private final Watch watch;
   private final String instanceId;
+
+  /**
+   * The scheduler instance as run ids name it: its id, with a random part of this watch's own when
+   * the job store is not clustered, since every such process that leaves the id unset has Quartz's
+   * {@code NON_CLUSTERED} and the RAM job store counts its fire instance ids from the time it was
+   * loaded, so two processes started together would give two firings one id. A clustered store's
+   * ids are unique across the cluster, which the recovery rule needs. One too long for a run id is
+   * a hash.
+   */
+  private final String instancePart;
+
   private final Listener listener = new Listener();
   private final Changes changes = new Changes();
 
@@ -129,12 +144,25 @@ public final class CronwatchQuartz implements AutoCloseable {
   volatile Duration syncTimeout = Bridge.SYNC_TIMEOUT;
 
   private CronwatchQuartz(
-      Cronwatch cw, Scheduler scheduler, QuartzOptions options, String instanceId) {
+      Cronwatch cw,
+      Scheduler scheduler,
+      QuartzOptions options,
+      String instanceId,
+      boolean clustered) {
     this.cw = cw;
     this.scheduler = scheduler;
     this.options = options;
     this.instanceId = instanceId;
     this.watch = new Watch(cw, TAG, options.app, SCHEDULER);
+    String part =
+        clustered ? instanceId : instanceId + "." + HexFormat.of().formatHex(randomBytes(4));
+    this.instancePart = part.length() > 100 ? "h" + sha256(part).substring(0, 32) : part;
+  }
+
+  private static byte[] randomBytes(int n) {
+    byte[] b = new byte[n];
+    ThreadLocalRandom.current().nextBytes(b);
+    return b;
   }
 
   /**
@@ -149,7 +177,12 @@ public final class CronwatchQuartz implements AutoCloseable {
     Objects.requireNonNull(cw, "cw");
     Objects.requireNonNull(options, "options");
     CronwatchQuartz q =
-        new CronwatchQuartz(cw, scheduler, options, scheduler.getSchedulerInstanceId());
+        new CronwatchQuartz(
+            cw,
+            scheduler,
+            options,
+            scheduler.getSchedulerInstanceId(),
+            scheduler.getMetaData().isJobStoreClustered());
     q.read();
     scheduler.getListenerManager().addJobListener(q.listener);
     scheduler.getListenerManager().addSchedulerListener(q.changes);
@@ -395,16 +428,21 @@ public final class CronwatchQuartz implements AutoCloseable {
 
   /**
    * A cron trigger's expression as CronWatch reads it: Quartz's six fields as they are (croner
-   * reads seconds first too), a seventh year field left out when it is {@code *} or {@code ?}, and
-   * kept when it names years, for the check to judge; then checked against Quartz's own fire times.
+   * reads seconds first too) but for a {@code ?}, which is {@code *}, a seventh year field left out
+   * when it is {@code *} or {@code ?}, and kept when it names years, for the check to judge; then
+   * checked against Quartz's own fire times.
    */
   private static String cronOf(String label, String expression, TimeZone tz, long now)
       throws ScheduleException {
     String[] fields = expression.trim().split("\\s+");
-    String expr = expression.trim();
-    if (fields.length == 7 && isAny(fields[6])) {
-      expr = String.join(" ", List.of(fields).subList(0, 6));
+    List<String> kept = new ArrayList<>(List.of(fields));
+    if (kept.size() == 7 && isAny(kept.get(6))) {
+      kept.remove(6);
     }
+    // Quartz's ? is any day; croner reads a ? as a day field named, every day, so that a day of
+    // the month and ? would be every day. Declared as *, which croner reads as Quartz does.
+    kept.replaceAll(f -> f.equals("?") ? "*" : f);
+    String expr = String.join(" ", kept);
     CronExpression quartz;
     try {
       quartz = new CronExpression(expression);
@@ -496,15 +534,16 @@ public final class CronwatchQuartz implements AutoCloseable {
   /**
    * The run's id: the app, the scheduler instance and the firing, since a fire instance id is
    * unique only within one scheduler instance and a refire reuses it. One longer than a store holds
-   * keeps its prefix and a hash of the rest.
+   * keeps its prefix and instance and a hash of the rest.
    */
-  private String runId(JobExecutionContext ctx) {
+  String runId(JobExecutionContext ctx) {
     String prefix = "quartz:" + watch.appSlug() + ":";
-    String rest = instanceId + ":" + ctx.getFireInstanceId() + ":" + ctx.getRefireCount();
-    if (prefix.length() + rest.length() <= 200) {
-      return prefix + rest;
+    String own = prefix + instancePart + ":";
+    String rest = ctx.getFireInstanceId() + ":" + ctx.getRefireCount();
+    if (own.length() + rest.length() <= 200) {
+      return own + rest;
     }
-    return prefix + sha256(rest).substring(0, 32);
+    return own + sha256(rest).substring(0, 32);
   }
 
   private static String sha256(String s) {
@@ -545,7 +584,7 @@ public final class CronwatchQuartz implements AutoCloseable {
       return;
     }
     String prefix = "quartz:" + watch.appSlug() + ":";
-    String mine = prefix + instanceId + ":";
+    String mine = prefix + instancePart + ":";
     try {
       for (Run run : cw.runs(name, 50)) {
         if (run.status().equals(RunStatus.RUNNING)
@@ -650,6 +689,26 @@ public final class CronwatchQuartz implements AutoCloseable {
     @Override
     public void schedulingDataCleared() {
       changed();
+    }
+
+    /**
+     * A job listener after this one that threw stops Quartz running the job, and no listener is
+     * told it was executed; Quartz says so here, in the worker thread, with the firing. Its run is
+     * given back, as a firing that never ran.
+     */
+    @Override
+    public void schedulerError(String msg, SchedulerException cause) {
+      try {
+        if (cause instanceof JobExecutionProcessException p
+            && String.valueOf(p.getMessage()).startsWith("JobListener ")
+            && p.getJobExecutionContext() != null
+            && p.getJobExecutionContext().get(RUN_KEY) instanceof ObservedRun run) {
+          p.getJobExecutionContext().put(RUN_KEY, null);
+          run.takeBack();
+        }
+      } catch (RuntimeException e) {
+        cw.reportError(e, "quartz");
+      }
     }
 
     @Override
