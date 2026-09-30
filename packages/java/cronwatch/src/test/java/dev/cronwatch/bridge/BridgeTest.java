@@ -145,6 +145,25 @@ class BridgeTest {
   }
 
   @Test
+  void walkingFindsTheFireAtOrBeforeAndTheOnesAfter() throws Exception {
+    // A scheduler that fires on every whole hour, asked only for the next one.
+    FireTimes hourly =
+        FireTimes.walking(at -> Math.floorDiv(at, 3_600_000L) * 3_600_000L + 3_600_000L, "hourly");
+    long start = Js.dateUtc(2026, 0, 1, 5, 30, 0, 0);
+    List<Long> runs = hourly.between(start, null);
+    assertEquals(Bridge.SAMPLE_RUNS + 1, runs.size());
+    assertEquals(Js.dateUtc(2026, 0, 1, 5, 0, 0, 0), runs.get(0), "the one at or before");
+    assertEquals(Js.dateUtc(2026, 0, 1, 6, 0, 0, 0), runs.get(1));
+    long end = Js.dateUtc(2026, 0, 1, 8, 0, 0, 0);
+    List<Long> until = hourly.between(start, end);
+    assertEquals(Js.dateUtc(2026, 0, 1, 9, 0, 0, 0), until.get(until.size() - 1), "one past");
+    Bridge.checkFires(hourly, "0 * * * *", "UTC", "x", "hourly", true, start);
+    FireTimes never = FireTimes.walking(at -> null, "Nothing");
+    ScheduleException e = assertThrows(ScheduleException.class, () -> never.between(start, null));
+    assertTrue(e.getMessage().startsWith("Nothing finds no fire time after "), e.getMessage());
+  }
+
+  @Test
   void checkFiresNamesATimeTheClockChangeSkips() throws Exception {
     // A scheduler that skips 02:30 in New York the night clocks go forward, where CronWatch
     // (croner) moves it past the jump.

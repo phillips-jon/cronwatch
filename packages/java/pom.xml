@@ -46,6 +46,7 @@
     <module>cronwatch-quartz</module>
     <module>cronwatch-jobrunr</module>
     <module>cronwatch-spring-boot-starter</module>
+    <module>examples/crontab</module>
   </modules>
 
   <properties>
@@ -377,6 +378,7 @@
               <!-- The flattened POMs stand alone, so the parent is not published. -->
               <excludeArtifacts>
                 <artifact>cronwatch-parent</artifact>
+                <artifact>cronwatch-example-crontab</artifact>
               </excludeArtifacts>
             </configuration>
           </plugin>
