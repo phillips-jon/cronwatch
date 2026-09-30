@@ -27,3 +27,6 @@ packages/elixir/**/mix.lock
 packages/elixir/**/erl_crash.dump
 packages/elixir/doc/
 packages/elixir/_build_floor/
+
+# Maven builds (target/ above covers the output)
+packages/java/**/.flattened-pom.xml
