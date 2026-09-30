@@ -550,7 +550,9 @@ public sealed class PgCronSource : ISource
                 JobOptions options = OptionsOf(description, extra, schedule, timezone);
                 Definition definition = options.Describe(name);
                 string key = KeyOf(definition);
-                if (!_declared.TryGetValue(name, out string? was) || was != key)
+                // One forgotten since it was declared (the dashboard's forget) is declared again,
+                // though unchanged: RecordRunAsync takes runs only of a declared job.
+                if (!_declared.TryGetValue(name, out string? was) || was != key || host.Declared(name) == null)
                 {
                     try
                     {
