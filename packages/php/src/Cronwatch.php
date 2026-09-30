@@ -250,7 +250,9 @@ final class Cronwatch
      * so recording the same run twice changes nothing. When two processes
      * record the same finish, only the one whose write lands evaluates it.
      * `evaluate: false` stores it without judging it, for history imported on
-     * first sight. Returns the alerts it sent.
+     * first sight. A metric that is not a finite number throws before
+     * anything is written, as a job's metric() does. Returns the alerts it
+     * sent.
      *
      * @param Run|array<string, mixed> $run
      * @return list<Alert>
@@ -261,6 +263,12 @@ final class Cronwatch
         $declared = $this->definitions[$given->job] ?? throw new \InvalidArgumentException("recordRun: job \"{$given->job}\" is not declared; call job() first");
         if (str_contains($given->id, "\0")) {
             throw new \InvalidArgumentException("recordRun: run ids cannot contain a NUL character (job \"{$given->job}\")");
+        }
+        // Refused as a job's metric() refuses them: a store keeps NaN and INF as null.
+        foreach ($given->metrics as $metric => $value) {
+            if (!Js::isFinite($value)) {
+                throw new \InvalidArgumentException("recordRun: metric \"{$metric}\" must be a finite number (job \"{$given->job}\", run \"{$given->id}\")");
+            }
         }
         $this->sync($declared);
         $run = clone $given;

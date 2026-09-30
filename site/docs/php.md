@@ -395,7 +395,7 @@ The client:
 | `silence($name, '2h')`, `unsilence($name)` | stop alerts for a while; state keeps updating underneath |
 | `forget($name)` | remove a job and its runs |
 | `resumeRun($name, $id)` | `job($name)->resume($id)` for a job declared in this process |
-| `recordRun($run, evaluate: true)` | record a run that happened elsewhere, for a source; returns the alerts it sent |
+| `recordRun($run, evaluate: true)` | record a run that happened elsewhere, for a source; a metric that is not a finite number throws and nothing is recorded; returns the alerts it sent |
 | `routes(...)` | the dashboard and JSON API |
 | `definedJobs()` | the definitions declared in this process |
 | `Cronwatch::current()` | the context of the run in progress in this process, or null |

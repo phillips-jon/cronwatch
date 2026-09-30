@@ -391,6 +391,22 @@ final class StartFinishTest extends TestCase
         $this->assertSame([], $this->capture->types());
     }
 
+    public function testRecordRunRefusesAMetricThatIsNoFiniteNumberAndStoresNothing(): void
+    {
+        $cw = $this->make();
+        $cw->job('imported');
+        foreach ([NAN, INF, null, '3'] as $i => $value) {
+            try {
+                $cw->recordRun(['id' => "m{$i}", 'job' => 'imported', 'status' => 'ok', 'startedAt' => 1, 'finishedAt' => 2, 'durationMs' => 1, 'metrics' => ['cost' => 1, 'rows' => $value]]);
+                $this->fail('expected recordRun to throw');
+            } catch (\InvalidArgumentException $error) {
+                $this->assertSame("recordRun: metric \"rows\" must be a finite number (job \"imported\", run \"m{$i}\")", $error->getMessage());
+            }
+            $this->assertNull($cw->getRun("m{$i}"));
+        }
+        $this->assertSame([], $cw->runs('imported'));
+    }
+
     public function testStartAndResumeRefuseIdsInThePgCronSourcesNamespace(): void
     {
         $cw = $this->make();

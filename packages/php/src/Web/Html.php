@@ -433,6 +433,10 @@ CSS;
                 . (Text::truthy($run->output) ? '<details class="out"' . ($run->status === 'ok' ? '' : ' open') . '><summary>output</summary><pre>' . Text::h($run->output) . '</pre></details>' : '');
             $metrics = '';
             foreach (Text::entries($run->metrics) as [$key, $value]) {
+                // A foreign row may hold a metric that is no finite number (null, text); it is left out.
+                if (!Js::isFinite($value)) {
+                    continue;
+                }
                 $metrics .= '<span><span class="k">' . Text::h($key) . '</span> ' . Text::h(Js::isInteger($value) ? $value : Text::toFixed($value, 4)) . '</span>';
             }
             $runRows[] = '<tr' . ($detail !== '' ? ' class="has-detail"' : '') . ">\n"
