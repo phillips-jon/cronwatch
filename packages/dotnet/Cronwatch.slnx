@@ -9,6 +9,7 @@
     <Project Path="test/Cronwatch.Tests/Cronwatch.Tests.csproj" />
     <Project Path="test/Cronwatch.WebTest/Cronwatch.WebTest.csproj" />
     <Project Path="test/ProcessExitChild/ProcessExitChild.csproj" />
+    <Project Path="test/WebEnvChild/WebEnvChild.csproj" />
   </Folder>
   <Project Path="webserver/webserver.csproj" />
 </Solution>
