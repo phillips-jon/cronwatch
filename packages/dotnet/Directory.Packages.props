@@ -3,10 +3,12 @@
        these are build-time analyzers and the tests' own. -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <!-- The integrations' schedulers, chosen with -p:HangfireVersion= and
-         -p:QuartzVersion= (CI's dotnet-frameworks runs the oldest and newest
-         each supports). NuGet resolves the lowest version that satisfies a
-         package's range, so the package's own floor is the oldest. -->
+    <!-- The integrations' schedulers. Each package asks for the oldest release
+         it supports (its floor, what NuGet resolves for an app that has no
+         other), and the tests run on the release chosen with
+         -p:HangfireVersion= and -p:QuartzVersion=, the newest by default
+         (CI's dotnet-frameworks runs the floor and the newest). -->
+    <HangfireFloor>1.8.0</HangfireFloor>
     <HangfireVersion Condition="'$(HangfireVersion)' == ''">1.8.25</HangfireVersion>
     <QuartzVersion Condition="'$(QuartzVersion)' == ''">4.3.0</QuartzVersion>
   </PropertyGroup>
@@ -22,9 +24,8 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
   </ItemGroup>
   <ItemGroup Label="Hangfire">
-    <PackageVersion Include="Hangfire.Core" Version="$(HangfireVersion)" />
+    <PackageVersion Include="Hangfire.Core" Version="$(HangfireFloor)" />
     <PackageVersion Include="Hangfire.InMemory" Version="1.0.0" />
-    <PackageVersion Include="Hangfire.PostgreSql" Version="1.21.1" />
     <!-- The Cronos Hangfire 1.8 carries inside its own assembly (1.8.25's is
          0.11.1, compared line for line), for reading its crons as it does. -->
     <PackageVersion Include="Cronos" Version="0.11.1" />

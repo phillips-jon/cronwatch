@@ -8,6 +8,8 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="Hangfire.InMemory" />
+    <!-- The release under test; the package itself asks for the floor. -->
+    <PackageReference Include="Hangfire.Core" VersionOverride="$(HangfireVersion)" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Cronwatch.Hangfire/Cronwatch.Hangfire.csproj" />
