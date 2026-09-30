@@ -69,6 +69,19 @@ defmodule Cronwatch.JobState do
   def counted_version(v) when is_float(v) and v >= 0 and v <= @max_version and v == trunc(v), do: trunc(v)
   def counted_version(_), do: nil
 
+  @doc false
+  # The failures in a row a stored `consecutiveFailures` value counts as, as
+  # the SDK's failureCount() reads it: a whole number (2.0 is 2) held at
+  # 2^53 - 1, else 0, so a foreign row's count at a 64-bit limit stays at the
+  # top and a 1.5, "3" or -1 counts as none.
+  def failure_count(v) when is_integer(v) and v > 0, do: min(v, @max_version)
+  def failure_count(v) when is_float(v) and v > 0 and v == trunc(v), do: min(trunc(v), @max_version)
+  def failure_count(_), do: 0
+
+  @doc false
+  # One more failure, held at 2^53 - 1.
+  def add_failure(n), do: min(failure_count(n) + 1, @max_version)
+
   # A stored integer is kept as it is, so the state reads back as written
   # (version_or_zero/1 counts it); anything else that is not a whole number
   # (1.5, "x", true) is dropped, and counts as 0.
@@ -153,7 +166,7 @@ defmodule Cronwatch.JobState do
      %__MODULE__{
        job: Read.str(o, "job"),
        open: open,
-       consecutive_failures: Read.int(o, "consecutiveFailures"),
+       consecutive_failures: failure_count(Object.get(o, "consecutiveFailures")),
        silenced_until: Read.nullable_int(o, "silencedUntil"),
        last_alert_at: Read.nullable_int(o, "lastAlertAt"),
        pending_recovery: pending,

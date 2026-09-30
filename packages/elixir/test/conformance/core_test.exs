@@ -217,7 +217,32 @@ defmodule Cronwatch.Conformance.CoreTest do
         same(acc, "stateVersion #{i}", JobState.version_or_zero(s), field(c, "version"))
       end)
 
-    assert length(list(f, "runDuration")) >= 8 and length(list(f, "stateVersion")) >= 17
+    failed_def = JS.parse!(~s({"name":"j","failuresBeforeAlert":3}))
+
+    failed_run =
+      run(
+        JS.parse!(
+          ~s({"id":"f","job":"j","status":"failed","startedAt":1767605340000,"finishedAt":1767605341000,) <>
+            ~s("durationMs":1000,"error":"Error: boom","output":null,"metrics":{},"trigger":"run"})
+        )
+      )
+
+    fails =
+      f
+      |> list("failureCount")
+      |> Enum.with_index()
+      |> Enum.reduce(fails, fn {c, i}, acc ->
+        {:ok, s} = JobState.from_json(field(c, "state"))
+        s = Evaluate.normalize_state(s, "j")
+        acc = same(acc, "failureCount #{i}", s.consecutive_failures, field(c, "consecutiveFailures"))
+        {:ok, {next, alerts}} = Evaluate.on_run_finish(failed_def, failed_run, s, [], 1_767_605_400_000)
+        got = %Object{pairs: [{"state", JobState.to_value(next)}, {"alerts", Enum.map(alerts, &draft_value/1)}]}
+        same(acc, "failureCount #{i} failed", got, field(c, "failed"))
+      end)
+
+    assert length(list(f, "runDuration")) >= 8 and length(list(f, "stateVersion")) >= 17 and
+             length(list(f, "failureCount")) >= 19
+
     check!(fails, "health")
   end
 

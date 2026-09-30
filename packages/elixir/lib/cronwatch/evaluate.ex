@@ -44,6 +44,7 @@ defmodule Cronwatch.Evaluate do
     %{
       s
       | job: if(s.job == "", do: job, else: s.job),
+        consecutive_failures: JobState.failure_count(s.consecutive_failures),
         pending_recovery: s.pending_recovery || [],
         undelivered: s.undelivered || []
     }
@@ -305,7 +306,8 @@ defmodule Cronwatch.Evaluate do
       end
     else
       # failed or timeout
-      next = %{next | consecutive_failures: next.consecutive_failures + 1}
+      # Held at 2^53 - 1: a count at the limit stays at the top.
+      next = %{next | consecutive_failures: JobState.add_failure(next.consecutive_failures)}
       next = close_condition(next, "missed")
       threshold = failures_before_alert(def)
       condition = if run.status == "timeout", do: "stuck", else: "failed"
