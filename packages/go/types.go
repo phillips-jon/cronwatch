@@ -469,7 +469,7 @@ func stateFrom(v any) (JobState, error) {
 			s.Open = append(s.Open, OpenCondition{Condition(k), toInt(at)})
 		}
 	}
-	s.ConsecutiveFailures = int(toInt(get(o, "consecutiveFailures")))
+	s.ConsecutiveFailures = failureCount(get(o, "consecutiveFailures"))
 	s.SilencedUntil = nullableInt(o, "silencedUntil")
 	s.LastAlertAt = nullableInt(o, "lastAlertAt")
 	if list, ok := get(o, "pendingRecovery").([]any); ok {
@@ -829,6 +829,26 @@ func str(o *js.Object, key string) string {
 	s, _ := get(o, key).(string)
 	return s
 }
+
+// failureCount is the failures in a row a stored state counts as, as the
+// SDK's failureCount() reads it: a whole number, held at 2^53 - 1, and 0
+// when it is negative or not a whole number. A foreign row's count at a
+// 64-bit limit stays at the top instead of wrapping negative, and a 1.5,
+// "3" or -1 counts as none.
+func failureCount(v any) int {
+	f := toFloat(v)
+	if math.IsNaN(f) || math.IsInf(f, 0) || f != math.Trunc(f) || f <= 0 {
+		return 0
+	}
+	if f >= float64(maxFailureCount) {
+		return maxFailureCount
+	}
+	return int(f)
+}
+
+// maxFailureCount is the most failures in a row counted: 2^53 - 1, or the
+// largest int where an int is narrower.
+const maxFailureCount = int(min(maxDurationMs, math.MaxInt))
 
 func toFloat(v any) float64 {
 	switch t := v.(type) {

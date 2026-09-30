@@ -131,6 +131,36 @@ func TestConformanceHealth(t *testing.T) {
 	if durations == 0 || versions == 0 {
 		t.Error("no runDuration or stateVersion cases")
 	}
+	// The failures in a row a foreign state counts as, read as a store reads
+	// it, then a failed run from it: held at 2^53 - 1, never negative.
+	failedDef, _ := definitionFrom(js.NewObject("name", "j", "failuresBeforeAlert", 3.0))
+	t0 := int64(1767605400000)
+	failedRun := Run{ID: "f", Job: "j", Status: StatusFailed, StartedAt: t0 - 60000, FinishedAt: ptr(t0 - 59000), DurationMs: ptr(int64(1000)),
+		Error: ptr("Error: boom"), Metrics: Metrics{}, Trigger: "run"}
+	counts := 0
+	for i, c := range objects(f, "failureCount") {
+		parsed, err := js.Parse(field(c, "state").(string))
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := normalizeState(ptr(fixtureState(t, parsed)), "j")
+		if want := int(field(c, "consecutiveFailures").(float64)); s.ConsecutiveFailures != want {
+			t.Errorf("failureCount %d (%s): %d, want %d", i, field(c, "state"), s.ConsecutiveFailures, want)
+		}
+		e, err := onRunFinish(failedDef, failedRun, s, nil, t0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		alerts := []any{}
+		for _, d := range e.alerts {
+			alerts = append(alerts, d.JSValue())
+		}
+		sameJSON(t, fmt.Sprintf("failureCount %d failed", i), js.NewObject("state", e.state.JSValue(), "alerts", alerts), field(c, "failed"))
+		counts++
+	}
+	if counts == 0 {
+		t.Error("no failureCount cases")
+	}
 	for i, c := range objects(f, "unevaluableSummary") {
 		s := unevaluableSummary(fixtureStored(t, field(c, "stored")), fixtureRuns(t, field(c, "recent")), fixtureState(t, field(c, "state")), now(c))
 		sameJSON(t, fmt.Sprintf("unevaluableSummary %d", i), s.JSValue(), field(c, "summary"))

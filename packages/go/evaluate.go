@@ -50,6 +50,7 @@ func normalizeState(state *JobState, job string) JobState {
 		return emptyState(job)
 	}
 	s := state.clone()
+	s.ConsecutiveFailures = failureCount(s.ConsecutiveFailures)
 	if s.Job == "" {
 		s.Job = job
 	}
@@ -304,7 +305,10 @@ func onRunFinish(def Definition, run Run, state JobState, history []Run, now int
 	}
 
 	// failed or timeout
-	next.ConsecutiveFailures++
+	// Held at the top: a count at the limit neither loses precision nor wraps below a threshold.
+	if next.ConsecutiveFailures < maxFailureCount {
+		next.ConsecutiveFailures++
+	}
 	closeCondition(&next, ConditionMissed)
 	threshold := failuresBeforeAlert(def)
 	condition, alertType := ConditionFailed, AlertFailed
