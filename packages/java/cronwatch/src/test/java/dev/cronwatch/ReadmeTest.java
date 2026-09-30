@@ -22,12 +22,16 @@ import org.junit.jupiter.api.io.TempDir;
 class ReadmeTest {
   private static final String IMPORTS =
       """
+      import com.sun.net.httpserver.HttpServer;
       import dev.cronwatch.*;
       import dev.cronwatch.jdbc.SqlStore;
       import dev.cronwatch.store.MemoryStore;
+      import dev.cronwatch.web.*;
+      import java.net.InetSocketAddress;
       import java.nio.file.Files;
       import java.nio.file.Path;
       import java.time.Duration;
+      import java.util.concurrent.Executors;
       """;
 
   @TempDir Path dir;
