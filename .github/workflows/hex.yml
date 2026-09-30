@@ -4,6 +4,17 @@
 # API key from the environment's secret; when Hex ships it, this moves to
 # OIDC and the key is revoked. Can also be started by hand for a tag.
 #
+# Three jobs. "ci" waits for CI to pass on the tagged commit (ci-passed.yml).
+# "build" fetches the dependencies, builds the package's tarball
+# (mix hex.build) and the docs (mix docs, compiling ex_doc's tree) with no
+# key in sight, and uploads both as the artifact "hex". "publish" is the only
+# job that sees HEX_API_KEY: it runs no Elixir and no dependency's code, and
+# posts the two prebuilt tarballs to Hex's API with curl, as mix hex.publish
+# would (POST /api/packages/cronwatch/releases, then
+# /api/packages/cronwatch/releases/<version>/docs). Hex takes a version
+# once, so when the release is already there (a run started again after the
+# docs failed) only the docs are sent.
+#
 # Stays off until the repository variable HEX_ENABLED is "true". Before
 # that, on hex.pm (signed in as the package's owner): Dashboard, Keys,
 # generate a key named cronwatch-ci whose only permission is the package
@@ -34,15 +45,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  ci:
     if: vars.HEX_ENABLED == 'true'
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      tag: ${{ inputs.tag }}
+
+  build:
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: hex
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.ci.outputs.sha }}
           persist-credentials: false
       - name: Check the tag is the package's version
         working-directory: packages/elixir
@@ -59,15 +80,81 @@ jobs:
         with:
           elixir-version: "1.20"
           otp-version: "29"
-      - name: mix deps.get
-        working-directory: packages/elixir
-        run: mix deps.get
-      # Publishes the package, then builds the docs with ex_doc (a dev
-      # dependency, so MIX_ENV stays dev) and publishes them to HexDocs.
-      # Hex reads the key from HEX_API_KEY; --yes answers its prompts.
-      - name: mix hex.publish
+      # ex_doc is a dev dependency, so MIX_ENV stays dev. The docs tarball
+      # holds what mix hex.publish would send: every file under doc/ but
+      # the hidden ones, gzipped, by the same erl_tar.
+      - name: Build the package and the docs
         working-directory: packages/elixir
         env:
           MIX_ENV: dev
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          OUT: ${{ runner.temp }}/hex/docs.tar.gz
+        run: |
+          version="${TAG#v}"
+          mix deps.get
+          mkdir -p "$RUNNER_TEMP/hex"
+          mix hex.build -o "$RUNNER_TEMP/hex/cronwatch-$version.tar"
+          mix docs
+          [ -f doc/index.html ] || { echo "mix docs wrote no doc/index.html"; exit 1; }
+          elixir -e '
+            files = for f <- Path.wildcard("doc/**"), File.regular?(f),
+                      do: {String.to_charlist(Path.relative_to(f, "doc")), String.to_charlist(f)}
+            :ok = :erl_tar.create(String.to_charlist(System.fetch_env!("OUT")), files, [:compressed])
+          '
+          ls -l "$RUNNER_TEMP/hex"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hex
+          path: ${{ runner.temp }}/hex/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: hex
+    # Nothing is checked out or built here: the job sends what "build" made.
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hex
+          path: hex
+      - name: Publish to Hex and HexDocs
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
-        run: mix hex.publish --yes
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          version="${TAG#v}"
+          if [ -z "$HEX_API_KEY" ]; then echo "the hex environment has no secret HEX_API_KEY"; exit 1; fi
+          package="hex/cronwatch-$version.tar"
+          ls -l hex
+          # The tarball must be this release's: its metadata names the package and version.
+          meta="$RUNNER_TEMP/metadata.config"
+          tar -xOf "$package" metadata.config > "$meta"
+          grep -qxF '{<<"name">>,<<"cronwatch">>}.' "$meta" || { echo "$package is not the cronwatch package"; exit 1; }
+          grep -qxF "{<<\"version\">>,<<\"$version\">>}." "$meta" || { echo "$package is not version $version"; exit 1; }
+          # The key goes in a header file, never on a command line.
+          headers="$RUNNER_TEMP/hex-headers"
+          (umask 077; printf 'authorization: %s\n' "$HEX_API_KEY" > "$headers")
+          api=https://hex.pm/api/packages/cronwatch/releases
+          checksum="$(sha256sum "$package" | cut -d' ' -f1)"
+          code="$(curl -sS -o release.json -w '%{http_code}' -H 'accept: application/json' "$api/$version")"
+          if [ "$code" = "200" ]; then
+            # Hex will not take a version twice. The checksum can differ for
+            # the same files: the tarball lists them in the order the build's
+            # file system gave them.
+            echo "cronwatch $version is already on Hex (checksum $(jq -r .checksum release.json), this build's $checksum); sending only the docs"
+          elif [ "$code" = "404" ]; then
+            curl -sS --fail-with-body -H @"$headers" -H 'accept: application/json' \
+              -H 'content-type: application/octet-stream' --data-binary @"$package" "$api?replace=false"
+            echo
+          else
+            echo "Hex answered $code when asked for cronwatch $version"
+            exit 1
+          fi
+          curl -sS --fail-with-body -H @"$headers" -H 'accept: application/json' \
+            -H 'content-type: application/octet-stream' --data-binary @hex/docs.tar.gz "$api/$version/docs"
+          echo
+          rm -f "$headers"

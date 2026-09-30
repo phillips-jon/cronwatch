@@ -47,15 +47,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # CI must pass on the tagged commit first (ci-passed.yml).
+  ci:
     if: vars.MAVEN_ENABLED == 'true'
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      tag: ${{ inputs.tag }}
+
+  publish:
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: maven
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.ci.outputs.sha }}
           persist-credentials: false
       - name: Check the tag is the build's version
         working-directory: packages/java

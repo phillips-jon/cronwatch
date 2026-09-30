@@ -1,0 +1,85 @@
+# Called by every publish workflow (pypi.yml, crates.yml, hex.yml, nuget.yml,
+# java.yml, php-split.yml, php-plugins-split.yml, wordpress-zip.yml) before
+# it publishes: finds CI's run on the release tag's commit and waits for it,
+# and fails unless that run passed. CI runs on pushes to main, not on tags, so
+# the run it waits for is the one on the push to main that carried the
+# tagged commit (`npm run release` makes the commit and the tag, and both
+# are pushed together). A tag on a commit that never reached main has no such
+# run and publishes nothing.
+#
+# Started by the tag's push, the commit is the tag's (github.sha); started by
+# hand with a tag, it is the commit that tag names now. Either way it is the
+# job's output "sha", which the publish jobs check out, so what is published
+# is exactly what CI tested. A CI run that failed and was then run again
+# counts by its latest attempt.
+name: CI passed
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The release tag, for a run started by hand; empty for a tag's push
+        type: string
+        default: ""
+    outputs:
+      sha:
+        description: The tagged commit, which CI passed
+        value: ${{ jobs.wait.outputs.sha }}
+
+permissions: {}
+
+jobs:
+  wait:
+    runs-on: ubuntu-latest
+    # CI's longest jobs (the Java and .NET matrices, the frameworks) take a
+    # while; a run that has not finished in five hours is not going to.
+    timeout-minutes: 300
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      sha: ${{ steps.wait.outputs.sha }}
+    steps:
+      - name: Wait for CI on the tagged commit
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PUSHED_SHA: ${{ github.sha }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9][0-9A-Za-z.-]*$ ]]; then echo "not a release tag: $TAG"; exit 1; fi
+          if [ "$EVENT" = "push" ]; then
+            sha="$PUSHED_SHA"
+          else
+            sha="$(gh api "repos/$REPO/commits/$TAG" --jq .sha)"
+          fi
+          if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then echo "could not find the commit $TAG names"; exit 1; fi
+          echo "$TAG is $sha"
+          # A run shows up a few seconds after its push; give it ten minutes.
+          appear=$((SECONDS + 600))
+          while :; do
+            run="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&branch=main&per_page=1" \
+              --jq '.workflow_runs[0] // empty | [.status, (.conclusion // "none"), .html_url] | @tsv')"
+            if [ -z "$run" ]; then
+              if [ "$SECONDS" -ge "$appear" ]; then
+                echo "CI has no run on a push to main for $sha; push the tagged commit to main, let CI pass, then start this again."
+                exit 1
+              fi
+              echo "No CI run for $sha yet"
+            else
+              IFS=$'\t' read -r status conclusion url <<< "$run"
+              if [ "$status" = "completed" ]; then
+                if [ "$conclusion" = "success" ]; then
+                  echo "CI passed on $sha: $url"
+                  echo "sha=$sha" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                echo "CI did not pass on $sha ($conclusion): $url"
+                exit 1
+              fi
+              echo "CI is $status on $sha: $url"
+            fi
+            sleep 30
+          done

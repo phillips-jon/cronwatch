@@ -44,14 +44,24 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
 
 jobs:
-  pack:
+  # CI must pass on the tagged commit first (ci-passed.yml).
+  ci:
     if: vars.NUGET_ENABLED == 'true'
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      tag: ${{ inputs.tag }}
+
+  pack:
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.ci.outputs.sha }}
           persist-credentials: false
       - name: Check the tag is the solution's version
         working-directory: packages/dotnet
@@ -85,7 +95,6 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: vars.NUGET_ENABLED == 'true'
     needs: pack
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -39,7 +39,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # CI must pass on the tagged commit first (ci-passed.yml).
+  ci:
+    if: >-
+      (vars.DRUPAL_SPLIT_ENABLED == 'true' && vars.DRUPAL_SPLIT_REPOSITORY != '') ||
+      (vars.CRAFT_SPLIT_ENABLED == 'true' && vars.CRAFT_SPLIT_REPOSITORY != '')
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      tag: ${{ inputs.tag }}
+
   drupal:
+    needs: ci
     if: vars.DRUPAL_SPLIT_ENABLED == 'true' && vars.DRUPAL_SPLIT_REPOSITORY != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -47,7 +60,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.ci.outputs.sha }}
           persist-credentials: false
       - name: Split packages/php/drupal and push it with the tag
         env:
@@ -84,6 +97,7 @@ jobs:
           rm -f "$key"
 
   craft:
+    needs: ci
     if: vars.CRAFT_SPLIT_ENABLED == 'true' && vars.CRAFT_SPLIT_REPOSITORY != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -91,7 +105,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.ci.outputs.sha }}
           persist-credentials: false
       - name: Split packages/php/craft and push it with the tag
         env:

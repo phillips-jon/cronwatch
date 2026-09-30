@@ -3,6 +3,12 @@
 # OIDC token, so no API token is stored anywhere. Can also be started by hand
 # for a tag.
 #
+# Three jobs. "ci" waits for CI to pass on the tagged commit (ci-passed.yml).
+# "build" builds the sdist and wheel from that commit with no credential and
+# uploads them as the artifact "python-dist"; the build backend and anything
+# it pulls in run there, never beside the OIDC token. "publish" holds the
+# token, compiles and builds nothing, and uploads exactly those files.
+#
 # Stays off until the repository variable PYPI_ENABLED is "true". Before
 # that, on pypi.org: add a pending trusted publisher for the project
 # cronwatch-sdk with owner phillips-jon, repository cronwatch, workflow
@@ -28,21 +34,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  ci:
     if: vars.PYPI_ENABLED == 'true'
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      tag: ${{ inputs.tag }}
+
+  build:
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: pypi
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.ci.outputs.sha }}
           persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-      - name: Build and publish packages/python
+      - name: Build packages/python
         working-directory: packages/python
         env:
           TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -54,4 +67,43 @@ jobs:
           if [ "v$version" != "$TAG" ]; then echo "packages/python is $version, the tag is $TAG"; exit 1; fi
           rm -rf dist
           uv build
-          uv publish --trusted-publishing always
+          ls -l dist
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: python-dist
+          path: packages/python/dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    # Nothing is checked out or built here: the job uploads what "build"
+    # made, and nothing else.
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-dist
+          path: dist
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Publish to PyPI
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          ls -l dist
+          # Exactly one sdist and one wheel (their version is PEP 440's
+          # spelling of the tag's, checked in "build").
+          sdists=0 wheels=0
+          for f in dist/*; do
+            case "$(basename "$f")" in
+              cronwatch_sdk-*.tar.gz) sdists=$((sdists + 1)) ;;
+              cronwatch_sdk-*-py3-none-any.whl) wheels=$((wheels + 1)) ;;
+              *) echo "unexpected file in the build: $f"; exit 1 ;;
+            esac
+          done
+          if [ "$sdists" != 1 ] || [ "$wheels" != 1 ]; then echo "expected one sdist and one wheel"; exit 1; fi
+          uv publish --trusted-publishing always dist/*

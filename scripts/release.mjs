@@ -122,7 +122,7 @@ const PUBLISH = [
   // need no tag of their own. Published by hand for now (packages/rust/DESIGN.md,
   // Crate name and releases); Cargo 1.90 or newer publishes a workspace's
   // crates in dependency order.
-  { dir: "packages/rust", commands: (v) => [`# packages/rust: the pushed tag v${v} is published to crates.io by .github/workflows/crates.yml (trusted publishing, once CRATES_ENABLED is true); by hand, (cd packages/rust && cargo publish --workspace --exclude cronwatch-webserver --exclude crontab)`] },
+  { dir: "packages/rust", commands: (v) => [`# packages/rust: the pushed tag v${v} is published to crates.io by .github/workflows/crates.yml (trusted publishing, once CRATES_ENABLED is true); by hand, (cd packages/rust && cargo publish --workspace --exclude cronwatch-webserver --exclude cronwatch-example-crontab)`] },
   // Hex reads a package from the tarball `mix hex.publish` uploads, so the
   // package needs no tag of its own. .github/workflows/hex.yml publishes it
   // and its docs from the pushed tag, with a package-scoped API key, once
@@ -416,13 +416,13 @@ if (leftovers.length > 0) {
   for (const line of leftovers) console.log(`  ${line}`);
 }
 if (options.skipRuby) console.log("\nSkipping the gem's tests and build (--skip-ruby).");
-else if (!ruby) console.log("\nNo Ruby 3.2 or newer with bundler found; skipping the gem's tests and build. CI runs the tests.");
+else if (!ruby) console.log("\nNo Ruby 3.2 or newer with bundler found; skipping the gem's tests and build. CI runs the tests; wait for it to pass before pushing the gem.");
 else console.log(`\nRuby ${ruby.version}${ruby.env.RBENV_VERSION ? " (rbenv)" : ""} found; the gem's tests run and the gem is built.`);
 if (options.skipPython) console.log("Skipping the Python package's tests (--skip-python).");
-else if (!uv) console.log("No uv found; skipping the Python package's tests. CI runs them.");
+else if (!uv) console.log("No uv found; skipping the Python package's tests. CI runs them, and pypi.yml waits for CI to pass before it publishes.");
 else console.log("uv found; the Python package's tests run.");
 if (options.skipPhp) console.log("Skipping the PHP package's tests (--skip-php).");
-else if (!php) console.log("No PHP 8.2 or newer with Composer found; skipping the PHP package's tests. CI runs them.");
+else if (!php) console.log("No PHP 8.2 or newer with Composer found; skipping the PHP package's tests. CI runs them, and the PHP splits wait for CI to pass before they push.");
 else console.log("PHP and Composer found; the PHP package's tests run.");
 if (gem !== next) console.log(`RubyGems spells ${next} as ${gem}.`);
 
@@ -451,7 +451,7 @@ if (options.dryRun) {
   console.log(`\nCommitted "Release ${next}" and tagged ${tag}. Nothing is pushed or published.`);
 }
 
-console.log(`\nNext, by hand:\n  git push origin ${branch} ${tag}`);
+console.log(`\nNext, by hand:\n  git push origin ${branch} ${tag}\n  # The tag's publish workflows wait for CI to pass on this commit (.github/workflows/ci-passed.yml); publish the rest by hand once it has.`);
 for (const { commands } of PUBLISH) for (const command of commands(next, gem)) console.log(`  ${command}`);
 for (const old of options.deprecate) {
   for (const name of NPM_PACKAGES) console.log(`  npm deprecate "${name}@${old}" "Upgrade to ${next}"`);

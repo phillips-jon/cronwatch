@@ -31,15 +31,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  split:
+  # CI must pass on the tagged commit first (ci-passed.yml).
+  ci:
     if: vars.PHP_SPLIT_ENABLED == 'true' && vars.PHP_SPLIT_REPOSITORY != ''
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      tag: ${{ inputs.tag }}
+
+  split:
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.ci.outputs.sha }}
           persist-credentials: false
       - name: Split packages/php and push it with the tag
         env:

@@ -4,6 +4,16 @@
 # workflow's OIDC token and hands back a token that lives for the job, so no
 # API token is stored anywhere. Can also be started by hand for a tag.
 #
+# Three jobs. "ci" waits for CI to pass on the tagged commit (ci-passed.yml).
+# "package" resolves the dependencies once, builds each crate from its own
+# tarball as crates.io will (cargo package), with no credential, and uploads
+# the Cargo.lock it resolved and the tarballs' checksums as the artifact
+# "crates". "publish" holds the token and compiles nothing: it packages the
+# same commit again with that Cargo.lock (--locked), checks the tarballs are
+# byte for byte the ones "package" built, and publishes them with
+# --no-verify --locked, so no dependency's build script or macro runs beside
+# the token.
+#
 # Stays off until the repository variable CRATES_ENABLED is "true". Before
 # that, on crates.io, for each of the four crates: Settings, Trusted
 # Publishing, add a GitHub publisher with owner phillips-jon, repository
@@ -29,8 +39,54 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  ci:
     if: vars.CRATES_ENABLED == 'true'
+    uses: ./.github/workflows/ci-passed.yml
+    permissions:
+      actions: read
+      contents: read
+    with:
+      tag: ${{ inputs.tag }}
+
+  package:
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.ci.outputs.sha }}
+          persist-credentials: false
+      - name: Check the tag is the workspace's version
+        working-directory: packages/rust
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
+          if [ "v$version" != "$TAG" ]; then echo "packages/rust is $version, the tag is $TAG"; exit 1; fi
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: cargo package
+        working-directory: packages/rust
+        run: |
+          cargo package --workspace --exclude cronwatch-webserver --exclude cronwatch-example-crontab
+          (cd target/package && sha256sum ./*.crate) > target/crates.sha256
+          cat target/crates.sha256
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: crates
+          path: |
+            packages/rust/Cargo.lock
+            packages/rust/target/crates.sha256
+          if-no-files-found: error
+
+  publish:
+    needs: [ci, package]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: crates
@@ -40,7 +96,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          ref: ${{ needs.ci.outputs.sha }}
           persist-credentials: false
       - name: Check the tag is the workspace's version
         working-directory: packages/rust
@@ -57,6 +113,20 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: crates
+          path: packages/rust
+      # Packaging alone runs no build script. The tarballs must be the ones
+      # "package" built and verified, from the same commit and Cargo.lock.
+      - name: The tarballs are the ones that were built
+        working-directory: packages/rust
+        run: |
+          cargo package --workspace --exclude cronwatch-webserver --exclude cronwatch-example-crontab --no-verify --locked
+          (cd target/package && sha256sum --strict -c ../crates.sha256)
+          # And no crate beyond them.
+          [ "$(find target/package -maxdepth 1 -name '*.crate' | wc -l)" = "$(wc -l < target/crates.sha256)" ]
+      # The token is fetched last, just before the one step that uses it.
       - name: Get a crates.io token for this job
         id: auth
         uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
@@ -64,4 +134,4 @@ jobs:
         working-directory: packages/rust
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-        run: cargo publish --workspace --exclude cronwatch-webserver --exclude crontab
+        run: cargo publish --workspace --exclude cronwatch-webserver --exclude cronwatch-example-crontab --no-verify --locked
