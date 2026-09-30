@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Never packed: the seeded dashboard packages/mcp/test/dotnet-web.test.ts
+       drives @cronwatch/mcp against. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Cronwatch.WebServer</RootNamespace>
+    <AssemblyName>webserver</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- A program, not a library: no captured context to avoid, and its
+         console is its output. -->
+    <NoWarn>$(NoWarn);CS1591;CA2007;CA1849</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../src/Cronwatch.AspNetCore/Cronwatch.AspNetCore.csproj" />
+  </ItemGroup>
+</Project>

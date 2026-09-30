@@ -1493,6 +1493,12 @@ jobs:
         env:
           CRONWATCH_CULTURE: tr-TR
         run: dotnet test -c Release --no-build
+      # @cronwatch/mcp end to end against webserver, the seeded dashboard on
+      # Kestrel through MapCronwatch.
+      - name: MCP against the .NET dashboard
+        env:
+          CRONWATCH_TEST_DOTNET: "1"
+        run: npm test --workspace packages/mcp
       # The package's files, and no dependency in its .nuspec: the core
       # depends on no other package.
       - name: dotnet pack, and the package's files
