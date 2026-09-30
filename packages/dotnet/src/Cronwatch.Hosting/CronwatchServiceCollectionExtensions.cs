@@ -78,8 +78,9 @@ public static class CronwatchServiceCollectionExtensions
         Duration retention = o.Retention ?? "30d";
         // Every line the app logs inside a run carries the job and the run.
         Func<JobContext, IDisposable?> scope = run => logger.BeginScope(new RunLogScope(run.Name, run.RunId));
-        // Alerts left untouched send to the console; set, even empty, they are the channels.
-        CronwatchOptions options = alerts.Count > 0
+        // Alerts touched in the options are the channels, even none; left untouched, the
+        // container's channels are, and with none there either, the console.
+        CronwatchOptions options = o.AlertsGiven || alerts.Count > 0
             ? new CronwatchOptions
             {
                 Store = o.Store,

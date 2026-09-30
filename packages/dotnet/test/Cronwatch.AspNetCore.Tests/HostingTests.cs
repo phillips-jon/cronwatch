@@ -119,6 +119,37 @@ public class HostingTests
         Assert.DoesNotContain("tok-not-shown", text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The channels: the options' once touched, even none (the core's <c>Alerts = []</c>), else
+    /// the container's, else the console.
+    /// </summary>
+    [Fact]
+    public async Task Alerts_set_empty_send_nowhere_and_left_untouched_send_to_the_console()
+    {
+        static async Task<string> Made(Action<CronwatchHostOptions> set, bool containerChannel = false)
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            if (containerChannel)
+            {
+                services.AddSingleton(Channel.Create("registered", (alert, ctx, ct) => Task.CompletedTask));
+            }
+            services.AddCronwatch(o =>
+            {
+                o.ProcessExitHook = false;
+                o.NoCheck = true;
+                set(o);
+            });
+            await using ServiceProvider sp = services.BuildServiceProvider();
+            return sp.GetRequiredService<CronwatchClient>().ToString();
+        }
+        Assert.EndsWith(", 1 channels)", await Made(o => { }), StringComparison.Ordinal);
+        Assert.EndsWith(", 0 channels)", await Made(o => o.Alerts = []), StringComparison.Ordinal);
+        Assert.EndsWith(", 0 channels)", await Made(o => o.Alerts.Clear()), StringComparison.Ordinal);
+        Assert.EndsWith(", 0 channels)", await Made(o => o.Alerts = [], containerChannel: true), StringComparison.Ordinal);
+        Assert.EndsWith(", 1 channels)", await Made(o => { }, containerChannel: true), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task No_check_runs_when_told_not_to_and_the_client_is_one_singleton()
     {

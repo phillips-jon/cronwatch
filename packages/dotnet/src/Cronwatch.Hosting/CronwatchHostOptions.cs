@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Cronwatch.Web;
 
@@ -16,7 +17,7 @@ namespace Cronwatch.Hosting;
 [DebuggerDisplay("{ToString(),nq}")]
 public sealed class CronwatchHostOptions
 {
-    private readonly List<IChannel> _alerts = [];
+    private readonly ChannelList _alerts = new();
     private readonly List<ISource> _sources = [];
 
     /// <summary>Where jobs, runs and state live. Default: a <see cref="MemoryStore"/>.</summary>
@@ -24,9 +25,24 @@ public sealed class CronwatchHostOptions
 
     /// <summary>
     /// Where alerts go. Default: every <see cref="IChannel"/> registered in the container, else the
-    /// console. Once one is added here, these are the channels.
+    /// console. Once this list is touched (a channel added, the list cleared, or set, even to an
+    /// empty list), these are the channels, and <c>Alerts = []</c> sends nowhere, as the core's
+    /// <see cref="CronwatchOptions.Alerts"/> does.
     /// </summary>
-    public IList<IChannel> Alerts => _alerts;
+    public IList<IChannel> Alerts
+    {
+        get => _alerts;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            IChannel[] given = [.. value];
+            _alerts.Clear();
+            foreach (IChannel c in given)
+            {
+                _alerts.Add(c);
+            }
+        }
+    }
 
     /// <summary>A diagnosis for each alert, or null for none.</summary>
     public ITriage? Triage { get; set; }
@@ -83,7 +99,7 @@ public sealed class CronwatchHostOptions
     /// </summary>
     public DashboardToken? Token { internal get; set; }
 
-    internal bool AlertsGiven => _alerts.Count > 0;
+    internal bool AlertsGiven => _alerts.Touched;
 
     /// <summary>Names what is set, never a secret's value.</summary>
     public override string ToString() =>
@@ -92,4 +108,36 @@ public sealed class CronwatchHostOptions
         + ", cronSecret " + (CronSecret == null ? "from CRON_SECRET" : CronSecret.ToString())
         + ", token " + (Token == null ? "from configuration" : Token.ToString())
         + (NoCheck ? ", no check" : "") + ")";
+
+    /// <summary>The channels, and whether the list was ever touched.</summary>
+    private sealed class ChannelList : Collection<IChannel>
+    {
+        public bool Touched { get; private set; }
+
+        protected override void InsertItem(int index, IChannel item)
+        {
+            ArgumentNullException.ThrowIfNull(item);
+            Touched = true;
+            base.InsertItem(index, item);
+        }
+
+        protected override void SetItem(int index, IChannel item)
+        {
+            ArgumentNullException.ThrowIfNull(item);
+            Touched = true;
+            base.SetItem(index, item);
+        }
+
+        protected override void RemoveItem(int index)
+        {
+            Touched = true;
+            base.RemoveItem(index);
+        }
+
+        protected override void ClearItems()
+        {
+            Touched = true;
+            base.ClearItems();
+        }
+    }
 }
