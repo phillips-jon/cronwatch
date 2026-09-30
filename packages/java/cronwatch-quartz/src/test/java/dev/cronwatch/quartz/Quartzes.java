@@ -28,7 +28,15 @@ final class Quartzes {
 
   /** A scheduler on the RAM job store, not started, named for the test alone. */
   static Scheduler ram() throws SchedulerException {
-    Properties p = base("ram-" + UUID.randomUUID(), "AUTO");
+    return ram("AUTO");
+  }
+
+  /**
+   * {@link #ram()} with the instance id given: {@code NON_CLUSTERED} is Quartz's own default, and
+   * every process that leaves it unset has it.
+   */
+  static Scheduler ram(String instanceId) throws SchedulerException {
+    Properties p = base("ram-" + UUID.randomUUID(), instanceId);
     p.setProperty("org.quartz.jobStore.class", "org.quartz.simpl.RAMJobStore");
     return new StdSchedulerFactory(p).getScheduler();
   }

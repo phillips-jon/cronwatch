@@ -147,11 +147,11 @@ class CronwatchQuartzTest {
       try {
         assertTrue(q.settle(Duration.ofSeconds(10)));
         assertEquals(
-            "{\"grace\":\"5m\",\"schedule\":\"0 0 2 * * ?\",\"timezone\":\"Europe/London\","
+            "{\"grace\":\"5m\",\"schedule\":\"0 0 2 * * *\",\"timezone\":\"Europe/London\","
                 + "\"tags\":[\"quartz\",\"quartz:billing\"],\"name\":\"nightlyReport\"}",
             stored(store, "nightlyReport"));
         assertEquals(
-            "{\"grace\":\"5m\",\"schedule\":\"0 30 1 * * ?\",\"timezone\":\"UTC\","
+            "{\"grace\":\"5m\",\"schedule\":\"0 30 1 * * *\",\"timezone\":\"UTC\","
                 + "\"tags\":[\"quartz\",\"quartz:billing\"],\"name\":\"reports.yearly\","
                 + "\"expect\":\"contains \\\"Report written\\\"\"}",
             stored(store, "reports.yearly"));
@@ -170,12 +170,12 @@ class CronwatchQuartzTest {
         assertTrue(
             all.contains(
                 "declaring Quartz job \"reports.mondays\": cronwatch: Quartz job \"reports.mondays\""
-                    + " is \"0 0 9 ? * 2\" in UTC, but after a run at"),
+                    + " is \"0 0 9 * * 2\" in UTC, but after a run at"),
             all);
         assertTrue(
             all.contains(
                 "cronwatch: \"reports.twice\" is run by 2 Quartz entries on different schedules"
-                    + " (0 0 3 * * ? in UTC; 0 0 4 * * ? in UTC)"),
+                    + " (0 0 3 * * * in UTC; 0 0 4 * * * in UTC)"),
             all);
         assertEquals(2, errors.size(), all);
       } finally {
@@ -202,7 +202,8 @@ class CronwatchQuartzTest {
       assertEquals("Report written", run.output());
       assertEquals("quartz", run.trigger());
       String instance = scheduler.getSchedulerInstanceId();
-      assertTrue(run.id().startsWith("quartz:billing:" + instance + ":"), run.id());
+      // Not clustered, so the instance carries a random part of the watch's own.
+      assertTrue(run.id().startsWith("quartz:billing:" + instance + "."), run.id());
       assertTrue(run.id().endsWith(":0"), "the refire count");
       assertTrue(errors.isEmpty(), errors.toString());
       q.close();
@@ -399,5 +400,146 @@ class CronwatchQuartzTest {
     assertNull(CronwatchQuartz.failureOf(null));
     assertEquals("reports.nightly", CronwatchQuartz.nameOf(JobKey.jobKey("nightly", "reports")));
     assertEquals("nightly", CronwatchQuartz.nameOf(JobKey.jobKey("nightly")));
+  }
+
+  /**
+   * A job listener after this one that throws stops Quartz running the job, and Quartz then tells
+   * no listener it was executed: the run opened for it was left running, current in Quartz's worker
+   * thread, to be reported stuck. It is given back, as a firing that never ran.
+   */
+  @Test
+  void aFiringAnotherListenerStoppedIsGivenBack() throws Exception {
+    MemoryStore store = new MemoryStore();
+    List<String> errors = Quartzes.errors();
+    Scheduler scheduler = Quartzes.ram();
+    try (Cronwatch cw = Quartzes.client(store, errors)) {
+      CronwatchQuartz q = CronwatchQuartz.watch(cw, scheduler);
+      AtomicInteger refused = new AtomicInteger();
+      scheduler
+          .getListenerManager()
+          .addJobListener(
+              new org.quartz.listeners.JobListenerSupport() {
+                @Override
+                public String getName() {
+                  return "refuses";
+                }
+
+                @Override
+                public void jobToBeExecuted(JobExecutionContext context) {
+                  refused.incrementAndGet();
+                  throw new IllegalStateException("not today");
+                }
+              });
+      scheduler.start();
+      scheduler.scheduleJob(detail(Reports.class, "stopped", "DEFAULT", "stopped"), once("t"));
+      await("the refusal", () -> refused.get() == 1);
+      await("the run given back", () -> cw.runs("stopped", 5).isEmpty());
+      assertNull(CALLS.get("stopped"), "Quartz did not run it");
+      q.close();
+    } finally {
+      scheduler.shutdown(true);
+    }
+  }
+
+  /**
+   * Quartz's own instance id is {@code NON_CLUSTERED} in every process that leaves it unset, and
+   * the RAM job store counts its fire instance ids from the time it was loaded, so two processes of
+   * one app started together gave two firings one run id, and the second went unrecorded.
+   */
+  @Test
+  void twoProcessesWithQuartzsDefaultInstanceIdGiveTheirRunsTwoIds() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Scheduler one = Quartzes.ram("NON_CLUSTERED");
+    Scheduler two = Quartzes.ram("NON_CLUSTERED");
+    try (Cronwatch cw = Quartzes.client(store, Quartzes.errors())) {
+      CronwatchQuartz a = CronwatchQuartz.watch(cw, one, QuartzOptions.defaults().app("billing"));
+      CronwatchQuartz b = CronwatchQuartz.watch(cw, two, QuartzOptions.defaults().app("billing"));
+      JobExecutionContext fired =
+          (JobExecutionContext)
+              java.lang.reflect.Proxy.newProxyInstance(
+                  JobExecutionContext.class.getClassLoader(),
+                  new Class<?>[] {JobExecutionContext.class},
+                  (proxy, method, args) ->
+                      switch (method.getName()) {
+                        case "getFireInstanceId" -> "1790000000042";
+                        case "getRefireCount" -> 0;
+                        default -> null;
+                      });
+      String first = a.runId(fired);
+      String second = b.runId(fired);
+      assertTrue(first.startsWith("quartz:billing:NON_CLUSTERED"), first);
+      assertTrue(first.endsWith(":1790000000042:0"), first);
+      assertFalse(first.equals(second), first + " and " + second);
+      a.close();
+      b.close();
+    } finally {
+      one.shutdown(true);
+      two.shutdown(true);
+    }
+  }
+
+  /**
+   * Each read walked every cron trigger's fire times beside CronWatch's again, every minute: most
+   * of a second each for a cron that fires every second in a zone with daylight saving. A trigger
+   * unchanged is walked once.
+   */
+  @Test
+  void anUnchangedCronIsWalkedOnce() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Scheduler scheduler = Quartzes.ram();
+    List<String> errors = Quartzes.errors();
+    try (Cronwatch cw = Quartzes.client(store, errors)) {
+      scheduler.scheduleJob(
+          detail(Reports.class, "often", "reports", "a"), cron("o", "*/10 * * * * ?", "UTC"));
+      CronwatchQuartz q = CronwatchQuartz.watch(cw, scheduler);
+      try {
+        q.sync();
+        q.sync();
+        assertEquals(1, q.walks.get());
+        String often = stored(store, "reports.often");
+        assertTrue(often.contains("\"schedule\":\"*/10 * * * * *\""), often + errors);
+      } finally {
+        q.close();
+      }
+    } finally {
+      scheduler.shutdown(true);
+    }
+  }
+
+  /**
+   * Quartz asks for a {@code ?} in one of the day fields, which croner reads as a day field named
+   * (every day, and either day field matching), not as {@code *}: declared as written, a monthly or
+   * a weekly trigger was read as daily and watched without a schedule.
+   */
+  @Test
+  void aQuestionMarkIsDeclaredAsAnyDay() throws Exception {
+    MemoryStore store = new MemoryStore();
+    List<String> errors = Quartzes.errors();
+    Scheduler scheduler = Quartzes.ram();
+    try (Cronwatch cw = Quartzes.client(store, errors)) {
+      scheduler.scheduleJob(
+          detail(Reports.class, "monthly", "reports", "a"), cron("m", "0 0 2 1 * ?", "UTC"));
+      scheduler.scheduleJob(
+          detail(Reports.class, "weekly", "reports", "a"),
+          cron("w", "0 0 9 ? * MON", "Europe/London"));
+      CronwatchQuartz q =
+          CronwatchQuartz.watch(cw, scheduler, QuartzOptions.defaults().app("billing"));
+      try {
+        assertTrue(q.settle(Duration.ofSeconds(10)));
+        assertEquals(
+            "{\"schedule\":\"0 0 2 1 * *\",\"timezone\":\"UTC\","
+                + "\"tags\":[\"quartz\",\"quartz:billing\"],\"name\":\"reports.monthly\"}",
+            stored(store, "reports.monthly"));
+        assertEquals(
+            "{\"schedule\":\"0 0 9 * * MON\",\"timezone\":\"Europe/London\","
+                + "\"tags\":[\"quartz\",\"quartz:billing\"],\"name\":\"reports.weekly\"}",
+            stored(store, "reports.weekly"));
+        assertTrue(errors.isEmpty(), errors.toString());
+      } finally {
+        q.close();
+      }
+    } finally {
+      scheduler.shutdown(true);
+    }
   }
 }

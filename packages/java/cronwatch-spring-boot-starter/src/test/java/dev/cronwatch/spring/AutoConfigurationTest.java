@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.cronwatch.Cronwatch;
@@ -148,6 +149,38 @@ class AutoConfigurationTest {
     }
   }
 
+  /** An app whose database cannot be reached when it starts. */
+  @SpringBootConfiguration
+  @EnableAutoConfiguration
+  public static class DatabaseDown {
+    /** A SQLite database in a directory that does not exist, so no connection can be made. */
+    @Bean
+    public DataSource dataSource() {
+      SQLiteDataSource ds = new SQLiteDataSource();
+      ds.setUrl("jdbc:sqlite:/nonexistent-" + UUID.randomUUID() + "/cw.db");
+      return ds;
+    }
+  }
+
+  /**
+   * A database that is down when the app starts is not a database the store refuses: the store is
+   * not quietly the in-memory one for the life of the app (each instance keeping its own runs, and
+   * nothing surviving a restart). The app does not start, as it would not with its own queries.
+   */
+  @Test
+  void aDatabaseDownAtTheStartIsNotTheMemoryStore() {
+    Exception e =
+        assertThrows(
+            Exception.class,
+            () ->
+                Apps.run(DatabaseDown.class, null, new Apps.Errors(), "cronwatch.check-mode=none"));
+    Throwable t = e;
+    while (t.getCause() != null && !(t instanceof dev.cronwatch.CronwatchException)) {
+      t = t.getCause();
+    }
+    assertInstanceOf(dev.cronwatch.CronwatchException.class, t, e.toString());
+  }
+
   /** Does nothing, for the scheduler's jobs. */
   public static final class Nothing implements Job {
     @Override
@@ -180,6 +213,35 @@ class AutoConfigurationTest {
   }
 
   @Test
+  void theCheckIntervalIsHeldToItsBoundsWhereverTheCheckRuns() throws Exception {
+    // Quartz refused an interval of 0 (the check job never scheduled, and nothing checked), and an
+    // interval too long for a long of milliseconds stopped the app starting.
+    for (String every : List.of("0s", "-1m", "3000000000d")) {
+      try (ConfigurableApplicationContext ctx =
+          Apps.run(
+              WithQuartz.class,
+              new MemoryStore(),
+              new Apps.Errors(),
+              "cronwatch.check-mode=quartz",
+              "cronwatch.check-every=" + every)) {
+        Scheduler scheduler = ctx.getBean(Scheduler.class);
+        org.quartz.Trigger trigger =
+            scheduler.getTrigger(
+                org.quartz.TriggerKey.triggerKey(
+                    CronwatchQuartz.CHECK_JOB.getName(), CronwatchQuartz.CHECK_JOB.getGroup()));
+        assertInstanceOf(org.quartz.SimpleTrigger.class, trigger, every);
+        long interval = ((org.quartz.SimpleTrigger) trigger).getRepeatInterval();
+        assertEquals(every.equals("3000000000d") ? 2_147_483_647L : 5000L, interval, every);
+      }
+    }
+    assertEquals(Duration.ofSeconds(5), CronwatchChecker.interval(Duration.ZERO));
+    assertEquals(Duration.ofMinutes(1), CronwatchChecker.interval(Duration.ofMinutes(1)));
+    assertEquals(
+        Duration.ofMillis(2_147_483_647L),
+        CronwatchChecker.interval(Duration.ofDays(3_000_000_000L)));
+  }
+
+  @Test
   void theAppsQuartzSchedulersAreWatched() throws Exception {
     MemoryStore store = new MemoryStore();
     try (ConfigurableApplicationContext ctx =
@@ -189,7 +251,7 @@ class AutoConfigurationTest {
       assertInstanceOf(CronwatchQuartz.class, watched);
       assertTrue(((CronwatchQuartz) watched).settle(Duration.ofSeconds(10)));
       assertEquals(
-          "{\"schedule\":\"0 0 2 * * ?\",\"timezone\":\"UTC\",\"tags\":[\"quartz\",\"quartz:billing\"],"
+          "{\"schedule\":\"0 0 2 * * *\",\"timezone\":\"UTC\",\"tags\":[\"quartz\",\"quartz:billing\"],"
               + "\"name\":\"reports.nightly\"}",
           stored(store, "reports.nightly"));
       CronwatchChecker checker = ctx.getBean(CronwatchChecker.class);

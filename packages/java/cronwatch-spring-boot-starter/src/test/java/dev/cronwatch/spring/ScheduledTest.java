@@ -90,6 +90,10 @@ class ScheduledTest {
     @Scheduled(cron = "-")
     public void disabled() {}
 
+    // Spring reads ? as *; croner reads it as a day field named, every day.
+    @Scheduled(cron = "0 0 2 1 * ?", zone = "UTC")
+    public void monthly() {}
+
     @Scheduled(cron = "0 0 3 * * *", zone = "UTC")
     @CronwatchJob(
         name = "nightly-report",
@@ -207,6 +211,11 @@ class ScheduledTest {
           stored(store, "Declared.delay"));
       assertNull(store.getJob("Declared.disabled"), "cron = \"-\" schedules nothing");
       assertEquals(
+          "{\"schedule\":\"0 0 2 1 * *\",\"timezone\":\"UTC\","
+              + tags
+              + ",\"name\":\"Declared.monthly\"}",
+          stored(store, "Declared.monthly"));
+      assertEquals(
           "{\"schedule\":\"0 0 3 * * *\",\"timezone\":\"UTC\",\"grace\":\"15m\",\"tags\":[\"reports\","
               + "\"spring-scheduled\",\"spring-scheduled:billing\"],\"name\":\"nightly-report\","
               + "\"expect\":\"contains \\\"Report written\\\"\"}",
@@ -219,6 +228,25 @@ class ScheduledTest {
                   + " \"Declared.firstMonday\" is \"0 0 9 1 * MON\" in UTC"),
           all);
       assertTrue(all.contains("\"Declared.twice\" is run by 2 Spring entries"), all);
+    }
+  }
+
+  /**
+   * The sync before each check walked every cron's fire times beside CronWatch's again: most of a
+   * second each for a cron that fires every second in a zone with daylight saving. A cron unchanged
+   * is walked once.
+   */
+  @Test
+  void anUnchangedCronIsWalkedOnce() throws Exception {
+    MemoryStore store = new MemoryStore();
+    Apps.Errors errors = new Apps.Errors();
+    try (ConfigurableApplicationContext ctx = app(store, errors)) {
+      CronwatchScheduling scheduling = ctx.getBean(CronwatchScheduling.class);
+      int walked = scheduling.walks.get();
+      assertTrue(walked > 0);
+      scheduling.sync();
+      scheduling.sync();
+      assertEquals(walked, scheduling.walks.get());
     }
   }
 

@@ -158,6 +158,19 @@
       <artifactId>sqlite-jdbc</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- For the readings report only: cron-utils' reading of a cron beside CronWatch's. -->
+    <dependency>
+      <groupId>com.cronutils</groupId>
+      <artifactId>cron-utils</artifactId>
+      <version>9.2.1</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
 
   <build>

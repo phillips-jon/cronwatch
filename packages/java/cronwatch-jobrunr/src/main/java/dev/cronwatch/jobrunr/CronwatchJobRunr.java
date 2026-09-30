@@ -15,12 +15,17 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jobrunr.jobs.Job;
@@ -88,6 +93,20 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition wake = lock.newCondition();
   private boolean closed;
+
+  /** A cron's reading as it was checked: whether it was refused, and the problem. */
+  private record Checked(@Nullable String problem) {}
+
+  /**
+   * Each recurring job's cron checked against JobRunr's own fire times, by the job, the cron, the
+   * zone and the year, so the read every minute walks only what changed: a cron that fires often in
+   * a zone with daylight saving takes most of a second to walk. Only what the last read saw is
+   * kept.
+   */
+  private final Map<String, Checked> checked = new ConcurrentHashMap<>();
+
+  /** How many crons were walked, for the tests. */
+  final AtomicInteger walks = new AtomicInteger();
 
   /** How long a sync the check job starts may take; the tests shorten it. */
   volatile Duration syncTimeout = Bridge.SYNC_TIMEOUT;
@@ -215,6 +234,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   /** Every recurring job but the check's, one entry each. */
   List<Entry> entries() {
     List<Entry> out = new ArrayList<>();
+    Set<String> seen = new HashSet<>();
     long now = cw.now();
     for (RecurringJob job : storage.getRecurringJobs()) {
       String name = job.getId();
@@ -230,12 +250,13 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
             "declaring " + label(name));
         continue;
       }
-      out.add(entryOf(name, job, now));
+      out.add(entryOf(name, job, now, seen));
     }
+    checked.keySet().retainAll(seen);
     return out;
   }
 
-  private Entry entryOf(String name, RecurringJob job, long now) {
+  private Entry entryOf(String name, RecurringJob job, long now, Set<String> seen) {
     String label = label(name);
     String schedule = "";
     String zone = "";
@@ -263,12 +284,31 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
     } else {
       String expr = job.getScheduleExpression();
       String tz = job.getZoneId() == null ? "" : job.getZoneId();
-      try {
-        check(label, s, job.getCreatedAt(), expr, tz, now);
+      String key =
+          label
+              + "\0"
+              + expr
+              + "\0"
+              + tz
+              + "\0"
+              + LocalDateTime.ofEpochSecond(Math.floorDiv(now, 1000), 0, ZoneOffset.UTC).getYear();
+      seen.add(key);
+      Checked c = checked.get(key);
+      if (c == null) {
+        walks.incrementAndGet();
+        try {
+          check(label, s, job.getCreatedAt(), expr, tz, now);
+          c = new Checked(null);
+        } catch (ScheduleException e) {
+          c = new Checked(e.getMessage());
+        }
+        checked.put(key, c);
+      }
+      if (c.problem() == null) {
         schedule = expr;
         zone = tz;
-      } catch (ScheduleException e) {
-        problem = e.getMessage();
+      } else {
+        problem = c.problem();
       }
     }
     return new Entry(

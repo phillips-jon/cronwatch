@@ -92,6 +92,24 @@ class CronwatchCliTest {
         err.toString(StandardCharsets.UTF_8));
   }
 
+  @SuppressWarnings("unchecked")
+  private static <E extends Exception> Cronwatch sneaky(Exception e) throws E {
+    throw (E) e;
+  }
+
+  /**
+   * A factory written in a language without checked exceptions (Kotlin, or Lombok's
+   * {@code @SneakyThrows}) can throw one anyway: it escaped {@code run}, which promises a status.
+   */
+  @Test
+  void aFactoryThatThrowsACheckedExceptionIsStatusOne() {
+    int status = run(() -> sneaky(new java.io.IOException("config not found")), "check");
+    assertEquals(1, status);
+    assertEquals(
+        "cronwatch: the client could not be made: config not found\n",
+        err.toString(StandardCharsets.UTF_8));
+  }
+
   @Test
   void anUnknownCommandIsStatusTwoWithTheUsage() {
     assertEquals(2, run(() -> client(new MemoryStore()), "run", "nightly"));

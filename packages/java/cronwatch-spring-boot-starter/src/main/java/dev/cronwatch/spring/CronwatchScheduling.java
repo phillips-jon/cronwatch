@@ -13,7 +13,9 @@ import io.micrometer.observation.ObservationRegistry;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -22,6 +24,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.DisposableBean;
@@ -67,6 +70,20 @@ public final class CronwatchScheduling
   private final ReentrantLock lock = new ReentrantLock();
   private final Set<ObservationRegistry> given = Collections.newSetFromMap(new IdentityHashMap<>());
   private volatile Map<String, Target> targets = Map.of();
+
+  /** A cron's reading as it was checked, the schedule to declare or the problem. */
+  private record Checked(@Nullable String schedule, @Nullable String problem) {}
+
+  /**
+   * Each cron's check against Spring's own fire times, by the job, the cron, the zone and the year,
+   * so the sync before each check walks only what changed: a cron that fires each second in a zone
+   * with daylight saving takes most of a second to walk. Only what the last declaration saw is
+   * kept. Guarded by {@code lock}.
+   */
+  private final Map<String, Checked> checked = new HashMap<>();
+
+  /** How many crons were walked, for the tests. */
+  final AtomicInteger walks = new AtomicInteger();
 
   CronwatchScheduling(
       Cronwatch cw,
@@ -212,6 +229,7 @@ public final class CronwatchScheduling
       }
       Map<String, Target> made = new HashMap<>();
       List<Entry> entries = new ArrayList<>();
+      Set<String> seen = new HashSet<>();
       long now = cw.now();
       for (ScheduledMethods.Found f : all) {
         String simple = baseName(f.userClass(), f.method(), false);
@@ -252,9 +270,10 @@ public final class CronwatchScheduling
           continue;
         }
         for (ScheduledMethods.Schedule s : f.schedules()) {
-          entries.add(entry(name, label, s, options, now));
+          entries.add(entry(name, label, s, options, now, seen));
         }
       }
+      checked.keySet().retainAll(seen);
       targets = Map.copyOf(made);
       watch.declare(entries);
     } finally {
@@ -316,18 +335,42 @@ public final class CronwatchScheduling
   }
 
   private Entry entry(
-      String name, String label, ScheduledMethods.Schedule s, JobOptions options, long now) {
+      String name,
+      String label,
+      ScheduledMethods.Schedule s,
+      JobOptions options,
+      long now,
+      Set<String> seen) {
     String schedule = "";
     String zone = "";
     String problem = null;
     switch (s.kind()) {
       case CRON -> {
-        try {
-          check(label, s.cron(), s.zone(), now);
-          schedule = s.cron();
+        String key =
+            label
+                + "\0"
+                + s.cron()
+                + "\0"
+                + s.zone()
+                + "\0"
+                + LocalDateTime.ofEpochSecond(Math.floorDiv(now, 1000), 0, ZoneOffset.UTC)
+                    .getYear();
+        seen.add(key);
+        Checked c = checked.get(key);
+        if (c == null) {
+          walks.incrementAndGet();
+          try {
+            c = new Checked(check(label, s.cron(), s.zone(), now), null);
+          } catch (ScheduleException e) {
+            c = new Checked(null, e.getMessage());
+          }
+          checked.put(key, c);
+        }
+        if (c.schedule() != null) {
+          schedule = c.schedule();
           zone = s.zone();
-        } catch (ScheduleException e) {
-          problem = e.getMessage();
+        } else {
+          problem = c.problem();
         }
       }
       case FIXED_RATE, FIXED_DELAY -> {
@@ -351,10 +394,11 @@ public final class CronwatchScheduling
   }
 
   /**
-   * Checks a {@code @Scheduled} cron against Spring's own fire times in its zone, as CronWatch
-   * would read it in the same zone.
+   * A {@code @Scheduled} cron as CronWatch reads it, checked against Spring's own fire times in its
+   * zone: as written, but for a {@code ?} in a field, which Spring reads as {@code *} and croner as
+   * a day field named (every day, and either day field matching), so it is declared as {@code *}.
    */
-  private static void check(String label, String cron, String zone, long now)
+  private static String check(String label, String cron, String zone, long now)
       throws ScheduleException {
     CronExpression spring;
     ZoneId tz;
@@ -380,7 +424,14 @@ public final class CronwatchScheduling
               return next == null ? null : next.toInstant().toEpochMilli();
             },
             SCHEDULER);
-    Bridge.checkFires(fires, cron, zone, "cronwatch: " + label, SCHEDULER, daily(cron), now);
+    String declared = cron.trim();
+    if (!declared.startsWith("@")) {
+      List<String> fields = new ArrayList<>(List.of(declared.split("\\s+", -1)));
+      fields.replaceAll(f -> f.equals("?") ? "*" : f);
+      declared = String.join(" ", fields);
+    }
+    Bridge.checkFires(fires, declared, zone, "cronwatch: " + label, SCHEDULER, daily(cron), now);
+    return declared;
   }
 
   /** A cron that names no day or month, which meets every clock change of one kind alike. */

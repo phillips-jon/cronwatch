@@ -3,7 +3,6 @@ package dev.cronwatch.spring;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.bridge.Bridge;
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import org.jspecify.annotations.Nullable;
@@ -63,6 +62,23 @@ final class CronwatchChecker implements SmartLifecycle {
     this.scheduling = scheduling;
     this.clusterLock = clusterLock;
     this.quartz = quartz;
+  }
+
+  /** The shortest interval between checks. */
+  private static final Duration SHORTEST = Duration.ofSeconds(5);
+
+  /** The longest, the SDK's (a timer's 2^31 - 1 ms), as {@code cw.start} holds it. */
+  private static final Duration LONGEST = Duration.ofMillis(Integer.MAX_VALUE);
+
+  /**
+   * {@code cronwatch.check-every} as the check runs it, wherever it runs (the starter's interval,
+   * ShedLock's lock, Quartz's check job): at least five seconds and at most 2^31 - 1 ms.
+   */
+  static Duration interval(Duration every) {
+    if (every.compareTo(SHORTEST) < 0) {
+      return SHORTEST;
+    }
+    return every.compareTo(LONGEST) > 0 ? LONGEST : every;
   }
 
   /** The mode {@code cronwatch.check-mode} comes to with what the app has. */
@@ -125,7 +141,7 @@ final class CronwatchChecker implements SmartLifecycle {
 
   private void loop(CronwatchProperties.CheckMode mode) {
     long wait = firstDelay.toNanos();
-    long every = Math.max(TimeUnit.SECONDS.toNanos(5), properties.getCheckEvery().toNanos());
+    long every = interval(properties.getCheckEvery()).toNanos();
     while (true) {
       lock.lock();
       try {
