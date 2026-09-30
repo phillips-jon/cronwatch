@@ -155,37 +155,12 @@ public sealed partial class CronwatchClient
     /// </summary>
     internal async Task<T> ExecuteAsync<T>(JobDef def, RunOptions options, Func<JobContext, CancellationToken, Task<T>> fn, CancellationToken cancellationToken)
     {
-        Opened o = await OpenAsync(def, options, cancellationToken).ConfigureAwait(false);
-        // Set in this async method, so it flows into everything the function awaits and starts,
-        // and is gone when this method returns: its caller's context is restored.
-        CurrentRun.Set(o.Context);
-        using Activity? activity = CronwatchTelemetry.Source.StartActivity("cronwatch.run");
-        activity?.SetTag("cronwatch.job", def.Name);
-        activity?.SetTag("cronwatch.run_id", o.Run.Id);
-        activity?.SetTag("cronwatch.trigger", options.Trigger);
-        IDisposable? scope = OpenRunScope(o.Context);
-        T value = default!;
-        Exception? thrown = null;
-        try
-        {
-            value = await fn(o.Context, o.Context.CancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            thrown = e;
-        }
-        finally
-        {
-            CloseRunScope(scope, def.Name);
-            o.EndFunction();
-        }
-        Run finished = await CloseAsync(o, value, thrown, cancellationToken).ConfigureAwait(false);
-        activity?.SetTag("cronwatch.status", finished.Status.Value);
+        var (_, value, thrown) = await ExecuteCaughtAsync(def, options, fn, cancellationToken).ConfigureAwait(false);
         if (thrown != null)
         {
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(thrown);
         }
-        return value;
+        return value!;
     }
 
     /// <summary>A run opened from outside its function, with its activity: <see cref="Job.OpenAsync"/>.</summary>
@@ -193,7 +168,7 @@ public sealed partial class CronwatchClient
     {
         // Started here, so its parent is the caller's activity; this method's end puts the
         // caller's back as current, and the run's own is made current by MakeCurrent.
-        Activity? activity = CronwatchTelemetry.Source.StartActivity("cronwatch.run");
+        Activity? activity = CronwatchTelemetry.StartActivity("cronwatch.run");
         try
         {
             activity?.SetTag("cronwatch.job", def.Name);
@@ -204,7 +179,7 @@ public sealed partial class CronwatchClient
         }
         catch (Exception)
         {
-            activity?.Dispose();
+            CronwatchTelemetry.StopActivity(activity);
             throw;
         }
     }
@@ -484,10 +459,10 @@ public sealed partial class CronwatchClient
                 Output = run.Output == null ? null : NulText.StripNul(OutputText.RedactSecrets(run.Output)),
             };
         }
-        CronwatchTelemetry.Runs.Add(1, new KeyValuePair<string, object?>("cronwatch.job", def.Name), new KeyValuePair<string, object?>("cronwatch.status", concluded.Status.Value));
+        CronwatchTelemetry.Add(CronwatchTelemetry.Runs, new("cronwatch.job", def.Name), new("cronwatch.status", concluded.Status.Value));
         if (concluded.DurationMs is long ms)
         {
-            CronwatchTelemetry.RunDuration.Record(ms, new KeyValuePair<string, object?>("cronwatch.job", def.Name));
+            CronwatchTelemetry.RecordDuration(ms, new("cronwatch.job", def.Name));
         }
         return concluded;
     }
@@ -545,7 +520,8 @@ public sealed partial class CronwatchClient
                 }
                 catch (Exception)
                 {
-                    throw;
+                    // The insert's failure is the one thrown, as the SDK throws it.
+                    stored = null;
                 }
                 if (stored == null)
                 {
@@ -687,7 +663,8 @@ public sealed partial class CronwatchClient
             }
             catch (Exception)
             {
-                throw;
+                // The insert's failure is the one thrown, as the SDK throws it.
+                again = null;
             }
             if (again == null)
             {

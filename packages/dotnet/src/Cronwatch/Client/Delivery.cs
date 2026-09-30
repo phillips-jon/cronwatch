@@ -208,11 +208,11 @@ public sealed partial class CronwatchClient
     }
 
     private static void Count(Alert alert, string outcome, string? channel = null) =>
-        CronwatchTelemetry.Alerts.Add(
-            1,
-            new KeyValuePair<string, object?>("cronwatch.channel", channel),
-            new KeyValuePair<string, object?>("cronwatch.type", alert.Type.Value),
-            new KeyValuePair<string, object?>("cronwatch.outcome", outcome));
+        CronwatchTelemetry.Add(
+            CronwatchTelemetry.Alerts,
+            new("cronwatch.channel", channel),
+            new("cronwatch.type", alert.Type.Value),
+            new("cronwatch.outcome", outcome));
 
     private async Task<Alert> AddTriageAsync(Alert alert, TimeSpan timeout)
     {

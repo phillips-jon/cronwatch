@@ -128,7 +128,7 @@ public sealed class ObservedRun
         {
             _activity.SetTag("cronwatch.status", status);
         }
-        _activity.Stop();
+        CronwatchTelemetry.StopActivity(_activity);
     }
 
     /// <summary>Names the job and the run.</summary>

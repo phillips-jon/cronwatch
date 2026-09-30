@@ -56,8 +56,20 @@ public sealed partial class CronwatchClient
 
     private async Task<CheckResult> RunCheckAsync()
     {
-        using Activity? activity = CronwatchTelemetry.Source.StartActivity("cronwatch.check");
-        CronwatchTelemetry.Checks.Add(1);
+        Activity? activity = CronwatchTelemetry.StartActivity("cronwatch.check");
+        try
+        {
+            return await CheckNowAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            CronwatchTelemetry.StopActivity(activity);
+        }
+    }
+
+    private async Task<CheckResult> CheckNowAsync()
+    {
+        CronwatchTelemetry.Add(CronwatchTelemetry.Checks);
         await EnsureReadyAsync().ConfigureAwait(false);
         var alerts = new List<Alert>();
         foreach (ISource source in _sources)

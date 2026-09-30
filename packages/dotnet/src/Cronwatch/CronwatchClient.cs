@@ -578,7 +578,16 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         {
             // Past the wait, or failed: what is left is cancelled below.
         }
-        await _closing.CancelAsync().ConfigureAwait(false);
+        try
+        {
+            await _closing.CancelAsync().ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            // A callback an app registered on a token the client handed it: its own failure,
+            // which must not keep the hook attached or the store open.
+            Report(e, "closing");
+        }
         if (_processExitHook)
         {
             AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;

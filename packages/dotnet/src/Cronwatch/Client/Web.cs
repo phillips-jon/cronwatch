@@ -44,7 +44,9 @@ public sealed partial class CronwatchClient
 
     /// <summary>
     /// Runs <paramref name="fn"/> as a recorded run and answers the run as recorded with what the
-    /// function answered or threw, rather than throwing: what a job's handler answers from.
+    /// function answered or threw, rather than throwing: what a job's handler answers from, and
+    /// what <c>RunAsync</c> throws from. The run is current, its activity open and the app's run
+    /// scope open while the function runs.
     /// </summary>
     internal async Task<(Run Run, T? Value, Exception? Thrown)> ExecuteCaughtAsync<T>(
         JobDef def,
@@ -53,27 +55,38 @@ public sealed partial class CronwatchClient
         CancellationToken cancellationToken)
     {
         Opened o = await OpenAsync(def, options, cancellationToken).ConfigureAwait(false);
+        // Set in this async method, so it flows into everything the function awaits and starts,
+        // and is gone when this method returns: its caller's context is restored.
         CurrentRun.Set(o.Context);
-        using Activity? activity = CronwatchTelemetry.Source.StartActivity("cronwatch.run");
-        activity?.SetTag("cronwatch.job", def.Name);
-        activity?.SetTag("cronwatch.run_id", o.Run.Id);
-        activity?.SetTag("cronwatch.trigger", options.Trigger);
-        T? value = default;
-        Exception? thrown = null;
+        Activity? activity = CronwatchTelemetry.StartActivity("cronwatch.run");
         try
         {
-            value = await fn(o.Context, o.Context.CancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            thrown = e;
+            activity?.SetTag("cronwatch.job", def.Name);
+            activity?.SetTag("cronwatch.run_id", o.Run.Id);
+            activity?.SetTag("cronwatch.trigger", options.Trigger);
+            IDisposable? scope = OpenRunScope(o.Context);
+            T? value = default;
+            Exception? thrown = null;
+            try
+            {
+                value = await fn(o.Context, o.Context.CancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                thrown = e;
+            }
+            finally
+            {
+                CloseRunScope(scope, def.Name);
+                o.EndFunction();
+            }
+            Run finished = await CloseAsync(o, value, thrown, cancellationToken).ConfigureAwait(false);
+            activity?.SetTag("cronwatch.status", finished.Status.Value);
+            return (finished, value, thrown);
         }
         finally
         {
-            o.EndFunction();
+            CronwatchTelemetry.StopActivity(activity);
         }
-        Run finished = await CloseAsync(o, value, thrown, cancellationToken).ConfigureAwait(false);
-        activity?.SetTag("cronwatch.status", finished.Status.Value);
-        return (finished, value, thrown);
     }
 }
