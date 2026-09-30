@@ -8,7 +8,7 @@ import pg from "pg";
 import { postgres } from "../src/stores/postgres.js";
 import { sqlite } from "../src/stores/sqlite.js";
 import type { Store } from "../src/types.js";
-import { capture, clock, flaky, HOUR, MIN } from "./helpers.js";
+import { capture, clock, flaky, HOUR, MIN, settle } from "./helpers.js";
 
 function make(options: Parameters<typeof cronwatch>[0] = {}) {
   const c = clock();
@@ -202,6 +202,34 @@ test("a run never finished is marked stuck after the job's timeout", async () =>
   assert.equal(stored!.status, "timeout");
   assert.match(stored!.error!, /Still running after 30m/);
   assert.deepEqual(alerts.types(), ["stuck"]);
+});
+
+test("close waits for a check under way before it closes the store", async () => {
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const sending = new Promise<void>((r) => { entered = r; });
+  const events: string[] = [];
+  const held = custom("held", async () => { entered(); await gate; events.push("sent"); });
+  const inner = memory();
+  const store: Store = { ...inner, close: async () => { events.push("closed"); } };
+  const { cw, c } = make({ alerts: [held], store });
+  await cw.job("callback", { timeout: "30m" }).start();
+  c.advance(31 * MIN);
+  const check = cw.check();
+  await sending;
+  let closed = false;
+  const closing = cw.close().then(() => { closed = true; });
+  await settle();
+  assert.equal(closed, false, "still waiting on the check");
+  assert.deepEqual(events, []);
+  release();
+  await closing;
+  assert.deepEqual(events, ["sent", "closed"]);
+  assert.deepEqual((await check).alerts.map((a) => a.type), ["stuck"]);
+  // With no check under way it closes straight away.
+  await cw.close();
+  assert.deepEqual(events, ["sent", "closed", "closed"]);
 });
 
 test("lines flushed while a check marks earlier runs stuck are kept on the run it marks next", async () => {

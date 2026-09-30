@@ -1273,8 +1273,15 @@ export class CronWatch {
     this.firstTick = null;
   }
 
+  /**
+   * Stop the interval, wait for a check already under way (bounded by its
+   * own channel, triage and retry timeouts; what it throws was reported to
+   * whoever started it), then close the store, so that check neither writes
+   * after the store is closed nor loses the alerts it would queue.
+   */
   async close(): Promise<void> {
     this.stop();
+    if (this.checking) await this.checking.catch(() => {});
     if (this.store.close) await this.store.close();
   }
 

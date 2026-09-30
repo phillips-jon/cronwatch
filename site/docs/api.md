@@ -98,7 +98,7 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 | `silence(name, duration)`, `unsilence(name)` | the silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
 | `forget(name)` | remove a job and its runs from the store. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `definedJobs()` | the definitions declared in this process |
-| `close()` | stop the interval and close the store |
+| `close()` | stop the interval, wait for a check already under way, then close the store |
 | `resumeRun(name, runId)` | `job(name).resume(runId)` for a job declared in this process; rejects for one that is not |
 | `recordRun(run, { evaluate? })` | record a run that happened outside this process, for a source; see [below](#recordrun) |
 
