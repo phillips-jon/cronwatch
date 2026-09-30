@@ -878,6 +878,25 @@ func TestRoutesBasePath(t *testing.T) {
 		m.Handle("/x/", http.StripPrefix("/x/y", open))
 	}, "/x/y/manifest.webmanifest"), "/x/y/")
 
+	// A wildcard segment is the request's own text: it never adds attributes
+	// to the sign-in cookie.
+	signIn := func(target string) string {
+		mux := http.NewServeMux()
+		mux.Handle("/t/{tenant}/cron/", must[*cronwatch.Routes](t)(cw.Routes(cronwatch.WithToken("tok"))))
+		server := httptest.NewServer(mux)
+		defer server.Close()
+		client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		res, err := client.Get(server.URL + target)
+		check(t, err)
+		res.Body.Close()
+		return res.Header.Get("Set-Cookie")
+	}
+	set := signIn("/t/x;Domain=example.com;SameSite=None;y/cron/?token=tok")
+	if !strings.Contains(set, "; Path=/; HttpOnly") || strings.Contains(set, "Domain") || strings.Contains(set, "SameSite=None") {
+		t.Errorf("a crafted segment reached the cookie: %s", set)
+	}
+	contains(t, "a plain tenant keeps its path", signIn("/t/acme/cron/?token=tok"), "; Path=/t/acme/cron; HttpOnly")
+
 	// The pages link under the base found, and the job links resolve.
 	mux := http.NewServeMux()
 	mux.Handle("/ops/", http.StripPrefix("/ops", open))

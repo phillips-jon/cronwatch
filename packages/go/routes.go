@@ -334,6 +334,24 @@ func (rt *Routes) basePath(r *http.Request, full string) string {
 	return DefaultBasePath
 }
 
+// cookiePath is the sign-in cookie's Path: the base, or "/" when the base is
+// the root or holds a character that has no place in a cookie attribute
+// (";", ",", a space or control, anything past ASCII). A base found from a
+// ServeMux wildcard is the request's own text, so a crafted link could
+// otherwise add attributes (Domain=...) to a cookie that is as good as the
+// token.
+func cookiePath(base string) string {
+	if base == "" {
+		return "/"
+	}
+	for i := 0; i < len(base); i++ {
+		if c := base[i]; c <= ' ' || c >= 0x7f || c == ';' || c == ',' {
+			return "/"
+		}
+	}
+	return base
+}
+
 // ServeHTTP answers one request as the SDK's routes answer it. A store
 // failure (or a panic) is reported to the client's error handler as
 // "routes" and answered 500.
@@ -637,12 +655,8 @@ func (rt *Routes) serve(r *http.Request, pathname, path, rawQuery, base string, 
 			if strings.HasPrefix(publicOrigin, "https:") {
 				secure = "; Secure"
 			}
-			cookiePath := base
-			if cookiePath == "" {
-				cookiePath = "/"
-			}
 			return redirectAnswer(pathname+search, [2]string{"Set-Cookie",
-				tokenCookie + "=" + rt.cookie + "; Path=" + cookiePath + "; HttpOnly; SameSite=Lax; Max-Age=" + strconv.Itoa(cookieMaxAge) + secure}), nil
+				tokenCookie + "=" + rt.cookie + "; Path=" + cookiePath(base) + "; HttpOnly; SameSite=Lax; Max-Age=" + strconv.Itoa(cookieMaxAge) + secure}), nil
 		}
 	}
 
