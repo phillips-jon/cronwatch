@@ -179,6 +179,33 @@ class ChannelHardeningTest {
   }
 
   @Test
+  void aBodyOfEmptyChunksIsLetGoAtTheDeadline() throws Exception {
+    // A transport of the app's own whose body answers empty chunks for ever, never blocking: the
+    // read gives up at the deadline and closes the answer, rather than spin on its own thread.
+    java.util.concurrent.atomic.AtomicBoolean closed =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    Transport empty =
+        request ->
+            new Response(
+                200,
+                new Response.Body() {
+                  @Override
+                  public byte[] next() {
+                    return new byte[0];
+                  }
+
+                  @Override
+                  public void close() {
+                    closed.set(true);
+                  }
+                });
+    Post.Answer answer = Post.fetch(empty, 200, "https://hooks.example.com/in", List.of(), "{}");
+    assertEquals(200, answer.status());
+    assertEquals("", answer.body());
+    assertTrue(Await.until(closed::get), "the answer was closed");
+  }
+
+  @Test
   void aChannelStopsWaitingAtItsDeadline() throws Exception {
     try (TestServer hang = TestServer.start(r -> new TestServer.Hang())) {
       Post.timeoutForTests(500);
@@ -356,6 +383,24 @@ class ChannelHardeningTest {
     String err = error(ch, ChannelsConformanceTest.sample());
     assertFalse(err.contains(secret) || err.contains("/services"), err);
     assertTrue(err.startsWith("https://hooks.example.com: IllegalStateException: "), err);
+
+    // Nor a header's value it quotes.
+    Transport headerQuoting =
+        request -> {
+          throw new IllegalStateException(
+              "refused " + request.header("authorization") + " as " + request.header("accept"));
+        };
+    Channel withHeader =
+        Webhook.channel(
+            WebhookOptions.builder()
+                .url("https://hooks.example.com/in")
+                .header("authorization", "Bearer " + secret)
+                .header("accept", "text/plain")
+                .transport(headerQuoting)
+                .build());
+    err = error(withHeader, ChannelsConformanceTest.sample());
+    assertEquals(
+        "https://hooks.example.com: IllegalStateException: refused [redacted] as text/plain", err);
   }
 
   @Test
@@ -452,6 +497,26 @@ class ChannelHardeningTest {
       assertEquals("7", seen.header("content-length"));
       assertTrue(seen.header("user-agent").startsWith("Java-http-client/"));
       assertEquals("{\"a\":1}", new String(seen.body(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+  }
+
+  @Test
+  void aHeaderValueTheJdkRefusesIsNeverQuoted() throws Exception {
+    // The JDK refuses a control character or one past U+00FF in a header value, quoting the
+    // value; a credential pasted with one must not end up in the error.
+    try (JdkTransport jdk = new JdkTransport()) {
+      for (String value : List.of("Bearer a\u0001-hidden-part", "Bearer €-hidden-part")) {
+        Channel ch =
+            Webhook.channel(
+                WebhookOptions.builder()
+                    .url("https://hooks.example.com/in")
+                    .header("authorization", value)
+                    .transport(jdk)
+                    .build());
+        String error = error(ch, ChannelsConformanceTest.sample());
+        assertFalse(error.contains("hidden-part"), error);
+        assertTrue(error.contains("authorization"), error);
+      }
     }
   }
 

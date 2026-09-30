@@ -79,7 +79,14 @@ public final class JdkTransport implements Transport, AutoCloseable {
         HttpRequest.newBuilder(uri).POST(HttpRequest.BodyPublishers.ofByteArray(request.body()));
     for (Map.Entry<String, String> h : request.headers()) {
       if (!RESTRICTED.contains(h.getKey().toLowerCase(Locale.ROOT))) {
-        b.header(h.getKey(), h.getValue());
+        try {
+          b.header(h.getKey(), h.getValue());
+        } catch (IllegalArgumentException refused) {
+          // The JDK refuses a control character or one past U+00FF in a value, and quotes the
+          // value, which may be a credential: named here by the header alone.
+          throw new IOException(
+              "the " + h.getKey() + " header's value holds a character the JDK will not send");
+        }
       }
     }
     CompletableFuture<HttpResponse<Pull>> sent = client.sendAsync(b.build(), info -> new Pull());
