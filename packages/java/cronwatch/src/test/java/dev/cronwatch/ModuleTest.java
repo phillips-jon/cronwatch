@@ -37,6 +37,8 @@ class ModuleTest {
     assertEquals(
         Set.of(
             "dev.cronwatch",
+            "dev.cronwatch.bridge",
+            "dev.cronwatch.cli",
             "dev.cronwatch.jdbc",
             "dev.cronwatch.json",
             "dev.cronwatch.store",

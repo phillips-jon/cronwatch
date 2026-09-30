@@ -2,6 +2,7 @@ package dev.cronwatch;
 
 import dev.cronwatch.Core.JobDef;
 import dev.cronwatch.internal.core.CurrentRun;
+import dev.cronwatch.internal.core.Friends;
 import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.duration.Schedules;
 import dev.cronwatch.internal.evaluate.Evaluate;
@@ -60,6 +61,10 @@ import org.jspecify.annotations.Nullable;
 public final class Cronwatch implements AutoCloseable {
   /** This library's version, as Maven built it. */
   public static final String VERSION = readVersion();
+
+  static {
+    Friends.set(new Friend());
+  }
 
   private static final Pattern NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._:-]{0,119}");
 
@@ -126,6 +131,13 @@ public final class Cronwatch implements AutoCloseable {
    * @throws CronwatchException for a name or option the SDK refuses, with its message
    */
   public Job job(String name, JobOptions options) {
+    JobDef def = define(name, options);
+    core.declare(def);
+    return new Job(this, def);
+  }
+
+  /** The job {@link #job} would declare, checked and not declared. */
+  JobDef define(String name, JobOptions options) {
     if (!NAME.matcher(name).matches()) {
       throw CronwatchException.invalid(
           "job name "
@@ -139,9 +151,7 @@ public final class Cronwatch implements AutoCloseable {
     fields.set("name", name);
     Definition stored = Expect.toStored(fields, options.expect);
     validate(name, stored);
-    JobDef def = new JobDef(name, stored, options.expect);
-    core.declare(def);
-    return new Job(this, def);
+    return new JobDef(name, stored, options.expect);
   }
 
   /** {@link #job(String, JobOptions)} with no options. */
@@ -328,7 +338,7 @@ public final class Cronwatch implements AutoCloseable {
   // ---- runs that span calls
 
   /** The SDK's refusal of a run id no store could hold, or one reserved for the pg_cron source. */
-  private static void checkRunId(String job, String id, String method) {
+  static void checkRunId(String job, String id, String method) {
     if (id.isEmpty() || id.length() > 200) {
       throw CronwatchException.invalid(
           "job "

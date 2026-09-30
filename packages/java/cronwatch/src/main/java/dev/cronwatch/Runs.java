@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Predicate;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -100,12 +101,116 @@ final class Runs {
    * is interrupted meanwhile. What the function threw is thrown again as it came.
    */
   <T> Executed<T> execute(JobDef def, RunOptions options, Body<T> body) {
+    Opened o = open(def, options);
+    T value = null;
+    Throwable thrown = null;
+    try {
+      value = body.call(o.context);
+    } catch (Throwable t) {
+      thrown = t;
+    } finally {
+      endFunction(o);
+    }
+    Run finished = close(o, value, thrown);
+    if (thrown != null) {
+      if (thrown instanceof InterruptedException) {
+        // Well-behaved code restores the interrupt status of a thread it was interrupted in.
+        Thread.currentThread().interrupt();
+      }
+      throw Runs.<RuntimeException>sneakyThrow(thrown);
+    }
+    return new Executed<>(finished, value);
+  }
+
+  /**
+   * A run opened and not yet closed: the first half of {@link #execute}, for a run whose function
+   * is seen from outside (a scheduler's listener told of its start and end).
+   */
+  static final class Opened {
+    final JobDef def;
+    final RunOptions options;
+    final Run run;
+    final boolean recorded;
+    final @Nullable Future<?> closing;
+    final Recorder recorder;
+    final JobContext context;
+    final Thread thread;
+    final ReentrantLock lock = new ReentrantLock();
+    boolean inFunction = true;
+    boolean interruptedAtTimeout;
+    boolean closed;
+    @Nullable ScheduledFuture<?> timer;
+    @Nullable OpenRun open;
+    @Nullable JobContext previous;
+    Mdc.@Nullable Saved saved;
+
+    Opened(
+        JobDef def,
+        RunOptions options,
+        Run run,
+        boolean recorded,
+        @Nullable Future<?> closing,
+        Recorder recorder,
+        JobContext context) {
+      this.def = def;
+      this.options = options;
+      this.run = run;
+      this.recorded = recorded;
+      this.closing = closing;
+      this.recorder = recorder;
+      this.context = context;
+      this.thread = Thread.currentThread();
+    }
+
+    /** Marks the run closed, and says whether it was open until now. */
+    boolean claim() {
+      lock.lock();
+      try {
+        if (closed) {
+          return false;
+        }
+        closed = true;
+        return true;
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    boolean isClosed() {
+      lock.lock();
+      try {
+        return closed;
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
+
+  /**
+   * Opens a run in the calling thread: its row inserted (a store failure goes to the error handler
+   * and the run goes on unrecorded), the run made current with its MDC keys, its timeout timer set,
+   * and the shutdown hook told of it. Missed and stuck are closed beside it, or at its close when
+   * it may be given back.
+   *
+   * @throws CronwatchException for a run id no store could hold
+   */
+  Opened open(JobDef def, RunOptions options) {
+    String id = options.id;
+    if (id != null) {
+      Cronwatch.checkRunId(def.name(), id, "run");
+    }
     long startedAt = core.now();
-    Run run = Run.running(UUID.randomUUID().toString(), def.name(), startedAt, options.trigger);
+    Run run =
+        Run.running(
+            id == null ? UUID.randomUUID().toString() : id, def.name(), startedAt, options.trigger);
     // The start is written on the client's thread: an interrupt of the caller cannot cut it.
     boolean recorded = Core.awaitUninterruptibly(core.submit(() -> beginRun(def, run)));
-    // Closing missed and stuck happens beside the job, which never waits on it.
-    Future<?> closing = recorded ? core.submit(() -> closeOnStart(def.name())) : null;
+    // Closing missed and stuck happens beside the job, which never waits on it. A run that may be
+    // given back closes them only once it is known not to be: one taken back must leave the state
+    // as it was, or a job overdue would have missed closed by each attempt given back and opened
+    // again by the next check, an alert each time.
+    Future<?> closing =
+        recorded && !options.mayTakeBack ? core.submit(() -> closeOnStart(def.name())) : null;
 
     Recorder recorder = new Recorder();
     JobContext context =
@@ -115,64 +220,94 @@ final class Runs {
             startedAt,
             recorder,
             task -> core.spawn(task, "cancelling " + def.name()));
-    Thread thread = Thread.currentThread();
-    ReentrantLock running = new ReentrantLock();
-    boolean[] inFunction = {true};
-    boolean[] interruptedAtTimeout = {false};
+    Opened o = new Opened(def, options, run, recorded, closing, recorder, context);
     double timeout = timeoutOrDefault(def.stored());
     long delay = (long) Math.min(Math.max(0, timeout), Evaluate.MAX_DURATION_MS);
     Runnable atTimeout =
         () -> {
           context.cancel();
           if (options.interruptAtTimeout) {
-            running.lock();
+            o.lock.lock();
             try {
-              if (inFunction[0]) {
-                interruptedAtTimeout[0] = true;
-                thread.interrupt();
+              if (o.inFunction) {
+                o.interruptedAtTimeout = true;
+                o.thread.interrupt();
               }
             } finally {
-              running.unlock();
+              o.lock.unlock();
             }
           }
         };
-    ScheduledFuture<?> timer;
     try {
-      timer = core.timer.schedule(atTimeout, delay, TimeUnit.MILLISECONDS);
+      o.timer = core.timer.schedule(atTimeout, delay, TimeUnit.MILLISECONDS);
     } catch (RejectedExecutionException e) {
       // The client was closed: the run is still recorded, with no timeout of its own.
-      timer = null;
+      o.timer = null;
     }
     OpenRun open = new OpenRun(def, run, recorder, recorded);
+    o.open = open;
     core.open.put(run.id(), open);
+    o.previous = CurrentRun.set(context);
+    o.saved = Mdc.put(def.name(), run.id());
+    return o;
+  }
 
-    T value = null;
-    Throwable thrown = null;
-    JobContext previous = CurrentRun.set(context);
-    Mdc.Saved saved = Mdc.put(def.name(), run.id());
+  /**
+   * Ends the part of a run in which its function runs: the timer is cancelled, and in the thread
+   * that opened it the current run and the MDC keys are put back as they were. Once only.
+   */
+  void endFunction(Opened o) {
+    o.lock.lock();
     try {
-      value = body.call(context);
-    } catch (Throwable t) {
-      thrown = t;
+      if (!o.inFunction) {
+        return;
+      }
+      o.inFunction = false;
     } finally {
-      running.lock();
-      try {
-        inFunction[0] = false;
-      } finally {
-        running.unlock();
-      }
-      if (timer != null) {
-        timer.cancel(false);
-      }
-      context.end();
-      Mdc.restore(saved);
-      CurrentRun.restore(previous);
+      o.lock.unlock();
     }
-    boolean timedOut = interruptedAtTimeout[0];
-    if (timedOut && thrown == null) {
+    ScheduledFuture<?> timer = o.timer;
+    if (timer != null) {
+      timer.cancel(false);
+    }
+    o.context.end();
+    if (Thread.currentThread().equals(o.thread)) {
+      Mdc.restore(o.saved);
+      CurrentRun.restore(o.previous);
+    }
+  }
+
+  /**
+   * The second half of {@link #execute}: judges and records a run whose function returned {@code
+   * value} or threw {@code thrown}, on a virtual thread of the client's that this waits for, and
+   * returns it as recorded. A run {@code discardWhen} answers true for is taken back instead.
+   * Throws nothing; a second close does nothing and returns the run as it opened.
+   */
+  Run close(Opened o, @Nullable Object value, @Nullable Throwable thrown) {
+    endFunction(o);
+    if (!o.claim()) {
+      return o.run;
+    }
+    JobDef def = o.def;
+    Run run = o.run;
+    boolean timedOut = o.interruptedAtTimeout;
+    if (timedOut && thrown == null && Thread.currentThread().equals(o.thread)) {
       // The function returned though it was interrupted: the interrupt was ours, so it is not
       // left for the caller's own code.
       Thread.interrupted();
+    }
+    Predicate<? super Throwable> discard = o.options.discardWhen;
+    if (discard != null
+        && thrown != null
+        && !(thrown instanceof Error)
+        && !timedOut
+        && givenBack(def.name(), discard, thrown)
+        && takeBackNow(o)) {
+      return run;
+    }
+    Future<?> closing = o.closing;
+    if (o.recorded && o.options.mayTakeBack) {
+      closing = core.submit(() -> closeOnStart(def.name()));
     }
 
     String failure;
@@ -187,28 +322,90 @@ final class Runs {
     }
     String text = resultText;
     boolean markTimeout = timedOut && thrown != null;
+    Future<?> started = closing;
     Future<Run> recording =
         core.submit(
             () ->
-                finishExecuted(def, run, recorder, text, failure, markTimeout, recorded, closing));
-    open.recording = recording;
-    Run finished;
+                finishExecuted(
+                    def, run, o.recorder, text, failure, markTimeout, o.recorded, started));
+    OpenRun open = o.open;
+    if (open != null) {
+      open.recording = recording;
+    }
     try {
-      finished = Core.awaitUninterruptibly(recording);
+      return Core.awaitUninterruptibly(recording);
     } catch (RuntimeException e) {
       core.report(e, "recording " + def.name());
-      finished = run;
+      return run;
     } finally {
       core.open.remove(run.id());
     }
-    if (thrown != null) {
-      if (thrown instanceof InterruptedException) {
-        // Well-behaved code restores the interrupt status of a thread it was interrupted in.
-        Thread.currentThread().interrupt();
-      }
-      throw Runs.<RuntimeException>sneakyThrow(thrown);
+  }
+
+  /**
+   * Gives an open run back rather than judge it: its running row is deleted, nothing is judged or
+   * alerted and the job's state is left as it was. Says whether it was taken back; when the store
+   * cannot take it back, nothing is changed and the caller records it as it ended. A run already
+   * closed is left as it is (true).
+   */
+  boolean takeBack(Opened o) {
+    endFunction(o);
+    if (o.isClosed()) {
+      return true;
     }
-    return new Executed<>(finished, value);
+    if (!takeBackNow(o)) {
+      return false;
+    }
+    o.claim();
+    return true;
+  }
+
+  /** Deletes a run's running row, for {@link #takeBack}; false when it must be recorded instead. */
+  private boolean takeBackNow(Opened o) {
+    boolean back = true;
+    if (o.recorded) {
+      back = Core.awaitUninterruptibly(core.submit(() -> discardRun(o.run)));
+    }
+    if (back) {
+      core.open.remove(o.run.id());
+    }
+    return back;
+  }
+
+  /** {@code discard(thrown)}, a throw in it reported and the run not given back. */
+  private boolean givenBack(String name, Predicate<? super Throwable> discard, Throwable thrown) {
+    try {
+      return discard.test(thrown);
+    } catch (RuntimeException e) {
+      core.report(e, "discarding " + name);
+      return false;
+    }
+  }
+
+  /**
+   * Takes back a run still running and says whether the caller is done with it. A store without
+   * {@code deleteRunIf}, or one that fails, is reported and the run is recorded as it ended, so it
+   * is not left running to be reported stuck; a row no longer running (a check marked it stuck
+   * meanwhile) is reported and left as it is.
+   */
+  private boolean discardRun(Run run) {
+    String where = "discarding " + run.job();
+    boolean deleted;
+    try {
+      deleted = Core.call(() -> core.store.deleteRunIf(run.id(), run.job(), RunStatus.RUNNING));
+    } catch (UnsupportedOperationException e) {
+      core.report(
+          "the store cannot take back a run (it has no deleteRunIf); recorded as it ended", where);
+      return false;
+    } catch (RuntimeException e) {
+      core.report(e, where);
+      return false;
+    }
+    if (!deleted) {
+      core.report(
+          "run " + run.id() + " of " + run.job() + " is no longer running; left as it is", where);
+    }
+    return true;
   }
 
   /** A throwable as a failed run's error: {@code Name: message} and five frames, capped. */

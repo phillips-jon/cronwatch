@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  * A job's expect rule: what a successful run's output must satisfy, and how the rule is described
  * in the stored definition (the SDK's {@code serialize.ts}).
  */
-public sealed interface Expect permits Expect.Contains, Expect.Matches, Expect.That {
+public sealed interface Expect permits Expect.Contains, Expect.Matches, Expect.That, Expect.Stored {
   /** Null when the output passes, or why it does not. */
   @Nullable String check(String output);
 
@@ -81,6 +81,28 @@ public sealed interface Expect permits Expect.Contains, Expect.Matches, Expect.T
     @Override
     public String describe() {
       return "custom function";
+    }
+  }
+
+  /**
+   * A rule another process stored that this one cannot run (a pattern the engine does not read):
+   * every output passes, and the rule is described as it was stored, so a definition written back
+   * is the one stored.
+   */
+  record Stored(String description) implements Expect {
+    /** Checks that the description is there. */
+    public Stored {
+      Objects.requireNonNull(description, "description");
+    }
+
+    @Override
+    public @Nullable String check(String output) {
+      return null;
+    }
+
+    @Override
+    public String describe() {
+      return description;
     }
   }
 

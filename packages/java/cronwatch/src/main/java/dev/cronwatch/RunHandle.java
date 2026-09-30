@@ -301,6 +301,14 @@ public final class RunHandle implements AutoCloseable {
     return finishWith(null, Runs.errorText(error));
   }
 
+  /**
+   * Finishes the run as failed with {@code error} as its error text, as written, for a failure that
+   * is not a throwable here (a scheduler's word that the process running it stopped).
+   */
+  public @Nullable Run fail(String error) {
+    return finishWith(null, error);
+  }
+
   private @Nullable Run finishWith(@Nullable String resultText, @Nullable String failure) {
     return Core.awaitUninterruptibly(core.submit(() -> finishNow(resultText, failure)));
   }

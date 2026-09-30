@@ -92,6 +92,17 @@ public final class Job {
   }
 
   /**
+   * Opens a run in the calling thread for a function this code does not call itself, as a
+   * scheduler's listener is told of one starting: closed with {@link ObservedRun#close} when the
+   * listener is told it ended. See {@link ObservedRun}. The store never fails out of it.
+   *
+   * @throws CronwatchException for a run id no store could hold
+   */
+  public ObservedRun open(RunOptions options) {
+    return new ObservedRun(cronwatch.runs, cronwatch.runs.open(def, options));
+  }
+
+  /**
    * Records a running run now, to finish later with the handle, perhaps from another process (see
    * {@link #resume}). Store failures go to the error handler. A run that is never finished is
    * marked stuck by the first check after the job's timeout.
