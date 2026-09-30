@@ -74,7 +74,16 @@ public sealed interface Expect permits Expect.Contains, Expect.Matches, Expect.T
         return predicate.test(output) ? null : "Output did not pass the expect() check";
       } catch (Exception e) {
         // Like the SDK's (error as Error).message: a throw with no message has an empty one.
-        return "Output check threw: " + Objects.toString(e.getMessage(), "");
+        return "Output check threw: " + message(e);
+      }
+    }
+
+    /** The throw's message, empty when it has none or reading it throws. */
+    private static String message(Exception e) {
+      try {
+        return Objects.toString(e.getMessage(), "");
+      } catch (RuntimeException unreadable) {
+        return "";
       }
     }
 
