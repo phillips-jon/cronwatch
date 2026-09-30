@@ -223,7 +223,7 @@ func (c *Client) execute(ctx context.Context, def *jobDef, fn func(context.Conte
 	startedAt := c.now()
 	run := Run{ID: newID(), Job: name, Status: StatusRunning, StartedAt: startedAt, Metrics: Metrics{}, Trigger: trigger}
 	recorded := false
-	if err := c.sync(sctx, def); err != nil {
+	if err := c.sync(sctx, def, true); err != nil {
 		c.report(err, "recording "+name)
 	} else if err := c.store.InsertRun(sctx, run.clone()); err != nil {
 		c.report(err, "recording "+name)
@@ -421,7 +421,7 @@ func (c *Client) conclude(def *jobDef, run *Run, result any, failure *string, ex
 func (c *Client) recordFinish(ctx context.Context, def *jobDef, run *Run, recorded bool, finishedAt int64) (string, error) {
 	if !recorded {
 		// The start was never written; the store may be back by now.
-		if err := c.sync(ctx, def); err != nil {
+		if err := c.sync(ctx, def, false); err != nil {
 			return "", err
 		}
 		err := c.store.InsertRun(ctx, run.clone())
@@ -586,7 +586,7 @@ func (c *Client) RecordRun(ctx context.Context, input Run, options ...RecordOpti
 			return nil, fmt.Errorf("recordRun: metric %s must be a finite number (job %s, run %s)", js.Quote(m.Name), js.Quote(input.Job), js.Quote(input.ID))
 		}
 	}
-	if err := c.sync(ctx, def); err != nil {
+	if err := c.sync(ctx, def, false); err != nil {
 		return nil, err
 	}
 	run := input.clone()

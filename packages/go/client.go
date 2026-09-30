@@ -325,14 +325,30 @@ func (c *Client) ensureReady(ctx context.Context) error {
 // per declaration. A handle kept from an earlier declaration writes the one
 // that replaced it, never its own over it, and one forgotten since writes
 // its own. A name declared again while its write was under way is still to
-// be written.
-func (c *Client) sync(ctx context.Context, def *jobDef) error {
+// be written. A name is marked as written only while that same declaration
+// stands, so a forget that lands during the write (deleting the row after
+// it) leaves the name to be written again, as does one forgotten before it.
+//
+// With confirm, as a run starts, a name already written is read back:
+// another process may have forgotten the job since, and a job still
+// declared here comes back on its next run.
+func (c *Client) sync(ctx context.Context, def *jobDef, confirm bool) error {
 	if err := c.ensureReady(ctx); err != nil {
 		return err
 	}
 	name := def.name
 	if _, done := c.standing(name, def); done {
-		return nil
+		if !confirm {
+			return nil
+		}
+		stored, err := c.store.GetJob(ctx, name)
+		if err != nil {
+			return err
+		}
+		if stored != nil {
+			return nil
+		}
+		c.unmarkSynced(name)
 	}
 	end, err := c.syncTurn(ctx, name)
 	if err != nil {
@@ -369,6 +385,54 @@ func (c *Client) markSynced(def *jobDef) {
 	if c.definitions[def.name] == def {
 		c.synced[def.name] = true
 	}
+}
+
+// unmarkSynced notes that the store may no longer have name's declaration
+// (another process forgot it), so the next sync writes it.
+func (c *Client) unmarkSynced(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.synced, name)
+}
+
+// storedJobs is every stored job, once each declaration has been written. A
+// job declared here that the store no longer has was forgotten by another
+// process after this one wrote it: it is written again, as its next run
+// would, so it is checked and shown while any process still declares it.
+func (c *Client) storedJobs(ctx context.Context) ([]StoredJob, error) {
+	declared := c.declaredAll()
+	for _, def := range declared {
+		if err := c.sync(ctx, def, false); err != nil {
+			return nil, err
+		}
+	}
+	jobs, err := c.store.ListJobs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	listed := map[string]bool{}
+	for _, job := range jobs {
+		listed[job.Name] = true
+	}
+	missing := false
+	for _, def := range declared {
+		if listed[def.name] {
+			continue
+		}
+		missing = true
+		// Not one forgotten here meanwhile.
+		if current, ok := c.declared(def.name); !ok || current != def {
+			continue
+		}
+		c.unmarkSynced(def.name)
+		if err := c.sync(ctx, def, false); err != nil {
+			return nil, err
+		}
+	}
+	if !missing {
+		return jobs, nil
+	}
+	return c.store.ListJobs(ctx)
 }
 
 // syncTurn waits for every earlier write of name's declaration to end, so

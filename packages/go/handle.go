@@ -121,7 +121,7 @@ func (c *Client) recordStart(ctx context.Context, def *jobDef, trigger, id strin
 	}
 	run := Run{ID: id, Job: name, Status: StatusRunning, StartedAt: c.now(), Metrics: Metrics{}, Trigger: trigger}
 	recorded := false
-	err := c.sync(sctx, def)
+	err := c.sync(sctx, def, true)
 	if err == nil {
 		err = c.store.InsertRun(sctx, run.clone())
 	}

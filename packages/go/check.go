@@ -83,7 +83,7 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 		alerts = append(alerts, found...)
 	}
 	for _, def := range c.declaredAll() {
-		if err := c.sync(ctx, def); err != nil {
+		if err := c.sync(ctx, def, false); err != nil {
 			return nil, err
 		}
 	}
@@ -135,7 +135,7 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 	// as failing (see unevaluableSummary) and does not stop the others.
 	jobs := []JobSummary{}
 	var spent time.Duration
-	stored, err := c.store.ListJobs(ctx)
+	stored, err := c.storedJobs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -263,16 +263,11 @@ func (c *Client) JobsWithRuns(ctx context.Context, limit int) ([]JobWithRuns, er
 	if err := c.ensureReady(ctx); err != nil {
 		return nil, err
 	}
-	for _, def := range c.declaredAll() {
-		if err := c.sync(ctx, def); err != nil {
-			return nil, err
-		}
-	}
-	now := c.now()
-	stored, err := c.store.ListJobs(ctx)
+	stored, err := c.storedJobs(ctx)
 	if err != nil {
 		return nil, err
 	}
+	now := c.now()
 	out := []JobWithRuns{}
 	for _, job := range stored {
 		out = append(out, c.snapshot(ctx, job, now, clampLimit(limit, 0)))
@@ -281,12 +276,14 @@ func (c *Client) JobsWithRuns(ctx context.Context, limit int) ([]JobWithRuns, er
 }
 
 // JobSummary is one job's summary, or nil when the store does not know it.
+// One declared here and forgotten elsewhere is written again, as a check
+// or a dashboard read writes it.
 func (c *Client) JobSummary(ctx context.Context, name string) (*JobSummary, error) {
 	if err := c.ensureReady(ctx); err != nil {
 		return nil, err
 	}
 	if def, ok := c.declared(name); ok {
-		if err := c.sync(ctx, def); err != nil {
+		if err := c.sync(ctx, def, true); err != nil {
 			return nil, err
 		}
 	}
@@ -345,7 +342,9 @@ func (c *Client) patchState(ctx context.Context, name string, change func(*JobSt
 }
 
 // Forget removes a job and its runs from the store. A job still declared
-// in code comes back on its next run.
+// in code comes back: here on its next run, and in any other process that
+// declares it on its next run there, or at that process's next check or
+// dashboard read.
 func (c *Client) Forget(ctx context.Context, name string) error {
 	if err := c.ensureReady(ctx); err != nil {
 		return err
