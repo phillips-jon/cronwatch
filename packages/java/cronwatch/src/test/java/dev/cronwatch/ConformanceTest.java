@@ -20,12 +20,12 @@ import org.junit.jupiter.api.Test;
  * fails when the SDK writes a fixture this port does not know, until it is placed.
  */
 class ConformanceTest {
-  /** Replayed in phase 1. */
+  /** Replayed. */
   static final Set<String> REPLAYED =
-      Set.of("duration", "schedule", "output", "evaluate", "format", "health", "store");
+      Set.of("duration", "schedule", "output", "evaluate", "format", "health", "store", "pgcron");
 
   /** Written by the SDK and replayed by a later phase (packages/java/DESIGN.md, Phases). */
-  static final Set<String> LATER = Set.of("channels", "triage", "pgcron");
+  static final Set<String> LATER = Set.of("channels", "triage");
 
   @Test
   void everyFixtureIsKnown() throws IOException {

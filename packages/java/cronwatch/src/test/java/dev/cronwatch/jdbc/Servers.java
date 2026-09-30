@@ -86,6 +86,19 @@ public final class Servers {
    * useAffectedRows=true}, say).
    */
   public static DataSource dataSource(Kind kind, String settings) {
+    return dataSource(kind, null, null, null, settings);
+  }
+
+  /**
+   * A data source over the server, on another database or as another role when they are given (null
+   * for the URL's own), with the driver's own settings added to its URL.
+   */
+  public static DataSource dataSource(
+      Kind kind,
+      @Nullable String database,
+      @Nullable String role,
+      @Nullable String rolePassword,
+      String settings) {
     String url = url(kind);
     if (url == null) {
       throw new IllegalStateException(kind.variable() + " is not set");
@@ -100,6 +113,13 @@ public final class Servers {
       password = colon < 0 ? "" : decode(info.substring(colon + 1));
     }
     String path = u.getRawPath() == null ? "" : u.getRawPath();
+    if (database != null) {
+      path = "/" + database;
+    }
+    if (role != null) {
+      user = role;
+      password = rolePassword == null ? "" : rolePassword;
+    }
     String jdbc =
         switch (kind) {
           case PG, PGCRON -> "jdbc:postgresql://" + host(u, 5432) + path;
