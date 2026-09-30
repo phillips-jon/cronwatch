@@ -452,7 +452,8 @@ module Cronwatch
       @store.get_run(id)
     end
 
-    # Stop alerts for a job for a while. State keeps updating underneath.
+    # Stop alerts for a job for a while. State keeps updating underneath. The
+    # end is a whole millisecond, held at 2**53 - 1 (see Evaluate.silence_end).
     #   silence("nightly-report", for: "2h")   # or silence("nightly-report", "2h")
     def silence(name, duration = nil, **options)
       unknown = options.keys - SILENCE_OPTIONS
@@ -461,7 +462,7 @@ module Cronwatch
 
       duration = options[:for] if duration.nil?
       ms = Duration.parse(duration, "silence duration")
-      patch_state(name) { |state| state.silenced_until = now + ms }
+      patch_state(name) { |state| state.silenced_until = Evaluate.silence_end(now, ms) }
     end
 
     def unsilence(name)

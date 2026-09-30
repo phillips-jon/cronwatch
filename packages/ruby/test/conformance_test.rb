@@ -411,6 +411,23 @@ class ConformanceTest < Minitest::Test
     end
   end
 
+  def test_silence_end
+    each_case(HEALTH["silenceEnd"]) do |c|
+      ms = Cronwatch::Duration.parse(c["duration"], "silence duration")
+      differs(c["silencedUntil"], Cronwatch::Evaluate.silence_end(c["now"], ms))
+    end
+  end
+
+  # The client stores exactly that, through silence and the JSON API.
+  def test_silence_stores_the_end_silence_end_gives
+    cw, clock, = make
+    cw.job("j")
+    each_case(HEALTH["silenceEnd"]) do |c|
+      clock.now = c["now"]
+      differs(c["silencedUntil"], cw.silence("j", c["duration"]).silenced_until)
+    end
+  end
+
   def test_stale_alert
     each_case(HEALTH["staleAlert"]) do |c|
       differs(c["stale"], Cronwatch::Evaluate.stale_alert?(Cronwatch::Alert.from_h(c["alert"]), state_from(c["state"])))

@@ -388,7 +388,7 @@ The client:
 | `start(every = "1m")`, `stop` | check in a background thread; the first check comes after a second, and the interval is at least 5 seconds. A second `start` does nothing, and one with another interval is reported to `on_error`. With `deliver: :check`, `start` warns once that these checks send nothing |
 | `jobs`, `jobs_with_runs(limit = 20)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit = 50)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
-| `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath. Each returns the job's stored state, `version` included |
+| `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath. The end is a whole millisecond, held at 2^53 - 1 however long the silence. Each returns the job's stored state, `version` included |
 | `forget(name)` | remove a job and its runs |
 | `resume_run(name, run_id)` | `job(name).resume(run_id)` for a job declared in this process; raises `ArgumentError` for one that is not |
 | `record_run(run, evaluate: true)` | record a run that happened elsewhere, for a source; see [pg_cron](#pg-cron). Returns the alerts it sent |

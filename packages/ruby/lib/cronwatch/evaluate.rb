@@ -35,6 +35,14 @@ module Cronwatch
       [ms, MAX_DURATION_MS].min
     end
 
+    # When a silence of `ms` from `now` ends: a whole millisecond, never past
+    # MAX_DURATION_MS (2**53 - 1), however long the silence asked for. Every
+    # port sharing the store reads it back unchanged, where a larger number
+    # could wrap to a time long past and send alerts during the silence.
+    def silence_end(now, ms)
+      [now + (ms >= MAX_DURATION_MS ? MAX_DURATION_MS : ms.floor), MAX_DURATION_MS].min
+    end
+
     # The version a stored state counts as for compare_and_set_state: its
     # `version` when that is a whole number from 0 to MAX_DURATION_MS
     # (2**53 - 1), else 0, as when it is absent. The SQL stores read it the
