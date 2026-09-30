@@ -339,28 +339,9 @@ public class ThreadsTests
     [Fact]
     public async Task A_process_that_exits_with_a_run_open_records_it_failed()
     {
-        string child = Path.Combine(
-            Path.GetDirectoryName(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar))!.Replace("Cronwatch.Tests", "ProcessExitChild", StringComparison.Ordinal),
-            Path.GetFileName(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)),
-            "ProcessExitChild.dll");
-        Assert.True(File.Exists(child), "the child is built beside the tests: " + child);
         using var dir = new TempDir();
         string file = dir.File("cw.db");
-        var start = new ProcessStartInfo(DotnetHost(), [child, file])
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        using (var process = Process.Start(start)!)
-        {
-            var stdout = process.StandardOutput.ReadToEndAsync();
-            var stderr = process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
-            string output = (await stdout).Replace("\r\n", "\n", StringComparison.Ordinal);
-            Assert.True(process.ExitCode == 3, "exit " + process.ExitCode + ": " + output + await stderr);
-            Assert.Equal("started\n", output);
-        }
+        await RunProcessExitChild(file, "open");
         var store = SqlStore.Sqlite(StoreTests.Sqlite(file));
         await using (store)
         {
@@ -370,6 +351,49 @@ public class ThreadsTests
             Assert.Equal("working", run.Output);
             Assert.NotNull(run.FinishedAt);
         }
+    }
+
+    /// <summary>
+    /// The process begins to stop the moment the run's row is written, before the client has gone
+    /// on to the function: the hook already knows of the run, waits for its row, and records it
+    /// failed (the Java port's gap, closed in both).
+    /// </summary>
+    [Fact]
+    public async Task A_process_that_exits_as_the_run_row_is_written_records_it_failed()
+    {
+        using var dir = new TempDir();
+        string file = dir.File("cw.db");
+        await RunProcessExitChild(file, "atstart");
+        var store = SqlStore.Sqlite(StoreTests.Sqlite(file));
+        await using (store)
+        {
+            var run = Assert.Single(await store.ListRunsAsync("long", 10));
+            Assert.Equal(RunStatus.Failed, run.Status);
+            Assert.Equal("Shutdown: the process stopped while the run was in progress", run.Error);
+            Assert.NotNull(run.FinishedAt);
+        }
+    }
+
+    private static async Task RunProcessExitChild(string file, string mode)
+    {
+        string child = Path.Combine(
+            Path.GetDirectoryName(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar))!.Replace("Cronwatch.Tests", "ProcessExitChild", StringComparison.Ordinal),
+            Path.GetFileName(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar)),
+            "ProcessExitChild.dll");
+        Assert.True(File.Exists(child), "the child is built beside the tests: " + child);
+        var start = new ProcessStartInfo(DotnetHost(), [child, file, mode])
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        using var process = Process.Start(start)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+        string output = (await stdout).Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.True(process.ExitCode == 3, "exit " + process.ExitCode + ": " + output + await stderr);
+        Assert.Equal("started\n", output);
     }
 
     /// <summary>The <c>dotnet</c> host of the runtime running the tests.</summary>

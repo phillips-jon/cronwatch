@@ -21,7 +21,7 @@ public sealed partial class CronwatchClient
     /// <summary>Runs open in this process, for the process-exit hook.</summary>
     private readonly ConcurrentDictionary<string, OpenRun> _open = new(StringComparer.Ordinal);
 
-    internal sealed class OpenRun(JobDef def, Run run, Recorder recorder, bool recorded)
+    internal sealed class OpenRun(JobDef def, Run run, Recorder recorder, Task<bool> begun)
     {
         public JobDef Def { get; } = def;
 
@@ -29,7 +29,8 @@ public sealed partial class CronwatchClient
 
         public Recorder Recorder { get; } = recorder;
 
-        public bool Recorded { get; } = recorded;
+        /// <summary>The write of the run's row, true once it is there; the hook waits for it.</summary>
+        public Task<bool> Begun { get; } = begun;
 
         public Task<Run>? Recording { get; set; }
     }
@@ -219,12 +220,23 @@ public sealed partial class CronwatchClient
         long startedAt = Now();
         Run run = Run.Running(options.Id ?? Guid.NewGuid().ToString(), def.Name, startedAt, options.Trigger ?? "run");
         // The start is written by the client's own task: a caller that stops waiting cannot cut it.
-        bool recorded = await Spawn(() => BeginRunAsync(def, run)).ConfigureAwait(false);
+        // The process-exit hook is told of the run before its row is written, so a process that
+        // stops once the row is there always finds it: the hook waits for the write and records
+        // the run failed.
+        var recorder = new Recorder();
+        Task<bool> begun = Spawn(() => BeginRunAsync(def, run));
+        var open = new OpenRun(def, run, recorder, begun);
+        _open[run.Id] = open;
+        bool recorded = await begun.ConfigureAwait(false);
+        if (!recorded)
+        {
+            // Nothing was written, so the hook has nothing to record.
+            _open.TryRemove(new KeyValuePair<string, OpenRun>(run.Id, open));
+        }
         // Closing missed and stuck happens beside the job, which never waits on it. A run that may
         // be given back closes them only once it is known not to be.
         Task? closing = recorded && !options.TakesBack ? Spawn(() => CloseOnStartAsync(def.Name)) : null;
 
-        var recorder = new Recorder();
         double timeout = TimeoutOrDefault(def.Stored);
         double delay = Math.Min(Math.Max(0, timeout), Evaluate.MaxDurationMs);
         // A timer holds at most 2^32 - 2 ms (some 49 days); a longer timeout never fires in a
@@ -234,8 +246,6 @@ public sealed partial class CronwatchClient
             : new CancellationTokenSource();
         var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
         var context = new JobContext(def.Name, run.Id, startedAt, recorder, linked.Token);
-        var open = new OpenRun(def, run, recorder, recorded);
-        _open[run.Id] = open;
         return new Opened
         {
             Def = def,
@@ -737,10 +747,6 @@ public sealed partial class CronwatchClient
                 work.Add(recording);
                 continue;
             }
-            if (!o.Recorded)
-            {
-                continue;
-            }
             work.Add(Spawn(() => FailOpenAsync(o)));
         }
         try
@@ -759,6 +765,12 @@ public sealed partial class CronwatchClient
 
     private async Task FailOpenAsync(OpenRun o)
     {
+        // A run opening as the process stops: its row is waited for, and one never written is
+        // left alone.
+        if (!await o.Begun.ConfigureAwait(false))
+        {
+            return;
+        }
         // The hook and a disposal during the shutdown may both get here: one records the run.
         if (!_open.TryRemove(new KeyValuePair<string, OpenRun>(o.Run.Id, o)))
         {
