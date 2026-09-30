@@ -227,6 +227,50 @@ def test_caught_up_runs_misses_and_errors() -> None:
         watched.close()
 
 
+def test_a_miss_heard_before_its_submission_fails_the_run_and_the_submission_starts_nothing() -> None:
+    """APScheduler 3 can dispatch the miss from its executor before the
+    scheduler thread dispatches the submission. The run must not be left
+    running, to be called stuck an hour later for a job that never ran."""
+    cw, c, alerts = make()
+    scheduler, watched = fixed_scheduler(cw)
+    due = datetime(2026, 1, 6, 2, tzinfo=timezone.utc)
+    try:
+        scheduler._dispatch_event(JobExecutionEvent(EVENT_JOB_MISSED, "nightly-report", "default", due))
+        scheduler._dispatch_event(JobSubmissionEvent(EVENT_JOB_SUBMITTED, "nightly-report", "default", [due]))
+        watched.flush()
+        assert cw.store.running_runs() == []
+        [skipped] = cw.runs("nightly-report")
+        assert skipped.status == "failed"
+        assert skipped.error.startswith("APScheduler skipped the run: it could not start within misfire_grace_time of 2026-01-06T02:00:00+00:00")
+        c.advance(2 * 3_600_000)
+        cw.check()
+        assert alerts.types() == ["failed"], "no stuck alert for a run that never started"
+    finally:
+        watched.close()
+
+
+def test_watching_again_finishes_the_runs_the_earlier_watch_has_under_way() -> None:
+    cw, _, _ = make()
+    scheduler, first_watch = fixed_scheduler(cw)
+    due = datetime(2026, 1, 6, 2, tzinfo=timezone.utc)
+    caught_up = due + timedelta(days=1)
+    try:
+        scheduler._dispatch_event(JobSubmissionEvent(EVENT_JOB_SUBMITTED, "nightly-report", "default", [due, caught_up]))
+        first_watch.flush()
+        assert len(cw.store.running_runs()) == 1
+        second_watch = watch(scheduler, client=cw)
+        assert [cb for cb, _ in scheduler._listeners] == [second_watch._listen], "one listener: every event is heard once"
+        scheduler._dispatch_event(JobExecutionEvent(EVENT_JOB_EXECUTED, "nightly-report", "default", due, retval="done"))
+        scheduler._dispatch_event(JobExecutionEvent(EVENT_JOB_EXECUTED, "nightly-report", "default", caught_up, retval="again"))
+        second_watch.flush()
+        assert cw.store.running_runs() == []
+        runs = cw.runs("nightly-report")
+        assert sorted((r.status, r.output) for r in runs) == [("ok", "again"), ("ok", "done")]
+        assert [r for r in runs if r.output == "done"][0].trigger == "apscheduler"
+    finally:
+        watch(scheduler, client=cw).close()
+
+
 def test_a_job_without_a_usable_name_is_reported_and_left_alone() -> None:
     errors = Errors()
     cw, _, _ = make(on_error=errors)
