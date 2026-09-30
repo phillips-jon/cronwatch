@@ -286,7 +286,8 @@
           <environmentVariables>
             <TZ>UTC</TZ>
           </environmentVariables>
-          <argLine>-Duser.timezone=UTC -Xss4m</argLine>
+          <!-- sqlite-jdbc loads its native library; JDK 24 and newer warn unless native access is on. -->
+          <argLine>-Duser.timezone=UTC --enable-native-access=ALL-UNNAMED</argLine>
           <systemPropertyVariables>
             <cronwatch.repo>${cronwatch.repo}</cronwatch.repo>
           </systemPropertyVariables>
