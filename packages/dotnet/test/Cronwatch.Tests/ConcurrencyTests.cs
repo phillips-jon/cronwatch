@@ -98,12 +98,12 @@ public class ConcurrencyTests
         using var dir = new TempDir();
         string file = dir.File("cw.db");
         var reader = SqlStore.Sqlite(StoreTests.Sqlite(file));
+        // The wrappers are not disposable, so the clients cannot close the stores inside them.
+        await using var a = SqlStore.Sqlite(StoreTests.Sqlite(file));
+        await using var b = SqlStore.Sqlite(StoreTests.Sqlite(file));
         await using (reader)
         {
-            var (state, types) = await Race(
-                new SlowReadsCas(SqlStore.Sqlite(StoreTests.Sqlite(file))),
-                new SlowReadsCas(SqlStore.Sqlite(StoreTests.Sqlite(file))),
-                reader);
+            var (state, types) = await Race(new SlowReadsCas(a), new SlowReadsCas(b), reader);
             Assert.Equal(2, state.ConsecutiveFailures);
             Assert.Equal(["failed"], types);
         }

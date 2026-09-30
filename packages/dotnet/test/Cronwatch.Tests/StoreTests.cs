@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Data.Common;
 using System.IO;
 using System.Linq;
@@ -32,7 +33,8 @@ public class StoreTests
     public async Task Sqlite_store_passes_the_contract()
     {
         using var dir = new TempDir();
-        await StoreContract.RunAsync(SqlStore.Sqlite(Sqlite(dir.File("cw.db"))));
+        await using var store = SqlStore.Sqlite(Sqlite(dir.File("cw.db")));
+        await StoreContract.RunAsync(store);
     }
 
     [Fact]
@@ -40,7 +42,25 @@ public class StoreTests
     {
         using var dir = new TempDir();
         int n = 0;
-        int cases = await StoreReplay.RunAsync(StoreFixture, () => SqlStore.Sqlite(Sqlite(dir.File("r" + ++n + ".db"))));
+        var opened = new List<SqlStore>();
+        int cases;
+        try
+        {
+            cases = await StoreReplay.RunAsync(StoreFixture, () =>
+            {
+                var fresh = SqlStore.Sqlite(Sqlite(dir.File("r" + ++n + ".db")));
+                opened.Add(fresh);
+                return fresh;
+            });
+        }
+        finally
+        {
+            // The replay disposes each store when its cases pass; one it stopped at is closed here.
+            foreach (var fresh in opened)
+            {
+                await fresh.DisposeAsync();
+            }
+        }
         Assert.True(cases >= 28);
         var source = Sqlite(dir.File("foreign.db"));
         var store = SqlStore.Sqlite(source);

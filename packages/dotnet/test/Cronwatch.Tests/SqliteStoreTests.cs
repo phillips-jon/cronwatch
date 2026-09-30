@@ -51,7 +51,8 @@ public class SqliteStoreTests
     {
         await StoreContract.RunAsync(SqlStore.Sqlite(SqliteFactory.Instance.CreateDataSource("Data Source=:memory:")));
         using var dir = new TempDir();
-        await StoreContract.RunAsync(SqlStore.Sqlite(Source(dir.File("contract.db"))).WithPrefix("cw_"));
+        await using var store = SqlStore.Sqlite(Source(dir.File("contract.db"))).WithPrefix("cw_");
+        await StoreContract.RunAsync(store);
     }
 
     [Fact]
@@ -263,11 +264,13 @@ public class SqliteStoreTests
     {
         using var dir = new TempDir();
         var store = SqlStore.Sqlite(Source(dir.File("reopen.db")));
-        await store.InitAsync();
-        await store.UpsertJobAsync(Definition.FromJson("{\"name\":\"a\"}"), 1);
-        await store.DisposeAsync();
-        Assert.Equal("a", (await store.ListJobsAsync())[0].Name);
-        await store.DisposeAsync();
+        await using (store)
+        {
+            await store.InitAsync();
+            await store.UpsertJobAsync(Definition.FromJson("{\"name\":\"a\"}"), 1);
+            await store.DisposeAsync();
+            Assert.Equal("a", (await store.ListJobsAsync())[0].Name);
+        }
     }
 
     [Fact]
@@ -275,12 +278,20 @@ public class SqliteStoreTests
     {
         using var dir = new TempDir();
         string file = dir.File("far.db");
-        await ForeignRows.CheckOverForeignRowsAsync(SqlStore.Sqlite(Source(file)), "cronwatch_", sql => Exec(file, sql));
+        var store = SqlStore.Sqlite(Source(file));
+        await using (store)
+        {
+            await ForeignRows.CheckOverForeignRowsAsync(store, "cronwatch_", sql => Exec(file, sql));
+        }
         int n = 0;
         foreach (string start in ForeignRows.FarStarts)
         {
             string each = dir.File("cron" + n++ + ".db");
-            await ForeignRows.CronOverForeignRowAsync(SqlStore.Sqlite(Source(each)), "cronwatch_", start, sql => Exec(each, sql));
+            var cron = SqlStore.Sqlite(Source(each));
+            await using (cron)
+            {
+                await ForeignRows.CronOverForeignRowAsync(cron, "cronwatch_", start, sql => Exec(each, sql));
+            }
         }
     }
 
