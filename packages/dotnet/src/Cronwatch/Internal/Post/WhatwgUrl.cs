@@ -659,7 +659,7 @@ internal sealed class WhatwgUrl
 
     private static bool C0OrHigh(int c) => c < 0x20 || c > 0x7e;
 
-    private static bool PathChar(int c) => !(C0OrHigh(c) || " \"#<>?`{}".Contains((char)c, StringComparison.Ordinal));
+    private static bool PathChar(int c) => !(C0OrHigh(c) || " \"#<>?^`{}".Contains((char)c, StringComparison.Ordinal));
 
     private static bool QueryChar(int c) => !(C0OrHigh(c) || " \"#<>'".Contains((char)c, StringComparison.Ordinal));
 
