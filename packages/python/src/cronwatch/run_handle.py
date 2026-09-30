@@ -73,6 +73,8 @@ class RunHandle:
         self._base = base
         self._recorded = recorded
         self._inactive = inactive
+        # True for a run this handle's start opened, not one it found by its id.
+        self._opened = False
         #: The run's id.
         self.id = run_id
         #: The job's name.

@@ -244,3 +244,68 @@ def test_cancelling_an_async_run_while_its_start_is_recorded_leaves_no_run_open(
     assert recorded.status == "failed"
     assert recorded.error.startswith("Interrupted: CancelledError")
     assert alerts.types() == ["failed"]
+
+
+def test_cancelling_an_async_start_while_it_is_recorded_leaves_no_run_open() -> None:
+    """AsyncJobHandle.start() the same way: the run its insert opened is
+    finished as interrupted before the cancellation goes on."""
+    store = HeldInsert()
+    cw, _, alerts = make(store=store)
+    job = AsyncCronwatch(cw).job("cancelled-start", timeout="5m")
+
+    async def main() -> None:
+        task = asyncio.ensure_future(job.start())
+        assert await asyncio.to_thread(store.entered.wait, 5)
+        task.cancel()
+        await asyncio.sleep(0)
+        store.gate.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert await asyncio.to_thread(store.inserted.wait, 5)
+
+    run(main())
+    assert store.running_runs() == []
+    [recorded] = cw.runs("cancelled-start")
+    assert recorded.status == "failed"
+    assert recorded.error.startswith("Interrupted: CancelledError")
+    assert alerts.types() == ["failed"]
+
+
+class HeldRead(MemoryStore):
+    """A memory store whose get_run waits for `gate` once `hold` is set."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.hold = False
+        self.entered = threading.Event()
+        self.gate = threading.Event()
+
+    def get_run(self, run_id: str) -> Any:
+        if self.hold:
+            self.entered.set()
+            assert self.gate.wait(10)
+        return super().get_run(run_id)
+
+
+def test_cancelling_an_async_start_that_found_its_id_leaves_that_run_open() -> None:
+    """A start whose id is already recorded opens nothing: it is handed the
+    run begun elsewhere, which its cancellation leaves for its owner."""
+    store = HeldRead()
+    cw, _, _ = make(store=store)
+    first = cw.job("shared", timeout="5m").start(id="one")
+    store.hold = True
+    job = AsyncCronwatch(cw).job("shared", timeout="5m")
+
+    async def main() -> None:
+        task = asyncio.ensure_future(job.start(id="one"))
+        assert await asyncio.to_thread(store.entered.wait, 5)
+        task.cancel()
+        await asyncio.sleep(0)
+        store.gate.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    run(main())
+    store.hold = False
+    assert [r.id for r in store.running_runs()] == ["one"]
+    assert first.finish() is not None

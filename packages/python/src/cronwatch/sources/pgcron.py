@@ -395,6 +395,10 @@ class PgCron:
         """Declares each job `jobs` picks. A paused one (active = false) keeps
         its failures but loses its schedule, so it is not missed. Returns each
         jobid's name and definition as declared."""
+        # One forgotten since it was declared (the dashboard's forget) is declared
+        # again, though unchanged: record_run takes runs only of a declared job.
+        defined = getattr(host, "defined_jobs", None)
+        live = {d.name for d in defined()} if callable(defined) else None
         names: dict[int, str] = {}
         definitions: dict[int, dict[str, Any]] = {}
         used: set[str] = set()
@@ -449,7 +453,7 @@ class PgCron:
                 definition.update(schedule=cadence, timezone=timezone)
             try:
                 key = _key(definition)
-                if self._declared.get(name) != key:
+                if self._declared.get(name) != key or (live is not None and name not in live):
                     try:
                         host.job(name, **definition)
                     except Exception as error:

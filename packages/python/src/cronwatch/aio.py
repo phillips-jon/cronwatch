@@ -38,7 +38,7 @@ import asyncio
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from .client import Cronwatch, JobHandle, is_async_callable
+from .client import Cronwatch, JobHandle, _settle, is_async_callable
 from .duration import Duration
 from .job import JobContext
 from .run_handle import UNSET, RunHandle
@@ -128,8 +128,24 @@ class AsyncJobHandle:
         return self.sync.handler(fn, secret=secret)
 
     async def start(self, *, trigger: str | None = None, id: str | None = None) -> AsyncRunHandle:  # noqa: A002
-        """job.start(), awaited: records a running run to finish later."""
-        return AsyncRunHandle(await asyncio.to_thread(lambda: self.sync.start(trigger=trigger, id=id)))
+        """job.start(), awaited: records a running run to finish later. A
+        cancellation while the start is under way cannot stop the worker
+        thread, whose insert still lands, so the run is not left running (to
+        be called stuck later): the start is waited for, the run it opened
+        recorded as interrupted by the cancellation, and then the cancellation
+        goes on."""
+        started = asyncio.ensure_future(asyncio.to_thread(lambda: self.sync.start(trigger=trigger, id=id)))
+        try:
+            return AsyncRunHandle(await asyncio.shield(started))
+        except asyncio.CancelledError as cancelled:
+
+            async def interrupted() -> None:
+                handle = await started
+                if handle._opened:
+                    await asyncio.to_thread(handle.fail, cancelled)
+
+            await _settle(interrupted())
+            raise
 
     async def resume(self, run_id: str) -> AsyncRunHandle:
         return AsyncRunHandle(await asyncio.to_thread(self.sync.resume, run_id))
