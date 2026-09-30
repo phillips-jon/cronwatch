@@ -126,6 +126,7 @@ class ClientTest {
     assertEquals(List.of(), m.cw().check().alerts());
     m.clock().set(T0 + 70 * MIN + 1);
     CheckResult r = m.cw().check();
+    assertEquals(T0 + 70 * MIN + 1, r.checkedAt(), "a check of its own, not the last one's answer");
     assertEquals(List.of(AlertType.MISSED), r.alerts().stream().map(Alert::type).toList());
     assertEquals(JobHealth.LATE, r.jobs().get(0).health());
     assertEquals(List.of(), m.cw().check().alerts(), "no repeat");
