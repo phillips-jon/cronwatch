@@ -22,7 +22,7 @@ import { composeAlert } from "./format.js";
 import { constantTimeEqual, json } from "./http.js";
 import { createRecorder } from "./job.js";
 import type { JobContext } from "./job.js";
-import { capOutput, errorMessage, OUTPUT_CAP, redactSecrets, stripNul } from "./output.js";
+import { capOutput, describeError, OUTPUT_CAP, redactAndCap, redactSecrets } from "./output.js";
 import { parseSchedule } from "./schedule.js";
 import { checkExpectation, toStored } from "./serialize.js";
 import { createRoutes } from "./routes/index.js";
@@ -592,7 +592,7 @@ export class CronWatch {
     run.finishedAt = finishedAt;
     run.durationMs = runDuration(startedAt, finishedAt);
     run.metrics = recorder.metrics();
-    run.output = recorder.output() ?? (typeof result === "string" ? capOutput(result) : null);
+    run.output = recorder.output() ?? (typeof result === "string" ? result : null);
     this.conclude(definition, run, result, error, threw, recorder.expectText() ?? (typeof result === "string" ? result : null));
 
     await started;
@@ -607,12 +607,13 @@ export class CronWatch {
 
   /**
    * Sets a finished run's status and error from how it ended, then redacts
-   * its output and error. Shared by execute() and RunHandle.finish().
+   * its output and error and caps them, in that order. Shared by execute()
+   * and RunHandle.finish().
    */
   private conclude(definition: JobDefinition, run: Run, result: unknown, error: unknown, threw: boolean, expectText: string | null): void {
     if (threw) {
       run.status = "failed";
-      run.error = errorMessage(error);
+      run.error = describeError(error);
     } else if (result instanceof Response && result.status >= 400) {
       run.status = "failed";
       run.error = `HTTP ${result.status}${result.statusText ? ` ${result.statusText}` : ""}`;
@@ -626,9 +627,10 @@ export class CronWatch {
       }
     }
     // Redacted after the expect check, so a rule can still match what was
-    // logged. NULs go last, so not even a custom redact can store one.
-    if (run.output !== null) run.output = stripNul(this.redact(run.output));
-    if (run.error !== null) run.error = stripNul(this.redact(run.error));
+    // logged, and before the cap, so the cut cannot keep half a secret. NULs
+    // go last, so not even a custom redact can store one.
+    if (run.output !== null) run.output = redactAndCap(run.output, this.redact);
+    if (run.error !== null) run.error = redactAndCap(run.error, this.redact);
   }
 
   /**
@@ -843,14 +845,15 @@ export class CronWatch {
         const result = typeof outcome === "string" ? outcome : failed ? undefined : outcome?.result;
         const error = failed ? (outcome as { error: unknown }).error : undefined;
         const finishedAt = self.now();
-        const added = recorder.output() ?? (typeof result === "string" ? capOutput(result) : null);
+        const added = recorder.output() ?? (typeof result === "string" ? result : null);
         const run: Run = {
           ...from,
           status: "running",
           finishedAt,
           durationMs: runDuration(from.startedAt, finishedAt),
           error: null,
-          output: joinOutput(from.output, added),
+          // Capped by conclude(), after it is redacted.
+          output: joinLines(from.output, added),
           metrics: { ...from.metrics, ...recorder.metrics() },
         };
         const expectText = joinLines(head, joinLines(from.output, recorder.expectText() ?? (typeof result === "string" ? result : null)));
@@ -902,7 +905,7 @@ export class CronWatch {
             self.report(new Error(`run ${id} of ${name} belongs to job "${stored.job}"; ignored`), `flushing ${name}`);
             return;
           }
-          const output = lines === null ? stored.output : joinOutput(stored.output, stripNul(self.redact(lines)));
+          const output = lines === null ? stored.output : joinOutput(stored.output, redactAndCap(lines, self.redact));
           // Only over a row still running, so a flush never undoes a finish written meanwhile.
           if (!(await self.writeRunIf({ ...stored, output, metrics: { ...stored.metrics, ...metrics } }, ["running"]))) return putBack();
           const text = taken.expectText();
@@ -945,8 +948,8 @@ export class CronWatch {
         run.error = unmet;
       }
     }
-    if (run.output !== null) run.output = stripNul(this.redact(capOutput(run.output)));
-    if (run.error !== null) run.error = stripNul(this.redact(capOutput(run.error)));
+    if (run.output !== null) run.output = redactAndCap(run.output, this.redact);
+    if (run.error !== null) run.error = redactAndCap(run.error, this.redact);
     const evaluate = options.evaluate !== false;
     const definition = toStored(declared);
 

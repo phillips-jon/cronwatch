@@ -2,6 +2,7 @@
   "generatedBy": "scripts/conformance.mjs",
   "sdkVersion": "0.9.0",
   "outputCap": 16384,
+  "redactEdge": 52224,
   "redact": [
     {
       "input": "DB_PASSWORD=hunter2 tokens: 1200",
@@ -1481,6 +1482,313 @@
       }
     }
   ],
+  "redactAndCap": [
+    {
+      "input": "password=x",
+      "result": {
+        "text": "password=[redacted]"
+      }
+    },
+    {
+      "input": "a\u0000b token=abc",
+      "result": {
+        "text": "ab token=[redacted]"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "x",
+            16384
+          ],
+          [
+            "\n-----BEGIN PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "QUJDQUJD\n",
+            200
+          ],
+          [
+            "-----END PRIVATE KEY-----\ndone",
+            1
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "9d011f12cec32b41b2bf708dcdb0177b6e1d326a727619a7d3d4d1edf7f6ab54"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "Authorization: Bearer opaqueTOKENvalue1234567890\n",
+            1
+          ],
+          [
+            "y",
+            16354
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "44a0a408991d000095db2f2b907519146c93d87752200e7b8dc0a436b3d46388"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "e",
+            16384
+          ],
+          [
+            " password=hunter2 ",
+            1
+          ],
+          [
+            "z",
+            16372
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "6ef0d26b321869dc5286aa255a673a81efa544d6898e8a5480477c274cf05ceb"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "a",
+            16384
+          ]
+        ]
+      },
+      "result": {
+        "length": 16384,
+        "sha256": "f3336bea752b5a28743033dd2c844a4a63fba08871aaee2586a2bf2d69be83a2"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "a",
+            16385
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "8b63db158db8cc8b0c0da739599f2c779b1eb146180e637aa85113b6e959316a"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "a",
+            68608
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "8b63db158db8cc8b0c0da739599f2c779b1eb146180e637aa85113b6e959316a"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "a",
+            68609
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "8b63db158db8cc8b0c0da739599f2c779b1eb146180e637aa85113b6e959316a"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "b",
+            7
+          ],
+          [
+            "a",
+            68608
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "8b63db158db8cc8b0c0da739599f2c779b1eb146180e637aa85113b6e959316a"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "-----BEGIN PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "QUJD",
+            4000
+          ],
+          [
+            "\n",
+            1
+          ],
+          [
+            "k",
+            60608
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "eb8c545a36df6be377918d2bc197ea4d7baf7cda5594fb2aa91fe7cb526a3c78"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "-----BEGIN PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "QUJDQUJD\n",
+            1800
+          ],
+          [
+            "-----END PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "-----BEGIN PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "QUJDQUJD\n",
+            1800
+          ],
+          [
+            "-----END PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "-----BEGIN PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "QUJDQUJD\n",
+            1800
+          ],
+          [
+            "-----END PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "-----BEGIN PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "QUJDQUJD\n",
+            1800
+          ],
+          [
+            "-----END PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "-----BEGIN PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "QUJDQUJD\n",
+            1800
+          ],
+          [
+            "-----END PRIVATE KEY-----\n",
+            1
+          ],
+          [
+            "tail",
+            1
+          ]
+        ]
+      },
+      "result": {
+        "text": "[earlier output trimmed]\n"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "password=",
+            1
+          ],
+          [
+            "p",
+            5000
+          ],
+          [
+            "\n",
+            1
+          ],
+          [
+            "q",
+            65608
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "fdfefc4f711cc67aad37345c91367962f9968b1f67feeba8ad321f7f95aeccec"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "😀",
+            68608
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "34ec952d4eebd2cacdfb3ab6e59e531b371705e962028c1de13cdd71bb436b01"
+      }
+    },
+    {
+      "input": {
+        "parts": [
+          [
+            "pwd=a ",
+            20000
+          ]
+        ]
+      },
+      "result": {
+        "length": 16409,
+        "sha256": "c670e80070d5e86ece7313104435dfd11cf9e6ffe54c95fba18bcf97acad2e23"
+      }
+    }
+  ],
   "errorMessage": [
     {
       "name": "StandardError",
@@ -1773,8 +2081,8 @@
         "sha256": "4a53e342128ce41facbdf6ea5efac7d8da2af591fe30f2801016be99145d6aa5"
       },
       "output": {
-        "length": 16409,
-        "sha256": "75d67347a78890161ae36a23878a2ef331cd3d266897f83a543de6fca448926c"
+        "length": 32767,
+        "sha256": "4a53e342128ce41facbdf6ea5efac7d8da2af591fe30f2801016be99145d6aa5"
       },
       "checks": [
         {
@@ -1837,8 +2145,8 @@
         "sha256": "a87db006de3baab52d821d97989ed757f7d93ba0990dca749bf21fce09b6001c"
       },
       "output": {
-        "length": 16409,
-        "sha256": "3cbf266182eabc061fbe63206d1d7b78ac8e086c80f1aadd735d38511d396bbf"
+        "length": 32768,
+        "sha256": "a87db006de3baab52d821d97989ed757f7d93ba0990dca749bf21fce09b6001c"
       },
       "checks": [
         {
@@ -1894,8 +2202,8 @@
         "sha256": "6b7f654b59c7ad1c8d8dbc4e2f63251df53562072e72856330ae837ad6081a0f"
       },
       "output": {
-        "length": 16409,
-        "sha256": "9e4eb02842fbc2c0c03003cc5002b020b203bb0d6d72f9009f27493fb8979286"
+        "length": 65517,
+        "sha256": "9c42f98ae8e4d77d73fc7387f6f09379bdb0915844b65a9351f0527897df4c39"
       },
       "checks": [
         {
@@ -1953,8 +2261,8 @@
         "sha256": "0a0920158398dbbbbc069e2899c3fef66c987a8ac47e569204f347ea65696ab4"
       },
       "output": {
-        "length": 16409,
-        "sha256": "6385c7239b5655f02156dcb5f118aa54c59a1d9e17bf78c2eb15d283a938363d"
+        "length": 100000,
+        "sha256": "67a90226cf4a7a1c068d5acd4b95db706e4988eb94a0539365a50ab895102fc3"
       },
       "checks": [
         {
@@ -2082,8 +2390,8 @@
         "sha256": "87cde9ed81087ab2320257431a08ccbb97b045b46c19b3b6b27ac88cf34a7c11"
       },
       "output": {
-        "length": 16409,
-        "sha256": "221c09210397518a7f354fc5cabd7be7f4fcb0a435b9f935a81824956b13ef26"
+        "length": 58035,
+        "sha256": "8836d2fb7e314f94aba58c1c464ed0d0faa53a2e6e9fff8397e2f43334674a4a"
       },
       "checks": [
         {
@@ -2139,8 +2447,8 @@
         "sha256": "f271d91f4261cf3d6013c1463cd1bc4a51f0dca1e2f17c4b437a23753dd63ca3"
       },
       "output": {
-        "length": 16409,
-        "sha256": "061ff1c753a56928040a7941e5e0441e70090eee4182b9c75fc48740a13b2010"
+        "length": 40203,
+        "sha256": "97beb7bf7346c821ab0994eddc40dad95477aa4b25aecbea824fb0e3c60b2be4"
       },
       "checks": [
         {
@@ -2195,8 +2503,8 @@
         "sha256": "eca1ee70594a305908e7208be01d023ad6919bd5cca01db1f393739102ad0c23"
       },
       "output": {
-        "length": 16409,
-        "sha256": "0283a9171b11512989d4cac0d6e03a7c5567d1ab367028e03905523004e568b6"
+        "length": 65519,
+        "sha256": "55da4bc5a18b26fdff815e725e808cf4b6e0829c878c8dc06356929047727ce4"
       },
       "checks": [
         {
@@ -2251,8 +2559,8 @@
         "sha256": "f890f5a2f573240e79b8423c00b8558082f8786255fdd10061ed5822ab660525"
       },
       "output": {
-        "length": 16409,
-        "sha256": "db6f3ecfe1c70d19e55d192740da6f344f730c68068e015ba868efd0c125d42c"
+        "length": 64541,
+        "sha256": "305e39699ed7fb2007a7d126e50f3f0b1582175b2b3d8b0fc843f61caa02bdc0"
       },
       "checks": [
         {

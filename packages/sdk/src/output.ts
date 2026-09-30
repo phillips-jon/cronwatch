@@ -9,7 +9,33 @@ export const OUTPUT_CAP = 16 * 1024;
 export function capOutput(text: string): string {
   const clean = stripNul(text);
   if (clean.length <= OUTPUT_CAP) return clean;
-  return "[earlier output trimmed]\n" + clean.slice(clean.length - OUTPUT_CAP);
+  return TRIMMED + clean.slice(clean.length - OUTPUT_CAP);
+}
+
+const TRIMMED = "[earlier output trimmed]\n";
+
+/**
+ * How much text before the kept tail redaction reads, and never keeps: three
+ * times the longest secret a default pattern can match (a PEM key's 16 KB body
+ * with its header and footer, under OUTPUT_CAP + 1024), since a replacement
+ * grows what it replaces at most threefold.
+ */
+export const REDACT_EDGE = 3 * (OUTPUT_CAP + 1024);
+
+/**
+ * Output or an error as it is stored: redacted, then capped like capOutput,
+ * so the cut cannot fall inside a secret and keep what follows its label.
+ * Text of at most OUTPUT_CAP + REDACT_EDGE is redacted whole. Longer text is
+ * cut to that many units from its end first, and after redacting, the first
+ * REDACT_EDGE units are never kept: a secret whose label fell before that cut
+ * is left out with them. NULs go before and after `redact`.
+ */
+export function redactAndCap(text: string, redact: (text: string) => string): string {
+  const clean = stripNul(text);
+  const from = clean.length - (OUTPUT_CAP + REDACT_EDGE);
+  if (from <= 0) return capOutput(redact(clean));
+  const redacted = stripNul(redact(clean.slice(from)));
+  return TRIMMED + redacted.slice(Math.max(redacted.length - OUTPUT_CAP, REDACT_EDGE));
 }
 
 /** Removes every U+0000. */
@@ -32,7 +58,8 @@ export function errorMessage(error: unknown): string {
   return capOutput(describeError(error));
 }
 
-function describeError(error: unknown): string {
+/** "Name: message" and the first five stack frames, not capped: see redactAndCap. */
+export function describeError(error: unknown): string {
   if (error instanceof Error) {
     // The stack repeats the header (over several lines when the message has
     // newlines), so take only its frames.

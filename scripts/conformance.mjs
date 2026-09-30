@@ -44,7 +44,7 @@ import {
   unevaluableSummary,
 } from "../packages/sdk/src/evaluate.ts";
 import { median, percentile } from "../packages/sdk/src/stats.ts";
-import { capOutput, errorMessage, OUTPUT_CAP, redactSecrets } from "../packages/sdk/src/output.ts";
+import { capOutput, errorMessage, OUTPUT_CAP, REDACT_EDGE, redactAndCap, redactSecrets } from "../packages/sdk/src/output.ts";
 import { embedDescription } from "../packages/sdk/src/alerts/discord.ts";
 import { createRecorder } from "../packages/sdk/src/job.ts";
 import { checkExpectation, toStored } from "../packages/sdk/src/serialize.ts";
@@ -1193,9 +1193,37 @@ function outputCases() {
       checks: needles.map((needle) => ({ expect: needle, result: checkExpectation(needle, text) })),
     };
   });
+
+  // Output and errors as stored: redacted with the default patterns, then
+  // capped. Text up to outputCap + redactEdge is redacted whole; longer text
+  // is cut to that many units from its end, redacted, and its first
+  // redactEdge units are never kept.
+  const pemKey = (n) => [["-----BEGIN PRIVATE KEY-----\n", 1], ["QUJDQUJD\n", n], ["-----END PRIVATE KEY-----\n", 1]];
+  const edge = OUTPUT_CAP + REDACT_EDGE;
+  const redactAndCapInputs = [
+    "password=x",
+    "a\u0000b token=abc",
+    long(["x", OUTPUT_CAP], ["\n-----BEGIN PRIVATE KEY-----\n", 1], ["QUJDQUJD\n", 200], ["-----END PRIVATE KEY-----\ndone", 1]),
+    long(["Authorization: Bearer opaqueTOKENvalue1234567890\n", 1], ["y", OUTPUT_CAP - 30]),
+    long(["e", OUTPUT_CAP], [" password=hunter2 ", 1], ["z", OUTPUT_CAP - 12]),
+    long(["a", OUTPUT_CAP]),
+    long(["a", OUTPUT_CAP + 1]),
+    long(["a", edge]),
+    long(["a", edge + 1]),
+    long(["b", 7], ["a", edge]),
+    long(["-----BEGIN PRIVATE KEY-----\n", 1], ["QUJD", 4000], ["\n", 1], ["k", edge - 8000]),
+    long(...pemKey(1800), ...pemKey(1800), ...pemKey(1800), ...pemKey(1800), ...pemKey(1800), ["tail", 1]),
+    long(["password=", 1], ["p", 5000], ["\n", 1], ["q", edge - 3000]),
+    long(["\u{1F600}", edge]),
+    long(["pwd=a ", 20_000]),
+  ];
+  const redactAndCapCases = redactAndCapInputs.map((input) => ({ input, result: digest(redactAndCap(expand(input), redactSecrets)) }));
+
   return {
     outputCap: OUTPUT_CAP,
+    redactEdge: REDACT_EDGE,
     redact: redact.map((input) => ({ input, result: digest(redactSecrets(expand(input))) })),
+    redactAndCap: redactAndCapCases,
     errorMessage: errors,
     expectText: recorder,
   };
