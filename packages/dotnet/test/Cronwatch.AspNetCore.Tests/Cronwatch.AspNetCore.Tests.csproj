@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Cronwatch.AspNetCore.Tests</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;xUnit1051;CA1707;CA2007;CA1515;CA1861;CA2000;CA1849;CA1822;CA1031;CA1062;CA2201;CA1305;CA1307;CA1309;CA1310;CA1304;CA1311;CA5394;CA1852;CA1812;CA1825;CA1859;CA1860;CA1865;CA1866;CA1867;CA2234</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.mtp-v2" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Cronwatch.AspNetCore/Cronwatch.AspNetCore.csproj" />
+    <ProjectReference Include="../Cronwatch.WebTest/Cronwatch.WebTest.csproj" />
+  </ItemGroup>
+</Project>

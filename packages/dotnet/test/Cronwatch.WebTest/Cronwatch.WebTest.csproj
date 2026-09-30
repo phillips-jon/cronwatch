@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Never packed: the dashboard's golden replay, the seed and a raw HTTP/1.1
+       client, shared by the adapters' tests. -->
+  <PropertyGroup>
+    <RootNamespace>Cronwatch.WebTest</RootNamespace>
+    <AssemblyName>Cronwatch.WebTest</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CA2007;CA1515;CA1031;CA1062;CA2201;CA1305;CA1307;CA1309;CA1310;CA1304;CA1311;CA5394;CA1849;CA2000</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Cronwatch/Cronwatch.csproj" />
+  </ItemGroup>
+</Project>

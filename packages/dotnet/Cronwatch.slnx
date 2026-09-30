@@ -1,9 +1,13 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Cronwatch/Cronwatch.csproj" />
+    <Project Path="src/Cronwatch.AspNetCore/Cronwatch.AspNetCore.csproj" />
+    <Project Path="src/Cronwatch.Hosting/Cronwatch.Hosting.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/Cronwatch.AspNetCore.Tests/Cronwatch.AspNetCore.Tests.csproj" />
     <Project Path="test/Cronwatch.Tests/Cronwatch.Tests.csproj" />
+    <Project Path="test/Cronwatch.WebTest/Cronwatch.WebTest.csproj" />
     <Project Path="test/ProcessExitChild/ProcessExitChild.csproj" />
   </Folder>
 </Solution>
