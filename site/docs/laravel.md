@@ -16,7 +16,7 @@ composer require cronwatch/cronwatch
 php artisan migrate
 ```
 
-Package discovery registers the service provider, so there is nothing to add to `bootstrap/providers.php`. The migration it loads makes the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go, Rust and Elixir ports.
+Package discovery registers the service provider, so there is nothing to add to `bootstrap/providers.php`. The migration it loads makes the three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) in the app's database, so another language can share them: on SQLite or Postgres any port, on MySQL or MariaDB the Go, Rust, Elixir and Java ports.
 
 Then say where alerts go, in `.env`:
 

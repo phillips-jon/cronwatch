@@ -7,7 +7,7 @@ group: Reference
 
 # MCP server
 
-`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts with its dashboard, which every port serves at the same paths, so it works the same with a TypeScript, Ruby, Python, PHP, Go, Rust or Elixir app. It needs a URL and the token, and nothing else. It runs on Node through `npx`; your app does not need Node for anything else.
+`@cronwatch/mcp` is a Model Context Protocol server over stdio. It talks to the JSON API your app mounts with its dashboard, which every port serves at the same paths, so it works the same with a TypeScript, Ruby, Python, PHP, Go, Rust, Elixir or Java app. It needs a URL and the token, and nothing else. It runs on Node through `npx`; your app does not need Node for anything else.
 
 ## Claude Code
 
@@ -44,6 +44,8 @@ Any client that launches stdio servers:
 | Rails, `mount Cronwatch::Web` | the mount point, `https://yourapp.com/cronwatch` |
 | Django, `cronwatch.django.urls` | the prefix you include it under |
 | Phoenix, `forward "/cronwatch", Cronwatch.Web` | the path you forward, `https://yourapp.com/cronwatch` |
+| Spring Boot, the starter | `cronwatch.web.path` within the app's context, `https://yourapp.com/cronwatch` by default |
+| Java, `CronwatchFilter` or `WebServer.mount` | the path you give it, `https://yourapp.com/cronwatch` by default |
 | Python, PHP, Go or Rust, the routes served by hand | the path you serve them at |
 | Laravel or Symfony | `https://yourapp.com/cronwatch` ([Laravel](/docs/laravel/), [Symfony](/docs/symfony/)) |
 | Drupal or Craft CMS | `https://yoursite.com/cronwatch`, once a token is set ([Drupal](/docs/drupal/), [Craft CMS](/docs/craft/)) |
@@ -71,7 +73,7 @@ Use an `https` URL. The server sends the token with every request, so over plain
 | `silence_job` | stop alerts for a while, for example during a fix. Takes `name` and `for`, a duration such as `"30m"`, `"2h"` or `"1d"`; one hour by default |
 | `unsilence_job` | resume them. Takes `name` |
 | `forget_job` | remove a job that no longer exists in the code, with its runs. Takes `name`. A job still declared in code comes back on its next run |
-| `get_setup_guide` | the TypeScript code to add CronWatch to a job, so the agent writes it correctly. For another language, point the agent at that language's page instead: [Rails](/docs/rails/), [Ruby](/docs/ruby/), [Django](/docs/django/), [Python](/docs/python/), [PHP](/docs/php/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Go](/docs/go/), [Rust](/docs/rust/) or [Elixir](/docs/elixir/) |
+| `get_setup_guide` | the TypeScript code to add CronWatch to a job, so the agent writes it correctly. For another language, point the agent at that language's page instead: [Rails](/docs/rails/), [Ruby](/docs/ruby/), [Django](/docs/django/), [Python](/docs/python/), [PHP](/docs/php/), [Laravel](/docs/laravel/), [Symfony](/docs/symfony/), [WordPress](/docs/wordpress/), [Go](/docs/go/), [Rust](/docs/rust/), [Elixir](/docs/elixir/) or [Java](/docs/java/) |
 
 The tools return prose an agent can act on, not raw JSON. A typical exchange: "why did invoice-run fail last night" becomes `get_job`, a read of the error and the earlier runs, and a suggested fix in your code.
 
