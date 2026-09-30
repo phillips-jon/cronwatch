@@ -377,7 +377,6 @@ public class CronwatchQuartzTests
             Assert.DoesNotContain(scheduler.ListenerManager.GetSchedulerListeners(), l => l.Name == CronwatchQuartz.ListenerName);
             Assert.False(scheduler.Context.ContainsKey(CronwatchQuartz.ContextKey));
             await scheduler.Start(default);
-            await scheduler.ScheduleJob(Job("unwatched", _ => default), Once("unwatched"), default, default);
             var ran = new TaskCompletionSource();
             await scheduler.ScheduleJob(Job("after", _ =>
             {
@@ -391,6 +390,20 @@ public class CronwatchQuartzTests
         {
             await scheduler.Shutdown(true, default);
         }
+    }
+
+    [Fact]
+    public async Task A_scheduler_shutting_down_stops_the_watch_cleanly()
+    {
+        await using var m = Client();
+        IScheduler scheduler = await BuildAsync(q => q.UseCronwatch(m.Cw));
+        await scheduler.Start(default);
+        await scheduler.ScheduleJob(Job("once", _ => default), Once("once"), default, default);
+        await Eventually("the run", async () => (await Runs(m.Cw, "once")) is [{ Status.Value: "ok" }]);
+        Assert.True(scheduler.Context.ContainsKey(CronwatchQuartz.ContextKey));
+        await scheduler.Shutdown(true, default);
+        Assert.Empty(m.Errors);
+        Assert.False(scheduler.Context.ContainsKey(CronwatchQuartz.ContextKey));
     }
 
     [Fact]
@@ -423,5 +436,9 @@ public class CronwatchQuartzTests
         JobOptions merged = CronwatchQuartz.Merged(new JobOptions { Grace = "5m", Timeout = "1h" }, new JobOptions { Timeout = "2h", Description = "Nightly", Expect = "done" });
         Assert.Equal("{\"grace\":\"5m\",\"timeout\":\"2h\",\"description\":\"Nightly\",\"name\":\"x\",\"expect\":\"contains \\\"done\\\"\"}", merged.Describe("x").ToJson());
         Assert.Equal("America/New_York", CronwatchQuartz.IanaId(TimeZoneInfo.FindSystemTimeZoneById("America/New_York")));
+        // A Windows zone id, as Quartz on Windows names a trigger's zone, is converted.
+        TimeZoneInfo windows = TimeZoneInfo.CreateCustomTimeZone("Eastern Standard Time", TimeSpan.FromHours(-5), "Eastern", "Eastern");
+        Assert.Equal("America/New_York", CronwatchQuartz.IanaId(windows));
+        Assert.Null(CronwatchQuartz.IanaId(TimeZoneInfo.CreateCustomTimeZone("Nowhere Standard Time", TimeSpan.FromHours(3), "Nowhere", "Nowhere")));
     }
 }
