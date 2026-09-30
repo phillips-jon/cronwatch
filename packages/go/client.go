@@ -92,6 +92,8 @@ type Client struct {
 
 	timerMu sync.Mutex
 	stop    chan struct{}
+	// ticking is closed when the goroutine Start began has returned.
+	ticking chan struct{}
 
 	warnMu              sync.Mutex
 	warnedDeferredStart bool

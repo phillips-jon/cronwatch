@@ -392,11 +392,18 @@ func (c *Client) Start(every time.Duration) {
 		fmt.Fprintln(Stderr, `[cronwatch] Start() was called with DeliverAtCheck, so these checks send no alerts. Another process must run checks with DeliverNow (the default) to send them.`)
 	}
 	c.warnMu.Unlock()
-	stop := make(chan struct{})
-	c.stop = stop
+	stop, ticking := make(chan struct{}), make(chan struct{})
+	c.stop, c.ticking = stop, ticking
 	delay := firstCheckDelay
 	go func() {
+		defer close(ticking)
 		tick := func() {
+			// A tick that fired as Stop was called starts nothing.
+			select {
+			case <-stop:
+				return
+			default:
+			}
 			if _, err := c.Check(context.Background()); err != nil {
 				c.report(err, "check")
 			}
@@ -418,18 +425,40 @@ func (c *Client) Start(every time.Duration) {
 	}()
 }
 
-// Stop stops the interval Start began. A check in flight finishes.
-func (c *Client) Stop() {
+// Stop stops the interval Start began. A check in flight finishes; Close
+// waits for it.
+func (c *Client) Stop() { c.stopTicking() }
+
+// stopTicking is Stop, returning a channel closed once the interval's
+// goroutine has returned (with the check it was running), or nil when
+// there was none.
+func (c *Client) stopTicking() chan struct{} {
 	c.timerMu.Lock()
 	defer c.timerMu.Unlock()
-	if c.stop != nil {
-		close(c.stop)
-		c.stop = nil
+	if c.stop == nil {
+		return nil
 	}
+	close(c.stop)
+	ticking := c.ticking
+	c.stop, c.ticking = nil, nil
+	return ticking
 }
 
-// Close stops the interval and closes the store.
+// Close stops the interval, waits for a check already under way (the
+// interval's, or one a caller began: bounded by its own channel, triage and
+// retry timeouts; what it returns went to whoever started it), then closes
+// the store, so that check neither writes after the store is closed nor
+// loses the alerts it would queue. Call it from outside a check (not from a
+// channel or a source), since it waits for the check to end.
 func (c *Client) Close() error {
-	c.Stop()
+	if ticking := c.stopTicking(); ticking != nil {
+		<-ticking
+	}
+	c.checkMu.Lock()
+	call := c.checking
+	c.checkMu.Unlock()
+	if call != nil {
+		<-call.done
+	}
 	return c.store.Close()
 }
