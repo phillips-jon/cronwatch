@@ -11,7 +11,7 @@
   }
   function render() {
     var dark = root.getAttribute("data-theme") === "dark";
-    document.querySelectorAll(".theme").forEach(function (b) { b.textContent = dark ? "Light paper" : "Dark paper"; });
+    document.querySelectorAll(".theme").forEach(function (b) { b.setAttribute("aria-label", dark ? "Switch to light" : "Switch to dark"); });
     if (themeColor) themeColor.setAttribute("content", dark ? "#09090b" : "#f4f4f5");
   }
   document.addEventListener("keydown", function (e) {

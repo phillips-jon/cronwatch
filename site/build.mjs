@@ -37,6 +37,21 @@ const escape = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").rep
 const slug = (s) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const hash = (buf) => createHash("sha256").update(buf).digest("hex").slice(0, 10);
 
+/* The footer's columns: the docs to start from, each language's page, the
+   registries every package is on, and the project itself. */
+const FOOTER = [
+  ["Docs", [["Getting started", "/docs/"], ["Schedules", "/docs/schedules/"], ["Alerts", "/docs/alerts/"], ["Dashboard", "/docs/dashboard/"], ["MCP server", "/docs/mcp/"], ["Agent skill", "/docs/agent-skill/"]]],
+  ["Languages", [["TypeScript", "/docs/node/"], ["Ruby", "/docs/ruby/"], ["Python", "/docs/python/"], ["PHP", "/docs/php/"], ["Go", "/docs/go/"], ["Rust", "/docs/rust/"], ["Elixir", "/docs/elixir/"], ["Java", "/docs/java/"], [".NET", "/docs/dotnet/"]]],
+  ["Packages", [["npm", "https://www.npmjs.com/package/@cronwatch/sdk"], ["RubyGems", "https://rubygems.org/gems/cronwatch"], ["PyPI", "https://pypi.org/project/cronwatch-sdk/"], ["Packagist", "https://packagist.org/packages/cronwatch/cronwatch"], ["pkg.go.dev", "https://pkg.go.dev/cronwatch.dev/go"], ["crates.io", "https://crates.io/crates/cronwatch"], ["Hex", "https://hex.pm/packages/cronwatch"], ["Maven Central", "https://central.sonatype.com/artifact/dev.cronwatch/cronwatch"], ["NuGet", "https://www.nuget.org/packages/Cronwatch"]]],
+  ["Project", [["GitHub", GITHUB], ["Releases", `${GITHUB}/releases`], ["Contact", "/contact/"], ["Terms", "/terms/"], ["Privacy", "/privacy/"]]],
+];
+const FOOTER_COLUMNS = FOOTER.map(([head, items]) =>
+  `<div><p class="foot-head">${head}</p><ul>${items.map(([label, href]) => `<li><a href="${href}">${label}</a></li>`).join("")}</ul></div>`).join("");
+
+/* The theme switch: a moon on light paper, a sun on dark, each drawn in the
+   footer's thin lines; the stylesheet shows the one for the paper in use. */
+const THEME_ICONS = `<svg class="moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+
 const LINKS = [
   { label: "Docs", href: "/docs/" },
   { label: "MCP", href: "/docs/mcp/" },
@@ -157,9 +172,17 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 ${body}
   </main>
   <footer>
-    <nav aria-label="Project links"><a href="/docs/">Docs</a><a href="${GITHUB}">GitHub</a><a href="https://www.npmjs.com/package/@cronwatch/sdk">npm</a><a href="https://rubygems.org/gems/cronwatch">RubyGems</a><a href="https://pypi.org/project/cronwatch-sdk/">PyPI</a><a href="https://packagist.org/packages/cronwatch/cronwatch">Packagist</a><a href="https://pkg.go.dev/cronwatch.dev/go">pkg.go.dev</a><a href="https://crates.io/crates/cronwatch">crates.io</a><a href="https://hex.pm/packages/cronwatch">Hex</a><a href="https://central.sonatype.com/artifact/dev.cronwatch/cronwatch">Maven Central</a><a href="https://www.nuget.org/packages/Cronwatch">NuGet</a><button class="theme" type="button" title="Turn the paper over (Shift+Cmd+D, or Shift+Ctrl+D)" aria-label="Switch between light and dark">Dark paper</button></nav>
-    <nav class="legal" aria-label="Site policies"><a href="/terms/">Terms</a><a href="/privacy/">Privacy</a><a href="/contact/">Contact</a></nav>
-    <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>.</p>
+    <div class="foot-top">
+      <div class="foot-about">
+        <a class="brand" href="/" title="CronWatch">${MARK}<span translate="no">CronWatch</span></a>
+        <p>Cron and scheduled-job monitoring that lives inside your app. Open source, with no server to run and no account to make.</p>
+      </div>
+      <nav class="foot-cols" aria-label="Footer">${FOOTER_COLUMNS}</nav>
+    </div>
+    <div class="foot-end">
+      <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>.</p>
+      <button class="theme" type="button" title="Switch between light and dark (Shift+Cmd+D, or Shift+Ctrl+D)" aria-label="Switch to light">${THEME_ICONS}</button>
+    </div>
   </footer>
 </div>
 </body>
