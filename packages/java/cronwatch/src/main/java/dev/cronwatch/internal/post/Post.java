@@ -283,7 +283,7 @@ public final class Post {
         throw fail(TIMED_OUT);
       } catch (ExecutionException e) {
         Throwable cause = e.getCause() == null ? e : e.getCause();
-        throw withoutUrl(describe(cause), rawUrl, url);
+        throw withoutUrl(withoutValues(describe(cause), checked), rawUrl, url);
       }
       byte[] bytes;
       try {
@@ -381,6 +381,25 @@ public final class Post {
   private static String name(Throwable t) {
     String simple = t.getClass().getSimpleName();
     return simple.isEmpty() ? t.getClass().getName() : simple;
+  }
+
+  /** The headers whose values say nothing secret, and so are left in a transport's error. */
+  private static final java.util.Set<String> PLAIN_HEADERS =
+      java.util.Set.of("accept", "content-type", "user-agent");
+
+  /**
+   * A transport's error with every header value it quotes cut out (the JDK's refusal of a value
+   * quotes it, and so may a transport of the app's own), bar the few that are never a credential.
+   */
+  static String withoutValues(String text, List<Map.Entry<String, String>> headers) {
+    String out = text;
+    for (Map.Entry<String, String> h : headers) {
+      String value = h.getValue();
+      if (value.length() >= 4 && !PLAIN_HEADERS.contains(h.getKey().toLowerCase(Locale.ROOT))) {
+        out = out.replace(value, "[redacted]");
+      }
+    }
+    return out;
   }
 
   /**

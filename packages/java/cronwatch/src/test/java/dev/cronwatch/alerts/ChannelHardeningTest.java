@@ -383,6 +383,24 @@ class ChannelHardeningTest {
     String err = error(ch, ChannelsConformanceTest.sample());
     assertFalse(err.contains(secret) || err.contains("/services"), err);
     assertTrue(err.startsWith("https://hooks.example.com: IllegalStateException: "), err);
+
+    // Nor a header's value it quotes.
+    Transport headerQuoting =
+        request -> {
+          throw new IllegalStateException(
+              "refused " + request.header("authorization") + " as " + request.header("accept"));
+        };
+    Channel withHeader =
+        Webhook.channel(
+            WebhookOptions.builder()
+                .url("https://hooks.example.com/in")
+                .header("authorization", "Bearer " + secret)
+                .header("accept", "text/plain")
+                .transport(headerQuoting)
+                .build());
+    err = error(withHeader, ChannelsConformanceTest.sample());
+    assertEquals(
+        "https://hooks.example.com: IllegalStateException: refused [redacted] as text/plain", err);
   }
 
   @Test
@@ -479,6 +497,26 @@ class ChannelHardeningTest {
       assertEquals("7", seen.header("content-length"));
       assertTrue(seen.header("user-agent").startsWith("Java-http-client/"));
       assertEquals("{\"a\":1}", new String(seen.body(), java.nio.charset.StandardCharsets.UTF_8));
+    }
+  }
+
+  @Test
+  void aHeaderValueTheJdkRefusesIsNeverQuoted() throws Exception {
+    // The JDK refuses a control character or one past U+00FF in a header value, quoting the
+    // value; a credential pasted with one must not end up in the error.
+    try (JdkTransport jdk = new JdkTransport()) {
+      for (String value : List.of("Bearer a\u0001-hidden-part", "Bearer €-hidden-part")) {
+        Channel ch =
+            Webhook.channel(
+                WebhookOptions.builder()
+                    .url("https://hooks.example.com/in")
+                    .header("authorization", value)
+                    .transport(jdk)
+                    .build());
+        String error = error(ch, ChannelsConformanceTest.sample());
+        assertFalse(error.contains("hidden-part"), error);
+        assertTrue(error.contains("authorization"), error);
+      }
     }
   }
 
