@@ -596,6 +596,29 @@ final class ClientHardeningTest extends TestCase
         $this->assertSame($trimmed . str_repeat('x', $cap), \Cronwatch\Output::redactAndCap(str_repeat('x', $cap + 5), $redact));
     }
 
+    public function testCloseDuringACheckWaitsForItBeforeItClosesTheStore(): void
+    {
+        $order = [];
+        $store = new FlakyStore(new MemoryStore());
+        $store->hooks['close'] = function (\Closure $next, array $args) use (&$order) {
+            $order[] = 'close';
+            return $next(...$args);
+        };
+        $cw = null;
+        // The channel closes the client while the check's stuck alert goes out.
+        $cw = $this->make(['store' => $store, 'alerts' => [new Custom('closer', function () use (&$cw, &$order): void {
+            $cw->close();
+            $order[] = 'send';
+        })]]);
+        $run = $cw->job('slow', ['timeout' => '5m'])->start();
+        $this->clock->advance(6 * self::MIN);
+        $cw->check();
+        $this->assertSame(['send', 'close'], $order);
+        $this->assertSame([], $this->wheres());
+        $this->assertSame('timeout', $store->inner->getRun($run->id)->status);
+        $this->assertSame(self::T0 + 6 * self::MIN, $store->inner->getState('slow')->lastAlertAt, 'the check recorded its send before the store closed');
+    }
+
     public function testACheckCalledFromInsideACheckIsRefused(): void
     {
         $cw = null;

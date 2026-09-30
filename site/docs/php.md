@@ -399,7 +399,7 @@ The client:
 | `routes(...)` | the dashboard and JSON API |
 | `definedJobs()` | the definitions declared in this process |
 | `Cronwatch::current()` | the context of the run in progress in this process, or null |
-| `close()` | close the store |
+| `close()` | close the store; called during a check, once the check ends |
 
 There is no `start()` or `stop()`: a PHP process does not stay up between checks, so the check is a crontab line, a scheduler entry or a worker's own loop. A check called from inside a check (by a channel, a source or triage) throws `LogicException`.
 

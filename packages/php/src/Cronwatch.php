@@ -87,6 +87,8 @@ final class Cronwatch
     private array $synced = [];
     private bool $ready = false;
     private bool $checking = false;
+    /** close() was called during a check, from a channel, a source or triage: the store closes once the check ends. */
+    private bool $closeAfterCheck = false;
     private int|float $lastPruneAt = 0;
     /** @var array<int, array{JobDefinition, Run, RunRecorder, bool, bool}> Runs of execute() in progress (recorded, and whether the start's state change waits for the finish), for the shutdown hook. */
     private array $inProgress = [];
@@ -347,6 +349,14 @@ final class Cronwatch
             return $this->runCheck();
         } finally {
             $this->checking = false;
+            if ($this->closeAfterCheck) {
+                $this->closeAfterCheck = false;
+                try {
+                    $this->store->close();
+                } catch (\Throwable $error) {
+                    $this->report($error, 'closing the store');
+                }
+            }
         }
     }
 
@@ -429,8 +439,17 @@ final class Cronwatch
         $this->store->deleteJob($name);
     }
 
+    /**
+     * Close the store. Called during a check (by a channel, a source or
+     * triage), it waits for the check: the store closes once the check ends,
+     * so the check can still record what it sent.
+     */
     public function close(): void
     {
+        if ($this->checking) {
+            $this->closeAfterCheck = true;
+            return;
+        }
         $this->store->close();
     }
 
