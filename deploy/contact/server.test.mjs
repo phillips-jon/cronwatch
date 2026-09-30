@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { after, before, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { checkForm, headerSafe, readConfig, signV4 } from "./server.mjs";
+import { checkForm, createContactServer, createLimiter, headerSafe, readConfig, signV4, sourceKey } from "./server.mjs";
 
 const SERVER = fileURLToPath(new URL("./server.mjs", import.meta.url));
 // Made-up credentials, shaped like real ones so a leak would be easy to spot.
@@ -204,6 +204,22 @@ test("header injection: line breaks never reach a header", async () => {
   await nextLog();
 });
 
+test("line breaks in the name cannot add lines to the message's header block", async () => {
+  const name = "Ada\nEmail: eve@example.com\r\nIP: 198.51.100.1\u2028User agent: Fake\u0085Time: never\u000bX";
+  const r = await post(form({ name }));
+  assert.equal(r.location, "/contact/sent/");
+  assert.equal(requests.length, 1);
+  const text = requests[0].body.Content.Simple.Body.Text.Data;
+  const [block] = text.split("\n\n");
+  const lines = block.split("\n");
+  assert.deepEqual(lines.map((l) => l.split(":")[0]), ["Name", "Email", "Time", "IP", "User agent"]);
+  assert.equal(lines[0], "Name: Ada Email: eve@example.com IP: 198.51.100.1 User agent: Fake Time: never X");
+  assert.equal(lines[1], "Email: ada@example.com");
+  assert.equal(lines[3], "IP: 203.0.113.9");
+  assert.ok(!/[\u0000-\u0009\u000b-\u001f\u007f\u0085\u2028\u2029]/.test(block), "no control character in the header block");
+  await nextLog();
+});
+
 test("only POST /contact with a urlencoded form is accepted", async () => {
   const get = await post(null, { method: "GET" });
   assert.equal(get.status, 405);
@@ -267,7 +283,80 @@ test("readConfig checks the region, the addresses and the test endpoint", () => 
 test("checkForm and headerSafe", () => {
   assert.equal(checkForm(new URLSearchParams(form({ message: "a\r\nb" }))).message, "a\nb");
   assert.equal(checkForm(new URLSearchParams({ name: "x", email: "x@example.com", message: "m" })).ok, true, "no timer, no honeypot field");
+  assert.equal(checkForm(new URLSearchParams(form({ name: " Ada\r\n\u0000Lovelace " }))).name, "Ada Lovelace");
+  assert.equal(checkForm(new URLSearchParams(form({ name: "\r\n\u0000" }))).reason, "bad-name");
   assert.equal(headerSafe("a\r\n\tb\u2028c"), "a b c");
+});
+
+/* ---- Rate limits ---- */
+
+test("sourceKey: IPv4 as it is, IPv6 by its /64", () => {
+  assert.equal(sourceKey("203.0.113.9"), "203.0.113.9");
+  assert.equal(sourceKey("::ffff:203.0.113.9"), "203.0.113.9");
+  for (const ip of ["2001:db8:1:2::1", "2001:DB8:1:2:ffff:ffff:ffff:ffff", "2001:0db8:0001:0002:0:0:0:9", "2001:db8:1:2:a:b:1.2.3.4", "2001:db8:1:2::1%eth0"]) {
+    assert.equal(sourceKey(ip), "2001:db8:1:2::/64", ip);
+  }
+  assert.equal(sourceKey("2001:db8::1"), "2001:db8:0:0::/64");
+  assert.equal(sourceKey("::1"), "0:0:0:0::/64");
+  assert.notEqual(sourceKey("2001:db8:1:3::1"), sourceKey("2001:db8:1:2::1"));
+  // Not an address: counted as itself, never merged with another.
+  for (const bad of ["2001:db8::1::2", "1:2:3:4:5:6:7:8:9", "2001:db8:1:2:zzzz::1", "unknown"]) assert.equal(sourceKey(bad), bad.toLowerCase(), bad);
+});
+
+test("createLimiter: per source, then an hourly and a daily cap on everything", () => {
+  const limiter = createLimiter({ perSource: { limit: 2, windowMs: 1000 }, hourly: { limit: 5, windowMs: 10_000 }, daily: { limit: 7, windowMs: 100_000 } });
+  let t = 0;
+  assert.equal(limiter.take("a", t), null);
+  assert.equal(limiter.take("a", t), null);
+  assert.equal(limiter.take("a", t), "rate-limited");
+  assert.equal(limiter.take("b", t), null, "another source still goes");
+  t = 1000;
+  assert.equal(limiter.take("a", t), null, "the source's window has passed");
+  assert.equal(limiter.take("c", t), null);
+  assert.equal(limiter.take("d", t), "over-cap", "five in the hour");
+  t = 10_000;
+  assert.equal(limiter.take("d", t), null);
+  assert.equal(limiter.take("e", t), null);
+  assert.equal(limiter.take("f", t), "over-cap", "seven in the day");
+  t = 100_000;
+  assert.equal(limiter.take("f", t), null, "the day has passed");
+});
+
+test("the service limits each IPv6 /64 and all senders together", async () => {
+  const lines = [];
+  const config = readConfig({
+    AWS_ACCESS_KEY_ID: KEY_ID, AWS_SECRET_ACCESS_KEY: SECRET, CONTACT_FROM: "a@example.com", CONTACT_TO: "b@example.com",
+    CONTACT_SES_URL: `http://127.0.0.1:${ses.address().port}/v2/email/outbound-emails`,
+  });
+  const server = createContactServer(config, {
+    log: (line) => lines.push(JSON.parse(line)),
+    limits: { perSource: { limit: 2, windowMs: 60_000 }, hourly: { limit: 4, windowMs: 60_000 }, daily: { limit: 100, windowMs: 60_000 } },
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const send = async (ip) => {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/contact`, {
+      method: "POST", redirect: "manual", body: form({}),
+      headers: { "content-type": "application/x-www-form-urlencoded", "x-real-ip": ip },
+    });
+    await res.text();
+    return res.headers.get("location");
+  };
+  try {
+    // A new address in the same /64 for every post is still one sender.
+    assert.equal(await send("2001:db8:1:2::1"), "/contact/sent/");
+    assert.equal(await send("2001:db8:1:2::2"), "/contact/sent/");
+    assert.equal(await send("2001:db8:1:2:dead:beef:0:3"), "/contact/error/");
+    assert.equal(lines.at(-1).reason, "rate-limited");
+    assert.equal(lines.at(-1).ip, "2001:db8:1:2:dead:beef:0:3");
+    // Another /64 and an IPv4 address go, until the cap on everything.
+    assert.equal(await send("2001:db8:1:3::1"), "/contact/sent/");
+    assert.equal(await send("198.51.100.7"), "/contact/sent/");
+    assert.equal(await send("198.51.100.8"), "/contact/error/");
+    assert.equal(lines.at(-1).reason, "over-cap");
+    assert.equal(requests.length, 4, "only the posts that were let through reached SES");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 /* ---- Signing ---- */

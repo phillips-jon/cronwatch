@@ -95,7 +95,10 @@ export function checkForm(fields) {
     if (!/^\d{1,12}$/.test(t)) return { ok: false, reason: "bad-timer" };
     if (Number(t) < MIN_FILL_MS) return { ok: false, reason: "too-fast" };
   }
-  const name = get("name").trim();
+  // The name goes on the body's "Name:" line and into the subject, so it is
+  // made one line: control characters and line breaks become spaces, and a
+  // sender cannot add lines that pass for the service's own Email or IP.
+  const name = headerSafe(get("name"));
   const email = get("email").trim();
   const message = get("message").replace(/\r\n?/g, "\n").trim();
   if (name.length < 1 || name.length > 200) return { ok: false, reason: "bad-name" };
@@ -109,6 +112,77 @@ function clientIp(req) {
   const real = req.headers["x-real-ip"];
   if (typeof real === "string" && /^[0-9A-Fa-f:.]{2,45}$/.test(real)) return real;
   return req.socket.remoteAddress ?? "unknown";
+}
+
+/* ---- Rate limits ---- */
+
+/**
+ * Who a limit counts a post against: an IPv4 address as it is, and an IPv6
+ * address by its /64, since one host is commonly handed a whole /64 and
+ * could otherwise take a new address for every post. An IPv4-mapped IPv6
+ * address counts as its IPv4 address. Anything unparsable counts as itself.
+ */
+export function sourceKey(ip) {
+  const text = String(ip).replace(/%.*$/, "").toLowerCase();
+  if (!text.includes(":")) return text;
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(text);
+  if (mapped) return mapped[1];
+  let body = text;
+  // A trailing dotted quad is the last two groups.
+  const quad = /^(.*:)(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(body);
+  if (quad) {
+    const [, head, a, b, c, d] = quad;
+    if ([a, b, c, d].some((n) => Number(n) > 255)) return text;
+    body = `${head}${((Number(a) << 8) | Number(b)).toString(16)}:${((Number(c) << 8) | Number(d)).toString(16)}`;
+  }
+  const halves = body.split("::");
+  if (halves.length > 2) return text;
+  const part = (s) => (s === "" ? [] : s.split(":"));
+  const head = part(halves[0]);
+  const tail = halves.length === 2 ? part(halves[1]) : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 2 ? missing < 1 : missing !== 0) return text;
+  const groups = [...head, ...Array(missing).fill("0"), ...tail];
+  if (!groups.every((g) => /^[0-9a-f]{1,4}$/.test(g))) return text;
+  return `${groups.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(":")}::/64`;
+}
+
+/**
+ * How many messages may go before the service stops sending: per source (an
+ * IPv4 address or an IPv6 /64), and in all, so that many sources together
+ * cannot use up the SES sending quota and crowd out real messages. nginx
+ * limits posts per address as well; these count only posts that would send.
+ */
+export const LIMITS = {
+  perSource: { limit: 10, windowMs: 60 * 60_000 },
+  hourly: { limit: 30, windowMs: 60 * 60_000 },
+  daily: { limit: 100, windowMs: 24 * 60 * 60_000 },
+};
+
+/** Sliding-window counters. take(source, now) counts a send and returns null, or the reason it may not go. */
+export function createLimiter(limits = LIMITS) {
+  const bySource = new Map();
+  const all = [];
+  const recent = (times, now, windowMs) => {
+    while (times.length > 0 && times[0] <= now - windowMs) times.shift();
+    return times.length;
+  };
+  return {
+    take(source, now) {
+      const longest = Math.max(limits.hourly.windowMs, limits.daily.windowMs);
+      recent(all, now, longest);
+      const inWindow = (windowMs) => all.filter((t) => t > now - windowMs).length;
+      if (inWindow(limits.daily.windowMs) >= limits.daily.limit || inWindow(limits.hourly.windowMs) >= limits.hourly.limit) return "over-cap";
+      // Forget sources whose posts are all old, so the map stays small.
+      if (bySource.size > 10_000) for (const [k, times] of bySource) if (recent(times, now, limits.perSource.windowMs) === 0) bySource.delete(k);
+      const times = bySource.get(source) ?? [];
+      if (recent(times, now, limits.perSource.windowMs) >= limits.perSource.limit) return "rate-limited";
+      times.push(now);
+      bySource.set(source, times);
+      all.push(now);
+      return null;
+    },
+  };
 }
 
 /* ---- The service ---- */
@@ -178,7 +252,8 @@ async function sendEmail(config, { name, email, message, ip, userAgent, at }) {
  * The HTTP server. `log` gets one line per submission: time, outcome,
  * reason and address, never the message, the sender's details or any credential.
  */
-export function createContactServer(config, { log = (line) => console.log(line) } = {}) {
+export function createContactServer(config, { log = (line) => console.log(line), limits = LIMITS, now = () => Date.now() } = {}) {
+  const limiter = createLimiter(limits);
   const record = (ip, outcome, reason) => log(JSON.stringify({ time: new Date().toISOString(), outcome, ...(reason ? { reason } : {}), ip }));
   return createServer((req, res) => {
     const finish = (status, location, extra = {}) => {
@@ -215,6 +290,11 @@ export function createContactServer(config, { log = (line) => console.log(line) 
       if (!form.ok) {
         record(ip, form.drop ? "dropped" : "rejected", form.reason);
         return finish(303, form.drop ? SENT : FAILED);
+      }
+      const limited = limiter.take(sourceKey(ip), now());
+      if (limited) {
+        record(ip, "rejected", limited);
+        return finish(303, FAILED);
       }
       const userAgent = headerSafe(req.headers["user-agent"] ?? "").slice(0, 400) || "none";
       const failure = await sendEmail(config, { ...form, ip, userAgent, at: new Date().toISOString() });
