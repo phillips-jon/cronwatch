@@ -174,6 +174,53 @@ func loneAt(s string, i int) (uint16, bool) {
 	return 0xd000 | uint16(s[i+1]&0x3f)<<6 | uint16(s[i+2]&0x3f), true
 }
 
+// Length16Lone is Length16 for text that may hold a lone half of a
+// surrogate pair as its WTF-8 bytes (Slice16Lone), counting that half as
+// the one code unit it is.
+func Length16Lone(s string) int {
+	n := 0
+	for i := 0; i < len(s); {
+		if _, ok := loneAt(s, i); ok {
+			n++
+			i += 3
+			continue
+		}
+		r, w := utf8.DecodeRuneInString(s[i:])
+		n += units(r)
+		i += w
+	}
+	return n
+}
+
+// Cut16Lone is the SDK's cut() for text that may hold a lone half
+// (Slice16Lone): at most max code units, one fewer when the unit at max - 1
+// is a high surrogate (a pair's first half, or a lone one), so it never
+// ends on a high surrogate it cut from its pair or left behind at the cut.
+func Cut16Lone(s string, max int) string {
+	if Length16Lone(s) <= max {
+		return s
+	}
+	n := 0
+	i := 0
+	for i < len(s) {
+		if u, ok := loneAt(s, i); ok {
+			if n+1 > max || (n+1 == max && u < 0xdc00) {
+				break
+			}
+			n++
+			i += 3
+			continue
+		}
+		r, w := utf8.DecodeRuneInString(s[i:])
+		if n+units(r) > max {
+			break
+		}
+		n += units(r)
+		i += w
+	}
+	return s[:i]
+}
+
 // Head16 is s.slice(0, n).
 func Head16(s string, n int) string {
 	return Slice16(s, 0, n)
