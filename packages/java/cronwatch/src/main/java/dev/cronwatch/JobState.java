@@ -1,6 +1,7 @@
 package dev.cronwatch;
 
 import dev.cronwatch.Run.Values;
+import dev.cronwatch.internal.evaluate.Evaluate;
 import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
@@ -215,7 +216,7 @@ public record JobState(
     return new JobState(
         Values.string(o, "job"),
         open,
-        Values.integer(o, "consecutiveFailures"),
+        Evaluate.failureCount(o.get("consecutiveFailures")),
         Values.nullableInteger(o, "silencedUntil"),
         Values.nullableInteger(o, "lastAlertAt"),
         pending,

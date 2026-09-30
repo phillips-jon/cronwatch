@@ -106,6 +106,21 @@ public final class Evaluate {
     return 0;
   }
 
+  /**
+   * The failures in a row a stored state's {@code consecutiveFailures} value counts as: a JSON
+   * number that is a whole number, held at 2^53 - 1, and 0 when it is negative or not a whole
+   * number. A foreign row's count at a 64-bit limit stays at the top instead of wrapping negative.
+   */
+  public static long failureCount(@Nullable Object count) {
+    if (count instanceof Number n) {
+      double d = n.doubleValue();
+      if (Js.isInteger(d) && d > 0) {
+        return d >= MAX_DURATION_MS ? MAX_DURATION_MS : (long) d;
+      }
+    }
+    return 0;
+  }
+
   /** a - b, held at the ends of the range. */
   static long saturatingSub(long a, long b) {
     try {
@@ -132,6 +147,7 @@ public final class Evaluate {
     if (s.job.isEmpty()) {
       s.job = job;
     }
+    s.consecutiveFailures = Math.clamp(s.consecutiveFailures, 0, MAX_DURATION_MS);
     s.pending();
     s.queued();
     return s.toState();
@@ -397,7 +413,8 @@ public final class Evaluate {
     }
 
     // failed or timeout
-    next.consecutiveFailures += 1;
+    // Held at the top: a count at the limit neither loses precision nor wraps below a threshold.
+    next.consecutiveFailures = Math.min(next.consecutiveFailures + 1, MAX_DURATION_MS);
     closeCondition(next, Condition.MISSED);
     double threshold = failuresBeforeAlert(def);
     boolean timedOut = run.status().equals(RunStatus.TIMEOUT);

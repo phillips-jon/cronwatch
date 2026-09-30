@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@code conformance/health.json}: health, summaries, percentiles, state normalization, silence,
- * which queued alerts a retry drops, a run's duration and a state's version.
+ * which queued alerts a retry drops, a run's duration, a state's version and its failures in a row.
  */
 class HealthConformanceTest {
   private static List<Run> runs(@Nullable Object v) {
@@ -210,7 +210,42 @@ class HealthConformanceTest {
           JobState.fromJson(text).countedVersion(),
           c.get("version"));
     }
-    assertTrue(cases == 145, "health.json cases: " + cases);
+    i = 0;
+    long t0 = 1_767_605_400_000L;
+    Run failedRun =
+        Run.fromValue(
+            Json.parse(
+                "{\"id\":\"f\",\"job\":\"j\",\"status\":\"failed\",\"startedAt\":"
+                    + (t0 - 60_000)
+                    + ",\"finishedAt\":"
+                    + (t0 - 59_000)
+                    + ",\"durationMs\":1000,\"error\":\"Error: boom\",\"output\":null,"
+                    + "\"metrics\":{},\"trigger\":\"run\"}"));
+    var failedDef = Cases.definition(Json.parse("{\"name\":\"j\",\"failuresBeforeAlert\":3}"));
+    for (JsObject c : Fixtures.objects(f, "failureCount")) {
+      cases++;
+      String text = Fixtures.string(c, "state");
+      Object parsed = Json.parse(text);
+      fails.same(
+          "failureCount " + i,
+          Evaluate.failureCount(parsed instanceof JsObject o ? o.get("consecutiveFailures") : null),
+          c.get("consecutiveFailures"));
+      JobState normalized = Evaluate.normalizeState(JobState.fromJson(text), "j");
+      fails.same(
+          "failureCount " + i + ", read as a state",
+          normalized.consecutiveFailures(),
+          c.get("consecutiveFailures"));
+      Evaluation out = Evaluate.onRunFinish(failedDef, failedRun, normalized, List.of(), t0);
+      List<Object> alerts = new ArrayList<>();
+      for (AlertDraft d : out.alerts()) {
+        alerts.add(d.toValue());
+      }
+      fails.same(
+          "failureCount " + i++ + ", then a failed run",
+          new JsObject().set("state", out.state().toValue()).set("alerts", alerts),
+          c.get("failed"));
+    }
+    assertTrue(cases == 164, "health.json cases: " + cases);
     fails.check("health");
   }
 }
