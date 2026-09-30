@@ -276,9 +276,12 @@ public sealed class Watch
             ReportOnce(e.Message, "declaring " + label);
             return;
         }
+        // Unchanged only while the client still declares it: a job forgotten (the dashboard's
+        // Forget) is declared again here, so it comes back without waiting for its next firing.
+        bool declared = _cw.Declared(name) != null;
         lock (_lock)
         {
-            if (_jobs.TryGetValue(name, out var d) && d.Key == key)
+            if (declared && _jobs.TryGetValue(name, out var d) && d.Key == key)
             {
                 d.Current = d.Current || current;
                 return;
