@@ -20,7 +20,7 @@ cd packages/java && ./mvnw -B install -DskipTests
 <dependency>
   <groupId>dev.cronwatch</groupId>
   <artifactId>cronwatch</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 
