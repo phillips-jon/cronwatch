@@ -424,7 +424,11 @@ internal static class Evaluate
         }
 
         // failed or timeout
-        next.ConsecutiveFailures += 1;
+        // Held at the top: a foreign row's count at the limit must not wrap to below any threshold.
+        if (next.ConsecutiveFailures < long.MaxValue)
+        {
+            next.ConsecutiveFailures += 1;
+        }
         CloseCondition(next, Condition.Missed);
         double threshold = FailuresBeforeAlert(def);
         bool timedOut = run.Status == RunStatus.Timeout;

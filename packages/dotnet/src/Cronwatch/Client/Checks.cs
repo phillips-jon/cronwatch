@@ -315,7 +315,9 @@ public sealed partial class CronwatchClient
     {
         lock (_intervalLock)
         {
-            if (_interval != null || _closing.IsCancellationRequested)
+            // Disposal marks the client before it stops the interval, under this lock, so a Start
+            // racing a disposal never leaves a timer running on a disposed client.
+            if (_interval != null || Volatile.Read(ref _disposed) != 0)
             {
                 return;
             }

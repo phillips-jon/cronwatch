@@ -154,6 +154,18 @@ public class AuditCoreTests
         Assert.Equal(["scoped-handler"], scopes);
     }
 
+    [Fact]
+    public async Task A_foreign_failure_count_at_the_limit_does_not_wrap_below_the_threshold()
+    {
+        await using var m = Make();
+        m.Cw.Job("counted");
+        await m.Cw.CheckAsync();
+        await m.Store.SetStateAsync(new JobState { Job = "counted", ConsecutiveFailures = long.MaxValue });
+        await Quietly(() => m.Cw.RunAsync("counted", (j, ct) => throw new InvalidOperationException("x")));
+        Assert.Equal(["failed"], m.Alerts.Types());
+        Assert.Equal(long.MaxValue, (await m.Store.GetStateAsync("counted"))!.ConsecutiveFailures);
+    }
+
     private sealed class Registering : ISource
     {
         public string Name => "registering";
