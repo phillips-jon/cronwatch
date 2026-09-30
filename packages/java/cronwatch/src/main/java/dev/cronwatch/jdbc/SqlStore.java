@@ -53,8 +53,15 @@ import org.jspecify.annotations.Nullable;
  * does not vanish with the rollback it caused. Give it a plain data source, not one that hands out
  * the app's transactional connection (Spring's {@code TransactionAwareDataSourceProxy}). JSON is
  * bound untyped ({@code setObject(i, text, Types.OTHER)}), so Postgres infers {@code jsonb} as it
- * does for node-postgres and the statements need no cast. MySQL and MariaDB come in a later
- * release.
+ * does for node-postgres and the statements need no cast.
+ *
+ * <p>On MySQL 8.0.13 or newer and MariaDB 10.6 or newer the dialect is the PHP, Go, Rust and Elixir
+ * ports': the same tables with {@code VARCHAR(255)} keys, the JSON columns as {@code LONGTEXT}
+ * holding the SDK's JSON byte for byte (never MySQL's {@code JSON} type, which rewrites it), names
+ * compared by byte ({@code utf8mb4_bin}), and a run's trigger cut to 255 characters. Statements run
+ * as on Postgres, each on a connection of its own in autocommit. A conditional write whose answer
+ * says no row changed is read back, so a connection that counts changed rather than matched rows
+ * ({@code useAffectedRows=true}) cannot make a write that landed read as refused.
  */
 public final class SqlStore implements Store {
   /** How long opening SQLite keeps retrying a busy database before it gives up (busy.ts). */
@@ -96,11 +103,23 @@ public final class SqlStore implements Store {
   }
 
   /**
+   * A store over the app's MySQL (8.0.13 or newer) or MariaDB (10.6 or newer) data source, with the
+   * PHP, Go, Rust and Elixir ports' dialect: {@code LONGTEXT} holding the SDK's JSON, {@code
+   * utf8mb4_bin}, {@code ON DUPLICATE KEY}. MySQL commits {@code CREATE TABLE} at once, so {@link
+   * #init} is best left to the client's first use, when the app has no transaction open. Nothing is
+   * read or written until {@link #init}.
+   */
+  public static SqlStore mysql(DataSource dataSource) {
+    return new SqlStore(dataSource, Dialect.MYSQL, Sql.DEFAULT_PREFIX);
+  }
+
+  /**
    * A store for whatever database the data source reaches, as its driver names it ({@code
-   * DatabaseMetaData.getDatabaseProductName()}): SQLite or Postgres. It takes a connection to ask.
+   * DatabaseMetaData.getDatabaseProductName()}): SQLite, Postgres, MySQL or MariaDB. It takes a
+   * connection to ask.
    *
    * @throws CronwatchException of kind {@code STORE} when no connection can be had, and of kind
-   *     {@code INVALID} for another database (MySQL and MariaDB come in a later release)
+   *     {@code INVALID} for another database
    */
   public static SqlStore of(DataSource dataSource) {
     String product;
@@ -117,12 +136,12 @@ public final class SqlStore implements Store {
       return postgres(dataSource);
     }
     if (name.contains("mysql") || name.contains("mariadb")) {
-      throw CronwatchException.invalid(
-          "SqlStore: MySQL and MariaDB are not supported by this release of the Java port; SQLite"
-              + " and Postgres are");
+      return mysql(dataSource);
     }
+    // The product's name is the driver's, never a credential, but it is not quoted either.
     throw CronwatchException.invalid(
-        "SqlStore: " + product + " is not a database SqlStore knows (SQLite or Postgres)");
+        "SqlStore: the data source's database is not one SqlStore knows (SQLite, Postgres, MySQL"
+            + " or MariaDB)");
   }
 
   /**
@@ -145,7 +164,7 @@ public final class SqlStore implements Store {
     return prefix;
   }
 
-  /** The store's database: {@code sqlite} or {@code postgres}. */
+  /** The store's database: {@code sqlite}, {@code postgres} or {@code mysql}. */
   public String dialect() {
     return dialect.label();
   }
@@ -165,7 +184,7 @@ public final class SqlStore implements Store {
 
   /**
    * Runs {@code work} on SQLite's kept connection, under the store's lock, or on a connection of
-   * its own from the data source, in autocommit, for Postgres.
+   * its own from the data source, in autocommit, for Postgres, MySQL and MariaDB.
    */
   private <T> T with(Work<T> work) throws SQLException {
     if (dialect == Dialect.SQLITE) {
@@ -289,7 +308,7 @@ public final class SqlStore implements Store {
   /** A whole number, or NULL. */
   private record Int(@Nullable Long value) implements Param {}
 
-  /** JSON: text on SQLite, untyped on Postgres so it is inferred as {@code jsonb}. */
+  /** JSON: text on SQLite and MySQL, untyped on Postgres so it is inferred as {@code jsonb}. */
   private record JsonText(String value) implements Param {}
 
   private void bind(PreparedStatement ps, List<Param> params) throws SQLException {
@@ -609,7 +628,27 @@ public final class SqlStore implements Store {
 
   @Override
   public void insertRun(Run run) throws SQLException {
-    run(sql.insertRun, insertRunParams(run));
+    Run r = run;
+    if (dialect == Dialect.MYSQL) {
+      // MySQL's trigger column is VARCHAR(255), which refuses anything longer (the others are
+      // TEXT): a long trigger is cut to 255 characters to fit rather than lose the whole run.
+      String trigger = r.trigger();
+      if (trigger.codePointCount(0, trigger.length()) > 255) {
+        r =
+            new Run(
+                r.id(),
+                r.job(),
+                r.status(),
+                r.startedAt(),
+                r.finishedAt(),
+                r.durationMs(),
+                r.error(),
+                r.output(),
+                r.metrics(),
+                trigger.substring(0, trigger.offsetByCodePoints(0, 255)));
+      }
+    }
+    run(sql.insertRun, insertRunParams(r));
   }
 
   @Override
@@ -626,7 +665,32 @@ public final class SqlStore implements Store {
     for (RunStatus s : from) {
       params.add(new Text(s.value()));
     }
-    return run(sql.updateRunIf(from.size()), params) > 0;
+    if (run(sql.updateRunIf(from.size()), params) > 0) {
+      return true;
+    }
+    return dialect == Dialect.MYSQL && landed(run, from);
+  }
+
+  /**
+   * Whether an update of a run that MySQL answered 0 for landed all the same: a connection that
+   * counts only the rows an UPDATE changed answers 0 for a row that already held these values (and
+   * matched). The stored run is read back and compared with what was written, metrics whatever
+   * order their keys came back in.
+   */
+  private boolean landed(Run run, List<RunStatus> from) throws SQLException {
+    Run stored = getRun(run.id());
+    return stored != null
+        && from.contains(stored.status())
+        && stored.status().equals(run.status())
+        && Objects.equals(stored.finishedAt(), run.finishedAt())
+        && Objects.equals(stored.durationMs(), run.durationMs())
+        && Objects.equals(stored.error(), wellFormed(run.error()))
+        && Objects.equals(stored.output(), wellFormed(run.output()))
+        && stored.metrics().asMap().equals(run.metrics().asMap());
+  }
+
+  private static @Nullable String wellFormed(@Nullable String text) {
+    return text == null ? null : Js.wellFormed(text);
   }
 
   /** Deletes a run only while it is of {@code job} and in {@code status}, in one statement. */
@@ -673,12 +737,47 @@ public final class SqlStore implements Store {
   @Override
   public boolean compareAndSetState(JobState state, long expected) throws SQLException {
     String body = state.toJson();
+    if (dialect == Dialect.MYSQL && expected == 0) {
+      return casFromZero(state, body);
+    }
     if (expected != 0) {
       return run(
               sql.casUpdate, List.of(new JsonText(body), new Text(state.job()), new Int(expected)))
           > 0;
     }
     return run(sql.casInsert, List.of(new Text(state.job()), new JsonText(body))) > 0;
+  }
+
+  /**
+   * MySQL's compare-and-set from version 0, in two steps that each decide alone: a row at version 0
+   * (or without one) is updated, and failing that the row is inserted, which a row already there
+   * refuses. A refused insert is another process's write, unless the row holds exactly what this
+   * write sent, when the write landed and only its answer was lost (a row at version 0 that already
+   * held these values, which a connection counting changed rows answers 0 for, or a connection
+   * dropped after the commit), as the PHP port's {@code stateLanded()} reads it. Counting that as
+   * refused would have the client work the change out again over its own write, and the alert the
+   * first attempt opened would never go out.
+   */
+  private boolean casFromZero(JobState state, String body) throws SQLException {
+    if (run(sql.casFromZero, List.of(new JsonText(body), new Text(state.job()))) > 0) {
+      return true;
+    }
+    try {
+      run(sql.casInsert, List.of(new Text(state.job()), new JsonText(body)));
+      return true;
+    } catch (SQLException refused) {
+      JobState stored;
+      try {
+        stored = getState(state.job());
+      } catch (SQLException | RuntimeException e) {
+        refused.addSuppressed(e);
+        throw refused;
+      }
+      if (stored == null) {
+        throw refused;
+      }
+      return stored.toJson().equals(body);
+    }
   }
 
   @Override
