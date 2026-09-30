@@ -19,6 +19,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -275,7 +276,13 @@ class ThreadsTest {
     try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
       Future<CheckResult> a = pool.submit(() -> m.cw().check());
       held.entered.await();
-      Future<CheckResult> b = pool.submit(() -> m.cw().check());
+      AtomicReference<@Nullable Thread> second = new AtomicReference<>();
+      Future<CheckResult> b =
+          pool.submit(
+              () -> {
+                second.set(Thread.currentThread());
+                return m.cw().check();
+              });
       AtomicReference<Throwable> interrupted = new AtomicReference<>();
       AtomicBoolean statusSet = new AtomicBoolean();
       Thread waiting =
@@ -289,7 +296,9 @@ class ThreadsTest {
                       statusSet.set(Thread.currentThread().isInterrupted());
                     }
                   });
-      Thread.sleep(50);
+      // Both callers are waiting on the check before it is let go, not merely started.
+      Support.await("the second caller to join the check", () -> parked(second.get()));
+      Support.await("the third caller to join the check", () -> parked(waiting));
       waiting.interrupt();
       waiting.join(30_000);
       assertTrue(interrupted.get() instanceof CronwatchException);
@@ -300,6 +309,11 @@ class ThreadsTest {
     assertEquals(1, held.syncs.get());
     m.cw().check();
     assertEquals(2, held.syncs.get(), "the next call runs a new check");
+  }
+
+  /** Whether {@code t} has started and is parked, as a caller waiting on a shared check is. */
+  private static boolean parked(@Nullable Thread t) {
+    return t != null && t.getState() == Thread.State.WAITING;
   }
 
   @Test
