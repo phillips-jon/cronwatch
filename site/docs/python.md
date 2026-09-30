@@ -7,7 +7,7 @@ group: Python
 
 # Python
 
-`cronwatch-sdk` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust or Elixir process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain Python and the API underneath.
+`cronwatch-sdk` is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Python process can share one database with a Node, Ruby, PHP, Go, Rust, Elixir or Java process and the [MCP server](/docs/mcp/) works against any of them. This page covers plain Python and the API underneath.
 
 ```bash
 pip install cronwatch-sdk        # or: uv add cronwatch-sdk
@@ -442,7 +442,7 @@ The client:
 
 ## Sharing a database with the other languages
 
-The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the PHP, Go, Rust and Elixir stores: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the PHP, Go, Rust, Elixir and Java stores: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store.
 

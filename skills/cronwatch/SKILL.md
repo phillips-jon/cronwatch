@@ -1,12 +1,12 @@
 ---
 name: cronwatch
-description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, the cronwatch gem, cronwatch-sdk (Python), cronwatch/cronwatch (PHP), the CronWatch WordPress plugin, cronwatch.dev/go (Go), the cronwatch crate (Rust), the cronwatch package on Hex (Elixir), cronwatch.dev or the cronwatch MCP server.
+description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, the cronwatch gem, cronwatch-sdk (Python), cronwatch/cronwatch (PHP), the CronWatch WordPress plugin, cronwatch.dev/go (Go), the cronwatch crate (Rust), the cronwatch package on Hex (Elixir), dev.cronwatch:cronwatch (Java), cronwatch.dev or the cronwatch MCP server.
 version: 0.8.0
 ---
 
 # CronWatch
 
-CronWatch is a library, not a service: `@cronwatch/sdk` (TypeScript on Node, Cloudflare Workers, Deno or Bun), the `cronwatch` gem (Ruby, Rails), `cronwatch-sdk` (Python: Django, Celery, APScheduler), `cronwatch/cronwatch` (PHP: Laravel, Symfony, WordPress, Drupal, Craft CMS), `cronwatch.dev/go` (Go: robfig/cron, gocron, River, Asynq), the `cronwatch` crate (Rust: tokio-cron-scheduler, apalis) or the `cronwatch` package on Hex (Elixir: Oban, Quantum) records every run of a scheduled job inside the app that runs it, and alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. The MCP server `@cronwatch/mcp` reads the same data so an agent can ask what failed and why.
+CronWatch is a library, not a service: `@cronwatch/sdk` (TypeScript on Node, Cloudflare Workers, Deno or Bun), the `cronwatch` gem (Ruby, Rails), `cronwatch-sdk` (Python: Django, Celery, APScheduler), `cronwatch/cronwatch` (PHP: Laravel, Symfony, WordPress, Drupal, Craft CMS), `cronwatch.dev/go` (Go: robfig/cron, gocron, River, Asynq), the `cronwatch` crate (Rust: tokio-cron-scheduler, apalis), the `cronwatch` package on Hex (Elixir: Oban, Quantum) or `dev.cronwatch:cronwatch` on Maven Central (Java: Spring Boot, Quartz, JobRunr) records every run of a scheduled job inside the app that runs it, and alerts when a run is missed, fails, gets stuck, runs slow or goes over budget. The MCP server `@cronwatch/mcp` reads the same data so an agent can ask what failed and why.
 
 ## Adding monitoring to a job
 
@@ -118,6 +118,20 @@ For an Elixir app, use the `cronwatch` package on Hex (Elixir 1.18 or newer on O
 - **Channels:** each `{module, options}` with the SDK's options in snake_case (`{Cronwatch.Alerts.Slack, webhook_url: ...}`), or `Cronwatch.Alerts.fun(name, fn alert -> ... end)`; Claude triage is `triage: {Cronwatch.Triage.Anthropic, []}` and pg_cron `sources: [{Cronwatch.Sources.PgCron, repo: MyApp.Repo}]`.
 
 The MCP server works against it unchanged. Docs: https://cronwatch.dev/docs/elixir/ and https://cronwatch.dev/docs/elixir-schedulers/
+
+## Java apps
+
+For a JVM service, use `dev.cronwatch:cronwatch` on Maven Central (Java 21 or newer); it is a port with the same conditions and alert text, with options on builders kept in the order set (`JobOptions.builder().schedule("0 2 * * *").timezone("UTC").grace("15m")`; durations as text, a `Duration` or milliseconds).
+
+- **Install:** in a Spring Boot app (3.5 or 4), `dev.cronwatch:cronwatch-spring-boot-starter`, which brings the rest; elsewhere `dev.cronwatch:cronwatch`, with `cronwatch-servlet` for a servlet container, `cronwatch-quartz` for Quartz 2.5 and `cronwatch-jobrunr` for JobRunr 8, all at one version. The core depends on nothing; the SQL store uses the app's own JDBC driver and `DataSource`.
+- **Client and store:** in Spring Boot the starter makes the client a bean from `cronwatch.*` properties, with `SqlStore` over the app's one `DataSource`, every `Channel` bean a channel. Elsewhere `Cronwatch.builder().store(SqlStore.postgres(dataSource)).alert(...).build()` (or `SqlStore.sqlite`, `SqlStore.mysql` for MySQL and MariaDB), one per app, closed when it stops, over a store every instance shares. A bad option is a `CronwatchException` from `build()` or `job()`.
+- **Wrap:** `Job nightly = cw.job("nightly-report", options)` once, then `nightly.run(job -> { ... })` (or `call` for a value) in the calling thread: what the function throws fails the run and is thrown again as it came, `job.cancelled()` turns true at the timeout (`RunOptions.interruptingAtTimeout()` interrupts the thread), a shutdown hook records runs a stopping JVM leaves open, and `job.log(line)` and `job.metric(name, value)` record output and numbers (`Cronwatch.current()` finds the run deeper down; `job.wrap(runnable)` carries it to another thread). Schedulers, with no change to the jobs: the starter watches every `@Scheduled` method (named `SimpleClassName.method`, or by `@CronwatchJob(name = ..., grace = ...)`), and under ShedLock only the instance that got the lock records the run; `CronwatchQuartz.watch(cw, scheduler, QuartzOptions.defaults())` (automatic in Spring Boot with `cronwatch-quartz`) makes every Quartz job with a trigger a job and each firing a run; `CronwatchJobRunr.watch(cw, storageProvider, JobRunrOptions.defaults())`, given to `.withJobFilter(...)`, makes every recurring job a job and each attempt a run. Each schedule is checked against the scheduler's own fire times.
+- **Check:** in Spring Boot the starter checks every `cronwatch.check-every`, once per cluster under ShedLock or a clustered Quartz; `CronwatchQuartz.scheduleCheck(scheduler)`, `CronwatchJobRunr.scheduleCheck(jobScheduler)`, `cw.start()` in any other long-running process, or for a program a crontab runs a second line running a `main` of the app's own that calls `CronwatchCli.main(MyApp::cronwatch, args)` with `check`.
+- **Dashboard:** the starter serves it at `/cronwatch` on Spring MVC or WebFlux (`cronwatch.web.*`), ahead of Spring Security since it checks its own token. Elsewhere `new CronwatchFilter(cw.routes(), "/cronwatch")` in a servlet container, or `WebServer.mount(server, "/cronwatch", cw.routes())` on the JDK's `HttpServer`. It needs `CRONWATCH_TOKEN` outside development, or `cronwatch.web.open=true` (`RoutesOptions.builder().noToken()`) behind the app's own auth.
+- **Handler:** for a platform that calls a URL, `nightly.handler((job, request) -> { ...; return null; })`, served by `WebServer.mount`, `new CronwatchServlet(handler)` or a `CronwatchFilter`, checked against `CRON_SECRET`.
+- **Channels:** in `dev.cronwatch.alerts`, each from its options (`Slack.webhook(url)`, `Resend.channel(ResendOptions.builder()...build())`), or `Channel.of(name, (alert, ctx) -> { ... })`; Claude triage is `Anthropic.triage(...)` in `dev.cronwatch.triage` and pg_cron `PgCron.source(dataSource)` in `dev.cronwatch.pgcron`.
+
+The MCP server works against it unchanged. Docs: https://cronwatch.dev/docs/java/ and https://cronwatch.dev/docs/java-schedulers/
 
 ## Investigating a failure
 

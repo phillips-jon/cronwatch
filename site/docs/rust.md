@@ -7,7 +7,7 @@ group: Rust
 
 # Rust
 
-The `cronwatch` crate is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Rust process can share one database with a Node, Ruby, Python, PHP, Go or Elixir process and the [MCP server](/docs/mcp/) works against any of them. This page covers the crate itself: a `main` a crontab runs, an axum or other tower service, a Lambda function. tokio-cron-scheduler and apalis have a page of their own: [Rust schedulers](/docs/rust-schedulers/).
+The `cronwatch` crate is a port of `@cronwatch/sdk`, not a new design. It decides missed, failed, stuck, slow and over budget by the same rules, sends the same alert text, and writes the same rows, so a Rust process can share one database with a Node, Ruby, Python, PHP, Go, Elixir or Java process and the [MCP server](/docs/mcp/) works against any of them. This page covers the crate itself: a `main` a crontab runs, an axum or other tower service, a Lambda function. tokio-cron-scheduler and apalis have a page of their own: [Rust schedulers](/docs/rust-schedulers/).
 
 ```bash
 cargo add cronwatch --features alerts
@@ -443,7 +443,7 @@ run.finish().await; // or run.fail(&err), or run.finish_with(result)
 
 ## Sharing a database with the other languages
 
-The SQL store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go and Elixir stores (the MySQL tables are the PHP and Go ports', which the Elixir port shares): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The crate's tests share a SQLite file with the built SDK, and have a Node client and a Rust client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+The SQL store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Elixir and Java stores (the MySQL tables are the PHP and Go ports', which the Elixir and Java ports share): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The crate's tests share a SQLite file with the built SDK, and have a Node client and a Rust client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
@@ -451,4 +451,4 @@ The public types write the SDK's JSON with `to_json()`, not serde_json, whose nu
 
 ## Kept in step
 
-The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Rust tests replay every one, as the Ruby gem's and the Python, PHP, Go and Elixir packages' do; the dashboard is checked against the SDK's pages byte for byte, straight, through tower and nested in axum. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).
+The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Rust tests replay every one, as the Ruby gem's and the Python, PHP, Go, Elixir and Java packages' do; the dashboard is checked against the SDK's pages byte for byte, straight, through tower and nested in axum. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).
