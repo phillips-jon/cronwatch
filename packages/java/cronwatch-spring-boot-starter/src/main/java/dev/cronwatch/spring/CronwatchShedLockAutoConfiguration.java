@@ -32,6 +32,7 @@ public class CronwatchShedLockAutoConfiguration {
   CronwatchChecker.ClusterLock cronwatchClusterLock(
       ObjectProvider<LockProvider> providers, CronwatchProperties properties) {
     return work ->
-        ShedLockSupport.underLock(providers.getObject(), properties.getCheckEvery(), work);
+        ShedLockSupport.underLock(
+            providers.getObject(), CronwatchChecker.interval(properties.getCheckEvery()), work);
   }
 }

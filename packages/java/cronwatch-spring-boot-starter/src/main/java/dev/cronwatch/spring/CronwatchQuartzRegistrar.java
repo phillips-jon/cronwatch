@@ -54,7 +54,7 @@ final class CronwatchQuartzRegistrar
       try {
         watched.add(CronwatchQuartz.watch(cw, s, QuartzOptions.defaults().app(app)));
         if (quartzCheck) {
-          CronwatchQuartz.scheduleCheck(s, properties.getCheckEvery());
+          CronwatchQuartz.scheduleCheck(s, CronwatchChecker.interval(properties.getCheckEvery()));
           runsTheCheck = true;
         }
       } catch (SchedulerException e) {
