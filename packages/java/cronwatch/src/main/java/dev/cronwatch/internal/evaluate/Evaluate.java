@@ -253,7 +253,7 @@ public final class Evaluate {
   /**
    * JavaScript's {@code Number(v)} for a JSON value, as a comparison with {@code >} coerces one.
    */
-  static double jsNumber(@Nullable Object v) {
+  public static double jsNumber(@Nullable Object v) {
     return switch (v) {
       case null -> 0;
       case Number n -> n.doubleValue();

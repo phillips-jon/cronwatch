@@ -2,6 +2,7 @@ package dev.cronwatch;
 
 import dev.cronwatch.Core.JobDef;
 import dev.cronwatch.internal.core.CurrentRun;
+import dev.cronwatch.internal.core.WebAccess;
 import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.duration.Schedules;
 import dev.cronwatch.internal.evaluate.Evaluate;
@@ -12,6 +13,8 @@ import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import dev.cronwatch.store.MemoryStore;
 import dev.cronwatch.store.Store;
+import dev.cronwatch.web.Routes;
+import dev.cronwatch.web.RoutesOptions;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
@@ -24,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
@@ -75,6 +79,51 @@ public final class Cronwatch implements AutoCloseable {
   final Runs runs;
   final Checks checks;
   private final @Nullable Thread shutdownHook;
+
+  /** Set the first time a handler of this client refuses a request for want of a secret. */
+  private final AtomicBoolean refusedNoSecret = new AtomicBoolean();
+
+  /** The environment when no variable names one: the Spring starter's, from the app's profiles. */
+  private volatile @Nullable String environmentFallback;
+
+  static {
+    WebAccess.install(
+        new WebAccess.Hooks() {
+          @Override
+          public JobState silence(Cronwatch cw, String name, double ms) {
+            return cw.silenceMs(name, ms);
+          }
+
+          @Override
+          public String environment(Cronwatch cw) {
+            return Env.environment(cw.environmentFallback);
+          }
+
+          @Override
+          public void environmentFallback(Cronwatch cw, @Nullable String environment) {
+            cw.environmentFallback = environment;
+          }
+
+          @Override
+          public boolean secretOptOut(Cronwatch cw) {
+            return cw.core.secretOptOut;
+          }
+
+          @Override
+          public boolean firstNoSecretRefusal(Cronwatch cw) {
+            return !cw.refusedNoSecret.getAndSet(true);
+          }
+
+          @Override
+          public WebAccess.Caught run(Job job, String trigger, WebAccess.Body body) {
+            Runs.Caught<Object> c =
+                job.cronwatch()
+                    .runs
+                    .executeCaught(job.def(), RunOptions.trigger(trigger), body::call);
+            return new WebAccess.Caught(c.run(), c.value(), c.thrown());
+          }
+        });
+  }
 
   private Cronwatch(Core core, boolean shutdownHook) {
     this.core = core;
@@ -696,6 +745,23 @@ public final class Cronwatch implements AutoCloseable {
     } catch (Exception e) {
       core.report(e, "closing the store");
     }
+  }
+
+  // ---- the dashboard
+
+  /**
+   * The dashboard and its JSON API, the SDK's {@code cw.routes()}: {@link Routes#handle} answers a
+   * request, and {@code WebServer}, the servlet filter and the Spring Boot starter serve it.
+   *
+   * @throws CronwatchException for an {@code origin} that is not an http or https URL
+   */
+  public Routes routes(RoutesOptions options) {
+    return Routes.of(this, options);
+  }
+
+  /** {@link #routes(RoutesOptions)} with the defaults: the token from {@code CRONWATCH_TOKEN}. */
+  public Routes routes() {
+    return routes(RoutesOptions.defaults());
   }
 
   // ---- what a source uses

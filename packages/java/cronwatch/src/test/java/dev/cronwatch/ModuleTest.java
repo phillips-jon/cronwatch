@@ -40,7 +40,8 @@ class ModuleTest {
             "dev.cronwatch.jdbc",
             "dev.cronwatch.json",
             "dev.cronwatch.store",
-            "dev.cronwatch.storetest"),
+            "dev.cronwatch.storetest",
+            "dev.cronwatch.web"),
         exported);
   }
 
