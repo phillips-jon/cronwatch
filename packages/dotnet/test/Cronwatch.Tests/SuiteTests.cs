@@ -11,17 +11,14 @@ namespace Cronwatch.Tests;
 /// <summary>What holds the suite itself: every fixture accounted for, the culture it runs in, the core's dependencies.</summary>
 public class SuiteTests
 {
-    /// <summary>The fixtures this phase replays.</summary>
-    private static readonly string[] Replayed = ["duration", "schedule", "output", "evaluate", "format", "health", "store", "triage", "pgcron"];
-
-    /// <summary>The fixtures the channels replay in phase 2.</summary>
-    private static readonly string[] Later = ["channels"];
+    /// <summary>Every fixture the SDK writes, each replayed.</summary>
+    private static readonly string[] Replayed = ["duration", "schedule", "output", "evaluate", "format", "health", "store", "channels", "triage", "pgcron"];
 
     [Fact]
     public void Every_fixture_the_sdk_writes_is_known()
     {
         var files = Directory.GetFiles(Fixtures.ConformanceDir, "*.json").Select(Path.GetFileNameWithoutExtension).OrderBy(n => n, StringComparer.Ordinal).ToList();
-        var known = Replayed.Concat(Later).ToHashSet(StringComparer.Ordinal);
+        var known = Replayed.ToHashSet(StringComparer.Ordinal);
         var unknown = files.Where(f => !known.Contains(f!)).ToList();
         Assert.True(unknown.Count == 0, "conformance/ has fixtures this port does not replay: " + string.Join(", ", unknown));
         foreach (string name in Replayed)
