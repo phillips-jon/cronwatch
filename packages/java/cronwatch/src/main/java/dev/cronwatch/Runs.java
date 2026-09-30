@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -120,24 +121,28 @@ final class Runs {
     boolean[] interruptedAtTimeout = {false};
     double timeout = timeoutOrDefault(def.stored());
     long delay = (long) Math.min(Math.max(0, timeout), Evaluate.MAX_DURATION_MS);
-    ScheduledFuture<?> timer =
-        core.timer.schedule(
-            () -> {
-              context.cancel();
-              if (options.interruptAtTimeout) {
-                running.lock();
-                try {
-                  if (inFunction[0]) {
-                    interruptedAtTimeout[0] = true;
-                    thread.interrupt();
-                  }
-                } finally {
-                  running.unlock();
-                }
+    Runnable atTimeout =
+        () -> {
+          context.cancel();
+          if (options.interruptAtTimeout) {
+            running.lock();
+            try {
+              if (inFunction[0]) {
+                interruptedAtTimeout[0] = true;
+                thread.interrupt();
               }
-            },
-            delay,
-            TimeUnit.MILLISECONDS);
+            } finally {
+              running.unlock();
+            }
+          }
+        };
+    ScheduledFuture<?> timer;
+    try {
+      timer = core.timer.schedule(atTimeout, delay, TimeUnit.MILLISECONDS);
+    } catch (RejectedExecutionException e) {
+      // The client was closed: the run is still recorded, with no timeout of its own.
+      timer = null;
+    }
     OpenRun open = new OpenRun(def, run, recorder, recorded);
     core.open.put(run.id(), open);
 
@@ -156,7 +161,9 @@ final class Runs {
       } finally {
         running.unlock();
       }
-      timer.cancel(false);
+      if (timer != null) {
+        timer.cancel(false);
+      }
       context.end();
       Mdc.restore(saved);
       CurrentRun.restore(previous);

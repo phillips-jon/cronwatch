@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
@@ -332,8 +333,14 @@ final class Checks {
                 + " Another process must run checks with Deliver.NOW (the default) to send them.");
       }
       Runnable tick = () -> core.spawn(this::check, "check");
-      firstTick = core.timer.schedule(tick, core.timings.firstCheckMs, TimeUnit.MILLISECONDS);
-      ticks = core.timer.scheduleAtFixedRate(tick, ms, ms, TimeUnit.MILLISECONDS);
+      try {
+        firstTick = core.timer.schedule(tick, core.timings.firstCheckMs, TimeUnit.MILLISECONDS);
+        ticks = core.timer.scheduleAtFixedRate(tick, ms, ms, TimeUnit.MILLISECONDS);
+      } catch (RejectedExecutionException e) {
+        // The client was closed: there is nothing to check on.
+        firstTick = null;
+        ticks = null;
+      }
     } finally {
       intervalLock.unlock();
     }

@@ -73,6 +73,16 @@ class SmokeTest {
   }
 
   @Test
+  void aRunAfterCloseStillRunsAndIsRecorded() {
+    Cronwatch cw = Cronwatch.builder().alerts(List.of()).noShutdownHook().build();
+    Job job = cw.job("late");
+    cw.close();
+    job.run(ctx -> ctx.log("after close"));
+    cw.start();
+    assertEquals("after close", cw.runs("late", 1).get(0).output());
+  }
+
+  @Test
   void theRunIsCurrentInItsThread() throws Exception {
     try (Cronwatch cw = Cronwatch.builder().alerts(List.of()).noShutdownHook().build()) {
       assertNull(Cronwatch.current());
