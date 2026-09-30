@@ -41,7 +41,7 @@ Every task in the app's schedule (`routes/console.php`, or `withSchedule()` in `
 
 - A run starts when Laravel starts the task, with the trigger `"schedule"`.
 - A command that exits non-zero fails with `Exited with code N`; a callback that throws fails with the exception, and one that returns `false` with `Returned false`. A callback's return value is treated as `run()`'s: a string is the output, and an HTTP response of 400 or more fails the run.
-- A command's output is what it wrote: its own file (`->sendOutputTo()`, or `->appendOutputTo()` read from where the file stood when the run started), or, for a task that sends its output nowhere (Laravel's default), a temporary file of CronWatch's own for the run. At most the last 256 KB is read. A failed command's output is kept with its error.
+- A command's output is what it wrote: its own file (`->sendOutputTo()`, or `->appendOutputTo()` read from where the file stood when the run started), or, for a task that sends its output nowhere (Laravel's default), nothing. Set `CRONWATCH_CAPTURE_OUTPUT=true` to record that output too: it goes to a temporary file of CronWatch's own for the run, which holds all of it until the run ends. At most the last 256 KB is read. A failed command's output is kept with its error.
 - A task Laravel skips (a filter said no, the schedule is paused, `->withoutOverlapping()` found the last run still going) records nothing.
 - A task `->onOneServer()` is recorded on the server that ran it, and a task `->runInBackground()` is finished by `schedule:finish`, which Laravel runs when the command ends, with its exit code and output. Sub-minute tasks (`->everyTenSeconds()`) record every run.
 

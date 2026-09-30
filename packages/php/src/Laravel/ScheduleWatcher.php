@@ -22,7 +22,8 @@ use Illuminate\Contracts\Container\Container;
  *   false"). A callback's return value is its output, as for run(); a
  *   command's output is what it wrote, read from its output file (the
  *   task's own, ->sendOutputTo() or ->appendOutputTo(), from where it stood
- *   when the run started, or else a file of CronWatch's own for the run).
+ *   when the run started, or else, with cronwatch.schedule.capture_output
+ *   on, a file of CronWatch's own for the run).
  * - ScheduledTaskFailed ends a run still open failed with the exception (a
  *   callback that threw).
  * - ScheduledTaskSkipped (filters or a paused schedule) records nothing.
@@ -40,9 +41,14 @@ final class ScheduleWatcher
     public const TRIGGER = 'schedule';
     /** How much of an output file's end a run reads. */
     private const OUTPUT_READ = 256 * 1024;
+    /** The name a foreground run's own output file starts with, in the system's temporary directory. */
+    private const OWN_PREFIX = 'cronwatch-schedule-';
+    /** How old an output file of CronWatch's own is before a later run sweeps it, in seconds. */
+    private const STALE_AFTER = 86400;
 
     /** @var array<int, array{key: int, file: ?string, offset: int, own: bool, output: mixed, append: mixed}> spl_object_id(event) => the run */
     private array $open = [];
+    private bool $swept = false;
 
     public function __construct(private readonly Container $app, private readonly ScheduledTasks $tasks)
     {
@@ -189,8 +195,12 @@ final class ScheduleWatcher
 
     /**
      * Where a command's output will be read from: its own file, from where
-     * it stands now, or a file of CronWatch's own for this run when the task
-     * sends its output nowhere.
+     * it stands now, or, when the task sends its output nowhere and
+     * `cronwatch.schedule.capture_output` is on, a file of CronWatch's own
+     * for this run. That file holds everything the command writes until the
+     * run ends (only its last 256 KB is read), so it is opt-in, and files
+     * of CronWatch's own left by runs that never ended are swept once a day
+     * old.
      *
      * @return array{file: ?string, offset: int, own: bool}
      */
@@ -199,7 +209,11 @@ final class ScheduleWatcher
         $default = method_exists($task, 'getDefaultOutput') ? $task->getDefaultOutput() : '/dev/null';
         $output = $task->output ?? $default;
         if ($output === $default) {
-            $file = !empty($task->runInBackground) ? self::backgroundFile($task) : (string) tempnam(sys_get_temp_dir(), 'cronwatch-schedule-');
+            if (!$this->app->make('config')->get('cronwatch.schedule.capture_output', false)) {
+                return ['file' => null, 'offset' => 0, 'own' => false];
+            }
+            $this->sweep();
+            $file = !empty($task->runInBackground) ? self::backgroundFile($task) : (string) @tempnam(sys_get_temp_dir(), self::OWN_PREFIX);
             if ($file === '') {
                 return ['file' => null, 'offset' => 0, 'own' => false];
             }
@@ -209,6 +223,24 @@ final class ScheduleWatcher
         }
         $offset = !empty($task->shouldAppendOutput) && is_file($output) ? (int) filesize($output) : 0;
         return ['file' => (string) $output, 'offset' => $offset, 'own' => false];
+    }
+
+    /** Output files of CronWatch's own more than a day old (a run killed before it ended), once per process. */
+    private function sweep(): void
+    {
+        if ($this->swept) {
+            return;
+        }
+        $this->swept = true;
+        $before = time() - self::STALE_AFTER;
+        $patterns = [sys_get_temp_dir() . '/' . self::OWN_PREFIX . '*', dirname(self::backgroundFile(null)) . '/schedule-cronwatch-*.log'];
+        foreach (array_unique($patterns) as $pattern) {
+            foreach (glob($pattern, GLOB_NOSORT) ?: [] as $file) {
+                if (is_file($file) && (int) @filemtime($file) < $before) {
+                    @unlink($file);
+                }
+            }
+        }
     }
 
     /**
@@ -232,13 +264,13 @@ final class ScheduleWatcher
     }
 
     /** The file a background task's output goes to, known to both schedule:run and schedule:finish. */
-    private static function backgroundFile(object $task): string
+    private static function backgroundFile(?object $task): string
     {
         $dir = function_exists('storage_path') ? storage_path('framework') : sys_get_temp_dir();
         if (!is_dir($dir)) {
             $dir = sys_get_temp_dir();
         }
-        return rtrim($dir, '/') . '/schedule-cronwatch-' . sha1((string) $task->mutexName()) . '.log';
+        return rtrim($dir, '/') . '/schedule-cronwatch-' . ($task === null ? '' : sha1((string) $task->mutexName())) . '.log';
     }
 
     /** The end of a file from an offset, at most OUTPUT_READ bytes. */
