@@ -344,6 +344,11 @@ final class Support {
     }
 
     @Override
+    public void close() throws Exception {
+      inner.close();
+    }
+
+    @Override
     public long prune(long before) throws Exception {
       check("prune");
       return inner.prune(before);
