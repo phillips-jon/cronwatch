@@ -124,11 +124,24 @@ internal sealed partial class HostedJobs : IHostedService, IDisposable
             {
                 return; // the schedule never fires again
             }
-            Waiting?.Invoke(hosted.Name, fire);
-            while ((now = _cw.NowMs) < fire)
+            // Told once the first timer is armed, so a clock moved after the telling fires it.
+            bool told = false;
+            while (true)
             {
-                TimeSpan wait = TimeSpan.FromMilliseconds(Math.Min(fire - now, LongestWait.TotalMilliseconds));
-                await Task.Delay(wait, clock, stop).ConfigureAwait(false);
+                now = _cw.NowMs;
+                Task? delay = now < fire
+                    ? Task.Delay(TimeSpan.FromMilliseconds(Math.Min(fire - now, LongestWait.TotalMilliseconds)), clock, stop)
+                    : null;
+                if (!told)
+                {
+                    told = true;
+                    Waiting?.Invoke(hosted.Name, fire);
+                }
+                if (delay == null)
+                {
+                    break;
+                }
+                await delay.ConfigureAwait(false);
             }
             lastFire = fire;
             if (running is { IsCompleted: false })
@@ -140,8 +153,11 @@ internal sealed partial class HostedJobs : IHostedService, IDisposable
                 }
                 continue;
             }
-            runningId = Guid.NewGuid().ToString();
-            running = RunOnceAsync(hosted, job, runningId, stop);
+            string id = runningId = Guid.NewGuid().ToString();
+            // Counted before it starts and uncounted only once its task has completed, so no run
+            // is under way whenever Running is 0, and the next fire is never skipped for it.
+            var begin = new Task<Task>(() => RunOnceAsync(hosted, job, id, stop));
+            running = begin.Unwrap();
             _runs.TryAdd(running, 0);
             _ = running.ContinueWith(
                 static (t, runs) => ((ConcurrentDictionary<Task, byte>)runs!).TryRemove(t, out _),
@@ -149,13 +165,13 @@ internal sealed partial class HostedJobs : IHostedService, IDisposable
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
+            // Off the loop, so the loop keeps the schedule while the job runs.
+            begin.Start(TaskScheduler.Default);
         }
     }
 
     private async Task RunOnceAsync(HostedJob hosted, Job job, string id, CancellationToken stop)
     {
-        // Off the loop, so the loop keeps the schedule while the job runs.
-        await Task.Yield();
         AsyncServiceScope scope = _scopes.CreateAsyncScope();
         await using (scope.ConfigureAwait(false))
         {
