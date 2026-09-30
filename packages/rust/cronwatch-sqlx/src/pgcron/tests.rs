@@ -400,6 +400,30 @@ async fn jobs_are_declared_history_is_copied_quietly_and_imports_are_idempotent(
     assert_eq!(k.runs("db:nightly-vacuum", 100).await.len(), 20, "its history is kept");
 }
 
+// The review: the source declared a job again only when its settings
+// changed, so after the dashboard's forget every later run was refused as
+// not declared until the process restarted.
+#[tokio::test]
+async fn a_job_forgotten_from_the_dashboard_is_declared_again_and_its_runs_recorded() {
+    let c = Clock::new(T0);
+    let cron = FakeCron::new();
+    cron.job(1, name("vacuum"), "0 3 * * *", true);
+    cron.add(1, "succeeded", T0 - 5000, T0 - 4000, Some("VACUUM"));
+    let k = Kit::new(&cron, Some(&c), Some(Arc::new(MemoryStore::new())), PgCronOptions::default());
+    k.check().await;
+    k.cw.forget("vacuum").await.unwrap();
+    cron.add(1, "succeeded", T0 - 3000, T0 - 2000, Some("VACUUM"));
+    cron.add(1, "failed", T0 - 1000, T0, Some("ERROR:  boom"));
+    c.advance(1000);
+    let result = k.check().await;
+    assert_eq!(k.others(), Vec::<String>::new());
+    assert_eq!(result.jobs.iter().map(|j| j.name.as_str()).collect::<Vec<_>>(), ["vacuum"]);
+    assert_eq!(summary(&result, "vacuum").definition.schedule(), "0 3 * * *");
+    let ids: Vec<String> = k.runs("vacuum", 50).await.into_iter().map(|r| r.id).collect();
+    assert_eq!(ids, [pid(3), pid(2)], "the runs after the forget");
+    assert_eq!(k.cw.defined_jobs().iter().map(|d| d.name().to_string()).collect::<Vec<_>>(), ["vacuum"]);
+}
+
 #[tokio::test]
 async fn a_jobs_options_apply_and_a_schedule_it_cannot_read_is_reported() {
     struct Rows;

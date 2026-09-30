@@ -576,7 +576,10 @@ impl PgCron {
         let all: Vec<PgCronJob> = rows.iter().map(job_of).collect();
 
         // Declare each job. A paused one (active = false) keeps its failures
-        // but loses its schedule, so it is not missed.
+        // but loses its schedule, so it is not missed. One forgotten since it
+        // was declared (the dashboard's forget) is declared again, though
+        // unchanged: record_run takes runs only of a declared job.
+        let live: HashSet<String> = host.defined_jobs().iter().map(|d| d.name().to_string()).collect();
         let mut order: Vec<i64> = Vec::new();
         let mut names: HashMap<i64, String> = HashMap::new();
         let mut definitions: HashMap<i64, Definition> = HashMap::new();
@@ -633,7 +636,7 @@ impl PgCron {
             };
             let mut definition = describe_job(&name, &options);
             let key = key_of(&definition);
-            if st.declared_keys.get(&name) != Some(&key) {
+            if st.declared_keys.get(&name) != Some(&key) || !live.contains(&name) {
                 if let Err(err) = host.job(&name, options) {
                     if sched.is_none() {
                         host.report_error(err, &format!("source pg_cron: job {}", j.job_id));
