@@ -12,6 +12,7 @@ import {
   onRunFinish,
   onRunStart,
   runDuration,
+  silenceEnd,
   staleAlert,
   stateVersion,
   summarize,
@@ -1197,10 +1198,13 @@ export class CronWatch {
     return this.store.getRun(id);
   }
 
-  /** Stop alerts for a job for a while. State keeps updating underneath. */
+  /**
+   * Stop alerts for a job for a while. State keeps updating underneath. The
+   * end is a whole millisecond, held at 2^53 - 1 (see silenceEnd).
+   */
   async silence(name: string, duration: Duration): Promise<JobState> {
     const ms = parseDuration(duration, "silence duration");
-    return this.patchState(name, (state) => { state.silencedUntil = this.now() + ms; });
+    return this.patchState(name, (state) => { state.silencedUntil = silenceEnd(this.now(), ms); });
   }
 
   async unsilence(name: string): Promise<JobState> {

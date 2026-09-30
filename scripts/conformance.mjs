@@ -37,6 +37,7 @@ import {
   onRunStart,
   isSilenced,
   runDuration,
+  silenceEnd,
   staleAlert,
   stateVersion,
   summarize,
@@ -1031,10 +1032,18 @@ function healthCases() {
   ];
   const staleCases = staleInputs.map(([alert, s]) => ({ alert, state: s, stale: staleAlert(alert, s) }));
 
+  // When a silence ends: the duration as silence() takes it (parsed as
+  // duration.json has it), added to now as a whole millisecond and held at
+  // 2^53 - 1, however long the silence asked for.
+  const silenceEnds = [
+    ["1h", T0], [0, T0], [1.5, T0], ["1.5s", T0], [0.999, T0], ["99999999999999999999w", T0], ["9".repeat(63) + "w", T0], [1e300, T0],
+    [MAX, T0], [MAX - T0, T0], [MAX - T0 - 1, T0], [MAX - T0 + 1, T0], ["1h", MAX - 10], [5, MAX], [2 ** 53, 0],
+  ].map(([duration, now]) => ({ duration, now, silencedUntil: silenceEnd(now, sdk.parseDuration(duration)) }));
+
   return {
     jobHealth: jobHealthCases, summarize: summaries, percentile: stats, median: medians, normalizeState: normalized, muteOpens: mutes, isStuck: stuck,
     unevaluableSummary: unevaluable, applySilence: silences, staleAlert: staleCases, runDuration: durations, stateVersion: versions,
-    failureCount: failureCounts,
+    failureCount: failureCounts, silenceEnd: silenceEnds,
   };
 }
 

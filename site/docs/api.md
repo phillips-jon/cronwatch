@@ -95,7 +95,7 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 | `jobsWithRuns(limit = 20)` | every job's summary with its newest `limit` runs, read together: `{ job, runs }[]` |
 | `jobSummary(name)`, `getRun(id)` | |
 | `runs(name, limit = 50)` | newest first; `limit` is truncated to a whole number from 1 to 500 |
-| `silence(name, duration)`, `unsilence(name)` | |
+| `silence(name, duration)`, `unsilence(name)` | the silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
 | `forget(name)` | remove a job and its runs from the store. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `definedJobs()` | the definitions declared in this process |
 | `close()` | stop the interval and close the store |

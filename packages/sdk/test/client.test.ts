@@ -202,6 +202,20 @@ test("silence swallows alerts and nothing opens underneath; unsilence alerts aga
   c.advance(1);
 });
 
+test("a silence ends on a whole millisecond, never past 2^53 - 1", async () => {
+  const { cw, c } = make();
+  cw.job("long");
+  assert.equal((await cw.silence("long", "99999999999999999999w")).silencedUntil, Number.MAX_SAFE_INTEGER);
+  assert.equal((await cw.silence("long", 1e300)).silencedUntil, Number.MAX_SAFE_INTEGER);
+  assert.equal((await cw.silence("long", 1.5)).silencedUntil, c.now() + 1);
+  const routes = cw.routes({ token: null, basePath: "/cronwatch" });
+  const res = await routes.POST(new Request("http://app.test/cronwatch/api/jobs/long/silence", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ for: "99999999999999999999w" }),
+  }));
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).state.silencedUntil, Number.MAX_SAFE_INTEGER);
+});
+
 test("triage output is attached to failure alerts and never blocks them", async () => {
   const { cw, alerts } = make({ triage: async ({ alert }) => `Probably ${alert.job}'s database.` });
   await assert.rejects(cw.run("t", async () => { throw new Error("x"); }));

@@ -50,6 +50,16 @@ export function runDuration(startedAt: number, finishedAt: number): number {
 }
 
 /**
+ * When a silence of `ms` from `now` ends: a whole millisecond, never past
+ * MAX_DURATION_MS (2^53 - 1), however long the silence asked for. Every port
+ * sharing the store reads it back unchanged, where a larger number could
+ * wrap to a time long past and send alerts during the silence.
+ */
+export function silenceEnd(now: number, ms: number): number {
+  return Math.min(now + Math.floor(Math.min(ms, MAX_DURATION_MS)), MAX_DURATION_MS);
+}
+
+/**
  * The version a stored state counts as for compareAndSetState: its
  * `version` when that is a whole number from 0 to MAX_DURATION_MS (2^53 - 1),
  * else 0, as when it is absent. The SQL stores read it the same way, so a
