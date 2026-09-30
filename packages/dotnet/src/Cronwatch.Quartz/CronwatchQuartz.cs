@@ -281,7 +281,11 @@ public sealed class CronwatchQuartz : IAsyncDisposable
             {
                 // The job listener stays until the firings open now have ended, since Quartz tells
                 // only the listeners it holds then that a job was executed.
-                scheduler.ListenerManager.RemoveSchedulerListener(ListenerName);
+                // Only its own: a watch that replaced this one under the same name keeps its listeners.
+                if (ReferenceEquals(scheduler.ListenerManager.GetSchedulerListener(ListenerName), SchedulerListener))
+                {
+                    scheduler.ListenerManager.RemoveSchedulerListener(ListenerName);
+                }
                 if (scheduler.Context.TryGetValue(ContextKey, out object? mine) && ReferenceEquals(mine, this))
                 {
                     scheduler.Context.Remove(ContextKey);
@@ -579,7 +583,10 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         }
         try
         {
-            scheduler.ListenerManager.RemoveJobListener(ListenerName);
+            if (ReferenceEquals(scheduler.ListenerManager.GetJobListener(ListenerName), JobListener))
+            {
+                scheduler.ListenerManager.RemoveJobListener(ListenerName);
+            }
         }
         catch (Exception e)
         {

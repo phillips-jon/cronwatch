@@ -415,6 +415,29 @@ public class CronwatchQuartzTests
     }
 
     [Fact]
+    public async Task Stopping_a_watch_another_replaced_leaves_the_new_ones_listeners()
+    {
+        await using var m = Client();
+        IScheduler scheduler = await BuildAsync();
+        try
+        {
+            CronwatchQuartz first = await CronwatchQuartz.WatchAsync(m.Cw, scheduler);
+            await using CronwatchQuartz second = await CronwatchQuartz.WatchAsync(m.Cw, scheduler);
+            await first.DisposeAsync();
+            Assert.Contains(scheduler.ListenerManager.GetJobListeners(), l => l.Name == CronwatchQuartz.ListenerName);
+            Assert.Contains(scheduler.ListenerManager.GetSchedulerListeners(), l => l.Name == CronwatchQuartz.ListenerName);
+            Assert.True(scheduler.Context.ContainsKey(CronwatchQuartz.ContextKey));
+            await scheduler.Start(default);
+            await scheduler.ScheduleJob(Job("after", _ => default), Once("after"), default, default);
+            await Eventually("the run", async () => (await Runs(m.Cw, "after")) is [{ Status.Value: "ok" }]);
+        }
+        finally
+        {
+            await scheduler.Shutdown(true, default);
+        }
+    }
+
+    [Fact]
     public async Task Stopping_while_a_firing_runs_still_closes_its_run()
     {
         await using var m = Client();
