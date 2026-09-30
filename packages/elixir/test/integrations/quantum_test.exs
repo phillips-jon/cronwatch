@@ -181,6 +181,23 @@ defmodule Cronwatch.QuantumTest do
     assert messages(errors) == []
   end
 
+  test "a job forgotten while Quantum still runs it comes back with its schedule" do
+    start_scheduler(nightly: [schedule: "0 2 1 7 *", task: {QJobs, :nightly, []}])
+    %{cw: cw} = make(alerts: [], integrations: [integration()])
+    Cronwatch.Quantum.settle(instance: cw, scheduler: QScheduler)
+    scheduled = stored(cw, "nightly")
+    assert scheduled =~ ~s("schedule":"0 2 1 7 *")
+
+    # The dashboard's Forget, then a run and a check with its sync.
+    Cronwatch.forget!("nightly", instance: cw)
+    QScheduler.run_job(:nightly)
+    eventually(fn -> match_runs(cw, "nightly") end)
+    assert {:ok, _} = Cronwatch.Quantum.check(instance: cw, scheduler: QScheduler)
+    assert stored(cw, "nightly") == scheduled
+    assert {:ok, _} = Cronwatch.Quantum.check(instance: cw, scheduler: QScheduler)
+    assert stored(cw, "nightly") == scheduled
+  end
+
   test "check/1 syncs and checks, and is never a job" do
     %{cw: earlier} = make(alerts: [])
     store = Cronwatch.Config.get(earlier).store
