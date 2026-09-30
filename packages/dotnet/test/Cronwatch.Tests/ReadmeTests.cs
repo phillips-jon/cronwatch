@@ -123,7 +123,10 @@ public class ReadmeTests
     public void Every_example_in_the_readme_is_here()
     {
         string readme = File.ReadAllText(Path.Combine(Fixtures.Repo, "packages", "dotnet", "README.md"), Encoding.UTF8);
-        string here = Squash(File.ReadAllText(Path.Combine(Fixtures.Repo, "packages", "dotnet", "test", "Cronwatch.Tests", "ReadmeTests.cs"), Encoding.UTF8));
+        // The ASP.NET Core examples compile in the adapter's tests, which reference it.
+        string here = Squash(
+            File.ReadAllText(Path.Combine(Fixtures.Repo, "packages", "dotnet", "test", "Cronwatch.Tests", "ReadmeTests.cs"), Encoding.UTF8)
+            + File.ReadAllText(Path.Combine(Fixtures.Repo, "packages", "dotnet", "test", "Cronwatch.AspNetCore.Tests", "ReadmeTests.cs"), Encoding.UTF8));
         var blocks = new List<string>();
         foreach (Match match in Regex.Matches(readme.Replace("\r\n", "\n", StringComparison.Ordinal), "```csharp\n(.*?)```", RegexOptions.Singleline))
         {
