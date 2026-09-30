@@ -33,7 +33,16 @@ public class CrontabExampleTests
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+        }
+        catch (TimeoutException)
+        {
+            // Stopped, so it lets go of the database before the directory is deleted.
+            process.Kill(entireProcessTree: true);
+            throw;
+        }
         return (process.ExitCode, (await stdout).Replace("\r\n", "\n", StringComparison.Ordinal), (await stderr).Replace("\r\n", "\n", StringComparison.Ordinal));
     }
 

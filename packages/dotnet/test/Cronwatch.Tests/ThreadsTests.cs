@@ -425,7 +425,16 @@ public class ThreadsTests
         using var process = Process.Start(start)!;
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+        }
+        catch (TimeoutException)
+        {
+            // Stopped, so it lets go of the database before the directory is deleted.
+            process.Kill(entireProcessTree: true);
+            throw;
+        }
         string output = (await stdout).Replace("\r\n", "\n", StringComparison.Ordinal);
         Assert.True(process.ExitCode == 3, "exit " + process.ExitCode + ": " + output + await stderr);
         Assert.Equal("started\n", output);
