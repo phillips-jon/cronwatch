@@ -38,7 +38,8 @@ const slug = (s) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^a-z0-9]+/
 const hash = (buf) => createHash("sha256").update(buf).digest("hex").slice(0, 10);
 
 /* The footer's columns: the docs to start from, each language's page, the
-   registries every package is on, and the project itself. */
+   registries every package is on, and the project itself. A link off the
+   site opens in a new tab. */
 const FOOTER = [
   ["Docs", [["Getting started", "/docs/"], ["Schedules", "/docs/schedules/"], ["Alerts", "/docs/alerts/"], ["Dashboard", "/docs/dashboard/"], ["MCP server", "/docs/mcp/"], ["Agent skill", "/docs/agent-skill/"]]],
   ["Languages", [["TypeScript", "/docs/node/"], ["Ruby", "/docs/ruby/"], ["Python", "/docs/python/"], ["PHP", "/docs/php/"], ["Go", "/docs/go/"], ["Rust", "/docs/rust/"], ["Elixir", "/docs/elixir/"], ["Java", "/docs/java/"], [".NET", "/docs/dotnet/"]]],
@@ -46,7 +47,7 @@ const FOOTER = [
   ["Project", [["GitHub", GITHUB], ["Releases", `${GITHUB}/releases`], ["Contact", "/contact/"], ["Terms", "/terms/"], ["Privacy", "/privacy/"]]],
 ];
 const FOOTER_COLUMNS = FOOTER.map(([head, items]) =>
-  `<div><p class="foot-head">${head}</p><ul>${items.map(([label, href]) => `<li><a href="${href}">${label}</a></li>`).join("")}</ul></div>`).join("");
+  `<div><p class="foot-head">${head}</p><ul>${items.map(([label, href]) => `<li><a href="${href}"${href.startsWith("http") ? ` target="_blank" rel="noopener"` : ""}>${label}</a></li>`).join("")}</ul></div>`).join("");
 
 /* The theme switch: a moon on light paper, a sun on dark, each drawn in the
    footer's thin lines; the stylesheet shows the one for the paper in use. */
@@ -180,7 +181,7 @@ ${body}
       <nav class="foot-cols" aria-label="Footer">${FOOTER_COLUMNS}</nav>
     </div>
     <div class="foot-end">
-      <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me">Jon Phillips</a>.</p>
+      <p class="rights">© ${new Date().getFullYear()} CronWatch. MIT licensed. Made by <a href="https://joncphillips.com" rel="me noopener" target="_blank">Jon Phillips</a>.</p>
       <button class="theme" type="button" title="Switch between light and dark (Shift+Cmd+D, or Shift+Ctrl+D)" aria-label="Switch to light">${THEME_ICONS}</button>
     </div>
   </footer>
