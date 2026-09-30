@@ -114,8 +114,12 @@ internal sealed class WhatwgUrl
         return b.ToString();
     }
 
-    /// <summary>Reads a URL: its kind, the scheme for another scheme, and the URL for a special one.</summary>
-    public static (UrlKind Kind, string Scheme, WhatwgUrl? Url) Parse(string raw)
+    /// <summary>
+    /// Reads a URL: its kind, the scheme for another scheme, and the URL for a special one. With
+    /// <paramref name="idn"/>, a host outside ASCII is lowercased and written in punycode, as the
+    /// dashboard reads an origin, rather than refused, as a channel's URL is.
+    /// </summary>
+    public static (UrlKind Kind, string Scheme, WhatwgUrl? Url) Parse(string raw, bool idn = false)
     {
         string s = Clean(raw);
         if (s.Length == 0 || !AsciiAlpha(s[0]))
@@ -140,7 +144,7 @@ internal sealed class WhatwgUrl
         {
             return (UrlKind.Other, scheme, null);
         }
-        WhatwgUrl? url = Special(scheme, s[(colon + 1)..]);
+        WhatwgUrl? url = Special(scheme, s[(colon + 1)..], idn);
         return url == null ? (UrlKind.Invalid, scheme, null) : (UrlKind.Special, scheme, url);
     }
 
@@ -157,7 +161,7 @@ internal sealed class WhatwgUrl
         return b.ToString();
     }
 
-    private static WhatwgUrl? Special(string scheme, string rest)
+    private static WhatwgUrl? Special(string scheme, string rest, bool idn)
     {
         int i = 0;
         while (i < rest.Length && (rest[i] == '/' || rest[i] == '\\'))
@@ -236,7 +240,7 @@ internal sealed class WhatwgUrl
             hostText = c < 0 ? hostPort : hostPort[..c];
             portText = c < 0 ? "" : hostPort[(c + 1)..];
         }
-        string? host = ReadHost(hostText);
+        string? host = ReadHost(hostText, idn);
         if (host == null)
         {
             return null;
@@ -283,7 +287,7 @@ internal sealed class WhatwgUrl
 
     // ---- the host
 
-    private static string? ReadHost(string text)
+    private static string? ReadHost(string text, bool idn)
     {
         if (text.Length == 0)
         {
@@ -297,6 +301,15 @@ internal sealed class WhatwgUrl
             return pieces == null ? null : "[" + Ipv6Text(pieces) + "]";
         }
         byte[] decoded = PercentDecodeBytes(text);
+        if (idn && Array.Exists(decoded, b => b >= 0x80))
+        {
+            byte[]? mapped = IdnHost(decoded);
+            if (mapped == null)
+            {
+                return null;
+            }
+            decoded = mapped;
+        }
         foreach (byte b in decoded)
         {
             // Outside ASCII: refused rather than converted to punycode, since .NET's IDN mapping
@@ -313,6 +326,45 @@ internal sealed class WhatwgUrl
             labels.RemoveAt(labels.Count - 1);
         }
         return IsNumber(labels[^1]) ? Ipv4(labels) : host;
+    }
+
+    /// <summary>
+    /// A host outside ASCII as the dashboard reads it: UTF-8 (anything else refused), no longer
+    /// than <see cref="Origins.MaxIdnHost"/> bytes, lowercased, and each label outside ASCII
+    /// written in punycode; null when it cannot be.
+    /// </summary>
+    private static byte[]? IdnHost(byte[] decoded)
+    {
+        if (decoded.Length > Origins.MaxIdnHost)
+        {
+            return null;
+        }
+        string? text = WebText.StrictUtf8(decoded);
+        if (text == null)
+        {
+            return null;
+        }
+        var labels = new List<string>();
+        foreach (string label in text.ToLowerInvariant().Split('.'))
+        {
+            bool ascii = true;
+            foreach (char c in label)
+            {
+                ascii &= c < 0x80;
+            }
+            if (ascii)
+            {
+                labels.Add(label);
+                continue;
+            }
+            string? code = Origins.Punycode(label);
+            if (code == null)
+            {
+                return null;
+            }
+            labels.Add("xn--" + code);
+        }
+        return Encoding.ASCII.GetBytes(string.Join('.', labels));
     }
 
     /// <summary>Whether a label reads as a number, so the host is an IPv4 address.</summary>

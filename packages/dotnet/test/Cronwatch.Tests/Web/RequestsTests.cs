@@ -30,6 +30,57 @@ public class RequestsTests
         Assert.Equal(expected, Origins.Configured(value));
     }
 
+    /// <summary>
+    /// The origin option over every text of <c>channels.json</c>'s <c>urls</c>, as the SDK's
+    /// <c>configuredOrigin</c> reads it with Node's <c>new URL</c>: an http or https URL's origin,
+    /// the http-or-https refusal for another scheme, and the absolute-URL refusal for no URL.
+    /// </summary>
+    [Fact]
+    public void The_origin_option_reads_the_fixtures_urls_as_node_does()
+    {
+        var wrong = new List<string>();
+        foreach (JsObject c in Fixtures.Objects(Fixtures.Load("channels"), "urls"))
+        {
+            string input = Fixtures.String(c, "input")!;
+            string want;
+            if (input.Length == 0)
+            {
+                // The SDK takes "" as no origin before it reads a URL.
+                want = "null";
+            }
+            else if (c.Get("invalid") is true)
+            {
+                want = "absolute";
+            }
+            else if (c.Has("other"))
+            {
+                want = "http or https";
+            }
+            else
+            {
+                string url = Fixtures.String(c, "url")!;
+                int slash = url.IndexOf('/', url.IndexOf("//", StringComparison.Ordinal) + 2);
+                want = url.StartsWith("http:", StringComparison.Ordinal) || url.StartsWith("https:", StringComparison.Ordinal)
+                    ? (slash < 0 ? url : url[..slash])
+                    : "http or https";
+            }
+            string got;
+            try
+            {
+                got = Origins.Configured(input) ?? "null";
+            }
+            catch (ArgumentException e)
+            {
+                got = e.Message.Contains("http or https", StringComparison.Ordinal) ? "http or https" : "absolute";
+            }
+            if (got != want)
+            {
+                wrong.Add(Json.Stringify(input) + ": node " + want + ", .NET " + got);
+            }
+        }
+        Assert.Equal([], wrong);
+    }
+
     [Fact]
     public void The_origin_option_is_refused_with_the_sdks_messages()
     {
@@ -60,6 +111,19 @@ public class RequestsTests
         Assert.Null(Origins.Bare("https://user@evil.example"));
         Assert.Null(Origins.Bare("https://evil.example?q"));
         Assert.Null(Origins.Bare("javascript://evil.example"));
+        // The SDK tests the path new URL resolved, so dot segments that resolve to "/" are bare.
+        Assert.Equal("https://evil.example", Origins.Bare("https://evil.example/."));
+        Assert.Equal("https://evil.example", Origins.Bare("https://evil.example/a/.."));
+        Assert.Equal("https://evil.example", Origins.Bare("https://evil.example?"));
+    }
+
+    /// <summary>A URL of another special scheme that is no URL is refused as Node refuses it: not a URL.</summary>
+    [Fact]
+    public void An_origin_option_of_another_scheme_that_is_no_url_is_refused_as_no_url()
+    {
+        Assert.Equal(
+            "routes: origin must be an absolute URL such as \"https://app.example.com\", got \"ws://[\"",
+            Assert.Throws<ArgumentException>(() => Origins.Configured("ws://[")).Message);
     }
 
     // The Go port's second audit: a Host header outside ASCII is punycoded only up to 1024 bytes;
