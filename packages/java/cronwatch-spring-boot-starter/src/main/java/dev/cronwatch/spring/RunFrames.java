@@ -1,7 +1,8 @@
 package dev.cronwatch.spring;
 
 import dev.cronwatch.ObservedRun;
-import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -11,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  * nest. The thread's entry is removed when its last frame is, so no pooled thread keeps one.
  */
 final class RunFrames {
-  private static final ThreadLocal<ArrayDeque<Frame>> STACK = new ThreadLocal<>();
+  private static final ThreadLocal<Deque<Frame>> STACK = new ThreadLocal<>();
 
   private RunFrames() {}
 
@@ -19,36 +20,49 @@ final class RunFrames {
   static final class Frame {
     final @Nullable ObservedRun run;
 
-    /** What the first lock asked for in the invocation answered: null until one was asked. */
-    @Nullable Boolean lockTaken;
+    /** The stack of the thread the invocation started in, which it is taken off at its end. */
+    final Deque<Frame> stack;
 
-    Frame(@Nullable ObservedRun run) {
+    /** The thread the invocation started in. */
+    final Thread thread = Thread.currentThread();
+
+    /** What the first lock asked for in the invocation answered: null until one was asked. */
+    volatile @Nullable Boolean lockTaken;
+
+    Frame(@Nullable ObservedRun run, Deque<Frame> stack) {
       this.run = run;
+      this.stack = stack;
     }
   }
 
   /** Pushes a frame for an invocation starting in this thread. */
   static Frame push(@Nullable ObservedRun run) {
-    ArrayDeque<Frame> stack = STACK.get();
+    Deque<Frame> stack = STACK.get();
     if (stack == null) {
-      stack = new ArrayDeque<>();
+      stack = new ConcurrentLinkedDeque<>();
       STACK.set(stack);
     }
-    Frame f = new Frame(run);
+    Frame f = new Frame(run, stack);
     stack.push(f);
     return f;
   }
 
-  /** Removes {@code frame} from this thread's stack, and the stack with its last frame. */
+  /**
+   * Removes {@code frame} from the stack of the thread it started in, whichever thread ends it (a
+   * reactive method's observation stops where its publisher completes), and in that thread the
+   * stack with its last frame.
+   */
   static void pop(Frame frame) {
-    ArrayDeque<Frame> stack = STACK.get();
-    if (stack == null) {
-      return;
-    }
-    stack.removeFirstOccurrence(frame);
-    if (stack.isEmpty()) {
+    frame.stack.removeFirstOccurrence(frame);
+    if (Thread.currentThread().equals(frame.thread) && frame.stack.isEmpty()) {
       STACK.remove();
     }
+  }
+
+  /** How many invocations are open in this thread. */
+  static int depth() {
+    Deque<Frame> stack = STACK.get();
+    return stack == null ? 0 : stack.size();
   }
 
   /**
@@ -56,12 +70,9 @@ final class RunFrames {
    * same invocation (one the method takes itself) changes nothing.
    */
   static void lockAnswered(boolean taken) {
-    ArrayDeque<Frame> stack = STACK.get();
-    if (stack == null || stack.isEmpty()) {
-      return;
-    }
-    Frame top = stack.peek();
-    if (top.lockTaken == null) {
+    Deque<Frame> stack = STACK.get();
+    Frame top = stack == null ? null : stack.peek();
+    if (top != null && top.lockTaken == null) {
       top.lockTaken = taken;
     }
   }
