@@ -1508,3 +1508,44 @@ jobs:
             unzip -l "$nupkg" | grep -q " $f\$" || { echo "missing $f"; exit 1; }
           done
           if unzip -l "$nupkg" | grep -Eq ' (test|conformance|examples)/'; then echo "the package carries test files"; exit 1; fi
+  dotnet-frameworks:
+    name: dotnet-frameworks (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest and newest release each integration supports: NuGet
+          # resolves a package's floor, and the app's own lock picks the rest.
+          - { name: oldest, hangfire: "1.8.0", quartz: "4.0.0" }
+          - { name: newest, hangfire: "1.8.25", quartz: "4.3.0" }
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+          POSTGRES_DB: cw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.nuget/packages
+          key: nuget-frameworks-${{ matrix.name }}-${{ hashFiles('packages/dotnet/Directory.Packages.props', 'packages/dotnet/**/*.csproj') }}
+          restore-keys: nuget-frameworks-${{ matrix.name }}-
+      - name: dotnet test, the integrations
+        working-directory: packages/dotnet
+        env:
+          CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
+        run: |
+          for p in test/Cronwatch.Hangfire.Tests test/Cronwatch.Quartz.Tests; do
+            dotnet test --project "$p" -c Release -p:HangfireVersion=${{ matrix.hangfire }} -p:QuartzVersion=${{ matrix.quartz }}
+          done
