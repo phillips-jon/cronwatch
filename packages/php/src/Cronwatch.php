@@ -360,12 +360,10 @@ final class Cronwatch
     public function jobsWithRuns(mixed $limit = 20): array
     {
         $this->ensureReady();
-        foreach ($this->definitions as $definition) {
-            $this->sync($definition);
-        }
+        $jobs = $this->writtenJobs();
         $at = $this->now();
         $count = self::clampLimit($limit, 20, 0);
-        return array_map(fn (StoredJob $stored) => $this->snapshot($stored, $at, $count), $this->store->listJobs());
+        return array_map(fn (StoredJob $stored) => $this->snapshot($stored, $at, $count), $jobs);
     }
 
     /** @return list<StoredJob> every job the store knows about, as stored, by name. Reads nothing else. */
@@ -375,11 +373,12 @@ final class Cronwatch
         return $this->store->listJobs();
     }
 
+    /** A job's summary, or null for one the store does not have. One declared here and forgotten elsewhere is written again. */
     public function jobSummary(string $name): ?JobSummary
     {
         $this->ensureReady();
         if (isset($this->definitions[$name])) {
-            $this->sync($this->definitions[$name]);
+            $this->sync($this->definitions[$name], true);
         }
         $stored = $this->store->getJob($name);
         return $stored === null ? null : $this->snapshot($stored, $this->now(), 0)->job;
@@ -417,7 +416,12 @@ final class Cronwatch
         });
     }
 
-    /** Remove a job and its runs from the store. A job still declared in code comes back on its next run. */
+    /**
+     * Remove a job and its runs from the store. A job still declared in code
+     * comes back: here on its next run, and in any other process that
+     * declares it on its next run there, or at that process's next check or
+     * dashboard read.
+     */
     public function forget(string $name): void
     {
         $this->ensureReady();
@@ -567,22 +571,65 @@ final class Cronwatch
      * calls back into the client (a hook inside it, say) can declare the name
      * again while its write is under way: the name is then still to be
      * written, whatever was written meanwhile, since this write may have
-     * landed after it.
+     * landed after it. A name is marked as written only while that same
+     * declaration stands, so a forget that lands during the write (deleting
+     * the row after it) leaves the name to be written again, as does one
+     * forgotten before it.
+     *
+     * With `confirm`, as a run starts, a name already written is read back:
+     * another process may have forgotten the job since, and a job still
+     * declared here comes back on its next run.
      */
-    private function sync(JobDefinition $definition): void
+    private function sync(JobDefinition $definition, bool $confirm = false): void
     {
         $this->ensureReady();
         $name = (string) $definition->get('name');
         if (isset($this->synced[$name])) {
-            return;
+            if (!$confirm || $this->store->getJob($name) !== null) {
+                return;
+            }
+            unset($this->synced[$name]);
         }
         $standing = $this->definitions[$name] ?? $definition;
         $this->store->upsertJob(Serialize::toStored($standing), $this->now());
-        if (($this->definitions[$name] ?? $standing) === $standing) {
+        if (($this->definitions[$name] ?? null) === $standing) {
             $this->synced[$name] = true;
         } else {
             unset($this->synced[$name]);
         }
+    }
+
+    /**
+     * Every stored job, once each declaration has been written. A job
+     * declared here that the store no longer has was forgotten by another
+     * process after this one wrote it: it is written again, as its next run
+     * would, so it is checked and shown while any process still declares it.
+     *
+     * @return list<StoredJob>
+     */
+    private function writtenJobs(): array
+    {
+        foreach ($this->definitions as $definition) {
+            $this->sync($definition);
+        }
+        $jobs = $this->store->listJobs();
+        $listed = [];
+        foreach ($jobs as $job) {
+            $listed[$job->name] = true;
+        }
+        $missing = array_filter($this->definitions, fn (JobDefinition $d) => !isset($listed[(string) $d->get('name')]));
+        if ($missing === []) {
+            return $jobs;
+        }
+        foreach ($missing as $name => $definition) {
+            // Not one forgotten or declared again meanwhile.
+            if (($this->definitions[$name] ?? null) !== $definition) {
+                continue;
+            }
+            unset($this->synced[$name]);
+            $this->sync($definition);
+        }
+        return $this->store->listJobs();
     }
 
     private function readState(string $job): JobState
@@ -711,7 +758,7 @@ final class Cronwatch
         $run = new Run($id ?? self::uuid(), $name, RunStatus::RUNNING, $startedAt, trigger: $trigger);
         $recorded = false;
         try {
-            $this->sync($definition);
+            $this->sync($definition, true);
             $this->store->insertRun(clone $run);
             $recorded = true;
         } catch (\Throwable $error) {
@@ -1041,7 +1088,7 @@ final class Cronwatch
         $run = new Run($id ?? self::uuid(), $name, RunStatus::RUNNING, $this->now(), trigger: $trigger);
         $recorded = false;
         try {
-            $this->sync($definition);
+            $this->sync($definition, true);
             $this->store->insertRun(clone $run);
             $recorded = true;
         } catch (\Throwable $error) {
@@ -1308,7 +1355,7 @@ final class Cronwatch
         // as failing (see Evaluate::unevaluableSummary) and does not stop the others.
         $jobs = [];
         $spent = 0.0;
-        foreach ($this->store->listJobs() as $stored) {
+        foreach ($this->writtenJobs() as $stored) {
             try {
                 $recent = $this->store->listRuns($stored->name, Evaluate::BASELINE_WINDOW);
                 $nextExpectedAt = null;

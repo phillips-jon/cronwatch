@@ -189,6 +189,53 @@ final class ConcurrencyTest extends TestCase
         $this->assertSame('every 5m', $inner->getJob('a')->definition->get('schedule'));
     }
 
+    public function testAForgetThatLandsWhileAJobsFirstWriteIsUnderWayLeavesItToBeWrittenOnItsNextRun(): void
+    {
+        $inner = new MemoryStore();
+        $store = new FlakyStore($inner);
+        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: false);
+        $forgotten = false;
+        $store->hooks['upsertJob'] = function (\Closure $next, array $args) use (&$forgotten, $cw) {
+            $next(...$args);
+            // The forget lands just after the write.
+            if (!$forgotten) {
+                $forgotten = true;
+                $cw->forget('a');
+            }
+        };
+        $handle = $cw->job('a', ['schedule' => 'every 5m']);
+        $handle->run(fn () => null);
+        $this->assertNull($inner->getJob('a'));
+        $handle->run(fn () => null);
+        $this->assertSame('every 5m', $inner->getJob('a')?->definition->get('schedule'));
+    }
+
+    public function testAJobForgottenByAnotherProcessComesBackInALongLivedOneThatStillDeclaresIt(): void
+    {
+        $store = new MemoryStore();
+        $clock = new Clock();
+        $worker = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: false);
+        $web = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: false);
+        $handle = $worker->job('nightly', ['schedule' => '0 2 * * *']);
+        $handle->run(fn () => null);
+        $comesBack = [
+            'run' => fn () => $handle->run(fn () => null),
+            'start' => fn () => $handle->start()->finish(),
+            'check' => fn () => $worker->check(),
+            'jobs' => fn () => $worker->jobs(),
+            'jobSummary' => fn () => $worker->jobSummary('nightly'),
+        ];
+        foreach ($comesBack as $how => $call) {
+            $web->forget('nightly');
+            $this->assertNull($store->getJob('nightly'), $how);
+            // The process that forgot it does not bring it back.
+            $web->check();
+            $this->assertNull($store->getJob('nightly'), $how);
+            $call();
+            $this->assertSame('0 2 * * *', $store->getJob('nightly')?->definition->get('schedule'), $how);
+        }
+    }
+
     public function testADeclarationWrittenFromInsideTheEarlierOnesWriteIsWrittenAgainSoItStays(): void
     {
         [$cw, $inner] = $this->heldUpsert(function (Cronwatch $cw): void {
