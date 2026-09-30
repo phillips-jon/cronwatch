@@ -60,11 +60,11 @@ export const { GET, POST, DELETE } = cw.routes();
 | Language | Install | Docs |
 |---|---|---|
 | TypeScript and Node | `npm install @cronwatch/sdk`, and the driver for a store (below) | [Getting started](https://cronwatch.dev/docs/) |
-| Ruby and Rails | `bundle add cronwatch` | [Ruby and Rails](#ruby-and-rails), [Rails](https://cronwatch.dev/docs/rails/), [Ruby](https://cronwatch.dev/docs/ruby/) |
+| Ruby and Rails | `bundle add cronwatch`, then `bin/rails generate cronwatch:install` and `bin/rails db:migrate` in a Rails app (Ruby 3.2 or newer; Rails 7.2, 8.0 and 8.1) | [Rails](https://cronwatch.dev/docs/rails/), [Ruby](https://cronwatch.dev/docs/ruby/), [its README](packages/ruby/README.md) |
 | Python | `pip install cronwatch-sdk` | [Python](https://cronwatch.dev/docs/python/), [its README](packages/python/README.md) |
 | PHP | `composer require cronwatch/cronwatch` | [PHP](https://cronwatch.dev/docs/php/), [its README](packages/php/README.md) |
 | WordPress | the plugin's zip, [cronwatch.zip](https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip): upload it under Plugins, Add New, or `wp plugin install https://github.com/phillips-jon/cronwatch/releases/latest/download/cronwatch.zip --activate` (it will be in the plugin directory once it is approved) | [WordPress](https://cronwatch.dev/docs/wordpress/) |
-| Drupal | `composer require drupal/cronwatch`, then `drush pm:install cronwatch` | [Drupal](https://cronwatch.dev/docs/drupal/) |
+| Drupal | `composer require drupal/cronwatch`, then `drush pm:install cronwatch` (once its first release is on drupal.org) | [Drupal](https://cronwatch.dev/docs/drupal/) |
 | Craft CMS | `composer require cronwatch/craft`, then `php craft plugin/install cronwatch` | [Craft CMS](https://cronwatch.dev/docs/craft/) |
 | Go | `go get cronwatch.dev/go`, and `go get cronwatch.dev/go/robfigcron` (or `/gocron`, `/river`, `/asynq`) for a scheduler | [Go](https://cronwatch.dev/docs/go/), [Go schedulers](https://cronwatch.dev/docs/go-schedulers/), [its README](packages/go/README.md) |
 | Rust | `cargo add cronwatch --features alerts`, `cargo add cronwatch-sqlx --features postgres` (or `sqlite`, `mysql`), `cargo add sqlx --no-default-features --features runtime-tokio,postgres` and `cargo add tokio --features macros,rt-multi-thread`; `cronwatch-tokio-cron-scheduler` or `cronwatch-apalis` for a scheduler | [Rust](https://cronwatch.dev/docs/rust/), [Rust schedulers](https://cronwatch.dev/docs/rust-schedulers/), [its README](packages/rust/README.md) |
@@ -84,28 +84,9 @@ The SDK depends only on `croner`. The core, the D1 store, the pg_cron source and
 
 The store entry points' type declarations refer to the driver's types, so a TypeScript project using them without `@types/better-sqlite3` or `@types/pg` fails with TS7016 unless `skipLibCheck` is on. The package ships ESM and CommonJS, each with its own types.
 
-## Ruby and Rails
+## One library, nine languages
 
-The `cronwatch` gem is a port of the SDK, not a new design: it writes the same tables and sends the same alerts, so a Rails app and a Node service can share one database and one dashboard.
-
-```ruby
-class NightlyReportJob < ApplicationJob
-  include Cronwatch::ActiveJob
-  cronwatch schedule: "0 2 * * *", grace: "15m", expect: "Report written"
-
-  def perform
-    cronwatch.log("Report written")
-  end
-end
-```
-
-```bash
-bundle add cronwatch
-bin/rails generate cronwatch:install
-bin/rails db:migrate
-```
-
-`gem "cronwatch"` in a Rails app loads the Rails integration, and `Cronwatch::Sidekiq` when Sidekiq is in the bundle. `bin/rails generate cronwatch:install` adds the migration and the initializer (which sets the ActiveRecord store) and prints the rest: schedule `Cronwatch::CheckJob` every five minutes (or `bin/rails cronwatch:check` from a crontab), and mount `Cronwatch::Web.new(Cronwatch.client)` in `config/routes.rb` for the dashboard (Rails autoloads it; outside Rails, `require "cronwatch/web"`). `schedule: :from_scheduler` reads a job's schedule from Solid Queue's or sidekiq-cron's config. Ruby 3.2 or newer; tested on Rails 7.2, 8.0 and 8.1. See [packages/ruby](packages/ruby), [cronwatch.dev/docs/rails](https://cronwatch.dev/docs/rails/) and [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/); the gem is on [RubyGems](https://rubygems.org/gems/cronwatch). The TypeScript SDK is the source of truth: `npm run conformance` generates cases in `conformance/` that the gem's tests replay.
+Every port is a port of the SDK, not a new design: each writes the same tables and sends the same alerts, so a Rails app, a Go service and a Node worker can share one database and one dashboard. The TypeScript SDK is the source of truth: `npm run conformance` generates cases in `conformance/` that every port's tests replay, and a behaviour change lands in TypeScript first. Each package's README and its page on [cronwatch.dev](https://cronwatch.dev/docs/) have the examples for its language and its schedulers.
 
 ## Why a library and not a service
 
@@ -119,7 +100,8 @@ Develop on Node 24 (`.nvmrc`); CI also runs Node 22, the oldest supported (bette
 npm ci
 npm run check          # dash check, typecheck, tests
 npm run build          # every package and the site
-npm run dev --workspace site    # the site on http://localhost:4321, rebuilding on change
+npm run dev:site       # the site on http://localhost:4321, rebuilding on change
+npm run dev:dashboard  # a dashboard of dummy jobs
 npm run check:packages # pack both packages and use them from a scratch project (after build)
 npm run conformance    # regenerate conformance/ from the SDK, for the Ruby gem and the Python, PHP, Go, Rust, Elixir, Java and .NET packages
 ```
@@ -183,7 +165,7 @@ The Java build (Java 21 or newer, with the Maven wrapper it commits), after `npm
 cd packages/java && ./mvnw -B verify
 ```
 
-It replays `conformance/` too, compiling with Error Prone and `-Xlint:all` with warnings as errors; `./mvnw spotless:apply` formats the code ([its README](packages/java/README.md#testing-this-package) has the rest). CI runs it on JDK 21 and the newest JDK, and `CRONWATCH_TEST_JAVA=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard.
+It replays `conformance/` too, compiling with Error Prone and `-Xlint:all` with warnings as errors; `./mvnw spotless:apply` formats the code ([its README](packages/java/README.md#testing-this-package) has the rest). CI runs it on JDK 21, 25 and the newest JDK, on Linux, macOS and Windows, and `CRONWATCH_TEST_JAVA=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard.
 
 The .NET solution (.NET 10 or newer, the SDK pinned by `global.json`), after `npm run build` for the same reason:
 
@@ -192,7 +174,7 @@ cd packages/dotnet && dotnet test
 CRONWATCH_CULTURE=tr-TR dotnet test    # the suite again under the tr-TR culture, as CI runs it
 ```
 
-It replays `conformance/` and the dashboard fixture too, with warnings as errors; `dotnet format` formats the code ([its README](packages/dotnet/README.md#testing-this-package) has the rest). CI runs it on .NET 10 and the newest .NET, on Linux, macOS and Windows, and `CRONWATCH_TEST_DOTNET=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard.
+It replays `conformance/` and the dashboard fixture too, with warnings as errors; `dotnet format` formats the code ([its README](packages/dotnet/README.md#testing-this-package) has the rest). CI runs it on .NET 10, on Linux, macOS and Windows, and `CRONWATCH_TEST_DOTNET=1 npm test --workspace packages/mcp` drives the MCP server against its dashboard.
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 
@@ -201,18 +183,18 @@ It replays `conformance/` and the dashboard fixture too, with warnings as errors
 Every package shares one version: the SDK, the MCP server, the gem, the Python and PHP packages (the WordPress plugin with them, and the Drupal module and the Craft plugin requiring the library at it), the Go module and its scheduler modules, the Rust crates, the Elixir package, the Java build, the .NET solution, and the skill. From a clean `main`:
 
 ```bash
-npm run release -- 0.8.0 --dry-run   # show every change and command, write nothing
-npm run release -- 0.8.0             # bump, regenerate, check, commit "Release 0.8.0", tag v0.8.0
+npm run release -- X.Y.Z --dry-run   # show every change and command, write nothing
+npm run release -- X.Y.Z             # bump, regenerate, check, commit "Release X.Y.Z", tag vX.Y.Z
 ```
 
-It bumps every file listed in `VERSIONED` at the top of `scripts/release.mjs` (and turns the WordPress readme's `= Unreleased =` changelog section into the release's, or adds a placeholder to rewrite), lists any other tracked file that still names the old version, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, and runs `npm run check`, the build and `npm run check:packages`; then, when it finds what they need, the gem's tests and build, with a check of what the gem carries (Ruby 3.2 or newer; `--skip-ruby` skips them), the Python package's tests (uv; `--skip-python`) and the PHP package's (PHP 8.2 or newer and Composer; `--skip-php`). The Go and Rust tests are CI's. RubyGems spells a prerelease `0.8.0-beta.1` as `0.8.0.pre.beta.1` and refuses `+build` metadata, so the script does too.
+It bumps every file listed in `VERSIONED` at the top of `scripts/release.mjs` (and turns the WordPress readme's `= Unreleased =` changelog section into the release's, or adds a placeholder to rewrite), lists any other tracked file that still names the old version, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, and runs `npm run check`, the build and `npm run check:packages`; then, when it finds what they need, the gem's tests and build, with a check of what the gem carries (Ruby 3.2 or newer; `--skip-ruby` skips them), the Python package's tests (uv; `--skip-python`) and the PHP package's (PHP 8.2 or newer and Composer; `--skip-php`). The Go, Rust, Elixir, Java and .NET tests are CI's. RubyGems spells a prerelease `X.Y.Z-beta.1` as `X.Y.Z.pre.beta.1` and refuses `+build` metadata, so the script does too.
 
 It does not push or publish. It prints what to run next, in order:
 
-- `git push origin main v0.8.0`. The tag starts the workflows that publish from it: `pypi.yml` (PyPI, once `PYPI_ENABLED` is `true`), `php-split.yml` (the PHP package's own repository, which Packagist reads, once `PHP_SPLIT_ENABLED` is `true`), `php-plugins-split.yml` (the Drupal module's and the Craft plugin's repositories, once `DRUPAL_SPLIT_ENABLED` and `CRAFT_SPLIT_ENABLED` are; then make the drupal.org release from the tag), `crates.yml` (crates.io, once `CRATES_ENABLED` is `true`; the printed `cargo publish --workspace` line does it by hand), `hex.yml` (Hex and HexDocs, once `HEX_ENABLED` is `true`; the printed `mix hex.publish` line does it by hand), `nuget.yml` (nuget.org, once `NUGET_ENABLED` is `true`: it packs the five packages and pushes them when its reviewer approves; the printed `dotnet nuget push` line does it by hand), `java.yml` (Maven Central, once `MAVEN_ENABLED` is `true`, which it is not for the first release) and `wordpress-zip.yml`, which needs no switch: it builds the WordPress plugin's zip and attaches it to the tag's GitHub release, making the release with short notes if there is none yet (edit them after), as `cronwatch-0.8.0.zip` and as `cronwatch.zip`, the file `releases/latest/download/cronwatch.zip` serves and the docs link to.
+- `git push origin main vX.Y.Z`. The tag starts the workflows that publish from it: `pypi.yml` (PyPI, once `PYPI_ENABLED` is `true`), `php-split.yml` (the PHP package's own repository, which Packagist reads, once `PHP_SPLIT_ENABLED` is `true`), `php-plugins-split.yml` (the Drupal module's and the Craft plugin's repositories, once `DRUPAL_SPLIT_ENABLED` and `CRAFT_SPLIT_ENABLED` are; then make the drupal.org release from the tag), `crates.yml` (crates.io, once `CRATES_ENABLED` is `true`; the printed `cargo publish --workspace` line does it by hand), `hex.yml` (Hex and HexDocs, once `HEX_ENABLED` is `true`; the printed `mix hex.publish` line does it by hand), `nuget.yml` (nuget.org, once `NUGET_ENABLED` is `true`: it packs the five packages and pushes them when its reviewer approves; the printed `dotnet nuget push` line does it by hand), `java.yml` (Maven Central, once `MAVEN_ENABLED` is `true`, which it is not for the first release) and `wordpress-zip.yml`, which needs no switch: it builds the WordPress plugin's zip and attaches it to the tag's GitHub release, making the release with short notes if there is none yet (edit them after), as `cronwatch-X.Y.Z.zip` and as `cronwatch.zip`, the file `releases/latest/download/cronwatch.zip` serves and the docs link to.
 - `npm publish` for the SDK and the MCP server, and `gem build` and `gem push` for the gem.
 - `./mvnw -B -P release deploy` in `packages/java`, by hand for the first release and whenever `java.yml` is off, then a check of the validated deployment in the Central Publisher Portal before it is published.
-- A tag and its push for the Go module (`packages/go/v0.8.0`) and for each scheduler module (`packages/go/robfigcron/v0.8.0` and the rest), then a `go list -m` that makes the Go proxy fetch them.
+- A tag and its push for the Go module (`packages/go/vX.Y.Z`) and for each scheduler module (`packages/go/robfigcron/vX.Y.Z` and the rest), then a `go list -m` that makes the Go proxy fetch them.
 - `npm deprecate` lines for each `--deprecate <old>`.
 
 A new package under `packages/` needs a row in both of the script's tables (`VERSIONED`, the file holding its version, and `PUBLISH`, how it ships), or the script refuses to run.
