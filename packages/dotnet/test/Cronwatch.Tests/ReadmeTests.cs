@@ -120,10 +120,54 @@ public class ReadmeTests
     }
 
     [Fact]
+    public async Task A_plain_crontab()
+    {
+        var store = new MemoryStore();
+        CronwatchClient MakeClient() => new(new CronwatchOptions { Store = store, Alerts = [], ProcessExitHook = false, OnWarning = _ => { } });
+        async Task<int> Main(string[] args)
+        {
+            if (args is ["cronwatch", .. var rest])
+            {
+                return await CronwatchCli.RunAsync(MakeClient, rest, Console.Out, Console.Error);
+            }
+            return -1;
+        }
+        Assert.Equal(0, await Main(["cronwatch", "help"]));
+        Assert.Equal(-1, await Main(["nightly-report"]));
+    }
+
+    /// <summary>Coravel's interface, so the README's invocable compiles without Coravel.</summary>
+    private interface IInvocable
+    {
+        Task Invoke();
+    }
+
+    private static Task SendDigestAsync(CancellationToken ct) => Task.CompletedTask;
+
+    public sealed class SendDigest(CronwatchClient cw) : IInvocable
+    {
+        public Task Invoke() => cw.Job("send-digest").RunAsync((job, ct) => SendDigestAsync(ct));
+    }
+
+    [Fact]
+    public async Task Coravel()
+    {
+        await using var m = Support.Make();
+        await new SendDigest(m.Cw).Invoke();
+        Assert.Equal(RunStatus.Ok, Assert.Single(await m.Cw.RunsAsync("send-digest")).Status);
+    }
+
+    [Fact]
     public void Every_example_in_the_readme_is_here()
     {
         string readme = File.ReadAllText(Path.Combine(Fixtures.Repo, "packages", "dotnet", "README.md"), Encoding.UTF8);
-        string here = Squash(File.ReadAllText(Path.Combine(Fixtures.Repo, "packages", "dotnet", "test", "Cronwatch.Tests", "ReadmeTests.cs"), Encoding.UTF8));
+        // The core's examples are compiled here, and each package's in its own tests' ReadmeTests.cs.
+        var sources = new StringBuilder();
+        foreach (string file in Directory.GetFiles(Path.Combine(Fixtures.Repo, "packages", "dotnet", "test"), "ReadmeTests.cs", SearchOption.AllDirectories))
+        {
+            sources.Append(File.ReadAllText(file, Encoding.UTF8));
+        }
+        string here = Squash(sources.ToString());
         var blocks = new List<string>();
         foreach (Match match in Regex.Matches(readme.Replace("\r\n", "\n", StringComparison.Ordinal), "```csharp\n(.*?)```", RegexOptions.Singleline))
         {

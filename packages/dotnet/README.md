@@ -94,6 +94,61 @@ await again.FinishAsync("export done");
 
 A run is judged once, however many processes finish it. A run id holding a NUL is refused.
 
+### A plain crontab
+
+A program a crontab runs needs no integration: it runs the job and returns 1 on failure, and a second crontab line runs a check on the same store, from the app's own program, since only the app knows its store and channels:
+
+```csharp
+if (args is ["cronwatch", .. var rest])
+{
+    return await CronwatchCli.RunAsync(MakeClient, rest, Console.Out, Console.Error);
+}
+```
+
+with the lines `0 2 * * * dotnet /app/MyApp.dll nightly-report` and `* * * * * dotnet /app/MyApp.dll cronwatch check`. The check prints `cronwatch: checked 3 jobs, sent 1 alert` and answers 0, 1 for a failed check, or 2 for a command it does not know; it never ends the process. [`examples/crontab`](examples/crontab) is that program on SQLite.
+
+### Hosted jobs
+
+`Cronwatch.Hosting` runs a job class on its cron inside a Generic Host or ASP.NET Core app, on the same definition CronWatch watches, so the schedule it runs on and the one it is watched on cannot drift apart:
+
+```csharp
+builder.Services.AddCronwatchJob<NightlyReport>("nightly-report", new JobOptions
+{
+    Schedule = "0 2 * * *",
+    Timezone = "UTC",
+    Grace = "15m",
+});
+```
+
+```csharp
+public sealed class NightlyReport(ReportBuilder reports) : ICronwatchJob
+{
+    public async Task RunAsync(JobContext job, CancellationToken cancellationToken)
+    {
+        string path = await reports.BuildAsync(cancellationToken); // cancelled at the timeout and at shutdown
+        job.Log($"Report written: {path}");
+    }
+}
+```
+
+Each fire is a run with the trigger `schedule`, its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
+
+```csharp
+var app = builder.Build();
+return await app.RunCronwatchCommandAsync(args); // `dotnet MyApp.dll cronwatch check`, else runs the app
+```
+
+### Coravel
+
+Coravel is not integrated: an invocable that should be watched wraps its body in a run.
+
+```csharp
+public sealed class SendDigest(CronwatchClient cw) : IInvocable
+{
+    public Task Invoke() => cw.Job("send-digest").RunAsync((job, ct) => SendDigestAsync(ct));
+}
+```
+
 ### Stores
 
 `MemoryStore` is the default and forgets on restart. `SqlStore.Sqlite(dataSource)` keeps the SDK's three tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`, their text byte for byte what the SDK writes) in the app's database; `WithPrefix("cw_")` names them otherwise. The store opens its connections with the app's ambient transaction suppressed, so a run survives the rollback its failure caused. A store of the app's own implements `IStore` and passes `Cronwatch.StoreTesting.StoreContract.RunAsync(store)`, which depends on no test framework.
