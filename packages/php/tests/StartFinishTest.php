@@ -7,6 +7,7 @@ namespace Cronwatch\Tests;
 use Cronwatch\Cronwatch;
 use Cronwatch\Pattern;
 use Cronwatch\Run;
+use Cronwatch\RunStatus;
 use Cronwatch\Store\ComparesAndSetsState;
 use Cronwatch\Store\MemoryStore;
 use Cronwatch\Tests\Support\Backend;
@@ -105,6 +106,10 @@ final class StartFinishTest extends TestCase
         foreach ([
             'belongs to job "inngest-fn"' => fn () => $cw->job('other')->start(id: '01HX-run'),
             'run id of 1 to 200 characters' => fn () => $job->start(id: ''),
+            // No store could hold a NUL (Postgres refuses it), so such an id is refused wherever one is taken.
+            'start() cannot take a run id containing a NUL character' => fn () => $job->start(id: "01HX\0run"),
+            'resume() cannot take a run id containing a NUL character' => fn () => $job->resume("01HX\0run"),
+            'recordRun: run ids cannot contain a NUL character (job "inngest-fn")' => fn () => $cw->recordRun(new Run("x\0y", 'inngest-fn', RunStatus::OK, 1, 2, 1)),
         ] as $expected => $start) {
             try {
                 $start();

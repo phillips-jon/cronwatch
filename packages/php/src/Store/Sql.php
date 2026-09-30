@@ -7,6 +7,7 @@ namespace Cronwatch\Store;
 use Cronwatch\JobDefinition;
 use Cronwatch\JobState;
 use Cronwatch\Js;
+use Cronwatch\Output;
 use Cronwatch\Run;
 use Cronwatch\StoredJob;
 
@@ -269,7 +270,7 @@ final class Sql
     /** @return list<mixed> */
     public static function upsertJobParams(JobDefinition $definition, int|float $now): array
     {
-        return [(string) $definition->get('name'), Js::stringify($definition), $now, $now];
+        return [(string) $definition->get('name'), self::jsonText($definition), $now, $now];
     }
 
     /** @return list<mixed> */
@@ -277,14 +278,14 @@ final class Sql
     {
         return [
             $run->id, $run->job, $run->status, $run->startedAt, $run->finishedAt, $run->durationMs,
-            self::text($run->error), self::text($run->output), Js::stringify(Js::obj($run->metrics)), $run->trigger,
+            self::text($run->error), self::text($run->output), self::jsonText(Js::obj($run->metrics)), Output::stripNul($run->trigger),
         ];
     }
 
     /** @return list<mixed> */
     public static function updateRunParams(Run $run): array
     {
-        return [$run->status, $run->finishedAt, $run->durationMs, self::text($run->error), self::text($run->output), Js::stringify(Js::obj($run->metrics)), $run->id];
+        return [$run->status, $run->finishedAt, $run->durationMs, self::text($run->error), self::text($run->output), self::jsonText(Js::obj($run->metrics)), $run->id];
     }
 
     /**
@@ -299,19 +300,34 @@ final class Sql
     /** @return list<mixed> */
     public static function stateParams(JobState $state): array
     {
-        return [$state->job, Js::stringify($state)];
+        return [$state->job, self::jsonText($state)];
     }
 
     /** @return list<mixed> */
     public static function casUpdateParams(JobState $state, int|float $expectedVersion): array
     {
-        return [Js::stringify($state), $state->job, $expectedVersion];
+        return [self::jsonText($state), $state->job, $expectedVersion];
     }
 
-    /** A TEXT value as a JavaScript driver writes it: valid UTF-8. */
+    /*
+     * Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
+     * whole row, so every dialect writes text without it: a run's trigger,
+     * output, error and metric names, and every key and string of a
+     * definition and a state (stores/sql.ts). Identifiers (a job's name, a
+     * run's id) are written as given; the client refuses one with a NUL
+     * before it gets here.
+     */
+
+    /** A TEXT value as a JavaScript driver writes it: valid UTF-8, without NUL. */
     private static function text(?string $value): ?string
     {
-        return $value === null ? null : Js::wellFormed($value);
+        return $value === null ? null : Output::stripNul(Js::wellFormed($value));
+    }
+
+    /** JSON text as the SDK writes it, without NUL. */
+    private static function jsonText(mixed $value): string
+    {
+        return Output::stripJsonNul(Js::stringify($value));
     }
 
     /** JSON text as the SDK wrote it. */

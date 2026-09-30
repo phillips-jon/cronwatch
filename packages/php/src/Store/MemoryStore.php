@@ -8,6 +8,7 @@ use Cronwatch\Evaluate;
 use Cronwatch\JobDefinition;
 use Cronwatch\JobState;
 use Cronwatch\Js;
+use Cronwatch\Output;
 use Cronwatch\Run;
 use Cronwatch\RunStatus;
 use Cronwatch\StoredJob;
@@ -44,6 +45,24 @@ final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState, De
         return $value::fromJson($data);
     }
 
+    /**
+     * A copy as the SQL stores write it (Sql's params): no U+0000 in any
+     * text but the identifiers, so every store reads back the same.
+     *
+     * @template T of Run|StoredJob|JobState
+     * @param T $value
+     * @return T
+     */
+    private static function kept(Run|StoredJob|JobState $value): Run|StoredJob|JobState
+    {
+        $copy = $value::fromJson(Js::parse(Output::stripJsonNul(Js::stringify($value))));
+        if ($value instanceof Run && $copy instanceof Run) {
+            $copy->id = $value->id;
+            $copy->job = $value->job;
+        }
+        return $copy;
+    }
+
     public function init(): void
     {
     }
@@ -52,7 +71,7 @@ final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState, De
     {
         $name = (string) $definition->get('name');
         $existing = $this->jobs[$name] ?? null;
-        $this->jobs[$name] = self::clone(new StoredJob($name, $definition, $existing?->createdAt ?? $now, $now));
+        $this->jobs[$name] = self::kept(new StoredJob($name, $definition, $existing?->createdAt ?? $now, $now));
     }
 
     public function getJob(string $name): ?StoredJob
@@ -83,7 +102,7 @@ final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState, De
         if (isset($this->runs[$run->id])) {
             throw new \RuntimeException("run {$run->id} already exists");
         }
-        $this->runs[$run->id] = self::clone($run);
+        $this->runs[$run->id] = self::kept($run);
         $this->order[$run->id] = ++$this->seq;
     }
 
@@ -117,7 +136,7 @@ final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState, De
 
     private static function finishedFields(Run $existing, Run $run): Run
     {
-        $copy = self::clone($run);
+        $copy = self::kept($run);
         $updated = self::clone($existing);
         $updated->status = $copy->status;
         $updated->finishedAt = $copy->finishedAt;
@@ -159,7 +178,7 @@ final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState, De
 
     public function setState(JobState $state): void
     {
-        $this->states[$state->job] = self::clone($state);
+        $this->states[$state->job] = self::kept($state);
     }
 
     public function compareAndSetState(JobState $state, int|float $expectedVersion): bool
@@ -168,7 +187,7 @@ final class MemoryStore implements Store, UpdatesRunIf, ComparesAndSetsState, De
         if (Evaluate::stateVersion($current) != $expectedVersion) {
             return false;
         }
-        $this->states[$state->job] = self::clone($state);
+        $this->states[$state->job] = self::kept($state);
         return true;
     }
 

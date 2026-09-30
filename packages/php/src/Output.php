@@ -26,6 +26,20 @@ final class Output
     }
 
     /**
+     * Removes every U+0000 from JSON text, keys and strings alike, by
+     * dropping each \u0000 escape (a NUL can appear in JSON no other way).
+     * Escapes are read left to right in pairs, so an escaped backslash
+     * followed by "u0000" is left as it is.
+     */
+    public static function stripJsonNul(string $json): string
+    {
+        if (!str_contains($json, '\\u0000')) {
+            return $json;
+        }
+        return (string) preg_replace_callback('/\\\\(u0000|[\s\S])/', fn (array $m) => $m[1] === 'u0000' ? '' : $m[0], $json);
+    }
+
+    /**
      * NUL characters are removed first, since Postgres refuses them in TEXT
      * and JSONB and the whole run row would be lost. The cap then applies to
      * what is left.
