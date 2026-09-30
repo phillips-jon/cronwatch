@@ -366,7 +366,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         bool recorded;
         try
         {
-            await SyncAsync(def).ConfigureAwait(false);
+            await SyncAsync(def, confirm: true).ConfigureAwait(false);
             await CallAsync(() => _store.InsertRunAsync(run)).ConfigureAwait(false);
             recorded = true;
         }

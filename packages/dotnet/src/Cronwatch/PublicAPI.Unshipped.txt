@@ -645,6 +645,8 @@ Cronwatch.JobState.Open.init -> void
 Cronwatch.JobState.OpenAt(Cronwatch.Condition condition) -> long?
 Cronwatch.JobState.PendingRecovery.get -> Cronwatch.ValueList<Cronwatch.Condition>?
 Cronwatch.JobState.PendingRecovery.init -> void
+Cronwatch.JobState.Sending.get -> Cronwatch.ValueList<Cronwatch.SendingAlert!>?
+Cronwatch.JobState.Sending.init -> void
 Cronwatch.JobState.SilencedUntil.get -> long?
 Cronwatch.JobState.SilencedUntil.init -> void
 Cronwatch.JobState.ToJson() -> string!
@@ -874,6 +876,15 @@ Cronwatch.RunStatus.RunStatus() -> void
 Cronwatch.RunStatus.RunStatus(string! Value) -> void
 Cronwatch.RunStatus.Value.get -> string!
 Cronwatch.RunStatus.Value.init -> void
+Cronwatch.SendingAlert
+Cronwatch.SendingAlert.<Clone>$() -> Cronwatch.SendingAlert!
+Cronwatch.SendingAlert.Alert.get -> Cronwatch.Alert?
+Cronwatch.SendingAlert.Alert.init -> void
+Cronwatch.SendingAlert.Equals(Cronwatch.SendingAlert? other) -> bool
+Cronwatch.SendingAlert.SendingAlert() -> void
+Cronwatch.SendingAlert.ToValue() -> Cronwatch.JsObject!
+Cronwatch.SendingAlert.Until.get -> long?
+Cronwatch.SendingAlert.Until.init -> void
 Cronwatch.SqlStore
 Cronwatch.SqlStore.CompareAndSetStateAsync(Cronwatch.JobState! state, long expected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Cronwatch.SqlStore.DeleteJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
@@ -1169,6 +1180,9 @@ override Cronwatch.RunHandle.ToString() -> string!
 override Cronwatch.RunOptions.ToString() -> string!
 override Cronwatch.RunStatus.GetHashCode() -> int
 override Cronwatch.RunStatus.ToString() -> string!
+override Cronwatch.SendingAlert.Equals(object? obj) -> bool
+override Cronwatch.SendingAlert.GetHashCode() -> int
+override Cronwatch.SendingAlert.ToString() -> string!
 override Cronwatch.SqlStore.ToString() -> string!
 override Cronwatch.StartOptions.ToString() -> string!
 override Cronwatch.StoredJob.Equals(object? obj) -> bool
@@ -1320,6 +1334,9 @@ static Cronwatch.RunStatus.Timeout.get -> Cronwatch.RunStatus
 static Cronwatch.RunStatus.implicit operator Cronwatch.RunStatus(string! value) -> Cronwatch.RunStatus
 static Cronwatch.RunStatus.operator !=(Cronwatch.RunStatus left, Cronwatch.RunStatus right) -> bool
 static Cronwatch.RunStatus.operator ==(Cronwatch.RunStatus left, Cronwatch.RunStatus right) -> bool
+static Cronwatch.SendingAlert.FromValue(object? v) -> Cronwatch.SendingAlert!
+static Cronwatch.SendingAlert.operator !=(Cronwatch.SendingAlert? left, Cronwatch.SendingAlert? right) -> bool
+static Cronwatch.SendingAlert.operator ==(Cronwatch.SendingAlert? left, Cronwatch.SendingAlert? right) -> bool
 static Cronwatch.SqlStore.For(System.Data.Common.DbDataSource! dataSource) -> Cronwatch.SqlStore!
 static Cronwatch.SqlStore.MySql(System.Data.Common.DbDataSource! dataSource) -> Cronwatch.SqlStore!
 static Cronwatch.SqlStore.Postgres(System.Data.Common.DbDataSource! dataSource) -> Cronwatch.SqlStore!

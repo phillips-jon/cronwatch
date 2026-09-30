@@ -120,12 +120,12 @@ public sealed partial class CronwatchClient
     {
         try
         {
-            return OutputText.ErrorMessage(e);
+            return OutputText.DescribeError(e);
         }
         catch (Exception)
         {
             // An exception whose message or trace cannot be read must not leave its run running.
-            return OutputText.ErrorMessage(OutputText.ErrorName(e), "", []);
+            return OutputText.DescribeError(OutputText.ErrorName(e), "", []);
         }
     }
 
@@ -369,7 +369,7 @@ public sealed partial class CronwatchClient
     {
         try
         {
-            await SyncAsync(def).ConfigureAwait(false);
+            await SyncAsync(def, confirm: true).ConfigureAwait(false);
             await CallAsync(() => _store.InsertRunAsync(run)).ConfigureAwait(false);
             return true;
         }
@@ -399,7 +399,8 @@ public sealed partial class CronwatchClient
         string? output = recorder.Output();
         if (output == null && failure == null && resultText != null)
         {
-            output = OutputText.Cap(resultText);
+            // Capped by Conclude, after it is redacted.
+            output = resultText;
         }
         string? expectText = recorder.ExpectText();
         if (expectText == null && failure == null)
@@ -456,8 +457,8 @@ public sealed partial class CronwatchClient
             concluded = run with
             {
                 Status = timedOut ? RunStatus.Timeout : RunStatus.Failed,
-                Error = NulText.StripNul(OutputText.RedactSecrets(ErrorText(e))),
-                Output = run.Output == null ? null : NulText.StripNul(OutputText.RedactSecrets(run.Output)),
+                Error = OutputText.RedactAndCap(ErrorText(e), OutputText.RedactSecrets),
+                Output = run.Output == null ? null : OutputText.RedactAndCap(run.Output, OutputText.RedactSecrets),
             };
         }
         CronwatchTelemetry.Add(CronwatchTelemetry.Runs, new("cronwatch.job", def.Name), new("cronwatch.status", concluded.Status.Value));
@@ -488,13 +489,14 @@ public sealed partial class CronwatchClient
             status = unmet == null ? RunStatus.Ok : RunStatus.Failed;
             error = unmet;
         }
-        // Redacted after the expect check, so a rule can still match what was logged. NULs go
-        // last, so not even a custom redact can store one.
+        // Redacted after the expect check, so a rule can still match what was logged, and before
+        // the cap, so the cut cannot keep half a secret. NULs go last, so not even a custom
+        // redact can store one.
         return run with
         {
             Status = status,
-            Error = error == null ? null : NulText.StripNul(Redact(error)),
-            Output = run.Output == null ? null : NulText.StripNul(Redact(run.Output)),
+            Error = error == null ? null : OutputText.RedactAndCap(error, Redact),
+            Output = run.Output == null ? null : OutputText.RedactAndCap(run.Output, Redact),
         };
     }
 
@@ -567,25 +569,23 @@ public sealed partial class CronwatchClient
     /// <summary>Judges a finished run and sends what it raised.</summary>
     internal async Task<IReadOnlyList<Alert>> FinishRunAsync(Definition def, Run run, long now)
     {
-        IReadOnlyList<AlertDraft> drafts;
+        Held held;
         try
         {
-            var result = await UpdateStateAsync<IReadOnlyList<Run>, IReadOnlyList<AlertDraft>>(
+            var result = await UpdateStateAsync<IReadOnlyList<Run>, Held>(
                 run.Job,
                 () => HistoryAsync(run),
                 (previous, history) =>
-                {
-                    var settled = Evaluate.ApplySilence(previous, Evaluate.OnRunFinish(def, run, previous, history, now), now);
-                    return (settled.State, settled.Alerts);
-                }).ConfigureAwait(false);
-            drafts = result.Result;
+                    Outbox(Evaluate.ApplySilence(previous, Evaluate.OnRunFinish(def, run, previous, history, now), now), def, now)).ConfigureAwait(false);
+            held = result.Result;
         }
         catch (Exception e)
         {
             Report(e, "evaluating " + run.Job);
             return [];
         }
-        return await DispatchAsync(drafts, def, now).ConfigureAwait(false);
+        ReportDropped(run.Job, held.Dropped);
+        return await DispatchAsync(run.Job, held.Alerts, now).ConfigureAwait(false);
     }
 
     private async Task<IReadOnlyList<Run>> HistoryAsync(Run run)
@@ -629,6 +629,15 @@ public sealed partial class CronwatchClient
         {
             throw CronwatchException.Invalid("recordRun: run ids cannot contain a NUL character (job " + Json.Quote(input.Job) + ")");
         }
+        // Refused as a job's Metric refuses them: a store keeps NaN and infinity as null.
+        foreach (var metric in input.Metrics)
+        {
+            if (!double.IsFinite(metric.Value))
+            {
+                throw CronwatchException.Invalid(
+                    "recordRun: metric " + Json.Quote(metric.Key) + " must be a finite number (job " + Json.Quote(input.Job) + ", run " + Json.Quote(input.Id) + ")");
+            }
+        }
         await SyncAsync(def).ConfigureAwait(false);
         Run run = input;
         if (run.Status == RunStatus.Ok)
@@ -641,8 +650,8 @@ public sealed partial class CronwatchClient
         }
         run = run with
         {
-            Output = run.Output == null ? null : NulText.StripNul(Redact(OutputText.Cap(run.Output))),
-            Error = run.Error == null ? null : NulText.StripNul(Redact(OutputText.Cap(run.Error))),
+            Output = run.Output == null ? null : OutputText.RedactAndCap(run.Output, Redact),
+            Error = run.Error == null ? null : OutputText.RedactAndCap(run.Error, Redact),
         };
         Run toWrite = run;
         Run? stored = await CallAsync(() => _store.GetRunAsync(toWrite.Id)).ConfigureAwait(false);
@@ -763,8 +772,8 @@ public sealed partial class CronwatchClient
             Status = RunStatus.Failed,
             FinishedAt = now,
             DurationMs = Evaluate.RunDuration(run.StartedAt, now),
-            Error = NulText.StripNul(Redact(ShutdownError)),
-            Output = output == null ? null : NulText.StripNul(Redact(output)),
+            Error = OutputText.RedactAndCap(ShutdownError, Redact),
+            Output = output == null ? null : OutputText.RedactAndCap(output, Redact),
             Metrics = o.Recorder.Metrics(),
         };
         try

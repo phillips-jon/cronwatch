@@ -255,7 +255,14 @@ internal static class Support
                 await before(definition);
             }
             await Inner.UpsertJobAsync(definition, now, cancellationToken);
+            if (AfterUpsert is { } after)
+            {
+                await after(definition);
+            }
         }
+
+        /// <summary>Awaited once a definition is written, when set.</summary>
+        public Func<Definition, Task>? AfterUpsert { get; set; }
 
         public Task<StoredJob?> GetJobAsync(string name, CancellationToken cancellationToken = default)
         {

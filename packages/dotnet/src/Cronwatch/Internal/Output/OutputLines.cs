@@ -48,7 +48,7 @@ internal sealed class OutputLines
             }
             _lines.AddLast(line);
             _size += line.Length + 1;
-            // Drop from the front once well past the cap; the cap trims exactly at the end.
+            // Drop from the front once well past the cap; RedactAndCap trims exactly at the end.
             while (_size > Window && _lines.Count > 1)
             {
                 _size -= _lines.First!.Value.Length + 1;
@@ -58,12 +58,16 @@ internal sealed class OutputLines
         }
     }
 
-    /// <summary>What the run stores as its output: the lines kept, capped; null when nothing was logged.</summary>
+    /// <summary>
+    /// The lines still held (past the window the oldest are let go), joined and not yet capped:
+    /// the client redacts them first, then caps them (<see cref="OutputText.RedactAndCap"/>).
+    /// Null when nothing was logged.
+    /// </summary>
     public string? Output()
     {
         lock (_lock)
         {
-            return _lines.Count == 0 ? null : OutputText.Cap(string.Join('\n', _lines));
+            return _lines.Count == 0 ? null : string.Join('\n', _lines);
         }
     }
 

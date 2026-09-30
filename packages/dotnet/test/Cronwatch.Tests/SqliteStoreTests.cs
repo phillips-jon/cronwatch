@@ -215,6 +215,28 @@ public class SqliteStoreTests
     }
 
     [Fact]
+    public async Task A_foreign_metric_that_is_no_finite_number_is_left_off_the_job_page()
+    {
+        using var dir = new TempDir();
+        string file = dir.File("metrics.db");
+        await using var w = new Web.WebKit(new Cronwatch.Web.RoutesOptions { Token = "tok" }, SqlStore.Sqlite(Source(file)));
+        await w.Ok("odd");
+        await Exec(
+            file,
+            "INSERT INTO cronwatch_runs (id, job, status, started_at, finished_at, duration_ms, metrics, trigger) VALUES "
+            + "('m', 'odd', 'ok', 5, 6, 1, '{\"rows\":null,\"label\":\"abc\",\"cost\":1.25,\"n\":3}', 'source')");
+        Cronwatch.Web.WebResponse page = await w.Get("/cronwatch/jobs/odd", Web.WebKit.Auth);
+        Web.WebKit.Status("job page", page, 200);
+        string text = page.Text();
+        int cost = text.IndexOf("<span class=\"k\">cost</span> 1.2500", StringComparison.Ordinal);
+        Assert.True(cost >= 0, "cost is shown");
+        Assert.True(text.IndexOf("<span class=\"k\">n</span> 3", StringComparison.Ordinal) > cost, "then n");
+        Assert.DoesNotContain("<span class=\"k\">rows</span>", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"k\">label</span>", text, StringComparison.Ordinal);
+        Assert.Equal("{\"cost\":1.25,\"n\":3}", (await w.Cw.GetRunAsync("m"))!.Metrics.ToJson());
+    }
+
+    [Fact]
     public async Task Rows_of_another_shape_are_read_as_the_sdk_reads_them()
     {
         using var dir = new TempDir();

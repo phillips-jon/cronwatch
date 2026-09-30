@@ -416,7 +416,15 @@ public class ChannelsConformanceTests
             failures.Same("smsBody with " + segments + " segments", Fixtures.Digest(TwilioChannel.SmsBody(longAlert, link, segments)), c.Get("body"));
             count++;
         }
-        counts["textCuts"] = new[] { "errorBodies", "subjects", "smsSegments", "smsBodies" }.Sum(k => Fixtures.Objects(cuts, k).Count);
+        foreach (JsObject c in Fixtures.Objects(cuts, "discordDescriptions"))
+        {
+            object? triage = c.Get("triage");
+            Alert a = first with { Message = Fixtures.Expand(c.Get("message")), Triage = triage == null ? null : triage as string ?? Fixtures.Expand(triage) };
+            failures.Same("discord description " + counts.GetValueOrDefault("discordDescriptions"), Fixtures.Digest(DiscordChannel.EmbedDescription(a)), c.Get("description"));
+            counts["discordDescriptions"] = counts.GetValueOrDefault("discordDescriptions") + 1;
+            count++;
+        }
+        counts["textCuts"] = new[] { "errorBodies", "subjects", "smsSegments", "smsBodies", "discordDescriptions" }.Sum(k => Fixtures.Objects(cuts, k).Count);
 
         failures.Check("channels");
         // Every case of the fixture, so a case added there is not skipped here.

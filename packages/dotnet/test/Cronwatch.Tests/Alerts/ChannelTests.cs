@@ -195,4 +195,22 @@ public class ChannelTests
         JobState? state = await store.GetStateAsync("nightly");
         Assert.True(state?.Undelivered is null or { Count: 0 });
     }
+
+    [Fact]
+    public void Discord_holds_the_whole_description_to_4096_cutting_the_message_and_keeping_the_triage()
+    {
+        string message = "Error: long\n" + string.Concat(Enumerable.Repeat("```", 1200)) + new string('x', 400) + string.Concat(Enumerable.Repeat("\U0001F600", 200));
+        string triage = string.Concat(Enumerable.Repeat("*_`~|[]()<>\\", 100));
+        Alert a = ChannelsConformanceTests.Sample() with { Message = message, Triage = triage };
+        string description = DiscordChannel.EmbedDescription(a);
+        Assert.Equal(4096, description.Length);
+        Assert.EndsWith("\n**Triage:** " + DiscordChannel.EscapeMarkdown(triage[..1000]), description, StringComparison.Ordinal);
+        Assert.StartsWith("```\nError: long\n", description, StringComparison.Ordinal);
+        Assert.Equal(2, description.Split("```").Length - 1);
+
+        // Emoji at the cut: never half a surrogate pair.
+        string cut = DiscordChannel.EmbedDescription(a with { Message = string.Concat(Enumerable.Repeat("\U0001F600", 1900)), Triage = new string('t', 1001) });
+        Assert.True(cut.Length <= 4096);
+        Assert.DoesNotContain(cut.Select((c, i) => (c, i)), p => char.IsHighSurrogate(p.c) && (p.i + 1 == cut.Length || !char.IsLowSurrogate(cut[p.i + 1])));
+    }
 }

@@ -36,21 +36,58 @@ internal static class OutputText
         {
             return clean;
         }
-        return "[earlier output trimmed]\n" + clean[^OutputCap..];
+        return Trimmed + clean[^OutputCap..];
+    }
+
+    private const string Trimmed = "[earlier output trimmed]\n";
+
+    /// <summary>
+    /// How much text before the kept tail redaction reads, and never keeps: three times the
+    /// longest secret a default pattern can match (a PEM key's 16 KB body with its header and
+    /// footer, under <see cref="OutputCap"/> + 1024), since a replacement grows what it replaces
+    /// at most threefold.
+    /// </summary>
+    public const int RedactEdge = 3 * (OutputCap + 1024);
+
+    /// <summary>
+    /// Output or an error as it is stored: redacted, then capped like <see cref="Cap"/>, so the
+    /// cut cannot fall inside a secret and keep what follows its label. Text of at most
+    /// <see cref="OutputCap"/> + <see cref="RedactEdge"/> is redacted whole. Longer text is cut to
+    /// that many units from its end first, and after redacting, the first
+    /// <see cref="RedactEdge"/> units are never kept: a secret whose label fell before that cut
+    /// is left out with them. NULs go before and after <paramref name="redact"/>.
+    /// </summary>
+    public static string RedactAndCap(string text, Func<string, string> redact)
+    {
+        string clean = NulText.StripNul(text);
+        int from = clean.Length - (OutputCap + RedactEdge);
+        if (from <= 0)
+        {
+            return Cap(redact(clean));
+        }
+        string redacted = NulText.StripNul(redact(clean[from..]));
+        return Trimmed + redacted[Math.Min(Math.Max(redacted.Length - OutputCap, RedactEdge), redacted.Length)..];
     }
 
     /// <summary>
     /// An error as a JavaScript stack reads, capped like output: <c>Name: message</c>, then up to
     /// five frames, each <c>"\n    at &lt;frame&gt;"</c>.
     /// </summary>
-    public static string ErrorMessage(string name, string message, IReadOnlyList<string> frames)
+    public static string ErrorMessage(string name, string message, IReadOnlyList<string> frames) =>
+        Cap(DescribeError(name, message, frames));
+
+    /// <summary>
+    /// <see cref="ErrorMessage(string, string, IReadOnlyList{string})"/> not capped: the client
+    /// redacts it first, then caps it (<see cref="RedactAndCap"/>).
+    /// </summary>
+    public static string DescribeError(string name, string message, IReadOnlyList<string> frames)
     {
         var b = new StringBuilder(name).Append(": ").Append(message);
         for (int k = 0; k < Math.Min(MaxFrames, frames.Count); k++)
         {
             b.Append("\n    at ").Append(frames[k]);
         }
-        return Cap(b.ToString());
+        return b.ToString();
     }
 
     /// <summary>
@@ -61,13 +98,16 @@ internal static class OutputText
     /// holding one exception is written as that exception, as <c>await</c> hands it over; inner
     /// exceptions are otherwise not written, as the SDK writes only the error's own stack.
     /// </summary>
-    public static string ErrorMessage(Exception error)
+    public static string ErrorMessage(Exception error) => Cap(DescribeError(error));
+
+    /// <summary><see cref="ErrorMessage(Exception)"/> not capped (see <see cref="RedactAndCap"/>).</summary>
+    public static string DescribeError(Exception error)
     {
         while (error is AggregateException { InnerExceptions.Count: 1 } one)
         {
             error = one.InnerExceptions[0];
         }
-        return ErrorMessage(ErrorName(error), MessageOf(error), Frames(error));
+        return DescribeError(ErrorName(error), MessageOf(error), Frames(error));
     }
 
     /// <summary>

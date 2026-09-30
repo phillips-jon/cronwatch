@@ -66,16 +66,12 @@ public sealed class DiscordChannel : IChannel
         ArgumentNullException.ThrowIfNull(alert);
         ArgumentNullException.ThrowIfNull(context);
         string url = ChannelShared.Link(_link, alert);
-        string triage = ChannelShared.Triage(alert);
         var embed = new JsObject().Set("title", alert.Title);
         if (url.Length > 0)
         {
             embed.Set("url", url);
         }
-        embed.Set(
-            "description",
-            "```\n" + SlackChannel.CodeBlockSafe(Js.Head(alert.Message, 3800)) + "\n```"
-                + (triage.Length == 0 ? "" : "\n**Triage:** " + EscapeMarkdown(Js.Head(triage, 1000))));
+        embed.Set("description", EmbedDescription(alert));
         // An unknown type has no colour, which JSON.stringify leaves out.
         if (Color.TryGetValue(alert.Type.Value, out int color))
         {
@@ -99,6 +95,22 @@ public sealed class DiscordChannel : IChannel
         {
             throw Post.Fail("Discord webhook answered " + answer.Status.ToString(CultureInfo.InvariantCulture) + ": " + Js.Head(answer.Body, 200));
         }
+    }
+
+    /// <summary>The longest embed description Discord takes. The title (under 256) and it stay well inside the embed's 6000.</summary>
+    internal const int DescriptionMax = 4096;
+
+    /// <summary>
+    /// The message in a code block, then the triage. Each part has its own cap, and escaping can
+    /// grow both, so the whole is held to <see cref="DescriptionMax"/> (in UTF-16 units) by
+    /// cutting the message's block, never the triage: Discord refuses a longer one on every retry.
+    /// </summary>
+    internal static string EmbedDescription(Alert alert)
+    {
+        string triage = ChannelShared.Triage(alert);
+        string section = triage.Length == 0 ? "" : "\n**Triage:** " + EscapeMarkdown(Js.Head(triage, 1000));
+        const int fences = 8;
+        return "```\n" + Post.Cut(SlackChannel.CodeBlockSafe(Js.Head(alert.Message, 3800)), DescriptionMax - fences - section.Length) + "\n```" + section;
     }
 
     /// <summary>Escapes the characters Discord reads as markdown, links included.</summary>

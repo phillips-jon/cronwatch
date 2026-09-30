@@ -97,15 +97,15 @@ public sealed partial class CronwatchClient
 
         // Runs that never reported back. One that cannot be judged (its job's stored timeout no
         // longer parses, say) is reported and skipped.
-        foreach (Run run in await CallAsync(() => _store.RunningRunsAsync()).ConfigureAwait(false))
+        foreach (Run listed in await CallAsync(() => _store.RunningRunsAsync()).ConfigureAwait(false))
         {
             try
             {
-                alerts.AddRange(await CheckRunningAsync(run, now).ConfigureAwait(false));
+                alerts.AddRange(await CheckRunningAsync(listed, now).ConfigureAwait(false));
             }
             catch (Exception e)
             {
-                Report(e, "checking " + run.Job);
+                Report(e, "checking " + listed.Job);
             }
         }
 
@@ -113,7 +113,7 @@ public sealed partial class CronwatchClient
         // not stop the others.
         var jobs = new List<JobSummary>();
         var budget = new RetryBudget();
-        foreach (StoredJob job in await CallAsync(() => _store.ListJobsAsync()).ConfigureAwait(false))
+        foreach (StoredJob job in await StoredJobsAsync().ConfigureAwait(false))
         {
             try
             {
@@ -143,9 +143,9 @@ public sealed partial class CronwatchClient
         return new CheckResult(now, ValueList<JobSummary>.Of(jobs), ValueList<Alert>.Of(alerts), pruned);
     }
 
-    private async Task<IReadOnlyList<Alert>> CheckRunningAsync(Run run, long now)
+    private async Task<IReadOnlyList<Alert>> CheckRunningAsync(Run listed, long now)
     {
-        JobDef? declared = Declared(run.Job);
+        JobDef? declared = Declared(listed.Job);
         Definition def;
         if (declared != null)
         {
@@ -153,14 +153,21 @@ public sealed partial class CronwatchClient
         }
         else
         {
-            StoredJob? stored = await CallAsync(() => _store.GetJobAsync(run.Job)).ConfigureAwait(false);
+            StoredJob? stored = await CallAsync(() => _store.GetJobAsync(listed.Job)).ConfigureAwait(false);
             if (stored == null)
             {
                 return [];
             }
             def = stored.Definition;
         }
-        if (!Evaluated(() => Evaluate.IsStuck(def, run, now)))
+        if (!Evaluated(() => Evaluate.IsStuck(def, listed, now)))
+        {
+            return [];
+        }
+        // Read again just before the write: lines and metrics flushed since the list was read
+        // (while earlier stuck runs were sent, say) are kept.
+        Run? run = await CallAsync(() => _store.GetRunAsync(listed.Id)).ConfigureAwait(false);
+        if (run == null || run.Status != RunStatus.Running || run.Job != listed.Job)
         {
             return [];
         }
@@ -184,15 +191,19 @@ public sealed partial class CronwatchClient
         var recent = await CallAsync(() => _store.ListRunsAsync(job.Name, Evaluate.BaselineWindow)).ConfigureAwait(false);
         Run? last = recent.Count == 0 ? null : recent[0];
         long? nextExpectedAt = null;
-        var (state, drafts) = await UpdateStateAsync(job.Name, previous =>
+        var (state, held) = await UpdateStateAsync(job.Name, previous =>
         {
             CheckOutcome o = Evaluate.OnCheck(job.Definition, job, last, previous, now);
             nextExpectedAt = o.NextExpectedAt;
             var settled = Evaluate.ApplySilence(previous, o.Evaluation, now);
-            return (settled.State, settled.Alerts);
+            // Alerts a process stopped sending part way go back to the retry queue.
+            var released = Evaluate.ReleaseSending(settled.State, Now());
+            var (next, fresh) = Outbox(new Evaluation(released.State, settled.Alerts), job.Definition, now);
+            return (next, fresh with { Dropped = released.Dropped + fresh.Dropped });
         }).ConfigureAwait(false);
+        ReportDropped(job.Name, held.Dropped);
         alerts.AddRange(await RetryUndeliveredAsync(job.Name, state, now, budget).ConfigureAwait(false));
-        alerts.AddRange(await DispatchAsync(drafts, job.Definition, now).ConfigureAwait(false));
+        alerts.AddRange(await DispatchAsync(job.Name, held.Alerts, now).ConfigureAwait(false));
         return Evaluated(() => Evaluate.Summarize(job, recent, state, nextExpectedAt, now));
     }
 
@@ -256,13 +267,10 @@ public sealed partial class CronwatchClient
     private async Task<IReadOnlyList<JobWithRuns>> JobsWithRunsNowAsync(int limit)
     {
         await EnsureReadyAsync().ConfigureAwait(false);
-        foreach (JobDef def in DeclaredAll())
-        {
-            await SyncAsync(def).ConfigureAwait(false);
-        }
+        var jobs = await StoredJobsAsync().ConfigureAwait(false);
         long now = Now();
         var output = new List<JobWithRuns>();
-        foreach (StoredJob job in await CallAsync(() => _store.ListJobsAsync()).ConfigureAwait(false))
+        foreach (StoredJob job in jobs)
         {
             output.Add(await SnapshotAsync(job, now, ClampLimit(limit, 0)).ConfigureAwait(false));
         }
@@ -275,16 +283,11 @@ public sealed partial class CronwatchClient
         JobDef? def = Declared(name);
         if (def != null)
         {
-            await SyncAsync(def).ConfigureAwait(false);
+            // One declared here and forgotten elsewhere is written again, as StoredJobsAsync does.
+            await SyncAsync(def, confirm: true).ConfigureAwait(false);
         }
         StoredJob? stored = await CallAsync(() => _store.GetJobAsync(name)).ConfigureAwait(false);
         return stored == null ? null : (await SnapshotAsync(stored, Now(), 0).ConfigureAwait(false)).Job;
-    }
-
-    private static long SaturatingAdd(long a, long b)
-    {
-        long r = unchecked(a + b);
-        return ((a ^ r) & (b ^ r)) < 0 ? (a < 0 ? long.MinValue : long.MaxValue) : r;
     }
 
     private async Task<JobState> PatchStateAsync(string name, Action<MutableState> change)
@@ -301,8 +304,7 @@ public sealed partial class CronwatchClient
 
     private Task<JobState> SilenceMsAsync(string name, double ms)
     {
-        long now = Now();
-        long until = SaturatingAdd(now, Js.ToLong(Math.Min(ms, Evaluate.MaxDurationMs)));
+        long until = Evaluate.SilenceEnd(Now(), ms);
         return PatchStateAsync(name, s => s.SilencedUntil = until);
     }
 

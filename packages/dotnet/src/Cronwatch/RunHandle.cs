@@ -161,7 +161,7 @@ public sealed class RunHandle
                 _client.Report("run " + Id + " of " + name + " belongs to job " + Json.Quote(stored.Job) + "; ignored", "flushing " + name);
                 return;
             }
-            string? output = lines == null ? stored.Output : JoinOutput(stored.Output, NulText.StripNul(_client.Redact(lines)));
+            string? output = lines == null ? stored.Output : JoinOutput(stored.Output, OutputText.RedactAndCap(lines, _client.Redact));
             Run next = stored with { Output = output, Metrics = stored.Metrics.Merged(metrics) };
             bool wrote;
             try
@@ -240,11 +240,11 @@ public sealed class RunHandle
         return FinishWithAsync(null, CronwatchClient.ErrorText(error), cancellationToken);
     }
 
-    /// <summary>Finishes the run as failed with this error text, capped as an error is.</summary>
+    /// <summary>Finishes the run as failed with this error text, redacted and capped as an error is.</summary>
     public Task<Run?> FailAsync(string error, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(error);
-        return FinishWithAsync(null, OutputText.Cap(error), cancellationToken);
+        return FinishWithAsync(null, error, cancellationToken);
     }
 
     private Task<Run?> FinishWithAsync(string? resultText, string? failure, CancellationToken cancellationToken) =>
@@ -320,7 +320,7 @@ public sealed class RunHandle
             string? added = rec.Output();
             if (added == null && resultText != null)
             {
-                added = OutputText.Cap(resultText);
+                added = resultText;
             }
             Run run = prior with
             {
@@ -328,7 +328,8 @@ public sealed class RunHandle
                 FinishedAt = finishedAt,
                 DurationMs = Evaluate.RunDuration(prior.StartedAt, finishedAt),
                 Error = null,
-                Output = JoinOutput(prior.Output, added),
+                // Capped by Conclude, after it is redacted.
+                Output = JoinLines(prior.Output, added),
                 Metrics = prior.Metrics.Merged(rec.Metrics()),
             };
             string? expected = rec.ExpectText() ?? resultText;
