@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Not packed: a job, a hosted job, a check and the dashboard, published with
+       Native AOT. CI publishes it with every trimming and AOT warning an error,
+       then runs it. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>aot</AssemblyName>
+    <RootNamespace>Cronwatch.Examples.Aot</RootNamespace>
+    <PublishAot>true</PublishAot>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- A program, not a library: no captured context to avoid. -->
+    <NoWarn>$(NoWarn);CS1591;CA2007</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Cronwatch.AspNetCore/Cronwatch.AspNetCore.csproj" />
+  </ItemGroup>
+</Project>

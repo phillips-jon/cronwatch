@@ -7,7 +7,10 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3.mtp-v2" />
+    <!-- The recovery test's clustered job store; SQLite refuses clustering. -->
     <PackageReference Include="Npgsql" />
+    <!-- The release under test; the package itself asks for the floor. -->
+    <PackageReference Include="Quartz" VersionOverride="$(QuartzVersion)" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Cronwatch.Quartz/Cronwatch.Quartz.csproj" />

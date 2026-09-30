@@ -10,6 +10,7 @@
          (CI's dotnet-frameworks runs the floor and the newest). -->
     <HangfireFloor>1.8.0</HangfireFloor>
     <HangfireVersion Condition="'$(HangfireVersion)' == ''">1.8.25</HangfireVersion>
+    <QuartzFloor>4.0.0</QuartzFloor>
     <QuartzVersion Condition="'$(QuartzVersion)' == ''">4.3.0</QuartzVersion>
   </PropertyGroup>
   <ItemGroup>
@@ -37,8 +38,6 @@
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup Label="Quartz">
-    <PackageVersion Include="Quartz" Version="$(QuartzVersion)" />
-    <!-- The recovery test's clustered job store; SQLite refuses clustering. -->
-    <PackageVersion Include="Npgsql" Version="10.0.3" />
+    <PackageVersion Include="Quartz" Version="$(QuartzFloor)" />
   </ItemGroup>
 </Project>

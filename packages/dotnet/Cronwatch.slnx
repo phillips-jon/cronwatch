@@ -17,6 +17,7 @@
     <Project Path="test/WebEnvChild/WebEnvChild.csproj" />
   </Folder>
   <Folder Name="/examples/">
+    <Project Path="examples/aot/aot.csproj" />
     <Project Path="examples/crontab/Crontab.csproj" />
   </Folder>
   <Project Path="webserver/webserver.csproj" />
