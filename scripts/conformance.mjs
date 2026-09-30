@@ -25,9 +25,16 @@ import { anthropic } from "../packages/sdk/dist/anthropic.js";
 import { formatDuration, formatRelative } from "../packages/sdk/src/duration.ts";
 import { expectation, nextFire, parseSchedule, runCovers } from "../packages/sdk/src/schedule.ts";
 import {
+  alertKey,
   applySilence,
   emptyState,
   formatNumber,
+  holdAlerts,
+  MAX_UNDELIVERED,
+  queueUndelivered,
+  recordSent,
+  releaseSending,
+  SEND_LEASE_MS,
   isStuck,
   jobHealth,
   muteOpens,
@@ -1043,8 +1050,81 @@ function healthCases() {
   return {
     jobHealth: jobHealthCases, summarize: summaries, percentile: stats, median: medians, normalizeState: normalized, muteOpens: mutes, isStuck: stuck,
     unevaluableSummary: unevaluable, applySilence: silences, staleAlert: staleCases, runDuration: durations, stateVersion: versions,
-    failureCount: failureCounts, silenceEnd: silenceEnds,
+    failureCount: failureCounts, silenceEnd: silenceEnds, delivery: deliveryCases(state),
   };
+}
+
+// The outbox and the retry queue, as each write leaves the state. An alert
+// is written into `sending` with the state that opens its condition (or,
+// deliver: "check", straight into `undelivered`); how its send went takes it
+// out again; one whose lease ran out goes to `undelivered` at a check.
+function deliveryCases(state) {
+  const details = {
+    failed: { consecutiveFailures: 1, threshold: 1 },
+    slow: { durationMs: 20_000, thresholdMs: 10_000, basis: "maxDuration" },
+    missed: { dueAt: T0 - 20 * MIN, deadline: T0 - 10 * MIN, graceMs: 10 * MIN, lastRunAt: null },
+    recovered: { after: ["failed"] },
+  };
+  const alert = (type, atMs, runId = null) => ({
+    type, job: "j", definition: { name: "j" }, run: runId === null ? null : sampleRun({ id: runId, job: "j" }), title: `j ${type}`, message: "m", at: atMs,
+    details: details[type],
+  });
+  const a = alert("failed", T0, "r1");
+  const b = alert("slow", T0, "r2");
+  const c = alert("recovered", T0 + MIN, "r3");
+  const d = alert("missed", T0 + 2 * MIN);
+  const many = (n, from = 0) => Array.from({ length: n }, (_, i) => alert("failed", T0 + (from + i) * SEC));
+  const held = (until, x) => ({ until, alert: x });
+
+  const alertKeys = [a, b, c, d, alert("missed", -5), alert("failed", 1.5, "")].map((x) => ({ alert: x, key: alertKey(x) }));
+
+  const normalized = [
+    state({ sending: [] }),
+    state({ sending: [held(T0, a)] }),
+    { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, sending: "nope" },
+    { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, sending: null },
+  ].map((s) => ({ state: s, normalized: clone(normalizeState(s, "j")) }));
+
+  const queued = [
+    [state(), [a]],
+    [state({ undelivered: [a, b] }), [{ ...a, triage: "Look." }, c]],
+    [state({ undelivered: many(19) }), [a, b]],
+    [state({ undelivered: many(25) }), []],
+    [state({ undelivered: many(20) }), many(3, 20)],
+  ].map(([s, alerts]) => ({ state: s, alerts, result: clone(queueUndelivered(s, alerts)) }));
+
+  const holds = [
+    [state(), [], false],
+    [state({ open: { failed: T0 } }), [a], false],
+    [state({ open: { failed: T0 }, sending: [held(T0, d)] }), [a, b], false],
+    [state({ sending: many(19).map((x) => held(T0, x)) }), [a, b], false],
+    [state({ open: { failed: T0 } }), [a], true],
+    [state({ undelivered: many(20) }), [a], true],
+  ].map(([s, alerts, deferred]) => ({ state: s, alerts, until: T0 + SEND_LEASE_MS, deferred, result: clone(holdAlerts(s, alerts, T0 + SEND_LEASE_MS, deferred)) }));
+
+  const now = T0 + SEND_LEASE_MS;
+  const releases = [
+    [state()],
+    [state({ sending: [held(now + 1, a)] })],
+    [state({ sending: [held(now, a)] })],
+    [state({ sending: [held(now - 1, a), held(now + 1, b)] })],
+    [state({ sending: [held(now - 1, a)], undelivered: [{ ...a, triage: null }, d] })],
+    [state({ sending: [{ alert: a }, { until: "x", alert: b }, { until: now - 1 }, null, held(now - 1, c)] })],
+    [state({ sending: many(5).map((x) => held(now - 1, x)), undelivered: many(18, 5) })],
+  ].map(([s]) => ({ state: s, now, result: clone(releaseSending(s, now)) }));
+
+  const at = T0 + 3 * MIN;
+  const sent = [
+    [state({ sending: [held(now, a)] }), [a], [], []],
+    [state({ sending: [held(now, a)] }), [], [{ ...a, triage: "Look." }], []],
+    [state({ sending: [held(now, a), held(now, b)] }), [a], [b], []],
+    [state({ sending: [held(now, d)], undelivered: [a, b] }), [a], [], [b]],
+    [state({ undelivered: [a, b] }), [], [{ ...a, triage: null }], []],
+    [state({ undelivered: many(20) }), [], [a], []],
+    [state({ sending: [held(now, a)], lastAlertAt: 5 }), [], [], []],
+  ].map(([s, delivered, failed, stale]) => ({ state: s, delivered, failed, stale, now: at, result: clone(recordSent(s, delivered, failed, stale, at)) }));
+
+  return { maxUndelivered: MAX_UNDELIVERED, sendLeaseMs: SEND_LEASE_MS, alertKey: alertKeys, normalizeState: normalized, queueUndelivered: queued, holdAlerts: holds, releaseSending: releases, recordSent: sent };
 }
 
 // ---------------------------------------------------------------- output

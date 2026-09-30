@@ -5,13 +5,18 @@ import {
   BASELINE_WINDOW,
   emptyState,
   hasFullBaseline,
+  holdAlerts,
   isSilenced,
   isStuck,
+  MAX_UNDELIVERED,
   normalizeState,
   onCheck,
   onRunFinish,
   onRunStart,
+  recordSent,
+  releaseSending,
   runDuration,
+  SEND_LEASE_MS,
   silenceEnd,
   staleAlert,
   stateVersion,
@@ -19,6 +24,7 @@ import {
   timeoutMs,
   unevaluableSummary,
 } from "./evaluate.js";
+import type { Evaluation } from "./evaluate.js";
 import { composeAlert } from "./format.js";
 import { constantTimeEqual, json } from "./http.js";
 import { createRecorder } from "./job.js";
@@ -32,7 +38,6 @@ import { memory } from "./stores/memory.js";
 import type {
   Alert,
   AlertChannel,
-  AlertDraft,
   CheckResult,
   Condition,
   Duration,
@@ -227,8 +232,6 @@ const TRIAGE_TIMEOUT_MS = 25_000;
 /** How long one channel may take to send one alert. */
 const CHANNEL_TIMEOUT_MS = 15_000;
 const PRUNE_INTERVAL_MS = 60 * 60_000;
-/** Undelivered alerts kept per job for retry; the oldest go first. */
-const MAX_UNDELIVERED = 20;
 /**
  * Wall-clock time one check spends retrying undelivered alerts, across every
  * job. Once it is spent the rest wait for the next check.
@@ -275,13 +278,14 @@ function validateDefinition(def: JobDefinition): void {
   }
 }
 
-function sameState(a: JobState, b: JobState): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+/** Alerts written with the state that opened their conditions, and how many older ones the queue let go. */
+interface Held {
+  alerts: Alert[];
+  dropped: number;
 }
 
-/** Identifies an alert across retries. */
-function alertKey(alert: Alert): string {
-  return `${alert.type}|${alert.at}|${alert.run?.id ?? ""}`;
+function sameState(a: JobState, b: JobState): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export class CronWatch {
@@ -1026,22 +1030,44 @@ export class CronWatch {
 
   /**
    * Evaluate a finished run (ok, failed, or timed out by a check), already
-   * written, against the job's state and send what that produces. Never throws.
+   * written, against the job's state and send what that produces. The
+   * alerts are written with that state (see outbox()). Never throws.
    */
   private async finishRun(definition: StoredJobDefinition, run: Run, now: number): Promise<Alert[]> {
-    let drafts: AlertDraft[];
+    let held: Held;
     try {
       let history: Run[] | null = null;
-      ({ result: drafts } = await this.updateState(run.job, async (previous) => {
+      ({ result: held } = await this.updateState(run.job, async (previous) => {
         history ??= await this.history(run);
-        const settled = applySilence(previous, onRunFinish(definition, run, previous, history, now), now);
-        return { state: settled.state, result: settled.alerts };
+        return this.outbox(applySilence(previous, onRunFinish(definition, run, previous, history, now), now), definition, now);
       }));
     } catch (e) {
       this.onError(e, `evaluating ${run.job}`);
       return [];
     }
-    return this.dispatch(drafts, definition, now);
+    this.reportDropped(run.job, held.dropped);
+    return this.dispatch(run.job, held.alerts, now);
+  }
+
+  /**
+   * An evaluation as it is written: its drafts composed into alerts and held
+   * in the same state (holdAlerts), so the write that opens a condition also
+   * keeps its alerts, and a process that stops before sending them does not
+   * lose them. Called inside updateState(), so it only computes.
+   */
+  private outbox(settled: Evaluation, definition: StoredJobDefinition, now: number): { state: JobState; result: Held } {
+    const alerts = settled.alerts.map((draft) => composeAlert(draft, definition, now));
+    const { state, dropped } = holdAlerts(settled.state, alerts, this.now() + SEND_LEASE_MS, this.deferDelivery);
+    return { state, result: { alerts, dropped } };
+  }
+
+  /** Reports alerts let go because a job's queue was full. */
+  private reportDropped(name: string, dropped: number): void {
+    if (dropped <= 0) return;
+    this.report(
+      new Error(`${dropped} undelivered alert${dropped === 1 ? "" : "s"} for ${name} dropped: only the newest ${MAX_UNDELIVERED} are kept for retry`),
+      `alert queue for ${name}`,
+    );
   }
 
   /**
@@ -1117,14 +1143,18 @@ export class CronWatch {
       try {
         const recent = await this.store.listRuns(stored.name, BASELINE_WINDOW);
         let nextExpectedAt: number | null = null;
-        const { state, result: drafts } = await this.updateState(stored.name, (previous) => {
+        const { state, result: held } = await this.updateState(stored.name, (previous) => {
           const evaluation = onCheck(stored.definition, stored, recent[0] ?? null, previous, now);
           nextExpectedAt = evaluation.nextExpectedAt;
           const settled = applySilence(previous, evaluation, now);
-          return { state: settled.state, result: settled.alerts };
+          // Alerts a process stopped sending part way go back to the retry queue.
+          const released = releaseSending(settled.state, this.now());
+          const out = this.outbox({ state: released.state, alerts: settled.alerts }, stored.definition, now);
+          return { state: out.state, result: { alerts: out.result.alerts, dropped: released.dropped + out.result.dropped } };
         });
+        this.reportDropped(stored.name, held.dropped);
         alerts.push(...(await this.retryUndelivered(stored.name, state, now, retries)));
-        alerts.push(...(await this.dispatch(drafts, stored.definition, now)));
+        alerts.push(...(await this.dispatch(stored.name, held.alerts, now)));
         jobs.push(summarize(stored, recent, state, nextExpectedAt, now));
       } catch (e) {
         this.onError(e, `checking ${stored.name}`);
@@ -1286,27 +1316,24 @@ export class CronWatch {
   }
 
   /**
-   * Compose, triage and send each draft. The state was saved before this
-   * (updateState), so a slow channel holds up nothing else; afterwards only
-   * the delivery fields are written back, onto a fresh read of the state.
+   * Triage and send each alert the outbox holds (see outbox()). The state,
+   * with the alerts in it, was saved before this, so a slow channel holds up
+   * nothing else; afterwards only the delivery fields are written back, onto
+   * a fresh read of the state, and the alerts leave `sending`. Triage is made
+   * here, never stored with the held alert: the write that opens a condition
+   * cannot wait for it, and a retry triages an alert that has none. With
+   * deliver: "check" the alerts were queued for a check elsewhere instead.
    */
-  private async dispatch(drafts: AlertDraft[], definition: StoredJobDefinition, now: number): Promise<Alert[]> {
-    if (drafts.length === 0) return [];
-    const composed: Alert[] = [];
+  private async dispatch(name: string, alerts: Alert[], now: number): Promise<Alert[]> {
+    if (alerts.length === 0 || this.deferDelivery) return alerts;
     const delivered: Alert[] = [];
     const failed: Alert[] = [];
-    for (const draft of drafts) {
-      const alert = composeAlert(draft, definition, now);
-      if (this.deferDelivery) {
-        failed.push(alert);
-      } else {
-        if (this.triage && alert.type !== "recovered") await this.addTriage(alert, TRIAGE_TIMEOUT_MS);
-        (await this.deliver(alert) ? delivered : failed).push(alert);
-      }
-      composed.push(alert);
+    for (const alert of alerts) {
+      if (this.triage && alert.type !== "recovered") await this.addTriage(alert, TRIAGE_TIMEOUT_MS);
+      (await this.deliver(alert) ? delivered : failed).push(alert);
     }
-    await this.recordDelivery(definition.name, delivered, failed, [], now);
-    return composed;
+    await this.recordDelivery(name, delivered, failed, [], now);
+    return alerts;
   }
 
   /**
@@ -1339,28 +1366,18 @@ export class CronWatch {
 
   /**
    * Mark delivered alerts done, drop stale ones, and keep failed ones for the
-   * next check. A failed alert replaces its stored copy, so a triage made on
-   * this attempt is kept. lastAlertAt moves only on a delivery.
+   * next check, taking them all out of `sending` (recordSent). A failed alert
+   * replaces its stored copy, so a triage made on this attempt is kept.
+   * lastAlertAt moves only on a delivery. When this write fails, alerts
+   * still in `sending` are retried once their lease runs out.
    */
   private async recordDelivery(name: string, delivered: Alert[], failed: Alert[], dropped: Alert[], now: number): Promise<void> {
     try {
       const { result: trimmed } = await this.updateState(name, (previous) => {
-        const state = normalizeState(previous, name);
-        const done = new Set([...delivered, ...dropped].map(alertKey));
-        const retried = new Map(failed.map((a) => [alertKey(a), a]));
-        const kept = state.undelivered!.filter((a) => !done.has(alertKey(a))).map((a) => retried.get(alertKey(a)) ?? a);
-        const known = new Set(kept.map(alertKey));
-        kept.push(...failed.filter((a) => !known.has(alertKey(a))));
-        state.undelivered = kept.slice(-MAX_UNDELIVERED);
-        if (delivered.length > 0) state.lastAlertAt = now;
-        return { state, result: Math.max(0, kept.length - MAX_UNDELIVERED) };
+        const { state, dropped: letGo } = recordSent(normalizeState(previous, name), delivered, failed, dropped, now);
+        return { state, result: letGo };
       });
-      if (trimmed > 0) {
-        this.onError(
-          new Error(`${trimmed} undelivered alert${trimmed === 1 ? "" : "s"} for ${name} dropped: only the newest ${MAX_UNDELIVERED} are kept for retry`),
-          `alert queue for ${name}`,
-        );
-      }
+      this.reportDropped(name, trimmed);
     } catch (e) {
       this.onError(e, `recording alert delivery for ${name}`);
     }

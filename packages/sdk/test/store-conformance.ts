@@ -82,9 +82,9 @@ export async function conformance(name: string, make: () => Store, skip: string 
     await store.setState({ job: "a", open: {}, consecutiveFailures: 0, silencedUntil: 99, lastAlertAt: 6 });
     assert.deepEqual(await store.getState("a"), { job: "a", open: {}, consecutiveFailures: 0, silencedUntil: 99, lastAlertAt: 6 });
     const undelivered = { type: "failed", job: "a", title: "a failed", message: "boom", at: 7, details: { consecutiveFailures: 1 } } as unknown as Alert;
-    const full = { job: "a", open: { stuck: 7 }, consecutiveFailures: 1, silencedUntil: null, lastAlertAt: 6, pendingRecovery: ["missed"], undelivered: [undelivered] } as JobState;
+    const full = { job: "a", open: { stuck: 7 }, consecutiveFailures: 1, silencedUntil: null, lastAlertAt: 6, pendingRecovery: ["missed"], undelivered: [undelivered], sending: [{ until: 8, alert: undelivered }] } as JobState;
     await store.setState(full);
-    assert.deepEqual(await store.getState("a"), full, "pendingRecovery and undelivered round-trip");
+    assert.deepEqual(await store.getState("a"), full, "pendingRecovery, undelivered and sending round-trip");
     await store.setState({ job: "a", open: {}, consecutiveFailures: 0, silencedUntil: 99, lastAlertAt: 6 });
 
     // compareAndSetState: writes only over the version it was told to expect.
