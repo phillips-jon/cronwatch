@@ -1,4 +1,4 @@
-package dev.cronwatch;
+package dev.cronwatch.spring;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,32 +15,33 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Every Java example in packages/java/README.md compiles against this build, each as the body of a
- * method of its own, so the README fails the build when one stops compiling (the Rust port's doc
- * tests, the Elixir port's README test).
+ * The integrations' examples in packages/java/README.md ({@code ```java spring}, {@code ```java
+ * quartz} and {@code ```java jobrunr} blocks) compile against this build, each as the body of a
+ * method of its own; the core's own test compiles the plain {@code ```java} blocks.
  */
 class ReadmeTest {
   private static final String IMPORTS =
       """
       import dev.cronwatch.*;
-      import dev.cronwatch.cli.CronwatchCli;
-      import dev.cronwatch.jdbc.SqlStore;
-      import dev.cronwatch.store.MemoryStore;
-      import java.nio.file.Files;
-      import java.nio.file.Path;
-      import java.time.Duration;
+      import dev.cronwatch.jobrunr.*;
+      import dev.cronwatch.quartz.*;
+      import dev.cronwatch.spring.*;
       """;
 
   @TempDir Path dir;
 
   @Test
-  void everyExampleCompiles() throws IOException, InterruptedException {
+  void everyIntegrationExampleCompiles() throws IOException, InterruptedException {
+    String repo = System.getProperty("cronwatch.repo", "../../..");
     String readme =
-        Files.readString(
-            Fixtures.repo().resolve("packages/java/README.md"), StandardCharsets.UTF_8);
-    Matcher m = Pattern.compile("```java\n(.*?)```", Pattern.DOTALL).matcher(readme);
+        Files.readString(Path.of(repo, "packages/java/README.md"), StandardCharsets.UTF_8);
+    Matcher m =
+        Pattern.compile("```java (spring|quartz|jobrunr)\n(.*?)```", Pattern.DOTALL)
+            .matcher(readme);
+    List<String> kinds = new ArrayList<>();
     List<Path> sources = new ArrayList<>();
     while (m.find()) {
+      kinds.add(m.group(1));
       String name = "ReadmeExample" + sources.size();
       Path file = dir.resolve(name + ".java");
       Files.writeString(
@@ -49,13 +50,14 @@ class ReadmeTest {
               + "class "
               + name
               + " {\n  static void example() throws Exception {\n"
-              + m.group(1)
+              + m.group(2)
               + "\n  }\n}\n",
           StandardCharsets.UTF_8);
       sources.add(file);
     }
-    assertTrue(sources.size() >= 4, "README examples found: " + sources.size());
-    // The JDK's own javac, as a process: the tests' module does not read java.compiler.
+    assertTrue(
+        kinds.containsAll(List.of("spring", "quartz", "jobrunr")),
+        "README integration examples found: " + kinds);
     List<String> command =
         new ArrayList<>(
             List.of(
