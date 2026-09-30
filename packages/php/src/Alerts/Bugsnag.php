@@ -30,7 +30,7 @@ final class Bugsnag implements AlertChannel
      * @param (callable(): (int|float))|null $now the clock for the Bugsnag-Sent-At header, in epoch milliseconds; for tests
      */
     public function __construct(
-        mixed $apiKey,
+        #[\SensitiveParameter] mixed $apiKey,
         private readonly ?string $releaseStage = null,
         ?string $endpoint = null,
         private readonly bool $recovered = false,

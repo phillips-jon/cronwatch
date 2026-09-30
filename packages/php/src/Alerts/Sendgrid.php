@@ -28,7 +28,7 @@ final class Sendgrid implements AlertChannel
      * @param string|null $region "eu" for an EU regional subuser; default "us"
      */
     public function __construct(
-        mixed $apiKey,
+        #[\SensitiveParameter] mixed $apiKey,
         private readonly string $from,
         string|array $to,
         ?string $region = null,

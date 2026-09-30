@@ -33,7 +33,7 @@ final class Discord implements AlertChannel
      * @param string $webhookUrl a channel webhook URL from Server Settings, Integrations, Webhooks
      * @param (callable(Alert): string)|null $link link back to the job in your dashboard
      */
-    public function __construct(private readonly string $webhookUrl, ?callable $link = null, ?Http $http = null)
+    public function __construct(#[\SensitiveParameter] private readonly string $webhookUrl, ?callable $link = null, ?Http $http = null)
     {
         if ($webhookUrl === '') {
             throw new \InvalidArgumentException('Discord needs a webhookUrl');

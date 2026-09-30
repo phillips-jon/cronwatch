@@ -27,7 +27,7 @@ final class Rollbar implements AlertChannel
      * @param bool $recovered also send recoveries, as info items; default true
      */
     public function __construct(
-        mixed $accessToken,
+        #[\SensitiveParameter] mixed $accessToken,
         private readonly ?string $environment = null,
         private readonly bool $recovered = true,
         ?callable $link = null,

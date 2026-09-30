@@ -557,6 +557,96 @@ final class ChannelsTest extends TestCase
         }
     }
 
+    /**
+     * tests/servers/raw.php in a mode, started; its port once it listens.
+     *
+     * @return array{resource, resource, int} the process, its output and the port
+     */
+    private function raw(string ...$args): array
+    {
+        if (!function_exists('proc_open')) {
+            $this->markTestSkipped('needs proc_open');
+        }
+        $process = proc_open([PHP_BINARY, __DIR__ . '/servers/raw.php', ...$args], [1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+        $ready = (string) fgets($pipes[1]);
+        $this->assertStringStartsWith('ready ', $ready);
+        return [$process, $pipes[1], (int) substr(trim($ready), 6)];
+    }
+
+    /** What raw.php printed once it answered, and its exit status. */
+    private static function rawDone($process, $out): string
+    {
+        $said = trim((string) stream_get_contents($out));
+        fclose($out);
+        proc_close($process);
+        return $said;
+    }
+
+    /**
+     * The deadline covers the answer's headers too: a server that sends one
+     * header line after another, each within the timeout of a read, no
+     * longer holds the request open past it. PHP's http:// stream read the
+     * headers before the deadline was looked at.
+     */
+    public function testTheStreamPathsDeadlineCoversAServerSendingItsHeadersSlowly(): void
+    {
+        [$process, $out, $port] = $this->raw('trickle');
+        try {
+            (new NativeHttp(false))->post("http://127.0.0.1:{$port}/hook", '{}', [], 500);
+            $this->fail('expected a timeout');
+        } catch (RequestTimeout $error) {
+            $this->assertSame('The operation was aborted due to timeout', $error->getMessage());
+        }
+        $said = self::rawDone($process, $out);
+        $this->assertMatchesRegularExpression('/^sent [0-9]+$/', $said);
+        $this->assertLessThan(40, (int) substr($said, 5), 'the client hung up before the headers ended');
+    }
+
+    public function testTheStreamPathReadsAChunkedAnswerToItsLastChunk(): void
+    {
+        [$process, $out, $port] = $this->raw('chunked');
+        $response = (new NativeHttp(false))->post("http://127.0.0.1:{$port}/hook", '{}', [], 5000);
+        $this->assertSame([200, 'hello world'], [$response->status, $response->body]);
+        $this->assertSame('done', self::rawDone($process, $out));
+    }
+
+    public function testTheStreamPathPostsOverTlsAndChecksTheCertificate(): void
+    {
+        if (!extension_loaded('openssl') || !function_exists('proc_open')) {
+            $this->markTestSkipped('needs openssl and proc_open');
+        }
+        $dir = sys_get_temp_dir() . '/cronwatch-tls-' . getmypid() . '-' . bin2hex(random_bytes(4));
+        mkdir($dir);
+        try {
+            file_put_contents("{$dir}/openssl.cnf", "[req]\ndistinguished_name = dn\n[dn]\n[san]\nsubjectAltName = IP:127.0.0.1\nbasicConstraints = critical,CA:TRUE\n");
+            $config = ['config' => "{$dir}/openssl.cnf", 'x509_extensions' => 'san', 'digest_alg' => 'sha256'];
+            $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1'] + $config);
+            $csr = openssl_csr_new(['commonName' => '127.0.0.1'], $key, $config);
+            $cert = openssl_csr_sign($csr, null, $key, 1, $config);
+            openssl_x509_export($cert, $pem);
+            openssl_pkey_export($key, $keyPem, null, $config);
+            file_put_contents("{$dir}/cert.pem", $pem . $keyPem);
+            file_put_contents("{$dir}/ca.pem", $pem);
+            $post = fn (string $url, string $ca) => (string) shell_exec(implode(' ', array_map('escapeshellarg', [PHP_BINARY, '-d', "openssl.cafile={$ca}", __DIR__ . '/workers/post.php', $url])));
+
+            // Trusted: the answer comes back.
+            [$process, $out, $port] = $this->raw('tls', "{$dir}/cert.pem");
+            $this->assertSame('201 ok', $post("https://127.0.0.1:{$port}/services/secret-path", "{$dir}/ca.pem"));
+            $this->assertSame('done', self::rawDone($process, $out));
+
+            // Not trusted: refused, and the error names only the origin.
+            file_put_contents("{$dir}/other.pem", '');
+            [$process, $out, $port] = $this->raw('tls', "{$dir}/cert.pem");
+            $said = $post("https://127.0.0.1:{$port}/services/secret-path", "{$dir}/other.pem");
+            self::rawDone($process, $out);
+            $this->assertStringStartsWith('RuntimeException: ', $said);
+            $this->assertStringNotContainsString('secret-path', $said);
+        } finally {
+            array_map('unlink', glob("{$dir}/*") ?: []);
+            rmdir($dir);
+        }
+    }
+
     #[DataProvider('transports')]
     public function testTheDefaultHttpTrimsHeaderValuesAndRefusesALineBreakInside(bool $curl): void
     {
@@ -668,6 +758,103 @@ final class ChannelsTest extends TestCase
             }
         }
         $this->assertSame('boom at https://h.example (x)', Alerts\Shared::scrub('boom at https://u:p@h.example/a/b?c=d (x)', 'https://u:p@h.example/a/b?c=d'));
+    }
+
+    /** Every string in a trace's arguments, all the way down arrays. */
+    private static function traceStrings(\Throwable $error): array
+    {
+        $out = [];
+        $walk = function (mixed $value) use (&$walk, &$out): void {
+            if (is_string($value)) {
+                $out[] = $value;
+            } elseif (is_array($value)) {
+                foreach ($value as $key => $item) {
+                    $out[] = (string) $key;
+                    $walk($item);
+                }
+            }
+        };
+        for ($e = $error; $e !== null; $e = $e->getPrevious()) {
+            foreach ($e->getTrace() as $frame) {
+                $walk($frame['args'] ?? []);
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * A failed send's exception goes to onError, and on to an error tracker
+     * that shows its trace with each frame's arguments (PHP records them
+     * unless zend.exception_ignore_args is on). No frame holds a credential:
+     * the parameters that carry one are #[\SensitiveParameter].
+     */
+    public function testAFailedSendsTraceHoldsNoCredential(): void
+    {
+        $ignore = ini_set('zend.exception_ignore_args', '0');
+        try {
+            $probe = stream_socket_server('tcp://127.0.0.1:0');
+            $closed = 'http://' . stream_socket_get_name($probe, false);
+            fclose($probe);
+            $secrets = ['hooks-secret-path', 'dd-secret-key-123', 're_secret_123', 'pm-secret-123', 'SG.secret-123', 'key-secret-123', 'sekret-sekret-123',
+                'AKIDEXAMPLE123', 'tw-secret-123', 'pubkey-secret-123', 'hb-secret-123', 'rb-secret-123', 'bs-secret-123', 'nr-secret-123', 'wh-secret-123', 'sign-secret-123', 'sk-ant-secret-123'];
+            $email = [...self::EMAIL];
+            $refused = new FakeHttp(401, 'no');
+            $channels = fn (Alerts\Http $http, string $base) => [
+                new Alerts\Slack("{$base}/services/hooks-secret-path", http: $http),
+                new Alerts\Discord("{$base}/api/webhooks/1/hooks-secret-path", http: $http),
+                new Alerts\Webhook("{$base}/in/hooks-secret-path", ['authorization' => 'Bearer wh-secret-123'], 'sign-secret-123', $http),
+                new Alerts\Honeybadger(apiKey: 'hb-secret-123', endpoint: $base, http: $http),
+                new Alerts\Bugsnag(apiKey: 'bs-secret-123', endpoint: "{$base}/", http: $http),
+                new Alerts\Datadog(apiKey: 'dd-secret-key-123', http: $http),
+                new Alerts\Resend(...$email, apiKey: 're_secret_123', http: $http),
+                new Alerts\Postmark(...$email, serverToken: 'pm-secret-123', http: $http),
+                new Alerts\Sendgrid(...$email, apiKey: 'SG.secret-123', http: $http),
+                new Alerts\Mailgun(...$email, apiKey: 'key-secret-123', domain: 'mg.example.com', http: $http),
+                new Alerts\Ses(...$email, region: 'us-east-1', accessKeyId: 'AKIDEXAMPLE123', secretAccessKey: 'sekret-sekret-123', http: $http),
+                new Alerts\Twilio(accountSid: 'AC1', authToken: 'tw-secret-123', from: '+1', to: '+2', http: $http),
+                new Alerts\Sentry(dsn: 'https://pubkey-secret-123@o1.ingest.sentry.io/42', http: $http),
+                new Alerts\Rollbar(accessToken: 'rb-secret-123', http: $http),
+                new Alerts\NewRelic(accountId: '1', apiKey: 'nr-secret-123', http: $http),
+            ];
+            $errors = [];
+            // Refused answers, and requests that could not be made at all (the first five post where they are told).
+            foreach ([[$refused, 'https://hooks.example.com'], [new NativeHttp(false), $closed]] as [$http, $base]) {
+                foreach ($channels($http, $base) as $i => $channel) {
+                    if ($http instanceof NativeHttp && $i >= 5) {
+                        break;
+                    }
+                    try {
+                        $channel->send(self::failed(), self::context());
+                        $this->fail("{$channel->name()} did not fail");
+                    } catch (\RuntimeException $error) {
+                        $errors[$channel->name()] = $error;
+                    }
+                }
+            }
+            if (extension_loaded('curl')) {
+                try {
+                    (new Alerts\Slack("{$closed}/services/hooks-secret-path", http: new NativeHttp(true)))->send(self::failed(), self::context());
+                } catch (\RuntimeException $error) {
+                    $errors['curl'] = $error;
+                }
+            }
+            try {
+                (new \Cronwatch\Triage\Anthropic(apiKey: 'sk-ant-secret-123', baseUrl: $closed, http: new NativeHttp(false)))(new \Cronwatch\TriageContext(self::failed(), [], new \Cronwatch\Job\AbortSignal(5000)));
+            } catch (\RuntimeException $error) {
+                $errors['triage'] = $error;
+            }
+            $this->assertGreaterThan(15, count($errors));
+            foreach ($errors as $name => $error) {
+                $this->assertNotSame([], $error->getTrace()[0]['args'] ?? [], "{$name}: the trace records arguments");
+                foreach (self::traceStrings($error) as $text) {
+                    foreach ($secrets as $secret) {
+                        $this->assertStringNotContainsString($secret, $text, $name);
+                    }
+                }
+            }
+        } finally {
+            ini_set('zend.exception_ignore_args', (string) $ignore);
+        }
     }
 
     public function testAChannelGivenNoHttpUsesTheTransportsDefault(): void

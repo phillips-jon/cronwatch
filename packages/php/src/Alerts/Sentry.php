@@ -28,7 +28,7 @@ final class Sentry implements AlertChannel
      * @param bool $recovered also send recoveries, as info events; default true
      */
     public function __construct(
-        mixed $dsn,
+        #[\SensitiveParameter] mixed $dsn,
         private readonly ?string $environment = null,
         private readonly ?string $release = null,
         private readonly bool $recovered = true,
@@ -46,7 +46,7 @@ final class Sentry implements AlertChannel
      *
      * @return array{string, string}
      */
-    public static function parseDsn(string $dsn): array
+    public static function parseDsn(#[\SensitiveParameter] string $dsn): array
     {
         $url = Shared::url($dsn) ?? throw new \InvalidArgumentException('Sentry needs a valid dsn');
         $segments = array_values(array_filter(explode('/', $url['pathname']), fn (string $s) => $s !== ''));

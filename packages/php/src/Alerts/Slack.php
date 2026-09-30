@@ -30,7 +30,7 @@ final class Slack implements AlertChannel
      * @param string $webhookUrl an incoming webhook URL from api.slack.com/messaging/webhooks
      * @param (callable(Alert): string)|null $link link back to the job in your dashboard
      */
-    public function __construct(private readonly string $webhookUrl, ?callable $link = null, ?Http $http = null)
+    public function __construct(#[\SensitiveParameter] private readonly string $webhookUrl, ?callable $link = null, ?Http $http = null)
     {
         if ($webhookUrl === '') {
             throw new \InvalidArgumentException('Slack needs a webhookUrl');

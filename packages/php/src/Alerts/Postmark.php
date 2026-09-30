@@ -28,7 +28,7 @@ final class Postmark implements AlertChannel
      * @param string|null $messageStream default "outbound", the transactional stream
      */
     public function __construct(
-        mixed $serverToken,
+        #[\SensitiveParameter] mixed $serverToken,
         private readonly string $from,
         string|array $to,
         private readonly ?string $messageStream = null,

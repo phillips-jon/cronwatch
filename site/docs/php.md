@@ -21,12 +21,12 @@ PHP 8.2 or newer, with no dependencies beyond `ext-json` and `ext-pcre`, which e
 | `Cronwatch\Store\SqliteStore` | one SQLite file | `pdo_sqlite` |
 | `Cronwatch\Store\MysqlStore` | MySQL 8.0.13 or newer, MariaDB 10.6 or newer | `pdo_mysql` |
 | `Cronwatch\Store\PostgresStore` | Postgres | `pdo_pgsql` |
-| `Cronwatch\Alerts\...` | Slack, Discord, webhook, email, SMS and error tracker channels | `ext-curl` when it is loaded, PHP's own streams otherwise |
+| `Cronwatch\Alerts\...` | Slack, Discord, webhook, email, SMS and error tracker channels | `ext-curl` when it is loaded, PHP's own stream sockets otherwise |
 | `Cronwatch\Triage\Anthropic` | Claude triage | the same; no Anthropic package |
 | `Cronwatch\Sources\PgCron` | watching pg_cron's jobs | `pdo_pgsql` |
 | `Cronwatch\Web\PsrHandler`, `PsrMiddleware`, `PsrJobHandler` | the dashboard and `handler()` in a PSR-15 stack | `psr/http-server-handler` (and `psr/http-server-middleware` for the middleware), with a PSR-7 and PSR-17 implementation such as `nyholm/psr7` |
 
-A store made without its extension throws a `LogicException` that names it. Over PHP's streams, an `https` channel needs `ext-openssl`.
+A store made without its extension throws a `LogicException` that names it. Over PHP's stream sockets, an `https` channel needs `ext-openssl`.
 
 ## Create one client
 

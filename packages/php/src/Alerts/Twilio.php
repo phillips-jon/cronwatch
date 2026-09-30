@@ -60,9 +60,9 @@ final class Twilio implements AlertChannel
     public function __construct(
         mixed $accountSid,
         string|array $to,
-        mixed $authToken = null,
-        mixed $apiKeySid = null,
-        mixed $apiKeySecret = null,
+        #[\SensitiveParameter] mixed $authToken = null,
+        #[\SensitiveParameter] mixed $apiKeySid = null,
+        #[\SensitiveParameter] mixed $apiKeySecret = null,
         private readonly ?string $from = null,
         private readonly ?string $messagingServiceSid = null,
         private readonly bool $recovered = false,

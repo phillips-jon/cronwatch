@@ -37,7 +37,7 @@ final class Honeybadger implements AlertChannel
      * @param bool $recovered also send recoveries; default false, since Honeybadger has no levels and a recovery would read as an error
      */
     public function __construct(
-        mixed $apiKey,
+        #[\SensitiveParameter] mixed $apiKey,
         private readonly ?string $environment = null,
         ?string $endpoint = null,
         private readonly bool $recovered = false,

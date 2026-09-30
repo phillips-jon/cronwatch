@@ -28,7 +28,7 @@ final class Mailgun implements AlertChannel
      * @param string|null $region "eu" for a domain in the EU region; default "us"
      */
     public function __construct(
-        mixed $apiKey,
+        #[\SensitiveParameter] mixed $apiKey,
         string $domain,
         private readonly string $from,
         string|array $to,

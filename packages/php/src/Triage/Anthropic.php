@@ -59,7 +59,7 @@ final class Anthropic
      * @param string|null $baseUrl default ANTHROPIC_BASE_URL, else https://api.anthropic.com
      */
     public function __construct(
-        ?string $apiKey = null,
+        #[\SensitiveParameter] ?string $apiKey = null,
         private readonly ?string $model = null,
         private readonly ?string $effort = null,
         private readonly ?int $maxTokens = null,
