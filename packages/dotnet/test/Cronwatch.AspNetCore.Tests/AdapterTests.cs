@@ -88,6 +88,57 @@ public class AdapterTests
         await app.StopAsync();
     }
 
+    /// <summary>
+    /// A handler with a secret is reached past a fallback policy, where its bearer is the guard;
+    /// one with no secret (<see cref="HandlerSecret.None"/>) takes the app's policy, so it never
+    /// opens a job to anyone the app's own sign-in would have turned away.
+    /// </summary>
+    [Fact]
+    public async Task A_handler_with_a_secret_is_reached_past_a_fallback_policy_and_an_open_one_takes_the_policy()
+    {
+        await using var cw = new CronwatchClient(new CronwatchOptions { ProcessExitHook = false, Alerts = [], CronSecret = "letmein-test" });
+        Job guarded = cw.Job("guarded");
+        Job open = cw.Job("open");
+        await using WebApplication app = App(cw, SignedInOnly);
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.MapCronwatchHandler("/cron/guarded", guarded, (job, http, ct) => Task.CompletedTask);
+        app.MapCronwatchHandler("/cron/open", open, (job, http, ct) => Task.CompletedTask, new HandlerOptions { Secret = HandlerSecret.None });
+        await app.StartAsync();
+        HttpClient http = app.GetTestClient();
+
+        var signed = new HttpRequestMessage(HttpMethod.Post, "/cron/guarded");
+        signed.Headers.Add("authorization", "Bearer letmein-test");
+        Assert.Equal(200, (int)(await http.SendAsync(signed)).StatusCode);
+
+        HttpResponseMessage challenged = await http.PostAsync("/cron/open", null);
+        Assert.Equal(401, (int)challenged.StatusCode);
+        Assert.Equal("", await challenged.Content.ReadAsStringAsync());
+        Assert.Empty(await cw.RunsAsync("open"));
+        await app.StopAsync();
+    }
+
+    /// <summary>
+    /// The middleware is no endpoint, so only the app's authorization running ahead of it guards an
+    /// open dashboard: after <c>UseAuthorization</c> the fallback policy applies to it.
+    /// </summary>
+    [Fact]
+    public async Task An_open_dashboard_as_middleware_after_UseAuthorization_takes_the_fallback_policy()
+    {
+        await using CronwatchClient cw = Client();
+        await using WebApplication app = App(cw, SignedInOnly);
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.UseCronwatch("/open", new RoutesOptions { Token = DashboardToken.None });
+        await app.StartAsync();
+        HttpClient http = app.GetTestClient();
+
+        HttpResponseMessage open = await http.SendAsync(Get("/open/api/jobs"));
+        Assert.Equal(401, (int)open.StatusCode);
+        Assert.Equal("", await open.Content.ReadAsStringAsync());
+        await app.StopAsync();
+    }
+
     [Fact]
     public async Task The_forms_pass_the_apps_antiforgery_and_a_form_read_ahead_is_taken_from_the_parsed_form()
     {

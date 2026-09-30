@@ -58,6 +58,14 @@ public sealed class Handler
     /// <summary>The job this handler runs.</summary>
     public Job Job => _job;
 
+    /// <summary>
+    /// Whether the handler runs the job for a request without a secret: it has none, and was
+    /// opted out (<see cref="HandlerSecret.None"/> or the client's <see cref="CronSecret.None"/>) or
+    /// the environment is development. An adapter then leaves the request to the app's own
+    /// authorization, as an open dashboard is left (<see cref="Routes.IsOpen"/>).
+    /// </summary>
+    public bool IsOpen => _secret.Length == 0 && (_optedOut || _job.Client.EnvironmentName == "development");
+
     /// <summary>Names the job, never the secret.</summary>
     public override string ToString() => "Handler(" + _job.Name + ")";
 

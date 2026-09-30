@@ -64,7 +64,10 @@ public static class CronwatchAspNetCore
     /// The dashboard as middleware at <paramref name="path"/>, ahead of whatever follows it: a
     /// branch answering everything under the path (its base path the branch's) and passing every
     /// other request on. For an app that wants the dashboard ahead of its other middleware, or
-    /// has no endpoint routing.
+    /// has no endpoint routing. A branch is no endpoint, so the app's authorization reaches an open
+    /// dashboard (<see cref="DashboardToken.None"/>) only when it runs ahead of the branch: call
+    /// <c>UseAuthentication</c> and <c>UseAuthorization</c>, with a fallback policy, before this, or
+    /// use <see cref="MapCronwatch(IEndpointRouteBuilder, string, RoutesOptions?)"/>.
     /// </summary>
     public static IApplicationBuilder UseCronwatch(this IApplicationBuilder app, string path = Routes.DefaultBasePath, RoutesOptions? options = null)
     {
@@ -85,6 +88,9 @@ public static class CronwatchAspNetCore
     /// Maps a job's handler at <paramref name="pattern"/> for every method: each request with the
     /// secret runs <paramref name="fn"/> as a recorded run with the trigger <c>handler</c> (see
     /// <see cref="Handler"/>), with the request's <c>RequestAborted</c> linked into the run's token.
+    /// The endpoint skips antiforgery and is left out of OpenAPI documents. While the handler has a
+    /// secret it allows anonymous requests, the bearer being its guard; a handler open to anyone
+    /// (<see cref="Handler.IsOpen"/>) takes the app's authorization policy.
     /// </summary>
     public static IEndpointConventionBuilder MapCronwatchHandler(
         this IEndpointRouteBuilder endpoints,
@@ -158,7 +164,12 @@ public static class CronwatchAspNetCore
         IEndpointConventionBuilder built = endpoints.Map(pattern, context => ServeAsync(context, handler.HandleAsync, null));
         built.DisableAntiforgery();
         built.ExcludeFromDescription();
-        built.AllowAnonymous();
+        // Anonymous to the app's authorization only while the bearer is the guard: a handler open
+        // to anyone takes the app's policy, so it never opens a job the app's sign-in would refuse.
+        if (!handler.IsOpen)
+        {
+            built.AllowAnonymous();
+        }
         return built;
     }
 
