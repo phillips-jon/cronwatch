@@ -393,7 +393,7 @@ The client:
 | `resume_run(name, run_id)` | `job(name).resume(run_id)` for a job declared in this process; raises `ArgumentError` for one that is not |
 | `record_run(run, evaluate: true)` | record a run that happened elsewhere, for a source; see [pg_cron](#pg-cron). Returns the alerts it sent |
 | `defined_jobs` | the definitions declared in this process |
-| `close` | stop the thread and close the store |
+| `close` | stop the interval, wait for a check already under way, then close the store |
 
 ## Runs that span calls
 

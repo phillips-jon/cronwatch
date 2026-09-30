@@ -39,6 +39,13 @@ module Cronwatch
         end
       end
 
+      # Waits for the thread to end: once stopped, after the tick under way.
+      # Returns at once when called from the thread itself.
+      def join
+        @thread.join unless Thread.current.equal?(@thread)
+        nil
+      end
+
       private
 
       # False once stopped.

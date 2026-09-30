@@ -518,18 +518,23 @@ module Cronwatch
     end
 
     def stop
-      after_fork_check
-      ticker = @ticker_lock.synchronize do
-        current = @ticker
-        @ticker = nil
-        current
-      end
-      ticker&.stop
+      stop_ticker
       nil
     end
 
+    # Stop the interval, wait for a check already under way (a failed one is
+    # reported by whoever started it), then close the store. Runs being
+    # recorded are not waited for.
     def close
-      stop
+      stop_ticker&.join
+      flight = @check_lock.synchronize { @checking }
+      if flight && !flight.owner.equal?(Thread.current)
+        begin
+          flight.value
+        rescue StandardError
+          nil
+        end
+      end
       @store.close if @store.respond_to?(:close)
       nil
     end
@@ -550,6 +555,18 @@ module Cronwatch
     end
 
     private
+
+    # Stops the interval thread and returns it, or nil when there was none.
+    def stop_ticker
+      after_fork_check
+      ticker = @ticker_lock.synchronize do
+        current = @ticker
+        @ticker = nil
+        current
+      end
+      ticker&.stop
+      ticker
+    end
 
     # Locks, the check in flight, the interval thread and the channel and
     # triage threads belong to one process. A forked child (Puma, Unicorn,

@@ -153,6 +153,45 @@ class StartFinishTest < Minitest::Test
     assert_equal [:stuck], capture.types
   end
 
+  # The memory store, with a close that is written down.
+  class ClosingStore < Cronwatch::Stores::Memory
+    def initialize(events)
+      super()
+      @events = events
+    end
+
+    def close
+      @events << "closed"
+    end
+  end
+
+  def test_close_waits_for_a_check_under_way_before_it_closes_the_store
+    sending = Queue.new
+    gate = Queue.new
+    events = []
+    held = Cronwatch::Alerts::Custom.new("held") do |_alert|
+      sending.push(true)
+      gate.pop
+      events << "sent"
+    end
+    cw, clock, = client(alerts: [held], store: ClosingStore.new(events))
+    cw.job("callback", timeout: "30m").start
+    clock.advance(31 * MIN)
+    check = Thread.new { cw.check }
+    sending.pop
+    closing = Thread.new { cw.close }
+    Thread.pass until closing.status == "sleep" || !closing.alive?
+    assert closing.alive?, "still waiting on the check"
+    assert_equal [], events
+    gate.push(true)
+    closing.join
+    assert_equal %w[sent closed], events
+    assert_equal [:stuck], check.value.alerts.map(&:type)
+    # With no check under way it closes straight away.
+    cw.close
+    assert_equal %w[sent closed closed], events
+  end
+
   def test_lines_flushed_while_a_check_marks_earlier_runs_stuck_are_kept_on_the_run_it_marks_next
     sending = Queue.new
     gate = Queue.new

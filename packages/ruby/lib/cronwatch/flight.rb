@@ -4,7 +4,11 @@ module Cronwatch
   class Client
     # One shared check: the first caller runs it, the others wait for its result.
     class Flight
+      # The thread running the check.
+      attr_reader :owner
+
       def initialize
+        @owner = Thread.current
         @lock = Mutex.new
         @done = ConditionVariable.new
         @finished = false
