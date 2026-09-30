@@ -49,6 +49,27 @@ final class SqliteStoreTest extends TestCase
         $b->close();
     }
 
+    /**
+     * The default file is the app's (data/cronwatch.db beside its vendor
+     * directory), not the working directory's, so the dashboard under
+     * PHP-FPM (whose working directory is the script's, often public/) and
+     * the cron check read the same file, and it is not under public/.
+     */
+    public function testTheDefaultFileIsTheAppsWhateverTheWorkingDirectory(): void
+    {
+        $root = realpath(__DIR__ . '/..');
+        $was = getcwd();
+        mkdir($this->dir);
+        try {
+            chdir($this->dir);
+            $this->assertSame("{$root}/data/cronwatch.db", (new SqliteStore())->path);
+            $this->assertSame("{$root}/data/cronwatch.db", SqliteStore::defaultPath());
+            $this->assertSame('./given.db', (new SqliteStore('./given.db'))->path, 'a path given is kept as it is');
+        } finally {
+            chdir((string) $was);
+        }
+    }
+
     public function testTheDatabaseFileAndItsWalAndShmFilesArePrivate(): void
     {
         if (PHP_OS_FAMILY === 'Windows') {
