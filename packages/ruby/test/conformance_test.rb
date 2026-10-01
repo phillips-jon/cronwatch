@@ -697,6 +697,26 @@ class ConformanceTest < Minitest::Test
     end
   end
 
+  # The webhook's body byte for byte, "schema": 1 first, and its signature.
+  def test_webhook_payloads
+    each_case(CHANNELS["webhookPayloads"]) do |c|
+      http = FakeHTTP.new
+      Cronwatch::Alerts::Webhook.new(url: "https://hooks.example.com/in", secret: c["secret"], http: http)
+                                .call(Cronwatch::Alert.from_h(CHANNEL_ALERTS.fetch(c["alert"])))
+      request = http.last
+      differs([c["body"], c["signature"]], [request["body"], request["headers"]["x-cronwatch-signature"]])
+    end
+    assert_equal CHANNELS["alerts"].length, CHANNELS["webhookPayloads"].length
+  end
+
+  def test_webhook_signature
+    assert_equal "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+                 Cronwatch::Alerts::Webhook.signature("key", "The quick brown fox jumps over the lazy dog")
+    CHANNELS["webhookPayloads"].each do |c|
+      assert_equal c["signature"], "sha256=#{Cronwatch::Alerts::Webhook.signature(c["secret"], c["body"])}"
+    end
+  end
+
   def test_channel_failures
     first = Cronwatch::Alert.from_h(CHANNELS["alerts"][0]["alert"])
     each_case(CHANNELS["failures"]) do |c|

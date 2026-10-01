@@ -204,7 +204,7 @@ Cronwatch::Alerts::Custom.new("pagerduty") do |alert|
 end
 ```
 
-Every alert goes to every channel. A channel that raises, or takes longer than 15 seconds, goes to `on_error` and never blocks the others. Each condition alerts once when it opens and once more when a clean run closes it; there are no repeat alerts. The webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`, the HMAC-SHA256 of the raw body.
+Every alert goes to every channel. A channel that raises, or takes longer than 15 seconds, goes to `on_error` and never blocks the others. Each condition alerts once when it opens and once more when a clean run closes it; there are no repeat alerts. The webhook's body is the alert's JSON with `"schema": 1` first (its [JSON Schema](https://cronwatch.dev/schemas/webhook/1.json)); parse the fields, not `title` and `message`, whose wording may change. It signs the body with `X-CronWatch-Signature: sha256=<hex>`, the HMAC-SHA256 of the raw body, which a receiver checks with `Rack::Utils.secure_compare("sha256=#{Cronwatch::Alerts::Webhook.signature(secret, raw_body)}", header)`.
 
 ## Triage
 
