@@ -64,7 +64,7 @@ The Rails install generator writes an initializer that reads `SLACK_WEBHOOK_URL`
 | Variable | What it does | When it is not set |
 |---|---|---|
 | `DATABASE_URL` | the Postgres store's connection string, when none is passed | libpq's own defaults (its `PG*` variables) |
-| `TZ` | the zone of a Celery beat schedule that names none | the system's zone (`/etc/localtime`) |
+| `TZ` | the zone of a Celery beat schedule, only when Celery's `timezone` setting is unset and `enable_utc` is off (with Celery's defaults a schedule is read in UTC, and a django-celery-beat schedule carries its own zone) | the system's zone (`/etc/localtime`) in that case |
 
 Django reads no variable of its own: its settings go in the `CRONWATCH` dict in `settings.py` (`TOKEN` first, then `CRONWATCH_TOKEN`). See [Django](/docs/django/).
 
