@@ -1,7 +1,6 @@
 package dev.cronwatch.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -335,11 +334,10 @@ abstract class ServerStoreTests {
     try (Cronwatch cw = client(store, new AtomicLong(T0), new ArrayList<>(), errors)) {
       cw.check();
     }
-    // Only the job whose definition is not an object is reported, as unreadable.
-    assertFalse(errors.isEmpty(), "b is reported");
-    for (String e : errors) {
-      assertTrue(e.startsWith("checking b: "), e);
-    }
+    // Only the job whose definition is not an object is reported, as the SDK reports it: once
+    // for its running run and once for the job itself.
+    String unreadable = "checking b: job \"b\": its stored definition is not a JSON object";
+    assertEquals(List.of(unreadable, unreadable), errors);
   }
 
   @Test
