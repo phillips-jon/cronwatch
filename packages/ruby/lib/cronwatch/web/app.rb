@@ -84,10 +84,8 @@ module Cronwatch
     LIBRARY = "cronwatch"
     LANGUAGE = "ruby"
     API_VERSION = 1
-    DECIMAL = /\A[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\z/
-    RADIX = { "x" => 16, "o" => 8, "b" => 2 }.freeze
-    private_constant :API_VERSION, :ASSET_CSP, :BEARER, :BOARD_PAGE_RUNS, :COOKIE, :COOKIE_MAX_AGE, :CSP, :DECIMAL,
-                     :DEFAULT_RUNS, :LANGUAGE, :LIBRARY, :MAX_RUNS, :RADIX, :SECURITY_HEADERS
+    private_constant :API_VERSION, :ASSET_CSP, :BEARER, :BOARD_PAGE_RUNS, :COOKIE, :COOKIE_MAX_AGE, :CSP,
+                     :DEFAULT_RUNS, :LANGUAGE, :LIBRARY, :MAX_RUNS, :SECURITY_HEADERS
 
     # Deprecated: use client.routes(**options). Still works through 1.x; a
     # Web made without a client serves Cronwatch.client, read on each request.
@@ -535,19 +533,7 @@ module Cronwatch
 
     # Number(string): decimal, 0x/0o/0b, Infinity, or NaN.
     def js_number(value)
-      text = JS.trim(value)
-      return 0 if text.empty?
-      # Ruby's Float() wants a digit on both sides of the point; JavaScript does not.
-      return Float(text.sub(/\A([+-]?)\./, "\\10.").sub(/\.(?=[eE]|\z)/, ".0")) if DECIMAL.match?(text)
-      return text.start_with?("-") ? -Float::INFINITY : Float::INFINITY if /\A[+-]?Infinity\z/.match?(text)
-
-      if (m = /\A0([xXoObB])([0-9a-fA-F]+)\z/.match(text))
-        return Integer(m[2], RADIX.fetch(m[1].downcase))
-      end
-
-      Float::NAN
-    rescue ArgumentError
-      Float::NAN
+      JS.to_number(value)
     end
 
     def whole(number)

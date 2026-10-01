@@ -220,5 +220,42 @@ module Cronwatch
     def parse(text)
       ::JSON.parse(text)
     end
+
+    DECIMAL = /\A[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\z/
+    RADIX = { "x" => 16, "o" => 8, "b" => 2 }.freeze
+
+    # Number(string): decimal, 0x/0o/0b, Infinity, or NaN; 0 for a string
+    # of only whitespace.
+    def to_number(value)
+      text = trim(value.dup.force_encoding(Encoding::UTF_8).scrub)
+      return 0 if text.empty?
+      # Ruby's Float() wants a digit on both sides of the point; JavaScript does not.
+      return Float(text.sub(/\A([+-]?)\./, "\\10.").sub(/\.(?=[eE]|\z)/, ".0")) if DECIMAL.match?(text)
+      return text.start_with?("-") ? -Float::INFINITY : Float::INFINITY if /\A[+-]?Infinity\z/.match?(text)
+
+      if (m = /\A0([xXoObB])([0-9a-fA-F]+)\z/.match(text))
+        return Integer(m[2], RADIX.fetch(m[1].downcase))
+      end
+
+      Float::NAN
+    rescue ArgumentError
+      Float::NAN
+    end
+
+    # A time or a count of milliseconds as a SQL column holds it: an Integer
+    # or a Float kept, a String that is not blank read as Number() reads it
+    # (Postgres hands BIGINT over as text), and nil when the result is not a
+    # finite number. A whole number in a Float comes back an Integer.
+    def finite_number(value)
+      n =
+        case value
+        when Integer, Float then value
+        when String then trim(value.dup.force_encoding(Encoding::UTF_8).scrub).empty? ? nil : to_number(value)
+        end
+      return nil unless finite?(n)
+      return n.to_i if n.is_a?(Float) && n == n.floor && n.abs <= MAX_SAFE_INTEGER
+
+      n
+    end
   end
 end

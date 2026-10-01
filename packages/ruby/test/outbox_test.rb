@@ -243,4 +243,42 @@ class OutboxTest < Minitest::Test
     assert_equal({ "x" => [1] }, body["futureAlertField"], "the retry sends it")
     assert_equal({ "consecutiveFailures" => 1, "a_b" => { "c_d" => 2 } }, body["details"])
   end
+
+  # A queued alert of any shape a foreign or damaged row can hold is read
+  # without raising, written back as it came, and dropped by the retry as
+  # stale, while the job's own alerts still go out.
+  def test_a_queued_alert_of_any_shape_is_read_kept_as_written_and_dropped_as_stale
+    odd = [
+      { "type" => 5, "run" => "x", "details" => "x", "at" => 1 },
+      { "type" => "failed", "run" => [1], "at" => true },
+      { "type" => "recovered", "details" => { "after" => ["failed", { "x" => 1 }] }, "at" => 1 },
+      { "at" => 1, "type" => "failed", "run" => { "id" => 7, "status" => 3, "metrics" => "x" } },
+      { "type" => "failed", "definition" => "x", "at" => nil },
+    ]
+    state = { "job" => "j", "open" => { "slow" => 2 }, "consecutiveFailures" => 0, "silencedUntil" => nil,
+              "lastAlertAt" => nil, "pendingRecovery" => [], "undelivered" => odd, }
+    read = Cronwatch::JobState.from_h(state)
+    normalized = Cronwatch::Evaluate.normalize_state(read, "j")
+    assert_equal 5, normalized.undelivered.length
+    normalized.undelivered.each do |alert|
+      assert_kind_of String, Cronwatch::Evaluate.alert_key(alert)
+      assert Cronwatch::Evaluate.stale_alert?(alert, normalized), json(alert.to_h)
+    end
+
+    clock = Clock.new
+    capture = Capture.new
+    errors = []
+    cw = Cronwatch.new(now: clock.to_proc, alerts: [capture], cron_secret: nil,
+                       on_error: ->(e, where) { errors << "#{where}: #{e.message}" })
+    job = cw.job("j", failures_before_alert: 1)
+    cw.check
+    cw.store.set_state(read)
+    cw.check
+    assert_empty errors
+    assert_empty cw.store.get_state("j").undelivered, "every one dropped as stale"
+    clock.advance(1000)
+    assert_raises(RuntimeError) { job.run { raise "boom" } }
+    assert_empty errors
+    assert_equal [:failed], capture.types, "the job's own alerts still go out"
+  end
 end

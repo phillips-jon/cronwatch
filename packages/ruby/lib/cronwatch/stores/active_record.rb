@@ -247,9 +247,10 @@ module Cronwatch
         read(:running_runs, []).map { |row| row_to_run(row) }
       end
 
+      # A state whose text does not parse, or is not an object, reads as none.
       def get_state(job)
         row = read(:get_state, [job]).first
-        row && JobState.from_h(json(row["state"]))
+        row && JobState.from_h(lenient_json(row["state"]))
       end
 
       def set_state(state)
@@ -347,7 +348,8 @@ module Cronwatch
         # The version inside a state's JSON, as Evaluate.state_version reads
         # it: a whole number from 0 to 2**53 - 1, else 0 (none, or a foreign
         # row's 1.5 or "x", which must neither fail the statement nor refuse
-        # every write for good). Each CASE tests the JSON type before any cast.
+        # every write for good; on SQLite, also text that is not JSON). Each
+        # CASE tests the JSON type before any cast.
         version = lambda do |column|
           if pg
             v = "(#{column}->>'version')::numeric"
@@ -355,7 +357,8 @@ module Cronwatch
                  "WHEN #{v} % 1 = 0 AND #{v} BETWEEN 0 AND 9007199254740991 THEN #{v}::bigint ELSE 0 END"
           end
           v = "json_extract(#{column}, '$.version')"
-          "CASE WHEN json_type(#{column}, '$.version') NOT IN ('integer', 'real') THEN 0 " \
+          # Text that is not JSON at all (SQLite holds any) counts as 0 too, before json_type could fail on it.
+          "CASE WHEN NOT json_valid(#{column}) THEN 0 WHEN json_type(#{column}, '$.version') NOT IN ('integer', 'real') THEN 0 " \
             "WHEN #{v} = CAST(#{v} AS INTEGER) AND #{v} BETWEEN 0 AND 9007199254740991 THEN CAST(#{v} AS INTEGER) ELSE 0 END"
         end
         sql = {
@@ -425,28 +428,43 @@ module Cronwatch
         end
       end
 
-      def int(value)
-        value.nil? ? nil : Integer(value)
-      end
-
-      def row_to_job(row)
-        StoredJob.new(name: row["name"], definition: JobDefinition.from_h(definition_json(row["definition"])),
-                      created_at: int(row["created_at"]), updated_at: int(row["updated_at"]))
-      end
-
-      # A definition that does not parse (nested past JSON.parse's limit, say)
-      # reads as nil, which JobDefinition.from_h marks unreadable.
-      def definition_json(value)
+      # Rows are read leniently: a foreign, hand-edited or damaged row (SQLite
+      # keeps whatever type it is given, in any column) must affect only its
+      # own job, never every read. JSON text that does not parse (or nests
+      # past JSON.parse's limit) reads as nil, which the client takes as no
+      # state, or as an unreadable definition it reports.
+      def lenient_json(value)
         json(value)
       rescue ::JSON::ParserError
         nil
       end
 
+      # A time that must be there: one that is not a finite number reads as 0.
+      def time(value)
+        JS.finite_number(value) || 0
+      end
+
+      # A time or duration that may be absent: one that is not a finite number reads as nil.
+      def maybe_time(value)
+        JS.finite_number(value)
+      end
+
+      def row_to_job(row)
+        StoredJob.new(name: row["name"], definition: JobDefinition.from_h(lenient_json(row["definition"]), row["name"]),
+                      created_at: time(row["created_at"]), updated_at: time(row["updated_at"]))
+      end
+
+      # A start that is not a finite number reads as 0, a finish or duration
+      # as nil; an error or output that is not text as nil; metrics that do
+      # not parse to an object as {}; a trigger that is not text as "run".
       def row_to_run(row)
-        metrics = row["metrics"].nil? ? {} : Run.metrics_from(json(row["metrics"]))
-        Run.new(id: row["id"], job: row["job"], status: row["status"].to_sym, started_at: int(row["started_at"]),
-                finished_at: int(row["finished_at"]), duration_ms: int(row["duration_ms"]), error: row["error"],
-                output: row["output"], metrics: metrics, trigger: row["trigger"])
+        error = row["error"]
+        output = row["output"]
+        trigger = row["trigger"]
+        Run.new(id: row["id"], job: row["job"], status: Run.status_from(row["status"]), started_at: time(row["started_at"]),
+                finished_at: maybe_time(row["finished_at"]), duration_ms: maybe_time(row["duration_ms"]),
+                error: error.is_a?(String) ? error : nil, output: output.is_a?(String) ? output : nil,
+                metrics: Run.metrics_from(lenient_json(row["metrics"])), trigger: trigger.is_a?(String) ? trigger : "run")
       end
     end
   end

@@ -82,29 +82,41 @@ module Cronwatch
 
     FIELDS.each_key { |field| define_method(field) { @fields[field] } }
 
-    # What from_h makes a stored definition that is not a JSON object from.
-    UNREADABLE = {}.freeze
-    private_constant :BY_JSON, :FIELDS, :UNREADABLE
+    private_constant :BY_JSON, :FIELDS
 
     def initialize(fields = {})
       @fields = {}
       fields.each { |k, v| @fields[k.is_a?(Symbol) ? k : k.to_s] = v }
       @fields.freeze
-      @unreadable = fields.equal?(UNREADABLE)
+      @unreadable = false
       freeze
     end
 
     # A stored definition that is not a JSON object (null, a string, a
-    # number, written by hand or by something else) reads as an empty one
-    # marked unreadable, so the one row does not stop every other job being
-    # listed; a check or a dashboard read reports that job and shows it as
-    # failing (see Client#evaluable).
-    def self.from_h(hash)
+    # number, an array, or text that does not parse, written by hand or by
+    # something else) reads as `{ name }` (`name` being the job's, when
+    # given) marked unreadable, so the one row does not stop every other job
+    # being listed; a check or a dashboard read reports that job and shows it
+    # as failing (see Client#evaluable). `tags` is kept only when it is a
+    # list of strings. Every other field is kept as stored.
+    def self.from_h(hash, name = nil)
       return hash if hash.is_a?(JobDefinition)
-      return new(UNREADABLE) unless hash.is_a?(Hash)
+      return unreadable(name) unless hash.is_a?(Hash)
 
-      new(hash.each_with_object({}) { |(k, v), out| out[BY_JSON[k.to_s] || k.to_s] = v })
+      fields = hash.each_with_object({}) { |(k, v), out| out[BY_JSON[k.to_s] || k.to_s] = v }
+      tags = fields[:tags]
+      fields.delete(:tags) if fields.key?(:tags) && !(tags.is_a?(Array) && tags.all?(String))
+      new(fields)
     end
+
+    # `{ name }`, marked unreadable. See from_h.
+    def self.unreadable(name)
+      definition = allocate
+      definition.instance_variable_set(:@fields, (name.nil? ? {} : { name: name }).freeze)
+      definition.instance_variable_set(:@unreadable, true)
+      definition.freeze
+    end
+    private_class_method :unreadable
 
     def [](field)
       @fields[field]
@@ -166,7 +178,7 @@ module Cronwatch
       new(
         id: Naming.fetch(hash, "id"),
         job: Naming.fetch(hash, "job"),
-        status: Naming.fetch(hash, "status")&.to_sym,
+        status: Run.status_from(Naming.fetch(hash, "status")),
         started_at: Naming.fetch(hash, "startedAt"),
         finished_at: Naming.fetch(hash, "finishedAt"),
         duration_ms: Naming.fetch(hash, "durationMs"),
@@ -179,10 +191,17 @@ module Cronwatch
 
     def to_h
       {
-        "id" => id, "job" => job, "status" => status.to_s, "startedAt" => started_at, "finishedAt" => finished_at,
+        "id" => id, "job" => job, "status" => status.is_a?(Symbol) ? status.to_s : status,
+        "startedAt" => started_at, "finishedAt" => finished_at,
         "durationMs" => duration_ms, "error" => error, "output" => output,
         "metrics" => Run.metrics_from(metrics), "trigger" => trigger,
       }
+    end
+
+    # A status as read: text as a Symbol, anything else (a foreign or
+    # damaged row's) kept as it came, which matches no known status.
+    def self.status_from(value)
+      value.is_a?(String) ? value.to_sym : value
     end
 
     # Stored metrics as a Hash with string keys. Anything else (a string or
@@ -201,9 +220,10 @@ module Cronwatch
     def self.from_h(hash)
       return hash if hash.is_a?(StoredJob)
 
+      name = Naming.fetch(hash, "name")
       new(
-        name: Naming.fetch(hash, "name"),
-        definition: JobDefinition.from_h(Naming.fetch(hash, "definition") || {}),
+        name: name,
+        definition: JobDefinition.from_h(Naming.fetch(hash, "definition"), name),
         created_at: Naming.fetch(hash, "createdAt"),
         updated_at: Naming.fetch(hash, "updatedAt"),
       )
@@ -248,20 +268,29 @@ module Cronwatch
       @triage_tried = true
     end
 
+    # Read leniently, since a queued alert a foreign writer left malformed
+    # must affect only its own job: a field of the wrong type is kept as it
+    # came (a `type` or `run` that is not what it should be, `details` that
+    # are not an object, an `at` that is not a number), and the retry drops
+    # such an alert as stale (Evaluate.stale_alert?).
     def self.from_h(hash)
       return hash if hash.is_a?(Alert)
 
       run = Naming.fetch(hash, "run")
       written = Naming.fetch(hash, "details") || {}
       details = Naming.from_json_value(written)
-      details[:after] = details[:after].map(&:to_sym) if details[:after].is_a?(Array)
-      details[:reason] = details[:reason].to_sym if details[:reason].is_a?(String)
+      if details.is_a?(Hash)
+        details[:after] = details[:after].map { |c| c.is_a?(String) ? c.to_sym : c } if details[:after].is_a?(Array)
+        details[:reason] = details[:reason].to_sym if details[:reason].is_a?(String)
+      end
+      type = Naming.fetch(hash, "type")
+      definition = Naming.fetch(hash, "definition")
       alert = new(
-        type: Naming.fetch(hash, "type")&.to_sym,
-        run: run && Run.from_h(run),
+        type: type.is_a?(String) ? type.to_sym : type,
+        run: run.is_a?(Hash) ? Run.from_h(run) : run,
         details: details,
         job: Naming.fetch(hash, "job"),
-        definition: JobDefinition.from_h(Naming.fetch(hash, "definition") || {}),
+        definition: definition.nil? || definition.is_a?(Hash) ? JobDefinition.from_h(definition || {}) : definition,
         title: Naming.fetch(hash, "title"),
         message: Naming.fetch(hash, "message"),
         at: Naming.fetch(hash, "at"),
@@ -272,16 +301,22 @@ module Cronwatch
     end
 
     # What a stored alert held that its members do not say again: the
-    # fields this version does not know (a newer release may add one), and
-    # its details as written, since snake_case and back would turn a key
-    # spelled `a_b` into `aB`. to_h writes both back, the details only while
-    # they are unchanged.
+    # fields this version does not know (a newer release may add one), its
+    # details as written, since snake_case and back would turn a key spelled
+    # `a_b` into `aB`, and which known fields it left out. to_h writes the
+    # first two back, the details only while they are unchanged, and leaves
+    # out a field that was absent while it still holds what its absence
+    # read as, so a partial alert (a foreign row's) is written as it came.
     #
     # @api private
     def keep_as_written(hash, written, details)
       extra = hash.each_with_object({}) { |(k, v), out| out[k.to_s] = v unless Alert::KNOWN.include?(k.to_s) }
       @extra = extra.empty? ? nil : extra
       @written_details = [Marshal.load(Marshal.dump(details)), Alert.string_keys(written)] if written.is_a?(Hash)
+      absent = (Alert::KNOWN - ["triage"]).reject { |key| Naming.present?(hash, key) }
+      @absent = absent.empty? ? nil : to_h.slice(*absent)
+      order = hash.keys.map(&:to_s)
+      @order = order.uniq == order ? order : nil
     end
 
     # @api private
@@ -295,13 +330,20 @@ module Cronwatch
 
     def to_h
       out = {
-        "type" => type.to_s, "run" => run&.to_h, "details" => details_json, "job" => job,
-        "definition" => definition.respond_to?(:to_h) ? definition.to_h : definition,
+        "type" => type.is_a?(Symbol) ? type.to_s : type, "run" => run.is_a?(Run) ? run.to_h : run,
+        "details" => details_json, "job" => job,
+        "definition" => definition.is_a?(JobDefinition) ? definition.to_h : definition,
         "title" => title, "message" => message, "at" => at,
       }
+      @absent&.each { |key, value| out.delete(key) if out[key] == value }
       out["triage"] = triage if triage_tried?
       @extra&.each { |key, value| out[key] = value unless out.key?(key) || Alert::KNOWN.include?(key) }
-      out
+      return out if @order.nil? || @order == out.keys
+
+      # The keys in the order they were read, as the object a store held
+      # keeps them; any added since go after.
+      written = @order.select { |key| out.key?(key) }
+      (written + (out.keys - written)).to_h { |key| [key, out[key]] }
     end
 
     private
@@ -321,6 +363,12 @@ module Cronwatch
   # made from a stale read (see Stores::Memory#compare_and_set_state). Absent
   # (nil) counts as 0.
   #
+  # from_h reads a state as stored, keeping each field as it came where it
+  # has the wrong type (Evaluate.normalize_state then reads it leniently),
+  # so a foreign, hand-edited or damaged row is written back unchanged by a
+  # read that changes nothing, and affects only its own job. A stored state
+  # that is not a JSON object reads as none (nil).
+  #
   # `sending` is the outbox (see Evaluate.hold_alerts): entries of
   # { "until" => epoch ms, "alert" => Alert }, read leniently, since an entry
   # a foreign writer left malformed must not make the whole state unreadable:
@@ -339,7 +387,9 @@ module Cronwatch
 
     def self.from_h(hash)
       return hash if hash.is_a?(JobState)
+      return nil unless hash.is_a?(Hash)
 
+      open = Naming.fetch(hash, "open") || {}
       pending = Naming.fetch(hash, "pendingRecovery")
       undelivered = Naming.fetch(hash, "undelivered")
       sending = Naming.fetch(hash, "sending")
@@ -347,12 +397,12 @@ module Cronwatch
       new(
         extra: extra.empty? ? nil : extra,
         job: Naming.fetch(hash, "job"),
-        open: (Naming.fetch(hash, "open") || {}).each_with_object({}) { |(k, v), out| out[k.to_sym] = v },
+        open: open.is_a?(Hash) ? open.to_h { |k, v| [k.to_sym, v] } : open,
         consecutive_failures: Naming.fetch(hash, "consecutiveFailures", 0),
         silenced_until: Naming.fetch(hash, "silencedUntil"),
         last_alert_at: Naming.fetch(hash, "lastAlertAt"),
-        pending_recovery: pending&.map(&:to_sym),
-        undelivered: undelivered&.map { |a| Alert.from_h(a) },
+        pending_recovery: pending.is_a?(Array) ? pending.map { |c| c.is_a?(String) ? c.to_sym : c } : pending,
+        undelivered: undelivered.is_a?(Array) ? undelivered.map { |a| a.is_a?(Hash) ? Alert.from_h(a) : a } : undelivered,
         version: Naming.fetch(hash, "version"),
         sending: sending.is_a?(Array) ? sending.map { |entry| JobState.sending_entry(entry) } : sending,
       )
@@ -384,11 +434,16 @@ module Cronwatch
     # only while it holds an entry.
     def to_h
       out = {
-        "job" => job, "open" => (open || {}).transform_keys(&:to_s), "consecutiveFailures" => consecutive_failures,
-        "silencedUntil" => silenced_until, "lastAlertAt" => last_alert_at,
+        "job" => job, "open" => open.is_a?(Hash) ? open.transform_keys(&:to_s) : (open || {}),
+        "consecutiveFailures" => consecutive_failures, "silencedUntil" => silenced_until, "lastAlertAt" => last_alert_at,
       }
-      out["pendingRecovery"] = pending_recovery.map(&:to_s) unless pending_recovery.nil?
-      out["undelivered"] = undelivered.map(&:to_h) unless undelivered.nil?
+      unless pending_recovery.nil?
+        out["pendingRecovery"] =
+          pending_recovery.is_a?(Array) ? pending_recovery.map { |c| c.is_a?(Symbol) ? c.to_s : c } : pending_recovery
+      end
+      unless undelivered.nil?
+        out["undelivered"] = undelivered.is_a?(Array) ? undelivered.map { |a| a.is_a?(Alert) ? a.to_h : a } : undelivered
+      end
       out["version"] = version unless version.nil?
       if sending.is_a?(Array) && !sending.empty?
         out["sending"] = sending.map do |entry|

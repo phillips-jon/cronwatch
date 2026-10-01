@@ -71,6 +71,12 @@ module Cronwatch
       [count, MAX_DURATION_MS].min.to_i
     end
 
+    # A JSON number, as JavaScript's typeof value === "number" sees one
+    # read from JSON: an Integer or a Float (never true or false).
+    def json_number?(value)
+      value.is_a?(Integer) || value.is_a?(Float)
+    end
+
     def empty_state(job)
       JobState.new(job: job, open: {}, consecutive_failures: 0, silenced_until: nil, last_alert_at: nil,
                    pending_recovery: [], undelivered: [])
@@ -79,19 +85,31 @@ module Cronwatch
     # A stored state with every field present, or a fresh one. State written
     # by an older version lacks the newer fields. `sending` is the exception:
     # it is there only while it holds an alert (see hold_alerts).
+    #
+    # Read leniently, since a foreign, hand-edited or damaged row must affect
+    # only its own job, and the next write puts it right: a state that is not
+    # an object reads as none; `open` keeps only its entries whose value is a
+    # number (anything but an object reads as {}); `silenced_until` and
+    # `last_alert_at` that are not numbers read as nil; `pending_recovery`
+    # keeps only its conditions (strings as stored), and `undelivered` only
+    # its entries that are objects (a list of neither shape reads as []).
+    # Unknown fields are kept as written.
     def normalize_state(state, job)
+      state = JobState.from_h(state)
       return empty_state(job) if state.nil?
 
-      state = JobState.from_h(state)
       sending = state.sending
+      open = state.open.is_a?(Hash) ? state.open.select { |_, at| json_number?(at) } : {}
+      pending = state.pending_recovery.is_a?(Array) ? state.pending_recovery.grep(Symbol) : []
+      undelivered = state.undelivered.is_a?(Array) ? state.undelivered.grep(Alert) : []
       JobState.new(
         job: state.job.nil? ? job : state.job,
-        open: (state.open || {}).dup,
+        open: open,
         consecutive_failures: failure_count(state),
-        silenced_until: state.silenced_until,
-        last_alert_at: state.last_alert_at,
-        pending_recovery: (state.pending_recovery || []).dup,
-        undelivered: (state.undelivered || []).dup,
+        silenced_until: json_number?(state.silenced_until) ? state.silenced_until : nil,
+        last_alert_at: json_number?(state.last_alert_at) ? state.last_alert_at : nil,
+        pending_recovery: pending,
+        undelivered: undelivered,
         version: state.version,
         sending: sending.is_a?(Array) && !sending.empty? ? sending.dup : nil,
         # Fields a newer release wrote, carried through every write.
@@ -118,7 +136,8 @@ module Cronwatch
     # as JavaScript prints a number.
     def alert_key(alert)
       at = alert.at
-      "#{alert.type}|#{at.is_a?(Numeric) ? JS.number(at) : at}|#{alert.run&.id}"
+      run = alert.run
+      "#{alert.type}|#{at.is_a?(Numeric) ? JS.number(at) : at}|#{run.id if run.is_a?(Run)}"
     end
 
     # `alerts` added to the undelivered queue: one with the same key as a
@@ -448,11 +467,19 @@ module Cronwatch
     # is dropped rather than sent late. An alert for a condition is stale once
     # that condition has closed, or has closed and opened again (it opened at a
     # time other than the alert's). A recovery is stale when any condition it
-    # names is open again; while they all stay closed it is kept.
+    # names is open again; while they all stay closed it is kept. From a
+    # foreign or damaged row: an alert whose `at` is not a number, and a
+    # recovery whose `details.after` is not a list of conditions, are stale.
     def stale_alert?(alert, state)
-      return Array(alert.details[:after]).any? { |condition| state.open.key?(condition.to_sym) } if alert.type == :recovered
+      if alert.type == :recovered
+        # One whose details say nothing of what it recovers from cannot be judged, and goes.
+        after = alert.details.is_a?(Hash) ? alert.details[:after] : nil
+        return true unless after.is_a?(Array)
 
-      state.open[alert.type] != alert.at
+        return after.any? { |condition| !condition.is_a?(Symbol) || state.open.key?(condition) }
+      end
+      # One with no time cannot match an open condition.
+      !json_number?(alert.at) || state.open[alert.type] != alert.at
     end
 
     # How a job looks at a glance. Silence wins, then stuck, failing and late.

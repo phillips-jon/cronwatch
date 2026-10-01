@@ -109,6 +109,82 @@ class ActiveRecordStoreForeignRowsTest < Minitest::Test
     refute_includes page.body, %(<span class="k">rows</span>)
     refute_includes page.body, %(<span class="k">label</span>)
   end
+
+  # conformance/store.json foreignRows, recorded from the SDK's SQLite store.
+  FOREIGN = JSON.parse(File.read(File.expand_path("../../../../conformance/store.json", __dir__)))["foreignRows"]
+
+  # One row into a table, each value bound as SQLite holds it (a String is
+  # TEXT, an Integer INTEGER, a Float REAL, nil NULL).
+  def insert_row(prefix, table, row)
+    with_conn do |conn|
+      keys = row.keys
+      conn.raw_connection.execute("INSERT INTO #{prefix}#{table} (#{keys.join(", ")}) VALUES (#{keys.map { "?" }.join(", ")})",
+                                  keys.map { |k| row[k] })
+    end
+  end
+
+  def test_each_foreign_row_reads_leniently
+    FOREIGN["rows"].each do |c|
+      prefix = ARSupport.prefix
+      store = make_store(prefix: prefix)
+      insert_row(prefix, c["table"], c["row"])
+      label = "#{c["table"]} #{JSON.generate(c["row"])}"
+      case c["table"]
+      when "jobs"
+        got = store.get_job(c["row"]["name"])
+        assert_equal json(c["read"]), json(got.to_h), label
+        assert_equal c["readable"], !got.definition.unreadable?, label
+        assert_equal json([c["read"]]), json(store.list_jobs.map(&:to_h)), label
+      when "runs"
+        assert_equal json(c["read"]), json(store.get_run(c["row"]["id"]).to_h), label
+        assert_equal json([c["read"]]), json(store.list_runs(c["row"]["job"], 10).map(&:to_h)), label
+      else
+        job = c["row"]["job"]
+        assert_equal json(c["read"]), json(Cronwatch::Evaluate.normalize_state(store.get_state(job), job).to_h), label
+      end
+    end
+  end
+
+  def test_a_check_a_silence_and_every_page_over_foreign_rows
+    c = FOREIGN["check"]
+    prefix = ARSupport.prefix
+    store = make_store(prefix: prefix)
+    rows = ->(table) { FOREIGN["rows"].select { |r| r["table"] == table }.map { |r| r["row"] } }
+    jobs = rows.call("jobs") + c["extraJobs"]
+    jobs.each { |row| insert_row(prefix, "jobs", row) }
+    (rows.call("runs") + c["extraRuns"]).each { |row| insert_row(prefix, "runs", row) }
+    rows.call("state").each { |row| insert_row(prefix, "state", row) }
+    names = jobs.map { |j| j["name"] }
+    errors = []
+    reported = lambda do
+      wheres = errors.dup
+      errors.clear
+      wheres.map { |where| names.find { |n| where.end_with?(" #{n}") } || where }.uniq.sort
+    end
+    sent = []
+    cw = Cronwatch.new(store: store, now: -> { c["now"] }, cron_secret: nil,
+                       alerts: [Cronwatch::Alerts::Custom.new("capture") { |alert| sent << alert }],
+                       on_error: ->(_e, where) { errors << where })
+    result = cw.check
+    assert_equal c["reported"], reported.call
+    assert_equal c["alerts"], sent.map { |a| { "type" => a.type.to_s, "job" => a.job, "at" => a.at } }
+    assert_equal c["health"], result.jobs.to_h { |j| [j.name, j.health.to_s] }
+
+    cw.silence(c["silence"]["job"], for: c["silence"]["for"])
+    assert_equal c["silence"]["reported"], reported.call
+    assert_equal json(c["silence"]["state"]), json(store.get_state(c["silence"]["job"]).to_h)
+    # As the rows hold them: a state no write changed is still the foreign value.
+    c["states"].each do |job, state|
+      raw = with_conn { |conn| conn.select_value("SELECT state FROM #{prefix}state WHERE job = #{conn.quote(job)}") }
+      assert_equal json(state), json(JSON.parse(raw)), job
+    end
+
+    web = cw.routes(token: "tok", base_path: "/cronwatch")
+    c["read"]["pages"].each do |page|
+      assert_equal page["status"], send_request(web, "GET", page["path"], BEARER).status, page["path"]
+    end
+    assert_equal c["read"]["reported"], reported.call
+  end
 end
 
 # The store writes on connections of its own, never inside a transaction the
