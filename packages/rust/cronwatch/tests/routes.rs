@@ -133,6 +133,21 @@ async fn check_accepts_the_cron_secret_and_nothing_else_does() {
     status("check", &w.get("/cronwatch/api/check", &[("authorization", &bearer)]).await, 200);
     status("jobs", &w.get("/cronwatch/api/jobs", &[("authorization", &bearer)]).await, 401);
     status("only as a bearer", &w.get(&format!("/cronwatch/api/check?token={secret}"), &[]).await, 401);
+    status("about", &w.get("/cronwatch/api", &[("authorization", &bearer)]).await, 401);
+}
+
+#[tokio::test]
+async fn get_api_names_the_library_its_language_and_version() {
+    let w = Web::new();
+    let want = format!(r#"{{"ok":true,"library":"cronwatch","language":"rust","version":"{}","api":1}}"#, cronwatch::VERSION);
+    for path in ["/cronwatch/api", "/cronwatch/api/"] {
+        let res = w.get(path, &[AUTH]).await;
+        status(path, &res, 200);
+        assert_eq!(res.text(), want);
+        contains(path, res.header_str("content-type").unwrap(), "application/json");
+    }
+    status("no token", &w.get("/cronwatch/api", &[]).await, 401);
+    status("another method", &w.send("POST", "/cronwatch/api", &[AUTH], "").await, 404);
 }
 
 #[tokio::test]
@@ -241,7 +256,7 @@ async fn a_silence_ends_on_a_whole_millisecond_never_past_2_to_the_53_less_1() {
     let res =
         w.send("POST", "/cronwatch/api/jobs/long/silence", &[AUTH, JSON], r#"{"for":"99999999999999999999w"}"#).await;
     status("silence", &res, 200);
-    assert_eq!(field(&json(&res), &["state", "silencedUntil"]).as_f64(), Some(MAX as f64));
+    assert_eq!(field(&json(&res), &["job", "silencedUntil"]).as_f64(), Some(MAX as f64));
 }
 
 #[tokio::test]
@@ -283,10 +298,13 @@ async fn api_writes() {
     assert_eq!(field(&result, &["ok"]).as_bool(), Some(true));
     assert_eq!(field(&result, &["jobs"]).as_array().unwrap().len(), 1);
     let silenced = json(&post("/cronwatch/api/jobs/s/silence", r#"{"for":"2h"}"#).await);
-    assert_eq!(field(&silenced, &["state", "silencedUntil"]).as_f64(), Some((T0 + 2 * HOUR) as f64));
+    assert_eq!(field(&silenced, &["job", "silencedUntil"]).as_f64(), Some((T0 + 2 * HOUR) as f64));
+    // The job's summary, as GET /api/jobs/:name answers it; no state.
+    assert_eq!(silenced.keys().collect::<Vec<_>>(), ["ok", "job"]);
+    assert_eq!(field(&silenced, &["job", "health"]).as_str(), Some("silenced"));
     assert_eq!(w.k.summary("s").await.unwrap().health, JobHealth::Silenced);
     let un = json(&post("/cronwatch/api/jobs/s/unsilence", "").await);
-    assert!(field(&un, &["state", "silencedUntil"]).is_null());
+    assert!(field(&un, &["job", "silencedUntil"]).is_null());
     status("ghost", &post("/cronwatch/api/jobs/nope/silence", r#"{"for":"1h"}"#).await, 404);
     status("delete", &w.send("DELETE", "/cronwatch/api/jobs/s", &[AUTH], "").await, 200);
     assert!(w.k.summary("s").await.is_none(), "the job was not forgotten");
@@ -532,7 +550,7 @@ async fn silence_durations() {
     }
     assert_eq!(w.k.summary("s").await.unwrap().silenced_until, None, "a bad duration silenced the job");
     async fn until(w: &Web, body: &str) -> i64 {
-        field(&json(&silence(w, body).await), &["state", "silencedUntil"]).as_f64().unwrap() as i64 - T0
+        field(&json(&silence(w, body).await), &["job", "silencedUntil"]).as_f64().unwrap() as i64 - T0
     }
     assert_eq!(until(&w, r#"{"for":7200000}"#).await, 7_200_000, "a number");
     assert_eq!(until(&w, r#"{"for":"60000"}"#).await, 60_000, "a numeric string");
@@ -542,7 +560,7 @@ async fn silence_durations() {
     status("query", &w.send("POST", "/cronwatch/api/jobs/s/silence?for=forever", &[AUTH], "").await, 400);
     let query = json(&w.send("POST", "/cronwatch/api/jobs/s/silence?for=3h", &[AUTH], "").await);
     assert_eq!(
-        field(&query, &["state", "silencedUntil"]).as_f64(),
+        field(&query, &["job", "silencedUntil"]).as_f64(),
         Some((T0 + 3 * HOUR) as f64),
         "the query when the body has none"
     );
@@ -1101,6 +1119,6 @@ async fn huge_durations_neither_hang_nor_wrap() {
         &w.send("POST", "/cronwatch/api/jobs/rare/silence", &[AUTH, JSON], r#"{"for":"99999999999999999999999"}"#)
             .await,
     );
-    let until = field(&silenced, &["state", "silencedUntil"]).as_f64().unwrap();
+    let until = field(&silenced, &["job", "silencedUntil"]).as_f64().unwrap();
     assert!(until > w.k.now() as f64, "a long silence ended at once: {until}");
 }

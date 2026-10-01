@@ -60,11 +60,17 @@ fn read_golden() -> Vec<Capture> {
                 body: c.get("body").and_then(Value::as_str).map(str::to_string),
                 status: c.get("status").and_then(Value::as_f64).unwrap() as u16,
                 response_headers: pairs(c.get("responseHeaders")),
-                response_body: text(c.get("responseBody").unwrap()),
+                // GET /api names the library, its language and its version,
+                // which differ from port to port: the fixture holds
+                // placeholders, and this port puts in its own.
+                response_body: text(c.get("responseBody").unwrap())
+                    .replace("\"<library>\"", "\"cronwatch\"")
+                    .replace("\"<language>\"", "\"rust\"")
+                    .replace("\"<version>\"", &format!("\"{}\"", cronwatch::VERSION)),
             }
         })
         .collect();
-    assert_eq!(captures.len(), 63, "golden.json's captures");
+    assert_eq!(captures.len(), 66, "golden.json's captures");
     captures
 }
 
