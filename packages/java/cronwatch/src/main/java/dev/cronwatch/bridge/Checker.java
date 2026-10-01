@@ -82,16 +82,25 @@ final class Checker {
       parsed = Schedules.parse(expr, zone.isEmpty() ? null : zone);
     } catch (IllegalArgumentException e) {
       throw new ScheduleException(
-          where + " is " + Bridge.quote(expr) + ", which CronWatch cannot read: " + e.getMessage());
+          where
+              + " is "
+              + SchedulerBridge.quote(expr)
+              + ", which CronWatch cannot read: "
+              + e.getMessage());
     }
     ZoneId tz = Zones.find(zone);
     if (tz == null) {
       throw new ScheduleException(
-          where + ": timezone " + Bridge.quote(zone) + " is not an IANA timezone");
+          where + ": timezone " + SchedulerBridge.quote(zone) + " is not an IANA timezone");
     }
     Checker checker =
         new Checker(
-            runs, parsed, tz.getRules(), zone, where + " is " + Bridge.quote(expr), scheduler);
+            runs,
+            parsed,
+            tz.getRules(),
+            zone,
+            where + " is " + SchedulerBridge.quote(expr),
+            scheduler);
     try {
       checker.check(daily, now);
     } catch (ScheduleException e) {

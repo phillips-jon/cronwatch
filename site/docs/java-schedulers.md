@@ -201,3 +201,7 @@ A program a crontab runs needs no integration: the job's line wraps its work in 
 ```
 
 `CronwatchMain` is a `main` of your own that calls `CronwatchCli.main(Nightly::cronwatch, args)` with the factory for your client; `check` runs one check, prints what it did and exits non-zero when it fails. [From a crontab](/docs/java/#from-a-crontab) on the Java page has both sides.
+
+## Writing an integration
+
+The integrations above are built on `dev.cronwatch.bridge`: `SchedulerBridge` (the app's tag, a scheduler's fire times checked against CronWatch's, a job declared again without its schedule) and `Watch` (a scheduler's entries declared as jobs, one per name, tagged with the integration and the app). It is public for integration authors, but outside the 1.x promise: it changes when an integration needs it to, in any release, so pin the exact CronWatch version an integration of your own is built on. `Bridge`, `SchedulerBridge`'s name before 1.0, still works, deprecated.

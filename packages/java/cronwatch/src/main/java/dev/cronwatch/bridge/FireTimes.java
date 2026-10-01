@@ -6,11 +6,11 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A scheduler's own fire times, from its own code, for {@link Bridge#checkFires}: given {@code
- * start} and {@code end} in epoch milliseconds, the one at or before {@code start} and every one
- * after it up to the first past {@code end}, or {@link Bridge#SAMPLE_RUNS} of them after that first
- * one when {@code end} is null, ascending. A schedule that never fires again answers {@link
- * ScheduleException#neverFires}.
+ * A scheduler's own fire times, from its own code, for {@link SchedulerBridge#checkFires}: given
+ * {@code start} and {@code end} in epoch milliseconds, the one at or before {@code start} and every
+ * one after it up to the first past {@code end}, or {@link SchedulerBridge#SAMPLE_RUNS} of them
+ * after that first one when {@code end} is null, ascending. A schedule that never fires again
+ * answers {@link ScheduleException#neverFires}.
  */
 @FunctionalInterface
 public interface FireTimes {
@@ -62,7 +62,8 @@ public interface FireTimes {
         }
         out.add(following);
         at = following;
-        if ((end == null && out.size() > Bridge.SAMPLE_RUNS) || (end != null && following > end)) {
+        if ((end == null && out.size() > SchedulerBridge.SAMPLE_RUNS)
+            || (end != null && following > end)) {
           return out;
         }
       }
