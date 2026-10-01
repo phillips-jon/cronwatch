@@ -975,3 +975,22 @@ func TestHugeDurationsNeitherHangNorWrap(t *testing.T) {
 		t.Fatalf("a long silence ended at once: %v", until)
 	}
 }
+
+// routes/index.ts answers { ok: true, job: null } when the job is forgotten
+// between the check that it exists and the summary read after the silence.
+func TestRoutesASilenceWhoseJobIsGoneAnswersOkWithNoJob(t *testing.T) {
+	for _, path := range []string{"silence", "unsilence"} {
+		store := newTestStore()
+		w := newWeb(t, nil, cronwatch.WithStore(store))
+		check(t, w.cw.Run(bg, "s", ok))
+		if _, err := w.cw.Silence(bg, "s", 2*hour); err != nil {
+			t.Fatal(err)
+		}
+		forget := func() { check(t, w.cw.Forget(bg, "s")) }
+		store.hook("SetState", forget)
+		store.hook("CompareAndSetState", forget)
+		rec := w.send("POST", "/cronwatch/api/jobs/s/"+path, join(auth, hdr{"content-type": "application/json"}), `{"for":"1h"}`)
+		status(t, path, rec, http.StatusOK)
+		eq(t, path, rec.Body.String(), `{"ok":true,"job":null}`)
+	}
+}
