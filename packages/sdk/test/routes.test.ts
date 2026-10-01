@@ -44,14 +44,14 @@ test("everything needs the token", async () => {
   assert.equal((await get("/cronwatch/api/jobs", { headers: { authorization: "Bearer tok" } })).status, 200);
 });
 
-test("GET /api names the library, its version and the API's version, behind the token", async () => {
+test("GET /api names the library, its language, its version and the API's version, behind the token", async () => {
   const { get, auth } = app();
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
   assert.equal(VERSION, pkg.version, "src/version.ts is in step with package.json");
   for (const path of ["/cronwatch/api", "/cronwatch/api/"]) {
     const res = await get(path, { headers: auth });
     assert.equal(res.status, 200, path);
-    assert.equal(await res.text(), `{"ok":true,"library":"@cronwatch/sdk","version":"${pkg.version}","api":1}`);
+    assert.equal(await res.text(), `{"ok":true,"library":"@cronwatch/sdk","language":"typescript","version":"${pkg.version}","api":1}`);
   }
   assert.equal((await get("/cronwatch/api")).status, 401);
 });

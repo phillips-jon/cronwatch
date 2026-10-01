@@ -34,7 +34,7 @@
         "x-content-type-options": "nosniff",
         "x-robots-tag": "noindex"
       },
-      "responseBody": "{\"ok\":true,\"library\":\"<library>\",\"version\":\"<version>\",\"api\":1}"
+      "responseBody": "{\"ok\":true,\"library\":\"<library>\",\"language\":\"<language>\",\"version\":\"<version>\",\"api\":1}"
     },
     {
       "method": "GET",
@@ -51,7 +51,7 @@
         "x-content-type-options": "nosniff",
         "x-robots-tag": "noindex"
       },
-      "responseBody": "{\"ok\":true,\"library\":\"<library>\",\"version\":\"<version>\",\"api\":1}"
+      "responseBody": "{\"ok\":true,\"library\":\"<library>\",\"language\":\"<language>\",\"version\":\"<version>\",\"api\":1}"
     },
     {
       "method": "GET",

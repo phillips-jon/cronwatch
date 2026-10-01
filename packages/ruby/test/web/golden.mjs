@@ -200,13 +200,13 @@ for (const [method, template, headers = {}, body] of requests) {
 }
 
 /**
- * GET /api names the library and its version, which differ from port to
- * port: the fixture holds <library> and <version> in their place, and each
- * port's replay puts in its own.
+ * GET /api names the library, its language and its version, which differ
+ * from port to port: the fixture holds <library>, <language> and <version>
+ * in their place, and each port's replay puts in its own.
  */
 function about(text) {
-  const prefix = `{"ok":true,"library":${JSON.stringify(LIBRARY)},"version":${JSON.stringify(VERSION)},`;
-  return text.startsWith(prefix) ? `{"ok":true,"library":"<library>","version":"<version>",${text.slice(prefix.length)}` : text;
+  const prefix = `{"ok":true,"library":${JSON.stringify(LIBRARY)},"language":"typescript","version":${JSON.stringify(VERSION)},`;
+  return text.startsWith(prefix) ? `{"ok":true,"library":"<library>","language":"<language>","version":"<version>",${text.slice(prefix.length)}` : text;
 }
 
 if (errors.length) {

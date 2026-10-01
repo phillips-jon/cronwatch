@@ -61,8 +61,12 @@ export interface Routes {
 }
 
 const COOKIE = "cronwatch_token";
-/** The package GET <base>/api names: each port answers with its own. */
+/**
+ * What GET <base>/api says is serving it: the package, as its registry names
+ * it, and the language. Each port answers with its own.
+ */
 const LIBRARY = "@cronwatch/sdk";
+const LANGUAGE = "typescript";
 
 /**
  * The cookie holds a digest of the token, so a leaked cookie does not reveal
@@ -425,7 +429,7 @@ export function buildRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes 
       const rest = parts.slice(1);
       // What is serving the API, so a client such as @cronwatch/mcp can tell.
       if (method === "GET" && rest.length === 0) {
-        return api({ ok: true, library: LIBRARY, version: VERSION, api: API_VERSION });
+        return api({ ok: true, library: LIBRARY, language: LANGUAGE, version: VERSION, api: API_VERSION });
       }
       if (method === "GET" && rest[0] === "jobs" && rest.length === 1) {
         return api({ ok: true, jobs: await cw.jobs() });

@@ -158,7 +158,7 @@ The service worker keeps only that shell in its cache. Every page, form post and
 
 | Method and path | Does | Returns |
 |---|---|---|
-| `GET /api` | what is serving the API | `{ ok: true, library, version, api: 1 }` |
+| `GET /api` | what is serving the API | `{ ok: true, library, language, version, api: 1 }` |
 | `GET /api/jobs` | list jobs | `{ ok: true, jobs: JobSummary[] }` |
 | `GET /api/jobs/:name?runs=20` | one job with recent runs (`runs` is 1 to 500) | `{ ok: true, job: JobSummary, runs: Run[] }` |
 | `DELETE /api/jobs/:name` | forget the job and its runs | `{ ok: true }` |
@@ -170,7 +170,7 @@ The service worker keeps only that shell in its cache. Every page, form post and
 
 Every success body carries `ok: true` beside its fields.
 
-`GET /api` says what is answering: `library` is the package (`@cronwatch/sdk`, or the port's own name, such as `cronwatch` for the gem), `version` its release, and `api` the version of this API, now `1`. The API only grows: a later release may add fields and endpoints, but does not remove or retype one, or move a path, without a new `api` number in a major release. So read the fields you need and ignore the rest. [`@cronwatch/mcp`](/docs/mcp/) works with any dashboard that answers this way, and with the 0.x releases before it.
+`GET /api` says what is answering: `library` is the package as its registry names it (`@cronwatch/sdk`, or the port's own, such as `cronwatch` for the gem), `language` the language it is written in (`typescript`, `ruby`, `python`, `php`, `go`, `rust`, `elixir`, `java` or `dotnet`), `version` its release, and `api` the version of this API, now `1`. The API only grows: a later release may add fields and endpoints, but does not remove or retype one, or move a path, without a new `api` number in a major release. So read the fields you need and ignore the rest. [`@cronwatch/mcp`](/docs/mcp/) works with any dashboard that answers this way, and with the 0.x releases before it.
 
 Silence and unsilence answer the job's summary, as `GET /api/jobs/:name` does, with `silencedUntil` set or cleared. Before 1.0 they answered the job's stored state instead (`{ ok: true, state }`); `@cronwatch/mcp` reads either.
 
