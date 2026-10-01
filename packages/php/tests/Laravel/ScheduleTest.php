@@ -386,12 +386,12 @@ final class ScheduleTest extends TestCase
 
     protected function checkOff($app): void
     {
-        $app['config']->set('cronwatch.schedule.check', false);
+        $app['config']->set('cronwatch.check.schedule', false);
     }
 
     protected function checkEveryTen($app): void
     {
-        $app['config']->set('cronwatch.schedule.check_cron', '*/10 * * * *');
+        $app['config']->set('cronwatch.check.frequency', '*/10 * * * *');
     }
 
     protected function turnedOff($app): void

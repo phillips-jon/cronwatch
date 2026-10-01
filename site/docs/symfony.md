@@ -207,6 +207,10 @@ claude mcp add cronwatch -e CRONWATCH_URL=https://app.example.com/cronwatch -e C
 
 The pages and API are the SDK's; see [Dashboard and API](/docs/dashboard/). Writes from another site are refused, and the origin compared is the one Symfony sees, so its trusted proxies apply.
 
+## Settings
+
+The bundle's keys, with the variables and Laravel's keys for the same settings, are in one table on the [Laravel page](/docs/laravel/#settings); the two spell a setting the same wherever it means the same thing (`table_prefix`, `create_tables`, `check.schedule`, `check.frequency`, `dashboard.token`). None of the bundle's keys changed for 1.0.
+
 ## Tests
 
 In the test environment, keep runs in memory:

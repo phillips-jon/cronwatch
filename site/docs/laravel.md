@@ -203,6 +203,37 @@ claude mcp add cronwatch -e CRONWATCH_URL=https://app.example.com/cronwatch -e C
 
 Laravel's CSRF middleware is taken off the dashboard's routes, since its forms carry no Laravel token and the routes refuse a cross-site write themselves; the origin they compare with is the request's as Laravel sees it, so the app's trusted proxies apply. `CRONWATCH_DASHBOARD=false` leaves the routes out.
 
+## Settings
+
+Every key of `config/cronwatch.php` (publish it with `php artisan vendor:publish --tag=cronwatch-config`), the variable it reads, and the [Symfony bundle](/docs/symfony/)'s key for the same setting, which keeps the same spelling wherever the two mean the same thing:
+
+| `config/cronwatch.php` | Variable | Symfony `cronwatch.yaml` |
+|---|---|---|
+| `enabled` | `CRONWATCH_ENABLED` | |
+| `app_id` | `CRONWATCH_APP_ID` | `app_id` |
+| `store.driver`, `store.connection`, `store.path` | `CRONWATCH_STORE`, `CRONWATCH_DB_CONNECTION`, `CRONWATCH_SQLITE_PATH` | `store` (a URL), `store_service` |
+| `store.migrations` | `CRONWATCH_MIGRATIONS` | |
+| `table_prefix` | `CRONWATCH_TABLE_PREFIX` | `table_prefix` |
+| `create_tables` | `CRONWATCH_CREATE_TABLES` | `create_tables` |
+| `alerts.mail.to`, `.from`, `.mailer`, `.subject_prefix` | `CRONWATCH_MAIL_TO`, `CRONWATCH_MAIL_FROM`, `CRONWATCH_MAILER`, `CRONWATCH_MAIL_SUBJECT_PREFIX` | `alerts.mailer.to`, `.from`, `.subject_prefix` |
+| `alerts.slack`, `alerts.discord` | `CRONWATCH_SLACK_WEBHOOK_URL`, `CRONWATCH_DISCORD_WEBHOOK_URL` | `alerts.slack`, `alerts.discord` |
+| `alerts.webhook.url`, `.secret` | `CRONWATCH_WEBHOOK_URL`, `CRONWATCH_WEBHOOK_SECRET` | `alerts.webhook.url`, `.secret` |
+| `alerts.log` (a log channel's name) | `CRONWATCH_LOG_CHANNEL` | `alerts.log` (true or false: the logger has no channels to name) |
+| `alerts.channels` (class names) | | `alerts.services` (service ids) |
+| `triage.enabled`, `.model`, `.context` | `CRONWATCH_TRIAGE`, `CRONWATCH_TRIAGE_MODEL`, `CRONWATCH_TRIAGE_CONTEXT` | `triage.enabled`, `.model`, `.context` |
+| `cron_secret` | `CRON_SECRET` | `cron_secret` |
+| `retention`, `defaults`, `deliver` | `CRONWATCH_RETENTION`, `CRONWATCH_DELIVER` | `retention`, `defaults`, `deliver` |
+| `schedule.watch`, `schedule.exclude` | `CRONWATCH_WATCH_SCHEDULE` | `scheduler.watch`, `scheduler.exclude` (and `scheduler.jobs`) |
+| `schedule.capture_output` | `CRONWATCH_CAPTURE_OUTPUT` | |
+| `check.schedule` | `CRONWATCH_SCHEDULE_CHECK` | `check.schedule` (a schedule's name, or false) |
+| `check.frequency` (a cron expression) | `CRONWATCH_CHECK_CRON` | `check.frequency` (a period, or a cron expression) |
+| `queue.watch` | `CRONWATCH_WATCH_QUEUE` | `messenger.watch` |
+| `dashboard.enabled`, `.path`, `.domain` | `CRONWATCH_DASHBOARD`, `CRONWATCH_PATH`, `CRONWATCH_DOMAIN` | the routes' import and prefix |
+| `dashboard.middleware` | | `dashboard.role` |
+| `dashboard.token` | `CRONWATCH_TOKEN` | `dashboard.token` |
+
+Releases before 1.0 spelled four of these differently: `store.prefix` (now `table_prefix`), `store.create_tables` (now `create_tables`), `schedule.check` (now `check.schedule`) and `schedule.check_cron` (now `check.frequency`). The variables did not change, so a config file that was never published needs nothing. A published one that still has an old key keeps working through 1.x: the old key is read in place of the new one, with a deprecation notice (Laravel writes those to its `deprecations` log channel when one is set) naming the key to rename it to. The old keys go in 2.0.
+
 ## Tests
 
 In tests, keep runs in memory, or turn CronWatch off:
