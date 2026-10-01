@@ -142,7 +142,7 @@
       <div><dt>Ruby</dt><dd>In Rails, <code>Cronwatch::CheckJob</code> scheduled beside your other recurring jobs; with Sidekiq jobs outside ActiveJob, <code>Cronwatch::Sidekiq::CheckWorker</code>.</dd></div>
       <div><dt>Python</dt><dd>The Celery beat entry for <code>cronwatch.celery.check</code>, or <code>manage.py cronwatch_check</code> from crontab.</dd></div>
       <div><dt>PHP</dt><dd>Laravel and Symfony schedule it themselves, WordPress as a WP-Cron event, Drupal after each cron run. Craft CMS runs <code>php craft cronwatch/check</code> from crontab.</dd></div>
-      <div><dt>Go</dt><dd><code>cw.Start</code> in a long-running process, or the River or Asynq check job.</dd></div>
+      <div><dt>Go</dt><dd><code>cw.StartChecking</code> in a long-running process, or the River or Asynq check job.</dd></div>
       <div><dt>Rust</dt><dd><code>cw.start()</code> in a long-running process, the tokio-cron-scheduler check job, or the apalis check worker.</dd></div>
       <div><dt>Elixir</dt><dd><code>check_every</code> on the instance in your supervision tree, <code>Cronwatch.Oban.CheckWorker</code> in Oban’s crontab, a Quantum job running <code>Cronwatch.Quantum.check</code>, or <code>Cronwatch.Release.check</code> from crontab.</dd></div>
       <div><dt>Java</dt><dd>The Spring Boot starter checks on its own, once per cluster under ShedLock or Quartz. Elsewhere, <code>cw.start()</code> in a long-running process, the Quartz or JobRunr check job, or <code>CronwatchCli</code> from crontab.</dd></div>
