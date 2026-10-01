@@ -7,6 +7,7 @@ namespace Cronwatch\Web;
 use Cronwatch\Cronwatch;
 use Cronwatch\Duration;
 use Cronwatch\Env;
+use Cronwatch\FromEnv;
 use Cronwatch\JobWithRuns;
 use Cronwatch\Js;
 
@@ -33,9 +34,10 @@ use Cronwatch\Js;
  *             in a file (developmentTokenFile, default in the system's temporary directory) so
  *             every PHP request after it asks for the same one, and writes a sign-in link to
  *             the server log (error_log) when it makes it; with no token otherwise it answers
- *             503. Pass false to opt out and serve it open everywhere, for example behind your
- *             own auth (the SDK's null; PHP's null is the default). /api/check also accepts
- *             the client's cronSecret as a bearer, for a platform cron.
+ *             503. Pass null to opt out and serve it open everywhere, for example behind your
+ *             own auth, as in the SDK (false does the same, deprecated since 1.0; in 0.x null
+ *             read CRONWATCH_TOKEN, which the default, FromEnv::Read, now does). /api/check
+ *             also accepts the client's cronSecret as a bearer, for a platform cron.
  * basePath:   where the routes are mounted, so links resolve. Default: the script, for a
  *             path-info URL such as /cronwatch.php/api/jobs, else "/cronwatch".
  * origin:     the public origin the dashboard is served from, such as "https://app.example.com",
@@ -62,6 +64,13 @@ use Cronwatch\Js;
 final class Dashboard
 {
     public const COOKIE = 'cronwatch_token';
+    /** The package GET <base>/api names: each port answers with its own. */
+    private const LIBRARY = 'cronwatch/cronwatch';
+    /**
+     * The JSON API's version, which GET <base>/api answers. It goes up only
+     * for a change that is not additive, and such a change waits for a major release.
+     */
+    private const API_VERSION = 1;
     public const DEFAULT_RUNS = 20;
     public const MAX_RUNS = 500;
     /** Runs per job the board reads in one go: the table's sparkline, and most jobs' lanes. */
@@ -83,7 +92,7 @@ final class Dashboard
      */
     public const SECURITY_HEADERS = ['x-content-type-options' => 'nosniff', 'referrer-policy' => 'same-origin', 'x-robots-tag' => 'noindex'];
 
-    public const LOCKED = 'Set CRONWATCH_TOKEN (or pass token: to $cw->routes()), or pass token: false to serve them open behind your own auth.';
+    public const LOCKED = 'Set CRONWATCH_TOKEN (or pass token: to $cw->routes()), or pass token: null to serve them open behind your own auth.';
 
     private readonly bool $optedOut;
     private readonly bool $generated;
@@ -98,7 +107,8 @@ final class Dashboard
     private readonly ?string $empty;
 
     /**
-     * @param string|false|null $token the dashboard's token; null reads CRONWATCH_TOKEN, "" counts as unset, false serves it open
+     * @param string|FromEnv|false|null $token the dashboard's token; the default (FromEnv::Read) reads CRONWATCH_TOKEN, as ""
+     *        does, and null serves it open (false does the same, deprecated since 1.0 and removed in 2.0)
      * @param callable(string): void|null $log where the development sign-in line goes; default error_log()
      * @param string|null $developmentTokenFile where a development token is kept between requests; default in the system's temporary directory (DevelopmentToken)
      * @param callable(string): string|null $head the pages' head assets for a host that loads its own (see above)
@@ -106,7 +116,7 @@ final class Dashboard
      */
     public function __construct(
         private readonly Cronwatch $cw,
-        string|false|null $token = null,
+        string|FromEnv|false|null $token = FromEnv::Read,
         ?string $basePath = null,
         ?string $origin = null,
         bool $trustProxy = false,
@@ -115,7 +125,7 @@ final class Dashboard
         ?callable $head = null,
         ?string $empty = null,
     ) {
-        $this->optedOut = $token === false;
+        $this->optedOut = $token === null || $token === false;
         $configured = null;
         if (!$this->optedOut) {
             $configured = is_string($token) && $token !== '' ? $token : Env::read('CRONWATCH_TOKEN');
@@ -432,6 +442,10 @@ final class Dashboard
     private function serveApi(Request $request, string $method, array $rest, ?string $bearer): Response
     {
         $cw = $this->cw;
+        // What is serving the API, so a client such as @cronwatch/mcp can tell.
+        if ($method === 'GET' && $rest === []) {
+            return self::api(['ok' => true, 'library' => self::LIBRARY, 'language' => 'php', 'version' => Cronwatch::VERSION, 'api' => self::API_VERSION]);
+        }
         if ($method === 'GET' && $rest === ['jobs']) {
             return self::api(['ok' => true, 'jobs' => $cw->jobs()]);
         }
@@ -467,10 +481,12 @@ final class Dashboard
                 } catch (\InvalidArgumentException $error) {
                     return self::api(['ok' => false, 'error' => $error->getMessage()], 400);
                 }
-                return self::api(['ok' => true, 'state' => $cw->silence($name, $duration)]);
+                $cw->silence($name, $duration);
+                return self::api(['ok' => true, 'job' => $cw->jobSummary($name)]);
             }
             if ($rest[2] === 'unsilence') {
-                return self::api(['ok' => true, 'state' => $cw->unsilence($name)]);
+                $cw->unsilence($name);
+                return self::api(['ok' => true, 'job' => $cw->jobSummary($name)]);
             }
         }
         if ($rest === ['check']) {

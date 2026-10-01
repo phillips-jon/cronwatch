@@ -28,7 +28,7 @@ final class CorrectnessTest extends TestCase
         $clock = new Clock();
         $sent = [];
         $job = null;
-        $cw = new Cronwatch(now: $clock, cronSecret: false, alerts: [
+        $cw = new Cronwatch(now: $clock, cronSecret: null, alerts: [
             // The missed alert takes a while (a slow webhook, or triage); the job turns up meanwhile.
             new Custom('slow-for-missed', function (Alert $a) use (&$sent, &$job): void {
                 if ($a->type === 'missed') {
@@ -52,7 +52,7 @@ final class CorrectnessTest extends TestCase
     {
         $clock = new Clock(Js::dateUtc(2026, 0, 1, 0, 0));
         $alerts = new Capture();
-        $cw = new Cronwatch(now: $clock, alerts: [$alerts], cronSecret: false, retention: '30d');
+        $cw = new Cronwatch(now: $clock, alerts: [$alerts], cronSecret: null, retention: '30d');
         $monthly = $cw->job('monthly', ['schedule' => '0 0 1 * *', 'timezone' => 'UTC']);
         $monthly->run(fn () => null);
         $clock->set(Js::dateUtc(2026, 0, 31, 12));
@@ -65,7 +65,7 @@ final class CorrectnessTest extends TestCase
 
     public function testAnExpectPatternGivesTheSameAnswerEveryRun(): void
     {
-        $cw = new Cronwatch(alerts: [new Capture()], cronSecret: false);
+        $cw = new Cronwatch(alerts: [new Capture()], cronSecret: null);
         $job = $cw->job('g', ['expect' => new Pattern('/done/')]);
         for ($i = 0; $i < 4; $i++) {
             $job->run(fn ($j) => $j->log('done'));
@@ -76,7 +76,7 @@ final class CorrectnessTest extends TestCase
 
     public function testExpectSeesALineLoggedEarlyEvenAfterTheStoredOutputHasDroppedIt(): void
     {
-        $cw = new Cronwatch(alerts: [new Capture()], cronSecret: false);
+        $cw = new Cronwatch(alerts: [new Capture()], cronSecret: null);
         $cw->run('report', function ($j): void {
             $j->log('Report written: /tmp/r.pdf');
             for ($i = 0; $i < 3000; $i++) {
@@ -92,7 +92,7 @@ final class CorrectnessTest extends TestCase
     {
         $clock = new Clock();
         $alerts = new Capture();
-        $cw = new Cronwatch(now: $clock, alerts: [$alerts], cronSecret: false);
+        $cw = new Cronwatch(now: $clock, alerts: [$alerts], cronSecret: null);
         $job = $cw->job('long', ['schedule' => 'every 5m', 'grace' => '2m']);
         $job->run(function () use ($cw, $clock): void {
             $clock->advance(8 * self::MIN);
@@ -105,7 +105,7 @@ final class CorrectnessTest extends TestCase
     {
         $clock = new Clock();
         $alerts = new Capture();
-        $cw = new Cronwatch(now: $clock, alerts: [$alerts], cronSecret: false);
+        $cw = new Cronwatch(now: $clock, alerts: [$alerts], cronSecret: null);
         $job = $cw->job('slowpoke', ['timeout' => '1m', 'failuresBeforeAlert' => 2]);
         try {
             $job->run(function () use ($cw, $clock): never {
@@ -125,7 +125,7 @@ final class CorrectnessTest extends TestCase
     {
         $clock = new Clock();
         $alerts = new Capture();
-        $cw = new Cronwatch(now: $clock, alerts: [$alerts], cronSecret: false);
+        $cw = new Cronwatch(now: $clock, alerts: [$alerts], cronSecret: null);
         $job = $cw->job('late', ['timeout' => '30s']);
         $job->run(function () use ($cw, $clock): void {
             $clock->advance(self::MIN);
@@ -186,7 +186,7 @@ final class CorrectnessTest extends TestCase
         // Stars back to back over newlines they do not match backtrack
         // polynomially (V8 takes seconds over 100); PCRE's backtrack limit,
         // at its default, stops them in milliseconds and the run fails.
-        $cw = new Cronwatch(alerts: [new Capture()], cronSecret: false);
+        $cw = new Cronwatch(alerts: [new Capture()], cronSecret: null);
         $output = str_repeat("\n", 32_000);
         $started = hrtime(true);
         $cw->job('slow', ['expect' => new Pattern('/\n*\n*\n*\n*\n*[xy]/')])->run(fn () => $output);

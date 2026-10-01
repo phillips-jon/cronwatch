@@ -42,21 +42,51 @@ final class Cronwatch
 {
     public const VERSION = '0.10.0';
 
+    /** @internal */
     public const NAME_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/D';
+    /** @internal */
     public const TRIAGE_TIMEOUT_MS = 25_000;
+    /** @internal */
     public const PRUNE_INTERVAL_MS = 60 * 60_000;
-    /** Undelivered alerts kept per job for retry; the oldest go first. */
+    /**
+     * Undelivered alerts kept per job for retry; the oldest go first.
+     *
+     * @internal
+     */
     public const MAX_UNDELIVERED = Evaluate::MAX_UNDELIVERED;
-    /** Wall-clock time one check spends retrying undelivered alerts, across every job. */
+    /**
+     * Wall-clock time one check spends retrying undelivered alerts, across every job.
+     *
+     * @internal
+     */
     public const RETRY_BUDGET_MS = 20_000;
-    /** Reads and writes of one job's state before an update gives up on a store that keeps changing under it. */
+    /**
+     * Reads and writes of one job's state before an update gives up on a store that keeps changing under it.
+     *
+     * @internal
+     */
     public const STATE_ATTEMPTS = 10;
-    /** Runs read for a baseline, and the most read when failures crowd out the successes. */
+    /**
+     * Runs read for a baseline, and the most read when failures crowd out the successes.
+     *
+     * @internal
+     */
     public const HISTORY_PAGE = Evaluate::BASELINE_WINDOW + 5;
+    /** @internal */
     public const HISTORY_MAX = 200;
-    /** Run ids that start with this belong to the pg_cron source. */
+    /** The longest run id, in UTF-16 code units: what start(), resume() and recordRun() take, and every store holds. */
+    private const MAX_RUN_ID = 200;
+    /**
+     * Run ids that start with this belong to the pg_cron source.
+     *
+     * @internal
+     */
     public const RESERVED_RUN_ID_PREFIX = 'pgcron:';
-    /** The options `defaults` may set. */
+    /**
+     * The options `defaults` may set.
+     *
+     * @internal
+     */
     public const DEFAULT_OPTIONS = ['grace', 'timeout', 'timezone', 'failuresBeforeAlert'];
 
     public readonly Store $store;
@@ -66,7 +96,7 @@ final class Cronwatch
     public readonly array $sources;
     /** The secret an outside cron may present to the dashboard's check endpoint (routes()) and to a job's handler(), or null. */
     public readonly ?string $cronSecret;
-    /** cronSecret was passed as false: handlers may run without a secret. */
+    /** cronSecret was passed as null (or the deprecated false): handlers may run without a secret. */
     public readonly bool $secretOptOut;
     public readonly int|float $retentionMs;
     /** @var array<string, mixed> */
@@ -106,8 +136,10 @@ final class Cronwatch
      * @param list<AlertChannel|callable>|null $alerts where alerts go; default the console. A callable is a Custom channel named "custom".
      * @param callable(TriageContext): ?string|null $triage adds a short diagnosis to every alert but recoveries
      * @param list<Source> $sources where runs this process does not wrap come from; each is synced at the start of every check
-     * @param string|false|null $cronSecret the secret the dashboard's check endpoint (routes()) also accepts, and a job's
-     *        handler() requires; null reads CRON_SECRET, "" counts as unset, and false lets both run without one
+     * @param string|FromEnv|false|null $cronSecret the secret the dashboard's check endpoint (routes()) also accepts, and a
+     *        job's handler() requires; the default (FromEnv::Read) reads CRON_SECRET, "" counts as unset, and null lets both
+     *        run without one. false is the same as null, deprecated since 1.0 and removed in 2.0 (in 0.x, null read
+     *        CRON_SECRET and false turned it off; null now means what it means in every other language).
      * @param mixed $retention how long finished runs are kept; default "30d"
      * @param array<string, mixed> $defaults grace, timeout, timezone and failuresBeforeAlert for every job that does not set its own
      * @param callable(string): string|false|null $redact applied to every run's output and error before it is stored, shown or
@@ -124,7 +156,7 @@ final class Cronwatch
         ?array $alerts = null,
         ?callable $triage = null,
         array $sources = [],
-        string|false|null $cronSecret = null,
+        string|FromEnv|false|null $cronSecret = FromEnv::Read,
         mixed $retention = '30d',
         array $defaults = [],
         callable|false|null $redact = null,
@@ -150,9 +182,9 @@ final class Cronwatch
             }
         }
         $this->sources = array_values($sources);
-        $secret = $cronSecret === null ? Env::read('CRON_SECRET') : $cronSecret;
+        $secret = $cronSecret === FromEnv::Read ? Env::read('CRON_SECRET') : $cronSecret;
         $this->cronSecret = is_string($secret) && $secret !== '' ? $secret : null;
-        $this->secretOptOut = $cronSecret === false;
+        $this->secretOptOut = $cronSecret === null || $cronSecret === false;
         $this->retentionMs = Duration::parse($retention ?? '30d', 'retention');
         foreach (array_keys($defaults) as $key) {
             if (!in_array($key, self::DEFAULT_OPTIONS, true)) {
@@ -185,7 +217,7 @@ final class Cronwatch
     /**
      * The context of the run in progress in this process (the innermost, when
      * one job runs another), or null. What a function wrapped with
-     * JobHandle::wrap() logs through.
+     * JobHandle::monitor() logs through.
      */
     public static function current(): ?JobContext
     {
@@ -263,6 +295,11 @@ final class Cronwatch
     {
         $given = $run instanceof Run ? $run : Run::fromJson($run);
         $declared = $this->definitions[$given->job] ?? throw new \InvalidArgumentException("recordRun: job \"{$given->job}\" is not declared; call job() first");
+        // The longest id start() takes; MySQL's column would hold 255, but every store holds 200.
+        $length = Js::length16($given->id);
+        if ($given->id === '' || $length > self::MAX_RUN_ID) {
+            throw new \InvalidArgumentException('recordRun: run ids must be 1 to ' . self::MAX_RUN_ID . " characters (got {$length} characters; job \"{$given->job}\")");
+        }
         if (str_contains($given->id, "\0")) {
             throw new \InvalidArgumentException("recordRun: run ids cannot contain a NUL character (job \"{$given->job}\")");
         }
@@ -325,7 +362,7 @@ final class Cronwatch
             return;
         }
         $this->warnedNoSecret = true;
-        $this->report(new \RuntimeException('handler() refused a request because no CRON_SECRET is set; pass secret: false to allow unauthenticated requests'), 'handler');
+        $this->report(new \RuntimeException('handler() refused a request because no CRON_SECRET is set; pass secret: null to allow unauthenticated requests'), 'handler');
     }
 
     /** Hands an error to onError, as a source reports what went wrong. */
@@ -458,12 +495,13 @@ final class Cronwatch
      * from a script, handle() with a Web\Request, or put it in a PSR-15 stack
      * with Web\PsrHandler or Web\PsrMiddleware. See Web\Dashboard.
      *
-     * @param string|false|null $token null reads CRONWATCH_TOKEN, "" counts as unset, false serves the dashboard open
+     * @param string|FromEnv|false|null $token the default (FromEnv::Read) reads CRONWATCH_TOKEN, as "" does, and null serves
+     *        the dashboard open; false is the same as null, deprecated since 1.0 and removed in 2.0
      * @param string|null $basePath where the dashboard is mounted; default the script of a path-info URL, else "/cronwatch"
      * @param string|null $origin the public origin, for an app behind a proxy
      * @param bool $trustProxy take the public origin from X-Forwarded-Proto and X-Forwarded-Host
      */
-    public function routes(string|false|null $token = null, ?string $basePath = null, ?string $origin = null, bool $trustProxy = false): Web\Dashboard
+    public function routes(string|FromEnv|false|null $token = FromEnv::Read, ?string $basePath = null, ?string $origin = null, bool $trustProxy = false): Web\Dashboard
     {
         return new Web\Dashboard($this, token: $token, basePath: $basePath, origin: $origin, trustProxy: $trustProxy);
     }
@@ -725,7 +763,7 @@ final class Cronwatch
      * the store is doing: store errors go to onError. Returns what it returns
      * and throws what it throws, after the run is recorded.
      *
-     * @internal Called by JobHandle::run() and wrap().
+     * @internal Called by JobHandle::run() and monitor().
      */
     public function execute(JobDefinition $definition, string $trigger, callable $fn): mixed
     {
@@ -1058,8 +1096,8 @@ final class Cronwatch
     private static function checkRunId(string $job, string $id, string $method): void
     {
         $length = Js::length16($id);
-        if ($id === '' || $length > 200) {
-            throw new \InvalidArgumentException("job \"{$job}\": {$method}() needs a run id of 1 to 200 characters (got {$length} characters)");
+        if ($id === '' || $length > self::MAX_RUN_ID) {
+            throw new \InvalidArgumentException("job \"{$job}\": {$method}() needs a run id of 1 to " . self::MAX_RUN_ID . " characters (got {$length} characters)");
         }
         // Postgres refuses NUL in text, so no store could hold such an id.
         if (str_contains($id, "\0")) {

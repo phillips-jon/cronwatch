@@ -411,8 +411,8 @@ final class ChannelsTest extends TestCase
         $this->assertSame('sha256=' . hash_hmac('sha256', $call['body'], 's3cret'), $call['headers']['x-cronwatch-signature']);
         $this->assertSame('cronwatch', $call['headers']['user-agent']);
         $this->assertSame('billing', $call['headers']['x-team']);
-        $this->assertSame(['type', 'run', 'details', 'job', 'definition', 'title', 'message', 'at', 'triage'], array_keys(Js::plain(Js::parse($call['body']))));
-        $this->assertSame(Js::stringify(self::alertJ('db')), $call['body']);
+        $this->assertSame(['schema', 'type', 'run', 'details', 'job', 'definition', 'title', 'message', 'at', 'triage'], array_keys(Js::plain(Js::parse($call['body']))));
+        $this->assertSame(Js::stringify(['schema' => 1, ...self::alertJ('db')->toJson()]), $call['body']);
     }
 
     // ------------------------------------------------------------ through the client
@@ -471,7 +471,7 @@ final class ChannelsTest extends TestCase
             $this->assertSame('/status/204?key=abc', $request['uri']);
             $this->assertSame('application/json', $request['headers']['content-type']);
             $this->assertSame('sha256=' . hash_hmac('sha256', $request['body'], 'k'), $request['headers']['x-cronwatch-signature']);
-            $this->assertSame(Js::stringify(self::alertJ()), $request['body']);
+            $this->assertSame(Js::stringify(['schema' => 1, ...self::alertJ()->toJson()]), $request['body']);
         } finally {
             $server->stop();
         }

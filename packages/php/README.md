@@ -35,7 +35,7 @@ $nightly->run(function (JobContext $job) {
 });
 ```
 
-A run is recorded when the function returns; what it throws is recorded as the failure and thrown again, and a run cut short by `exit()` or a fatal error is recorded as failed when the process ends. `run()` returns what the function returns. `$nightly->wrap($callable)` gives a callable whose every call is a run, with `Cronwatch::current()` its context.
+A run is recorded when the function returns; what it throws is recorded as the failure and thrown again, and a run cut short by `exit()` or a fatal error is recorded as failed when the process ends. `run()` returns what the function returns. `$nightly->monitor($callable)` gives a callable whose every call is a run, with `Cronwatch::current()` its context.
 
 A PHP process does not stay up between runs, so missed and stuck runs are found by a check, every five minutes, from a second crontab line or the framework's scheduler. Put the client in a file that returns it, `cronwatch.php`:
 
@@ -72,9 +72,17 @@ A run that is never finished is marked stuck by the first check after the job's 
 
 `job($name, [...])`: `schedule` (five or six field cron, a nickname such as `@hourly`, or `every 5m`), `timezone` (IANA; default PHP's), `grace` (default `10m`), `timeout` (default `1h`), `maxDuration`, `budget` (`['metric' => ceiling]`), `expect` (a string the output must contain, a `Cronwatch\Pattern` it must match, or a callable), `failuresBeforeAlert` (default 1), `description`, `tags`. Durations are strings like `1h30m`, milliseconds, or a `DateInterval`.
 
-`new Cronwatch(...)`: `store`, `alerts` (channels or callables; default the console), `triage` (a callable returning a short diagnosis added to each alert), `sources`, `retention` (default `30d`), `defaults`, `redact` (secrets are blanked from output and errors by default; pass your own callable, or `false`), `deliver` (`check` queues alerts for another process's check to send), `onError` (store and channel failures; default PHP's error log), `now`.
+`new Cronwatch(...)`: `store`, `alerts` (channels or callables; default the console), `triage` (a callable returning a short diagnosis added to each alert), `sources`, `cronSecret` (default `CRON_SECRET`; `null` for none on purpose), `retention` (default `30d`), `defaults`, `redact` (secrets are blanked from output and errors by default; pass your own callable, or `false`), `deliver` (`check` queues alerts for another process's check to send), `onError` (store and channel failures; default PHP's error log), `now`.
 
 `check()`, `jobs()`, `jobsWithRuns()`, `jobSummary($name)`, `runs($name)`, `getRun($id)`, `silence($name, '2h')`, `unsilence($name)`, `forget($name)`, `recordRun($run)`, `resumeRun($name, $id)`, `close()`.
+
+Public means documented here or on the [PHP page of the docs](https://cronwatch.dev/docs/php/); every other class and method is marked `@internal`.
+
+### Changed in 1.0, and deprecated
+
+`cronSecret`, the dashboard's `token` and a handler's `secret` read `null` as every other language does: off. In 0.x `null` was the default and read the environment, and `false` turned them off. Leaving the argument out, or passing `Cronwatch\FromEnv::Read`, still reads `CRON_SECRET` or `CRONWATCH_TOKEN`.
+
+Deprecated, working through 1.x and gone in 2.0: `false` for those three (use `null`), `$job->wrap($fn)` (use `$job->monitor($fn)`) and `Alerts\Webhook::hmacSha256Hex()` (use `Webhook::signature()`).
 
 ### Stores
 
@@ -134,7 +142,7 @@ $app->add(new Cronwatch\Web\PsrMiddleware($cw->routes(), $factory, $factory));  
 
 `routes(token:, basePath:, origin:, trustProxy:)`:
 
-- `token`: everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. Defaults to `CRONWATCH_TOKEN`. With none, the dashboard answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `WP_ENVIRONMENT_TYPE` set to `development`, `dev`, `local`, `test` or `testing`), where it makes one, keeps it in a file in the system's temporary directory so every request asks for the same one, and writes a sign-in link to the server log (naming the host only when `origin` is set or the request's host is loopback, since a client chooses it). `false` serves it open, for behind your own auth. `/api/check` also takes the client's `cronSecret`, for a platform cron.
+- `token`: everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. Defaults to `CRONWATCH_TOKEN` (leave it out, or pass `Cronwatch\FromEnv::Read`). With none, the dashboard answers 503, except in development (`CRONWATCH_ENV`, `APP_ENV` or `WP_ENVIRONMENT_TYPE` set to `development`, `dev`, `local`, `test` or `testing`), where it makes one, keeps it in a file in the system's temporary directory so every request asks for the same one, and writes a sign-in link to the server log (naming the host only when `origin` is set or the request's host is loopback, since a client chooses it). `null` serves it open, for behind your own auth (in 0.x `null` read `CRONWATCH_TOKEN` and `false` served it open; `false` still does, deprecated). `/api/check` also takes the client's `cronSecret`, for a platform cron.
 - `basePath`: where it is mounted. Default: the script, for a path-info URL like `/cronwatch.php/`, else `/cronwatch`.
 - `origin` (`https://app.example.com`) or `trustProxy: true`: the public origin, for an app behind a proxy, used for the same-origin check on changes, the cookie's `Secure` flag and the redirects.
 
@@ -154,7 +162,7 @@ return $cron($request);                                      // a Symfony (or La
 $psr = new Cronwatch\Web\PsrJobHandler($cron, $f, $f);       // PSR-15, with a PSR-17 factory
 ```
 
-The caller must send `Authorization: Bearer <secret>`: the handler's `secret:`, else the client's `cronSecret` (`CRON_SECRET` by default). With no secret at all it answers 503 outside development; `secret: false` lets anyone run the job. Each request is a recorded run, answered with `{"ok","job","run","status","durationMs"}` and 200 or 500. A function that returns a response is answered with it, and a status of 400 or more fails the run, from any job: a PSR-7 response, Symfony's or Laravel's, Laravel's HTTP client response, a `Cronwatch\Web\Response`, or an array such as `['status' => 503, 'body' => 'down']`.
+The caller must send `Authorization: Bearer <secret>`: the handler's `secret:`, else the client's `cronSecret` (`CRON_SECRET` by default). With no secret at all it answers 503 outside development; `secret: null` lets anyone run the job (`false`, deprecated, does the same; in 0.x `null` meant the client's secret). Each request is a recorded run, answered with `{"ok","job","run","status","durationMs"}` and 200 or 500. A function that returns a response is answered with it, and a status of 400 or more fails the run, from any job: a PSR-7 response, Symfony's or Laravel's, Laravel's HTTP client response, a `Cronwatch\Web\Response`, or an array such as `['status' => 503, 'body' => 'down']`.
 
 ### Laravel
 

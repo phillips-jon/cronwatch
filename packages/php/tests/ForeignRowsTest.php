@@ -65,7 +65,7 @@ final class ForeignRowsTest extends TestCase
             $capture = new Custom('capture', function (Alert $alert) use (&$sent): void {
                 $sent[] = $alert;
             });
-            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: false, onError: function (\Throwable $e): void {
+            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: null, onError: function (\Throwable $e): void {
                 throw $e;
             });
             $cw->check();
@@ -108,7 +108,7 @@ final class ForeignRowsTest extends TestCase
             $capture = new Custom('capture', function (Alert $alert) use (&$sent): void {
                 $sent[] = $alert->type;
             });
-            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: false, onError: function (\Throwable $e): void {
+            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: null, onError: function (\Throwable $e): void {
                 throw $e;
             });
             $read = $store->getState('odd');
@@ -170,7 +170,7 @@ final class ForeignRowsTest extends TestCase
             $capture = new Custom('capture', function (Alert $alert) use (&$sent): void {
                 $sent[] = $alert;
             });
-            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: false, onError: function (\Throwable $e, string $context) use (&$errors): void {
+            $cw = new Cronwatch(store: $store, alerts: [$capture], cronSecret: null, onError: function (\Throwable $e, string $context) use (&$errors): void {
                 $errors[] = "{$context}: {$e->getMessage()}";
             });
             $cw->check();

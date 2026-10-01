@@ -98,7 +98,7 @@ final class FinishOnceTest extends TestCase
 
     private static function client(Backend $backend): Cronwatch
     {
-        return new Cronwatch(store: $backend->open(), now: fn () => Clock::T0, alerts: [], cronSecret: false);
+        return new Cronwatch(store: $backend->open(), now: fn () => Clock::T0, alerts: [], cronSecret: null);
     }
 
     #[DataProvider('backends')]

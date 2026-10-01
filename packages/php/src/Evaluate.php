@@ -9,6 +9,8 @@ namespace Cronwatch;
  * current state and returns the new state plus the alerts that should go
  * out. Nothing here touches a store or a network, which is what makes it
  * testable.
+ *
+ * @internal
  */
 final class Evaluate
 {
@@ -105,17 +107,13 @@ final class Evaluate
         if ($state === null) {
             return self::emptyState($job);
         }
-        return new JobState(
-            $state->job,
-            $state->open,
-            self::failureCount($state),
-            $state->silencedUntil,
-            $state->lastAlertAt,
-            $state->pendingRecovery ?? [],
-            $state->undelivered ?? [],
-            $state->version,
-            $state->sending === null || $state->sending === [] ? null : array_values($state->sending),
-        );
+        // A copy, so the fields this release does not know come along.
+        $next = clone $state;
+        $next->consecutiveFailures = self::failureCount($state);
+        $next->pendingRecovery = $state->pendingRecovery ?? [];
+        $next->undelivered = $state->undelivered ?? [];
+        $next->sending = $state->sending === null || $state->sending === [] ? null : array_values($state->sending);
+        return $next;
     }
 
     // ------------------------------------------------------------ delivery

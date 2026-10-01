@@ -10,6 +10,8 @@ namespace Cronwatch;
  * lastRunAt}, failed and stuck {consecutiveFailures, threshold}, slow
  * {durationMs, thresholdMs, basis}, over_budget {breaches: [{metric, value,
  * limit, basis}]}, recovered {after, reason?, since?}.
+ *
+ * @internal
  */
 final class AlertDraft
 {

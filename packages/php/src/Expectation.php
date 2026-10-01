@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Cronwatch;
 
-/** When the next run the schedule asks for is due, and when it counts as missed. */
+/**
+ * When the next run the schedule asks for is due, and when it counts as missed.
+ *
+ * @internal
+ */
 final class Expectation
 {
     public function __construct(

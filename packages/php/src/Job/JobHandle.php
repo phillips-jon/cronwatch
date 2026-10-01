@@ -14,7 +14,7 @@ use Cronwatch\JobDefinition;
  *         $job->log('Report written');
  *     });
  *
- *     $task = $nightly->wrap($callable);           // a callable whose every call is a run
+ *     $task = $nightly->monitor($callable);        // a callable whose every call is a run
  */
 final class JobHandle
 {
@@ -46,11 +46,22 @@ final class JobHandle
     /**
      * A callable that runs `$fn` as a recorded run each time it is called,
      * with the arguments it is called with. Inside it, Cronwatch::current()
-     * is the run's context, for log() and metric().
+     * is the run's context, for log() and metric(). The Python package's
+     * decorator has the same name.
+     */
+    public function monitor(callable $fn, string $trigger = 'run'): \Closure
+    {
+        return fn (mixed ...$args) => $this->client->execute($this->definition, $trigger, fn () => $fn(...$args));
+    }
+
+    /**
+     * The same as monitor().
+     *
+     * @deprecated since 1.0, removed in 2.0: use monitor(), which is the same.
      */
     public function wrap(callable $fn, string $trigger = 'run'): \Closure
     {
-        return fn (mixed ...$args) => $this->client->execute($this->definition, $trigger, fn () => $fn(...$args));
+        return $this->monitor($fn, $trigger);
     }
 
     /**
@@ -58,13 +69,14 @@ final class JobHandle
      * function is called as fn(JobContext $job, $request) for each request
      * carrying `Authorization: Bearer <secret>`, as a recorded run with the
      * trigger "handler", and the request is answered with how it went. The
-     * secret defaults to the client's cronSecret (CRON_SECRET); false lets
-     * anyone run the job. See Handler for its answers and its adapters
+     * secret defaults to the client's cronSecret (CRON_SECRET); null lets
+     * anyone run the job (false does the same, deprecated since 1.0 and
+     * removed in 2.0; in 0.x null meant the client's secret). See Handler for its answers and its adapters
      * (serve() for a bare script, laravel(), a Symfony controller, PSR-15).
      *
      * @param callable(JobContext, mixed): mixed $fn
      */
-    public function handler(callable $fn, string|false|null $secret = null): Handler
+    public function handler(callable $fn, string|false|null $secret = ''): Handler
     {
         return new Handler($this->client, $this->definition, $fn, $secret);
     }

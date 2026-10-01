@@ -6,6 +6,7 @@ namespace Cronwatch\Tests;
 
 use Cronwatch\Cronwatch;
 use Cronwatch\Env;
+use Cronwatch\FromEnv;
 use Cronwatch\Job\Handler;
 use Cronwatch\Job\JobContext;
 use Cronwatch\Tests\Support\Clients;
@@ -129,23 +130,26 @@ final class HandlerTest extends TestCase
         $handler->respond(self::get());
         $this->assertSame(0, $ran);
         $this->assertSame(['handler'], $this->wheres(), 'reported once');
-        $this->assertSame(['handler() refused a request because no CRON_SECRET is set; pass secret: false to allow unauthenticated requests'], $this->messages());
+        $this->assertSame(['handler() refused a request because no CRON_SECRET is set; pass secret: null to allow unauthenticated requests'], $this->messages());
 
-        // Opting out with false runs the job, and does not show the error to the caller.
-        $open = $cw->job('open')->handler(fn () => throw new \RuntimeException('private detail'), secret: false);
-        $failed = $open->respond(self::get());
-        $this->assertSame(500, $failed->status);
-        $this->assertArrayNotHasKey('error', self::body($failed));
+        // Opting out with null runs the job, and does not show the error to the caller; false, deprecated, does the same.
+        foreach ([null, false] as $off) {
+            $open = $cw->job('open')->handler(fn () => throw new \RuntimeException('private detail'), secret: $off);
+            $failed = $open->respond(self::get());
+            $this->assertSame(500, $failed->status);
+            $this->assertArrayNotHasKey('error', self::body($failed));
+        }
 
         putenv('CRONWATCH_ENV=development');
         $this->assertSame(200, $handler->respond(self::get())->status);
         $this->assertSame(1, $ran);
     }
 
-    public function testTheClientSecretIsUsedUnlessTheHandlerHasItsOwnAndFalseOptsOutForEveryHandler(): void
+    public function testTheClientSecretIsUsedUnlessTheHandlerHasItsOwnAndNullOptsOutForEveryHandler(): void
     {
         putenv('CRON_SECRET=from-env');
-        $cw = $this->make(['cronSecret' => null]);
+        $cw = $this->make(['cronSecret' => FromEnv::Read]);
+        $this->assertSame('from-env', (new Cronwatch(alerts: []))->cronSecret, 'the default reads CRON_SECRET');
         $job = $cw->job('j');
         $this->assertSame(200, $job->handler(fn () => null)->respond(self::get(['authorization' => 'Bearer from-env']))->status);
         $own = $job->handler(fn () => null, secret: 'mine');
@@ -154,12 +158,16 @@ final class HandlerTest extends TestCase
         $this->assertSame(200, $own->respond(self::get(['authorization' => 'Bearer mine']))->status);
         $this->assertSame('from-env', $job->handler(fn () => null, secret: '')->secret, '"" counts as unset');
 
-        $opted = $this->make(['cronSecret' => false]);
-        $handler = $opted->job('j')->handler(fn () => null);
-        $this->assertNull($handler->secret);
-        $this->assertSame(200, $handler->respond(self::get())->status);
-        $this->assertSame(200, $opted->job('k')->handler(fn () => null, secret: '')->respond(self::get())->status);
-        $this->assertSame(401, $opted->job('m')->handler(fn () => null, secret: 'own')->respond(self::get())->status, 'its own secret still counts');
+        // null turns the secret off, and never reads CRON_SECRET; false, deprecated, does the same.
+        foreach ([null, false] as $off) {
+            $opted = $this->make(['cronSecret' => $off]);
+            $this->assertNull($opted->cronSecret);
+            $handler = $opted->job('j')->handler(fn () => null);
+            $this->assertNull($handler->secret);
+            $this->assertSame(200, $handler->respond(self::get())->status);
+            $this->assertSame(200, $opted->job('k')->handler(fn () => null, secret: '')->respond(self::get())->status);
+            $this->assertSame(401, $opted->job('m')->handler(fn () => null, secret: 'own')->respond(self::get())->status, 'its own secret still counts');
+        }
     }
 
     public function testTheBearerIsReadFromEveryKindOfRequest(): void

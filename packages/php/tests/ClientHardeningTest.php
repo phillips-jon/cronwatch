@@ -180,7 +180,7 @@ final class ClientHardeningTest extends TestCase
         $unused = new Capture();
         $triaged = 0;
         // The recording process: no network, so it sends nothing itself.
-        $recorder = new Cronwatch(store: $store, now: $clock, alerts: [$unused], deliver: 'check', triage: fn () => 'never asked', cronSecret: false);
+        $recorder = new Cronwatch(store: $store, now: $clock, alerts: [$unused], deliver: 'check', triage: fn () => 'never asked', cronSecret: null);
         $job = $recorder->job('backup', ['schedule' => '40 3 * * *', 'timezone' => 'UTC']);
         $this->failing(fn () => $job->run(self::thrower('disk full')));
         $this->assertSame([], $unused->types(), 'nothing sent from the recording process');
@@ -194,7 +194,7 @@ final class ClientHardeningTest extends TestCase
         $server = new Cronwatch(store: $store, now: $clock, alerts: [$sent], triage: function () use (&$triaged): string {
             $triaged++;
             return 'The disk is full.';
-        }, cronSecret: false);
+        }, cronSecret: null);
         $clock->advance(self::MIN);
         $result = $server->check();
         $this->assertSame(['failed'], array_map(fn (Alert $a) => $a->type, $result->alerts));
@@ -337,7 +337,7 @@ final class ClientHardeningTest extends TestCase
     /** A job's failure queued by a deliver: "check" process, so a check elsewhere must triage and send it. */
     private function queued(Store $store, Clock $clock, string $name = 'backup'): Cronwatch
     {
-        $recorder = new Cronwatch(store: $store, now: $clock, deliver: 'check', cronSecret: false);
+        $recorder = new Cronwatch(store: $store, now: $clock, deliver: 'check', cronSecret: null);
         $this->failing(fn () => $recorder->run($name, self::thrower('disk full')));
         return $recorder;
     }
@@ -359,7 +359,7 @@ final class ClientHardeningTest extends TestCase
         $server = new Cronwatch(store: $store, now: $clock, alerts: [$channel], triage: function () use (&$asked): string {
             $asked++;
             return 'The disk is full.';
-        }, cronSecret: false, onError: fn () => null);
+        }, cronSecret: null, onError: fn () => null);
         $server->check();
         $this->assertSame(1, $asked);
         $this->assertSame('The disk is full.', $store->getState('backup')->undelivered[0]->triage, 'the stored copy has it');
@@ -383,7 +383,7 @@ final class ClientHardeningTest extends TestCase
             $server = new Cronwatch(
                 store: $store,
                 now: $clock,
-                cronSecret: false,
+                cronSecret: null,
                 onError: fn () => null,
                 alerts: [new Custom('down', function (): never {
                     throw new \RuntimeException('down');
@@ -418,7 +418,7 @@ final class ClientHardeningTest extends TestCase
             $tried[] = $a->job;
             $wall += 12_000;
             throw new \RuntimeException('timed out');
-        })], cronSecret: false, onError: fn () => null);
+        })], cronSecret: null, onError: fn () => null);
         (new \ReflectionProperty(Cronwatch::class, 'wall'))->setValue($server, function () use (&$wall): int {
             return $wall;
         });

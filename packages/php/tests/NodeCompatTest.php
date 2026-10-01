@@ -161,7 +161,7 @@ final class NodeCompatTest extends TestCase
         $store = new SqliteStore($file, prefix: 'cw_');
         // A PHP client finishes a run of a job Node wrote, and checks every job.
         $clock = new Clock(1_767_606_100_000);
-        $client = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: false);
+        $client = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: null);
         $client->job('every-5', ['schedule' => 'every 5m', 'timeout' => '2m', 'maxDuration' => '90s'])->run(fn ($ctx) => $ctx->log('from php'));
         $clock->advance(10 * Clock::MIN);
         $result = $client->check();

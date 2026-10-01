@@ -21,7 +21,7 @@ final class Cron
             // Croner reads a string with a colon after its first character as a
             // one-time date to fire at, not as a cron expression.
             if (preg_match('/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/', $text) === 1) {
-                throw new CronError('CronPattern: a one-time date is not supported by the PHP port');
+                throw new CronError('CronPattern: a one-time date is not supported');
             }
             throw new CronError('Invalid ISO8601 passed to timezone parser.');
         }

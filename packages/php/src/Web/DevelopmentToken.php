@@ -11,6 +11,8 @@ namespace Cronwatch\Web;
  * configured reaches it; a host that always gives the dashboard a token, or
  * false, never does, so it may leave this file out (the WordPress plugin's
  * zip does).
+ *
+ * @internal
  */
 final class DevelopmentToken
 {

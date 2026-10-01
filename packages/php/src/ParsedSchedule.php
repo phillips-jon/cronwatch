@@ -6,7 +6,11 @@ namespace Cronwatch;
 
 use Cronwatch\Cron\Cron;
 
-/** A schedule as Schedule::parse() reads it: a cron expression, or an interval. */
+/**
+ * A schedule as Schedule::parse() reads it: a cron expression, or an interval.
+ *
+ * @internal
+ */
 final class ParsedSchedule
 {
     public const CRON = 'cron';

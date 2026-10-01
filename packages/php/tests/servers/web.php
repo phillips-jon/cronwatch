@@ -34,7 +34,7 @@ $clock = function () use (&$now): int {
 $channel = new Custom('test', function (Alert $alert): void {
     file_put_contents('php://stderr', "alert {$alert->job} {$alert->type}\n");
 });
-$cw = new Cronwatch(store: new SqliteStore($db), alerts: [$channel], cronSecret: false, now: $clock);
+$cw = new Cronwatch(store: new SqliteStore($db), alerts: [$channel], cronSecret: null, now: $clock);
 if (!$seeded) {
     // Declared only while seeding: a job declared on every request would come back after the MCP test forgets it.
     $nightly = $cw->job('nightly', ['schedule' => '0 2 * * *', 'timezone' => 'UTC', 'grace' => '15m']);

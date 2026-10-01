@@ -134,6 +134,24 @@ final class ChannelConformanceTest extends TestCase
         });
     }
 
+    /** The webhook's body byte for byte, "schema": 1 first, and its signature, for every sample alert. */
+    public function testWebhookPayloadsAndSignatures(): void
+    {
+        $this->eachCase(self::fixture()->webhookPayloads, function (\stdClass $c): ?string {
+            $http = new FakeHttp();
+            (new Alerts\Webhook('https://hooks.example.com/cronwatch', secret: $c->secret, http: $http))->send(self::alert($c->alert), self::context());
+            $request = $http->requests[count($http->requests) - 1];
+            return self::differs([$c->body, $c->signature, $c->signature], [$request['body'], $request['headers']['x-cronwatch-signature'] ?? null, 'sha256=' . Alerts\Webhook::signature($c->secret, $c->body)]);
+        });
+    }
+
+    public function testTheSignatureHelper(): void
+    {
+        $this->assertSame('f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8', Alerts\Webhook::signature('key', 'The quick brown fox jumps over the lazy dog'));
+        // The deprecated name answers the same.
+        $this->assertSame(Alerts\Webhook::signature('key', 'body'), Alerts\Webhook::hmacSha256Hex('key', 'body'));
+    }
+
     public function testSlackDiscordAndWebhookFailures(): void
     {
         $this->eachCase(self::fixture()->failures, function (\stdClass $c): ?string {

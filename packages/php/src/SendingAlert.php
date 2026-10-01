@@ -10,6 +10,8 @@ namespace Cronwatch;
  * Evaluate::releaseSending() treats an entry: one whose `until` is not a
  * number counts as run out, and one without an alert object is dropped when
  * it is released, so a malformed entry never makes the state unreadable.
+ *
+ * @internal
  */
 final class SendingAlert
 {

@@ -142,8 +142,8 @@ final class StartFinishTest extends TestCase
             $onError = function (\Throwable $e) use (&$errors): void {
                 $errors[] = $e->getMessage();
             };
-            $first = new Cronwatch(store: $backend->open(), now: $clock, alerts: [$alerts], cronSecret: false, onError: $onError);
-            $second = new Cronwatch(store: $backend->open(), now: $clock, alerts: [$alerts], cronSecret: false, onError: $onError);
+            $first = new Cronwatch(store: $backend->open(), now: $clock, alerts: [$alerts], cronSecret: null, onError: $onError);
+            $second = new Cronwatch(store: $backend->open(), now: $clock, alerts: [$alerts], cronSecret: null, onError: $onError);
             $options = ['expect' => 'sent', 'budget' => ['emails' => 100]];
             $started = $first->job('digest', $options)->start(id: 'evt-1');
             $started->log('loaded 40 recipients');

@@ -15,7 +15,7 @@ use Cronwatch\Store\SqliteStore;
 require __DIR__ . '/../bootstrap.php';
 
 [, $mode, $file] = $argv;
-$cw = new Cronwatch(store: new SqliteStore($file), alerts: [], cronSecret: false);
+$cw = new Cronwatch(store: new SqliteStore($file), alerts: [], cronSecret: null);
 $cw->job('nightly')->run(function ($job) use ($mode): void {
     $job->log('started');
     if ($mode === 'exit') {

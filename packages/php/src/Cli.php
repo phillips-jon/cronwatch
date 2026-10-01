@@ -17,6 +17,8 @@ namespace Cronwatch;
  * Composer autoloader is loaded first, so the file can use the app's
  * classes. The check prints the line every port's check command prints and
  * exits 0, or prints what went wrong to standard error and exits 1.
+ *
+ * @internal
  */
 final class Cli
 {

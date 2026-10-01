@@ -34,7 +34,11 @@ final class Alert
         }
     }
 
-    /** Records a triage attempt: the diagnosis, or null when there was none. */
+    /**
+     * Records a triage attempt: the diagnosis, or null when there was none.
+     *
+     * @internal Called by the client when triage has run.
+     */
     public function setTriage(?string $diagnosis): void
     {
         $this->triage = $diagnosis;
@@ -73,7 +77,11 @@ final class Alert
         return is_scalar($value) ? (string) $value : '';
     }
 
-    /** An alert's details as JSON: an object, even when empty. */
+    /**
+     * An alert's details as JSON: an object, even when empty.
+     *
+     * @internal
+     */
     public static function detailsJson(array $details): \stdClass
     {
         return Js::obj($details);
