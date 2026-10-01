@@ -14,6 +14,11 @@ namespace Cronwatch;
  */
 final class Alert
 {
+    private const KNOWN = ['type', 'run', 'details', 'job', 'definition', 'title', 'message', 'at', 'triage'];
+
+    /** @var array<string, mixed> the stored fields this release does not know, as decoded JSON */
+    private array $extra = [];
+
     /** @param array<string, mixed> $details see AlertDraft */
     public function __construct(
         public string $type,
@@ -54,12 +59,15 @@ final class Alert
         // of the wrong kind reads as absent rather than making the state unreadable.
         $f = Js::fields($data);
         $run = $f['run'] ?? null;
-        $details = Js::plain($f['details'] ?? []);
+        // The details' own values stay as decoded, so an empty object in them
+        // is written back as one.
+        $details = $f['details'] ?? [];
+        $details = $details instanceof \stdClass || is_array($details) ? Js::fields($details) : [];
         $definition = $f['definition'] ?? null;
         $alert = new self(
             type: self::text($f['type'] ?? null),
             run: $run instanceof \stdClass || $run instanceof Run || (is_array($run) && $run !== []) ? Run::fromJson($run) : null,
-            details: is_array($details) ? $details : [],
+            details: $details,
             job: self::text($f['job'] ?? null),
             definition: JobDefinition::fromJson($definition instanceof \stdClass || $definition instanceof JobDefinition || is_array($definition) ? $definition : []),
             title: self::text($f['title'] ?? null),
@@ -69,6 +77,9 @@ final class Alert
         if (array_key_exists('triage', $f)) {
             $alert->setTriage(is_string($f['triage']) ? $f['triage'] : null);
         }
+        // Fields a newer release added are kept, so the queue keeps them and
+        // a retry sends them, as the SDK carries a queued alert as it was stored.
+        $alert->extra = array_diff_key($f, array_flip(self::KNOWN));
         return $alert;
     }
 
@@ -101,6 +112,9 @@ final class Alert
         ];
         if ($this->triageTried) {
             $out['triage'] = $this->triage;
+        }
+        foreach ($this->extra as $key => $value) {
+            $out[$key] = $value;
         }
         return $out;
     }
