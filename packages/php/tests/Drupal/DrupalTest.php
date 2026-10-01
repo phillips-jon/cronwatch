@@ -833,6 +833,16 @@ final class DrupalTest extends TestCase
         [$status] = self::http('GET', '/cronwatch/api/jobs', null, ['Authorization' => 'Bearer wrong']);
         $this->assertSame(401, $status);
 
+        // GET /api names the library: the dashboard answers it, not the site's 404 page.
+        foreach (['/cronwatch/api', '/cronwatch/api/'] as $path) {
+            [$status, $headers, $body] = self::http('GET', $path, null, ['Authorization' => "Bearer {$token}"]);
+            $this->assertStringStartsWith('application/json', $headers['content-type'], "{$path}: {$body}");
+            $this->assertContains($status, [200, 404], $body);
+            $this->assertSame($status === 200 ? ['ok' => true, 'library' => 'cronwatch/cronwatch', 'language' => 'php', 'version' => \Cronwatch\Cronwatch::VERSION, 'api' => 1] : ['ok' => false, 'error' => 'Not found'], json_decode($body, true));
+        }
+        [$status] = self::http('GET', '/cronwatch/api');
+        $this->assertSame(401, $status);
+
         // A check is prepared (every job declared) only for a caller with the token.
         $declared = fn (): int => (int) self::inDrupal("echo json_encode(\\Drupal::state()->get('cwt.declared', 0));");
         $before = $declared();

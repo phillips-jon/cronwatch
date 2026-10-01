@@ -67,7 +67,9 @@ final class Plugin extends BasePlugin
             $event->rules['cronwatch/view'] = 'cronwatch/dashboard/view';
         });
         Event::on(UrlManager::class, UrlManager::EVENT_REGISTER_SITE_URL_RULES, function (RegisterUrlRulesEvent $event): void {
-            // The JSON API for @cronwatch/mcp: 404 until a token is set.
+            // The JSON API for @cronwatch/mcp: 404 until a token is set. GET
+            // /cronwatch/api itself (the library and its version) has no path after it.
+            $event->rules['cronwatch/api'] = 'cronwatch/api/index';
             $event->rules['cronwatch/api/<path:.*>'] = 'cronwatch/api/index';
         });
         Event::on(UserPermissions::class, UserPermissions::EVENT_REGISTER_PERMISSIONS, function (RegisterUserPermissionsEvent $event): void {

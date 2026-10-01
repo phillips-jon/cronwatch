@@ -832,6 +832,13 @@ final class WordPressTest extends TestCase
         $this->assertStringNotContainsString('\/', $body, 'the library\'s JSON, not the REST server\'s (which escapes slashes)');
         [$status, , $body] = self::http('GET', $api);
         $this->assertSame([401, '{"ok":false,"error":"Unauthorized"}'], [$status, $body]);
+        // GET /api names the library: the dashboard answers it.
+        foreach (['/?rest_route=/cronwatch/v1/api', '/?rest_route=/cronwatch/v1/api/'] as $path) {
+            [$status, $headers, $body] = self::http('GET', $path, ['Authorization' => "Bearer {$secret}"]);
+            $this->assertSame('application/json; charset=utf-8', $headers['content-type'], "{$path}: {$body}");
+            $this->assertContains($status, [200, 404], $body);
+            $this->assertSame($status === 200 ? ['ok' => true, 'library' => 'cronwatch/cronwatch', 'language' => 'php', 'version' => \Cronwatch\Cronwatch::VERSION, 'api' => 1] : ['ok' => false, 'error' => 'Not found'], json_decode($body, true));
+        }
         [$status, $headers, $body] = self::http('GET', $api, ['Authorization' => 'Bearer wrong']);
         $this->assertSame([401, '{"ok":false,"error":"Unauthorized"}', 'application/json; charset=utf-8'], [$status, $body, $headers['content-type']], 'the permission callback refuses it, with the dashboard\'s own body');
         [$status, , $body] = self::http('POST', '/?rest_route=/cronwatch/v1/api/check', ['Authorization' => 'Bearer ' . substr($secret, 0, -1)]);
