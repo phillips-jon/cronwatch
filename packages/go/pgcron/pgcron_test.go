@@ -158,7 +158,7 @@ func TestConformancePgCron(t *testing.T) {
 	count := 0
 	for _, c := range get(f, "schedules").([]any) {
 		o := c.(*js.Object)
-		got, ok := pgcron.Schedule(get(o, "schedule").(string))
+		got, ok := pgcron.ScheduleOf(get(o, "schedule").(string))
 		var result any = got
 		if !ok {
 			result = nil
@@ -173,7 +173,7 @@ func TestConformancePgCron(t *testing.T) {
 		if n, ok := get(j, "jobname").(string); ok {
 			job.JobName = &n
 		}
-		same(t, "name of "+js.Stringify(j), pgcron.JobName(job), get(o, "name").(string))
+		same(t, "name of "+js.Stringify(j), pgcron.DefaultJobName(job), get(o, "name").(string))
 		count++
 	}
 	for _, c := range get(f, "runs").([]any) {
@@ -198,13 +198,13 @@ func TestConformancePgCron(t *testing.T) {
 			fallback = int64(n)
 		}
 		var got any
-		if run := pgcron.RunOf(row, "db:j", "pgcron:db:", fallback); run != nil {
-			got = run.JSValue()
+		if run := pgcron.RunOfRow(row, "db:j", "pgcron:db:", fallback); run != nil {
+			got = js.ValueOf(run)
 		}
 		same(t, "run of "+js.Stringify(r), js.Stringify(got), js.Stringify(get(o, "run")))
 		count++
 	}
-	same(t, "holdMs", float64(pgcron.Hold.Milliseconds()), get(f, "holdMs").(float64))
+	same(t, "holdMs", float64(pgcron.HoldFor.Milliseconds()), get(f, "holdMs").(float64))
 	t.Logf("%d cases replayed", count+1)
 }
 
@@ -307,7 +307,7 @@ func TestJobsAreDeclaredHistoryIsCopiedQuietlyAndImportsAreIdempotent(t *testing
 		t.Fatalf("closed %v", closed)
 	}
 	same(t, "title", closed[0].Title, "db:nightly-vacuum is no longer scheduled")
-	details, _ := closed[0].JSValue().(*js.Object).Get("details")
+	details, _ := js.ValueOf(closed[0]).(*js.Object).Get("details")
 	same(t, "details", js.Stringify(details), `{"after":["missed"],"reason":"unscheduled","since":`+js.FormatNumber(float64(utc(2026, 1, 6, 3, 11, 0)))+`}`)
 	for _, a := range k.check(t).Alerts {
 		if a.Job == "db:nightly-vacuum" {

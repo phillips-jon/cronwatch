@@ -74,7 +74,7 @@ A scheduler you already run is watched with one line, each integration a module 
 **robfig/cron v3** (`go get cronwatch.dev/go/robfigcron`): a `cron.Option`. A job is named after its function (`jobs.NightlyReport`) or type; name a closure, or give options, with `robfigcron.Named`. `watcher.Func` makes a job that gets the run's context and logs.
 
 ```go
-c := cron.New(robfigcron.Watch(cw, robfigcron.Options{Chain: []cron.JobWrapper{cron.Recover(logger)}}))
+c := cron.New(robfigcron.New(cw, robfigcron.Options{Chain: []cron.JobWrapper{cron.Recover(logger)}}).Option())
 c.AddFunc("0 2 * * *", jobs.NightlyReport)
 c.AddJob("*/15 * * * *", robfigcron.Named("sync-invoices", syncJob, cronwatch.Grace("5m")))
 ```
@@ -82,7 +82,7 @@ c.AddJob("*/15 * * * *", robfigcron.Named("sync-invoices", syncJob, cronwatch.Gr
 **gocron v2** (`go get cronwatch.dev/go/gocron`, gocron 2.21 or newer): its event listeners, as a scheduler option. Cron, duration, and daily, weekly and monthly jobs are read as schedules; a job is named by `gocron.WithName`, else its function.
 
 ```go
-s, err := gocron.NewScheduler(cwgocron.Watch(cw, cwgocron.Options{}))
+s, err := gocron.NewScheduler(cwgocron.New(cw, cwgocron.Options{}).Option())
 s.NewJob(gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(2, 0, 0))), gocron.NewTask(jobs.NightlyReport))
 ```
 
@@ -152,7 +152,7 @@ cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(pgcro
 if err != nil {
 	log.Fatal(err)
 }
-cw.Start(time.Minute)
+cw.StartChecking(time.Minute)
 ```
 
 ## Dashboard
@@ -183,7 +183,7 @@ The answer is `{"ok","job","run","status","durationMs"}`, 200 or 500 (a panic in
 
 ## Checks
 
-Missed and stuck runs are found by a check. A long-running service (a server, a worker, a process running a scheduler) calls `cw.Start(time.Minute)`, a goroutine that checks every minute until `cw.Stop` or `cw.Close`; one process is enough, and more are harmless. A program run from a crontab checks from a second crontab line, on a store both reach ([`examples/crontab`](examples/crontab/main.go) is one):
+Missed and stuck runs are found by a check. A long-running service (a server, a worker, a process running a scheduler) calls `cw.StartChecking(time.Minute)`, a goroutine that checks every minute until `cw.Stop` or `cw.Close`; one process is enough, and more are harmless. A program run from a crontab checks from a second crontab line, on a store both reach ([`examples/crontab`](examples/crontab/main.go) is one):
 
 ```
 # m  h  dom mon dow  command
@@ -202,6 +202,24 @@ h, err = nightly.Resume(ctx, deliveryID)
 h.Log("done")
 h.Finish(ctx) // or h.Fail(ctx, err); a run is judged once, however many processes finish it
 ```
+
+## Deprecated
+
+Each still works and is marked `Deprecated:` in its doc comment:
+
+| Deprecated | Use instead | Goes in |
+|---|---|---|
+| `cw.Start(every)` | `cw.StartChecking(every)`: a job's `Start` opens a run, so the client's is named for what it starts | 2.0 |
+| `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 1.0 |
+| `cwgocron.Converted` | `robfigcron.Converted`, the same type, which every integration's `Convert` returns | 1.0 |
+| `cwgocron.Panic` | `cwgocron.PanicError`, the same type | 1.0 |
+| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics` and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |
+| `cronwatch.Stderr`, `cronwatch.Stdout` | `WithErrorHandler`, and a channel of your own in place of `Console` | 1.0 |
+| `cronwatch.MaxBody`, `cronwatch.ReservedRunIDPrefix` | nothing: the 1 MiB limit and the `pgcron:` prefix are documented and do not change | 1.0 |
+| `pgcron.Hold`, `pgcron.Schedule`, `pgcron.JobName`, `pgcron.RunOf` | nothing: they are the source's internals | 1.0 |
+| `triage.System` | nothing: the prompt is not part of the promise | 1.0 |
+
+`cronwatch.dev/go/bridge`, what the scheduler integrations share, is outside the 1.x promise: it may change in any minor release.
 
 ## Testing
 

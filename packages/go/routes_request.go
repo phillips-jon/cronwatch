@@ -18,12 +18,19 @@ import (
 	"cronwatch.dev/go/internal/js"
 )
 
-// MaxBody is the most of a request body the dashboard reads: its forms and
+// maxBody is the most of a request body the dashboard reads: its forms and
 // JSON are a few bytes. A body past it is answered 413; the SDK leaves this
 // to the server in front of it.
-const MaxBody = 1 << 20
+const maxBody = 1 << 20
 
-// errBodyTooLarge is a request body over MaxBody.
+// MaxBody is the most of a request body the dashboard reads (1 MiB); a body
+// past it is answered 413.
+//
+// Deprecated: MaxBody is internal, and goes in 1.0. The limit is documented
+// on the dashboard's page and does not change.
+const MaxBody = maxBody
+
+// errBodyTooLarge is a request body over maxBody.
 var errBodyTooLarge = errors.New("the request body is larger than 1048576 bytes")
 
 // header is a request header as fetch's Headers.get gives it: every value
@@ -211,7 +218,7 @@ func param(pairs []formPair, name string) (string, bool) {
 	return "", false
 }
 
-// readLimited reads a body up to MaxBody, or errBodyTooLarge past it (by
+// readLimited reads a body up to maxBody, or errBodyTooLarge past it (by
 // its Content-Length, or once more than that has arrived). A body that
 // could not be read to its end (the client went away, a read deadline) is
 // none, as the SDK's readBody has it, never the part that arrived:
@@ -220,11 +227,11 @@ func readLimited(r *http.Request) ([]byte, error) {
 	if r.Body == nil || r.Body == http.NoBody {
 		return nil, nil
 	}
-	if r.ContentLength > MaxBody {
+	if r.ContentLength > maxBody {
 		return nil, errBodyTooLarge
 	}
-	data, err := io.ReadAll(io.LimitReader(r.Body, MaxBody+1))
-	if len(data) > MaxBody {
+	data, err := io.ReadAll(io.LimitReader(r.Body, maxBody+1))
+	if len(data) > maxBody {
 		return nil, errBodyTooLarge
 	}
 	if err != nil {

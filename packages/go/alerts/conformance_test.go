@@ -296,6 +296,39 @@ func TestConformanceChannels(t *testing.T) {
 		}
 	})
 
+	// The webhook's body in full for every alert, "schema":1 first, and its
+	// signature.
+	t.Run("webhookPayloads", func(t *testing.T) {
+		cases := objects(field(f, "webhookPayloads"))
+		if len(cases) == 0 {
+			t.Fatal("channels.json has no webhookPayloads")
+		}
+		for _, c := range cases {
+			ch, err := Webhook(WebhookOptions{URL: "https://hooks.example.com/x", Secret: text(c, "secret"), HTTPClient: client})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec.reset(200, "")
+			what := "webhook " + text(c, "alert")
+			if err := ch.Send(bg, alerts[text(c, "alert")], cronwatch.ChannelContext{}); err != nil {
+				t.Fatalf("%s: %v", what, err)
+			}
+			got := rec.taken()
+			if len(got) != 1 {
+				t.Fatalf("%s: %d requests", what, len(got))
+			}
+			if got[0].body != text(c, "body") {
+				t.Errorf("%s: body\n got %s\nwant %s", what, got[0].body, text(c, "body"))
+			}
+			if sig := got[0].header.Get("X-Cronwatch-Signature"); sig != text(c, "signature") {
+				t.Errorf("%s: signature %q, want %q", what, sig, text(c, "signature"))
+			}
+			if sig := "sha256=" + Signature(text(c, "secret"), text(c, "body")); sig != text(c, "signature") {
+				t.Errorf("%s: Signature gives %q, want %q", what, sig, text(c, "signature"))
+			}
+		}
+	})
+
 	t.Run("providerSends", func(t *testing.T) {
 		for _, c := range objects(field(f, "providerSends")) {
 			o, _ := field(c, "options").(*js.Object)
@@ -462,4 +495,12 @@ func TestConformanceChannels(t *testing.T) {
 		}
 	})
 	t.Logf("%d cases replayed", count)
+}
+
+// The HMAC-SHA256 test vector every port checks its signature helper with.
+func TestSignatureKnownVector(t *testing.T) {
+	const want = "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+	if got := Signature("key", "The quick brown fox jumps over the lazy dog"); got != want {
+		t.Errorf("Signature: %s, want %s", got, want)
+	}
 }

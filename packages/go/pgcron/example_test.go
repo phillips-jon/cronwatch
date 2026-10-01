@@ -25,6 +25,6 @@ func ExampleNew() {
 	if err != nil {
 		panic(err)
 	}
-	cw.Start(time.Minute)
+	cw.StartChecking(time.Minute)
 	defer cw.Close()
 }

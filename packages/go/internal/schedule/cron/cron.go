@@ -22,7 +22,7 @@ func New(text string, loc *time.Location) (*Cron, error) {
 		// Croner reads a string with a colon after its first character as a
 		// one-time date to fire at, not as a cron expression.
 		if isoDate.MatchString(text) {
-			return nil, fail("CronPattern: a one-time date is not supported by the Go port")
+			return nil, fail("CronPattern: a one-time date is not supported")
 		}
 		return nil, fail("Invalid ISO8601 passed to timezone parser.")
 	}

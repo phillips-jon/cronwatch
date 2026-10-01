@@ -8,16 +8,16 @@
 // src/Cron do, so the four agree on every expression they read, every one
 // they refuse and every fire time.
 //
-// Where it cannot match croner:
+// Where it departs from croner, as the SDK's parseSchedule does:
 //
 //   - A date no month has (0 0 30 2 *) makes croner, which walks by
-//     recursion a year at a time, run out of stack before the year 3000.
-//     This port walks in a loop and answers that the expression never
-//     fires.
+//     recursion a year at a time, give no fire or run out of stack. This
+//     port walks in a loop and answers that the expression never fires,
+//     which is what the SDK answers too.
 //   - Croner reads a string with a colon after its first character as a
 //     one-time date, through JavaScript's lenient Date.parse. This port
-//     refuses every such string: one that looks like an ISO date with
-//     "CronPattern: a one-time date is not supported by the Go port",
+//     refuses every such string, as the SDK does: one that looks like an
+//     ISO date with "CronPattern: a one-time date is not supported",
 //     anything else with the message croner gives for text Date.parse
 //     cannot read, "Invalid ISO8601 passed to timezone parser.".
 package cron

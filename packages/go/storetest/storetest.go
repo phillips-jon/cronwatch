@@ -508,7 +508,7 @@ func ReplayFixture(t *testing.T, path string, newStore func(t *testing.T) cronwa
 			if j == nil {
 				t.Fatalf("%s: no job", what)
 			}
-			got = json.RawMessage(js.Stringify(js.NewObject("name", j.Name, "definition", j.Definition.JSValue(), "createdAt", j.CreatedAt, "updatedAt", j.UpdatedAt)))
+			got = json.RawMessage(js.Stringify(js.NewObject("name", j.Name, "definition", js.ValueOf(j.Definition), "createdAt", j.CreatedAt, "updatedAt", j.UpdatedAt)))
 		case step.Has("insertRun"), step.Has("updateRun"), step.Has("updateRunIf"):
 			switch {
 			case step.Has("insertRun"):

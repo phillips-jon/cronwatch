@@ -15,8 +15,8 @@ go get cronwatch.dev/go/robfigcron   # or cronwatch.dev/go/gocron, /river, /asyn
 
 | Scheduler | Module | Oldest supported | What you add |
 |---|---|---|---|
-| [robfig/cron](#robfig-cron) v3 | `cronwatch.dev/go/robfigcron` | v3.0.1 | `robfigcron.Watch(cw, ...)` to `cron.New` |
-| [gocron](#gocron) v2 | `cronwatch.dev/go/gocron` | v2.21.0 | `cwgocron.Watch(cw, ...)` to `gocron.NewScheduler` |
+| [robfig/cron](#robfig-cron) v3 | `cronwatch.dev/go/robfigcron` | v3.0.1 | `robfigcron.New(cw, ...).Option()` to `cron.New` |
+| [gocron](#gocron) v2 | `cronwatch.dev/go/gocron` | v2.21.0 | `cwgocron.New(cw, ...).Option()` to `gocron.NewScheduler` |
 | [River](#river) | `cronwatch.dev/go/river` | v0.44.1 | `w.PeriodicJob` for `river.NewPeriodicJob`, and a worker middleware |
 | [Asynq](#asynq) | `cronwatch.dev/go/asynq` | v0.25.1 | `w.NewScheduler` for `asynq.NewScheduler`, and a server middleware |
 
@@ -26,7 +26,7 @@ A program that a crontab runs needs no integration: see [Run the check](/docs/go
 
 - **Entries become jobs.** Each of the scheduler's entries is a CronWatch job with the scheduler's own schedule, so a job that stops running is reported missed without you copying a cron expression anywhere. A schedule is converted only where it means exactly the same times: it is checked against the scheduler's own fire times around every clock change of the next five years and through a sample year. One that cannot match (a time a spring-forward gap removes, which each scheduler handles its own way, or a schedule type CronWatch cannot read) is reported once to the error handler and the job is watched without a schedule, so its failures, duration and budgets still alert.
 - **Jobs gone lose their schedule.** An entry taken out of the scheduler, in this process or since an earlier deploy, has its job declared again without its schedule and with ` (no longer scheduled)` after its description, so it keeps its history and is never reported missed; a missed alert already open closes with a recovery.
-- **Jobs belong to an app.** Every job is tagged with the integration (`robfig-cron`, `gocron`, `river`, `asynq`) and the app (`gocron:billing`), so two apps sharing a store never take each other's jobs for gone. The app is the `App` option, else `CRONWATCH_APP_ID`, else the running executable's name. Set `CRONWATCH_APP_ID` when one app's processes are different executables (an Asynq scheduler and its server, say), or two apps' executables share a name.
+- **Jobs belong to an app.** Every job is tagged with the integration (`robfig-cron`, `gocron`, `river`, `asynq`) and the app (`gocron:billing`), so two apps sharing a store never take each other's jobs for gone. The app is the `App` option, else `CRONWATCH_APP_ID`, else the running executable's name. Set `CRONWATCH_APP_ID` when one app's processes are different executables (an Asynq scheduler and its server, say), or two apps' executables share a name. Each run's trigger is the integration's name too (`robfig-cron`, `gocron`, `river`, `asynq`), and a job's name is the scheduler's own, with no prefix. These spellings are stored, and do not change within 1.x: see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names).
 - **Declarations reach the store.** A process that only schedules (a River client inserting jobs its workers run elsewhere, an Asynq scheduler) neither runs nor checks, so what it declares is written to the store in the background, where the processes that run and check read it. Each watcher's `Wait()` waits for those writes, for tests and a clean exit.
 - **Options per job.** `Options.Defaults` are job options for every job, and `Options.Jobs` (robfig/cron, gocron) gives options by job name, after the schedule, so a `Schedule` there replaces the scheduler's. `Options.Exclude` (robfig/cron, gocron, Asynq) leaves jobs out by name.
 
@@ -36,7 +36,7 @@ For the queues, every attempt is a run of its own. An attempt that fails (an err
 
 ### The check
 
-robfig/cron and gocron run in the same process as the rest of the app, so that process checks: `cw.Start(time.Minute)` beside `c.Start()`. River and Asynq have a check job of their own, scheduled like any other and never a job itself, which also declares again without their schedules the jobs this app's scheduler no longer runs.
+robfig/cron and gocron run in the same process as the rest of the app, so that process checks: `cw.StartChecking(time.Minute)` beside `c.Start()`. River and Asynq have a check job of their own, scheduled like any other and never a job itself, which also declares again without their schedules the jobs this app's scheduler no longer runs.
 
 ## robfig/cron
 
@@ -47,16 +47,16 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-c := cron.New(robfigcron.Watch(cw, robfigcron.Options{
+c := cron.New(robfigcron.New(cw, robfigcron.Options{
 	Chain: []cron.JobWrapper{cron.Recover(logger)},
-}))
+}).Option())
 c.AddFunc("0 2 * * *", jobs.NightlyReport) // the job "jobs.NightlyReport"
 c.AddJob("*/15 * * * *", robfigcron.Named("sync-invoices", syncJob, cronwatch.Grace("5m")))
 c.Start()
-cw.Start(time.Minute) // checks for missed and stuck runs
+cw.StartChecking(time.Minute) // checks for missed and stuck runs
 ```
 
-`Watch` is a `cron.Option`. It sets the cron's chain to your wrappers (`Options.Chain`) with CronWatch's innermost, and its logger to one around yours (`Options.Logger`, else robfig/cron's default), which is how entries added or removed later are followed: robfig/cron logs `start`, `added` and `removed`, and each starts a sync. A `cron.WithChain` or `cron.WithLogger` given to `cron.New` after `Watch` replaces CronWatch's, so give yours to the options instead. A wrapper outside CronWatch's that skips a run (`cron.SkipIfStillRunning`) records nothing, and one that recovers panics (`cron.Recover`) sees the panic after the run is recorded as failed; without one, the panic ends the program, as it would without CronWatch.
+The watcher's `Option` is a `cron.Option`. It sets the cron's chain to your wrappers (`Options.Chain`) with CronWatch's innermost, and its logger to one around yours (`Options.Logger`, else robfig/cron's default), which is how entries added or removed later are followed: robfig/cron logs `start`, `added` and `removed`, and each starts a sync. A `cron.WithChain` or `cron.WithLogger` given to `cron.New` after it replaces CronWatch's, so give yours to the options instead. A wrapper outside CronWatch's that skips a run (`cron.SkipIfStillRunning`) records nothing, and one that recovers panics (`cron.Recover`) sees the panic after the run is recorded as failed; without one, the panic ends the program, as it would without CronWatch.
 
 **Names.** A job is named by `robfigcron.Named(name, job, options...)`, which also gives it options; else after the function a `FuncJob` holds, without its package's path (`jobs.NightlyReport`, or `jobs.Reporter.Run` for a method value); else after its type (`jobs.Nightly` for a `*jobs.Nightly`). A function literal has no stable name, since it moves with the code around it (`main.main.func1`), so it is not watched until it is named, and is reported once.
 
@@ -83,7 +83,7 @@ import (
 	"github.com/go-co-op/gocron/v2"
 )
 
-s, err := gocron.NewScheduler(cwgocron.Watch(cw, cwgocron.Options{}))
+s, err := gocron.NewScheduler(cwgocron.New(cw, cwgocron.Options{}).Option())
 if err != nil {
 	log.Fatal(err)
 }
@@ -91,10 +91,10 @@ s.NewJob(gocron.CronJob("0 2 * * *", false), gocron.NewTask(jobs.NightlyReport))
 s.NewJob(gocron.DurationJob(15*time.Minute), gocron.NewTask(syncInvoices),
 	gocron.WithName("sync-invoices"))
 s.Start()
-cw.Start(time.Minute) // checks for missed and stuck runs
+cw.StartChecking(time.Minute) // checks for missed and stuck runs
 ```
 
-The package is also called `gocron`, so import it under a name of its own. `Watch` is a `gocron.SchedulerOption` that adds gocron's event listeners to every job (`BeforeJobRuns`, `AfterJobRuns`, `AfterJobRunsWithError` and `AfterJobRunsWithPanic`): a run starts when gocron is about to run the job and ends with its outcome, an error failing it. A job added or updated later is declared at once, and one removed is unscheduled at the next sync (the next run of a job not declared yet, or the watcher's `Sync`).
+The package is also called `gocron`, so import it under a name of its own. The watcher's `Option` is a `gocron.SchedulerOption` that adds gocron's event listeners to every job (`BeforeJobRuns`, `AfterJobRuns`, `AfterJobRunsWithError` and `AfterJobRunsWithPanic`): a run starts when gocron is about to run the job and ends with its outcome, an error failing it, and a panic too (its error reads `PanicError: <value>`, a `cwgocron.PanicError`). A job added or updated later is declared at once, and one removed is unscheduled at the next sync (the next run of a job not declared yet, or the watcher's `Sync`).
 
 **Names.** A job is named by `gocron.WithName`, else after its function without the package's path (`jobs.NightlyReport`). A function literal is not watched until it is named, and is reported once.
 

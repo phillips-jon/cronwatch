@@ -12,6 +12,7 @@ import (
 
 	cronwatch "cronwatch.dev/go"
 	cwgocron "cronwatch.dev/go/gocron"
+	"cronwatch.dev/go/robfigcron"
 	"cronwatch.dev/go/storetest"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
@@ -246,7 +247,7 @@ func TestAPanicFailsTheRunAndCarriesOn(t *testing.T) {
 			return nil
 		})))
 		check(t, err)
-		s, err := gocron.NewScheduler(cwgocron.Watch(cw, cwgocron.Options{}))
+		s, err := gocron.NewScheduler(cwgocron.New(cw, cwgocron.Options{}).Option())
 		check(t, err)
 		_, err = s.NewJob(gocron.DurationJob(time.Hour), gocron.NewTask(func() { panic("boom") }), gocron.WithName("panics"),
 			gocron.WithStartAt(gocron.WithStartImmediately()))
@@ -261,7 +262,7 @@ func TestAPanicFailsTheRunAndCarriesOn(t *testing.T) {
 	if err == nil {
 		t.Fatalf("the process did not end with the panic:\n%s", out)
 	}
-	contains(t, "recorded and alerted", string(out), "ALERT failed Panic: boom")
+	contains(t, "recorded and alerted", string(out), "ALERT failed PanicError: boom")
 	contains(t, "then panicked", string(out), "panic: boom")
 }
 
@@ -286,6 +287,30 @@ func TestASyncAfterShutdownUnschedulesNothing(t *testing.T) {
 // The audit: a job with a panic listener of its own (which replaces
 // CronWatch's) left its run running, to be reported stuck, and the next
 // end of that job was paired with it.
+// Watch, deprecated, is New(cw, options).Option(); Panic is PanicError and
+// Converted is robfigcron.Converted, under their names before 1.0.
+func TestTheDeprecatedNamesStillWork(t *testing.T) {
+	k := newKit(t)
+	s, err := gocron.NewScheduler(cwgocron.Watch(k.cw, cwgocron.Options{}), gocron.WithLocation(time.UTC))
+	check(t, err)
+	defer func() { _ = s.Shutdown() }()
+	_, err = s.NewJob(gocron.DurationJob(time.Hour), gocron.NewTask(func() {}), gocron.WithName("hourly"),
+		gocron.WithStartAt(gocron.WithStartImmediately()))
+	check(t, err)
+	s.Start()
+	waitFor(t, "the run", func() bool {
+		runs := k.runs(t, "hourly")
+		return len(runs) > 0 && runs[0].Status == cronwatch.StatusOK
+	})
+	eq(t, "recorded by the watcher", k.runs(t, "hourly")[0].Trigger, cwgocron.Trigger)
+
+	var old error = cwgocron.Panic{Value: "boom"}
+	var target cwgocron.PanicError
+	eq(t, "Panic is PanicError", errors.As(old, &target) && target.Value == "boom", true)
+	var converted cwgocron.Converted = robfigcron.Converted{Schedule: "every 1h"}
+	eq(t, "Converted is robfigcron.Converted", converted.Schedule, "every 1h")
+}
+
 func TestAPanicAJobsOwnListenerTookFailsTheRun(t *testing.T) {
 	k := newKit(t)
 	w := cwgocron.New(k.cw, cwgocron.Options{})

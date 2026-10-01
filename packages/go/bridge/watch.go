@@ -334,7 +334,7 @@ func Unscheduled(def cronwatch.Definition) []cronwatch.JobOption {
 		case "budget":
 			// Read from the definition's own object, which keeps the order
 			// the metrics were given in.
-			raw, _ := def.JSValue().(*js.Object).Get("budget")
+			raw, _ := js.ValueOf(def).(*js.Object).Get("budget")
 			if budget, ok := raw.(*js.Object); ok {
 				for _, metric := range budget.Keys() {
 					v, _ := budget.Get(metric)

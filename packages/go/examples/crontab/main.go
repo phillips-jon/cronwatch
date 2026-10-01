@@ -16,7 +16,7 @@
 //
 // A program that stays up (a server, a worker) checks in itself instead:
 //
-//	cw.Start(time.Minute) // a goroutine that checks every minute, until cw.Stop or cw.Close
+//	cw.StartChecking(time.Minute) // a goroutine that checks every minute, until cw.Stop or cw.Close
 //
 // Only one process needs to check; running Start in every replica of a
 // service is harmless, since a check judges each run once.

@@ -77,7 +77,7 @@ func runSummary(a cronwatch.Alert) any {
 
 // details is the alert's details as the SDK writes them.
 func details(a cronwatch.Alert) any {
-	o, _ := a.JSValue().(*js.Object)
+	o, _ := js.ValueOf(a).(*js.Object)
 	v, _ := o.Get("details")
 	return v
 }

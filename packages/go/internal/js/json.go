@@ -20,6 +20,10 @@ type Valuer interface {
 	JSValue() any
 }
 
+// ValueOf is v's JSON value, for the packages that read a cronwatch type's
+// value (whose JSValue method is deprecated, to be unexported at 1.0).
+func ValueOf(v Valuer) any { return v.JSValue() }
+
 // Object is a JavaScript object: keys in JavaScript's order, which is every
 // key that is an array index (a canonical whole number below 2^32 - 1) in
 // ascending order, then every other key in the order it was first set.

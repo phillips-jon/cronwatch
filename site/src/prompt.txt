@@ -383,11 +383,12 @@ Go (Go 1.25 or newer)
 
 3. Watch each scheduled job:
 
-   - robfig/cron: cron.New(robfigcron.Watch(cw, robfigcron.Options{})), the
-     cron's other options after it. Every entry is watched with its spec,
+   - robfig/cron: cron.New(robfigcron.New(cw, robfigcron.Options{}).Option()),
+     the cron's other options after it. Every entry is watched with its spec,
      named after its function; name a closure with
      robfigcron.Named("nightly-report", cron.FuncJob(fn)).
-   - gocron v2: gocron.NewScheduler(cwgocron.Watch(cw, cwgocron.Options{}))
+   - gocron v2:
+     gocron.NewScheduler(cwgocron.New(cw, cwgocron.Options{}).Option())
      with import cwgocron "cronwatch.dev/go/gocron". Name closures with
      gocron.WithName.
    - River: w := cwriver.New(cw, cwriver.Options{}) (import cwriver
@@ -411,10 +412,10 @@ Go (Go 1.25 or newer)
      Lambda. It needs Authorization: Bearer $CRON_SECRET.
 
 4. Run the check every few minutes so missed and stuck runs are noticed:
-   cw.Start(time.Minute) once in a long-running process (robfig/cron and
-   gocron apps included), the River or Asynq check job above, or a second
-   crontab line running a command that declares the same jobs and calls
-   cw.Check(ctx).
+   cw.StartChecking(time.Minute) once in a long-running process (robfig/cron
+   and gocron apps included), the River or Asynq check job above, or a
+   second crontab line running a command that declares the same jobs and
+   calls cw.Check(ctx).
 
 5. Mount the dashboard: routes, err := cw.Routes() (or cw.MustRoutes() at
    package level), then mux.Handle("/cronwatch/", routes). Outside

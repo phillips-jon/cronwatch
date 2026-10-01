@@ -18,7 +18,7 @@ import (
 // no option gives are left out.
 func OptionsOf(def cronwatch.Definition) []cronwatch.JobOption {
 	var options []cronwatch.JobOption
-	raw, _ := def.JSValue().(*js.Object)
+	raw, _ := js.ValueOf(def).(*js.Object)
 	for _, key := range def.Keys() {
 		value, _ := def.Get(key)
 		switch key {

@@ -6,7 +6,7 @@
 //
 //	source := pgcron.New(db, pgcron.Options{Prefix: "db:"}) // the app's *sql.DB, any Postgres driver
 //	cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(source))
-//	cw.Start(time.Minute)
+//	cw.StartChecking(time.Minute)
 //
 // A job that is renamed, unscheduled or no longer picked keeps its old
 // name's runs and history, and that name is declared again without a
@@ -104,10 +104,16 @@ const (
 	maxPages = 10
 )
 
-// Hold is how long a run pg_cron has queued but not started (no start_time
+// hold is how long a run pg_cron has queued but not started (no start_time
 // yet) is waited for. After that it is copied as running from when it was
 // first seen, so a run that never starts is marked stuck like any other.
-const Hold = 10 * time.Minute
+const hold = 10 * time.Minute
+
+// Hold is how long a run pg_cron has queued but not started is waited for
+// (ten minutes), before it is copied as running.
+//
+// Deprecated: Hold is internal, and goes in 1.0.
+const Hold = hold
 
 const (
 	jobsSQL = `SELECT jobid, jobname, schedule, database, username, active FROM cron.job ORDER BY jobid`
@@ -139,13 +145,19 @@ var (
 	utcRE     = regexp.MustCompile(`^(?i)(gmt|utc|z)$`)
 )
 
-// Schedule is a pg_cron schedule as a CronWatch one: a cron expression,
+// Schedule is a pg_cron schedule as a CronWatch one, or false for one that
+// has no cadence to watch (@reboot).
+//
+// Deprecated: Schedule is internal, and goes in 1.0.
+func Schedule(schedule string) (string, bool) { return scheduleOf(schedule) }
+
+// scheduleOf is a pg_cron schedule as a CronWatch one: a cron expression,
 // "$" for the last day of the month read as "L", or "N seconds" as
 // "every Ns". pg_cron reads only the first five fields of an expression
 // and ignores the rest, so only those are kept (a sixth would otherwise be
 // read as seconds). It answers false for one that has no cadence to watch
 // (@reboot).
-func Schedule(schedule string) (string, bool) {
+func scheduleOf(schedule string) (string, bool) {
 	text := js.Trim(schedule)
 	if m := secondsRE.FindStringSubmatch(text); m != nil {
 		n, _ := strconv.ParseFloat(m[1], 64)
@@ -166,7 +178,15 @@ func Schedule(schedule string) (string, bool) {
 
 // JobName is the default CronWatch name for a pg_cron job, before the
 // prefix.
-func JobName(j Job) string {
+//
+// Deprecated: JobName is internal, and goes in 1.0. The default name is
+// documented (the job's jobname with characters a name cannot hold made
+// "-", or "pg_cron:<jobid>") and does not change.
+func JobName(j Job) string { return defaultJobName(j) }
+
+// defaultJobName is the default CronWatch name for a pg_cron job, before
+// the prefix.
+func defaultJobName(j Job) string {
 	name := ""
 	if j.JobName != nil {
 		name = *j.JobName
@@ -182,11 +202,19 @@ func JobName(j Job) string {
 }
 
 // RunOf is a row of cron.job_run_details as a CronWatch run, or nil for
+// one that has not started.
+//
+// Deprecated: RunOf is internal, and goes in 1.0.
+func RunOf(row Row, job, idPrefix string, fallbackAt int64) *cronwatch.Run {
+	return runOf(row, job, idPrefix, fallbackAt)
+}
+
+// runOf is a row of cron.job_run_details as a CronWatch run, or nil for
 // one that has not started (no start_time, not finished). A finished row
 // with no start_time (pg_cron writes these for runs a server restart cut
 // off, "server restarted") starts at its end_time, else at fallbackAt (the
 // reader passes the job's newest run's start, or now).
-func RunOf(row Row, job, idPrefix string, fallbackAt int64) *cronwatch.Run {
+func runOf(row Row, job, idPrefix string, fallbackAt int64) *cronwatch.Run {
 	var finishedAt *int64
 	if row.EndTime != nil {
 		ms := row.EndTime.UnixMilli()
@@ -541,7 +569,7 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 			delete(s.failing, j.JobID)
 			continue
 		}
-		base := JobName(j)
+		base := defaultJobName(j)
 		if s.o.JobName != nil {
 			base, p = guard(func() string { return s.o.JobName(j) })
 			if p != nil {
@@ -569,7 +597,7 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 		used[name] = true
 		schedule := ""
 		if j.Active && recording {
-			schedule, _ = Schedule(j.Schedule)
+			schedule, _ = scheduleOf(j.Schedule)
 		}
 		paused := ""
 		if !j.Active {
@@ -680,19 +708,19 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 			if !seen {
 				since = now
 			}
-			if now-since < Hold.Milliseconds() {
+			if now-since < hold.Milliseconds() {
 				s.held[row.RunID] = since
 				return
 			}
 			start := time.UnixMilli(since)
 			row.StartTime = &start
-			run = RunOf(row, name, s.idPrefix, now)
+			run = runOf(row, name, s.idPrefix, now)
 		} else {
 			fallback, ok := s.lastAt[row.JobID]
 			if !ok {
 				fallback = now
 			}
-			run = RunOf(row, name, s.idPrefix, fallback)
+			run = runOf(row, name, s.idPrefix, fallback)
 		}
 		delete(s.held, row.RunID)
 		if run == nil {

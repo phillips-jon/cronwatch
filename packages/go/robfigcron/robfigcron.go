@@ -3,19 +3,19 @@
 // recorded, with one option given to cron.New.
 //
 //	cw, _ := cronwatch.New(cronwatch.WithStore(store))
-//	c := cron.New(robfigcron.Watch(cw, robfigcron.Options{}))
+//	c := cron.New(robfigcron.New(cw, robfigcron.Options{}).Option())
 //	c.AddFunc("0 2 * * *", jobs.NightlyReport) // the job "jobs.NightlyReport"
 //	c.Start()
-//	cw.Start(time.Minute) // checks for missed and stuck runs
+//	cw.StartChecking(time.Minute) // checks for missed and stuck runs
 //
-// Watch installs a JobWrapper that records each run (a panic is a failed
+// The watcher's Option installs a JobWrapper that records each run (a panic is a failed
 // run, and carries on to the wrappers outside it, such as cron.Recover)
 // and a Logger that hears the cron start and entries being added and
 // removed, so entries added or removed later are followed: an entry's job
 // is declared with its schedule, and a job whose entries are all gone is
 // declared again without one, so it is never reported missed. Give your own
 // wrappers and logger to Options (Chain, Logger): a cron.WithChain or
-// cron.WithLogger given to cron.New after Watch replaces CronWatch's.
+// cron.WithLogger given to cron.New after it replaces CronWatch's.
 //
 // # Names
 //
@@ -113,6 +113,9 @@ func New(cw *cronwatch.Client, options Options) *Watcher {
 }
 
 // Watch is New(cw, options).Option(), for cron.New.
+//
+// Deprecated: Use New(cw, options).Option(), which does the same and keeps
+// the Watcher for its Sync and Wait. Watch goes in 1.0.
 func Watch(cw *cronwatch.Client, options Options) cron.Option { return New(cw, options).Option() }
 
 // Option is the cron.Option that attaches the watcher to the cron it is
@@ -218,11 +221,11 @@ func (w *Watcher) Sync(ctx context.Context) error {
 	c, wrapped := w.cron, w.wrapped
 	w.mu.Unlock()
 	if c == nil {
-		return errors.New("the watcher was not given to cron.New; pass robfigcron.Watch(cw, options) or watcher.Option() to it")
+		return errors.New("the watcher was not given to cron.New; pass watcher.Option() to it")
 	}
 	entries := c.Entries()
 	if len(entries) > 0 && wrapped == 0 {
-		w.watch.ReportOnce(errors.New("the cron's jobs are not wrapped by CronWatch, so no run is recorded: a cron.WithChain given to cron.New after robfigcron.Watch replaced its wrapper; give your wrappers in robfigcron.Options.Chain"), "robfig/cron")
+		w.watch.ReportOnce(errors.New("the cron's jobs are not wrapped by CronWatch, so no run is recorded: a cron.WithChain given to cron.New after the watcher's Option replaced its wrapper; give your wrappers in robfigcron.Options.Chain"), "robfig/cron")
 	}
 	var found []bridge.Entry
 	for _, entry := range entries {
