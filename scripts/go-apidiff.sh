@@ -33,7 +33,23 @@ for name in "" robfigcron gocron river asynq; do
   mkdir -p "$base"
   git -C "$root" archive "$baseline" packages/go | tar -x -C "$base"
   echo "$module: against $baseline"
-  packages="$(cd "$base/$dir" && go list ./... | grep -v -e '/internal' -e '/examples' -e '^cronwatch.dev/go/bridge$' || true)"
+  if [ ! -f "$base/$dir/go.mod" ]; then
+    echo "  new since the baseline: nothing to compare"
+    continue
+  fi
+  # A baseline that fails to load fails the check: comparing no packages
+  # would pass an incompatible change.
+  if ! listed="$(cd "$base/$dir" && go list ./...)"; then
+    echo "  go list failed in the baseline"
+    status=1
+    continue
+  fi
+  packages="$(printf '%s\n' "$listed" | grep -v -e '/internal' -e '/examples' -e '^cronwatch.dev/go/bridge$' || true)"
+  if [ -z "$packages" ]; then
+    echo "  the baseline lists no packages"
+    status=1
+    continue
+  fi
   for pkg in $packages; do
     export_file="$scratch/$(echo "$pkg" | tr '/.' '__').export"
     (cd "$base/$dir" && apidiff -w "$export_file" "$pkg")
