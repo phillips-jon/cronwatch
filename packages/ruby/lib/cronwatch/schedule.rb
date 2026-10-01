@@ -29,6 +29,8 @@ module Cronwatch
 
       # The compiled cron fields, kept out of the public shape.
       attr_accessor :pattern
+      # Whether the cron names a date no month has ("0 0 30 2 *"), and so never fires.
+      attr_accessor :never
 
       def cron? = kind == :cron
       def interval? = kind == :interval
@@ -47,12 +49,21 @@ module Cronwatch
       def to_h = { "dueAt" => due_at, "deadline" => deadline }
     end
 
+    # Where a cron is asked once whether it ever fires: more than a 400-year
+    # cycle of the calendar before the year 3000, as in schedule.ts.
+    PROBE_FROM_MS = 946_684_800_000 # 2000-01-01T00:00:00Z
+    # Text that starts like an ISO date and time, which croner would take for a one-time date.
+    ONE_TIME_DATE = /\A\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/
+
     @cache = {}
     @lock = Mutex.new
 
     module_function
 
-    # Parsed once per (schedule, timezone) pair and cached. Without a timezone
+    # Text with a colon after its first character, which croner would take
+    # for a one-time date, is refused. A cron that names a date no month has
+    # ("0 0 30 2 *") is read, and never fires: nothing is ever due, so it is
+    # never missed. Parsed once per (schedule, timezone) pair and cached. Without a timezone
     # the expression is read in the process timezone, like crontab. Vercel and
     # GitHub Actions run their crons in UTC, so pass timezone: "UTC" for those.
     def parse(schedule, timezone = nil)
@@ -68,6 +79,13 @@ module Cronwatch
 
         parsed = Parsed.new(kind: :interval, source: text, every_ms: every_ms)
       else
+        # croner reads text with a colon after its first character as a
+        # one-time date to fire at, not as a cron expression. A cron monitor
+        # has no use for one, so every such text is refused, as in the SDK.
+        if text[1..].to_s.include?(":")
+          reason = ONE_TIME_DATE.match?(text) ? "CronPattern: a one-time date is not supported" : "Invalid ISO8601 passed to timezone parser."
+          raise ArgumentError, "schedule \"#{schedule}\" is not a cron expression or \"every <duration>\": #{reason}"
+        end
         begin
           pattern = CronPattern.compile(text)
         rescue ArgumentError => e
@@ -75,6 +93,8 @@ module Cronwatch
         end
         parsed = Parsed.new(kind: :cron, source: text, timezone: timezone.nil? || timezone == "" ? nil : timezone)
         parsed.pattern = pattern
+        # The calendar alone decides it, so it is asked in UTC.
+        parsed.never = pattern.next_after(PROBE_FROM_MS, "UTC").nil?
       end
       parsed.freeze
       @lock.synchronize { @cache[key] = parsed }
@@ -88,6 +108,7 @@ module Cronwatch
     # stepped over an hour at a time. Ported from fireAfter in schedule.ts.
     def fire_after(parsed, from)
       raise ArgumentError, "schedule \"#{parsed.source}\" was not made by Schedule.parse" unless parsed.pattern
+      return nil if parsed.never
 
       start = count_from(from)
       return nil if start.nil?
@@ -111,6 +132,7 @@ module Cronwatch
     # any that do not move forward (see fire_after).
     def fires_between(parsed, from, to, limit)
       raise ArgumentError, "schedule \"#{parsed.source}\" was not made by Schedule.parse" unless parsed.pattern
+      return [] if parsed.never
 
       out = []
       start = count_from(from)

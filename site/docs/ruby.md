@@ -436,9 +436,10 @@ The gem reads every schedule the SDK writes but a few cron forms croner takes an
 - `#` on a range of weekdays (`0 0 * * 1-5#2`)
 - a seventh (year) field
 - `L` after a day of the month other than on its own (`0 0 3L * *`)
-- a date no month has (`0 0 30 2 *`)
 
 A job the Node side declares with one of these is shown on the Ruby dashboard as `failing` (or `silenced`, while it is) without a next expected time, and a Ruby check skips it and reports the schedule to `on_error`; the other jobs are checked as usual. Let the Node side check those jobs.
+
+A date no month has (`0 0 30 2 *`) and a one-time date (`2026-12-01T00:00:00`) are read as every language reads them: see [Schedule syntax](/docs/schedules/#schedule-syntax).
 
 Both sides write a job's state through `compare_and_set_state` and the same `version` inside its JSON, so a Ruby process and a Node process updating one job at the same moment refuse each other's stale writes rather than lose them.
 

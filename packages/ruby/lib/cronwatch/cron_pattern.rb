@@ -27,14 +27,15 @@ module Cronwatch
 
     def initialize(text)
       fields, dom, dow = croner_fields(text)
-      cron = begin
-        Fugit::Cron.parse(fields.each_with_index.map { |f, i| i == 3 ? dom : (i == 5 ? dow : f) }.join(" "))
-      rescue StandardError
-        nil
-      end
+      # Fugit refuses a date no month has ("30 2"), and drops a month the
+      # days cannot fall in ("31 2,3" reads as March alone). Croner keeps
+      # both, so the days are read with every month and the months with
+      # every day, and a date no month has is a cron that never fires.
+      cron = fugit(fields.each_with_index.map { |f, i| i == 3 ? dom : (i == 4 ? "*" : (i == 5 ? dow : f)) })
+      months = fugit(["0", "0", "0", "*", fields[4], "*"])
       # Croner accepts a few forms Fugit does not read (a range with #, a day of
-      # the month with L after it, a date no month has). Those are refused.
-      raise ArgumentError, "CronPattern: '#{text}' uses a form the Ruby port does not read" unless cron
+      # the month with L after it). Those are refused.
+      raise ArgumentError, "CronPattern: '#{text}' uses a form the Ruby port does not read" unless cron && months
 
       @seconds = flags(cron.seconds, 60, 0)
       @minutes = flags(cron.minutes, 60, 0)
@@ -45,7 +46,7 @@ module Cronwatch
       else
         cron.monthdays.each { |d| @days[d - 1] = true if d.positive? }
       end
-      @months = flags(cron.months, 12, 1)
+      @months = flags(months.months, 12, 1)
       @weekdays = Array.new(7, 0)
       if cron.weekdays.nil?
         @weekdays.fill(ANY_NTH)
@@ -74,6 +75,12 @@ module Cronwatch
     end
 
     private
+
+    def fugit(fields)
+      Fugit::Cron.parse(fields.join(" "))
+    rescue StandardError
+      nil
+    end
 
     def flags(values, size, base)
       return Array.new(size, true) if values.nil?
