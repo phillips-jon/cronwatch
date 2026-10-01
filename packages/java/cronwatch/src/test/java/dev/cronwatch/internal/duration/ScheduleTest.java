@@ -225,7 +225,7 @@ class ScheduleTest {
   void oneTimeDatesAreRefused() {
     assertTrue(
         error(() -> Schedules.parse("2026-12-01T00:00:00", null))
-            .endsWith(": CronPattern: a one-time date is not supported by the Java port"));
+            .endsWith(": CronPattern: a one-time date is not supported"));
     assertTrue(
         error(() -> Schedules.parse("0 2:30 * * *", null))
             .endsWith(": Invalid ISO8601 passed to timezone parser."));

@@ -23,6 +23,7 @@ class ConformanceTest {
   /** Every fixture, each replayed beside the code it holds to the SDK. */
   static final Set<String> REPLAYED =
       Set.of(
+          "client",
           "duration",
           "schedule",
           "output",

@@ -9,6 +9,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * A job and its health, as the dashboard shows it.
  *
+ * <p>Build one with {@link #of}, not the canonical constructor: a record that may grow gains a
+ * component in a minor release, which changes its constructor, while {@code of} keeps its
+ * parameters and gives the new component its default.
+ *
  * @param name the job's name
  * @param definition its stored definition
  * @param health how it looks at a glance
@@ -40,6 +44,29 @@ public record JobSummary(
    * @param p95Ms the 95th percentile duration of the successful ones, or null
    */
   public record Stats(long runs, double okRate, @Nullable Long p50Ms, @Nullable Long p95Ms) {}
+
+  /** A summary with these fields. */
+  public static JobSummary of(
+      String name,
+      Definition definition,
+      JobHealth health,
+      List<Condition> open,
+      @Nullable Run lastRun,
+      @Nullable Long nextExpectedAt,
+      long consecutiveFailures,
+      @Nullable Long silencedUntil,
+      Stats stats) {
+    return new JobSummary(
+        name,
+        definition,
+        health,
+        open,
+        lastRun,
+        nextExpectedAt,
+        consecutiveFailures,
+        silencedUntil,
+        stats);
+  }
 
   /** Keeps unmodifiable copies. */
   public JobSummary {

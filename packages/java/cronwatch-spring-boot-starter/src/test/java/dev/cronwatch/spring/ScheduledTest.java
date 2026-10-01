@@ -157,7 +157,7 @@ class ScheduledTest {
       Run run = finished(cw, "Ticks.tick").get(0);
       assertEquals(RunStatus.OK, run.status());
       assertEquals("tick", run.output());
-      assertEquals("scheduled", run.trigger());
+      assertEquals("spring-scheduled", run.trigger());
       assertTrue(run.id().startsWith("scheduled:billing:"), run.id());
       assertEquals(
           "{\"schedule\":\"every 1s\",\"tags\":[\"spring-scheduled\",\"spring-scheduled:billing\"],"

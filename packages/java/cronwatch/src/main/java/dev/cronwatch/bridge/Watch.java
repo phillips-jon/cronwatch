@@ -89,14 +89,14 @@ public final class Watch {
 
   /**
    * A watch for one scheduler: {@code tag} is the integration's ({@code quartz}), {@code app} the
-   * app's name for its tag (null for {@link Bridge#appName()}), and {@code scheduler} how messages
-   * name the scheduler ({@code Quartz}).
+   * app's name for its tag (null for {@link SchedulerBridge#appName()}), and {@code scheduler} how
+   * messages name the scheduler ({@code Quartz}).
    */
   public Watch(Cronwatch cw, String tag, @Nullable String app, String scheduler) {
     this.cw = Objects.requireNonNull(cw, "cw");
     this.tag = Objects.requireNonNull(tag, "tag");
-    String name = app == null || app.isEmpty() ? Bridge.appName() : app;
-    this.appTag = Bridge.appTag(tag, name);
+    String name = app == null || app.isEmpty() ? SchedulerBridge.appName() : app;
+    this.appTag = SchedulerBridge.appTag(tag, name);
     this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
   }
 
@@ -218,7 +218,7 @@ public final class Watch {
           zone = "";
           reportOnce(
               "cronwatch: "
-                  + Bridge.quote(name)
+                  + SchedulerBridge.quote(name)
                   + " is run by "
                   + list.size()
                   + " "
@@ -258,8 +258,8 @@ public final class Watch {
       for (String name : goneNames) {
         declareOne(
             name,
-            Bridge.quote(name),
-            Bridge.unscheduled(Objects.requireNonNull(gone.get(name))),
+            SchedulerBridge.quote(name),
+            SchedulerBridge.unscheduled(Objects.requireNonNull(gone.get(name))),
             false);
       }
     } finally {
@@ -281,7 +281,7 @@ public final class Watch {
   private void declareOne(String name, String label, JobOptions options, boolean current) {
     String key;
     try {
-      key = Bridge.definition(cw, name, options).toJson();
+      key = SchedulerBridge.definition(cw, name, options).toJson();
     } catch (CronwatchException e) {
       reportOnce(Objects.requireNonNullElse(e.getMessage(), "invalid"), "declaring " + label);
       return;
@@ -408,7 +408,7 @@ public final class Watch {
       throw new CronwatchException(
           CronwatchException.Kind.OTHER,
           "writing the declaration of "
-              + Bridge.quote(name)
+              + SchedulerBridge.quote(name)
               + " took longer than "
               + saveTimeoutMs / 1000
               + " seconds; gave up");
@@ -416,7 +416,7 @@ public final class Watch {
       Thread.currentThread().interrupt();
       throw new CronwatchException(
           CronwatchException.Kind.OTHER,
-          "interrupted while writing the declaration of " + Bridge.quote(name),
+          "interrupted while writing the declaration of " + SchedulerBridge.quote(name),
           e);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
@@ -491,7 +491,7 @@ public final class Watch {
     }
     JobOptions made =
         stored != null && stored.definition().tags().contains(appTag)
-            ? Bridge.optionsOf(stored.definition())
+            ? SchedulerBridge.optionsOf(stored.definition())
             : tagged(name, options.copy());
     // In turn with declare, and after looking again: a job declared from a scheduler entry
     // meanwhile is that one, so the client never ends up holding the declaration without the
@@ -585,7 +585,7 @@ public final class Watch {
           continue;
         }
         try {
-          cw.job(job.name(), Bridge.unscheduled(def));
+          cw.job(job.name(), SchedulerBridge.unscheduled(def));
           names.add(job.name());
         } catch (CronwatchException e) {
           failed.add("declaring " + job.name() + ": " + e.getMessage());

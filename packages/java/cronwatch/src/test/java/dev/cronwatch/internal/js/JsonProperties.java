@@ -81,7 +81,7 @@ class JsonProperties {
           String s = g.anyString(60);
           JsObject o = new JsObject().set(s, List.of(s));
           assertEquals(o.toJson(), Json.stringify(Json.parse(o.toJson())));
-          assertEquals(s, Json.parse(Json.quote(s)));
+          assertEquals(s, Json.parse(Json.stringify(s)));
         });
   }
 }

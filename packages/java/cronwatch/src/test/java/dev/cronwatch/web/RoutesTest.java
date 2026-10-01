@@ -81,6 +81,22 @@ class RoutesTest {
       status("check", w.get("/cronwatch/api/check", bearer), 200);
       status("jobs", w.get("/cronwatch/api/jobs", bearer), 401);
       status("only as a bearer", w.get("/cronwatch/api/check?token=" + secret, NONE), 401);
+      status("what is serving", w.get("/cronwatch/api", bearer), 401);
+    }
+  }
+
+  @Test
+  void apiNamesTheLibraryLanguageAndVersions() {
+    try (WebKit w = new WebKit()) {
+      String want =
+          "{\"ok\":true,\"library\":\"dev.cronwatch:cronwatch\",\"language\":\"java\","
+              + "\"version\":\""
+              + Cronwatch.VERSION
+              + "\",\"api\":1}";
+      assertEquals(want, w.get("/cronwatch/api", headers(AUTH)).text());
+      assertEquals(want, w.get("/cronwatch/api/", headers(AUTH)).text());
+      status("no token", w.get("/cronwatch/api", NONE), 401);
+      status("POST", w.send("POST", "/cronwatch/api", headers(AUTH, JSON), ""), 404);
     }
   }
 
@@ -221,11 +237,13 @@ class RoutesTest {
                   "/cronwatch/api/jobs/s/silence",
                   headers(AUTH, JSON),
                   "{\"for\":\"2h\"}"));
-      assertEquals((double) (T0 + 2 * HOUR), field(silenced, "state", "silencedUntil"));
+      assertEquals((double) (T0 + 2 * HOUR), field(silenced, "job", "silencedUntil"));
+      assertEquals("silenced", field(silenced, "job", "health"));
+      assertEquals(List.of("ok", "job"), silenced.keys());
       assertEquals(JobHealth.SILENCED, w.summary("s").health());
       JsObject un =
           json(w.send("POST", "/cronwatch/api/jobs/s/unsilence", headers(AUTH, JSON), ""));
-      assertNull(field(un, "state", "silencedUntil"));
+      assertNull(field(un, "job", "silencedUntil"));
       status(
           "ghost",
           w.send(
@@ -611,14 +629,14 @@ class RoutesTest {
           json(w.send("POST", "/cronwatch/api/jobs/s/silence?for=3h", headers(AUTH), ""));
       assertEquals(
           (double) (T0 + 3 * HOUR),
-          field(query, "state", "silencedUntil"),
+          field(query, "job", "silencedUntil"),
           "the query when the body has none");
     }
   }
 
   private static long until(WebKit w, String body) {
     JsObject r = json(w.send("POST", "/cronwatch/api/jobs/s/silence", headers(AUTH, JSON), body));
-    return ((Number) field(r, "state", "silencedUntil")).longValue() - T0;
+    return ((Number) field(r, "job", "silencedUntil")).longValue() - T0;
   }
 
   // The Go audit: a body cut short was read as far as it came, so "for=7d" silenced the job for
@@ -1151,7 +1169,7 @@ class RoutesTest {
                   "/cronwatch/api/jobs/rare/silence",
                   headers(AUTH, JSON),
                   "{\"for\":\"99999999999999999999999\"}"));
-      double until = ((Number) field(silenced, "state", "silencedUntil")).doubleValue();
+      double until = ((Number) field(silenced, "job", "silencedUntil")).doubleValue();
       assertTrue(until > w.clock.get(), "a long silence ended at once: " + until);
     }
   }

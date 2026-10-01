@@ -50,7 +50,7 @@ class FormatConformanceTest {
       JsObject got =
           new JsObject().set("length", out.length()).set("sha256", Fixtures.sha256Hex(out));
       JsObject want = new JsObject().set("length", c.get("length")).set("sha256", c.get("sha256"));
-      fails.same("capOutput(" + Json.quote(piece) + " x " + times + ")", got, want);
+      fails.same("capOutput(" + Json.stringify(piece) + " x " + times + ")", got, want);
     }
 
     List<JsObject> stored = Fixtures.objects(f, "toStored");

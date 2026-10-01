@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
-import dev.cronwatch.jdbc.SqlStore;
+import dev.cronwatch.store.SqlStore;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;

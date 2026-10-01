@@ -23,7 +23,7 @@ import java.util.concurrent.Future;
  */
 public final class Twilio implements Channel {
   /** The most segments a text may use, which keeps it inside Twilio's 1600 character limit. */
-  public static final int MAX_SEGMENTS = 10;
+  private static final int MAX_SEGMENTS = 10;
 
   /** The longest Body Twilio takes. */
   static final int MAX_BODY = 1600;

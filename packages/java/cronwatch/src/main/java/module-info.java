@@ -3,13 +3,13 @@
  * alerted once and recovered once, from the job's own process, with no service to run.
  *
  * <p>The API is {@link dev.cronwatch.Cronwatch}. Stores are in {@code dev.cronwatch.store} (the
- * interface and {@code MemoryStore}) and {@code dev.cronwatch.jdbc} ({@code SqlStore} over a {@code
- * DataSource}); {@code dev.cronwatch.pgcron} watches pg_cron; {@code dev.cronwatch.storetest} is
- * the store contract test for a store of the app's own. The alert channels are in {@code
- * dev.cronwatch.alerts} and Claude triage in {@code dev.cronwatch.triage}. {@code
- * dev.cronwatch.web} is the dashboard and a job's handler, framework-free, with an adapter for the
- * JDK's own HTTP server. {@code dev.cronwatch.internal.*} is not exported and may change in any
- * release.
+ * interface, {@code MemoryStore}, and {@code SqlStore} over a {@code DataSource}; {@code
+ * dev.cronwatch.jdbc} holds only {@code SqlStore}'s deprecated alias of before 1.0); {@code
+ * dev.cronwatch.pgcron} watches pg_cron; {@code dev.cronwatch.storetest} is the store contract test
+ * for a store of the app's own. The alert channels are in {@code dev.cronwatch.alerts} and Claude
+ * triage in {@code dev.cronwatch.triage}. {@code dev.cronwatch.web} is the dashboard and a job's
+ * handler, framework-free, with an adapter for the JDK's own HTTP server. {@code
+ * dev.cronwatch.internal.*} is not exported and may change in any release.
  */
 @org.jspecify.annotations.NullMarked
 module dev.cronwatch {

@@ -1,4 +1,4 @@
-package dev.cronwatch.jdbc;
+package dev.cronwatch.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -20,12 +20,12 @@ import dev.cronwatch.RunHandle;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
 import dev.cronwatch.internal.js.Js;
-import dev.cronwatch.jdbc.Servers.Kind;
-import dev.cronwatch.store.Store;
+import dev.cronwatch.store.Servers.Kind;
 import dev.cronwatch.storetest.FinishOnce;
 import dev.cronwatch.storetest.ForeignRows;
 import dev.cronwatch.storetest.StoreContract;
 import dev.cronwatch.storetest.StoreReplay;
+import dev.cronwatch.storetest.TestRuns;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -314,7 +314,7 @@ abstract class ServerStoreTests {
     String p = prefix();
     SqlStore store = Servers.store(kind(), p);
     store.init();
-    store.insertRun(StoreContract.newRun("good", "a", RunStatus.RUNNING, 1));
+    store.insertRun(TestRuns.newRun("good", "a", RunStatus.RUNNING, 1));
     store.upsertJob(Definition.fromJson("{\"name\":\"a\",\"schedule\":\"0 * * * *\"}"), 1);
     exec(
         "INSERT INTO "

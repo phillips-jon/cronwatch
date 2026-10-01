@@ -26,7 +26,7 @@ class ReadmeTest {
       import dev.cronwatch.*;
       import dev.cronwatch.cli.CronwatchCli;
       import dev.cronwatch.alerts.*;
-      import dev.cronwatch.jdbc.SqlStore;
+      import dev.cronwatch.store.SqlStore;
       import dev.cronwatch.pgcron.*;
       import dev.cronwatch.triage.*;
       import dev.cronwatch.store.MemoryStore;

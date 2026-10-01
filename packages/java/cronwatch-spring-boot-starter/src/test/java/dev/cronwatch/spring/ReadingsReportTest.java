@@ -7,9 +7,9 @@ import com.cronutils.model.CronType;
 import com.cronutils.model.definition.CronDefinitionBuilder;
 import com.cronutils.model.time.ExecutionTime;
 import com.cronutils.parser.CronParser;
-import dev.cronwatch.bridge.Bridge;
 import dev.cronwatch.bridge.FireTimes;
 import dev.cronwatch.bridge.ScheduleException;
+import dev.cronwatch.bridge.SchedulerBridge;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -25,12 +25,12 @@ import org.springframework.scheduling.support.CronExpression;
 /**
  * A report, not a gate: generated cron expressions read by Spring's {@code CronExpression},
  * Quartz's and cron-utils', each checked against CronWatch's reading (the croner port) as the
- * integrations check a schedule ({@link Bridge#checkFires}), and how many each reads alike printed,
- * with why the rest differ. It keeps measured why CronWatch ports croner rather than depending on a
- * Java cron library (see DESIGN.md, Keeping in step), as the Rust port's report on the croner crate
- * and the Elixir port's on Oban and the crontab package do. Seeded, so the numbers repeat; the
- * generator and the zones are the Elixir report's, with a seconds field first. It takes some
- * seconds, so it runs only when asked: {@code -Dcronwatch.readings=true}.
+ * integrations check a schedule ({@link SchedulerBridge#checkFires}), and how many each reads alike
+ * printed, with why the rest differ. It keeps measured why CronWatch ports croner rather than
+ * depending on a Java cron library (see DESIGN.md, Keeping in step), as the Rust port's report on
+ * the croner crate and the Elixir port's on Oban and the crontab package do. Seeded, so the numbers
+ * repeat; the generator and the zones are the Elixir report's, with a seconds field first. It takes
+ * some seconds, so it runs only when asked: {@code -Dcronwatch.readings=true}.
  */
 class ReadingsReportTest {
   private static final String[] ZONES = {
@@ -103,7 +103,7 @@ class ReadingsReportTest {
 
   private static Reading check(FireTimes fires, String expr, String zone, boolean daily) {
     try {
-      Bridge.checkFires(fires, expr, zone, "x", "the library", daily, NOW);
+      SchedulerBridge.checkFires(fires, expr, zone, "x", "the library", daily, NOW);
       return Reading.ALIKE;
     } catch (ScheduleException e) {
       return Reading.OTHER;

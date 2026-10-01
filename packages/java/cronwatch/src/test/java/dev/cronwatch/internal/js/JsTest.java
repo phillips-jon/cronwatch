@@ -99,10 +99,10 @@ class JsTest {
 
   @Test
   void stringsEscapeAsJsonStringifyDoes() {
-    assertEquals("\"a\\\"b\\\\c\\n\\u0001<>&\u2028\"", Json.quote("a\"b\\c\n\u0001<>&\u2028"));
-    assertEquals("\"a\\ud83d\"", Json.quote("a\ud83d"));
-    assertEquals("\"\\ude00b\"", Json.quote("\ude00b"));
-    assertEquals("\"\ud83d\ude00\"", Json.quote("\ud83d\ude00"));
+    assertEquals("\"a\\\"b\\\\c\\n\\u0001<>&\u2028\"", Json.stringify("a\"b\\c\n\u0001<>&\u2028"));
+    assertEquals("\"a\\ud83d\"", Json.stringify("a\ud83d"));
+    assertEquals("\"\\ude00b\"", Json.stringify("\ude00b"));
+    assertEquals("\"\ud83d\ude00\"", Json.stringify("\ud83d\ude00"));
     assertEquals("\ud83d\ude00 \ud83d x \u00e9", Json.parse("\"\ud83d\ude00 \\ud83d x \u00e9\""));
     assertEquals("\ud83d\ude00", Json.parse("\"\\ud83d\\ude00\""));
   }
@@ -125,12 +125,15 @@ class JsTest {
   @Test
   void nestingIsHeldToMaxDepth() {
     assertEquals(
-        List.of(), unwrap(Json.parse("[".repeat(Json.MAX_DEPTH) + "]".repeat(Json.MAX_DEPTH))));
+        List.of(),
+        unwrap(Json.parse("[".repeat(Js.JSON_MAX_DEPTH) + "]".repeat(Js.JSON_MAX_DEPTH))));
     assertEquals(
         "JSON nested too deeply",
         assertThrows(
                 Json.JsonException.class,
-                () -> Json.parse("[".repeat(Json.MAX_DEPTH + 1) + "]".repeat(Json.MAX_DEPTH + 1)))
+                () ->
+                    Json.parse(
+                        "[".repeat(Js.JSON_MAX_DEPTH + 1) + "]".repeat(Js.JSON_MAX_DEPTH + 1)))
             .getMessage());
     assertThrows(
         Json.JsonException.class, () -> Json.parse("[".repeat(1_000_000) + "]".repeat(1_000_000)));

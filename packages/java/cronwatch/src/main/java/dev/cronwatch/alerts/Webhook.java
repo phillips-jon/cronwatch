@@ -10,13 +10,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
- * POSTs each alert as JSON to any URL ({@code alerts/webhook.ts}). The body is the {@link Alert} as
- * the SDK writes it ({@link Alert#toJson}). A redirect is an error: point the URL at where the
+ * POSTs each alert as JSON to any URL ({@code alerts/webhook.ts}). The body is {@code "schema": 1}
+ * followed by the {@link Alert} as the SDK writes it ({@link Alert#toJson}): the payload {@code
+ * https://cronwatch.dev/schemas/webhook/1.json} describes. A receiver reads its fields, not the
+ * wording of {@code title} and {@code message}. A redirect is an error: point the URL at where the
  * receiver really is.
  */
 public final class Webhook implements Channel {
+  /**
+   * The payload's version, sent as its first field. It goes up only if a major release changes the
+   * payload in a way that is not additive.
+   */
+  public static final int SCHEMA = 1;
+
   private final WebhookOptions options;
 
   private Webhook(WebhookOptions options) {
@@ -36,6 +45,15 @@ public final class Webhook implements Channel {
     return Shared.hex(Shared.hmacSha256(Js.utf8(secret), body));
   }
 
+  /** The request's body: {@code "schema": 1}, then the alert's own fields in the SDK's order. */
+  static String body(Alert alert) {
+    JsObject o = new JsObject().set("schema", SCHEMA);
+    for (Map.Entry<String, @Nullable Object> e : alert.toValue().entries()) {
+      o.set(e.getKey(), e.getValue());
+    }
+    return o.toJson();
+  }
+
   @Override
   public String name() {
     return "webhook";
@@ -43,7 +61,7 @@ public final class Webhook implements Channel {
 
   @Override
   public void send(Alert alert, ChannelContext context) throws Exception {
-    String body = alert.toJson();
+    String body = body(alert);
     // A JavaScript object's keys: an exact name given again keeps its place.
     JsObject headers =
         new JsObject().set("content-type", "application/json").set("user-agent", "cronwatch");

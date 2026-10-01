@@ -1,6 +1,7 @@
 package dev.cronwatch;
 
 import dev.cronwatch.internal.evaluate.Expect;
+import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.internal.jsre.Regexp;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
@@ -86,8 +87,9 @@ public final class JobOptions {
   }
 
   /**
-   * How long a run may go on before it is treated as stuck and marked timeout, as the SDK's text.
-   * Default 1h. {@link JobContext#cancelled()} turns true when it passes.
+   * How long a run may go on before it is treated as stuck and marked timeout (a failure), as the
+   * SDK's text. Default 1h. {@link JobContext#cancelled()} turns true when it passes. Not {@link
+   * #maxDuration}, which flags a run that finished successfully but slowly: set this well above it.
    */
   public JobOptions timeout(String duration) {
     return put("timeout", duration);
@@ -216,7 +218,7 @@ public final class JobOptions {
    */
   public JobOptions field(String key, @Nullable Object value) {
     Json.stringify(value);
-    return put(key, Json.copy(value));
+    return put(key, Js.copyJson(value));
   }
 
   /**
@@ -227,7 +229,7 @@ public final class JobOptions {
    */
   public JobOptions merge(JobOptions other) {
     for (Map.Entry<String, @Nullable Object> e : other.fields.entries()) {
-      fields.set(e.getKey(), Json.copy(e.getValue()));
+      fields.set(e.getKey(), Js.copyJson(e.getValue()));
     }
     if (other.expect != null) {
       expect = other.expect;

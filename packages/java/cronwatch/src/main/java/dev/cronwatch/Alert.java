@@ -1,6 +1,7 @@
 package dev.cronwatch;
 
 import dev.cronwatch.Run.Values;
+import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import java.util.Objects;
@@ -8,6 +9,10 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A condition opening or closing, with the text every channel shows.
+ *
+ * <p>Build one with {@link #of}, not the canonical constructor: a record that may grow gains a
+ * component in a minor release, which changes its constructor, while {@code of} keeps its
+ * parameters and gives the new component its default.
  *
  * @param type what the alert says
  * @param run the run behind the alert, when there is one
@@ -41,6 +46,21 @@ public record Alert(
     Objects.requireNonNull(definition, "definition");
     Objects.requireNonNull(title, "title");
     Objects.requireNonNull(message, "message");
+  }
+
+  /** An alert with these fields, as a channel's test might build one. */
+  public static Alert of(
+      AlertType type,
+      @Nullable Run run,
+      AlertDetails details,
+      String job,
+      Definition definition,
+      String title,
+      String message,
+      @Nullable String triage,
+      boolean triageTried,
+      long at) {
+    return new Alert(type, run, details, job, definition, title, message, triage, triageTried, at);
   }
 
   /** This alert with triage tried and its diagnosis, or null when it gave nothing. */
@@ -89,7 +109,7 @@ public record Alert(
    */
   public static Alert fromValue(@Nullable Object v) {
     if (!(v instanceof JsObject o)) {
-      throw new Json.JsonException("an alert must be an object, not " + Json.kind(v));
+      throw new Json.JsonException("an alert must be an object, not " + Js.typeOf(v));
     }
     AlertType type = AlertType.of(Values.string(o, "type"));
     Run run = null;

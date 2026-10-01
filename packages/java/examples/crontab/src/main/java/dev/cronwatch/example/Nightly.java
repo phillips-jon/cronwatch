@@ -3,7 +3,7 @@ package dev.cronwatch.example;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.Job;
 import dev.cronwatch.JobOptions;
-import dev.cronwatch.jdbc.SqlStore;
+import dev.cronwatch.store.SqlStore;
 import org.sqlite.SQLiteDataSource;
 
 /**

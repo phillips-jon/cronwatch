@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  *     (or one a server restart cut off)
  * @param endTime when it ended, epoch milliseconds, or null
  */
-public record PgCronRow(
+record PgCronRow(
     long runId,
     long jobId,
     @Nullable String status,

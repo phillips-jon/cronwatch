@@ -1,4 +1,4 @@
-package dev.cronwatch.jdbc;
+package dev.cronwatch.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -14,9 +14,9 @@ import dev.cronwatch.Metrics;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
-import dev.cronwatch.jdbc.Servers.Kind;
 import dev.cronwatch.json.Json;
-import dev.cronwatch.storetest.StoreContract;
+import dev.cronwatch.store.Servers.Kind;
+import dev.cronwatch.storetest.TestRuns;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -156,7 +156,7 @@ class PostgresStoreTest extends ServerStoreTests {
     SqlStore store = store();
     store.init();
     for (String id : List.of("t1", "t2", "t3")) {
-      store.insertRun(StoreContract.newRun(id, "ties", RunStatus.OK, 5));
+      store.insertRun(TestRuns.newRun(id, "ties", RunStatus.OK, 5));
     }
     List<String> ties = new ArrayList<>();
     for (Run r : store.listRuns("ties", 10)) {

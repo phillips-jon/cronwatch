@@ -103,13 +103,13 @@ dataSource.setUrl("jdbc:postgresql://localhost/app");
 Cronwatch cw = Cronwatch.builder().store(SqlStore.postgres(dataSource)).build();
 ```
 
-A store of your own implements `dev.cronwatch.store.Store` and is held to the contract every store passes, from any test framework:
+A store of your own implements `dev.cronwatch.store.Store`, building the records it hands back with their static factories (`Run.of(...)`, `StoredJob.of(...)`, and `JobState.fromJson` for the state's JSON) rather than their canonical constructors, since a record may gain a component in a 1.x release. It is held to the contract every store passes, from any test framework:
 
 ```java
 dev.cronwatch.storetest.StoreContract.run(new MemoryStore());
 ```
 
-`StoreReplay` replays the SDK's recorded store cases (`conformance/store.json`, which your test reads), and `FinishOnce` runs several clients over one database to hold a run to being recorded and judged once.
+`StoreContract.run` is the kit's one entry point, and the only part of `dev.cronwatch.storetest` the 1.x releases promise. (Before 1.0 the package also published `StoreReplay`, `FinishOnce`, `ForeignRows` and `StoreContract.newRun`, the parts the port's own store tests use; they are internal now.)
 
 ### Alerts
 
@@ -152,7 +152,7 @@ Cronwatch cw = Cronwatch.builder()
         .options(JobOptions.builder().grace("5m"))
         .build()))
     .build();
-cw.start();
+cw.startChecking();
 ```
 
 The pg_cron source watches the jobs that run inside Postgres, where nothing can wrap them: each check reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a missed, failed, stuck or slow pg_cron job is alerted like any other. It needs a data source on the database pg_cron runs in (its `cron.database_name`). Jobs are named from their jobname (`prefix` in front); a paused job loses its schedule, and one renamed or dropped keeps its history without one.
@@ -221,7 +221,7 @@ cronwatch.app=billing
 cronwatch.jobs[NightlyReports.build].grace=15m
 ```
 
-With `@EnableScheduling`, every `@Scheduled` method is watched with no code changes (`cronwatch.scheduled.enabled=false` turns it off). Each invocation is a run, recorded from the `Observation` Spring makes of it, in the thread that runs the method, so `Cronwatch.current()` works inside it; a method that throws fails its run and Spring's error handler does what it did before. A job is named `SimpleClassName.method` after the bean's own class, the full name when two classes' simple names would give one name, and `@CronwatchJob` names it and gives its options:
+With `@EnableScheduling`, every `@Scheduled` method is watched with no code changes (`cronwatch.scheduled.enabled=false` turns it off). Each invocation is a run (trigger `spring-scheduled`; runs recorded before 1.0 carry `scheduled`), recorded from the `Observation` Spring makes of it, in the thread that runs the method, so `Cronwatch.current()` works inside it; a method that throws fails its run and Spring's error handler does what it did before. A job is named `SimpleClassName.method` after the bean's own class, the full name when two classes' simple names would give one name, and `@CronwatchJob` names it and gives its options:
 
 ```java spring
 class NightlyReports {
@@ -291,6 +291,10 @@ final class CronwatchMain {
 ```
 
 `check` prints `cronwatch: checked 3 jobs, sent 1 alert` and exits non-zero when the check fails, so cron mails it; code already running in an app calls `CronwatchCli.run`, which answers the status and never ends the JVM. `examples/crontab` is such a program on SQLite.
+
+## Deprecated
+
+These still work, marked `@Deprecated(forRemoval = true)`, through every 1.x release, and go in 2.0: `cw.start()` and its overloads (use `cw.startChecking()`); `dev.cronwatch.jdbc.SqlStore` (use `dev.cronwatch.store.SqlStore`, the same store, now beside `MemoryStore`); `dev.cronwatch.bridge.Bridge` (use `SchedulerBridge`, the .NET port's name; the bridge is for integration authors and outside the 1.x promise); `Routes.of(cw, options)` (use `cw.routes(options)`). `Json.quote`, `Json.kind`, `Json.copy`, `Json.MAX_DEPTH`, pg_cron's helpers (`PgCron.schedule`, `jobName`, `run`, `HOLD_MS`, `PgCronRow`), `Twilio.MAX_SEGMENTS` and every part of `dev.cronwatch.storetest` but `StoreContract.run` are internal from 1.0. The [Java docs](https://cronwatch.dev/docs/java/#deprecated) have the list.
 
 ## Testing this package
 

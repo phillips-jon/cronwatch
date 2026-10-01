@@ -34,6 +34,17 @@ import org.junit.jupiter.api.Test;
 /** The Go and Rust ports' bridge tests, with their audits' regressions. */
 class BridgeTest {
   @Test
+  @SuppressWarnings("removal") // Bridge, the deprecated alias, is what this tests
+  void theNameBefore10IsTheSameBridge() {
+    assertEquals(SchedulerBridge.appTag("quartz", "Billing"), Bridge.appTag("quartz", "Billing"));
+    assertEquals(SchedulerBridge.SAMPLE_RUNS, Bridge.SAMPLE_RUNS);
+    assertEquals(SchedulerBridge.SYNC_TIMEOUT, Bridge.SYNC_TIMEOUT);
+    assertEquals(
+        SchedulerBridge.everyText(Duration.ofMinutes(5)), Bridge.everyText(Duration.ofMinutes(5)));
+    assertEquals(SchedulerBridge.validName("a b"), Bridge.validName("a b"));
+  }
+
+  @Test
   void theAppTagIsThePhpPorts() {
     // What the PHP port's Bridge\Unscheduled::appTag() gives for each name.
     String x39 = "x".repeat(39);
@@ -54,12 +65,13 @@ class BridgeTest {
             "\u212a",
             "laravel-scheduler:f7781178");
     for (Map.Entry<String, String> c : cases.entrySet()) {
-      assertEquals(c.getValue(), Bridge.appTag("laravel-scheduler", c.getKey()), c.getKey());
+      assertEquals(
+          c.getValue(), SchedulerBridge.appTag("laravel-scheduler", c.getKey()), c.getKey());
     }
     // The PHP port's own cases.
-    assertEquals("fw:laravel", Bridge.appTag("fw", "Laravel"));
-    assertEquals("fw:billing-api", Bridge.appTag("fw", "  Billing API! "));
-    assertEquals("fw:app-1d4ce23f0a88", Bridge.appTag("fw", "app-1d4ce23f0a88"));
+    assertEquals("fw:laravel", SchedulerBridge.appTag("fw", "Laravel"));
+    assertEquals("fw:billing-api", SchedulerBridge.appTag("fw", "  Billing API! "));
+    assertEquals("fw:app-1d4ce23f0a88", SchedulerBridge.appTag("fw", "app-1d4ce23f0a88"));
   }
 
   @Test
@@ -67,24 +79,25 @@ class BridgeTest {
     if (System.getenv("CRONWATCH_APP_ID") != null) {
       return; // the variable wins, which this JVM cannot unset
     }
-    assertEquals("billing", Bridge.appName(" billing "));
-    assertFalse(Bridge.appName(null).isEmpty());
-    assertFalse(Bridge.appName(null).contains("."), Bridge.appName(null));
+    assertEquals("billing", SchedulerBridge.appName(" billing "));
+    assertFalse(SchedulerBridge.appName(null).isEmpty());
+    assertFalse(SchedulerBridge.appName(null).contains("."), SchedulerBridge.appName(null));
   }
 
   @Test
   void everyTextIsExactToTheMillisecond() {
-    assertEquals("every 1h30m", Bridge.everyText(Duration.ofMinutes(90)));
-    assertEquals("every 1d12h1s500ms", Bridge.everyText(Duration.ofMillis(36 * 3_600_000L + 1500)));
-    assertEquals("every 0ms", Bridge.everyText(Duration.ZERO));
-    assertEquals("every 1ms", Bridge.everyText(Duration.ofNanos(600_000)));
+    assertEquals("every 1h30m", SchedulerBridge.everyText(Duration.ofMinutes(90)));
+    assertEquals(
+        "every 1d12h1s500ms", SchedulerBridge.everyText(Duration.ofMillis(36 * 3_600_000L + 1500)));
+    assertEquals("every 0ms", SchedulerBridge.everyText(Duration.ZERO));
+    assertEquals("every 1ms", SchedulerBridge.everyText(Duration.ofNanos(600_000)));
   }
 
   @Test
   void validNamesAreTheClients() {
-    assertTrue(Bridge.validName("NightlyReports.build"));
-    assertFalse(Bridge.validName("Outer$Inner.run"));
-    assertFalse(Bridge.validName("x".repeat(121)));
+    assertTrue(SchedulerBridge.validName("NightlyReports.build"));
+    assertFalse(SchedulerBridge.validName("Outer$Inner.run"));
+    assertFalse(SchedulerBridge.validName("x".repeat(121)));
   }
 
   /** A scheduler that runs at hour:00 UTC every {@code step} days from the epoch. */
@@ -98,7 +111,7 @@ class BridgeTest {
       while (true) {
         day += step;
         out.add(at(day, hour));
-        if ((end == null && out.size() > Bridge.SAMPLE_RUNS)
+        if ((end == null && out.size() > SchedulerBridge.SAMPLE_RUNS)
             || (end != null && at(day, hour) > end)) {
           return out;
         }
@@ -113,12 +126,12 @@ class BridgeTest {
   @Test
   void checkFiresComparesTheSchedulersOwnRuns() throws Exception {
     long now = Js.dateUtc(2026, 8, 1, 0, 0, 0, 0);
-    Bridge.checkFires(daily(2, 1), "0 2 * * *", "UTC", "x", "a scheduler", true, now);
+    SchedulerBridge.checkFires(daily(2, 1), "0 2 * * *", "UTC", "x", "a scheduler", true, now);
     ScheduleException e =
         assertThrows(
             ScheduleException.class,
             () ->
-                Bridge.checkFires(
+                SchedulerBridge.checkFires(
                     daily(2, 2), "0 2 * * *", "UTC", "cronwatch: x", "a scheduler", true, now));
     assertTrue(
         e.getMessage().contains("cronwatch: x is \"0 2 * * *\" in UTC, but after a run at"),
@@ -126,7 +139,9 @@ class BridgeTest {
     assertTrue(e.getMessage().contains("a scheduler runs it next at"), e.getMessage());
     assertThrows(
         ScheduleException.class,
-        () -> Bridge.checkFires(daily(3, 1), "0 2 * * *", "UTC", "x", "a scheduler", true, now));
+        () ->
+            SchedulerBridge.checkFires(
+                daily(3, 1), "0 2 * * *", "UTC", "x", "a scheduler", true, now));
     FireTimes never =
         (start, end) -> {
           throw ScheduleException.neverFires("no fire time");
@@ -134,13 +149,16 @@ class BridgeTest {
     e =
         assertThrows(
             ScheduleException.class,
-            () -> Bridge.checkFires(never, "0 2 * * *", "UTC", "x", "a scheduler", true, now));
+            () ->
+                SchedulerBridge.checkFires(
+                    never, "0 2 * * *", "UTC", "x", "a scheduler", true, now));
     assertTrue(e.getMessage().endsWith("which never fires: no fire time"), e.getMessage());
     e =
         assertThrows(
             ScheduleException.class,
             () ->
-                Bridge.checkFires(daily(2, 1), "not a cron", "UTC", "x", "a scheduler", true, now));
+                SchedulerBridge.checkFires(
+                    daily(2, 1), "not a cron", "UTC", "x", "a scheduler", true, now));
     assertTrue(e.getMessage().contains("which CronWatch cannot read"), e.getMessage());
   }
 
@@ -151,13 +169,13 @@ class BridgeTest {
         FireTimes.walking(at -> Math.floorDiv(at, 3_600_000L) * 3_600_000L + 3_600_000L, "hourly");
     long start = Js.dateUtc(2026, 0, 1, 5, 30, 0, 0);
     List<Long> runs = hourly.between(start, null);
-    assertEquals(Bridge.SAMPLE_RUNS + 1, runs.size());
+    assertEquals(SchedulerBridge.SAMPLE_RUNS + 1, runs.size());
     assertEquals(Js.dateUtc(2026, 0, 1, 5, 0, 0, 0), runs.get(0), "the one at or before");
     assertEquals(Js.dateUtc(2026, 0, 1, 6, 0, 0, 0), runs.get(1));
     long end = Js.dateUtc(2026, 0, 1, 8, 0, 0, 0);
     List<Long> until = hourly.between(start, end);
     assertEquals(Js.dateUtc(2026, 0, 1, 9, 0, 0, 0), until.get(until.size() - 1), "one past");
-    Bridge.checkFires(hourly, "0 * * * *", "UTC", "x", "hourly", true, start);
+    SchedulerBridge.checkFires(hourly, "0 * * * *", "UTC", "x", "hourly", true, start);
     FireTimes never = FireTimes.walking(at -> null, "Nothing");
     ScheduleException e = assertThrows(ScheduleException.class, () -> never.between(start, null));
     assertTrue(e.getMessage().startsWith("Nothing finds no fire time after "), e.getMessage());
@@ -186,7 +204,8 @@ class BridgeTest {
               out.clear();
             }
             out.add(fire);
-            if ((end == null && out.size() > Bridge.SAMPLE_RUNS) || (end != null && fire > end)) {
+            if ((end == null && out.size() > SchedulerBridge.SAMPLE_RUNS)
+                || (end != null && fire > end)) {
               return out;
             }
           }
@@ -196,7 +215,7 @@ class BridgeTest {
         assertThrows(
             ScheduleException.class,
             () ->
-                Bridge.checkFires(
+                SchedulerBridge.checkFires(
                     runs, "30 2 * * *", "America/New_York", "job", "a scheduler", true, now));
     assertTrue(
         e.getMessage()
@@ -558,10 +577,10 @@ class BridgeTest {
   void optionsOfRebuildsAnExpectPatternAndACustomFunction() {
     try (Cronwatch cw = client(new MemoryStore())) {
       Definition def =
-          Bridge.definition(cw, "x", JobOptions.builder().expectMatch("done \\d+", "i"));
-      JobOptions rebuilt = Bridge.optionsOf(def);
-      assertEquals(def.toJson(), Bridge.definition(cw, "x", rebuilt).toJson());
-      Job job = cw.job("x", Bridge.optionsOf(def));
+          SchedulerBridge.definition(cw, "x", JobOptions.builder().expectMatch("done \\d+", "i"));
+      JobOptions rebuilt = SchedulerBridge.optionsOf(def);
+      assertEquals(def.toJson(), SchedulerBridge.definition(cw, "x", rebuilt).toJson());
+      Job job = cw.job("x", SchedulerBridge.optionsOf(def));
       job.run(ctx -> ctx.log("Done 12"));
       job.run(ctx -> ctx.log("nothing"));
       List<Run> runs = cw.runs("x", 2);
@@ -569,14 +588,16 @@ class BridgeTest {
       assertNull(runs.get(1).error(), "run by the JavaScript engine, /i and all");
 
       Definition custom =
-          Bridge.definition(cw, "y", JobOptions.builder().expectThat(output -> false));
+          SchedulerBridge.definition(cw, "y", JobOptions.builder().expectThat(output -> false));
       assertEquals(
           "{\"name\":\"y\",\"expect\":\"custom function\"}",
-          Bridge.definition(cw, "y", Bridge.optionsOf(custom)).toJson());
+          SchedulerBridge.definition(cw, "y", SchedulerBridge.optionsOf(custom)).toJson());
 
       // A pattern the engine does not read is kept as stored, and passes every output.
       Definition unread = Definition.fromJson("{\"name\":\"z\",\"expect\":\"matches /(?<=a)b/\"}");
-      assertEquals(unread.toJson(), Bridge.definition(cw, "z", Bridge.optionsOf(unread)).toJson());
+      assertEquals(
+          unread.toJson(),
+          SchedulerBridge.definition(cw, "z", SchedulerBridge.optionsOf(unread)).toJson());
     }
   }
 
@@ -595,7 +616,7 @@ class BridgeTest {
         Definition def =
             Definition.fromJson(
                 "{\"name\":\"x\",\"expect\":\"matches " + c[0].replace("\\", "\\\\") + "\"}");
-        Job job = cw.job("x", Bridge.optionsOf(def));
+        Job job = cw.job("x", SchedulerBridge.optionsOf(def));
         long started = System.nanoTime();
         job.run(ctx -> ctx.log(c[1]));
         long took = TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started);
@@ -620,7 +641,7 @@ class BridgeTest {
     CountDownLatch hang = new CountDownLatch(1);
     try (Cronwatch cw = client(new MemoryStore(), errors)) {
       assertFalse(
-          Bridge.syncWithin(
+          SchedulerBridge.syncWithin(
               cw,
               Duration.ofMillis(100),
               "quartz",
@@ -632,9 +653,9 @@ class BridgeTest {
                 }
               }));
       assertEquals(List.of("quartz: the sync took longer than 0 seconds; gave up"), errors);
-      assertTrue(Bridge.syncWithin(cw, Duration.ofSeconds(10), "quartz", () -> {}));
+      assertTrue(SchedulerBridge.syncWithin(cw, Duration.ofSeconds(10), "quartz", () -> {}));
       assertFalse(
-          Bridge.syncWithin(
+          SchedulerBridge.syncWithin(
               cw,
               Duration.ofSeconds(10),
               "quartz",

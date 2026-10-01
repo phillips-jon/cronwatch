@@ -86,7 +86,7 @@ final class Checks {
       pairs.sort(Map.Entry.comparingByKey());
       List<String> body = new ArrayList<>();
       for (Map.Entry<String, @Nullable Object> e : pairs) {
-        body.add(Json.quote(e.getKey()) + ":" + write(e.getValue()));
+        body.add(Json.stringify(e.getKey()) + ":" + write(e.getValue()));
       }
       return "{" + String.join(",", body) + "}";
     }

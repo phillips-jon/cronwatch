@@ -1,6 +1,7 @@
 package dev.cronwatch.internal.evaluate;
 
 import dev.cronwatch.Definition;
+import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.internal.jsre.Regexp;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
@@ -29,12 +30,12 @@ public sealed interface Expect permits Expect.Contains, Expect.Matches, Expect.T
 
     @Override
     public @Nullable String check(String output) {
-      return output.contains(text) ? null : "Output did not contain " + Json.quote(text);
+      return output.contains(text) ? null : "Output did not contain " + Json.stringify(text);
     }
 
     @Override
     public String describe() {
-      return "contains " + Json.quote(text);
+      return "contains " + Json.stringify(text);
     }
   }
 
@@ -130,7 +131,7 @@ public sealed interface Expect permits Expect.Contains, Expect.Matches, Expect.T
     JsObject out = new JsObject();
     for (Map.Entry<String, @Nullable Object> e : fields.entries()) {
       if (!e.getKey().equals("expect")) {
-        out.set(e.getKey(), Json.copy(e.getValue()));
+        out.set(e.getKey(), Js.copyJson(e.getValue()));
       }
     }
     if (rule != null) {

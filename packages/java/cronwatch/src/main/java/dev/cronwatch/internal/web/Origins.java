@@ -57,11 +57,11 @@ public final class Origins {
     } catch (NotOrigin e) {
       if (e.notHttp) {
         throw new IllegalArgumentException(
-            "routes: origin must be http or https, got " + Json.quote(value));
+            "routes: origin must be http or https, got " + Json.stringify(value));
       }
       throw new IllegalArgumentException(
           "routes: origin must be an absolute URL such as \"https://app.example.com\", got "
-              + Json.quote(value));
+              + Json.stringify(value));
     }
   }
 

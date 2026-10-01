@@ -14,7 +14,8 @@ import java.util.List;
  * Elixir ports do, so they agree on every expression they read, every one they refuse and every
  * fire time.
  *
- * <p>Where it cannot match croner:
+ * <p>Where it departs from croner, it answers as the SDK does (the SDK's {@code parseSchedule}
+ * makes the same two departures):
  *
  * <ul>
  *   <li>A date no month has ({@code 0 0 30 2 *}) makes croner, which walks by recursion a year at a
@@ -22,9 +23,9 @@ import java.util.List;
  *       expression never fires.
  *   <li>Croner reads a string with a colon after its first character as a one-time date, through
  *       JavaScript's lenient {@code Date.parse}. This port refuses every such string: one that
- *       looks like an ISO date with "CronPattern: a one-time date is not supported by the Java
- *       port", anything else with the message croner gives for text {@code Date.parse} cannot read,
- *       "Invalid ISO8601 passed to timezone parser.".
+ *       looks like an ISO date with "CronPattern: a one-time date is not supported", anything else
+ *       with the message croner gives for text {@code Date.parse} cannot read, "Invalid ISO8601
+ *       passed to timezone parser.".
  * </ul>
  *
  * <p>An expression that schedules nothing and only answers {@link #nextRuns}; safe to share between
@@ -52,7 +53,7 @@ public final class Cron {
       // Croner reads a string with a colon after its first character as a one-time date to fire
       // at, not as a cron expression.
       if (isIsoDate(text)) {
-        throw new CronException("CronPattern: a one-time date is not supported by the Java port");
+        throw new CronException("CronPattern: a one-time date is not supported");
       }
       throw new CronException("Invalid ISO8601 passed to timezone parser.");
     }

@@ -1,7 +1,7 @@
 package dev.cronwatch.spring;
 
 import dev.cronwatch.Cronwatch;
-import dev.cronwatch.bridge.Bridge;
+import dev.cronwatch.bridge.SchedulerBridge;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -62,6 +62,6 @@ public class CronwatchSchedulingAutoConfiguration {
     if (app != null && !app.isBlank()) {
       return app.trim();
     }
-    return Bridge.appName(environment.getProperty("spring.application.name"));
+    return SchedulerBridge.appName(environment.getProperty("spring.application.name"));
   }
 }

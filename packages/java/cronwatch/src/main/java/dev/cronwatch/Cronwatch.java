@@ -55,7 +55,7 @@ import org.jspecify.annotations.Nullable;
  * });
  *
  * cw.check();                                // missed and stuck runs, retries, pruning
- * cw.start(Duration.ofMinutes(1));           // a check every minute, for a long-running service
+ * cw.startChecking(Duration.ofMinutes(1));   // a check every minute, for a long-running service
  * }</pre>
  *
  * <p>One per app, kept where the app keeps its {@code DataSource} and closed at shutdown ({@link
@@ -78,6 +78,12 @@ public final class Cronwatch implements AutoCloseable {
 
   /** Run ids that start with this belong to the pg_cron source. */
   public static final String RESERVED_RUN_ID_PREFIX = "pgcron:";
+
+  /**
+   * The longest run id, in UTF-16 code units: what {@code start}, {@code resume} and {@code
+   * recordRun} take, and every store holds.
+   */
+  static final int MAX_RUN_ID = 200;
 
   final Core core;
   final Delivery delivery;
@@ -152,12 +158,12 @@ public final class Cronwatch implements AutoCloseable {
     if (!NAME.matcher(name).matches()) {
       throw CronwatchException.invalid(
           "job name "
-              + Json.quote(name)
+              + Json.stringify(name)
               + " must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"");
     }
     JsObject fields = core.defaults.copy();
     for (Map.Entry<String, @Nullable Object> e : options.fields.entries()) {
-      fields.set(e.getKey(), Json.copy(e.getValue()));
+      fields.set(e.getKey(), Js.copyJson(e.getValue()));
     }
     fields.set("name", name);
     Definition stored = Expect.toStored(fields, options.expect);
@@ -172,7 +178,7 @@ public final class Cronwatch implements AutoCloseable {
 
   /** The SDK's refusals of options that would otherwise quietly turn a check off. */
   private static void validate(String name, Definition def) {
-    String quoted = Json.quote(name);
+    String quoted = Json.stringify(name);
     try {
       if (def.has("schedule")) {
         Object v = def.get("schedule");
@@ -188,7 +194,7 @@ public final class Cronwatch implements AutoCloseable {
         String tz = def.get("timezone") instanceof String z ? z : "";
         if (!Schedules.isZone(tz)) {
           throw CronwatchException.invalid(
-              "job " + quoted + ": timezone " + Json.quote(tz) + " is not an IANA timezone");
+              "job " + quoted + ": timezone " + Json.stringify(tz) + " is not an IANA timezone");
         }
       }
       if (def.has("grace")) {
@@ -299,7 +305,7 @@ public final class Cronwatch implements AutoCloseable {
     JobDef declared = core.declared(name);
     if (declared == null) {
       throw CronwatchException.invalid(
-          "job " + Json.quote(name) + " is not declared in this process");
+          "job " + Json.stringify(name) + " is not declared in this process");
     }
     core.ensureReady();
     return core.inTurn(
@@ -356,13 +362,15 @@ public final class Cronwatch implements AutoCloseable {
 
   /** The SDK's refusal of a run id no store could hold, or one reserved for the pg_cron source. */
   static void checkRunId(String job, String id, String method) {
-    if (id.isEmpty() || id.length() > 200) {
+    if (id.isEmpty() || id.length() > MAX_RUN_ID) {
       throw CronwatchException.invalid(
           "job "
-              + Json.quote(job)
+              + Json.stringify(job)
               + ": "
               + method
-              + "() needs a run id of 1 to 200 characters (got "
+              + "() needs a run id of 1 to "
+              + MAX_RUN_ID
+              + " characters (got "
               + id.length()
               + " characters)");
     }
@@ -370,7 +378,7 @@ public final class Cronwatch implements AutoCloseable {
     if (id.indexOf('\0') >= 0) {
       throw CronwatchException.invalid(
           "job "
-              + Json.quote(job)
+              + Json.stringify(job)
               + ": "
               + method
               + "() cannot take a run id containing a NUL character");
@@ -378,11 +386,11 @@ public final class Cronwatch implements AutoCloseable {
     if (id.startsWith(RESERVED_RUN_ID_PREFIX)) {
       throw CronwatchException.invalid(
           "job "
-              + Json.quote(job)
+              + Json.stringify(job)
               + ": "
               + method
               + "() cannot take a run id starting with "
-              + Json.quote(RESERVED_RUN_ID_PREFIX)
+              + Json.stringify(RESERVED_RUN_ID_PREFIX)
               + ", which the pg_cron source uses for its runs");
     }
   }
@@ -494,11 +502,11 @@ public final class Cronwatch implements AutoCloseable {
     if (!stored.job().equals(def.name())) {
       throw CronwatchException.invalid(
           "run "
-              + Json.quote(stored.id())
+              + Json.stringify(stored.id())
               + " belongs to job "
-              + Json.quote(stored.job())
+              + Json.stringify(stored.job())
               + ", not "
-              + Json.quote(def.name()));
+              + Json.stringify(def.name()));
     }
     boolean finished =
         stored.status().equals(RunStatus.OK) || stored.status().equals(RunStatus.FAILED);
@@ -522,7 +530,7 @@ public final class Cronwatch implements AutoCloseable {
     JobDef def = core.declared(name);
     if (def == null) {
       throw CronwatchException.invalid(
-          "resumeRun: job " + Json.quote(name) + " is not declared; call job first");
+          "resumeRun: job " + Json.stringify(name) + " is not declared; call job first");
     }
     return resumeHandle(def, runId);
   }
@@ -537,8 +545,9 @@ public final class Cronwatch implements AutoCloseable {
    * number throws before anything is written, as {@link JobContext#metric} does. Returns the alerts
    * it sent.
    *
-   * @throws CronwatchException when the job is not declared, for a metric that is not a finite
-   *     number, or when the store fails
+   * @throws CronwatchException when the job is not declared, for a run id that is not 1 to 200
+   *     characters or holds a NUL, for a metric that is not a finite number, or when the store
+   *     fails
    */
   public List<Alert> recordRun(Run run) {
     return recordRun(run, true);
@@ -677,24 +686,24 @@ public final class Cronwatch implements AutoCloseable {
 
   /**
    * Checks every minute, for a long-running service: the first check a second from now. Not for a
-   * program a crontab runs once, which calls {@link #check} instead. A second {@code start} does
-   * nothing.
+   * program a crontab runs once, which calls {@link #check} instead. A second call, under this name
+   * or {@code start}, does nothing.
    */
-  public void start() {
+  public void startChecking() {
     checks.start(60_000);
   }
 
-  /** {@link #start()} on an interval: five seconds at least, at most 2^31 - 1 ms. */
-  public void start(Duration every) {
+  /** {@link #startChecking()} on an interval: five seconds at least, at most 2^31 - 1 ms. */
+  public void startChecking(Duration every) {
     checks.start(JobOptions.millis(every, "check interval"));
   }
 
   /**
-   * {@link #start()} on an interval given as the SDK's text ({@code "1m"}).
+   * {@link #startChecking()} on an interval given as the SDK's text ({@code "1m"}).
    *
    * @throws CronwatchException for text that is not a duration
    */
-  public void start(String every) {
+  public void startChecking(String every) {
     try {
       checks.start(Durations.parse(every, "check interval"));
     } catch (IllegalArgumentException e) {
@@ -703,7 +712,39 @@ public final class Cronwatch implements AutoCloseable {
     }
   }
 
-  /** Stops the interval {@link #start} began. A check in flight finishes. */
+  /**
+   * {@link #startChecking()}: a job's {@code start} opens a run, so the client's is named for what
+   * it starts.
+   *
+   * @deprecated use {@link #startChecking()}, which does the same; removed in 2.0
+   */
+  @Deprecated(since = "1.0", forRemoval = true)
+  public void start() {
+    startChecking();
+  }
+
+  /**
+   * {@link #startChecking(Duration)}.
+   *
+   * @deprecated use {@link #startChecking(Duration)}, which does the same; removed in 2.0
+   */
+  @Deprecated(since = "1.0", forRemoval = true)
+  public void start(Duration every) {
+    startChecking(every);
+  }
+
+  /**
+   * {@link #startChecking(String)}.
+   *
+   * @throws CronwatchException for text that is not a duration
+   * @deprecated use {@link #startChecking(String)}, which does the same; removed in 2.0
+   */
+  @Deprecated(since = "1.0", forRemoval = true)
+  public void start(String every) {
+    startChecking(every);
+  }
+
+  /** Stops the interval {@link #startChecking} began. A check in flight finishes. */
   public void stop() {
     checks.stop();
   }
@@ -757,6 +798,7 @@ public final class Cronwatch implements AutoCloseable {
    *
    * @throws CronwatchException for an {@code origin} that is not an http or https URL
    */
+  @SuppressWarnings("removal") // Routes.of is this, under the name it had before 1.0
   public Routes routes(RoutesOptions options) {
     return Routes.of(this, options);
   }

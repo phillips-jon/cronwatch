@@ -1,4 +1,4 @@
-package dev.cronwatch.jdbc;
+package dev.cronwatch.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

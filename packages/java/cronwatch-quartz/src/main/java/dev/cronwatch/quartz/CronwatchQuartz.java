@@ -9,10 +9,10 @@ import dev.cronwatch.Run;
 import dev.cronwatch.RunHandle;
 import dev.cronwatch.RunOptions;
 import dev.cronwatch.RunStatus;
-import dev.cronwatch.bridge.Bridge;
 import dev.cronwatch.bridge.Entry;
 import dev.cronwatch.bridge.FireTimes;
 import dev.cronwatch.bridge.ScheduleException;
+import dev.cronwatch.bridge.SchedulerBridge;
 import dev.cronwatch.bridge.Watch;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -83,9 +83,9 @@ import org.quartz.listeners.SchedulerListenerSupport;
  * integration starts, again when the scheduler says a job or trigger was added or removed, and
  * every minute besides. A job with one {@link CronTrigger} is declared on its expression in the
  * trigger's zone (a {@code ?} as {@code *}, which croner reads as Quartz reads a {@code ?}),
- * checked against Quartz's own fire times ({@link Bridge#checkFires}): one Quartz reads differently
- * (nearly every expression naming a day of the week by number, since Quartz counts from 1 for
- * Sunday) is reported once and watched without a schedule. A {@link SimpleTrigger} repeating
+ * checked against Quartz's own fire times ({@link SchedulerBridge#checkFires}): one Quartz reads
+ * differently (nearly every expression naming a day of the week by number, since Quartz counts from
+ * 1 for Sunday) is reported once and watched without a schedule. A {@link SimpleTrigger} repeating
  * forever is declared {@code every <interval>}; any other trigger, a trigger with a {@code
  * Calendar}, or several triggers on different schedules is a job without a schedule. A job removed
  * from the scheduler keeps its runs and is declared again without its schedule, so it is never
@@ -170,7 +170,7 @@ public final class CronwatchQuartz implements AutoCloseable {
   final AtomicInteger walks = new AtomicInteger();
 
   /** How long a sync the check job starts may take; the tests shorten it. */
-  volatile Duration syncTimeout = Bridge.SYNC_TIMEOUT;
+  volatile Duration syncTimeout = SchedulerBridge.SYNC_TIMEOUT;
 
   private CronwatchQuartz(
       Cronwatch cw,
@@ -289,7 +289,7 @@ public final class CronwatchQuartz implements AutoCloseable {
       throw new CronwatchException(
           CronwatchException.Kind.OTHER, "reading the scheduler's jobs: " + e.getMessage(), e);
     }
-    watch.settle(Bridge.SYNC_TIMEOUT);
+    watch.settle(SchedulerBridge.SYNC_TIMEOUT);
     watch.unschedule();
   }
 
@@ -303,7 +303,7 @@ public final class CronwatchQuartz implements AutoCloseable {
 
   /** The check job's work: {@link #sync} within 30 seconds, then a check. Never throws. */
   void checkNow() {
-    Bridge.syncWithin(cw, syncTimeout, "quartz", this::sync);
+    SchedulerBridge.syncWithin(cw, syncTimeout, "quartz", this::sync);
     try {
       cw.check();
     } catch (RuntimeException e) {
@@ -393,7 +393,7 @@ public final class CronwatchQuartz implements AutoCloseable {
   }
 
   private static String quote(String s) {
-    return dev.cronwatch.json.Json.quote(s);
+    return dev.cronwatch.json.Json.stringify(s);
   }
 
   /** The options the app gave one job, over the integration's defaults. */
@@ -417,7 +417,7 @@ public final class CronwatchQuartz implements AutoCloseable {
           continue;
         }
         String name = nameOf(key);
-        if (!Bridge.validName(name)) {
+        if (!SchedulerBridge.validName(name)) {
           watch.reportOnce(
               "cronwatch: "
                   + label(name)
@@ -491,7 +491,7 @@ public final class CronwatchQuartz implements AutoCloseable {
                   + "ms, more often than CronWatch's shortest schedule of one second, so it is"
                   + " watched without a schedule";
         } else {
-          schedule = Bridge.everyText(Duration.ofMillis(interval));
+          schedule = SchedulerBridge.everyText(Duration.ofMillis(interval));
         }
       }
     } else if (trigger instanceof CalendarIntervalTrigger
@@ -547,7 +547,7 @@ public final class CronwatchQuartz implements AutoCloseable {
             && isAny(fields[4])
             && isAny(fields[5])
             && (fields.length < 7 || isAny(fields[6]));
-    Bridge.checkFires(
+    SchedulerBridge.checkFires(
         FireTimes.walking(at -> nextAfter(quartz, at), SCHEDULER),
         expr,
         tz.getID(),
@@ -706,7 +706,7 @@ public final class CronwatchQuartz implements AutoCloseable {
           return;
         }
         String name = nameOf(key);
-        if (!Bridge.validName(name)) {
+        if (!SchedulerBridge.validName(name)) {
           return;
         }
         Job job = watch.job(name);

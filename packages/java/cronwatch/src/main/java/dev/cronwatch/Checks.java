@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Checks, reads and the interval (the SDK's {@code check()}, {@code jobs()}, {@code silence()},
- * {@code start()}).
+ * {@code startChecking()}).
  */
 final class Checks {
   /** How often a check prunes old runs. */
@@ -369,7 +369,8 @@ final class Checks {
         warnedDeferredStart = true;
         Env.LOGGER.log(
             System.Logger.Level.WARNING,
-            "[cronwatch] start() was called with Deliver.AT_CHECK, so these checks send no alerts."
+            "[cronwatch] startChecking() was called with Deliver.AT_CHECK, so these checks send no"
+                + " alerts."
                 + " Another process must run checks with Deliver.NOW (the default) to send them.");
       }
       Runnable tick = () -> core.spawn(this::check, "check");

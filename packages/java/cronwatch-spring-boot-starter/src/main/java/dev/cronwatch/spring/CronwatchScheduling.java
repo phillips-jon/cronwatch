@@ -3,10 +3,10 @@ package dev.cronwatch.spring;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.Job;
 import dev.cronwatch.JobOptions;
-import dev.cronwatch.bridge.Bridge;
 import dev.cronwatch.bridge.Entry;
 import dev.cronwatch.bridge.FireTimes;
 import dev.cronwatch.bridge.ScheduleException;
+import dev.cronwatch.bridge.SchedulerBridge;
 import dev.cronwatch.bridge.Watch;
 import dev.cronwatch.json.Json;
 import io.micrometer.observation.ObservationRegistry;
@@ -206,7 +206,7 @@ public final class CronwatchScheduling
       String label = targetClass.getName() + "#" + method.getName();
       watch.reportOnce(
           "cronwatch: the @Scheduled method "
-              + Json.quote(label)
+              + Json.stringify(label)
               + " runs on a JDK proxy "
               + fits.size()
               + " beans share ("
@@ -264,8 +264,8 @@ public final class CronwatchScheduling
         if (props != null && props.getName() != null && !props.getName().isBlank()) {
           name = props.getName().trim();
         }
-        String label = "@Scheduled method " + Json.quote(name);
-        if (!Bridge.validName(name)) {
+        String label = "@Scheduled method " + Json.stringify(name);
+        if (!SchedulerBridge.validName(name)) {
           watch.reportOnce(
               "cronwatch: "
                   + label
@@ -404,7 +404,7 @@ public final class CronwatchScheduling
                   + "ms, more often than CronWatch's shortest schedule of one second, so it is"
                   + " watched without a schedule";
         } else {
-          schedule = Bridge.everyText(Duration.ofMillis(s.millis()));
+          schedule = SchedulerBridge.everyText(Duration.ofMillis(s.millis()));
         }
       }
       case ONCE -> {
@@ -434,7 +434,7 @@ public final class CronwatchScheduling
           "cronwatch: "
               + label
               + " is "
-              + Json.quote(cron)
+              + Json.stringify(cron)
               + ", which Spring cannot read: "
               + e.getMessage());
     }
@@ -451,7 +451,8 @@ public final class CronwatchScheduling
       fields.replaceAll(f -> f.equals("?") ? "*" : f);
       declared = String.join(" ", fields);
     }
-    Bridge.checkFires(fires, declared, zone, "cronwatch: " + label, SCHEDULER, daily(cron), now);
+    SchedulerBridge.checkFires(
+        fires, declared, zone, "cronwatch: " + label, SCHEDULER, daily(cron), now);
     return declared;
   }
 
@@ -476,7 +477,7 @@ public final class CronwatchScheduling
    */
   public void sync() {
     declare();
-    watch.settle(Bridge.SYNC_TIMEOUT);
+    watch.settle(SchedulerBridge.SYNC_TIMEOUT);
     watch.unschedule();
   }
 

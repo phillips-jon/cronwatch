@@ -1,7 +1,7 @@
 package dev.cronwatch.storetest;
 
-import dev.cronwatch.jdbc.SqlStore;
 import dev.cronwatch.store.MemoryStore;
+import dev.cronwatch.store.SqlStore;
 import dev.cronwatch.store.Store;
 import java.io.IOException;
 import java.nio.file.Files;

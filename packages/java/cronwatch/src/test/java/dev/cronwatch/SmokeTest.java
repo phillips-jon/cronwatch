@@ -78,7 +78,7 @@ class SmokeTest {
     Job job = cw.job("late");
     cw.close();
     job.run(ctx -> ctx.log("after close"));
-    cw.start();
+    cw.startChecking();
     assertEquals("after close", cw.runs("late", 1).get(0).output());
   }
 

@@ -1,5 +1,6 @@
 package dev.cronwatch;
 
+import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import java.util.Collections;
@@ -110,16 +111,16 @@ public final class Metrics {
       return EMPTY;
     }
     if (!(v instanceof JsObject o)) {
-      throw new Json.JsonException("metrics must be an object, not " + Json.kind(v));
+      throw new Json.JsonException("metrics must be an object, not " + Js.typeOf(v));
     }
     JsObject out = new JsObject();
     for (Map.Entry<String, @Nullable Object> e : o.entries()) {
       if (!(e.getValue() instanceof Number n)) {
         throw new Json.JsonException(
             "metric "
-                + Json.quote(e.getKey())
+                + Json.stringify(e.getKey())
                 + " must be a number, not "
-                + Json.kind(e.getValue()));
+                + Js.typeOf(e.getValue()));
       }
       out.set(e.getKey(), n.doubleValue());
     }

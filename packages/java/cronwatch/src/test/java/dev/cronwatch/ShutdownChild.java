@@ -1,6 +1,6 @@
 package dev.cronwatch;
 
-import dev.cronwatch.jdbc.SqlStore;
+import dev.cronwatch.store.SqlStore;
 import dev.cronwatch.store.Store;
 import java.io.PrintWriter;
 import java.sql.Connection;

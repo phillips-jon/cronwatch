@@ -47,7 +47,7 @@ Cronwatch cw = Cronwatch.builder()
     .alert(Slack.webhook(System.getenv("SLACK_WEBHOOK_URL")))
     .retention("30d")
     .build();
-cw.start();                                          // check every minute, in a long-running service
+cw.startChecking();                                  // check every minute, in a long-running service
 ```
 
 Every option has the SDK's default, and `build()` checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to standard error. `close()` stops the check, waits up to five seconds for a check and sends in flight, and closes the store; a servlet container or a Spring context calls it when the app stops, so no thread of the client's holds the app's class loader.
@@ -102,7 +102,7 @@ When the JVM begins to stop (`System.exit`, a `SIGTERM`), a shutdown hook record
 
 ## Run the check
 
-A job that never starts cannot report itself, so something has to look. `cw.start()` checks every minute, the first a second after it is called, for a long-running service; `start("5m")` or `start(Duration)` sets the interval (five seconds at least), and `stop()` ends it. Where another process checks, call `check()` there:
+A job that never starts cannot report itself, so something has to look. `cw.startChecking()` checks every minute, the first a second after it is called, for a long-running service; `startChecking("5m")` or `startChecking(Duration)` sets the interval (five seconds at least), and `stop()` ends it. (`start()`, its name before 1.0, still works, deprecated; a job's `start` opens a run.) Where another process checks, call `check()` there:
 
 ```java
 CheckResult result = cw.check();   // checkedAt, jobs, alerts, pruned
@@ -180,7 +180,7 @@ In a Spring Boot app, the starter registers it on Spring MVC, or a `WebFilter` o
 - `trustProxy()`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
 - `basePath(...)`: where it is mounted, when the adapter cannot tell; the JDK server's context and the servlet filter's path say so already.
 
-A request body past 1 MiB is answered 413. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). Tomcat, Jetty and Spring Security refuse an encoded slash (`%2F`) in a path by default, so a job whose name holds a `/` is reached through the dashboard behind them only if the app allows it; the JDK's server passes it through.
+A request body past 1 MiB is answered 413. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` names what is serving it, `{"ok":true,"library":"dev.cronwatch:cronwatch","language":"java","version":"<Cronwatch.VERSION>","api":1}`, and a silence or unsilence over the API answers the job's summary after it (`{"ok":true,"job":{...}}`), as `GET /api/jobs/<name>` does; `cw.silence` and `cw.unsilence` still answer the state. `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). Tomcat, Jetty and Spring Security refuse an encoded slash (`%2F`) in a path by default, so a job whose name holds a `/` is reached through the dashboard behind them only if the app allows it; the JDK's server passes it through.
 
 ## Jobs a URL starts
 
@@ -204,7 +204,7 @@ A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, an
 
 `MemoryStore` is the default, for tests and trying it out. Nothing survives a restart, so a miss cannot be noticed across one, and each process has its own. When the environment is production (`CRONWATCH_ENV` or `APP_ENV` set to `production` or `prod`), the client warns once that it is using it.
 
-`SqlStore` keeps the same three tables as the SDK's SQL stores in your database, through your `DataSource`:
+`SqlStore` (`dev.cronwatch.store.SqlStore`, beside `MemoryStore`) keeps the same three tables as the SDK's SQL stores in your database, through your `DataSource`:
 
 | Factory | |
 |---|---|
@@ -219,13 +219,13 @@ Cronwatch cw = Cronwatch.builder().store(SqlStore.postgres(dataSource).prefix("a
 
 The tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on the client's first use, byte for byte as the SDK makes them. `prefix(...)` names them: lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. The store's writes never join a transaction your code has open: on Postgres and MySQL each statement takes a connection of its own from the data source, in autocommit, so a run recorded inside a transaction that rolls back stays recorded. Give it a plain data source, not one that hands out your transaction's connection (Spring's `TransactionAwareDataSourceProxy`).
 
-A store of your own implements `dev.cronwatch.store.Store`: `init`, `upsertJob`, `getJob`, `listJobs`, `deleteJob`, `insertRun`, `updateRun`, `getRun`, `listRuns`, `lastRun`, `runningRuns`, `getState`, `setState`, `prune` and `close`, with epoch milliseconds for every time. Three default methods are what keep processes sharing a store from judging a run twice or losing each other's updates: `updateRunIf`, `compareAndSetState` and `deleteRunIf` (which takes back an attempt a scheduler gave back without failing; see [Java schedulers](/docs/java-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `dev.cronwatch.storetest` is the contract the built-in stores pass, from any test framework:
+A store of your own implements `dev.cronwatch.store.Store`: `init`, `upsertJob`, `getJob`, `listJobs`, `deleteJob`, `insertRun`, `updateRun`, `getRun`, `listRuns`, `lastRun`, `runningRuns`, `getState`, `setState`, `prune` and `close`, with epoch milliseconds for every time. Three default methods are what keep processes sharing a store from judging a run twice or losing each other's updates: `updateRunIf`, `compareAndSetState` and `deleteRunIf` (which takes back an attempt a scheduler gave back without failing; see [Java schedulers](/docs/java-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. Build the records a store hands back with their static factories, `Run.of(...)` and `StoredJob.of(...)`, and keep a state as its JSON (`state.toJson()`, `JobState.fromJson(text)`), never through a record's canonical constructor: a record such as `Run` may gain a component in a 1.x release, as the stored JSON may gain a field, and its factory keeps its parameters when it does. `dev.cronwatch.storetest` is the contract the built-in stores pass, from any test framework:
 
 ```java
 StoreContract.run(new MyStore());
 ```
 
-`StoreReplay` replays the SDK's recorded store cases (`conformance/store.json`, which your test reads), and `FinishOnce` runs several clients over one database to hold a run to being recorded and judged once.
+`StoreContract.run` is the kit's one entry point, and the only part of `dev.cronwatch.storetest` the 1.x releases promise; the helpers the port's own store tests use beside it are internal.
 
 ## Alerts
 
@@ -286,7 +286,14 @@ The options are the SDK's in camelCase: `subjectPrefix` and `link` among the ema
 
 Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for the whole request, reads at most 1 MiB of the answer, follows no redirect (so credentials never reach another address), and always verifies TLS. A refused request names only the URL's origin, never its path, with the channel's keys cut out. The requests go through the client's `Transport`, by default a `JdkTransport` over one `HttpClient` the client makes on its first send and closes with itself; `transport(...)` on the builder, or on one channel's or triage's options, takes one of your own, for a proxy, your own trust store or another HTTP client. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
-A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`. `Webhook.signature(secret, body)` is that hex, for a receiver in Java; compare it with `MessageDigest.isEqual`.
+The webhook's body is the alert as JSON after one more field, `"schema": 1`, which comes first (`Webhook.SCHEMA`): the same payload every CronWatch library posts, described by its [JSON Schema](/schemas/webhook/1.json) (see [Webhook](/docs/alerts/#webhook)). A receiver should read its fields (`type`, `details.durationMs`) rather than the wording of `title` and `message`, which is not promised. With a secret, the webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`, the HMAC-SHA256 of the raw body. `Webhook.signature(secret, body)` is that hex, for a receiver in Java; hash the body as it arrived, before parsing it, and compare in constant time:
+
+```java
+byte[] expected = ("sha256=" + Webhook.signature(secret, rawBody)).getBytes(StandardCharsets.UTF_8);
+String header = request.getHeader("x-cronwatch-signature");
+byte[] received = (header == null ? "" : header).getBytes(StandardCharsets.UTF_8);
+boolean ok = MessageDigest.isEqual(expected, received);
+```
 
 ### Processes that cannot send
 
@@ -310,7 +317,7 @@ Cronwatch cw = Cronwatch.builder()
         .options(JobOptions.builder().grace("5m"))
         .build()))
     .build();
-cw.start();
+cw.startChecking();
 ```
 
 It reads through a data source on the database pg_cron runs in (its `cron.database_name`), each query on a connection of its own in autocommit. Its options: `jobs`, `jobIds` and `pick` to choose jobs; `prefix`, `jobName`, and `options` (job options for every job, or a function answering them per job; the schedule and zone always come from pg_cron); and `timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
@@ -377,6 +384,8 @@ The builder's options:
 
 A job's options, on `JobOptions.builder()`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the JVM's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `maxDuration`, `budget` (a metric and its ceiling, or a map of them), `expect`, `expectMatch`, `expectThat`, `failuresBeforeAlert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
 
+`timeout` and `maxDuration` both measure a run's length. `timeout` gives up on a run still going: once a running run is older than it, the next check marks it `timeout` (a failure) and the job is stuck. `maxDuration` flags a run that finished successfully but slowly: it stays ok and the job is slow. Set `timeout` well above `maxDuration`: `.maxDuration("10m").timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
+
 | Method | |
 |---|---|
 | `job(name, options)` | declare a job and get its handle |
@@ -390,13 +399,26 @@ A job's options, on `JobOptions.builder()`: `schedule` (five or six field cron, 
 | `forget(name)` | remove a job and its runs |
 | `job.start(options)`, `job.resume(id)`, `resumeRun(name, id)` | runs that span calls |
 | `job.open(options)` | a run seen from outside the function, for a scheduler integration: an `ObservedRun` to close or take back |
-| `recordRun(run)` | record a run that happened elsewhere, for a source; answers the alerts it sent |
+| `recordRun(run)` | record a run that happened elsewhere, for a source (its id 1 to 200 characters, as `start` takes); answers the alerts it sent |
 | `syncJob(name)` | write a declaration to the store now, unless it already holds it |
 | `definedJobs()` | the jobs declared in this process |
 | `routes()`, `job.handler(fn)` | the dashboard and a job's handler |
 | `close()` | stop the check and close the store |
 
 `CronwatchException` has a `kind()`: `INVALID` (an option, name, schedule or run id the SDK refuses, with its message), `STORE` (the store's own exception as the cause) and `OTHER`. Reads (`jobs()`, `jobSummary()`, `runs()`) and `check()` throw it when the store fails; `run`, `start`, `flush` and `finish` never do.
+
+## Deprecated
+
+These names still work, and do exactly what their replacements do, through every 1.x release; each is marked `@Deprecated(forRemoval = true)`, so the compiler warns where it is used, and each goes in 2.0.
+
+| Deprecated | Use instead |
+|---|---|
+| `cw.start()`, `start(Duration)`, `start(String)` | `cw.startChecking()`, with the same overloads: a job's `start` opens a run, so the client's is named for what it starts |
+| `dev.cronwatch.jdbc.SqlStore` | `dev.cronwatch.store.SqlStore`, the same store beside `MemoryStore`; the old class hands every call to it |
+| `dev.cronwatch.bridge.Bridge` | `dev.cronwatch.bridge.SchedulerBridge`, the name the .NET port has; the bridge is for integration authors and outside the 1.x promise |
+| `Routes.of(cw, options)` | `cw.routes(options)`, the one way to mount the dashboard |
+
+Public means documented here or in the package's README; everything else may change in any release. These were public before 1.0 without being meant for apps, and are internal from 1.0: `Json.quote`, `Json.kind`, `Json.copy` and `Json.MAX_DEPTH` (`Json.stringify` of a string is `quote`); `PgCron.schedule`, `PgCron.jobName`, `PgCron.run`, `PgCron.HOLD_MS` and `PgCronRow`; `Twilio.MAX_SEGMENTS`; and in `dev.cronwatch.storetest`, everything but `StoreContract.run` (`StoreReplay`, `FinishOnce`, `ForeignRows`, `StoreContract.newRun`). A record that may grow (`Run`, `StoredJob`, `JobState`, `Alert`, `JobSummary`, `CheckResult`) is built with its static `of`, whose parameters stay put when the record gains a component; its canonical constructor does not.
 
 ## Runs that span calls
 
@@ -418,6 +440,8 @@ again.finish();                                               // or again.fail(e
 `SqlStore` writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Rust, Elixir and .NET stores (the MySQL tables are the PHP, Go, Rust, Elixir and .NET ports'): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and a Java client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
+
+A 1.x release keeps what it does not know of what it reads: a key of a job's state or definition, a condition, a run's status or trigger that a newer release wrote is kept as it was through every check, silence and run, so any 1.x release of any language can share a store with any other. 0.x processes are not covered: upgrade every process to 1.0 together.
 
 ## Kept in step
 

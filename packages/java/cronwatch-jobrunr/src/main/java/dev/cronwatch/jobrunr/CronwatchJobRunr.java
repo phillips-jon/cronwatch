@@ -5,10 +5,10 @@ import dev.cronwatch.CronwatchException;
 import dev.cronwatch.JobOptions;
 import dev.cronwatch.ObservedRun;
 import dev.cronwatch.RunOptions;
-import dev.cronwatch.bridge.Bridge;
 import dev.cronwatch.bridge.Entry;
 import dev.cronwatch.bridge.FireTimes;
 import dev.cronwatch.bridge.ScheduleException;
+import dev.cronwatch.bridge.SchedulerBridge;
 import dev.cronwatch.bridge.Watch;
 import dev.cronwatch.json.Json;
 import java.lang.reflect.InvocationTargetException;
@@ -63,11 +63,11 @@ import org.jspecify.annotations.Nullable;
  * is watched only when its JobRunr name is given to {@link JobRunrOptions#watchJob}.
  *
  * <p>A recurring job's cron is read in its zone and checked against JobRunr's own fire times
- * ({@link Bridge#checkFires}); one JobRunr reads differently is reported once and watched without a
- * schedule. An interval ({@code Duration}) is declared {@code every <interval>}. The recurring jobs
- * are read when the integration starts and every minute besides, and a recurring job deleted is
- * declared again without its schedule, so it is never reported missed. Jobs are tagged {@code
- * jobrunr} and {@code jobrunr:<app>}.
+ * ({@link SchedulerBridge#checkFires}); one JobRunr reads differently is reported once and watched
+ * without a schedule. An interval ({@code Duration}) is declared {@code every <interval>}. The
+ * recurring jobs are read when the integration starts and every minute besides, and a recurring job
+ * deleted is declared again without its schedule, so it is never reported missed. Jobs are tagged
+ * {@code jobrunr} and {@code jobrunr:<app>}.
  */
 public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   /** The tag every job this integration declares carries. */
@@ -109,7 +109,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   final AtomicInteger walks = new AtomicInteger();
 
   /** How long a sync the check job starts may take; the tests shorten it. */
-  volatile Duration syncTimeout = Bridge.SYNC_TIMEOUT;
+  volatile Duration syncTimeout = SchedulerBridge.SYNC_TIMEOUT;
 
   private CronwatchJobRunr(Cronwatch cw, StorageProvider storage, JobRunrOptions options) {
     this.cw = cw;
@@ -159,7 +159,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   }
 
   void checkNow() {
-    Bridge.syncWithin(cw, syncTimeout, "jobrunr", this::sync);
+    SchedulerBridge.syncWithin(cw, syncTimeout, "jobrunr", this::sync);
     try {
       cw.check();
     } catch (RuntimeException e) {
@@ -181,7 +181,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
    */
   public void sync() {
     watch.declare(entries());
-    watch.settle(Bridge.SYNC_TIMEOUT);
+    watch.settle(SchedulerBridge.SYNC_TIMEOUT);
     watch.unschedule();
   }
 
@@ -223,7 +223,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   // ---- the recurring jobs
 
   private static String label(String name) {
-    return "JobRunr recurring job " + Json.quote(name);
+    return "JobRunr recurring job " + Json.stringify(name);
   }
 
   private JobOptions optionsFor(String name) {
@@ -241,7 +241,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
       if (CHECK_ID.equals(name)) {
         continue;
       }
-      if (!Bridge.validName(name)) {
+      if (!SchedulerBridge.validName(name)) {
         watch.reportOnce(
             "cronwatch: "
                 + label(name)
@@ -279,7 +279,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
                 + "ms, more often than CronWatch's shortest schedule of one second, so it is"
                 + " watched without a schedule";
       } else {
-        schedule = Bridge.everyText(every);
+        schedule = SchedulerBridge.everyText(every);
       }
     } else {
       String expr = job.getScheduleExpression();
@@ -324,7 +324,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
       tz = zone.isEmpty() ? ZoneId.systemDefault() : ZoneId.of(zone);
     } catch (RuntimeException e) {
       throw new ScheduleException(
-          "cronwatch: " + label + ": the zone " + Json.quote(zone) + " is not one Java reads");
+          "cronwatch: " + label + ": the zone " + Json.stringify(zone) + " is not one Java reads");
     }
     Instant created = createdAt == null ? Instant.EPOCH : createdAt;
     FireTimes fires =
@@ -348,7 +348,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
             && any(fields[day])
             && any(fields[day + 1])
             && any(fields[day + 2]);
-    Bridge.checkFires(fires, expr, zone, "cronwatch: " + label, SCHEDULER, daily, now);
+    SchedulerBridge.checkFires(fires, expr, zone, "cronwatch: " + label, SCHEDULER, daily, now);
   }
 
   private static boolean any(String field) {
@@ -390,10 +390,12 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   private @Nullable String nameOf(Job job) {
     String recurring = job.getRecurringJobId().orElse(null);
     if (recurring != null) {
-      return CHECK_ID.equals(recurring) || !Bridge.validName(recurring) ? null : recurring;
+      return CHECK_ID.equals(recurring) || !SchedulerBridge.validName(recurring) ? null : recurring;
     }
     String jobName = job.getJobName();
-    return jobName != null && options.watched.contains(jobName) && Bridge.validName(jobName)
+    return jobName != null
+            && options.watched.contains(jobName)
+            && SchedulerBridge.validName(jobName)
         ? jobName
         : null;
   }

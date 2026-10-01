@@ -1,7 +1,7 @@
 package dev.cronwatch.spring;
 
 import dev.cronwatch.Cronwatch;
-import dev.cronwatch.bridge.Bridge;
+import dev.cronwatch.bridge.SchedulerBridge;
 import java.time.Duration;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -171,11 +171,11 @@ final class CronwatchChecker implements SmartLifecycle {
         () -> {
           CronwatchScheduling s = scheduling;
           if (s != null) {
-            Bridge.syncWithin(cw, Bridge.SYNC_TIMEOUT, "scheduled", s::sync);
+            SchedulerBridge.syncWithin(cw, SchedulerBridge.SYNC_TIMEOUT, "scheduled", s::sync);
           }
           QuartzChecks q = quartz;
           if (check && q != null && !q.runsTheCheck()) {
-            Bridge.syncWithin(cw, Bridge.SYNC_TIMEOUT, "quartz", q::sync);
+            SchedulerBridge.syncWithin(cw, SchedulerBridge.SYNC_TIMEOUT, "quartz", q::sync);
           }
           if (check) {
             try {
