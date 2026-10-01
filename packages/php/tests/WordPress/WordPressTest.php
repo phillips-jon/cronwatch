@@ -347,8 +347,8 @@ final class WordPressTest extends TestCase
         $run = self::runs('wp:cwt_ok')[0];
         $this->assertSame('ok', $run['status']);
         $this->assertSame('wp-cron', $run['trigger']);
-        $this->assertSame("logged []\ndid ok", $run['output'], 'cronwatch_log() lines, then what was echoed');
-        $this->assertSame("logged [\"x\"]\ndid ok", self::runs("wp:cwt_ok:{$key}")[0]['output']);
+        $this->assertSame("logged []\nand by the function\ndid ok", $run['output'], 'the cronwatch_log lines, then what was echoed');
+        $this->assertSame("logged [\"x\"]\nand by the function\ndid ok", self::runs("wp:cwt_ok:{$key}")[0]['output']);
     }
 
     public function testSingleEventsAreOneJobPerHookWithoutASchedule(): void
