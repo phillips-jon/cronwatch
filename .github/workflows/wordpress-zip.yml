@@ -75,12 +75,23 @@ jobs:
           if [ ! -f "$zip" ]; then echo "build.php did not write $zip"; exit 1; fi
           cp "$zip" "$out/cronwatch.zip"
           # A release written by hand first keeps its title and notes. A
-          # prerelease (v0.8.0-beta.1) is marked one, so releases/latest
-          # keeps serving the newest stable release's zip.
+          # prerelease (v0.8.0-beta.1) is marked one, and only the highest
+          # stable tag is marked latest (a rerun for an older tag is not), so
+          # releases/latest keeps serving the newest stable release's zip.
           if ! gh release view "$TAG" >/dev/null 2>&1; then
+            latest=false
             set --
-            case "$version" in *-*) set -- --prerelease ;; esac
-            gh release create "$TAG" --verify-tag "$@" --title "CronWatch $version" \
+            case "$version" in
+              *-*) set -- --prerelease ;;
+              *)
+                highest="$(gh api "repos/$GH_REPO/git/matching-refs/tags/v" --paginate --jq '.[].ref' \
+                  | sed -n 's#^refs/tags/v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$#\1#p' \
+                  | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)"
+                if [ -z "$highest" ]; then echo "could not list the release tags"; exit 1; fi
+                if [ "$highest" = "$version" ]; then latest=true; fi
+                ;;
+            esac
+            gh release create "$TAG" --verify-tag "$@" --latest="$latest" --title "CronWatch $version" \
               --notes "CronWatch $version. Docs: https://cronwatch.dev/docs/. The WordPress plugin's zip is attached below until it is listed in the WordPress plugin directory."
           fi
           gh release upload "$TAG" "$zip" "$out/cronwatch.zip" --clobber
