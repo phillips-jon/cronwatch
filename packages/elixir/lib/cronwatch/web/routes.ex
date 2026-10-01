@@ -13,7 +13,6 @@ defmodule Cronwatch.Web.Routes do
   alias Cronwatch.Duration
   alias Cronwatch.Env
   alias Cronwatch.Evaluate
-  alias Cronwatch.JobState
   alias Cronwatch.JobSummary
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
@@ -35,6 +34,13 @@ defmodule Cronwatch.Web.Routes do
   @board_page_runs 20
   @cookie_max_age 60 * 60 * 24 * 30
   @default_base "/cronwatch"
+
+  # What GET <base>/api says is serving it: the package, as its registry
+  # names it, the language, and the API's version, which goes up only with a
+  # change that is not additive, in a major release.
+  @library "cronwatch"
+  @language "elixir"
+  @api_version 1
 
   # The most of a request body the dashboard reads: its forms and JSON are a
   # few bytes. A body past it is answered 413; the SDK leaves this to the
@@ -635,8 +641,26 @@ defmodule Cronwatch.Web.Routes do
 
   defp no_such_job, do: api(error_body("No such job"), 404)
 
+  # A silence's or an unsilence's answer: the job's summary after it.
+  defp summary_answer(name, inst) do
+    job = Cronwatch.job_summary!(name, inst)
+    api(ok_body([{"job", if(job, do: JobSummary.to_value(job))}]), 200)
+  end
+
   defp serve_api(req, method, rest, said, inst) do
     case {method, rest} do
+      # What is serving the API, so a client such as @cronwatch/mcp can tell.
+      {"GET", []} ->
+        api(
+          ok_body([
+            {"library", @library},
+            {"language", @language},
+            {"version", Cronwatch.version()},
+            {"api", @api_version}
+          ]),
+          200
+        )
+
       {"GET", ["jobs"]} ->
         jobs = Cronwatch.jobs!(inst)
         api(ok_body([{"jobs", Enum.map(jobs, &JobSummary.to_value/1)}]), 200)
@@ -672,8 +696,8 @@ defmodule Cronwatch.Web.Routes do
               value ->
                 case silence_duration(value || Request.param(said.query, "for")) do
                   {:ok, duration} ->
-                    state = Cronwatch.silence!(name, duration, inst)
-                    api(ok_body([{"state", JobState.to_value(state)}]), 200)
+                    Cronwatch.silence!(name, duration, inst)
+                    summary_answer(name, inst)
 
                   {:error, message} ->
                     api(error_body(message), 400)
@@ -681,8 +705,8 @@ defmodule Cronwatch.Web.Routes do
             end
 
           action == "unsilence" ->
-            state = Cronwatch.unsilence!(name, inst)
-            api(ok_body([{"state", JobState.to_value(state)}]), 200)
+            Cronwatch.unsilence!(name, inst)
+            summary_answer(name, inst)
 
           true ->
             api(error_body("Not found"), 404)

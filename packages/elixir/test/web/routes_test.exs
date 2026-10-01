@@ -61,6 +61,24 @@ defmodule Cronwatch.Web.RoutesTest do
     assert get(w, "/cronwatch/api/check?token=#{secret}").status == 401, "only as a bearer"
   end
 
+  test "GET /api names the library, the language and the versions" do
+    secret = "cron-" <> "s3cret"
+    w = web([], cron_secret: secret)
+    want = ~s({"ok":true,"library":"cronwatch","language":"elixir","version":"#{Cronwatch.version()}","api":1})
+
+    for path <- ["/cronwatch/api", "/cronwatch/api/"] do
+      res = get(w, path, [@auth])
+      assert res.status == 200, path
+      assert res.body == want, path
+      assert header(res, "content-type") =~ "application/json", path
+    end
+
+    assert get(w, "/cronwatch/api").status == 401
+    assert get(w, "/cronwatch/api", [{"authorization", "Bearer " <> secret}]).status == 401, "the cron secret"
+    res = req(w, "POST", "/cronwatch/api", [@auth])
+    assert {res.status, res.body} == {404, ~s({"ok":false,"error":"Not found"})}
+  end
+
   test "sign-in sets a cookie and redirects to a clean URL" do
     w = web()
     cookie = token_cookie()
@@ -155,10 +173,12 @@ defmodule Cronwatch.Web.RoutesTest do
     assert field(result, ["ok"]) == true
     assert length(field(result, ["jobs"])) == 1
     silenced = json(post.("/cronwatch/api/jobs/s/silence", ~s({"for":"2h"})))
-    assert field(silenced, ["state", "silencedUntil"]) == @t0 + 2 * @hour
+    assert field(silenced, ["job", "silencedUntil"]) == @t0 + 2 * @hour
+    assert field(silenced, ["job", "health"]) == "silenced", "the summary after the silence"
+    assert Enum.map(silenced.pairs, &elem(&1, 0)) == ["ok", "job"]
     assert summary(w, "s").health == "silenced"
     un = json(post.("/cronwatch/api/jobs/s/unsilence", ""))
-    assert field(un, ["state", "silencedUntil"]) == nil
+    assert field(un, ["job", "silencedUntil"]) == nil
     assert post.("/cronwatch/api/jobs/nope/silence", ~s({"for":"1h"})).status == 404
     assert req(w, "DELETE", "/cronwatch/api/jobs/s", [@auth]).status == 200
     assert summary(w, "s") == nil, "the job was not forgotten"
@@ -328,7 +348,7 @@ defmodule Cronwatch.Web.RoutesTest do
     end
 
     assert summary(w, "s").silenced_until == nil, "a bad duration silenced the job"
-    until = fn body -> field(json(silence.(body)), ["state", "silencedUntil"]) - @t0 end
+    until = fn body -> field(json(silence.(body)), ["job", "silencedUntil"]) - @t0 end
     assert until.(~s({"for":7200000})) == 7_200_000, "a number"
     assert until.(~s({"for":"60000"})) == 60_000, "a numeric string"
     assert until.(~s({"for":"90m"})) == 90 * @min, "text"
@@ -336,7 +356,7 @@ defmodule Cronwatch.Web.RoutesTest do
     assert until.(~s(\uFEFF{"for":"2h"})) == 2 * @hour, "a byte order mark"
     assert req(w, "POST", "/cronwatch/api/jobs/s/silence?for=forever", [@auth]).status == 400
     query = json(req(w, "POST", "/cronwatch/api/jobs/s/silence?for=3h", [@auth]))
-    assert field(query, ["state", "silencedUntil"]) == @t0 + 3 * @hour, "the query when the body has none"
+    assert field(query, ["job", "silencedUntil"]) == @t0 + 3 * @hour, "the query when the body has none"
     # The SDK's 64 character cap, quoting the first 32.
     long = json(silence.(~s({"for":"#{String.duplicate("1", 65)}m"})))
     assert field(long, ["error"]) =~ "silence duration"
@@ -460,7 +480,7 @@ defmodule Cronwatch.Web.RoutesTest do
         |> Map.merge(%{host: "app.test", req_headers: [@auth, @json], body_params: params})
         |> Cronwatch.Web.call(Cronwatch.Web.init(w.opts))
 
-      assert field(JS.parse!(conn.resp_body), ["state", "silencedUntil"]) == @t0 + want, inspect(params)
+      assert field(JS.parse!(conn.resp_body), ["job", "silencedUntil"]) == @t0 + want, inspect(params)
     end
   end
 
@@ -791,7 +811,7 @@ defmodule Cronwatch.Web.RoutesTest do
     silenced =
       json(req(w, "POST", "/cronwatch/api/jobs/rare/silence", [@auth, @json], ~s({"for":"99999999999999999999999"})))
 
-    assert field(silenced, ["state", "silencedUntil"]) > Clock.now(w.clock), "a long silence ended at once"
+    assert field(silenced, ["job", "silencedUntil"]) > Clock.now(w.clock), "a long silence ended at once"
   end
 
   test "a foreign row's far times do not fail the pages" do
