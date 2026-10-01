@@ -213,7 +213,7 @@ test("a silence ends on a whole millisecond, never past 2^53 - 1", async () => {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ for: "99999999999999999999w" }),
   }));
   assert.equal(res.status, 200);
-  assert.equal((await res.json()).state.silencedUntil, Number.MAX_SAFE_INTEGER);
+  assert.equal((await res.json()).job.silencedUntil, Number.MAX_SAFE_INTEGER);
 });
 
 test("triage output is attached to failure alerts and never blocks them", async () => {
