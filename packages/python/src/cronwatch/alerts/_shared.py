@@ -9,6 +9,7 @@ import base64
 import hashlib
 import math
 import urllib.parse
+import warnings
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
@@ -217,3 +218,13 @@ def form(pairs: Iterable[tuple[str, str]]) -> str:
 def json_body(value: Any) -> str:
     """JSON.stringify."""
     return _js.dumps(value)
+
+
+def positional_url(channel: str, positional: str | None, webhook_url: str | None) -> str | None:
+    """The webhook URL given by name, or (deprecated, until 2.0) as the first argument."""
+    if positional is None:
+        return webhook_url
+    if webhook_url is not None:
+        raise TypeError(f"{channel}() got webhook_url twice: pass it by name only")
+    warnings.warn(f"{channel}(url) is deprecated: pass {channel}(webhook_url=url)", DeprecationWarning, stacklevel=3)
+    return positional

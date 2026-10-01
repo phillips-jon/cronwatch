@@ -216,8 +216,10 @@ def test_text_cut_for_a_subject_never_leaves_half_a_surrogate_pair() -> None:
         (lambda: A.Datadog(api_key="k", site="evil.com/x?y"), "site like"),
         (lambda: A.NewRelic(account_id="12a", api_key="k"), "numeric account_id"),
         (lambda: A.Rollbar(access_token=None), "access_token"),  # type: ignore[arg-type]
-        (lambda: A.Slack(""), "webhook_url"),
-        (lambda: A.Discord(None), "webhook_url"),  # type: ignore[arg-type]
+        (lambda: A.Slack(webhook_url=""), "webhook_url"),
+        (lambda: A.Slack(), "webhook_url"),
+        (lambda: A.Discord(), "webhook_url"),
+        (lambda: A.Discord(webhook_url=None), "webhook_url"),  # type: ignore[arg-type]
         (lambda: A.Webhook(""), "url"),
         (lambda: A.Resend(api_key="  ", **EMAIL), "needs an api_key"),
     ],
@@ -317,7 +319,7 @@ def alert_j(triage: str | None = None) -> Any:
 
 def test_discord_keeps_job_output_inside_its_code_block_and_pings_no_one() -> None:
     http = FakeHTTP()
-    A.Discord("https://discord.example/api/webhooks/1/secret", http=http).send(alert_j("See [the docs](https://evil.example) *now*"))
+    A.Discord(webhook_url="https://discord.example/api/webhooks/1/secret", http=http).send(alert_j("See [the docs](https://evil.example) *now*"))
     body = json.loads(http.requests[0]["body"])
     assert body["allowed_mentions"] == {"parse": []}
     description = body["embeds"][0]["description"]
@@ -333,7 +335,7 @@ def test_discord_holds_the_whole_description_to_4096_cutting_the_message_and_kee
     http = FakeHTTP()
     alert = alert_j("*_`~|[]()<>\\" * 100)
     alert.message = "Error: long\n" + "```" * 1200 + "x" * 400 + "\U0001F600" * 200
-    A.Discord("https://discord.example/api/webhooks/1/secret", http=http).send(alert)
+    A.Discord(webhook_url="https://discord.example/api/webhooks/1/secret", http=http).send(alert)
     embed = json.loads(http.requests[0]["body"])["embeds"][0]
     description = embed["description"]
     assert _js.length16(description) == 4096
@@ -347,7 +349,7 @@ def test_discord_holds_the_whole_description_to_4096_cutting_the_message_and_kee
     http.requests.clear()
     alert = alert_j("t" * 1001)
     alert.message = "\U0001F600" * 1900
-    A.Discord("https://discord.example/api/webhooks/1/secret", http=http).send(alert)
+    A.Discord(webhook_url="https://discord.example/api/webhooks/1/secret", http=http).send(alert)
     cut = json.loads(http.requests[0]["body"])["embeds"][0]["description"]
     assert _js.length16(cut) <= 4096
     assert "\ufffd" not in cut and all(not 0xD800 <= ord(ch) <= 0xDFFF for ch in cut)
@@ -355,7 +357,7 @@ def test_discord_holds_the_whole_description_to_4096_cutting_the_message_and_kee
 
 def test_discord_adds_the_link_and_reports_a_refusal() -> None:
     http = FakeHTTP(400, "x" * 500)
-    channel = A.Discord("https://discord.example/w", link=lambda a: f"https://app.example/{a.job}", http=http)
+    channel = A.Discord(webhook_url="https://discord.example/w", link=lambda a: f"https://app.example/{a.job}", http=http)
     with pytest.raises(RuntimeError, match="^Discord webhook answered 400: x{200}$"):
         channel.send(alert_j())
     assert json.loads(http.requests[0]["body"])["embeds"][0]["url"] == "https://app.example/j"
@@ -363,7 +365,7 @@ def test_discord_adds_the_link_and_reports_a_refusal() -> None:
 
 def test_slack_escapes_control_characters_and_fences_in_the_blocks_and_the_fallback_text() -> None:
     http = FakeHTTP()
-    A.Slack("https://hooks.slack.example/T/B/secret", http=http).send(alert_j("<b> & co"))
+    A.Slack(webhook_url="https://hooks.slack.example/T/B/secret", http=http).send(alert_j("<b> & co"))
     body = json.loads(http.requests[0]["body"])
     assert "<!channel>" not in body["text"]
     block = body["blocks"][1]["text"]["text"]
@@ -376,7 +378,7 @@ def test_slack_escapes_control_characters_and_fences_in_the_blocks_and_the_fallb
 
 def test_slack_link_and_failure() -> None:
     http = FakeHTTP(500, "no")
-    channel = A.Slack("https://hooks.slack.example/x", link=lambda _a: "https://app.example/j", http=http)
+    channel = A.Slack(webhook_url="https://hooks.slack.example/x", link=lambda _a: "https://app.example/j", http=http)
     with pytest.raises(RuntimeError, match="^Slack webhook answered 500: no$"):
         channel.send(alert_j())
     assert json.loads(http.requests[0]["body"])["blocks"][0]["text"]["text"] == ":x: *j failed* (<https://app.example/j|open>)"
@@ -402,6 +404,18 @@ def test_webhook_signs_the_raw_body_and_sends_the_alert_as_the_sdk_does() -> Non
     assert parsed["schema"] == 1
     assert parsed["details"] == {"consecutiveFailures": 1, "threshold": 1}
     assert call["body"] == '{"schema":1,' + _js.dumps(alert_j("db").to_dict())[1:]
+
+
+@pytest.mark.parametrize("make_channel", [A.Slack, A.Discord])
+def test_a_positional_webhook_url_still_works_with_a_deprecation_warning(make_channel: Any) -> None:
+    http = FakeHTTP()
+    name = make_channel.__name__
+    with pytest.warns(DeprecationWarning, match=rf"{name}\(webhook_url=url\)"):
+        channel = make_channel("https://hooks.example.com/x", http=http)
+    channel.send(alert_j())
+    assert http.requests[0]["url"] == "https://hooks.example.com/x"
+    with pytest.raises(TypeError, match="webhook_url twice"):
+        make_channel("https://a.example/x", webhook_url="https://b.example/x")
 
 
 def test_signature_is_the_hmac_sha256_hex_a_receiver_checks() -> None:
@@ -543,8 +557,8 @@ def test_no_channel_follows_a_redirect_so_its_credentials_never_reach_another_or
             A.Bugsnag(api_key="bs-secret", http=http),
             A.NewRelic(account_id="1", api_key="nr-secret", http=http),
             A.Webhook(f"{provider.url}/in", headers={"authorization": "Bearer wh-secret"}, secret="s", http=http),
-            A.Slack(f"{provider.url}/in", http=http),
-            A.Discord(f"{provider.url}/in", http=http),
+            A.Slack(webhook_url=f"{provider.url}/in", http=http),
+            A.Discord(webhook_url=f"{provider.url}/in", http=http),
         ]
         for channel in channels:
             with pytest.raises(RuntimeError, match="answered 307"):
@@ -754,7 +768,7 @@ def test_the_default_http_posts_only_to_http_and_https_and_never_quotes_the_url(
         UrllibHTTP(timeout=1).post("https://hooks.example.com" + secret_path + " x", "{}", {})
     assert str(invalid.value) == "cannot post to https://hooks.example.com: the URL is not valid"
     with pytest.raises(ValueError) as failed:
-        A.Slack("https://hooks.example.com" + secret_path + " x").send(alert_j())
+        A.Slack(webhook_url="https://hooks.example.com" + secret_path + " x").send(alert_j())
     assert "hookpathsecret" not in str(failed.value)
 
 
@@ -778,4 +792,4 @@ def test_a_header_value_with_a_line_break_is_refused_without_quoting_it() -> Non
 
 def test_the_default_http_gives_up_after_ten_seconds() -> None:
     assert UrllibHTTP().timeout == 10
-    assert A.Slack("https://hooks.slack.example/x")._http.timeout == 10  # type: ignore[attr-defined]
+    assert A.Slack(webhook_url="https://hooks.slack.example/x")._http.timeout == 10  # type: ignore[attr-defined]

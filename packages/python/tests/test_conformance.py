@@ -776,9 +776,9 @@ def channel_for(c: dict[str, Any], http: Any) -> Any:
     options = c["options"]
     given = link if options.get("link") else None
     if c["channel"] == "slack":
-        return alerts.Slack(options["webhookUrl"], link=given, http=http)
+        return alerts.Slack(webhook_url=options["webhookUrl"], link=given, http=http)
     if c["channel"] == "discord":
-        return alerts.Discord(options["webhookUrl"], link=given, http=http)
+        return alerts.Discord(webhook_url=options["webhookUrl"], link=given, http=http)
     if c["channel"] == "webhook":
         return alerts.Webhook(options["url"], headers=options.get("headers"), secret=options.get("secret"), http=http)
     keywords: dict[str, Any] = {}

@@ -1,7 +1,7 @@
 """Claude triage, through the official anthropic package (triage/anthropic.ts)::
 
-    from cronwatch.triage.anthropic import AnthropicTriage
-    cw = cronwatch.Cronwatch(triage=AnthropicTriage(context="A Django app on Fly.io."))
+    from cronwatch.triage.anthropic import Anthropic
+    cw = cronwatch.Cronwatch(triage=Anthropic(context="A Django app on Fly.io."))
 
 It runs only when an alert is sent (never per run), so cost is bounded by
 how often things go wrong, and it never blocks an alert: the client gives it
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import inspect
 import re
+import warnings
 from collections.abc import Mapping
 from typing import Any
 
@@ -91,8 +92,9 @@ def _field(value: Any, name: str) -> Any:
     return getattr(value, name, None)
 
 
-class AnthropicTriage:
-    """A triage function backed by Claude. Pass it as ``triage``.
+class Anthropic:
+    """A triage function backed by Claude. Pass it as ``triage``. (Named as
+    every port names it; ``AnthropicTriage`` is its deprecated old name.)
 
     api_key:    defaults to what the anthropic package resolves (ANTHROPIC_API_KEY).
     client:     bring a configured ``anthropic.Anthropic`` instead.
@@ -156,6 +158,15 @@ class AnthropicTriage:
         blocks = _field(response, "content") or []
         text = _js.trim("\n".join(str(_field(b, "text")) for b in blocks if str(_field(b, "type")) == "text"))
         return text or None
+
+
+class AnthropicTriage(Anthropic):
+    """Deprecated: renamed :class:`Anthropic`, as every port names it. This
+    name still works through 1.x, with a DeprecationWarning, and goes in 2.0."""
+
+    def __init__(self, **options: Any) -> None:
+        warnings.warn("AnthropicTriage is deprecated: use cronwatch.triage.anthropic.Anthropic", DeprecationWarning, stacklevel=2)
+        super().__init__(**options)
 
 
 def _split(create: Any, params: dict[str, Any]) -> dict[str, Any]:

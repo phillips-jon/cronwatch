@@ -89,7 +89,7 @@ In `cronwatch.alerts`, standard library only, each the SDK's request for request
 from cronwatch.alerts import Slack, Resend, Twilio, Sentry
 
 alerts = [
-    Slack(os.environ["SLACK_WEBHOOK_URL"], link=lambda a: f"https://app.example.com/cronwatch/jobs/{a.job}"),
+    Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"], link=lambda a: f"https://app.example.com/cronwatch/jobs/{a.job}"),
     Resend(api_key=os.environ["RESEND_API_KEY"], from_="alerts@example.com", to="ops@example.com"),
     Twilio(account_sid=..., auth_token=..., from_="+15005550006", to=["+15551110000"]),
     Sentry(dsn=os.environ["SENTRY_DSN"]),
@@ -100,7 +100,7 @@ alerts = [
 
 ### Triage and pg_cron
 
-`cronwatch.triage.anthropic.AnthropicTriage(context="A Django app on Fly.io.")` (`pip install "cronwatch-sdk[anthropic]"`), passed as `triage=`, adds Claude's short diagnosis to each alert. Recoveries are sent without one.
+`cronwatch.triage.anthropic.Anthropic(context="A Django app on Fly.io.")` (`pip install "cronwatch-sdk[anthropic]"`), passed as `triage=`, adds Claude's short diagnosis to each alert. Recoveries are sent without one.
 
 `cronwatch.sources.pgcron.PgCron(url_or_connection, prefix="db:")`, passed in `sources=[...]`, watches pg_cron's jobs: each is declared with its schedule, and the rows of `cron.job_run_details` are copied in as runs on every check, so missed, failed, stuck and slow pg_cron jobs alert like any other.
 

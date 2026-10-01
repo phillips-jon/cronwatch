@@ -8,7 +8,7 @@ from typing import Any
 from .. import _js
 from ..types import Alert
 from ._http import HTTP
-from ._shared import http_or_default, link_for, present, slice16
+from ._shared import http_or_default, link_for, positional_url, present, slice16
 
 EMOJI = {
     "missed": ":hourglass_flowing_sand:",
@@ -26,11 +26,23 @@ class Slack:
 
         Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"],
               link=lambda alert: f"https://app.example.com/cronwatch/jobs/{alert.job}")
+
+    The URL is taken by name; ``Slack(url)``, positionally, is deprecated (it
+    warns, and goes in 2.0).
     """
 
     name = "slack"
 
-    def __init__(self, webhook_url: str, *, link: Callable[[Alert], Any] | None = None, http: HTTP | None = None) -> None:
+    def __init__(
+        self,
+        _url: str | None = None,
+        /,
+        *,
+        webhook_url: str | None = None,
+        link: Callable[[Alert], Any] | None = None,
+        http: HTTP | None = None,
+    ) -> None:
+        webhook_url = positional_url("Slack", _url, webhook_url)
         if not present(webhook_url):
             raise ValueError("Slack() needs a webhook_url")
         self._webhook_url = str(webhook_url)

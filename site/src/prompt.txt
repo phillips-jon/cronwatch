@@ -200,7 +200,7 @@ Python (Python 3.11 or newer)
    INSTALLED_APPS += ["cronwatch.django"]
    CRONWATCH = {
        "STORE": "cronwatch.stores.postgres.PostgresStore",
-       "ALERTS": [Slack(os.environ["SLACK_WEBHOOK_URL"])],   # from cronwatch.alerts import Slack
+       "ALERTS": [Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])],   # from cronwatch.alerts import Slack
        "TOKEN": os.environ.get("CRONWATCH_TOKEN", ""),
    }
 

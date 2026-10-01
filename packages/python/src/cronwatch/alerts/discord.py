@@ -9,7 +9,7 @@ from typing import Any
 from .. import _js
 from ..types import Alert
 from ._http import HTTP
-from ._shared import cut, http_or_default, iso, link_for, present, slice16
+from ._shared import cut, http_or_default, iso, link_for, positional_url, present, slice16
 
 COLOR = {
     "missed": 0xB7791F,
@@ -28,11 +28,26 @@ DESCRIPTION_MAX = 4096
 
 class Discord:
     """Sends alerts to a Discord channel through a webhook (Server Settings,
-    Integrations, Webhooks)."""
+    Integrations, Webhooks)::
+
+        Discord(webhook_url=os.environ["DISCORD_WEBHOOK_URL"])
+
+    The URL is taken by name; ``Discord(url)``, positionally, is deprecated (it
+    warns, and goes in 2.0).
+    """
 
     name = "discord"
 
-    def __init__(self, webhook_url: str, *, link: Callable[[Alert], Any] | None = None, http: HTTP | None = None) -> None:
+    def __init__(
+        self,
+        _url: str | None = None,
+        /,
+        *,
+        webhook_url: str | None = None,
+        link: Callable[[Alert], Any] | None = None,
+        http: HTTP | None = None,
+    ) -> None:
+        webhook_url = positional_url("Discord", _url, webhook_url)
         if not present(webhook_url):
             raise ValueError("Discord() needs a webhook_url")
         self._webhook_url = str(webhook_url)

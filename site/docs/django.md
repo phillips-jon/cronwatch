@@ -27,7 +27,7 @@ INSTALLED_APPS = [
 
 CRONWATCH = {
     "STORE": "cronwatch.stores.postgres.PostgresStore",   # reads DATABASE_URL
-    "ALERTS": [Slack(os.environ["SLACK_WEBHOOK_URL"])],
+    "ALERTS": [Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])],
     "TOKEN": os.environ.get("CRONWATCH_TOKEN", ""),
 }
 ```

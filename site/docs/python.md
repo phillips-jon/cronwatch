@@ -39,7 +39,7 @@ from cronwatch.stores import SqliteStore
 
 cw = cronwatch.Cronwatch(
     store=SqliteStore("./data/cronwatch.db"),
-    alerts=[Slack(os.environ["SLACK_WEBHOOK_URL"])],
+    alerts=[Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])],
     retention="30d",
 )
 ```
@@ -47,7 +47,7 @@ cw = cronwatch.Cronwatch(
 Or configure one for the whole process and reach it anywhere with `cronwatch.client()`:
 
 ```python
-cronwatch.configure(alerts=[Slack(os.environ["SLACK_WEBHOOK_URL"])])
+cronwatch.configure(alerts=[Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])])
 ```
 
 `configure` takes the same options and returns the client. Configuring again replaces it and stops the old one's interval checks. `cronwatch.client()` before any `configure` is a client with the defaults (the memory store, alerts printed to the console).
@@ -255,8 +255,8 @@ import os
 from cronwatch import Console, Custom
 from cronwatch.alerts import Slack, Discord, Webhook
 
-Slack(os.environ["SLACK_WEBHOOK_URL"], link=lambda a: f"https://app.example.com/cronwatch/jobs/{a.job}")
-Discord(os.environ["DISCORD_WEBHOOK_URL"])
+Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"], link=lambda a: f"https://app.example.com/cronwatch/jobs/{a.job}")
+Discord(webhook_url=os.environ["DISCORD_WEBHOOK_URL"])
 Webhook("https://hooks.example.com/cronwatch", secret=os.environ.get("CRONWATCH_WEBHOOK_SECRET"),
         headers={"X-Team": "ops"})
 Console()
@@ -389,9 +389,9 @@ pip install "cronwatch-sdk[anthropic]"
 ```
 
 ```python
-from cronwatch.triage.anthropic import AnthropicTriage
+from cronwatch.triage.anthropic import Anthropic
 
-cw = cronwatch.Cronwatch(triage=AnthropicTriage(context="A Flask app on Postgres, jobs run from crontab."))
+cw = cronwatch.Cronwatch(triage=Anthropic(context="A Flask app on Postgres, jobs run from crontab."))
 ```
 
 | Option | Default | |

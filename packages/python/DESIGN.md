@@ -52,7 +52,7 @@ packages/python/
     sources/
       pgcron.py      PgCron, the pg_cron reader (sources/pgcron.ts), and its psycopg adapter
     triage/
-      anthropic.py   AnthropicTriage, Claude through the anthropic package (triage/anthropic.ts)
+      anthropic.py   Anthropic, Claude through the anthropic package (triage/anthropic.ts)
     client.py        Cronwatch and JobHandle: job, run (plain and async), check, start/stop, silence, forget, jobs, runs, record_run, routes
     aio.py           AsyncCronwatch, AsyncJobHandle, AsyncRunHandle: the client's methods as coroutines, the store in a worker thread
     handler.py       job.handler(): the SDK's fetch-style job handler, and its Django, Flask, Starlette, WSGI and ASGI adapters
@@ -173,7 +173,7 @@ They are the SDK's, request for request, standard library only: the same URL, he
 
 ## Triage
 
-`cronwatch.triage.anthropic.AnthropicTriage(context=..., model=..., effort=..., max_tokens=..., fallbacks=..., api_key=..., client=...)` is `triage/anthropic.ts`: the same default model (`claude-opus-5`), effort (`medium`), `max_tokens` (800), system prompt and user prompt text, byte for byte, the same `<job_data>` fencing of anything the job wrote, the same server-side fallback beta and `fallbacks: "default"` unless `fallbacks=False`, and one attempt (`with_options(max_retries=0)`) with a 24 second request timeout, under the client's 25 second wait. A field the installed anthropic package does not name yet goes in `extra_body`, so the body is the same whatever its version. A refusal, or an answer with no text, is None. `tests/test_triage.py` replays `conformance/triage.json` against a stub client and puts each request through the real package onto a mock transport, comparing the JSON on the wire.
+`cronwatch.triage.anthropic.Anthropic(context=..., model=..., effort=..., max_tokens=..., fallbacks=..., api_key=..., client=...)` is `triage/anthropic.ts`: the same default model (`claude-opus-5`), effort (`medium`), `max_tokens` (800), system prompt and user prompt text, byte for byte, the same `<job_data>` fencing of anything the job wrote, the same server-side fallback beta and `fallbacks: "default"` unless `fallbacks=False`, and one attempt (`with_options(max_retries=0)`) with a 24 second request timeout, under the client's 25 second wait. A field the installed anthropic package does not name yet goes in `extra_body`, so the body is the same whatever its version. A refusal, or an answer with no text, is None. `tests/test_triage.py` replays `conformance/triage.json` against a stub client and puts each request through the real package onto a mock transport, comparing the JSON on the wire.
 
 ## Sources
 
