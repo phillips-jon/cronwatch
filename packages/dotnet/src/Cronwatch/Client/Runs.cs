@@ -129,12 +129,18 @@ public sealed partial class CronwatchClient
         }
     }
 
+    /// <summary>
+    /// The longest run id, in UTF-16 code units (JavaScript's string length): what a run's start,
+    /// <c>ResumeAsync</c> and <c>RecordRunAsync</c> take, and every store holds.
+    /// </summary>
+    private const int MaxRunId = 200;
+
     internal static void CheckRunId(string job, string id, string method)
     {
-        if (id.Length == 0 || id.Length > 200)
+        if (id.Length == 0 || id.Length > MaxRunId)
         {
             throw CronwatchException.Invalid(
-                "job " + Json.Quote(job) + ": " + method + "() needs a run id of 1 to 200 characters (got " + id.Length + " characters)");
+                "job " + Json.Quote(job) + ": " + method + "() needs a run id of 1 to " + MaxRunId + " characters (got " + id.Length + " characters)");
         }
         // Postgres refuses NUL in text, so no store could hold such an id.
         if (id.Contains('\0', StringComparison.Ordinal))
@@ -625,6 +631,12 @@ public sealed partial class CronwatchClient
     {
         JobDef def = Declared(input.Job)
             ?? throw CronwatchException.Invalid("recordRun: job " + Json.Quote(input.Job) + " is not declared; call Job() first");
+        // The longest id a run's start takes; MySQL's column would hold 255, but every store holds 200.
+        if (input.Id.Length == 0 || input.Id.Length > MaxRunId)
+        {
+            throw CronwatchException.Invalid(
+                "recordRun: run ids must be 1 to " + MaxRunId + " characters (got " + input.Id.Length + " characters; job " + Json.Quote(input.Job) + ")");
+        }
         if (input.Id.Contains('\0', StringComparison.Ordinal))
         {
             throw CronwatchException.Invalid("recordRun: run ids cannot contain a NUL character (job " + Json.Quote(input.Job) + ")");

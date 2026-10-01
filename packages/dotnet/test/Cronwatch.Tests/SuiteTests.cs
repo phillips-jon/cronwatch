@@ -12,7 +12,7 @@ namespace Cronwatch.Tests;
 public class SuiteTests
 {
     /// <summary>Every fixture the SDK writes, each replayed.</summary>
-    private static readonly string[] Replayed = ["duration", "schedule", "output", "evaluate", "format", "health", "store", "channels", "triage", "pgcron"];
+    private static readonly string[] Replayed = ["duration", "schedule", "output", "evaluate", "format", "health", "store", "channels", "triage", "pgcron", "client"];
 
     [Fact]
     public void Every_fixture_the_sdk_writes_is_known()

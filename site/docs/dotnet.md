@@ -429,7 +429,7 @@ A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname
 | `ForgetAsync(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `job.StartAsync(options)`, `job.ResumeAsync(id)`, `ResumeRunAsync(name, id)` | runs that span calls |
 | `job.OpenAsync(options)` | a run seen from outside the function, for a scheduler integration: an `ObservedRun` to close or take back |
-| `RecordRunAsync(run)` | record a run that happened elsewhere, for a source; answers the alerts it sent |
+| `RecordRunAsync(run)` | record a run that happened elsewhere, for a source, its id 1 to 200 characters; answers the alerts it sent |
 | `SyncJobAsync(name)` | write a declaration to the store now, unless it already holds it |
 | `DefinedJobs` | the jobs declared in this client |
 | `Routes()`, `job.Handler(fn)` | the dashboard and a job's handler |
@@ -457,6 +457,8 @@ await again.FinishAsync();                                                      
 `SqlStore` writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Rust, Elixir and Java stores (the MySQL tables are the PHP, Go, Rust, Elixir and Java ports'): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and a .NET client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
+
+A 1.x release keeps what it does not know in the stored data: a field of a job's state or definition a newer release added, a condition it does not alert on, a run status or trigger it has not seen. It writes them back as they were, never treating an unknown status as running, so any 1.x release of any language can share a store with any other. 0.x releases are not covered: upgrade every process to 1.0 together.
 
 ## Kept in step
 
