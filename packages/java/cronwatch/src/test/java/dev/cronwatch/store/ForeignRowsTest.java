@@ -1,4 +1,4 @@
-package dev.cronwatch.jdbc;
+package dev.cronwatch.store;
 
 import dev.cronwatch.storetest.ForeignRows;
 import java.nio.file.Path;

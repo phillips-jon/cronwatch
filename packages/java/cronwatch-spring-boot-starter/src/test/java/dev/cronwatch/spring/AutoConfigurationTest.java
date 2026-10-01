@@ -10,9 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.JobOptions;
-import dev.cronwatch.jdbc.SqlStore;
 import dev.cronwatch.quartz.CronwatchQuartz;
 import dev.cronwatch.store.MemoryStore;
+import dev.cronwatch.store.SqlStore;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;

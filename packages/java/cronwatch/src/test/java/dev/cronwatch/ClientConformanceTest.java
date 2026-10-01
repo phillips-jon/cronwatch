@@ -3,11 +3,11 @@ package dev.cronwatch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import dev.cronwatch.jdbc.Servers;
-import dev.cronwatch.jdbc.SqlStore;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import dev.cronwatch.store.MemoryStore;
+import dev.cronwatch.store.Servers;
+import dev.cronwatch.store.SqlStore;
 import dev.cronwatch.store.Store;
 import java.util.ArrayList;
 import java.util.List;

@@ -1,4 +1,4 @@
-package dev.cronwatch.jdbc;
+package dev.cronwatch.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -14,8 +14,8 @@ import dev.cronwatch.Metrics;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
-import dev.cronwatch.jdbc.Servers.Kind;
 import dev.cronwatch.json.Json;
+import dev.cronwatch.store.Servers.Kind;
 import dev.cronwatch.storetest.TestRuns;
 import java.util.ArrayList;
 import java.util.List;

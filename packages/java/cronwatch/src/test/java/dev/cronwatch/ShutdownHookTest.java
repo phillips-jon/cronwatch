@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import dev.cronwatch.jdbc.SqlStore;
+import dev.cronwatch.store.SqlStore;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;

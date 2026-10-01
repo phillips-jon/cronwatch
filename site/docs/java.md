@@ -204,7 +204,7 @@ A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, an
 
 `MemoryStore` is the default, for tests and trying it out. Nothing survives a restart, so a miss cannot be noticed across one, and each process has its own. When the environment is production (`CRONWATCH_ENV` or `APP_ENV` set to `production` or `prod`), the client warns once that it is using it.
 
-`SqlStore` keeps the same three tables as the SDK's SQL stores in your database, through your `DataSource`:
+`SqlStore` (`dev.cronwatch.store.SqlStore`, beside `MemoryStore`) keeps the same three tables as the SDK's SQL stores in your database, through your `DataSource`:
 
 | Factory | |
 |---|---|

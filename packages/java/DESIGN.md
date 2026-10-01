@@ -60,8 +60,8 @@ packages/java/
       RunStatus.java  Condition.java  AlertType.java  JobHealth.java   the wire values (see The Java API)
       Channel.java  Triage.java  Source.java  Console.java   the interfaces and the default channel
       CronwatchException.java
-    src/main/java/dev/cronwatch/store/     Store and its optional methods, MemoryStore
-    src/main/java/dev/cronwatch/jdbc/      SqlStore: SQLite, Postgres, MySQL and MariaDB over a DataSource
+    src/main/java/dev/cronwatch/store/     Store and its optional methods, MemoryStore, and SqlStore: SQLite, Postgres, MySQL and MariaDB over a DataSource
+    src/main/java/dev/cronwatch/jdbc/      SqlStore's deprecated alias, its package before 1.0
     src/main/java/dev/cronwatch/storetest/ the store contract test (StoreContract.run, the one promise)
     src/main/java/dev/cronwatch/alerts/    the channels, a class and its options each, with Email, SigV4, Transport and JdkTransport
     src/main/java/dev/cronwatch/triage/    Claude triage over plain HTTP (triage/anthropic.ts)
@@ -373,7 +373,7 @@ The owner settled the draft's open questions before phase 1, taking each recomme
 1. **The coordinates** are the group `dev.cronwatch`, verified on the Central Publisher Portal by a DNS TXT record on `cronwatch.dev` that the owner adds, with the artifact ids `cronwatch`, `cronwatch-servlet`, `cronwatch-spring-boot-starter`, `cronwatch-quartz` (and `cronwatch-jobrunr` if kept), claimed by the first batched release after phase 1 works. The fallback, if the owner would rather not touch the DNS, is `io.github.phillips-jon`.
 2. **Maven**, with the wrapper committed; not Gradle.
 3. **The floor is Java 21**, tested on 21 and the newest release (and 25 for the tests alone, when the phase that needs it adds the entry).
-4. **The JDBC store lives in the core** (`dev.cronwatch.jdbc`), not in a `cronwatch-jdbc` artifact; the servlet adapter is an artifact of its own.
+4. **The JDBC store lives in the core** (`dev.cronwatch.store`, beside `MemoryStore`, since 1.0; `dev.cronwatch.jdbc.SqlStore`, its package before, is a deprecated alias that hands every call to it), not in a `cronwatch-jdbc` artifact; the servlet adapter is an artifact of its own.
 5. **One starter for Spring Boot 3.5 and 4**, tested on 3.5.0 and the newest 4.x, dropping 3.5 at the first release where it needs code of its own.
 6. **The current run is a `ThreadLocal`**, removed in `finally`, carried by `JobContext.wrap` and Micrometer's context propagation; `ScopedValue` when the floor reaches 25; not `InheritableThreadLocal`.
 7. **The function types are generic in what they throw**, so `run` throws exactly what the function throws, checked or not, with no wrapping.

@@ -1,4 +1,4 @@
-package dev.cronwatch.jdbc;
+package dev.cronwatch.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -13,8 +13,6 @@ import dev.cronwatch.StoredJob;
 import dev.cronwatch.internal.output.Output;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
-import dev.cronwatch.store.MemoryStore;
-import dev.cronwatch.store.Store;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;

@@ -1,4 +1,4 @@
-package dev.cronwatch.jdbc;
+package dev.cronwatch.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -20,8 +20,7 @@ import dev.cronwatch.RunHandle;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
 import dev.cronwatch.internal.js.Js;
-import dev.cronwatch.jdbc.Servers.Kind;
-import dev.cronwatch.store.Store;
+import dev.cronwatch.store.Servers.Kind;
 import dev.cronwatch.storetest.FinishOnce;
 import dev.cronwatch.storetest.ForeignRows;
 import dev.cronwatch.storetest.StoreContract;
