@@ -306,7 +306,11 @@ module Cronwatch
     # `a_b` into `aB`, and which known fields it left out. to_h writes the
     # first two back, the details only while they are unchanged, and leaves
     # out a field that was absent while it still holds what its absence
-    # read as, so a partial alert (a foreign row's) is written as it came.
+    # read as, so a partial alert (a foreign row's) is written as it came,
+    # in the order it came. An alert with every field the SDK writes has
+    # them written back in the SDK's order, then the fields it does not
+    # know, since a store on Postgres jsonb gives an object's keys back in
+    # an order of its own (as JobState.sending_entry does for an entry).
     #
     # @api private
     def keep_as_written(hash, written, details)
@@ -316,7 +320,7 @@ module Cronwatch
       absent = (Alert::KNOWN - ["triage"]).reject { |key| Naming.present?(hash, key) }
       @absent = absent.empty? ? nil : to_h.slice(*absent)
       order = hash.keys.map(&:to_s)
-      @order = order.uniq == order ? order : nil
+      @order = @absent && order.uniq == order ? order : nil
     end
 
     # @api private
