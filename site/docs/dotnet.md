@@ -421,7 +421,7 @@ The core, `Cronwatch.Hosting`, `Cronwatch.AspNetCore` and `Cronwatch.Quartz` are
 | `ProcessExitHook` | `true` | see [The current run and the timeout](#the-current-run-and-the-timeout) |
 | `Clock` | `TimeProvider.System` | every time and timer the client uses; a `FakeTimeProvider` in tests |
 
-A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the clock's local zone by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget` (metrics and their ceilings), `Expect`, `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/).
+A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the clock's local zone by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget` (metrics and their ceilings), `Expect`, `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `Timeout` and `MaxDuration` both measure a run's length: `Timeout` gives up on a run still going (it becomes `timeout`, a failure, and the job is stuck), while `MaxDuration` flags a run that finished successfully but slowly (it stays ok, and the job is slow). Set `Timeout` well above `MaxDuration`: `new JobOptions { MaxDuration = "10m", Timeout = "1h" }`.
 
 | Method | |
 |---|---|
