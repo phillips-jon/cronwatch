@@ -414,9 +414,11 @@ jobs:
       # download's checksum against api.wordpress.org), install the built
       # plugin zip, and drive it through wp-cli and wp-cron.php. PHP 8.2 runs
       # them on WordPress 6.1, the plugin's floor; 8.5 on the default, current one.
+      # A 5xx fails the download, not the checksum, and is retried five
+      # times, curl doubling its wait from a second each time.
       - name: Download WP-CLI
         run: |
-          curl -sSLo "$RUNNER_TEMP/wp-cli.phar" https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar
+          curl -fsSL --retry 5 --retry-all-errors -o "$RUNNER_TEMP/wp-cli.phar" https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar
           echo "be928f6b8ca1e8dfb9d2f4b75a13aa4aee0896f8a9a0a1c45cd5d2c98605e6172e6d014dda2e27f88c98befc16c040cbb2bd1bfa121510ea5cdf5f6a30fe8832  $RUNNER_TEMP/wp-cli.phar" | sha512sum -c -
       - run: vendor/bin/phpunit
         working-directory: packages/php
@@ -1249,8 +1251,29 @@ jobs:
       - name: Install Elixir (macOS)
         if: runner.os == 'macOS'
         run: brew install elixir
+      # setup-beam has no retry of its own, and a download of OTP or Elixir
+      # that answers 5xx fails the job: it is tried up to three times, 30
+      # and then 90 seconds apart.
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        id: beam1
         if: runner.os == 'Windows'
+        continue-on-error: true
+        with:
+          elixir-version: "1.20"
+          otp-version: "29"
+      - if: runner.os == 'Windows' && steps.beam1.outcome == 'failure'
+        run: sleep 30
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        id: beam2
+        if: runner.os == 'Windows' && steps.beam1.outcome == 'failure'
+        continue-on-error: true
+        with:
+          elixir-version: "1.20"
+          otp-version: "29"
+      - if: runner.os == 'Windows' && steps.beam2.outcome == 'failure'
+        run: sleep 90
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        if: runner.os == 'Windows' && steps.beam2.outcome == 'failure'
         with:
           elixir-version: "1.20"
           otp-version: "29"
