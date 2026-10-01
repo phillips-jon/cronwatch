@@ -20,7 +20,7 @@ use yii\web\Response;
  * (the dashboard is a page of its own, with its own styles and a strict
  * CSP); admin/cronwatch/view?cw=<path> is the dashboard's page at <path>.
  * Both need the plugin's own permission (accessPlugin-cronwatch), which
- * Craft gives the plugin's section; the dashboard runs open (token false),
+ * Craft gives the plugin's section; the dashboard runs open (token null),
  * Craft's sign-in standing for its token. A change (silence, forget, "Run
  * check now", all POSTs) also needs the cronwatch-manage permission and
  * Craft's CSRF token, which every form carries as a hidden field, besides
@@ -54,7 +54,7 @@ final class DashboardController extends Controller
             }
         }
         $origin = $this->request->getHostInfo();
-        $dashboard = new Dashboard($recorder->client(), token: false, basePath: EmbeddedDashboard::MARKER, origin: $origin);
+        $dashboard = new Dashboard($recorder->client(), token: null, basePath: EmbeddedDashboard::MARKER, origin: $origin);
         $inner = EmbeddedDashboard::request(Request::fromGlobals(), $path, ['cw', 'p', $this->request->csrfParam]);
         $field = '<input type="hidden" name="' . htmlspecialchars($this->request->csrfParam, ENT_QUOTES) . '" value="' . htmlspecialchars((string) $this->request->getCsrfToken(), ENT_QUOTES) . '">';
         $answer = EmbeddedDashboard::rewrite(

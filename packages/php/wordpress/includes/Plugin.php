@@ -186,7 +186,7 @@ final class Plugin
             'store' => new WpdbStore($wpdb),
             'alerts' => $channels === [] ? null : $channels,
             'defaults' => ['grace' => self::grace($settings['grace'])],
-            'cronSecret' => false,
+            'cronSecret' => null,
             'onError' => [self::class, 'report'],
         ];
         $args = apply_filters('cronwatch_client_args', $args);
