@@ -19,6 +19,8 @@ Every port applies these rules the same way: TypeScript, Ruby, Python, PHP, Go, 
 | Interval | `every 15m`, `every 6h`, `every 2d` | at least one second (`every 500ms` throws); counted from the last run's start, or from registration before the first run |
 | None | | watched for failures, duration and budgets; never missed |
 
+Two schedules that never make sense are settled the same way in every language. A one-time date in place of a cron expression (`2026-12-01T00:00:00`, or anything else with a colon after its first character) is refused when the job is declared: CronWatch watches jobs that repeat. A cron that names a date no month has (`0 0 30 2 *`, `0 0 31 4,6,9,11 *`) is accepted and never fires, so the job is never due and never missed; its runs are still watched for failures, duration and budgets.
+
 Durations everywhere use the same units: `ms`, `s`, `m`, `h`, `d`, `w`, and compounds like `1h30m`. A number is milliseconds. A duration string is at most 64 characters; a longer one is refused.
 
 ## Timezone

@@ -358,6 +358,70 @@
     {
       "schedule": "0 0 -1 * *",
       "error": "schedule \"0 0 -1 * *\" is not a cron expression or \"every <duration>\": CronPattern: Syntax error, illegal lower range (NaN)"
+    },
+    {
+      "schedule": "2026-12-01T00:00:00",
+      "error": "schedule \"2026-12-01T00:00:00\" is not a cron expression or \"every <duration>\": CronPattern: a one-time date is not supported"
+    },
+    {
+      "schedule": "2026-12-01 00:00",
+      "error": "schedule \"2026-12-01 00:00\" is not a cron expression or \"every <duration>\": CronPattern: a one-time date is not supported"
+    },
+    {
+      "schedule": "2026-12-01T00:00:00Z",
+      "timezone": "UTC",
+      "error": "schedule \"2026-12-01T00:00:00Z\" is not a cron expression or \"every <duration>\": CronPattern: a one-time date is not supported"
+    },
+    {
+      "schedule": "  2026-12-01T09:30:00+01:00  ",
+      "error": "schedule \"  2026-12-01T09:30:00+01:00  \" is not a cron expression or \"every <duration>\": CronPattern: a one-time date is not supported"
+    },
+    {
+      "schedule": "2026-12-01",
+      "error": "schedule \"2026-12-01\" is not a cron expression or \"every <duration>\": CronPattern: invalid configuration format ('2026-12-01'), exactly five, six, or seven space separated parts are required."
+    },
+    {
+      "schedule": "0 2:30 * * *",
+      "error": "schedule \"0 2:30 * * *\" is not a cron expression or \"every <duration>\": Invalid ISO8601 passed to timezone parser."
+    },
+    {
+      "schedule": "x:y",
+      "error": "schedule \"x:y\" is not a cron expression or \"every <duration>\": Invalid ISO8601 passed to timezone parser."
+    },
+    {
+      "schedule": ":0 * * * *",
+      "error": "schedule \":0 * * * *\" is not a cron expression or \"every <duration>\": CronPattern: configuration entry 1 (:0) contains illegal characters."
+    },
+    {
+      "schedule": "0:",
+      "error": "schedule \"0:\" is not a cron expression or \"every <duration>\": Invalid ISO8601 passed to timezone parser."
+    },
+    {
+      "schedule": "every 1:30",
+      "error": "schedule interval \"1:30\" is not a duration like \"15m\", \"1h30m\" or \"90s\""
+    },
+    {
+      "schedule": "0 0 30 2 *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 30 2 *"
+      }
+    },
+    {
+      "schedule": "0 0 31 4,6,9,11 *",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 31 4,6,9,11 *"
+      }
+    },
+    {
+      "schedule": "0 0 31 2 *",
+      "timezone": "UTC",
+      "parsed": {
+        "kind": "cron",
+        "source": "0 0 31 2 *",
+        "timezone": "UTC"
+      }
     }
   ],
   "fires": [
@@ -1003,6 +1067,56 @@
       "from": 9007199254740991,
       "fires": [
         null
+      ]
+    },
+    {
+      "schedule": "0 0 30 2 *",
+      "timezone": "UTC",
+      "from": 1767571200000,
+      "fires": [
+        null
+      ]
+    },
+    {
+      "schedule": "0 0 30 2 *",
+      "timezone": "America/New_York",
+      "from": 1832976000000,
+      "fires": [
+        null
+      ]
+    },
+    {
+      "schedule": "0 0 31 4,6,9,11 *",
+      "timezone": "UTC",
+      "from": 1767571200000,
+      "fires": [
+        null
+      ]
+    },
+    {
+      "schedule": "0 0 30 2 *",
+      "timezone": "UTC",
+      "from": -62135596800001,
+      "fires": [
+        null
+      ]
+    },
+    {
+      "schedule": "0 0 30 2 *",
+      "timezone": "UTC",
+      "from": 32472144000000,
+      "fires": [
+        null
+      ]
+    },
+    {
+      "schedule": "0 0 30 2 1",
+      "timezone": "UTC",
+      "from": 1767571200000,
+      "fires": [
+        1769990400000,
+        1770595200000,
+        1771200000000
       ]
     }
   ],
@@ -6600,6 +6714,30 @@
         "dueAt": 1835395200000,
         "deadline": 1835395200000
       }
+    },
+    {
+      "schedule": "0 0 30 2 *",
+      "timezone": "UTC",
+      "lastRunAt": null,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": null
+    },
+    {
+      "schedule": "0 0 30 2 *",
+      "timezone": "UTC",
+      "lastRunAt": 1767601800000,
+      "registeredAt": 1767519000000,
+      "graceMs": 600000,
+      "expected": null
+    },
+    {
+      "schedule": "0 0 31 4,6,9,11 *",
+      "timezone": "America/New_York",
+      "lastRunAt": 1767601800000,
+      "registeredAt": 1767519000000,
+      "graceMs": 0,
+      "expected": null
     },
     {
       "schedule": "0 2 * * *",

@@ -148,6 +148,14 @@ function scheduleCases() {
     ["5/15 * * * *"], ["/5 * * * *"], ["5-1 * * * *"], ["0 0 * * fri-mon"], ["0 0 * * 1#6"], ["0 0 * * 1#0"],
     ["@reboot"], ["@every 5m"], ["0 0 * * * * * *"], ["0 0 L * 1L"], ["0 0 15W * *"], ["0 0 * * +"],
     ["0 2 * * * UTC"], ["0 0 5L * *"], ["x * * * *"], ["0 0 1-5/0 * *"], ["0 0 * * 1-"], ["0 0 -1 * *"],
+    // Text with a colon after its first character is not a cron expression
+    // (croner would read it as a one-time date): one that starts like an
+    // ISO date and time is refused as a one-time date, anything else as
+    // text no date parser reads.
+    ["2026-12-01T00:00:00"], ["2026-12-01 00:00"], ["2026-12-01T00:00:00Z", "UTC"], ["  2026-12-01T09:30:00+01:00  "],
+    ["2026-12-01"], ["0 2:30 * * *"], ["x:y"], [":0 * * * *"], ["0:"], ["every 1:30"],
+    // A date no month has is read; it never fires (see fires and expectation).
+    ["0 0 30 2 *"], ["0 0 31 4,6,9,11 *"], ["0 0 31 2 *", "UTC"],
   ];
   const parse = parseInputs.map(([schedule, timezone]) => {
     const r = attempt(() => sdk.parseSchedule(schedule, timezone));
@@ -227,6 +235,14 @@ function scheduleCases() {
     ["0 2 * * *", "UTC", LAST_DATE, 1],
     ["0 2 * * *", "UTC", 8_640_000_000_000_001, 1],
     ["0 2 * * *", "UTC", Number.MAX_SAFE_INTEGER, 1],
+    // A date no month has never fires, from any time; with a weekday as well
+    // it fires on that weekday, as cron reads a day of the month or week.
+    ["0 0 30 2 *", "UTC", "2026-01-05T00:00:00Z", 1],
+    ["0 0 30 2 *", NY, "2028-02-01T00:00:00Z", 1],
+    ["0 0 31 4,6,9,11 *", "UTC", "2026-01-05T00:00:00Z", 1],
+    ["0 0 30 2 *", "UTC", FIRST_DATE - 1, 1],
+    ["0 0 30 2 *", "UTC", "2999-01-01T00:00:00Z", 1],
+    ["0 0 30 2 1", "UTC", "2026-01-05T00:00:00Z", 3],
   ];
   const fires = fireInputs.map(([schedule, timezone, from, n]) => {
     const parsed = sdk.parseSchedule(schedule, timezone);
@@ -293,6 +309,10 @@ function scheduleCases() {
   expect("0 * * * *", NY, Date.UTC(2026, 2, 8, 7, 0, 2), 0, 0);
   expect("0 0 1 1 *", "UTC", Date.UTC(2026, 0, 1, 0, 0, 3), Date.UTC(2025, 11, 31), 10 * MIN);
   expect("0 0 29 2 *", "UTC", Date.UTC(2024, 1, 29, 0, 0, 1), 0, 0);
+  // A date no month has: nothing is ever due, so nothing is ever missed.
+  expect("0 0 30 2 *", "UTC", null, T0 - DAY, 10 * MIN);
+  expect("0 0 30 2 *", "UTC", T0 - HOUR, T0 - DAY, 10 * MIN);
+  expect("0 0 31 4,6,9,11 *", NY, T0 - HOUR, T0 - DAY, 0);
   // A last run, or a registration, from a foreign or damaged row.
   const far = [
     Number.MIN_SAFE_INTEGER, -8_640_000_000_000_001, FIRST_DATE - 1, FIRST_DATE, FIRST_DATE + 2 * HOUR,

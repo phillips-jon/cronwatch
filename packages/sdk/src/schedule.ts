@@ -13,15 +13,42 @@ export interface ParsedSchedule {
 const cache = new Map<string, ParsedSchedule>();
 /** The croner instance behind each cron schedule, kept out of the public type. */
 const crons = new WeakMap<ParsedSchedule, Cron>();
+/** Cron schedules that name a date no month has, which never fire. */
+const never = new WeakSet<ParsedSchedule>();
+
+/** Where neverFires() looks from: croner looks up to the year 3000, more than a 400-year cycle of the calendar. */
+const PROBE_FROM_MS = Date.UTC(2000, 0, 1);
+
+/**
+ * Whether a cron never fires: it names a date no month has, such as
+ * "0 0 30 2 *". croner walks to such a date by recursion, a year at a time,
+ * so it answers that there is none, or runs out of stack first (from further
+ * back, or over several months); either way the schedule never fires, and is
+ * then never asked again. Anything else croner throws here (a timezone it
+ * cannot use) is left to the calls that compute fire times, as before.
+ */
+function neverFires(cron: Cron): boolean {
+  try {
+    return cron.nextRuns(1, new Date(PROBE_FROM_MS)).length === 0;
+  } catch (error) {
+    return error instanceof RangeError && /call stack/i.test(error.message);
+  }
+}
+
+/** Text that starts like an ISO date and time, which croner would take for a one-time date. */
+const ONE_TIME_DATE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
 
 /** How early a run may start and still count for the fire it was meant for. */
 export const EARLY_SLACK_MS = 60_000;
 
 /**
  * "0 2 * * *" (cron, five or six fields), "@hourly", or "every 5m".
- * Parsed once per (schedule, timezone) pair and cached. The croner instance
- * gets no callback, so it schedules nothing; it is only used to compute fire
- * times. Without a timezone the expression is read in the process timezone,
+ * Text with a colon after its first character, which croner would take for
+ * a one-time date, is refused. A cron that names a date no month has
+ * ("0 0 30 2 *") is read, and never fires: nothing is ever due, so it is
+ * never missed. Parsed once per (schedule, timezone) pair and cached. The
+ * croner instance gets no callback, so it schedules nothing; it is only used
+ * to compute fire times. Without a timezone the expression is read in the process timezone,
  * like crontab. Vercel and GitHub Actions run their crons in UTC, so pass
  * timezone: "UTC" for those.
  */
@@ -38,6 +65,14 @@ export function parseSchedule(schedule: string, timezone?: string): ParsedSchedu
     if (everyMs < 1000) throw new Error(`schedule "${schedule}" is shorter than one second`);
     parsed = { kind: "interval", source: text, everyMs };
   } else {
+    // croner reads text with a colon after its first character as a one-time
+    // date to fire at (through Date.parse, which reads almost anything), not
+    // as a cron expression. A cron monitor has no use for one, so every such
+    // text is refused, as in every port.
+    if (text.slice(1).includes(":")) {
+      const reason = ONE_TIME_DATE.test(text) ? "CronPattern: a one-time date is not supported" : "Invalid ISO8601 passed to timezone parser.";
+      throw new Error(`schedule "${schedule}" is not a cron expression or "every <duration>": ${reason}`);
+    }
     let cron: Cron;
     try {
       cron = new Cron(text, timezone ? { timezone } : {});
@@ -46,6 +81,7 @@ export function parseSchedule(schedule: string, timezone?: string): ParsedSchedu
     }
     parsed = { kind: "cron", source: text, ...(timezone ? { timezone } : {}) };
     crons.set(parsed, cron);
+    if (neverFires(cron)) never.add(parsed);
   }
   cache.set(key, parsed);
   return parsed;
@@ -103,6 +139,7 @@ function countFrom(from: number): number | null {
 function fireAfter(parsed: ParsedSchedule, from: number): number | null {
   const cron = crons.get(parsed);
   if (!cron) throw new Error(`schedule "${parsed.source}" was not made by parseSchedule`);
+  if (never.has(parsed)) return null;
   const start = countFrom(from);
   if (start === null) return null;
   let probe = start;
@@ -125,6 +162,7 @@ function fireAfter(parsed: ParsedSchedule, from: number): number | null {
 export function firesBetween(parsed: ParsedSchedule, from: number, to: number, limit: number): number[] | null {
   const cron = crons.get(parsed);
   if (!cron) throw new Error(`schedule "${parsed.source}" was not made by parseSchedule`);
+  if (never.has(parsed)) return [];
   const out: number[] = [];
   const start = countFrom(from);
   if (start === null) return out;

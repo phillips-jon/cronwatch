@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { cronwatch } from "../src/index.js";
 import { expectation, firesBetween, nextFire, parseSchedule, runCovers } from "../src/schedule.js";
 import { MIN, HOUR } from "./helpers.js";
 
@@ -123,4 +124,32 @@ test("firesBetween lists a cron's fires in a span, the same ones nextFire gives,
   const night = firesBetween(ny, Date.UTC(2026, 10, 1, 4), Date.UTC(2026, 10, 1, 9), 20)!;
   assert.ok(night.every((x, i) => i === 0 || x > night[i - 1]!));
   assert.ok(night.length >= 4 && night.length <= 5, String(night.length));
+});
+
+test("a one-time date is refused where a schedule goes, as in every port", () => {
+  for (const text of ["2026-12-01T00:00:00", "2026-12-01 09:30", "2026-12-01T00:00:00Z"]) {
+    assert.throws(() => parseSchedule(text), /: CronPattern: a one-time date is not supported$/, text);
+  }
+  assert.throws(() => parseSchedule("0 2:30 * * *"), /: Invalid ISO8601 passed to timezone parser\.$/);
+  assert.throws(() => cronwatch({ alerts: [] }).job("once", { schedule: "2026-12-01T00:00:00" }), /one-time date is not supported/);
+});
+
+test("a date no month has never fires, and its job is checked like any other", async () => {
+  for (const text of ["0 0 30 2 *", "0 0 31 4,6,9,11 *"]) {
+    const parsed = parseSchedule(text, "UTC");
+    // From any time, however far back: croner alone would run out of stack.
+    for (const from of [Date.UTC(2026, 0, 5), -62_135_596_800_001, Date.UTC(2999, 0, 1)]) {
+      assert.equal(nextFire(parsed, from, null), null, `${text} from ${from}`);
+      assert.deepEqual(firesBetween(parsed, from, from + 400 * 365 * DAY, 10), [], `${text} from ${from}`);
+      assert.equal(expectation(parsed, from, from, 0), null, `${text} from ${from}`);
+    }
+  }
+  const errors: string[] = [];
+  const cw = cronwatch({ alerts: [], now: () => Date.UTC(2026, 0, 5), onError: (e) => void errors.push((e as Error).message) });
+  cw.job("feb30", { schedule: "0 0 31 4,6,9,11 *", timezone: "UTC" });
+  const { jobs, alerts } = await cw.check();
+  assert.deepEqual(errors, []);
+  assert.deepEqual(alerts, []);
+  assert.equal(jobs[0]!.health, "never_ran");
+  assert.equal(jobs[0]!.nextExpectedAt, null);
 });
