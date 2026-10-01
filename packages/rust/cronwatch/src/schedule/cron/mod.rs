@@ -8,17 +8,18 @@
 //! port's `_cron.py` and the PHP port's `src/Cron` do, so the five agree on
 //! every expression they read, every one they refuse and every fire time.
 //!
-//! Where it cannot match croner:
+//! Where it differs from croner, as the SDK's `parseSchedule` does since
+//! 1.0, so the SDK and every port agree:
 //!
 //! - A date no month has (`0 0 30 2 *`) makes croner, which walks by
-//!   recursion a year at a time, run out of stack before the year 3000.
-//!   This port walks in a loop and answers that the expression never fires.
+//!   recursion a year at a time, answer nothing or run out of stack. This
+//!   port walks in a loop and answers that the expression never fires.
 //! - Croner reads a string with a colon after its first character as a
-//!   one-time date, through JavaScript's lenient `Date.parse`. This port
-//!   refuses every such string: one that looks like an ISO date with
-//!   "CronPattern: a one-time date is not supported by the Rust port",
-//!   anything else with the message croner gives for text `Date.parse`
-//!   cannot read, "Invalid ISO8601 passed to timezone parser.".
+//!   one-time date, through JavaScript's lenient `Date.parse`. Every such
+//!   string is refused: one that looks like an ISO date with
+//!   "CronPattern: a one-time date is not supported", anything else with
+//!   the message croner gives for text `Date.parse` cannot read, "Invalid
+//!   ISO8601 passed to timezone parser.".
 
 mod date;
 mod pattern;
@@ -66,7 +67,7 @@ impl Cron {
             // Croner reads a string with a colon after its first character as
             // a one-time date to fire at, not as a cron expression.
             if is_iso_date(text) {
-                return Err("CronPattern: a one-time date is not supported by the Rust port".into());
+                return Err("CronPattern: a one-time date is not supported".into());
             }
             return Err("Invalid ISO8601 passed to timezone parser.".into());
         }

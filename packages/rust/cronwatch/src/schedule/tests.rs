@@ -213,7 +213,7 @@ fn a_far_start_counts_from_the_year_1_or_has_no_fire_after_it() {
 #[test]
 fn one_time_dates_are_refused() {
     for (text, want) in [
-        ("2026-12-01T00:00:00", "CronPattern: a one-time date is not supported by the Rust port"),
+        ("2026-12-01T00:00:00", "CronPattern: a one-time date is not supported"),
         ("0 2:30 * * *", "Invalid ISO8601 passed to timezone parser."),
     ] {
         let err = parse(text, "").unwrap_err();

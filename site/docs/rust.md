@@ -447,7 +447,7 @@ The SQL store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cron
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
-The public types write the SDK's JSON with `to_json()`, not serde_json, whose numbers and key order differ; with the `serde` feature they also serialize through that same JSON. The cron reader matches croner with two exceptions, both for schedules that never make sense: a date no month has (`0 0 30 2 *`) is a schedule that never fires, where croner gives up; and a one-time date in place of a cron expression (`2026-12-01T00:00:00`) is refused.
+The public types write the SDK's JSON with `to_json()`, not serde_json, whose numbers and key order differ; with the `serde` feature they also serialize through that same JSON. The cron reader matches croner and the SDK, including the two [schedules that never make sense](/docs/schedules/#schedule-syntax): a date no month has never fires, and a one-time date is refused.
 
 ## Kept in step
 
