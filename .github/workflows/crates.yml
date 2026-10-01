@@ -1,6 +1,7 @@
 # A release tag -> the Rust crates in packages/rust published to crates.io
 # (cronwatch, cronwatch-sqlx, cronwatch-tokio-cron-scheduler and
-# cronwatch-apalis), with crates.io's trusted publishing: crates.io trusts this
+# cronwatch-apalis, which keeps a 0.x version of its own that
+# scripts/release.mjs moves), with crates.io's trusted publishing: crates.io trusts this
 # workflow's OIDC token and hands back a token that lives for the job, so no
 # API token is stored anywhere. Can also be started by hand for a tag.
 #
@@ -67,6 +68,11 @@ jobs:
           case "$TAG" in v[0-9]*) ;; *) echo "not a release tag: $TAG"; exit 1 ;; esac
           version="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)"
           if [ "v$version" != "$TAG" ]; then echo "packages/rust is $version, the tag is $TAG"; exit 1; fi
+          # cronwatch-apalis has a version of its own and stays below 1.0
+          # while apalis 1.0 is a release candidate; a crates.io version can
+          # never be deleted, so a 1.x of it is refused here.
+          apalis="$(sed -n 's/^version = "\(.*\)"$/\1/p' cronwatch-apalis/Cargo.toml | head -1)"
+          case "$apalis" in 0.*) echo "cronwatch-apalis is $apalis" ;; *) echo "cronwatch-apalis is '$apalis', not 0.x"; exit 1 ;; esac
       - name: Install Rust
         run: |
           rustup toolchain install stable --profile minimal

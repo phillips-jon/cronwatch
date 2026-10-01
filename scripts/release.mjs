@@ -22,10 +22,17 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { addMarkdownChangelog, addReadmeChangelog, addRootChangelog, today } from "./changelogs.mjs";
 
-/** Every place the release version lives. Each pattern captures (before)(version)(after). */
-const VERSIONED = [
+/**
+ * Every place the release version lives. Each pattern captures
+ * (before)(version)(after). A row may say `of: "apalis"` (cronwatch-apalis's
+ * own version, not the release's) and `form: "minor"` (the version as "X.Y",
+ * an install line's constraint, which a prerelease leaves alone); a pattern
+ * with the g flag moves every match in its file, and must match at least once.
+ */
+export const VERSIONED = [
   { file: "packages/sdk/package.json", pattern: /^( {2}"version": ")([^"]+)(")/m },
   // What the SDK reports about itself (VERSION, and GET <base>/api).
   { file: "packages/sdk/src/version.ts", pattern: /^(export const VERSION = ")([^"]+)(")/m },
@@ -62,9 +69,25 @@ const VERSIONED = [
   // through [workspace.dependencies]; cronwatch::VERSION is the package's own.
   { file: "packages/rust/Cargo.toml", pattern: /^(version = ")([^"]+)(")/m },
   { file: "packages/rust/Cargo.toml", pattern: /^(cronwatch = \{ path = "cronwatch", version = "=)([^"]+)(")/m },
+  // Except cronwatch-apalis, which stays below 1.0 while apalis 1.0 is a
+  // release candidate (packages/rust/DESIGN.md, item 42): its version is its
+  // own, the release's below 1.0 and a 0.x line of its own from 1.0
+  // (apalisVersion below).
+  { file: "packages/rust/cronwatch-apalis/Cargo.toml", pattern: /^(version = ")([^"]+)(")/m, of: "apalis" },
+  // The install lines name a minor ("0.10" in Cargo admits 0.10.x, "1.0"
+  // every 1.x), so a copied line installs this release or a later
+  // compatible one.
+  ...["packages/rust/README.md", "packages/rust/cronwatch-sqlx/README.md", "packages/rust/cronwatch-tokio-cron-scheduler/README.md", "packages/rust/cronwatch-apalis/README.md", "site/docs/rust.md", "site/docs/rust-schedulers.md"].map((file) => (
+    { file, pattern: /^(cronwatch(?:-sqlx|-tokio-cron-scheduler)? = (?:\{ version = )?")([^"]+)(")/gm, form: "minor" })),
+  ...["packages/rust/cronwatch-apalis/README.md", "site/docs/rust-schedulers.md"].map((file) => (
+    { file, pattern: /^(cronwatch-apalis = (?:\{ version = )?")([^"]+)(")/gm, form: "minor", of: "apalis" })),
   // The Hex package's version lives in mix.exs alone; Cronwatch.version/0
   // reads it from the application's spec.
   { file: "packages/elixir/mix.exs", pattern: /^(\s*@version ")([^"]+)(")/m },
+  // The install line, "~> X.Y", admits every later release below the next
+  // major. (landing.html escapes the >, and build.mjs's llms.txt the quotes.)
+  ...["README.md", "packages/elixir/README.md", "site/docs/elixir.md", "site/src/landing.html", "site/src/prompt.txt", "skills/cronwatch/SKILL.md", "site/build.mjs"].map((file) => (
+    { file, pattern: /(\{:cronwatch, \\?"~(?:>|&gt;) )([^"\\]+)(\\?")/g, form: "minor" })),
   // The Maven build's version lives in the parent POM's <revision> alone:
   // every module's version is ${revision}, the flatten plugin writes it into
   // the POMs that are published, and Cronwatch.VERSION is read from a
@@ -128,7 +151,7 @@ const PUBLISH = [
   // need no tag of their own. Published by hand for now (packages/rust/DESIGN.md,
   // Crate name and releases); Cargo 1.90 or newer publishes a workspace's
   // crates in dependency order.
-  { dir: "packages/rust", commands: (v) => [`# packages/rust: the pushed tag v${v} is published to crates.io by .github/workflows/crates.yml (trusted publishing, once CRATES_ENABLED is true); by hand, (cd packages/rust && cargo publish --workspace --exclude cronwatch-webserver --exclude cronwatch-example-crontab)`] },
+  { dir: "packages/rust", commands: (v) => [`# packages/rust: the pushed tag v${v} is published to crates.io by .github/workflows/crates.yml (trusted publishing, once CRATES_ENABLED is true), cronwatch-apalis at its own version (its Cargo.toml); by hand, (cd packages/rust && cargo publish --workspace --exclude cronwatch-webserver --exclude cronwatch-example-crontab)`] },
   // Hex reads a package from the tarball `mix hex.publish` uploads, so the
   // package needs no tag of its own. .github/workflows/hex.yml publishes it
   // and its docs from the pushed tag, with a package-scoped API key, once
@@ -273,30 +296,78 @@ function checkGem(file, ruby) {
   console.log(`${contents.length} files, with ${listed(GEM_REQUIRED)}, and nothing under ${GEM_FORBIDDEN.join(" or ")}.`);
 }
 
-/** The edits to make, one per file, after checking every row holds the current version. */
-function planEdits(current, next) {
+/** "X.Y" of a version: what an install line's constraint names. */
+export function minorOf(version) {
+  const [, major, minor] = SEMVER.exec(version);
+  return `${major}.${minor}`;
+}
+
+/**
+ * cronwatch-apalis's version for a release from `current` to `next`, given
+ * its own `apalis` now. Below 1.0 it is the release's. From 1.0 it keeps a
+ * 0.x line of its own: a release that moves the major or minor moves its
+ * minor, a patch release its patch, and a prerelease carries the same
+ * suffix (1.0.0-beta.1 after 0.10.0 makes it 0.11.0-beta.1, then 1.0.0
+ * makes it 0.11.0).
+ */
+export function apalisVersion(apalis, current, next) {
+  const [, nMajor, nMinor, nPatch, nPre] = SEMVER.exec(next);
+  if (nMajor === "0") return next;
+  const [, aMajor, aMinor, aPatch, aPre] = SEMVER.exec(apalis);
+  const [, cMajor, cMinor, cPatch] = SEMVER.exec(current);
+  if (aMajor !== "0") throw new Error(`cronwatch-apalis is at ${apalis}: once apalis 1.0 is final, put it back on version.workspace and drop its rows from VERSIONED`);
+  let base;
+  // Only the prerelease moved, or the crate's own prerelease is finished first.
+  if ((cMajor === nMajor && cMinor === nMinor && cPatch === nPatch) || aPre !== undefined) base = [aMajor, aMinor, aPatch];
+  else if (cMajor !== nMajor || cMinor !== nMinor) base = [aMajor, Number(aMinor) + 1, 0];
+  else base = [aMajor, aMinor, Number(aPatch) + 1];
+  return `${base.join(".")}${nPre === undefined ? "" : `-${nPre}`}`;
+}
+
+/**
+ * The edits to make, one per file, after checking every row holds the
+ * current version. Throws when a row has no match or holds another version.
+ */
+export function planEdits(rows, readFile, current, next) {
+  const apalisRow = rows.find((row) => row.of === "apalis" && row.form === undefined);
+  const apalis = apalisRow && apalisRow.pattern.exec(readFile(apalisRow.file))?.[2];
+  if (apalisRow && !apalis) throw new Error(`${apalisRow.file}: no match for ${apalisRow.pattern}; update VERSIONED in scripts/release.mjs`);
+  if (apalis && SEMVER.exec(current)[1] === "0" && apalis !== current) throw new Error(`${apalisRow.file} says ${apalis}, not ${current}; below 1.0 cronwatch-apalis is released at the release's version`);
+  const versions = { release: [current, next], apalis: apalis ? [apalis, apalisVersion(apalis, current, next)] : undefined };
+  const prerelease = (v) => SEMVER.exec(v)[4] !== undefined;
   const edits = new Map();
-  for (const { file, pattern } of VERSIONED) {
-    const before = edits.get(file)?.after ?? read(file);
-    const match = pattern.exec(before);
-    if (!match) fail(`${file}: no match for ${pattern}; update VERSIONED in scripts/release.mjs`);
-    if (match[2] !== current) fail(`${file} says ${match[2]}, not ${current}; bring it in step first`);
-    const after = before.replace(pattern, `$1${next}$3`);
-    edits.set(file, { before: edits.get(file)?.before ?? before, after, lines: [...(edits.get(file)?.lines ?? []), [match[0], `${match[1]}${next}${match[3]}`]] });
+  for (const { file, pattern, of = "release", form } of rows) {
+    const [was, will] = versions[of];
+    // An install line names the newest stable minor: a prerelease leaves it
+    // alone, and while the current version is one it may name any.
+    const expected = form === "minor" ? (prerelease(was) ? null : minorOf(was)) : was;
+    const value = form === "minor" ? (prerelease(will) ? null : minorOf(will)) : will;
+    const before = edits.get(file)?.after ?? readFile(file);
+    const matches = pattern.global ? [...before.matchAll(pattern)] : [pattern.exec(before)].filter(Boolean);
+    if (matches.length === 0) throw new Error(`${file}: no match for ${pattern}; update VERSIONED in scripts/release.mjs`);
+    for (const match of matches) if (expected !== null && match[2] !== expected) throw new Error(`${file} says ${match[2]}, not ${expected}; bring it in step first`);
+    const after = before.replace(pattern, (_, head, version, tail) => `${head}${value ?? version}${tail}`);
+    const lines = matches.map((match) => [match[0], `${match[1]}${value ?? match[2]}${match[3]}`]);
+    edits.set(file, { before: edits.get(file)?.before ?? before, after, lines: [...(edits.get(file)?.lines ?? []), ...lines] });
   }
   return edits;
 }
 
-/** Tracked files, outside the table and the regenerated ones, that still mention the old version. */
+/**
+ * Tracked files, outside the table and the regenerated ones, that still
+ * mention the old version, or name its minor the way an install line does
+ * (`cronwatch = "X.Y"` in Cargo, `{:cronwatch, "~> X.Y"}` on Hex).
+ */
 function strays(current) {
   const skip = new Set([...VERSIONED.map((row) => row.file), ...MARKDOWN_CHANGELOGS, ROOT_CHANGELOG, "package-lock.json", "scripts/release.mjs"]);
-  let out = "";
-  try {
-    out = git("grep", "-n", "-F", current, "--", ".", ":!conformance/", ":!package-lock.json");
-  } catch {
-    return [];
+  const minor = minorOf(current).replace(".", "\\.");
+  const found = [];
+  for (const args of [["-F", current], ["-E", `cronwatch[a-z-]* = (\\{ version = )?"${minor}"|\\{:cronwatch, \\\\?"~(>|&gt;) ${minor}`]]) {
+    try {
+      found.push(...git("grep", "-n", ...args, "--", ".", ":!conformance/", ":!package-lock.json").split("\n"));
+    } catch {}
   }
-  return out.split("\n").filter((line) => line && !skip.has(line.split(":")[0]));
+  return [...new Set(found)].filter((line) => line && !skip.has(line.split(":")[0]));
 }
 
 /** Whether uv, which runs the Python package's tests, is on the PATH. */
@@ -346,124 +417,134 @@ function run(label, cmd, args, { cwd = ROOT, env = {} } = {}) {
   }
 }
 
-const options = parseArgs(process.argv.slice(2));
-const next = options.version;
-if (!SEMVER.test(next)) fail(`${next} is not a valid semver version`);
-if (next.includes("+")) fail(`${next} has build metadata, which RubyGems rejects; release without the +...`);
-const current = JSON.parse(read("packages/sdk/package.json")).version;
-if (compareVersions(next, current) <= 0) fail(`${next} is not greater than the current ${current}`);
+/** Run as a script (not imported by its tests): cut the release. */
+function main() {
+  const options = parseArgs(process.argv.slice(2));
+  const next = options.version;
+  if (!SEMVER.test(next)) fail(`${next} is not a valid semver version`);
+  if (next.includes("+")) fail(`${next} has build metadata, which RubyGems rejects; release without the +...`);
+  const current = JSON.parse(read("packages/sdk/package.json")).version;
+  if (compareVersions(next, current) <= 0) fail(`${next} is not greater than the current ${current}`);
 
-checkTable();
-const branch = git("rev-parse", "--abbrev-ref", "HEAD");
-if (branch !== options.branch) fail(`on ${branch}, not ${options.branch}${options.branch === "main" ? " (--branch overrides, for testing)" : ""}`);
-const dirty = git("status", "--porcelain", "--untracked-files=no");
-if (dirty !== "") fail(`the working tree has changes; commit or stash them first:\n${dirty}`);
-const tag = `v${next}`;
-if (git("tag", "--list", tag) !== "") fail(`tag ${tag} already exists`);
+  checkTable();
+  const branch = git("rev-parse", "--abbrev-ref", "HEAD");
+  if (branch !== options.branch) fail(`on ${branch}, not ${options.branch}${options.branch === "main" ? " (--branch overrides, for testing)" : ""}`);
+  const dirty = git("status", "--porcelain", "--untracked-files=no");
+  if (dirty !== "") fail(`the working tree has changes; commit or stash them first:\n${dirty}`);
+  const tag = `v${next}`;
+  if (git("tag", "--list", tag) !== "") fail(`tag ${tag} already exists`);
 
-const edits = planEdits(current, next);
-{
-  const readme = edits.get(README_CHANGELOG);
-  if (!readme) fail(`${README_CHANGELOG} is not in VERSIONED`);
-  const date = today();
-  const changes = [[README_CHANGELOG, readme, (text) => addReadmeChangelog(text, next, README_CHANGELOG), '"= Unreleased ="']];
-  for (const file of MARKDOWN_CHANGELOGS) {
-    if (!edits.has(file)) { const text = read(file); edits.set(file, { before: text, after: text, lines: [] }); }
-    changes.push([file, edits.get(file), (text) => addMarkdownChangelog(text, next, date, file), '"## Unreleased"']);
+  let edits;
+  try {
+    edits = planEdits(VERSIONED, read, current, next);
+  } catch (error) {
+    fail(error.message);
   }
   {
-    const text = read(ROOT_CHANGELOG);
-    edits.set(ROOT_CHANGELOG, { before: text, after: text, lines: [] });
-    changes.push([ROOT_CHANGELOG, edits.get(ROOT_CHANGELOG), (text) => addRootChangelog(text, next, date, ROOT_CHANGELOG), '"## Unreleased"']);
-  }
-  for (const [file, edit, add, heading] of changes) {
-    let result;
-    try {
-      result = add(edit.after);
-    } catch (error) {
-      fail(error.message);
+    const readme = edits.get(README_CHANGELOG);
+    if (!readme) fail(`${README_CHANGELOG} is not in VERSIONED`);
+    const date = today();
+    const changes = [[README_CHANGELOG, readme, (text) => addReadmeChangelog(text, next, README_CHANGELOG), '"= Unreleased ="']];
+    for (const file of MARKDOWN_CHANGELOGS) {
+      if (!edits.has(file)) { const text = read(file); edits.set(file, { before: text, after: text, lines: [] }); }
+      changes.push([file, edits.get(file), (text) => addMarkdownChangelog(text, next, date, file), '"## Unreleased"']);
     }
-    edit.after = result.text;
-    edit.lines.push([`Changelog`, result.change]);
-    if (!result.written) console.log(`Note: ${file} has no ${heading} section, so the release adds a placeholder changelog entry; edit it before tagging, or write the notes under ${heading} next time.\n`);
+    {
+      const text = read(ROOT_CHANGELOG);
+      edits.set(ROOT_CHANGELOG, { before: text, after: text, lines: [] });
+      changes.push([ROOT_CHANGELOG, edits.get(ROOT_CHANGELOG), (text) => addRootChangelog(text, next, date, ROOT_CHANGELOG), '"## Unreleased"']);
+    }
+    for (const [file, edit, add, heading] of changes) {
+      let result;
+      try {
+        result = add(edit.after);
+      } catch (error) {
+        fail(error.message);
+      }
+      edit.after = result.text;
+      edit.lines.push([`Changelog`, result.change]);
+      if (!result.written) console.log(`Note: ${file} has no ${heading} section, so the release adds a placeholder changelog entry; edit it before tagging, or write the notes under ${heading} next time.\n`);
+    }
+  }
+  const ruby = options.skipRuby ? null : findRuby();
+  const uv = !options.skipPython && hasUv();
+  const php = !options.skipPhp && hasPhp();
+  const gem = gemVersion(next, ruby);
+  const gemDir = options.dryRun ? path.join(os.tmpdir(), "cronwatch-gem-XXXXXX") : mkdtempSync(path.join(os.tmpdir(), "cronwatch-gem-"));
+  const gemFile = path.join(gemDir, `cronwatch-${gem}.gem`);
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  const steps = [
+    ["Refresh package-lock.json", npm, ["install", "--no-audit", "--no-fund"]],
+    ["Regenerate conformance/", npm, ["run", "conformance"]],
+    ["Build the SDK", npm, ["run", "build", "--workspace", "packages/sdk"]],
+    ["Regenerate the web golden fixture", "node", ["packages/ruby/test/web/golden.mjs"], { env: { TZ: "UTC" } }],
+    ["Check", npm, ["run", "check"]],
+    ["Build", npm, ["run", "build"]],
+    ["Check the packages", npm, ["run", "check:packages"]],
+    ...(ruby ? [
+      ["Install the gem's bundle", "bundle", ["install", "--quiet"], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env }],
+      ["Test the gem", "bundle", ["exec", "rake", "test"], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env }],
+      ["Build the gem", "gem", ["build", "cronwatch.gemspec", "--output", gemFile], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env, after: () => checkGem(gemFile, ruby) }],
+    ] : []),
+    ...(uv ? [["Test the Python package", "uv", ["run", "pytest", "-q"], { cwd: path.join(ROOT, "packages/python") }]] : []),
+    ...(php ? [
+      ["Install the PHP package's dev dependencies", "composer", ["install", "--no-interaction", "--quiet"], { cwd: path.join(ROOT, "packages/php") }],
+      ["Test the PHP package", "php", ["vendor/bin/phpunit"], { cwd: path.join(ROOT, "packages/php") }],
+    ] : []),
+  ];
+  const leftovers = strays(current);
+
+  console.log(`Release ${current} -> ${next} on ${branch}${options.dryRun ? " (dry run: nothing is written)" : ""}\n`);
+  for (const [file, { lines }] of edits) {
+    console.log(file);
+    for (const [before, after] of lines) console.log(`  - ${before.trim()}\n  + ${after.trim()}`);
+  }
+  console.log(`\nRegenerated by the steps below: ${REGENERATED.join(", ")}`);
+  if (leftovers.length > 0) {
+    console.log(`\nStill mentioning ${current} (not in VERSIONED; check whether they should move):`);
+    for (const line of leftovers) console.log(`  ${line}`);
+  }
+  if (options.skipRuby) console.log("\nSkipping the gem's tests and build (--skip-ruby).");
+  else if (!ruby) console.log("\nNo Ruby 3.2 or newer with bundler found; skipping the gem's tests and build. CI runs the tests; wait for it to pass before pushing the gem.");
+  else console.log(`\nRuby ${ruby.version}${ruby.env.RBENV_VERSION ? " (rbenv)" : ""} found; the gem's tests run and the gem is built.`);
+  if (options.skipPython) console.log("Skipping the Python package's tests (--skip-python).");
+  else if (!uv) console.log("No uv found; skipping the Python package's tests. CI runs them, and pypi.yml waits for CI to pass before it publishes.");
+  else console.log("uv found; the Python package's tests run.");
+  if (options.skipPhp) console.log("Skipping the PHP package's tests (--skip-php).");
+  else if (!php) console.log("No PHP 8.2 or newer with Composer found; skipping the PHP package's tests. CI runs them, and the PHP splits wait for CI to pass before they push.");
+  else console.log("PHP and Composer found; the PHP package's tests run.");
+  if (gem !== next) console.log(`RubyGems spells ${next} as ${gem}.`);
+
+  if (options.dryRun) {
+    console.log("\nWould run:");
+    for (const [label, cmd, args, opts = {}] of steps) {
+      const env = Object.entries(opts.env ?? {}).map(([k, v]) => `${k}=${v} `).join("");
+      const cwd = opts.cwd ? `(cd ${path.relative(ROOT, opts.cwd)}) ` : "";
+      console.log(`  ${label}: ${cwd}${env}${[cmd, ...args].join(" ")}`);
+      if (opts.after) console.log(`    then check it carries ${listed(GEM_REQUIRED)} and nothing under ${GEM_FORBIDDEN.join(" or ")}`);
+    }
+    console.log(`  Commit: git add -u && git commit -m "Release ${next}"`);
+    console.log(`  Tag: git tag -a ${tag} -m "Release ${next}"`);
+  } else {
+    for (const [file, { after }] of edits) writeFileSync(path.join(ROOT, file), after);
+    for (const [label, cmd, args, opts = {}] of steps) {
+      run(label, cmd, args, opts);
+      opts.after?.();
+    }
+    rmSync(gemDir, { recursive: true, force: true });
+    const untracked = git("status", "--porcelain").split("\n").filter((line) => line.startsWith("??"));
+    if (untracked.length > 0) console.log(`\nLeft out of the commit (untracked):\n${untracked.join("\n")}`);
+    git("add", "-u");
+    execFileSync("git", ["commit", "-m", `Release ${next}`], { cwd: ROOT, stdio: "inherit" });
+    git("tag", "-a", tag, "-m", `Release ${next}`);
+    console.log(`\nCommitted "Release ${next}" and tagged ${tag}. Nothing is pushed or published.`);
+  }
+
+  console.log(`\nNext, by hand:\n  git push origin ${branch} ${tag}\n  # The tag's publish workflows wait for CI to pass on this commit (.github/workflows/ci-passed.yml); publish the rest by hand once it has.`);
+  for (const { commands } of PUBLISH) for (const command of commands(next, gem)) console.log(`  ${command}`);
+  for (const old of options.deprecate) {
+    for (const name of NPM_PACKAGES) console.log(`  npm deprecate "${name}@${old}" "Upgrade to ${next}"`);
   }
 }
-const ruby = options.skipRuby ? null : findRuby();
-const uv = !options.skipPython && hasUv();
-const php = !options.skipPhp && hasPhp();
-const gem = gemVersion(next, ruby);
-const gemDir = options.dryRun ? path.join(os.tmpdir(), "cronwatch-gem-XXXXXX") : mkdtempSync(path.join(os.tmpdir(), "cronwatch-gem-"));
-const gemFile = path.join(gemDir, `cronwatch-${gem}.gem`);
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const steps = [
-  ["Refresh package-lock.json", npm, ["install", "--no-audit", "--no-fund"]],
-  ["Regenerate conformance/", npm, ["run", "conformance"]],
-  ["Build the SDK", npm, ["run", "build", "--workspace", "packages/sdk"]],
-  ["Regenerate the web golden fixture", "node", ["packages/ruby/test/web/golden.mjs"], { env: { TZ: "UTC" } }],
-  ["Check", npm, ["run", "check"]],
-  ["Build", npm, ["run", "build"]],
-  ["Check the packages", npm, ["run", "check:packages"]],
-  ...(ruby ? [
-    ["Install the gem's bundle", "bundle", ["install", "--quiet"], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env }],
-    ["Test the gem", "bundle", ["exec", "rake", "test"], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env }],
-    ["Build the gem", "gem", ["build", "cronwatch.gemspec", "--output", gemFile], { cwd: path.join(ROOT, "packages/ruby"), env: ruby.env, after: () => checkGem(gemFile, ruby) }],
-  ] : []),
-  ...(uv ? [["Test the Python package", "uv", ["run", "pytest", "-q"], { cwd: path.join(ROOT, "packages/python") }]] : []),
-  ...(php ? [
-    ["Install the PHP package's dev dependencies", "composer", ["install", "--no-interaction", "--quiet"], { cwd: path.join(ROOT, "packages/php") }],
-    ["Test the PHP package", "php", ["vendor/bin/phpunit"], { cwd: path.join(ROOT, "packages/php") }],
-  ] : []),
-];
-const leftovers = strays(current);
 
-console.log(`Release ${current} -> ${next} on ${branch}${options.dryRun ? " (dry run: nothing is written)" : ""}\n`);
-for (const [file, { lines }] of edits) {
-  console.log(file);
-  for (const [before, after] of lines) console.log(`  - ${before.trim()}\n  + ${after.trim()}`);
-}
-console.log(`\nRegenerated by the steps below: ${REGENERATED.join(", ")}`);
-if (leftovers.length > 0) {
-  console.log(`\nStill mentioning ${current} (not in VERSIONED; check whether they should move):`);
-  for (const line of leftovers) console.log(`  ${line}`);
-}
-if (options.skipRuby) console.log("\nSkipping the gem's tests and build (--skip-ruby).");
-else if (!ruby) console.log("\nNo Ruby 3.2 or newer with bundler found; skipping the gem's tests and build. CI runs the tests; wait for it to pass before pushing the gem.");
-else console.log(`\nRuby ${ruby.version}${ruby.env.RBENV_VERSION ? " (rbenv)" : ""} found; the gem's tests run and the gem is built.`);
-if (options.skipPython) console.log("Skipping the Python package's tests (--skip-python).");
-else if (!uv) console.log("No uv found; skipping the Python package's tests. CI runs them, and pypi.yml waits for CI to pass before it publishes.");
-else console.log("uv found; the Python package's tests run.");
-if (options.skipPhp) console.log("Skipping the PHP package's tests (--skip-php).");
-else if (!php) console.log("No PHP 8.2 or newer with Composer found; skipping the PHP package's tests. CI runs them, and the PHP splits wait for CI to pass before they push.");
-else console.log("PHP and Composer found; the PHP package's tests run.");
-if (gem !== next) console.log(`RubyGems spells ${next} as ${gem}.`);
-
-if (options.dryRun) {
-  console.log("\nWould run:");
-  for (const [label, cmd, args, opts = {}] of steps) {
-    const env = Object.entries(opts.env ?? {}).map(([k, v]) => `${k}=${v} `).join("");
-    const cwd = opts.cwd ? `(cd ${path.relative(ROOT, opts.cwd)}) ` : "";
-    console.log(`  ${label}: ${cwd}${env}${[cmd, ...args].join(" ")}`);
-    if (opts.after) console.log(`    then check it carries ${listed(GEM_REQUIRED)} and nothing under ${GEM_FORBIDDEN.join(" or ")}`);
-  }
-  console.log(`  Commit: git add -u && git commit -m "Release ${next}"`);
-  console.log(`  Tag: git tag -a ${tag} -m "Release ${next}"`);
-} else {
-  for (const [file, { after }] of edits) writeFileSync(path.join(ROOT, file), after);
-  for (const [label, cmd, args, opts = {}] of steps) {
-    run(label, cmd, args, opts);
-    opts.after?.();
-  }
-  rmSync(gemDir, { recursive: true, force: true });
-  const untracked = git("status", "--porcelain").split("\n").filter((line) => line.startsWith("??"));
-  if (untracked.length > 0) console.log(`\nLeft out of the commit (untracked):\n${untracked.join("\n")}`);
-  git("add", "-u");
-  execFileSync("git", ["commit", "-m", `Release ${next}`], { cwd: ROOT, stdio: "inherit" });
-  git("tag", "-a", tag, "-m", `Release ${next}`);
-  console.log(`\nCommitted "Release ${next}" and tagged ${tag}. Nothing is pushed or published.`);
-}
-
-console.log(`\nNext, by hand:\n  git push origin ${branch} ${tag}\n  # The tag's publish workflows wait for CI to pass on this commit (.github/workflows/ci-passed.yml); publish the rest by hand once it has.`);
-for (const { commands } of PUBLISH) for (const command of commands(next, gem)) console.log(`  ${command}`);
-for (const old of options.deprecate) {
-  for (const name of NPM_PACKAGES) console.log(`  npm deprecate "${name}@${old}" "Upgrade to ${next}"`);
-}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

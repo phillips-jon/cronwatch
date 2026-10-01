@@ -509,7 +509,7 @@ Elixir (Elixir 1.18 or newer on OTP 27 or newer)
 
 1. Add the package to the deps in mix.exs and run mix deps.get:
 
-   {:cronwatch, "~> 0.8"}
+   {:cronwatch, "~> 0.10"}
 
    It needs only tz and telemetry. The SQL store uses the project's own Ecto
    repo and adapter (ecto_sqlite3, postgrex or myxql); the dashboard and a

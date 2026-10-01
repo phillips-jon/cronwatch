@@ -2,7 +2,12 @@
 name = "cronwatch-apalis"
 description = "CronWatch for apalis: each attempt of a worker's jobs recorded as a run, and apalis-cron on CronWatch's own schedules"
 readme = "README.md"
-version.workspace = true
+# Its own version line, not the workspace's: while apalis 1.0 is a release
+# candidate this crate stays below 1.0. Below 1.0 the two are the same;
+# from the workspace's 1.0, scripts/release.mjs moves this to the next 0.x
+# minor (or patch, for a patch release). Back to version.workspace once
+# apalis 1.0 is final.
+version = "0.10.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

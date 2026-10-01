@@ -13,7 +13,7 @@ Elixir 1.18 or newer on Erlang/OTP 27 or newer. The package depends on [`tz`](ht
 ```elixir
 def deps do
   [
-    {:cronwatch, "~> 0.8"},
+    {:cronwatch, "~> 0.10"},
     {:ecto_sqlite3, "~> 0.17"} # for Cronwatch.Store.Ecto on SQLite, if your app has no repo yet
   ]
 end
