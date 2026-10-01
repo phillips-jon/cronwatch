@@ -1,0 +1,793 @@
+# cronwatch
+class AbortError(Exception)
+class AbortSignal
+    def __init__(self, timeout_ms: float | None=None) -> None
+    @property def aborted(self) -> bool
+    def abort(self) -> None
+    def throw_if_aborted(self) -> None
+    def settle(self) -> None
+class Alert
+    type: AlertType | str
+    run: Run | None
+    details: dict[str, Any]
+    job: str
+    definition: JobDefinition
+    title: str
+    message: str
+    at: int
+    triage: str | None = None
+    triage_tried: bool = False
+    def set_triage(self, diagnosis: str | None) -> None
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | Alert) -> Alert
+    def to_dict(self) -> dict[str, Any]
+class AlertDraft
+    type: AlertType | str
+    run: Run | None
+    details: dict[str, Any]
+    def to_dict(self) -> dict[str, Any]
+class AlertType(StrEnum)
+    MISSED = 'missed'
+    FAILED = 'failed'
+    STUCK = 'stuck'
+    SLOW = 'slow'
+    OVER_BUDGET = 'over_budget'
+    RECOVERED = 'recovered'
+class ChannelContext
+    def __init__(self, on_error: Callable[[BaseException], None]) -> None
+    def on_error(self, error: BaseException) -> None
+class ChannelTimeout(Exception)
+class CheckInterrupted(Exception)
+class CheckResult
+    checked_at: int
+    jobs: list[JobSummary]
+    alerts: list[Alert]
+    pruned: int
+    def to_dict(self) -> dict[str, Any]
+class Condition(StrEnum)
+    MISSED = 'missed'
+    FAILED = 'failed'
+    STUCK = 'stuck'
+    SLOW = 'slow'
+    OVER_BUDGET = 'over_budget'
+class Console
+    name = 'console'
+    def send(self, alert: Alert, context: ChannelContext | None=None) -> None
+class Cronwatch
+    def __init__(self, *, store: Any=None, alerts: Sequence[Any] | None=None, triage: Callable[[TriageContext], str | None] | None=None, sources: Sequence[Any] | None=None, cron_secret: str | None=_UNSET, retention: Duration='30d', defaults: Mapping[str, Any] | None=None, redact: Callable[[str], str] | bool | None=None, deliver: str='now', on_error: Callable[[BaseException, str], Any] | None=None, now: Callable[[], int] | None=None) -> None
+    def now(self) -> int
+    def job(self, name: str, **options: Any) -> JobHandle
+    def run(self, name: str, fn: Callable[[JobContext], T] | None=None, **options: Any) -> Any
+    def defined_jobs(self) -> list[JobDefinition]
+    def resume_run(self, name: str, run_id: str) -> RunHandle
+    def record_run(self, run: Run | Mapping[str, Any], *, evaluate: bool=True) -> list[Alert]
+    def on_error(self, error: BaseException, where: str) -> None
+    def check(self) -> CheckResult
+    def jobs(self) -> list[JobSummary]
+    def jobs_with_runs(self, limit: int=20) -> list[JobWithRuns]
+    def job_summary(self, name: str) -> JobSummary | None
+    def runs(self, name: str, limit: int=50) -> list[Run]
+    def get_run(self, run_id: str) -> Run | None
+    def silence(self, name: str, duration: Duration) -> JobState
+    def unsilence(self, name: str) -> JobState
+    def forget(self, name: str) -> None
+    def routes(self, **options: Any) -> Any
+    def start_checking(self, every: Duration='1m') -> None
+    def start(self, every: Duration='1m') -> None
+    def stop(self) -> None
+    def close(self) -> None
+class Custom
+    def __init__(self, name: str, send: Callable[..., Any]) -> None
+    def send(self, alert: Alert, context: ChannelContext | None=None) -> None
+class JobContext
+    def __init__(self, run: Run, signal: AbortSignal, recorder: RunRecorder) -> None
+    def log(self, *parts: Any) -> None
+    def metric(self, name: str, value: float) -> None
+    def metrics(self, values: Mapping[str, float] | None=None, **more: float) -> None
+    @property def aborted(self) -> bool
+class JobDefinition
+    FIELDS: dict[str, str] = {'name': 'name', 'schedule': 'schedule', 'timezone': 'timezone', 'grace': 'grace', 'timeout': 'timeout', 'max_duration': 'maxDuration', 'budget': 'budget', 'expect': 'expect', 'failures_before_alert': 'failuresBeforeAlert', 'description': 'description', 'tags': 'tags'}
+    OPTIONS: tuple[str, ...] = tuple((k for k in FIELDS if k != 'name'))
+    def __init__(self, fields: Mapping[str, Any] | None=None) -> None
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | JobDefinition | None) -> JobDefinition
+    name = property(lambda self: self._fields.get('name'))
+    schedule = property(lambda self: self._fields.get('schedule'))
+    timezone = property(lambda self: self._fields.get('timezone'))
+    grace = property(lambda self: self._fields.get('grace'))
+    timeout = property(lambda self: self._fields.get('timeout'))
+    max_duration = property(lambda self: self._fields.get('maxDuration'))
+    budget = property(lambda self: self._fields.get('budget'))
+    expect = property(lambda self: self._fields.get('expect'))
+    failures_before_alert = property(lambda self: self._fields.get('failuresBeforeAlert'))
+    description = property(lambda self: self._fields.get('description'))
+    tags = property(lambda self: self._fields.get('tags'))
+    @property def fields(self) -> dict[str, Any]
+    def get(self, key: str, default: Any=None) -> Any
+    def replace(self, **changes: Any) -> JobDefinition
+    def to_dict(self) -> dict[str, Any]
+class JobHandle
+    def __init__(self, client: Cronwatch, definition: JobDefinition) -> None
+    def run(self, fn: None=None, *, trigger: str='run') -> _RunBlock
+    def run(self, fn: Callable[[JobContext], Awaitable[T]], *, trigger: str='run') -> Awaitable[T]
+    def run(self, fn: Callable[[JobContext], T], *, trigger: str='run') -> T
+    def run(self, fn: Callable[[JobContext], Any] | None=None, *, trigger: str='run') -> Any
+    def monitor(self, fn: Callable[P, T], *, trigger: str='run') -> Callable[P, T]
+    def monitor(self, fn: None=None, *, trigger: str='run') -> Callable[[Callable[P, T]], Callable[P, T]]
+    def monitor(self, fn: Callable[..., Any] | None=None, *, trigger: str='run') -> Any
+    def handler(self, fn: Callable[..., Any], *, secret: str | None=_UNSET) -> Handler
+    def start(self, *, trigger: str | None=None, id: str | None=None) -> RunHandle
+    def resume(self, run_id: str) -> RunHandle
+class JobHealth(StrEnum)
+    HEALTHY = 'healthy'
+    LATE = 'late'
+    FAILING = 'failing'
+    STUCK = 'stuck'
+    SILENCED = 'silenced'
+    NEVER_RAN = 'never_ran'
+class JobState
+    job: str
+    open: dict[str, int] = field(default_factory=dict)
+    consecutive_failures: int = 0
+    silenced_until: float | None = None
+    last_alert_at: int | None = None
+    pending_recovery: list[Condition | str] | None = None
+    undelivered: list[Alert] | None = None
+    sending: list[Any] | None = None
+    version: int | None = None
+    extra: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | JobState) -> JobState
+    def to_dict(self) -> dict[str, Any]
+    def copy(self) -> JobState
+class JobStats
+    runs: int
+    ok_rate: float
+    p50_ms: int | None
+    p95_ms: int | None
+    def to_dict(self) -> dict[str, Any]
+class JobSummary
+    name: str
+    definition: JobDefinition
+    health: JobHealth
+    open: list[Condition | str]
+    last_run: Run | None
+    next_expected_at: int | None
+    consecutive_failures: int
+    silenced_until: float | None
+    stats: JobStats
+    def to_dict(self) -> dict[str, Any]
+class JobWithRuns
+    job: JobSummary
+    runs: list[Run]
+    def to_dict(self) -> dict[str, Any]
+class Run
+    id: str
+    job: str
+    status: RunStatus | str
+    started_at: int
+    finished_at: int | None = None
+    duration_ms: int | None = None
+    error: str | None = None
+    output: str | None = None
+    metrics: dict[str, float] = field(default_factory=dict)
+    trigger: str = 'run'
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | Run) -> Run
+    def to_dict(self) -> dict[str, Any]
+    def copy(self) -> Run
+    @property def running(self) -> bool
+    @property def ok(self) -> bool
+class RunHandle
+    def __init__(self, client: Cronwatch, definition: JobDefinition, run_id: str, base: Run | None, recorded: bool, inactive: str | None) -> None
+    @property def active(self) -> bool
+    def log(self, *parts: Any) -> None
+    def metric(self, name: str, value: float) -> None
+    def metrics(self, values: Mapping[str, float] | None=None, **more: float) -> None
+    def flush(self) -> None
+    def finish(self, outcome: Any=None, *, result: Any=UNSET, error: Any=UNSET) -> Run | None
+    def fail(self, error: Any) -> Run | None
+class RunStatus(StrEnum)
+    RUNNING = 'running'
+    OK = 'ok'
+    FAILED = 'failed'
+    TIMEOUT = 'timeout'
+class SendingAlert
+    until: Any
+    alert: Any
+    @classmethod def from_json(cls, entry: Any) -> Any
+    def to_dict(self) -> dict[str, Any]
+class StoredJob
+    name: str
+    definition: JobDefinition
+    created_at: int
+    updated_at: int
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | StoredJob) -> StoredJob
+    def to_dict(self) -> dict[str, Any]
+class TriageContext
+    alert: Alert
+    recent_runs: list[Run]
+    signal: AbortSignal
+__version__: str
+module alerts
+def client() -> Cronwatch
+def configure(**options: Any) -> Cronwatch
+def current() -> JobContext | None
+def format_duration(ms: float) -> str
+def parse_duration(value: Duration, label: str='duration') -> int | float
+def parse_schedule(schedule: str, timezone: str | None=None) -> ParsedSchedule
+def redact_secrets(text: str) -> str
+module stores
+
+# cronwatch.aio
+class AsyncCronwatch
+    def __init__(self, client: Cronwatch | None=None, **options: Any) -> None
+    @property def store(self) -> Any
+    def now(self) -> int
+    def job(self, name: str, **options: Any) -> AsyncJobHandle
+    def run(self, name: str, fn: Callable[[JobContext], Any] | None=None, **options: Any) -> Any
+    def defined_jobs(self) -> list[JobDefinition]
+    async def check(self) -> CheckResult
+    async def jobs(self) -> list[JobSummary]
+    async def jobs_with_runs(self, limit: int=20) -> list[JobWithRuns]
+    async def job_summary(self, name: str) -> JobSummary | None
+    async def runs(self, name: str, limit: int=50) -> list[Run]
+    async def get_run(self, run_id: str) -> Run | None
+    async def silence(self, name: str, duration: Duration) -> JobState
+    async def unsilence(self, name: str) -> JobState
+    async def forget(self, name: str) -> None
+    async def record_run(self, run: Run | Mapping[str, Any], *, evaluate: bool=True) -> list[Alert]
+    async def resume_run(self, name: str, run_id: str) -> AsyncRunHandle
+    def on_error(self, error: BaseException, where: str) -> None
+    def routes(self, **options: Any) -> Any
+    def start_checking(self, every: Duration='1m') -> None
+    def start(self, every: Duration='1m') -> None
+    def stop(self) -> None
+    async def close(self) -> None
+class AsyncJobHandle
+    def __init__(self, handle: JobHandle) -> None
+    def run(self, fn: Callable[[JobContext], Any] | None=None, *, trigger: str='run') -> Any
+    def monitor(self, fn: Callable[..., Any] | None=None, *, trigger: str='run') -> Any
+    def handler(self, fn: Callable[..., Any], *, secret: str | None=UNSET) -> Any
+    async def start(self, *, trigger: str | None=None, id: str | None=None) -> AsyncRunHandle
+    async def resume(self, run_id: str) -> AsyncRunHandle
+class AsyncRunHandle
+    def __init__(self, handle: RunHandle) -> None
+    @property def id(self) -> str
+    @property def job(self) -> str
+    @property def started_at(self) -> int | None
+    @property def active(self) -> bool
+    def log(self, *parts: Any) -> None
+    def metric(self, name: str, value: float) -> None
+    def metrics(self, values: Mapping[str, float] | None=None, **more: float) -> None
+    async def flush(self) -> None
+    async def finish(self, outcome: Any=None, *, result: Any=UNSET, error: Any=UNSET) -> Run | None
+    async def fail(self, error: Any) -> Run | None
+
+# cronwatch.alerts
+class AlertChannel(Protocol)
+    name: str
+    def send(self, alert: Alert, context: ChannelContext) -> None
+class Bugsnag
+    name = 'bugsnag'
+    def __init__(self, *, api_key: str, release_stage: str | None=None, endpoint: str | None=None, recovered: bool=False, now: Callable[[], int] | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class ChannelContext
+    def __init__(self, on_error: Callable[[BaseException], None]) -> None
+    def on_error(self, error: BaseException) -> None
+class Console
+    name = 'console'
+    def send(self, alert: Alert, context: ChannelContext | None=None) -> None
+class Custom
+    def __init__(self, name: str, send: Callable[..., Any]) -> None
+    def send(self, alert: Alert, context: ChannelContext | None=None) -> None
+class Datadog
+    name = 'datadog'
+    def __init__(self, *, api_key: str, site: str | None=None, tags: Sequence[str] | None=None, host: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Discord
+    name = 'discord'
+    def __init__(self, _url: str | None=None, /, *, webhook_url: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Honeybadger
+    name = 'honeybadger'
+    def __init__(self, *, api_key: str, environment: str | None=None, endpoint: str | None=None, recovered: bool=False, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Mailgun
+    name = 'mailgun'
+    def __init__(self, *, api_key: str, domain: str, from_: str, to: str | list[str], region: str | None=None, subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class NewRelic
+    name = 'newrelic'
+    def __init__(self, *, account_id: str | int, api_key: str, region: str | None=None, event_type: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Postmark
+    name = 'postmark'
+    def __init__(self, *, server_token: str, from_: str, to: str | list[str], message_stream: str | None=None, subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class RequestTimeout(TimeoutError)
+    def __init__(self, message: str='The operation was aborted due to timeout') -> None
+class Resend
+    name = 'resend'
+    def __init__(self, *, api_key: str, from_: str, to: str | list[str], subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Response
+    status: int
+    body: str = ''
+    @property def ok(self) -> bool
+class Rollbar
+    name = 'rollbar'
+    def __init__(self, *, access_token: str, environment: str | None=None, recovered: bool=True, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Sendgrid
+    name = 'sendgrid'
+    def __init__(self, *, api_key: str, from_: str, to: str | list[str], region: str | None=None, subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Sentry
+    name = 'sentry'
+    def __init__(self, *, dsn: str, environment: str | None=None, release: str | None=None, recovered: bool=True, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Ses
+    name = 'ses'
+    def __init__(self, *, region: str, access_key_id: str, secret_access_key: str, from_: str, to: str | list[str], session_token: str | None=None, configuration_set_name: str | None=None, subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, now: Callable[[], int] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Slack
+    name = 'slack'
+    def __init__(self, _url: str | None=None, /, *, webhook_url: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class Twilio
+    name = 'twilio'
+    def __init__(self, *, account_sid: str, to: str | list[str], auth_token: str | None=None, api_key_sid: str | None=None, api_key_secret: str | None=None, from_: str | None=None, messaging_service_sid: str | None=None, recovered: bool=False, segments: Any=3, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+class UrllibHTTP
+    def __init__(self, timeout: float=TIMEOUT) -> None
+    def post(self, url: str, body: str, headers: dict[str, str]) -> Response
+class Webhook
+    name = 'webhook'
+    def __init__(self, url: str, *, headers: Mapping[str, str] | None=None, secret: str | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.bugsnag
+class Bugsnag
+    name = 'bugsnag'
+    def __init__(self, *, api_key: str, release_stage: str | None=None, endpoint: str | None=None, recovered: bool=False, now: Callable[[], int] | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.datadog
+class Datadog
+    name = 'datadog'
+    def __init__(self, *, api_key: str, site: str | None=None, tags: Sequence[str] | None=None, host: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.discord
+class Discord
+    name = 'discord'
+    def __init__(self, _url: str | None=None, /, *, webhook_url: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.honeybadger
+class Honeybadger
+    name = 'honeybadger'
+    def __init__(self, *, api_key: str, environment: str | None=None, endpoint: str | None=None, recovered: bool=False, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.mailgun
+class Mailgun
+    name = 'mailgun'
+    def __init__(self, *, api_key: str, domain: str, from_: str, to: str | list[str], region: str | None=None, subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.newrelic
+class NewRelic
+    name = 'newrelic'
+    def __init__(self, *, account_id: str | int, api_key: str, region: str | None=None, event_type: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.postmark
+class Postmark
+    name = 'postmark'
+    def __init__(self, *, server_token: str, from_: str, to: str | list[str], message_stream: str | None=None, subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.resend
+class Resend
+    name = 'resend'
+    def __init__(self, *, api_key: str, from_: str, to: str | list[str], subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.rollbar
+class Rollbar
+    name = 'rollbar'
+    def __init__(self, *, access_token: str, environment: str | None=None, recovered: bool=True, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.sendgrid
+class Sendgrid
+    name = 'sendgrid'
+    def __init__(self, *, api_key: str, from_: str, to: str | list[str], region: str | None=None, subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.sentry
+class Sentry
+    name = 'sentry'
+    def __init__(self, *, dsn: str, environment: str | None=None, release: str | None=None, recovered: bool=True, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.ses
+class Ses
+    name = 'ses'
+    def __init__(self, *, region: str, access_key_id: str, secret_access_key: str, from_: str, to: str | list[str], session_token: str | None=None, configuration_set_name: str | None=None, subject_prefix: str | None=None, link: Callable[[Alert], Any] | None=None, now: Callable[[], int] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.slack
+class Slack
+    name = 'slack'
+    def __init__(self, _url: str | None=None, /, *, webhook_url: str | None=None, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.twilio
+class Twilio
+    name = 'twilio'
+    def __init__(self, *, account_sid: str, to: str | list[str], auth_token: str | None=None, api_key_sid: str | None=None, api_key_secret: str | None=None, from_: str | None=None, messaging_service_sid: str | None=None, recovered: bool=False, segments: Any=3, link: Callable[[Alert], Any] | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+
+# cronwatch.alerts.webhook
+WEBHOOK_SCHEMA = 1
+class Webhook
+    name = 'webhook'
+    def __init__(self, url: str, *, headers: Mapping[str, str] | None=None, secret: str | None=None, http: HTTP | None=None) -> None
+    def send(self, alert: Alert, context: Any=None) -> None
+def signature(secret: str, body: str) -> str
+
+# cronwatch.apscheduler
+class ScheduleError(ValueError)
+class SchedulerWatch
+    def __init__(self, scheduler: Any, *, client: Cronwatch | Callable[[], Cronwatch] | None, jobs: Mapping[str, Mapping[str, Any]], exclude: Iterable[str], options: Mapping[str, Any], previous: SchedulerWatch | None=None) -> None
+    @property def client(self) -> Cronwatch
+    def flush(self) -> None
+    def close(self) -> None
+def convert(trigger: Any, where: str='cronwatch: this job') -> dict[str, Any] | None
+def watch(scheduler: Any, *, client: Cronwatch | Callable[[], Cronwatch] | None=None, jobs: Mapping[str, Mapping[str, Any]] | None=None, exclude: Iterable[str]=(), **options: Any) -> SchedulerWatch
+
+# cronwatch.celery
+CHECK_TASK = 'cronwatch.celery.check'
+class CeleryWatch
+    def __init__(self, app: Any, *, client: Cronwatch | Callable[[], Cronwatch] | None, beat: bool, django_celery_beat: bool | None, tasks: Mapping[str, Mapping[str, Any]], exclude: Iterable[str], options: Mapping[str, Any]) -> None
+    @property def client(self) -> Cronwatch
+    def beat_entries(self, report: Callable[[BaseException, str], None] | None=None) -> list[_BeatEntry]
+    def declarations(self, refresh: bool=False, report: Callable[[BaseException, str], None] | None=None) -> dict[str, _Declaration]
+    def handle(self, task: str, declaration: _Declaration | None=None, *, strict: bool=False) -> JobHandle | None
+    def declare(self, *, strict: bool=True) -> list[JobHandle]
+class ScheduleError(ValueError)
+def check(self: Any) -> str
+def cronwatch_task(**options: Any) -> Callable[[Any], Any]
+def install(app: Any=None, *, client: Cronwatch | Callable[[], Cronwatch] | None=None, beat: bool=True, django_celery_beat: bool | None=None, tasks: Mapping[str, Mapping[str, Any]] | None=None, exclude: Iterable[str]=(), **options: Any) -> CeleryWatch
+def watch_for(app: Any) -> CeleryWatch | None
+
+# cronwatch.django
+class DjangoWeb(Web)
+    @property def client(self) -> Any
+def client() -> cronwatch.Cronwatch
+def reset() -> None
+def routes() -> Web
+
+# cronwatch.django.apps
+class CronwatchConfig(AppConfig)
+    name = 'cronwatch.django'
+    label = 'cronwatch'
+    verbose_name = 'CronWatch'
+    def ready(self) -> None
+
+# cronwatch.django.management.commands.cronwatch_check
+class Command(BaseCommand)
+    help = 'Check for missed and stuck runs and send alerts (what cw.check() does).'
+    def handle(self, *args: Any, **options: Any) -> None
+
+# cronwatch.django.urls
+app_name = 'cronwatch'
+urlpatterns = [re_path('^(?P<path>.*)\\Z', dashboard, name='dashboard')]
+
+# cronwatch.django.views
+def dashboard(request: HttpRequest, path: str='') -> HttpResponse
+
+# cronwatch.sources.pgcron
+class Job
+    jobid: int
+    jobname: str | None = None
+    schedule: str = ''
+    database: str | None = None
+    username: str | None = None
+    active: bool = True
+class PgCron
+    name = 'pg_cron'
+    def __init__(self, db: Any, *, jobs: Iterable[str | int] | Callable[[Job], bool] | None=None, prefix: str='', job_name: Callable[[Job], str] | None=None, options: Mapping[str, Any] | Callable[[Job], Mapping[str, Any]] | None=None, timezone: str | None=None) -> None
+    def sync(self, host: Any) -> list[Alert]
+
+# cronwatch.stores
+class MemoryStore
+    def __init__(self) -> None
+    def upsert_job(self, definition: JobDefinition, now: int) -> None
+    def get_job(self, name: str) -> StoredJob | None
+    def list_jobs(self) -> list[StoredJob]
+    def delete_job(self, name: str) -> None
+    def insert_run(self, run: Run) -> None
+    def update_run(self, run: Run) -> None
+    def update_run_if(self, run: Run, from_statuses: Sequence[RunStatus | str]) -> bool
+    def get_run(self, run_id: str) -> Run | None
+    def list_runs(self, job: str, limit: int) -> list[Run]
+    def last_run(self, job: str) -> Run | None
+    def running_runs(self) -> list[Run]
+    def get_state(self, job: str) -> JobState | None
+    def set_state(self, state: JobState) -> None
+    def compare_and_set_state(self, state: JobState, expected_version: int) -> bool
+    def prune(self, before: int) -> int
+    def close(self) -> None
+class SqliteStore
+    def __init__(self, path: str | os.PathLike[str]='./data/cronwatch.db', *, connection: sqlite3.Connection | None=None, prefix: str=_sql.DEFAULT_PREFIX) -> None
+    def init(self) -> None
+    def upsert_job(self, definition: JobDefinition, now: int) -> None
+    def get_job(self, name: str) -> StoredJob | None
+    def list_jobs(self) -> list[StoredJob]
+    def delete_job(self, name: str) -> None
+    def insert_run(self, run: Run) -> None
+    def update_run(self, run: Run) -> None
+    def update_run_if(self, run: Run, from_statuses: Sequence[RunStatus | str]) -> bool
+    def get_run(self, run_id: str) -> Run | None
+    def list_runs(self, job: str, limit: int) -> list[Run]
+    def last_run(self, job: str) -> Run | None
+    def running_runs(self) -> list[Run]
+    def get_state(self, job: str) -> JobState | None
+    def set_state(self, state: JobState) -> None
+    def compare_and_set_state(self, state: JobState, expected_version: int) -> bool
+    def prune(self, before: int) -> int
+    def close(self) -> None
+class Store(Protocol)
+    def upsert_job(self, definition: JobDefinition, now: int) -> None
+    def get_job(self, name: str) -> StoredJob | None
+    def list_jobs(self) -> list[StoredJob]
+    def delete_job(self, name: str) -> None
+    def insert_run(self, run: Run) -> None
+    def update_run(self, run: Run) -> None
+    def get_run(self, run_id: str) -> Run | None
+    def list_runs(self, job: str, limit: int) -> list[Run]
+    def last_run(self, job: str) -> Run | None
+    def running_runs(self) -> list[Run]
+    def get_state(self, job: str) -> JobState | None
+    def set_state(self, state: JobState) -> None
+    def prune(self, before: int) -> int
+
+# cronwatch.stores.memory
+class MemoryStore
+    def __init__(self) -> None
+    def upsert_job(self, definition: JobDefinition, now: int) -> None
+    def get_job(self, name: str) -> StoredJob | None
+    def list_jobs(self) -> list[StoredJob]
+    def delete_job(self, name: str) -> None
+    def insert_run(self, run: Run) -> None
+    def update_run(self, run: Run) -> None
+    def update_run_if(self, run: Run, from_statuses: Sequence[RunStatus | str]) -> bool
+    def get_run(self, run_id: str) -> Run | None
+    def list_runs(self, job: str, limit: int) -> list[Run]
+    def last_run(self, job: str) -> Run | None
+    def running_runs(self) -> list[Run]
+    def get_state(self, job: str) -> JobState | None
+    def set_state(self, state: JobState) -> None
+    def compare_and_set_state(self, state: JobState, expected_version: int) -> bool
+    def prune(self, before: int) -> int
+    def close(self) -> None
+
+# cronwatch.stores.postgres
+class PostgresStore
+    def __init__(self, conninfo: str | None=None, *, pool: Any=None, prefix: str=_sql.DEFAULT_PREFIX) -> None
+    def init(self) -> None
+    def upsert_job(self, definition: JobDefinition, now: int) -> None
+    def get_job(self, name: str) -> StoredJob | None
+    def list_jobs(self) -> list[StoredJob]
+    def delete_job(self, name: str) -> None
+    def insert_run(self, run: Run) -> None
+    def update_run(self, run: Run) -> None
+    def update_run_if(self, run: Run, from_statuses: Sequence[RunStatus | str]) -> bool
+    def get_run(self, run_id: str) -> Run | None
+    def list_runs(self, job: str, limit: int) -> list[Run]
+    def last_run(self, job: str) -> Run | None
+    def running_runs(self) -> list[Run]
+    def get_state(self, job: str) -> JobState | None
+    def set_state(self, state: JobState) -> None
+    def compare_and_set_state(self, state: JobState, expected_version: int) -> bool
+    def prune(self, before: int) -> int
+    def close(self) -> None
+
+# cronwatch.stores.sqlite
+class SqliteStore
+    def __init__(self, path: str | os.PathLike[str]='./data/cronwatch.db', *, connection: sqlite3.Connection | None=None, prefix: str=_sql.DEFAULT_PREFIX) -> None
+    def init(self) -> None
+    def upsert_job(self, definition: JobDefinition, now: int) -> None
+    def get_job(self, name: str) -> StoredJob | None
+    def list_jobs(self) -> list[StoredJob]
+    def delete_job(self, name: str) -> None
+    def insert_run(self, run: Run) -> None
+    def update_run(self, run: Run) -> None
+    def update_run_if(self, run: Run, from_statuses: Sequence[RunStatus | str]) -> bool
+    def get_run(self, run_id: str) -> Run | None
+    def list_runs(self, job: str, limit: int) -> list[Run]
+    def last_run(self, job: str) -> Run | None
+    def running_runs(self) -> list[Run]
+    def get_state(self, job: str) -> JobState | None
+    def set_state(self, state: JobState) -> None
+    def compare_and_set_state(self, state: JobState, expected_version: int) -> bool
+    def prune(self, before: int) -> int
+    def close(self) -> None
+
+# cronwatch.triage.anthropic
+class Anthropic
+    def __init__(self, *, api_key: str | None=None, client: Any=None, model: str | None=None, effort: str | None=None, max_tokens: int | None=None, fallbacks: bool | None=None, context: str | None=None) -> None
+    def params(self, context: Any) -> dict[str, Any]
+    def __call__(self, context: Any) -> str | None
+DEFAULT_EFFORT = 'medium'
+DEFAULT_MAX_TOKENS = 800
+DEFAULT_MODEL = 'claude-opus-5'
+
+# cronwatch.types
+class Alert
+    type: AlertType | str
+    run: Run | None
+    details: dict[str, Any]
+    job: str
+    definition: JobDefinition
+    title: str
+    message: str
+    at: int
+    triage: str | None = None
+    triage_tried: bool = False
+    def set_triage(self, diagnosis: str | None) -> None
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | Alert) -> Alert
+    def to_dict(self) -> dict[str, Any]
+class AlertDraft
+    type: AlertType | str
+    run: Run | None
+    details: dict[str, Any]
+    def to_dict(self) -> dict[str, Any]
+class AlertType(StrEnum)
+    MISSED = 'missed'
+    FAILED = 'failed'
+    STUCK = 'stuck'
+    SLOW = 'slow'
+    OVER_BUDGET = 'over_budget'
+    RECOVERED = 'recovered'
+class CheckResult
+    checked_at: int
+    jobs: list[JobSummary]
+    alerts: list[Alert]
+    pruned: int
+    def to_dict(self) -> dict[str, Any]
+class Condition(StrEnum)
+    MISSED = 'missed'
+    FAILED = 'failed'
+    STUCK = 'stuck'
+    SLOW = 'slow'
+    OVER_BUDGET = 'over_budget'
+class JobDefinition
+    FIELDS: dict[str, str] = {'name': 'name', 'schedule': 'schedule', 'timezone': 'timezone', 'grace': 'grace', 'timeout': 'timeout', 'max_duration': 'maxDuration', 'budget': 'budget', 'expect': 'expect', 'failures_before_alert': 'failuresBeforeAlert', 'description': 'description', 'tags': 'tags'}
+    OPTIONS: tuple[str, ...] = tuple((k for k in FIELDS if k != 'name'))
+    def __init__(self, fields: Mapping[str, Any] | None=None) -> None
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | JobDefinition | None) -> JobDefinition
+    name = property(lambda self: self._fields.get('name'))
+    schedule = property(lambda self: self._fields.get('schedule'))
+    timezone = property(lambda self: self._fields.get('timezone'))
+    grace = property(lambda self: self._fields.get('grace'))
+    timeout = property(lambda self: self._fields.get('timeout'))
+    max_duration = property(lambda self: self._fields.get('maxDuration'))
+    budget = property(lambda self: self._fields.get('budget'))
+    expect = property(lambda self: self._fields.get('expect'))
+    failures_before_alert = property(lambda self: self._fields.get('failuresBeforeAlert'))
+    description = property(lambda self: self._fields.get('description'))
+    tags = property(lambda self: self._fields.get('tags'))
+    @property def fields(self) -> dict[str, Any]
+    def get(self, key: str, default: Any=None) -> Any
+    def replace(self, **changes: Any) -> JobDefinition
+    def to_dict(self) -> dict[str, Any]
+class JobHealth(StrEnum)
+    HEALTHY = 'healthy'
+    LATE = 'late'
+    FAILING = 'failing'
+    STUCK = 'stuck'
+    SILENCED = 'silenced'
+    NEVER_RAN = 'never_ran'
+class JobState
+    job: str
+    open: dict[str, int] = field(default_factory=dict)
+    consecutive_failures: int = 0
+    silenced_until: float | None = None
+    last_alert_at: int | None = None
+    pending_recovery: list[Condition | str] | None = None
+    undelivered: list[Alert] | None = None
+    sending: list[Any] | None = None
+    version: int | None = None
+    extra: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | JobState) -> JobState
+    def to_dict(self) -> dict[str, Any]
+    def copy(self) -> JobState
+class JobStats
+    runs: int
+    ok_rate: float
+    p50_ms: int | None
+    p95_ms: int | None
+    def to_dict(self) -> dict[str, Any]
+class JobSummary
+    name: str
+    definition: JobDefinition
+    health: JobHealth
+    open: list[Condition | str]
+    last_run: Run | None
+    next_expected_at: int | None
+    consecutive_failures: int
+    silenced_until: float | None
+    stats: JobStats
+    def to_dict(self) -> dict[str, Any]
+class JobWithRuns
+    job: JobSummary
+    runs: list[Run]
+    def to_dict(self) -> dict[str, Any]
+MISSING: Any
+class Run
+    id: str
+    job: str
+    status: RunStatus | str
+    started_at: int
+    finished_at: int | None = None
+    duration_ms: int | None = None
+    error: str | None = None
+    output: str | None = None
+    metrics: dict[str, float] = field(default_factory=dict)
+    trigger: str = 'run'
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | Run) -> Run
+    def to_dict(self) -> dict[str, Any]
+    def copy(self) -> Run
+    @property def running(self) -> bool
+    @property def ok(self) -> bool
+class RunStatus(StrEnum)
+    RUNNING = 'running'
+    OK = 'ok'
+    FAILED = 'failed'
+    TIMEOUT = 'timeout'
+class SendingAlert
+    until: Any
+    alert: Any
+    @classmethod def from_json(cls, entry: Any) -> Any
+    def to_dict(self) -> dict[str, Any]
+class StoredJob
+    name: str
+    definition: JobDefinition
+    created_at: int
+    updated_at: int
+    @classmethod def from_dict(cls, data: Mapping[str, Any] | StoredJob) -> StoredJob
+    def to_dict(self) -> dict[str, Any]
+
+# cronwatch.web
+class BodyTooLarge(Exception)
+    def __init__(self) -> None
+class Request
+    method: str
+    path: str
+    query: str = ''
+    headers: dict[str, str] = field(default_factory=dict)
+    body: bytes | Callable[[], bytes] = b''
+    origin: str = 'http://localhost'
+    mount: str = ''
+    form: Mapping[str, Any] | None = None
+    def header(self, name: str) -> str | None
+    def read(self) -> bytes
+    def params(self) -> list[tuple[str, str]]
+    def param(self, name: str) -> str | None
+    @classmethod def from_wsgi(cls, environ: Mapping[str, Any]) -> Request
+    @classmethod def from_asgi(cls, scope: Mapping[str, Any], body: bytes) -> Request
+class Response
+    status: int
+    headers: dict[str, str]
+    body: bytes = b''
+    @property def text(self) -> str
+    def wsgi_headers(self) -> list[tuple[str, str]]
+class Web
+    def __init__(self, client: Any=None, *, token: str | None=_UNSET, base_path: str | None=None, origin: str | None=None, trust_proxy: bool=False) -> None
+    @property def client(self) -> Any
+    @property def token(self) -> str | None
+    def __call__(self, environ: Mapping[str, Any], start_response: Callable[..., Any]) -> list[bytes]
+    async def asgi(self, scope: Mapping[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> None
+    def handle(self, request: Request) -> Response
+    def public_origin(self, request: Request) -> str

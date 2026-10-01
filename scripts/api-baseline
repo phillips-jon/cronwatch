@@ -1,0 +1,9 @@
+# The commit the API checks (scripts/go-apidiff.sh, scripts/rust-semver.sh)
+# compare against while it is newer than the last release: the state of
+# main when the checks were added, after the 1.0 preparation. Once a
+# release is tagged on top of it, the tag is the baseline and this line no
+# longer matters. To accept a breaking change on purpose (a major release,
+# or a change a pre-1.0 dependency forces, as site/docs/stability.md
+# allows), push the change, then a commit moving this line to the change's
+# commit, in the same push, and record it in CHANGELOG.md.
+14cd2fbcc20b9ed31dd09e67d002fe2847cb4bba

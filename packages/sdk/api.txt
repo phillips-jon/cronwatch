@@ -1,0 +1,475 @@
+# @cronwatch/sdk
+type Alert = (AlertBase & { type: 'missed'; details: { dueAt: number; deadline: number; graceMs: number; lastRunAt: number | null; }; }) | (AlertBase & { type: 'failed'; details: { consecutiveFailures: number; threshold: number; }; }) | (AlertBase & { type: 'stuck'; details: { consecutiveFailures: number; threshold: number; }; }) | (AlertBase & { type: 'slow'; details: { durationMs: number; thresholdMs: number; basis: string; }; }) | (AlertBase & { type: 'over_budget'; details: { breaches: Array<BudgetBreach>; }; }) | (AlertBase & { type: 'recovered'; details: { after: Array<Condition>; reason?: 'unscheduled' | undefined; since?: number | undefined; }; })
+interface AlertChannel
+  name: string
+  send(alert: Alert, context?: ChannelContext | undefined): Promise<void>
+interface AlertDetails
+  missed: { dueAt: number; deadline: number; graceMs: number; lastRunAt: number | null }
+  failed: { consecutiveFailures: number; threshold: number }
+  stuck: { consecutiveFailures: number; threshold: number }
+  slow: { durationMs: number; thresholdMs: number; basis: string }
+  over_budget: { breaches: BudgetBreach[] }
+  recovered: { after: Condition[]; reason?: "unscheduled"; since?: number }
+type AlertDraft = { type: 'missed'; run: Run | null; details: { dueAt: number; deadline: number; graceMs: number; lastRunAt: number | null; }; } | { type: 'failed'; run: Run | null; details: { consecutiveFailures: number; threshold: number; }; } | { type: 'stuck'; run: Run | null; details: { consecutiveFailures: number; threshold: number; }; } | { type: 'slow'; run: Run | null; details: { durationMs: number; thresholdMs: number; basis: string; }; } | { type: 'over_budget'; run: Run | null; details: { breaches: Array<BudgetBreach>; }; } | { type: 'recovered'; run: Run | null; details: { after: Array<Condition>; reason?: 'unscheduled' | undefined; since?: number | undefined; }; }
+type AlertType = Condition | 'recovered'
+interface BudgetBreach
+  metric: string
+  value: number
+  limit: number
+  basis: string
+interface ChannelContext
+  onError(error: unknown): void
+interface CheckResult
+  checkedAt: number
+  jobs: JobSummary[]
+  alerts: Alert[]
+  pruned: number
+type Condition = 'missed' | 'failed' | 'stuck' | 'slow' | 'over_budget'
+type CronWatch = Cronwatch (deprecated)
+type CronWatchOptions = CronwatchOptions (deprecated)
+class Cronwatch
+  constructor(options?: CronwatchOptions)
+  readonly store: Store
+  readonly alerts: AlertChannel[]
+  readonly triage: TriageFn | undefined
+  readonly sources: Source[]
+  readonly cronSecret: string | null
+  readonly retentionMs: number
+  readonly now: () => number
+  readonly onError: (error: unknown, where: string) => void
+  job(name: string, options?: JobOptions): JobHandle
+  run<T>(name: string, fn: JobFn<T>): Promise<T>
+  run<T>(name: string, options: JobOptions, fn: JobFn<T>): Promise<T>
+  definedJobs(): Array<JobDefinition>
+  resumeRun(name: string, runId: string): Promise<RunHandle>
+  recordRun(input: Run, options?: RecordRunOptions): Promise<Array<Alert>>
+  check(): Promise<CheckResult>
+  jobs(): Promise<Array<JobSummary>>
+  jobsWithRuns(limit?: number): Promise<Array<{ job: JobSummary; runs: Array<Run>; }>>
+  jobSummary(name: string): Promise<JobSummary | null>
+  runs(name: string, limit?: number): Promise<Array<Run>>
+  getRun(id: string): Promise<Run | null>
+  silence(name: string, duration: Duration): Promise<JobState>
+  unsilence(name: string): Promise<JobState>
+  forget(name: string): Promise<void>
+  routes(options?: RoutesOptions | undefined): Routes
+  startChecking(every?: Duration): void
+  start(every?: Duration): void (deprecated)
+  stop(): void
+  close(): Promise<void>
+interface CronwatchOptions
+  store?: Store
+  sources?: Source[]
+  alerts?: AlertChannel[]
+  triage?: TriageFn
+  cronSecret?: string | null
+  retention?: Duration
+  defaults?: Pick<JobOptions, "grace" | "timeout" | "timezone" | "failuresBeforeAlert">
+  redact?: ((text: string) => string) | false
+  deliver?: "now" | "check"
+  onError?: (error: unknown, where: string) => void
+  now?: () => number
+type Duration = string | number
+type ExpectRule = string | RegExp | ((output: string) => boolean)
+type FetchHandler = (request: Request) => Promise<Response>
+type HandlerFn<T> = (job: JobContext, request: Request) => T | Promise<T>
+interface HandlerOptions
+  secret?: string | null
+interface JobContext
+  readonly name: string
+  readonly runId: string
+  readonly startedAt: number
+  readonly signal: AbortSignal
+  log(...parts: Array<unknown>): void
+  metric(name: string, value: number): void
+  metrics(values: Record<string, number>): void
+interface JobDefinition
+  name: string
+  schedule?: string
+  timezone?: string
+  grace?: Duration
+  timeout?: Duration
+  maxDuration?: Duration
+  budget?: Record<string, number>
+  expect?: ExpectRule
+  failuresBeforeAlert?: number
+  description?: string
+  tags?: string[]
+type JobFn<T> = (job: JobContext) => T | Promise<T>
+interface JobHandle
+  readonly name: string
+  readonly definition: JobDefinition
+  run<T>(fn: JobFn<T>, options?: { trigger?: string | undefined; } | undefined): Promise<T>
+  handler<T>(fn: HandlerFn<T>, options?: HandlerOptions | undefined): (request: Request) => Promise<Response>
+  start(options?: StartOptions | undefined): Promise<RunHandle>
+  resume(runId: string): Promise<RunHandle>
+type JobHealth = 'stuck' | 'healthy' | 'late' | 'failing' | 'silenced' | 'never_ran'
+interface JobOptions
+  schedule?: string
+  timezone?: string
+  grace?: Duration
+  timeout?: Duration
+  maxDuration?: Duration
+  budget?: Record<string, number>
+  expect?: ExpectRule
+  failuresBeforeAlert?: number
+  description?: string
+  tags?: string[]
+interface JobState
+  job: string
+  open: Partial<Record<Condition, number>>
+  consecutiveFailures: number
+  silencedUntil: number | null
+  lastAlertAt: number | null
+  pendingRecovery?: Condition[]
+  undelivered?: Alert[]
+  sending?: SendingAlert[]
+  version?: number
+interface JobSummary
+  name: string
+  definition: StoredJobDefinition
+  health: JobHealth
+  open: Condition[]
+  lastRun: Run | null
+  nextExpectedAt: number | null
+  consecutiveFailures: number
+  silencedUntil: number | null
+  stats: { runs: number; okRate: number; p50Ms: number | null; p95Ms: number | null }
+interface ParsedSchedule
+  kind: "cron" | "interval"
+  source: string
+  timezone?: string
+  everyMs?: number
+interface RecordRunOptions
+  evaluate?: boolean
+interface Routes
+  handler: FetchHandler
+  GET: FetchHandler
+  POST: FetchHandler
+  DELETE: FetchHandler
+interface RoutesOptions
+  token?: string | null
+  basePath?: string
+  origin?: string
+  trustProxy?: boolean
+interface Run
+  id: string
+  job: string
+  status: RunStatus
+  startedAt: number
+  finishedAt: number | null
+  durationMs: number | null
+  error: string | null
+  output: string | null
+  metrics: Record<string, number>
+  trigger: string
+interface RunHandle
+  readonly id: string
+  readonly job: string
+  readonly startedAt: number | null
+  readonly active: boolean
+  log(...parts: Array<unknown>): void
+  metric(name: string, value: number): void
+  metrics(values: Record<string, number>): void
+  flush(): Promise<void>
+  finish(outcome?: string | RunOutcome | undefined): Promise<Run | null>
+  fail(error: unknown): Promise<Run | null>
+type RunOutcome = { status?: 'ok' | undefined; result?: unknown; } | { error: unknown; }
+type RunStatus = 'failed' | 'timeout' | 'running' | 'ok'
+interface SendingAlert
+  until: number
+  alert: Alert
+interface Source
+  name: string
+  sync(host: SourceHost): Promise<void | Array<Alert>>
+interface SourceHost
+  job(name: string, options?: JobOptions | undefined): unknown
+  recordRun(run: Run, options?: RecordRunOptions | undefined): Promise<Array<Alert>>
+  readonly store: Store
+  readonly now: () => number
+  readonly onError: (error: unknown, where: string) => void
+interface StartOptions
+  trigger?: string
+  id?: string
+interface Store
+  upsertJob(definition: StoredJobDefinition, now: number): Promise<void>
+  getJob(name: string): Promise<StoredJob | null>
+  listJobs(): Promise<Array<StoredJob>>
+  deleteJob(name: string): Promise<void>
+  insertRun(run: Run): Promise<void>
+  updateRun(run: Run): Promise<void>
+  getRun(id: string): Promise<Run | null>
+  listRuns(job: string, limit: number): Promise<Array<Run>>
+  lastRun(job: string): Promise<Run | null>
+  runningRuns(): Promise<Array<Run>>
+  getState(job: string): Promise<JobState | null>
+  setState(state: JobState): Promise<void>
+  prune(before: number): Promise<number>
+interface StoredJob
+  name: string
+  definition: StoredJobDefinition
+  createdAt: number
+  updatedAt: number
+interface StoredJobDefinition
+  expect?: string
+  grace?: Duration
+  timeout?: Duration
+  timezone?: string
+  failuresBeforeAlert?: number
+  name: string
+  schedule?: string
+  maxDuration?: Duration
+  budget?: Record<string, number>
+  description?: string
+  tags?: string[]
+interface TriageContext
+  alert: Alert
+  recentRuns: Run[]
+  signal: AbortSignal
+type TriageFn = (context: TriageContext) => Promise<string | null>
+const VERSION: string
+function composeAlert(draft: AlertDraft, def: StoredJobDefinition, now: number): Alert
+function consoleChannel(): AlertChannel
+function createRoutes(cw: Cronwatch, options?: RoutesOptions): Routes (deprecated)
+function cronwatch(options?: CronwatchOptions): Cronwatch
+function custom(name: string, send: (alert: Alert) => void | Promise<void>): AlertChannel
+function formatDuration(ms: number): string
+function memory(): Store
+function nextFire(parsed: ParsedSchedule, from: number, lastRunAt: number | null): number | null
+function parseDuration(value: Duration, label?: string): number
+function parseSchedule(schedule: string, timezone?: string | undefined): ParsedSchedule
+
+# @cronwatch/sdk/sqlite
+interface SqliteOptions
+  path?: string
+  database?: Database.Database
+  prefix?: string
+function sqlite(options?: SqliteOptions): Store
+
+# @cronwatch/sdk/postgres
+interface PostgresOptions
+  connectionString?: string
+  pool?: pg.Pool
+  prefix?: string
+function postgres(options?: PostgresOptions): Store
+
+# @cronwatch/sdk/d1
+interface D1DatabaseLike
+  prepare(query: string): D1PreparedStatementLike
+  batch(statements: Array<D1PreparedStatementLike>): Promise<Array<unknown>>
+interface D1Options
+  prefix?: string
+  createTables?: boolean
+interface D1PreparedStatementLike
+  bind(...values: Array<unknown>): D1PreparedStatementLike
+  first(): Promise<unknown>
+  all(): Promise<{ results?: Array<unknown> | undefined; }>
+  run(): Promise<{ meta?: { changes?: number | undefined; } | undefined; }>
+function d1(database: D1DatabaseLike, options?: D1Options): Store
+
+# @cronwatch/sdk/slack
+interface SlackOptions
+  webhookUrl: string
+  link?: (alert: Alert) => string
+function slack(options: SlackOptions): AlertChannel
+
+# @cronwatch/sdk/discord
+const DESCRIPTION_MAX: number (deprecated)
+interface DiscordOptions
+  webhookUrl: string
+  link?: (alert: Alert) => string
+const codeBlockSafe: (text: string) => string (deprecated)
+function discord(options: DiscordOptions): AlertChannel
+const embedDescription: (alert: Alert) => string (deprecated)
+const escapeMarkdown: (text: string) => string (deprecated)
+
+# @cronwatch/sdk/webhook
+interface WebhookOptions
+  url: string
+  headers?: Record<string, string>
+  secret?: string
+const hmacSha256Hex: (secret: string, body: string) => Promise<string> (deprecated)
+function signature(secret: string, body: string): Promise<string>
+function webhook(options: WebhookOptions): AlertChannel
+
+# @cronwatch/sdk/resend
+interface ResendOptions
+  apiKey: string
+  from: string
+  to: string | string[]
+  subjectPrefix?: string
+  link?: (alert: Alert) => string
+function resend(options: ResendOptions): AlertChannel
+
+# @cronwatch/sdk/postmark
+interface PostmarkOptions
+  serverToken: string
+  messageStream?: string
+  from: string
+  to: string | string[]
+  subjectPrefix?: string
+  link?: (alert: Alert) => string
+function postmark(options: PostmarkOptions): AlertChannel
+
+# @cronwatch/sdk/sendgrid
+interface SendgridOptions
+  apiKey: string
+  region?: "us" | "eu"
+  from: string
+  to: string | string[]
+  subjectPrefix?: string
+  link?: (alert: Alert) => string
+function sendgrid(options: SendgridOptions): AlertChannel
+
+# @cronwatch/sdk/mailgun
+interface MailgunOptions
+  apiKey: string
+  domain: string
+  region?: "us" | "eu"
+  from: string
+  to: string | string[]
+  subjectPrefix?: string
+  link?: (alert: Alert) => string
+function mailgun(options: MailgunOptions): AlertChannel
+
+# @cronwatch/sdk/ses
+interface SesOptions
+  region: string
+  accessKeyId: string
+  secretAccessKey: string
+  sessionToken?: string
+  configurationSetName?: string
+  now?: () => number
+  from: string
+  to: string | string[]
+  subjectPrefix?: string
+  link?: (alert: Alert) => string
+function ses(options: SesOptions): AlertChannel
+
+# @cronwatch/sdk/twilio
+const MAX_BODY: number (deprecated)
+const MAX_SEGMENTS: number (deprecated)
+interface TwilioOptions
+  accountSid: string
+  authToken?: string
+  apiKeySid?: string
+  apiKeySecret?: string
+  from?: string
+  messagingServiceSid?: string
+  to: string | string[]
+  recovered?: boolean
+  segments?: number
+  link?: (alert: Alert) => string
+const smsBody: (alert: Alert, link: string | undefined, segments?: number) => string (deprecated)
+const smsSegments: (text: string) => number (deprecated)
+function twilio(options: TwilioOptions): AlertChannel
+
+# @cronwatch/sdk/sentry
+interface SentryOptions
+  dsn: string
+  environment?: string
+  release?: string
+  recovered?: boolean
+  link?: (alert: Alert) => string
+const parseDsn: (dsn: string) => Dsn (deprecated)
+function sentry(options: SentryOptions): AlertChannel
+
+# @cronwatch/sdk/honeybadger
+interface HoneybadgerOptions
+  apiKey: string
+  environment?: string
+  endpoint?: string
+  recovered?: boolean
+  link?: (alert: Alert) => string
+function honeybadger(options: HoneybadgerOptions): AlertChannel
+
+# @cronwatch/sdk/datadog
+interface DatadogOptions
+  apiKey: string
+  site?: string
+  tags?: string[]
+  host?: string
+  link?: (alert: Alert) => string
+function datadog(options: DatadogOptions): AlertChannel
+
+# @cronwatch/sdk/rollbar
+interface RollbarOptions
+  accessToken: string
+  environment?: string
+  recovered?: boolean
+  link?: (alert: Alert) => string
+function rollbar(options: RollbarOptions): AlertChannel
+
+# @cronwatch/sdk/bugsnag
+interface BugsnagOptions
+  apiKey: string
+  releaseStage?: string
+  endpoint?: string
+  recovered?: boolean
+  now?: () => number
+  link?: (alert: Alert) => string
+function bugsnag(options: BugsnagOptions): AlertChannel
+
+# @cronwatch/sdk/newrelic
+interface NewRelicOptions
+  accountId: string | number
+  apiKey: string
+  region?: "us" | "eu"
+  eventType?: string
+  link?: (alert: Alert) => string
+function newrelic(options: NewRelicOptions): AlertChannel
+
+# @cronwatch/sdk/anthropic
+interface AnthropicTriageOptions
+  apiKey?: string
+  client?: Anthropic
+  model?: string
+  effort?: "low" | "medium" | "high"
+  maxTokens?: number
+  fallbacks?: boolean
+  context?: string
+function anthropic(options?: AnthropicTriageOptions): TriageFn
+
+# @cronwatch/sdk/pg-cron
+const PG_CRON_HOLD_MS: number (deprecated)
+interface PgCronJob
+  jobid: number
+  jobname: string | null
+  schedule: string
+  database: string
+  username: string
+  active: boolean
+interface PgCronOptions
+  jobs?: (string | number)[] | ((job: PgCronJob) => boolean)
+  prefix?: string
+  jobName?: (job: PgCronJob) => string
+  options?: Omit<JobOptions, "schedule" | "timezone"> | ((job: PgCronJob) => Omit<JobOptions, "schedule" | "timezone">)
+  timezone?: string
+interface Queryable
+  query(text: string, values?: Array<unknown> | undefined): Promise<{ rows: Array<any>; }>
+function pgCron(db: Queryable, options?: PgCronOptions): Source
+const pgCronJobName: (job: Pick<PgCronJob, 'jobid' | 'jobname'>) => string (deprecated)
+const pgCronRun: (row: DetailRow, job: string, idPrefix: string, fallbackAt?: number) => Run | null (deprecated)
+const pgCronSchedule: (schedule: string) => string | null (deprecated)
+
+# @cronwatch/sdk/node
+interface BodySource
+  url?: string
+  rawBody?: unknown
+  body?: unknown
+type FetchLike = (request: Request) => Response | Promise<Response>
+interface KoaContextLike
+  req: IncomingMessage
+  res: ServerResponse
+  respond?: boolean
+  originalUrl?: string
+  request?: { body?: unknown; rawBody?: unknown }
+type NodeHandler = (req: IncomingMessage, res: ServerResponse<IncomingMessage>, next?: NodeNext | undefined) => Promise<void>
+interface NodeHandlerOptions
+  trustProxy?: boolean
+  basePath?: string
+type NodeNext = (error?: unknown) => void
+function toKoaMiddleware(handler: FetchLike, options?: NodeHandlerOptions): (ctx: KoaContextLike, next: () => Promise<unknown>) => Promise<void>
+function toNodeHandler(handler: FetchLike, options?: NodeHandlerOptions): NodeHandler
+function toRequest(req: IncomingMessage, options?: { trustProxy?: boolean | undefined; signal?: AbortSignal | undefined; }, source?: BodySource): Request
+function writeResponse(res: ServerResponse<IncomingMessage>, response: Response, method?: string): Promise<void>

@@ -1,0 +1,639 @@
+# Cronwatch
+  function active?/1
+  function cancelled?/1
+  function check!/1
+  function check/1
+  function child_spec/1
+  function current/0
+  function defined_jobs/1
+  function fail/2
+  function finish/2
+  function flush/1
+  function forget!/2
+  function forget/2
+  function get_run!/2
+  function get_run/2
+  function job!/2
+  function job/2
+  function job_summary!/2
+  function job_summary/2
+  function jobs!/1
+  function jobs/1
+  function jobs_with_runs!/2
+  function jobs_with_runs/2
+  function log/1
+  function log/2
+  function metric/2
+  function metric/3
+  function record_run!/2
+  function record_run/2
+  function redact_secrets/1
+  function resume/2
+  function resume_run/3
+  function run/3
+  function runs!/3
+  function runs/3
+  function silence!/3
+  function silence/3
+  function start/0 (deprecated)
+  function start/2
+  function start_checking/1
+  function start_link/1
+  function stop/1
+  function sync_job/2
+  function unsilence!/2
+  function unsilence/2
+  function version/0
+# Cronwatch.Alert
+  function from_json/1
+  function from_value/1
+  function to_json/1
+  function to_value/1
+  type t/0
+# Cronwatch.AlertType
+  function recovered/0
+# Cronwatch.Alerts
+  function fun/2
+# Cronwatch.Alerts.Bugsnag
+# Cronwatch.Alerts.Console
+# Cronwatch.Alerts.Datadog
+# Cronwatch.Alerts.Discord
+  type t/0
+# Cronwatch.Alerts.Email
+  type t/0
+# Cronwatch.Alerts.Honeybadger
+# Cronwatch.Alerts.Mailgun
+# Cronwatch.Alerts.NewRelic
+# Cronwatch.Alerts.Postmark
+# Cronwatch.Alerts.Resend
+# Cronwatch.Alerts.Rollbar
+# Cronwatch.Alerts.SES
+# Cronwatch.Alerts.SendGrid
+# Cronwatch.Alerts.Sentry
+# Cronwatch.Alerts.Slack
+  type t/0
+# Cronwatch.Alerts.Twilio
+# Cronwatch.Alerts.Webhook
+  function signature/2
+  type t/0
+# Cronwatch.Channel
+  callback init/1
+  callback name/1
+  callback send/3
+# Cronwatch.ChannelContext
+  function report/2
+  type t/0
+# Cronwatch.CheckResult
+  function to_json/1
+  function to_value/1
+  type t/0
+# Cronwatch.Condition
+  function all/0
+  function failed/0
+  function missed/0
+  function over_budget/0
+  function slow/0
+  function stuck/0
+# Cronwatch.Context
+  function current/0
+  type t/0
+# Cronwatch.Error
+  type t/0
+# Cronwatch.Handler
+  function init/1
+  type t/0
+# Cronwatch.Health
+# Cronwatch.JS.Object
+  function delete/2
+  function fetch/2
+  function get/3
+  function has_key?/2
+  function keys/1
+  function merge/2
+  function new/0
+  function new/1
+  function put/3
+  function size/1
+  function to_list/1
+  type number_value/0
+  type t/0
+  type value/0
+# Cronwatch.Job
+  type rule/0
+  type t/0
+# Cronwatch.JobState
+  function from_json/1
+  function from_value/1
+  function new/1
+  function open_at/2
+  function to_json/1
+  function to_value/1
+  type sending/0
+  type t/0
+# Cronwatch.JobSummary
+  function to_json/1
+  function to_value/1
+  type t/0
+# Cronwatch.Metrics
+  function from_value/1
+  type t/0
+# Cronwatch.Oban
+  function settle/1
+  function sync/1
+  function tag/0
+# Cronwatch.Oban.CheckWorker
+# Cronwatch.Quantum
+  function check/1
+  function settle/1
+  function sync/1
+# Cronwatch.Release
+  function check/2
+# Cronwatch.Run
+  function from_json/1
+  function from_value/1
+  function to_json/1
+  function to_value/1
+  type t/0
+# Cronwatch.RunHandle
+  function active?/1
+  function fail/2
+  function finish/2
+  function flush/1
+  function log/2
+  function metric/3
+  type t/0
+# Cronwatch.RunStatus
+  function failed/0
+  function ok/0
+  function running/0
+  function timeout/0
+# Cronwatch.Source
+  callback name/1
+  callback sync/2
+# Cronwatch.Sources.PgCron
+  function sync/2
+# Cronwatch.Sources.PgCron.Job
+  type t/0
+# Cronwatch.Store
+  callback child_spec/1
+  callback close/1
+  callback compare_and_set_state/3
+  callback delete_job/2
+  callback delete_run_if/4
+  callback get_job/2
+  callback get_run/2
+  callback get_state/2
+  callback init/1
+  callback insert_run/2
+  callback last_run/2
+  callback list_jobs/1
+  callback list_runs/3
+  callback new/2
+  callback prune/2
+  callback running_runs/1
+  callback set_state/2
+  callback update_run/2
+  callback update_run_if/3
+  callback upsert_job/3
+  type handle/0
+  type reason/0
+  type t/0
+# Cronwatch.Store.Ecto
+  function close/1
+  function create_statements/1
+  function delete_job/2
+  function delete_run_if/4
+  function init/1
+  function new/2
+  type t/0
+# Cronwatch.Store.Memory
+  function start_link/1
+# Cronwatch.StoreCase
+# Cronwatch.StoredJob
+  type t/0
+# Cronwatch.Telemetry
+# Cronwatch.Test.Capture
+  function alerts/1
+  function channel/1
+  function new/0
+  function types/1
+# Cronwatch.Test.Client
+  function eventually/2
+  function make/1
+  function messages/1
+  function wheres/1
+# Cronwatch.Test.Clock
+  function advance/2
+  function fun/1
+  function hour/0
+  function min/0
+  function new/1
+  function now/1
+  function set/2
+  function t0/0
+# Cronwatch.Test.Conformance
+  function check!/2
+  function digest/1
+  function dir/0
+  function failures/0
+  function field/2
+  function fixture/1
+  function list/2
+  function same/4
+# Cronwatch.Test.Endpoint
+  function broadcast!/3
+  function broadcast/3
+  function broadcast_from!/4
+  function broadcast_from/4
+  function call/2
+  function child_spec/1
+  function config/2
+  function config_change/2
+  function host/0
+  function init/1
+  function local_broadcast/3
+  function local_broadcast_from/4
+  function path/1
+  function script_name/0
+  function serve/0
+  function server_info/1
+  function start_link/1
+  function static_integrity/1
+  function static_lookup/1
+  function static_path/1
+  function static_url/0
+  function struct_url/0
+  function subscribe/2
+  function unsubscribe/1
+  function url/0
+# Cronwatch.Test.ErrorJSON
+  function render/2
+# Cronwatch.Test.EveryChannel
+  function specs/2
+  function started/2
+# Cronwatch.Test.Flaky
+  function break/2
+  function mend/2
+  function new/1
+# Cronwatch.Test.ForeignRows
+  function check_over/1
+  function cron_over/2
+  function far_starts/0
+  function replay_versions/1
+  macro __using__/1
+# Cronwatch.Test.HTTP
+  function request/5
+  function serve/1
+# Cronwatch.Test.HTTPServer
+  function ca/1
+  function requests/1
+  function start/2
+# Cronwatch.Test.Handlers
+  function answer/4
+  function count/3
+  function current/3
+  function fail/3
+  function log_path/2
+  function raise_it/3
+  function sent/4
+  function text/3
+# Cronwatch.Test.Jobs
+  function served/2
+# Cronwatch.Test.More
+  function bump/1
+  function channel/2
+  function count/1
+  function counter/0
+  function events/2
+  function get/1
+  function push/2
+  function put/2
+  function shared_memory/0
+  function state/2
+  function switch/1
+# Cronwatch.Test.MyRepo
+  function aggregate/3
+  function aggregate/4
+  function all/2
+  function all_by/3
+  function checked_out?/0
+  function checkout/2
+  function child_spec/1
+  function config/0
+  function default_options/1
+  function delete!/2
+  function delete/2
+  function delete_all/2
+  function disconnect_all/2
+  function exists?/2
+  function explain/3
+  function get!/3
+  function get/3
+  function get_by!/3
+  function get_by/3
+  function get_dynamic_repo/0
+  function in_transaction?/0
+  function insert!/2
+  function insert/2
+  function insert_all/3
+  function insert_or_update!/2
+  function insert_or_update/2
+  function load/2
+  function one!/2
+  function one/2
+  function preload/3
+  function prepare_query/3
+  function prepare_transaction/2
+  function put_dynamic_repo/1
+  function query!/3
+  function query/3
+  function query_many!/3
+  function query_many/3
+  function reload!/2
+  function reload/2
+  function rollback/1
+  function start_link/1
+  function stop/1
+  function stream/2
+  function to_sql/3
+  function transact/2
+  function transaction/2
+  function update!/2
+  function update/2
+  function update_all/3
+# Cronwatch.Test.Oban
+  function engines/0
+  function start/2
+# Cronwatch.Test.ObanLite
+  function aggregate/3
+  function aggregate/4
+  function all/2
+  function all_by/3
+  function checked_out?/0
+  function checkout/2
+  function child_spec/1
+  function config/0
+  function default_options/1
+  function delete!/2
+  function delete/2
+  function delete_all/2
+  function disconnect_all/2
+  function exists?/2
+  function explain/3
+  function get!/3
+  function get/3
+  function get_by!/3
+  function get_by/3
+  function get_dynamic_repo/0
+  function in_transaction?/0
+  function insert!/2
+  function insert/2
+  function insert_all/3
+  function insert_or_update!/2
+  function insert_or_update/2
+  function load/2
+  function one!/2
+  function one/2
+  function preload/3
+  function prepare_query/3
+  function prepare_transaction/2
+  function put_dynamic_repo/1
+  function query!/3
+  function query/3
+  function query_many!/3
+  function query_many/3
+  function reload!/2
+  function reload/2
+  function rollback/1
+  function start_link/1
+  function stop/1
+  function stream/2
+  function to_sql/3
+  function transact/2
+  function transaction/2
+  function update!/2
+  function update/2
+  function update_all/3
+# Cronwatch.Test.ObanMigration
+  function down/0
+  function up/0
+# Cronwatch.Test.ObanPg
+  function aggregate/3
+  function aggregate/4
+  function all/2
+  function all_by/3
+  function checked_out?/0
+  function checkout/2
+  function child_spec/1
+  function config/0
+  function default_options/1
+  function delete!/2
+  function delete/2
+  function delete_all/2
+  function disconnect_all/2
+  function exists?/2
+  function explain/3
+  function get!/3
+  function get/3
+  function get_by!/3
+  function get_by/3
+  function get_dynamic_repo/0
+  function in_transaction?/0
+  function insert!/2
+  function insert/2
+  function insert_all/3
+  function insert_or_update!/2
+  function insert_or_update/2
+  function load/2
+  function one!/2
+  function one/2
+  function preload/3
+  function prepare_query/3
+  function prepare_transaction/2
+  function put_dynamic_repo/1
+  function query!/3
+  function query/3
+  function query_many!/3
+  function query_many/3
+  function reload!/2
+  function reload/2
+  function rollback/1
+  function start_link/1
+  function stop/1
+  function stream/2
+  function to_sql/3
+  function transact/2
+  function transaction/2
+  function update!/2
+  function update/2
+  function update_all/3
+# Cronwatch.Test.PgRepo
+  function aggregate/3
+  function aggregate/4
+  function all/2
+  function all_by/3
+  function checked_out?/0
+  function checkout/2
+  function child_spec/1
+  function config/0
+  function default_options/1
+  function delete!/2
+  function delete/2
+  function delete_all/2
+  function disconnect_all/2
+  function exists?/2
+  function explain/3
+  function get!/3
+  function get/3
+  function get_by!/3
+  function get_by/3
+  function get_dynamic_repo/0
+  function in_transaction?/0
+  function insert!/2
+  function insert/2
+  function insert_all/3
+  function insert_or_update!/2
+  function insert_or_update/2
+  function load/2
+  function one!/2
+  function one/2
+  function preload/3
+  function prepare_query/3
+  function prepare_transaction/2
+  function put_dynamic_repo/1
+  function query!/3
+  function query/3
+  function query_many!/3
+  function query_many/3
+  function reload!/2
+  function reload/2
+  function rollback/1
+  function start_link/1
+  function stop/1
+  function stream/2
+  function to_sql/3
+  function transact/2
+  function transaction/2
+  function update!/2
+  function update/2
+  function update_all/3
+# Cronwatch.Test.PhoenixRouter
+  function call/2
+  function formatted_routes/1
+  function init/1
+  function verified_route?/2
+# Cronwatch.Test.PlainStore
+# Cronwatch.Test.RecordingTransport
+  function answer_by/2
+  function answer_with/3
+  function spec/1
+  function start/0
+  function taken/1
+# Cronwatch.Test.Repo
+  function aggregate/3
+  function aggregate/4
+  function all/2
+  function all_by/3
+  function checked_out?/0
+  function checkout/2
+  function child_spec/1
+  function config/0
+  function default_options/1
+  function delete!/2
+  function delete/2
+  function delete_all/2
+  function disconnect_all/2
+  function exists?/2
+  function explain/3
+  function get!/3
+  function get/3
+  function get_by!/3
+  function get_by/3
+  function get_dynamic_repo/0
+  function in_transaction?/0
+  function insert!/2
+  function insert/2
+  function insert_all/3
+  function insert_or_update!/2
+  function insert_or_update/2
+  function load/2
+  function one!/2
+  function one/2
+  function preload/3
+  function prepare_query/3
+  function prepare_transaction/2
+  function put_dynamic_repo/1
+  function query!/3
+  function query/3
+  function query_many!/3
+  function query_many/3
+  function reload!/2
+  function reload/2
+  function rollback/1
+  function sql/3
+  function start/2
+  function start_link/1
+  function stop/1
+  function store/2
+  function stream/2
+  function tmp_dir/0
+  function to_sql/3
+  function transact/2
+  function transaction/2
+  function update!/2
+  function update/2
+  function update_all/3
+# Cronwatch.Test.RewriteTransport
+  function spec/2
+# Cronwatch.Test.ServerStoreTests
+# Cronwatch.Test.Servers
+  function drop/2
+  function drop_at_exit/2
+  function prefix/0
+  function repo/1
+  function skip_unless/1
+  function sql/4
+  function start/2
+  function store/2
+  function url/1
+  function var/1
+# Cronwatch.Test.Stores
+  function hook/3
+  function hooked/1
+  function memory/0
+  function option/1
+  function unhook/2
+# Cronwatch.Test.Web
+  function field/2
+  function header/2
+  function json/1
+  function send/5
+  function token_cookie/0
+# Cronwatch.Test.WebRouter
+  function call/2
+  function init/1
+# Cronwatch.Test.Wrap
+  function memory/1
+  function spec/1
+# Cronwatch.Test.WrapNoCas
+  function spec/1
+# Cronwatch.Transport
+  callback post/2
+  type spec/0
+# Cronwatch.Transport.HTTP
+# Cronwatch.Transport.Request
+  type t/0
+# Cronwatch.Transport.Response
+  type chunk/0
+  type t/0
+# Cronwatch.Triage
+  callback init/1
+  callback triage/2
+# Cronwatch.Triage.Anthropic
+  function init/1
+  type t/0
+# Cronwatch.Web
+  function init/1
+  function token/1
+  type t/0
+# Mix.Tasks.Cronwatch.Check

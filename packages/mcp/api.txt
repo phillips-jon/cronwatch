@@ -1,0 +1,12 @@
+# @cronwatch/mcp
+class ApiClient
+  constructor(options: ApiClientOptions)
+  call<T = unknown>(method: string, path: string, body?: unknown): Promise<T>
+class ApiError
+  constructor(message: string, status: number)
+  readonly status: number
+interface ServerOptions
+  baseUrl: string
+  token: string | null
+  fetch?: typeof fetch
+function createServer(options: ServerOptions): McpServer

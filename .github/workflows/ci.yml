@@ -18,7 +18,9 @@
 # checked on the newest. The MCP server is driven against each port's
 # dashboard. One Node, one Ruby, one Python, one PHP and one Go entry also
 # run the pg_cron tests against a Postgres with the extension, and the built
-# site's links are checked.
+# site's links are checked. Each package's public API is checked against a
+# committed report (TypeScript, Python, Elixir, .NET) or the last release
+# (Go, Rust).
 # A green run on main is what lets deploy.yml ship the site.
 name: CI
 
@@ -79,6 +81,9 @@ jobs:
       - run: npm ci --no-audit --no-fund || { sleep 10; npm ci --no-audit --no-fund; }
       - run: npm run check:dashes
       - run: npm run typecheck
+      # The public API of @cronwatch/sdk and @cronwatch/mcp matches the
+      # report committed in packages/sdk/api.txt and packages/mcp/api.txt.
+      - run: npm run check:api
       # A second Postgres with pg_cron, for the pg_cron source's tests against
       # the real extension. The stock image has the PGDG apt repository, so
       # the extension is installed before the server starts. The entrypoint's
@@ -450,6 +455,8 @@ jobs:
           $cw->job("smoke", ["schedule" => "*/5 * * * *", "timezone" => "UTC"]);
           return $cw;
           PHP
+          # In single quotes on purpose: the variables are PHP's.
+          # shellcheck disable=SC2016
           php -r '
           $cw = require "cronwatch.php";
           $job = $cw->job("smoke", ["schedule" => "*/5 * * * *", "timezone" => "UTC"]);
@@ -989,6 +996,39 @@ jobs:
           cargo fmt --check
           cargo +nightly fuzz build
 
+  # The Go modules' and the Rust crates' public API against the last
+  # release, or the commit in scripts/api-baseline while that is newer:
+  # apidiff fails on an incompatible change to a Go module, and
+  # cargo-semver-checks on a change the crate's version does not allow.
+  # The TypeScript, Python and Elixir packages compare a committed report
+  # of their API in their own jobs, and .NET holds its surface in
+  # PublicAPI.Unshipped.txt, checked by every build.
+  api:
+    name: public API (Go, Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # The baseline comes from the history and the release tags.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: packages/go/*/go.sum
+      - name: Install apidiff
+        run: go install golang.org/x/exp/cmd/apidiff@v0.0.0-20260908205506-85c1c2202aba
+      - name: Go modules
+        run: scripts/go-apidiff.sh
+      # A fixed Rust, since cargo-semver-checks reads rustdoc's JSON, whose
+      # format changes between releases; move both together.
+      - name: Install Rust 1.98 and cargo-semver-checks
+        run: |
+          rustup toolchain install 1.98 --profile minimal
+          rustup default 1.98
+          cargo install cargo-semver-checks --version 0.50.0 --locked
+      - name: Rust crates
+        run: scripts/rust-semver.sh
+
   # The Elixir port (packages/elixir), on its floor (Elixir 1.18 on OTP 27,
   # what Debian 13 ships) and the current release, with the database
   # services for the SQL store and the MCP server's end-to-end test against
@@ -1089,7 +1129,7 @@ jobs:
       - name: mix compile
         working-directory: packages/elixir
         run: |
-          MIX_ENV=test mix compile --warnings-as-errors
+          MIX_ENV="test" mix compile --warnings-as-errors
           if [ "${{ matrix.newest }}" = "false" ]; then
             MIX_ENV=dev MIX_BUILD_ROOT=_build/no-optional mix compile --no-optional-deps --warnings-as-errors
           fi
@@ -1182,7 +1222,7 @@ jobs:
         env:
           CRONWATCH_TEST_PG: postgres://postgres:pw@127.0.0.1:5432/cw
         run: |
-          MIX_ENV=test mix compile --warnings-as-errors
+          MIX_ENV="test" mix compile --warnings-as-errors
           mix test
 
   # The Elixir package on macOS and Windows, on the newest Elixir and OTP:
@@ -1222,7 +1262,7 @@ jobs:
       - name: mix test
         working-directory: packages/elixir
         run: |
-          MIX_ENV=test mix compile --warnings-as-errors
+          MIX_ENV="test" mix compile --warnings-as-errors
           mix test
 
   java:
@@ -1330,6 +1370,8 @@ jobs:
         if: matrix.newest
         working-directory: packages/java
         run: |
+          # The jar names hold only the module and the version.
+          # shellcheck disable=SC2010
           for module in cronwatch cronwatch-servlet cronwatch-quartz cronwatch-jobrunr cronwatch-spring-boot-starter; do
             jar=$(ls "$module"/target/"$module"-*.jar | grep -v -E -- '-(tests|sources|javadoc)\.jar$')
             unzip -Z1 "$jar" | sort > "$RUNNER_TEMP/jar.txt"

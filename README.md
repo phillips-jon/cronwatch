@@ -88,6 +88,10 @@ The store entry points' type declarations refer to the driver's types, so a Type
 
 Every port is a port of the SDK, not a new design: each writes the same tables and sends the same alerts, so a Rails app, a Go service and a Node worker can share one database and one dashboard. The TypeScript SDK is the source of truth: `npm run conformance` generates cases in `conformance/` that every port's tests replay, and a behaviour change lands in TypeScript first. Each package's README and its page on [cronwatch.dev](https://cronwatch.dev/docs/) have the examples for its language and its schedulers.
 
+## Stability
+
+From 1.0 every package follows semantic versioning, one version for all of them. [Stability](https://cronwatch.dev/docs/stability/) says what a 1.x release promises (the documented API, the stored data, the JSON API, the webhook, settings and environment variable names, documented behaviour) and what it does not; [Environment variables](https://cronwatch.dev/docs/environment/) lists every variable each library reads; [Deprecations](https://cronwatch.dev/docs/deprecations/) lists every deprecated name with its replacement. What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
+
 ## Why a library and not a service
 
 A hosted monitor gives you an observer that is alive when your job is not. That is real, and it is the one thing a library cannot do: if your whole app is down, nothing inside it can alert (pair it with any uptime monitor for that case). Everything else, from a job that never fires to one that costs three times what it should, is caught from within, with your run history in your own database and nothing to sign up for.
@@ -178,6 +182,8 @@ It replays `conformance/` and the dashboard fixture too, with warnings as errors
 
 `npm run check:dashes` fails on an em or en dash in any tracked text file; CI also checks the commit messages.
 
+Each package's public API is checked, so a change to it is seen and recorded in [CHANGELOG.md](CHANGELOG.md). TypeScript, Python and Elixir commit a report of theirs (`api.txt` in `packages/sdk`, `packages/mcp`, `packages/python` and `packages/elixir`), which a check compares with the code: `npm run check:api` for TypeScript (part of `npm run check`; `node scripts/api-report.mjs` rewrites the reports), and a test in each of the other two (`CRONWATCH_WRITE_API=1` rewrites theirs). .NET holds its surface in `PublicAPI.Unshipped.txt`. CI's `api` job compares the Go modules (`scripts/go-apidiff.sh`, with apidiff) and the Rust crates (`scripts/rust-semver.sh`, with cargo-semver-checks) against the last release, or against the commit in `scripts/api-baseline` while that is newer, and fails on an incompatible change; `scripts/api-baseline` says how a break is accepted on purpose.
+
 ## Releasing
 
 Every package shares one version: the SDK, the MCP server, the gem, the Python and PHP packages (the WordPress plugin with them, and the Drupal module and the Craft plugin requiring the library at it), the Go module and its scheduler modules, the Rust crates, the Elixir package, the Java build, the .NET solution, and the skill. From a clean `main`:
@@ -187,7 +193,7 @@ npm run release -- X.Y.Z --dry-run   # show every change and command, write noth
 npm run release -- X.Y.Z             # bump, regenerate, check, commit "Release X.Y.Z", tag vX.Y.Z
 ```
 
-It bumps every file listed in `VERSIONED` at the top of `scripts/release.mjs` (and turns the WordPress readme's `= Unreleased =` changelog section into the release's, or adds a placeholder to rewrite), lists any other tracked file that still names the old version, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, and runs `npm run check`, the build and `npm run check:packages`; then, when it finds what they need, the gem's tests and build, with a check of what the gem carries (Ruby 3.2 or newer; `--skip-ruby` skips them), the Python package's tests (uv; `--skip-python`) and the PHP package's (PHP 8.2 or newer and Composer; `--skip-php`). The Go, Rust, Elixir, Java and .NET tests are CI's. RubyGems spells a prerelease `X.Y.Z-beta.1` as `X.Y.Z.pre.beta.1` and refuses `+build` metadata, so the script does too.
+It bumps every file listed in `VERSIONED` at the top of `scripts/release.mjs` (and turns the `## Unreleased` section of `CHANGELOG.md` into the release's, dated, refusing to run without one; and the WordPress readme's `= Unreleased =` changelog section and the Drupal and Craft `CHANGELOG.md` sections the same way, or adds a placeholder to rewrite), lists any other tracked file that still names the old version, refreshes `package-lock.json`, regenerates `conformance/` and the dashboard fixture, and runs `npm run check`, the build and `npm run check:packages`; then, when it finds what they need, the gem's tests and build, with a check of what the gem carries (Ruby 3.2 or newer; `--skip-ruby` skips them), the Python package's tests (uv; `--skip-python`) and the PHP package's (PHP 8.2 or newer and Composer; `--skip-php`). The Go, Rust, Elixir, Java and .NET tests are CI's. RubyGems spells a prerelease `X.Y.Z-beta.1` as `X.Y.Z.pre.beta.1` and refuses `+build` metadata, so the script does too.
 
 It does not push or publish. It prints what to run next, in order:
 
