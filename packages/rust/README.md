@@ -162,9 +162,36 @@ run.finish().await;
 A service that runs its jobs from a scheduler watches them through the scheduler's crate: each job is declared with the scheduler's schedule, every run is recorded, and a job the scheduler no longer has keeps its runs and loses its schedule, so it is never reported missed.
 
 - [`cronwatch-tokio-cron-scheduler`](https://crates.io/crates/cronwatch-tokio-cron-scheduler): `watcher.job(name, "0 0 2 * * *", "UTC", |job| async move { .. }, options)` stands in for `Job::new_async_tz`, each schedule checked against the scheduler's own fire times.
-- [`cronwatch-apalis`](https://crates.io/crates/cronwatch-apalis): a tower layer that records each attempt of a worker's tasks as a run (retries included, one alert for the failures and a recovery for the success), and `watcher.cron(name, "0 2 * * *", "Europe/London", options)`, apalis-cron's backend on CronWatch's own schedule. apalis 1.0 is at release candidates; the crate is pinned to them.
+- [`cronwatch-apalis`](https://crates.io/crates/cronwatch-apalis): a tower layer that records each attempt of a worker's tasks as a run (retries included, one alert for the failures and a recovery for the success), and `watcher.cron(name, "0 2 * * *", "Europe/London", options)`, apalis-cron's backend on CronWatch's own schedule. apalis 1.0 is at release candidates; the crate is pinned to them, and stays below 1.0, outside the promise, until apalis 1.0 is final.
+
+Both are built on `cronwatch::bridge`, which is for integration authors and outside the 1.x promise.
 
 A program a crontab runs needs neither: [`examples/crontab`](https://github.com/phillips-jon/cronwatch/tree/main/packages/rust/examples/crontab) is a job and its check from two crontab lines on one SQLite file.
+
+## Changes for 1.0
+
+1.0 promises the names this README and the [Rust docs](https://cronwatch.dev/docs/rust/) document, the stored data, the dashboard's JSON API and the webhook's payload. Getting there changed a few things in this release.
+
+**Breaking, for code that builds these types with a struct literal.** They are `#[non_exhaustive]` now, so a later 1.x can add a field without breaking your build:
+
+- `Run`, `StoredJob`, `OpenCondition`, `SendingAlert`, `BudgetBreach`, `Alert`, `JobState`, `Stats`, `JobSummary`, `CheckResult`, `JobWithRuns`, `TriageContext`, `alerts::Request` and `alerts::Response`: make one with `Run::new(id, job, status, started_at)`, `StoredJob::new(definition, created_at, updated_at)`, `OpenCondition::new`, `SendingAlert::new`, `BudgetBreach::new`, `Alert::new(type, job, details, at)`, `TriageContext::new`, `alerts::Request::new` or `Response::new` and set the rest of its fields, or read one with `from_json`.
+- `AlertDetails`'s variants: make one with `AlertDetails::missed`, `failure`, `slow`, `over_budget` or `recovered`, and match with `..`.
+- Every channel's options (`SlackOptions`, `DiscordOptions`, `WebhookOptions`, `EmailOptions`, `ResendOptions`, `PostmarkOptions`, `SendgridOptions`, `MailgunOptions`, `SesOptions`, `TwilioOptions`, `SentryOptions`, `HoneybadgerOptions`, `DatadogOptions`, `RollbarOptions`, `BugsnagOptions`, `NewRelicOptions`), `triage::AnthropicOptions`, `cronwatch_sqlx::PgCronOptions` and the integrations' `Options`: start from `new()` and set fields with the builder method named after each, `SlackOptions::new().webhook_url(url)` where you wrote `SlackOptions { webhook_url: url, ..Default::default() }`. `cronwatch_sqlx::PgCronJob` is read only.
+- `js::parse` answers `JsonError`, the error every `from_json` answers, where it answered `js::ParseError`.
+
+**On the wire.** The dashboard API's silence and unsilence answer `{"ok":true,"job":<summary>}` where they answered the stored state, and `GET <base>/api` names the library, its language and version. The webhook's body starts with `"schema": 1`. `record_run` refuses a run id longer than 200 characters, as `start` does.
+
+**Deprecated**, each still working and marked `#[deprecated]` so the compiler says what to use:
+
+| Deprecated | Use instead | Goes in |
+|---|---|---|
+| `Client::start(every)`, `blocking::Client::start(every)` | `start_checking(every)`: a job's `start` opens a run, so the client's is named for what it starts | 2.0 |
+| `Routes::into_router()` | `Router::new().nest_service("/cronwatch", routes)`: axum is below 1.0, so its types stay out of this crate's API | 1.0 |
+| `ReqwestTransport::with_client(client)` | the default transport (`transport: None`, which honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`), or a `Transport` of your own: reqwest is below 1.0 | 1.0 |
+| `describe_job`, `run_duration`, `state_version`; `js::ParseError`; `alerts::MAX_SEGMENTS`, `alerts::post::{TIMEOUT, MAX_BODY, origin}`; `triage::{SYSTEM, REQUEST_TIMEOUT, FALLBACK_BETA}`; `cronwatch_sqlx::pgcron::{HOLD, schedule, job_name, run_of}` | nothing: internal, public by accident (`JsonError` for `ParseError`) | 1.0 |
+| everything in `storetest` but `run` (`replay_fixture`, `finish_once`, `Shared`, `Clock`, `T0` and the other fixture helpers) | `storetest::run`, the contract test | 1.0 |
+
+`cronwatch::bridge`, which the scheduler integrations are built on, is for integration authors and outside the promise. `cronwatch-apalis` stays below 1.0 while apalis is a release candidate.
 
 ## Testing
 

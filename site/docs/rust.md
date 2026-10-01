@@ -426,6 +426,20 @@ The client (every call that can reach the store is `async` and returns a `Result
 
 Errors are `cronwatch::Error`: `Invalid` (an option, name, schedule or run id the SDK refuses, with its message), `Store` (the store's own error, kept as its source) and `Other`. Nothing panics for a bad option or a store failure. Rust errors carry no stack frames on stable, so a failed run's error has none; call `cronwatch::capture_panic_frames()` once at startup to keep a panic's backtrace with its run.
 
+### Deprecated, and what changed for 1.0
+
+These still work and are marked `#[deprecated]`, so the compiler names the replacement. A rename goes in 2.0; a name that was public by accident goes at 1.0.
+
+| Deprecated | Use instead | Goes in |
+|---|---|---|
+| `Client::start(every)`, `blocking::Client::start(every)` | `start_checking(every)` | 2.0 |
+| `Routes::into_router()` | `Router::new().nest_service("/cronwatch", routes)`: axum is below 1.0, so none of its types is in the crate's API | 1.0 |
+| `ReqwestTransport::with_client(client)` | the default transport, or a `Transport` of your own: reqwest is below 1.0 | 1.0 |
+| `describe_job`, `run_duration`, `state_version`, `js::ParseError`, `alerts::MAX_SEGMENTS`, `alerts::post::{TIMEOUT, MAX_BODY, origin}`, `triage::{SYSTEM, REQUEST_TIMEOUT, FALLBACK_BETA}`, `cronwatch_sqlx::pgcron::{HOLD, schedule, job_name, run_of}` | nothing: internal (`JsonError` for `ParseError`) | 1.0 |
+| everything in `storetest` but `run` | `storetest::run` | 1.0 |
+
+The data types (`Run`, `StoredJob`, `Alert`, `JobState`, `JobSummary` and the rest), `AlertDetails`'s variants and every options struct are `#[non_exhaustive]`, so a 1.x release can add a field without breaking your build. Code that built one with a struct literal before 1.0 uses its constructor now (`Run::new`, `StoredJob::new`, `Alert::new`, `AlertDetails::failure` and the others) or, for options, `new()` and a builder method per field: `SlackOptions::new().webhook_url(url)`. `cronwatch::bridge`, which the [scheduler integrations](/docs/rust-schedulers/) are built on, is for integration authors and outside the 1.x promise, and `cronwatch-apalis` stays below 1.0 while apalis is a release candidate.
+
 ## Runs that span calls
 
 A run is normally one call. Work that starts in one place and ends in another (a job that hands work to a queue, a webhook that reports completion later) can be one run too: `start` records it as running and returns a `RunHandle`, and `finish` on that handle, or on one from `resume` in another process, ends it.
