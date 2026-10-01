@@ -24,6 +24,8 @@ A release that a crontab runs needs no integration: see [a crontab](#a-crontab) 
 - **Each run is a run in the scheduler's own process.** The integration attaches to the scheduler's `:telemetry` events, which fire in the process that runs the job, so the run's context is there: `Cronwatch.log/1`, `Cronwatch.metric/2` and `Cronwatch.current/0` work inside the job with no code, and Logger metadata carries `cronwatch_job` and `cronwatch_run`. The process is monitored like any run's, so a job killed part way is a failed run at once.
 - **Options per job.** `defaults:` are job options for every job, before its schedule, and each integration takes options per job after them.
 
+Each integration's name is the trigger of the runs it records and the tag on the jobs it declares: `oban` and `quantum`, with `oban:<app>` and `quantum:<app>`. Job names carry no prefix: a job is named after the Oban worker or the Quantum job, which are the app's own names (see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)).
+
 Both integrations are built on `Cronwatch.Bridge`, which is public for integration authors but outside the 1.x promise: it changes whenever an integration needs something (see [What 1.x promises](/docs/elixir/#what-1-x-promises)).
 
 ### Retries
