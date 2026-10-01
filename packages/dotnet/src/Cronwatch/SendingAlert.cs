@@ -18,6 +18,9 @@ public sealed record SendingAlert
     /// <summary>The alert, never with triage; null when the stored entry holds no alert.</summary>
     public Alert? Alert { get; init; }
 
+    /// <summary>Keys of the stored entry this release does not know, as JSON, written back after its own.</summary>
+    internal string? Unknown { get; init; }
+
     /// <summary>The entry as the SDK's JSON object, <c>until</c> then <c>alert</c>, each only when present.</summary>
     public JsObject ToValue()
     {
@@ -30,7 +33,7 @@ public sealed record SendingAlert
         {
             o.Set("alert", Alert.ToValue());
         }
-        return o;
+        return Values.WithUnknown(o, Unknown);
     }
 
     /// <summary>
@@ -62,6 +65,6 @@ public sealed record SendingAlert
                 // Not an alert: it could never be delivered.
             }
         }
-        return new SendingAlert { Until = until, Alert = alert };
+        return new SendingAlert { Until = until, Alert = alert, Unknown = Values.Unknown(o, "until", "alert") };
     }
 }

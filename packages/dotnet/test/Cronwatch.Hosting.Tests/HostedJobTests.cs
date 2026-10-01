@@ -178,6 +178,8 @@ public class HostedJobTests
         await m.IdleAsync();
         await m.FireAsync("gated", T0.AddMinutes(4));
         await Eventually("the next fire runs again", async () => (await Runs(m.Cw, "gated")).Length == 2);
+        // The run's row is written before its body starts, so the body's gate may come later.
+        await Eventually("the second run's body to start", () => Task.FromResult(!Gated.Gates.IsEmpty));
         Assert.True(Gated.Gates.TryDequeue(out gate));
         gate.SetResult();
     }

@@ -67,6 +67,25 @@ public class PagesTests
         Assert.Equal(Body(Capture("GET", "/cronwatch/jobs/" + name)), page);
     }
 
+    // The cross-port check: a stored metric that reads as Infinity (1e400 in a foreign row) is
+    // left out of the run list, as the SDK's Number.isFinite filter leaves it out.
+    [Fact]
+    public void A_metric_that_reads_as_infinity_is_left_off_the_job_page()
+    {
+        JsObject answer = Json.ParseObject(Body(Capture("GET", "/cronwatch/api/jobs/nightly-report")));
+        JobSummary job = Summary(Fixtures.Object(answer, "job"));
+        var runs = Fixtures.Objects(answer, "runs").Select(Run.FromValue).ToList();
+        string Page(string metrics)
+        {
+            var with = runs.ToList();
+            with[0] = with[0] with { Metrics = Metrics.Lenient(Json.Parse(metrics)) };
+            return EvaluateDeps.InZone(TimeZoneInfo.Utc, () => Html.JobPage(job, with, T0, "/cronwatch", true));
+        }
+        Assert.Equal(Page("{\"ok\":2}"), Page("{\"rows\":1e400,\"ok\":2,\"low\":-1e400}"));
+        Assert.Equal(Page("{}"), Page("{\"rows\":1e400}"));
+        Assert.Contains("<span class=\"k\">ok</span>", Page("{\"ok\":2}"), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_job_that_never_ran_has_its_page()
     {

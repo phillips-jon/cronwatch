@@ -17,4 +17,40 @@ internal static class Values
 
     /// <summary>A number field, or NaN.</summary>
     public static double Number(JsObject o, string key) => JsonText.TryNumber(o.Get(key), out double d) ? d : double.NaN;
+
+    /// <summary>
+    /// The keys of <paramref name="o"/> this port does not know, as JSON in their order, or null
+    /// when there are none: kept as text so a record holding them stays equal by value.
+    /// </summary>
+    public static string? Unknown(JsObject o, params string[] known)
+    {
+        JsObject? extra = null;
+        foreach (var e in o)
+        {
+            if (System.Array.IndexOf(known, e.Key) < 0)
+            {
+                (extra ??= new JsObject()).Set(e.Key, JsonText.Copy(e.Value));
+            }
+        }
+        return extra?.ToJson();
+    }
+
+    /// <summary>
+    /// <paramref name="target"/> with the keys <see cref="Unknown"/> kept added after its own, a
+    /// key it already has left as it is.
+    /// </summary>
+    public static JsObject WithUnknown(JsObject target, string? unknown)
+    {
+        if (unknown != null)
+        {
+            foreach (var e in Json.ParseObject(unknown))
+            {
+                if (!target.Has(e.Key))
+                {
+                    target.Set(e.Key, e.Value);
+                }
+            }
+        }
+        return target;
+    }
 }

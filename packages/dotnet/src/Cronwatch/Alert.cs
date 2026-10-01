@@ -39,6 +39,12 @@ public sealed record Alert
     /// <summary>When it was raised.</summary>
     public required long At { get; init; }
 
+    /// <summary>Keys of the stored alert this release does not know, as JSON, written back after its own.</summary>
+    internal string? Unknown { get; init; }
+
+    /// <summary>Keys of the stored alert's run this release does not know, as JSON.</summary>
+    internal string? RunUnknown { get; init; }
+
     /// <summary>A copy with triage's answer (null for none), marked tried.</summary>
     public Alert WithTriage(string? diagnosis) => this with { Triage = diagnosis, TriageTried = true };
 
@@ -47,7 +53,7 @@ public sealed record Alert
     {
         var o = new JsObject()
             .Set("type", Type.Value)
-            .Set("run", Run?.ToValue())
+            .Set("run", Run == null ? null : Values.WithUnknown(Run.ToValue(), RunUnknown))
             .Set("details", Details.ToValue())
             .Set("job", Job)
             .Set("definition", Definition.ToObject())
@@ -58,7 +64,8 @@ public sealed record Alert
         {
             o.Set("triage", Triage);
         }
-        return o;
+        // A field a newer release added is kept, as the SDK keeps a queued alert as plain JSON.
+        return Values.WithUnknown(o, Unknown);
     }
 
     /// <summary>The alert's JSON.</summary>
@@ -67,6 +74,11 @@ public sealed record Alert
     /// <summary>An alert read from JSON.</summary>
     /// <exception cref="JsonParseException">When it is not an alert.</exception>
     public static Alert FromJson(string text) => FromValue(Json.Parse(text));
+
+    private static readonly string[] Keys = ["type", "run", "details", "job", "definition", "title", "message", "at", "triage"];
+
+    private static readonly string[] RunKeys =
+        ["id", "job", "status", "startedAt", "finishedAt", "durationMs", "error", "output", "metrics", "trigger"];
 
     /// <summary>An alert read from a JSON value, leniently.</summary>
     /// <exception cref="JsonParseException">When it is not an alert.</exception>
@@ -78,12 +90,14 @@ public sealed record Alert
         }
         var type = new AlertType(Values.String(o, "type"));
         Run? run = null;
+        string? runUnknown = null;
         object? r = o.Get("run");
         if (r is JsObject ro)
         {
             var copy = ro.Copy();
             copy.Set("metrics", Metrics.Lenient(copy.Get("metrics")).ToValue());
             run = Run.FromValue(copy);
+            runUnknown = Values.Unknown(ro, RunKeys);
         }
         else if (r != null)
         {
@@ -103,6 +117,8 @@ public sealed record Alert
             Triage = Values.NullableString(o, "triage"),
             TriageTried = o.Has("triage"),
             At = Values.Integer(o, "at"),
+            Unknown = Values.Unknown(o, Keys),
+            RunUnknown = runUnknown,
         };
     }
 }
@@ -117,28 +133,44 @@ public abstract record AlertDetails
     /// <summary>The details as the SDK's JSON object.</summary>
     public abstract JsObject ToValue();
 
+    /// <summary>Keys of the stored details this release does not know, as JSON, written back after its own.</summary>
+    internal string? Unknown { get; init; }
+
+    /// <summary>
+    /// The details of an alert of a type this release does not know (one a newer release added),
+    /// kept as they were read, as JSON.
+    /// </summary>
+    internal sealed record Other(string Text) : AlertDetails
+    {
+        /// <inheritdoc/>
+        public override JsObject ToValue() => Json.ParseObject(Text);
+    }
+
     /// <summary>A missed run: when it was due, the deadline, the grace, and the last run's start.</summary>
     public sealed record Missed(long DueAt, double Deadline, double GraceMs, long? LastRunAt) : AlertDetails
     {
         /// <inheritdoc/>
-        public override JsObject ToValue() => new JsObject()
-            .Set("dueAt", DueAt).Set("deadline", Deadline).Set("graceMs", GraceMs).Set("lastRunAt", LastRunAt);
+        public override JsObject ToValue() => Values.WithUnknown(
+            new JsObject().Set("dueAt", DueAt).Set("deadline", Deadline).Set("graceMs", GraceMs).Set("lastRunAt", LastRunAt),
+            Unknown);
     }
 
     /// <summary>A failure or a stuck run: failures in a row and the threshold.</summary>
     public sealed record Failure(long ConsecutiveFailures, long Threshold) : AlertDetails
     {
         /// <inheritdoc/>
-        public override JsObject ToValue() => new JsObject()
-            .Set("consecutiveFailures", ConsecutiveFailures).Set("threshold", Threshold);
+        public override JsObject ToValue() => Values.WithUnknown(
+            new JsObject().Set("consecutiveFailures", ConsecutiveFailures).Set("threshold", Threshold),
+            Unknown);
     }
 
     /// <summary>A slow run: how long it took, the threshold, and where the threshold came from.</summary>
     public sealed record Slow(long DurationMs, double ThresholdMs, string Basis) : AlertDetails
     {
         /// <inheritdoc/>
-        public override JsObject ToValue() => new JsObject()
-            .Set("durationMs", DurationMs).Set("thresholdMs", ThresholdMs).Set("basis", Basis);
+        public override JsObject ToValue() => Values.WithUnknown(
+            new JsObject().Set("durationMs", DurationMs).Set("thresholdMs", ThresholdMs).Set("basis", Basis),
+            Unknown);
     }
 
     /// <summary>Metrics over their budgets.</summary>
@@ -152,7 +184,7 @@ public abstract record AlertDetails
             {
                 list.Add(b.ToValue());
             }
-            return new JsObject().Set("breaches", list);
+            return Values.WithUnknown(new JsObject().Set("breaches", list), Unknown);
         }
     }
 
@@ -179,7 +211,7 @@ public abstract record AlertDetails
             {
                 o.Set("since", Since.Value);
             }
-            return o;
+            return Values.WithUnknown(o, Unknown);
         }
     }
 
@@ -188,11 +220,17 @@ public abstract record AlertDetails
     {
         if (type == AlertType.Missed)
         {
-            return new Missed(Values.Integer(o, "dueAt"), Values.Number(o, "deadline"), Values.Number(o, "graceMs"), Values.NullableInteger(o, "lastRunAt"));
+            return new Missed(Values.Integer(o, "dueAt"), Values.Number(o, "deadline"), Values.Number(o, "graceMs"), Values.NullableInteger(o, "lastRunAt"))
+            {
+                Unknown = Values.Unknown(o, "dueAt", "deadline", "graceMs", "lastRunAt"),
+            };
         }
         if (type == AlertType.Slow)
         {
-            return new Slow(Values.Integer(o, "durationMs"), Values.Number(o, "thresholdMs"), Values.String(o, "basis"));
+            return new Slow(Values.Integer(o, "durationMs"), Values.Number(o, "thresholdMs"), Values.String(o, "basis"))
+            {
+                Unknown = Values.Unknown(o, "durationMs", "thresholdMs", "basis"),
+            };
         }
         if (type == AlertType.OverBudget)
         {
@@ -202,10 +240,13 @@ public abstract record AlertDetails
                 foreach (var b in list)
                 {
                     var bo = b as JsObject ?? new JsObject();
-                    breaches.Add(new BudgetBreach(Values.String(bo, "metric"), Values.Number(bo, "value"), Values.Number(bo, "limit"), Values.String(bo, "basis")));
+                    breaches.Add(new BudgetBreach(Values.String(bo, "metric"), Values.Number(bo, "value"), Values.Number(bo, "limit"), Values.String(bo, "basis"))
+                    {
+                        Unknown = Values.Unknown(bo, "metric", "value", "limit", "basis"),
+                    });
                 }
             }
-            return new OverBudget(ValueList<BudgetBreach>.Of(breaches));
+            return new OverBudget(ValueList<BudgetBreach>.Of(breaches)) { Unknown = Values.Unknown(o, "breaches") };
         }
         if (type == AlertType.Recovered)
         {
@@ -220,9 +261,20 @@ public abstract record AlertDetails
                     }
                 }
             }
-            return new Recovered(ValueList<Condition>.Of(after), Values.NullableString(o, "reason"), Values.NullableInteger(o, "since"));
+            return new Recovered(ValueList<Condition>.Of(after), Values.NullableString(o, "reason"), Values.NullableInteger(o, "since"))
+            {
+                Unknown = Values.Unknown(o, "after", "reason", "since"),
+            };
         }
-        return new Failure(Values.Integer(o, "consecutiveFailures"), Values.Integer(o, "threshold"));
+        if (type == AlertType.Failed || type == AlertType.Stuck)
+        {
+            return new Failure(Values.Integer(o, "consecutiveFailures"), Values.Integer(o, "threshold"))
+            {
+                Unknown = Values.Unknown(o, "consecutiveFailures", "threshold"),
+            };
+        }
+        // A type a newer release added: its details as they were read, as the SDK keeps them.
+        return new Other(o.ToJson());
     }
 }
 
@@ -234,7 +286,11 @@ public abstract record AlertDetails
 public sealed record BudgetBreach(string Metric, double Value, double Limit, string Basis)
 {
     /// <summary>The breach as the SDK's JSON object.</summary>
-    public JsObject ToValue() => new JsObject().Set("metric", Metric).Set("value", Value).Set("limit", Limit).Set("basis", Basis);
+    public JsObject ToValue() =>
+        Values.WithUnknown(new JsObject().Set("metric", Metric).Set("value", Value).Set("limit", Limit).Set("basis", Basis), Unknown);
+
+    /// <summary>Keys of the stored breach this release does not know, as JSON, written back after its own.</summary>
+    internal string? Unknown { get; init; }
 }
 
 /// <summary>A job as the dashboard and the check report it: the SDK's <c>JobSummary</c>.</summary>
