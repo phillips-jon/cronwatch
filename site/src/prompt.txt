@@ -445,10 +445,9 @@ Rust (Rust 1.85 or newer; 1.94 for the SQL store)
 
    let cw = cronwatch::Client::builder()
        .store(cronwatch_sqlx::SqlStore::postgres(pool.clone()))   // or SqlStore::sqlite(pool), SqlStore::mysql(pool)
-       .alert(cronwatch::alerts::slack(cronwatch::alerts::SlackOptions {
-           webhook_url: std::env::var("SLACK_WEBHOOK_URL")?,
-           ..Default::default()
-       })?)
+       .alert(cronwatch::alerts::slack(
+           cronwatch::alerts::SlackOptions::new().webhook_url(std::env::var("SLACK_WEBHOOK_URL")?),
+       )?)
        .build()?;
 
    Other channels in cronwatch::alerts, each made from an options struct:
@@ -492,9 +491,9 @@ Rust (Rust 1.85 or newer; 1.94 for the SQL store)
    type in place of String when the closure uses ? on it.
 
 4. Run the check every few minutes so missed and stuck runs are noticed:
-   cw.start(Duration::from_secs(60)) once in a long-running process, the
-   check job or check worker above, or a second crontab line running a
-   command that declares the same jobs and calls cw.check().await.
+   cw.start_checking(Duration::from_secs(60)) once in a long-running
+   process, the check job or check worker above, or a second crontab line
+   running a command that declares the same jobs and calls cw.check().await.
 
 5. Mount the dashboard: let routes =
    cw.routes(RoutesOptions::new())? (cronwatch::web::RoutesOptions), then

@@ -14,6 +14,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`datadog`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct DatadogOptions {
     /// An API key (not an application key).
     pub api_key: String,
@@ -30,6 +31,15 @@ pub struct DatadogOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(DatadogOptions {
+    text api_key,
+    text site,
+    texts tags,
+    text host,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Datadog {
     o: DatadogOptions,

@@ -16,6 +16,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`twilio`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct TwilioOptions {
     /// The account SID, `AC...`. It is in the URL whichever credentials sign
     /// the request.
@@ -37,7 +38,7 @@ pub struct TwilioOptions {
     /// Also texts when a job recovers. Off by default: a text is for what
     /// needs a person.
     pub recovered: bool,
-    /// How many SMS segments a message may use, 1 to [`MAX_SEGMENTS`].
+    /// How many SMS segments a message may use, 1 to 10.
     /// `None` for 3.
     pub segments: Option<u32>,
     /// A link back to the job in your dashboard, kept whole at the end of the
@@ -47,9 +48,23 @@ pub struct TwilioOptions {
     pub transport: Option<Arc<dyn Transport>>,
 }
 
+super::setters!(TwilioOptions {
+    text account_sid,
+    text auth_token,
+    text api_key_sid,
+    text api_key_secret,
+    text from,
+    text messaging_service_sid,
+    texts to,
+    flag recovered,
+    some segments: u32,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
+
 /// The most segments a message may use, which keeps it inside Twilio's 1600
 /// character Body limit.
-pub const MAX_SEGMENTS: u32 = 10;
+pub(crate) const SEGMENTS_MAX: u32 = 10;
 
 /// The longest Body Twilio takes.
 const MAX_SMS_BODY: usize = 1600;
@@ -230,13 +245,13 @@ fn fits(text: &str, segments: usize) -> bool {
     js::len16(text) <= MAX_SMS_BODY && sms_segments(text) <= segments
 }
 
-/// A segment count clamped to 1 to [`MAX_SEGMENTS`]; 3 for anything not a
+/// A segment count clamped to 1 to 10; 3 for anything not a
 /// number.
 fn segment_budget(segments: f64) -> usize {
     if !segments.is_finite() {
         return 3;
     }
-    segments.floor().clamp(1.0, f64::from(MAX_SEGMENTS)) as usize
+    segments.floor().clamp(1.0, f64::from(SEGMENTS_MAX)) as usize
 }
 
 /// The title, then as many lines of the message (and the triage) as fit,

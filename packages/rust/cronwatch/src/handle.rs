@@ -19,13 +19,17 @@ use crate::types::{Metrics, Run, RunStatus, run_duration};
 /// Starts the run ids of the pg_cron source, so no other run may use it.
 pub const RESERVED_RUN_ID_PREFIX: &str = "pgcron:";
 
+/// The longest run id, in UTF-16 code units (JavaScript's string length):
+/// what `start`, `resume` and `record_run` take, and every store holds.
+pub(crate) const MAX_RUN_ID: usize = 200;
+
 /// The SDK's error for a run id no store could hold, or one reserved for the
 /// pg_cron source.
 fn check_run_id(job: &str, id: &str, method: &str) -> Result<(), Error> {
     let n = js::len16(id);
-    if n == 0 || n > 200 {
+    if n == 0 || n > MAX_RUN_ID {
         return Err(Error::Invalid(format!(
-            "job {}: {method}() needs a run id of 1 to 200 characters (got {n} characters)",
+            "job {}: {method}() needs a run id of 1 to {MAX_RUN_ID} characters (got {n} characters)",
             js::quote(job)
         )));
     }

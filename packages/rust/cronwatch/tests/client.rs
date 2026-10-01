@@ -422,18 +422,11 @@ async fn a_secret_split_by_the_16_kb_cut_is_redacted_whole() {
     let _ = k.cw.run("thrown", None, move |_| std::future::ready(Err::<(), _>(thrown))).await.unwrap();
     assert!(!k.runs("thrown").await[0].error.clone().unwrap().contains("opaqueTOKEN"));
     k.cw.job("imported", JobOptions::new()).unwrap();
-    let run = cronwatch::Run {
-        id: "i1".into(),
-        job: "imported".into(),
-        status: RunStatus::Ok,
-        started_at: 1,
-        finished_at: Some(2),
-        duration_ms: Some(1),
-        error: None,
-        output: Some(format!("{bearer}\n{tail}")),
-        metrics: Metrics::new(),
-        trigger: "source".into(),
-    };
+    let mut run = cronwatch::Run::new("i1", "imported", RunStatus::Ok, 1);
+    run.finished_at = Some(2);
+    run.duration_ms = Some(1);
+    run.output = Some(format!("{bearer}\n{tail}"));
+    run.trigger = "source".into();
     k.cw.record_run(run, cronwatch::RecordOptions::new()).await.unwrap();
     assert!(!k.cw.get_run("i1").await.unwrap().unwrap().output.unwrap().contains("opaqueTOKEN"));
     let handle = k.cw.job("flushed", JobOptions::new()).unwrap().start(cronwatch::StartOptions::new()).await.unwrap();

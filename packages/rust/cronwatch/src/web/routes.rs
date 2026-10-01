@@ -387,6 +387,21 @@ fn bearer(req: &Request) -> Option<String> {
     Some(text)
 }
 
+/// What `GET <base>/api` says is serving it: the package as its registry
+/// names it, and the language. Each port answers with its own.
+const LIBRARY: &str = "cronwatch";
+const LANGUAGE: &str = "rust";
+
+/// The API's version, which goes up only with a change that is not
+/// additive, in a major release.
+const API_VERSION: i64 = 1;
+
+/// A job's summary as JSON, what silence and unsilence answer: the same as
+/// `GET <base>/api/jobs/:name`'s `job` after the change.
+async fn summary_value(cw: &Client, name: &str) -> Result<Value, Error> {
+    Ok(cw.job_summary(name).await?.map_or(Value::Null, |s| s.to_value()))
+}
+
 /// Absent means one hour; a number or numeric string is milliseconds. The
 /// error is the SDK's for anything else.
 fn silence_duration(value: Option<&str>) -> Result<f64, String> {
@@ -776,6 +791,16 @@ impl Routes {
         let cw = &self.inner.client;
         let no_such_job = || api(error_body("No such job"), 404);
         match (method, rest) {
+            // What is serving the API, so a client such as @cronwatch/mcp can tell.
+            ("GET", []) => {
+                let about = Object::new()
+                    .with("ok", true)
+                    .with("library", LIBRARY)
+                    .with("language", LANGUAGE)
+                    .with("version", crate::VERSION)
+                    .with("api", API_VERSION);
+                return Ok(api(about, 200));
+            }
             ("GET", ["jobs"]) => {
                 let jobs = cw.jobs().await?;
                 let list: Vec<Value> = jobs.iter().map(JobSummary::to_value).collect();
@@ -811,12 +836,18 @@ impl Routes {
                             Ok(ms) => ms,
                             Err(message) => return Ok(api(error_body(&message), 400)),
                         };
-                        let state = cw.silence_ms(name, ms).await?;
-                        return Ok(api(Object::new().with("ok", true).with("state", state.to_value()), 200));
+                        cw.silence_ms(name, ms).await?;
+                        return Ok(api(
+                            Object::new().with("ok", true).with("job", summary_value(cw, name).await?),
+                            200,
+                        ));
                     }
                     "unsilence" => {
-                        let state = cw.unsilence(name).await?;
-                        return Ok(api(Object::new().with("ok", true).with("state", state.to_value()), 200));
+                        cw.unsilence(name).await?;
+                        return Ok(api(
+                            Object::new().with("ok", true).with("job", summary_value(cw, name).await?),
+                            200,
+                        ));
                     }
                     _ => {}
                 }

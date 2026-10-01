@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use cronwatch::storetest::{Capture, Errors};
+use cronwatch::storetest::kit::{Capture, Errors};
 use cronwatch::{AlertType, Channel, Client, JobOptions, JobSummary, RunStatus};
 use cronwatch_sqlx::{PgCron, PgCronJob, PgCronOptions, SqlStore};
 use sqlx::{AssertSqlSafe, PgPool};
@@ -49,9 +49,9 @@ fn others(errors: &Errors) -> Vec<String> {
     errors.list().into_iter().filter(|e| !e.contains("cron.") && !e.contains("row level")).collect()
 }
 
-fn picks(tag: &str) -> Arc<dyn Fn(&PgCronJob) -> bool + Send + Sync> {
+fn picks(tag: &str) -> impl Fn(&PgCronJob) -> bool + Send + Sync + 'static {
     let tag = tag.to_string();
-    Arc::new(move |j: &PgCronJob| j.job_name.as_deref().is_some_and(|n| n.starts_with(&tag)))
+    move |j: &PgCronJob| j.job_name.as_deref().is_some_and(|n| n.starts_with(&tag))
 }
 
 async fn unschedule(pool: &PgPool, tag: &str) {
@@ -78,11 +78,7 @@ async fn the_source_against_a_real_pg_cron() {
             .on_error(|_, _| {})
             .source(Arc::new(PgCron::new(
                 pool.clone(),
-                PgCronOptions {
-                    pick: Some(picks(&tag)),
-                    options: JobOptions::new().grace("30s"),
-                    ..Default::default()
-                },
+                PgCronOptions::new().pick(picks(&tag)).options(JobOptions::new().grace("30s")),
             )))
             .build()
             .unwrap()
@@ -229,10 +225,7 @@ async fn restart_rows_a_crowded_job_first_sight_and_a_rename() {
         .alerts([Arc::new(alerts.clone()) as Arc<dyn Channel>])
         .no_cron_secret()
         .on_error(move |e, w| errs.add(e, w))
-        .source(Arc::new(PgCron::new(
-            pool.clone(),
-            PgCronOptions { pick: Some(picks(&tag)), timezone: Some("UTC".into()), ..Default::default() },
-        )))
+        .source(Arc::new(PgCron::new(pool.clone(), PgCronOptions::new().pick(picks(&tag)).timezone("UTC"))))
         .build()
         .unwrap();
     cw.check().await.unwrap();

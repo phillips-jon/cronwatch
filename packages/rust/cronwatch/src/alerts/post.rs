@@ -21,12 +21,22 @@ use crate::store::{BoxError, BoxFuture};
 
 /// How long one request may take, connecting, sending and reading the
 /// answer, as the SDK's `AbortSignal.timeout(10_000)`.
-pub const TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const DEADLINE: Duration = Duration::from_secs(10);
+
+/// `DEADLINE`'s public name before 1.0.
+#[doc(hidden)]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+pub const TIMEOUT: Duration = DEADLINE;
 
 /// How much of an answer is read. A channel quotes 200 characters of a
 /// refusal, and a compressed answer from a broken or hostile endpoint could
 /// otherwise decode to far more than a process has.
-pub const MAX_BODY: usize = 1 << 20;
+pub(crate) const ANSWER_MAX: usize = 1 << 20;
+
+/// `ANSWER_MAX`'s public name before 1.0.
+#[doc(hidden)]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+pub const MAX_BODY: usize = ANSWER_MAX;
 
 /// How much of an answer's body goes into an error.
 pub(crate) const ERROR_BODY_MAX: usize = 200;
@@ -35,6 +45,7 @@ pub(crate) const ERROR_BODY_MAX: usize = 200;
 /// URL's origin and the header names only, since the rest carries the
 /// channel's credentials.
 #[derive(Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Request {
     /// An http or https URL, as the WHATWG URL parser (and so fetch) writes
     /// it. Its path or query may be a credential: never quote it.
@@ -46,7 +57,16 @@ pub struct Request {
     pub body: Vec<u8>,
 }
 
+impl Request {
+    /// A POST to `url` with these headers and body, for a test of a
+    /// [`Transport`] of the app's own.
+    pub fn new(url: impl Into<String>, headers: Vec<(String, String)>, body: impl Into<Vec<u8>>) -> Request {
+        Request { url: url.into(), headers, body: body.into() }
+    }
+}
+
 /// An answer: its status, and its body as it arrives.
+#[non_exhaustive]
 pub struct Response {
     pub status: u16,
     pub body: Box<dyn ResponseBody>,
@@ -62,7 +82,7 @@ impl Response {
 impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Request")
-            .field("origin", &origin(&self.url))
+            .field("origin", &origin_of(&self.url))
             .field("headers", &self.headers.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>())
             .field("body", &format_args!("{} bytes", self.body.len()))
             .finish()
@@ -76,7 +96,7 @@ impl fmt::Debug for Response {
 }
 
 /// An answer's body, read a chunk at a time, so no more of it than
-/// [`MAX_BODY`] is ever read and the deadline holds while it arrives.
+/// 1 MiB is ever read and the deadline holds while it arrives.
 pub trait ResponseBody: Send {
     /// The next chunk, or `None` at the end.
     fn chunk(&mut self) -> BoxFuture<'_, Result<Option<Vec<u8>>, BoxError>>;
@@ -129,6 +149,15 @@ impl ReqwestTransport {
     /// `redirect(reqwest::redirect::Policy::none())`: reqwest decides about
     /// redirects inside the client, so one that follows them sends the
     /// channel's credential headers wherever a redirect points.
+    ///
+    /// Deprecated: it takes a type of reqwest's, which is below 1.0, so its
+    /// next release would break this crate's API. The default transport
+    /// ([`new`](Self::new), or `transport: None`) honours `HTTP_PROXY`,
+    /// `HTTPS_PROXY` and `NO_PROXY` and trusts the platform's roots; for
+    /// anything else, implement [`Transport`] over a client of your own.
+    #[deprecated(
+        note = "use the default transport (transport: None), or implement Transport over your own client; this goes at 1.0"
+    )]
     pub fn with_client(client: reqwest::Client) -> ReqwestTransport {
         ReqwestTransport { client }
     }
@@ -275,11 +304,18 @@ pub(crate) fn postable(raw: &str) -> Result<Url, BoxError> {
 /// `new URL(url).origin`: the scheme, host and port only, a port that is the
 /// scheme's own left out. A URL's path or query can hold a credential, so an
 /// error names only this.
-pub fn origin(raw: &str) -> String {
+pub(crate) fn origin_of(raw: &str) -> String {
     match parse(raw) {
         Ok(url) => url.origin().ascii_serialization(),
         Err(_) => "(invalid URL)".to_string(),
     }
+}
+
+/// `origin_of`'s public name before 1.0.
+#[doc(hidden)]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+pub fn origin(raw: &str) -> String {
+    origin_of(raw)
 }
 
 /// Whether a header name is an HTTP token (RFC 9110).
@@ -339,9 +375,9 @@ pub(crate) async fn fetch(
     loop {
         match tokio::time::timeout_at(deadline, body.chunk()).await {
             Ok(Ok(Some(chunk))) => {
-                let room = MAX_BODY - data.len();
+                let room = ANSWER_MAX - data.len();
                 data.extend_from_slice(&chunk[..chunk.len().min(room)]);
-                if data.len() >= MAX_BODY {
+                if data.len() >= ANSWER_MAX {
                     break;
                 }
             }
@@ -435,7 +471,7 @@ pub(crate) fn error_body(text: &str, secrets: &[&str]) -> String {
 /// The error for an answer outside 2xx: `<provider> <origin> answered
 /// <status>: <body>`, the body's secrets cut out.
 pub(crate) fn refused(provider: &str, raw_url: &str, answer: &Answer, secrets: &[&str]) -> BoxError {
-    let mut text = format!("{provider} {} answered {}", origin(raw_url), answer.status);
+    let mut text = format!("{provider} {} answered {}", origin_of(raw_url), answer.status);
     if !answer.body.is_empty() {
         text.push_str(": ");
         text.push_str(&error_body(&answer.body, secrets));
@@ -443,7 +479,7 @@ pub(crate) fn refused(provider: &str, raw_url: &str, answer: &Answer, secrets: &
     fail(text)
 }
 
-/// [`fetch`] within [`TIMEOUT`] that fails on an answer outside 2xx.
+/// [`fetch`] within [`DEADLINE`] that fails on an answer outside 2xx.
 #[cfg(feature = "alerts")]
 pub(crate) async fn post(
     transport: &dyn Transport,
@@ -453,7 +489,7 @@ pub(crate) async fn post(
     body: Vec<u8>,
     secrets: &[&str],
 ) -> Result<Answer, BoxError> {
-    let answer = fetch(transport, TIMEOUT, raw_url, list, body).await?;
+    let answer = fetch(transport, DEADLINE, raw_url, list, body).await?;
     if !answer.ok() {
         return Err(refused(provider, raw_url, &answer, secrets));
     }

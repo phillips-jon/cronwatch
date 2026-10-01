@@ -5,8 +5,8 @@
 //! port of croner in the `cron` module, so a Rust process and a Node, Ruby,
 //! Python, PHP or Go process sharing one store agree on every due time.
 //!
-//! Where it cannot match the SDK, see the `cron` module: a date no month
-//! has never fires, and croner's one-time dates are refused.
+//! As in the SDK, a date no month has never fires and croner's one-time
+//! dates are refused (see the `cron` module).
 
 pub(crate) mod cron;
 mod duration;

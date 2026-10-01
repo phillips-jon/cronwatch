@@ -17,7 +17,7 @@
 //! timeout, and sends the alerts, printing what it did.
 //!
 //! A program that stays up (a server, a worker) checks in itself instead,
-//! with `cw.start(Duration::from_secs(60))`. Only one process needs to
+//! with `cw.start_checking(Duration::from_secs(60))`. Only one process needs to
 //! check; running it in every replica of a service is harmless, since a
 //! check judges each run once.
 #![forbid(unsafe_code)]

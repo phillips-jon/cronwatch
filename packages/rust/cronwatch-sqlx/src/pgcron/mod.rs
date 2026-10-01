@@ -10,9 +10,9 @@
 //! use std::sync::Arc;
 //! use cronwatch_sqlx::{PgCron, PgCronOptions, SqlStore};
 //!
-//! let source = PgCron::new(pool.clone(), PgCronOptions { prefix: "db:".into(), ..Default::default() });
+//! let source = PgCron::new(pool.clone(), PgCronOptions::new().prefix("db:"));
 //! let cw = cronwatch::Client::builder().store(SqlStore::postgres(pool)).source(Arc::new(source)).build()?;
-//! cw.start(std::time::Duration::from_secs(60));
+//! cw.start_checking(std::time::Duration::from_secs(60));
 //! # Ok(())
 //! # }
 //! ```
@@ -32,10 +32,10 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 use std::time::Duration;
 
+use cronwatch::__private::describe_job;
 use cronwatch::js::Value;
 use cronwatch::{
-    Alert, BoxError, BoxFuture, Client, Definition, DurationSpec, JobOptions, Metrics, RecordOptions, Run, RunStatus,
-    Source, describe_job,
+    Alert, BoxError, BoxFuture, Client, Definition, DurationSpec, JobOptions, RecordOptions, Run, RunStatus, Source,
 };
 use tokio::sync::Mutex;
 
@@ -44,8 +44,10 @@ use crate::rows::{Param, Row};
 #[cfg(test)]
 mod tests;
 
-/// A row of `cron.job`.
+/// A row of `cron.job`, as `pick`, `job_name` and `options_for` are given
+/// it. `#[non_exhaustive]`: the source reads these.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct PgCronJob {
     pub job_id: i64,
     /// `None` for a job scheduled without a name.
@@ -56,8 +58,11 @@ pub struct PgCronJob {
     pub active: bool,
 }
 
-/// A row of `cron.job_run_details`, its times in epoch milliseconds.
+/// A row of `cron.job_run_details`, its times in epoch milliseconds. Hidden
+/// and outside the promise: only the deprecated [`run_of`] takes one.
+#[doc(hidden)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct PgCronRow {
     pub run_id: i64,
     pub job_id: i64,
@@ -75,8 +80,11 @@ pub type NameFn = Arc<dyn Fn(&PgCronJob) -> String + Send + Sync>;
 pub type OptionsFn = Arc<dyn Fn(&PgCronJob) -> JobOptions + Send + Sync>;
 
 /// What the source watches and how it names and judges it. Every field's
-/// default is the SDK's.
+/// default is the SDK's. `#[non_exhaustive]`, so a release can add an
+/// option: start from [`PgCronOptions::new`] and set what you need with its
+/// builder methods, one per field.
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct PgCronOptions {
     /// The jobs to watch by name; with `job_ids`, only the jobs either
     /// names are watched. Both `None` (the default) is every job the role
@@ -90,7 +98,7 @@ pub struct PgCronOptions {
     /// Goes before every job name, to keep them apart from the app's own
     /// (`"db:"`). It also keeps run ids apart.
     pub prefix: String,
-    /// The CronWatch name for a job. Default [`job_name`]: its jobname with
+    /// The CronWatch name for a job. By default its jobname with
     /// anything other than letters, digits, `.`, `_`, `:` and `-` turned into
     /// `-`, or `pg_cron:<jobid>` when it has none. The prefix goes in front
     /// either way. One that panics, like a `pick` or `options_for` that
@@ -108,6 +116,65 @@ pub struct PgCronOptions {
     /// with `pg_read_all_settings`; UTC (pg_cron's default) is assumed when it
     /// cannot be read.
     pub timezone: Option<String>,
+}
+
+impl PgCronOptions {
+    /// The SDK's defaults: every job the role can see, no prefix.
+    pub fn new() -> PgCronOptions {
+        PgCronOptions::default()
+    }
+
+    /// Sets `jobs`: the jobs to watch by name.
+    pub fn jobs<I, S>(mut self, names: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.jobs = Some(names.into_iter().map(Into::into).collect());
+        self
+    }
+
+    /// Sets `job_ids`: the jobs to watch by id.
+    pub fn job_ids(mut self, ids: impl IntoIterator<Item = i64>) -> Self {
+        self.job_ids = Some(ids.into_iter().collect());
+        self
+    }
+
+    /// Sets `pick`: picks the jobs to watch with a function.
+    pub fn pick(mut self, f: impl Fn(&PgCronJob) -> bool + Send + Sync + 'static) -> Self {
+        self.pick = Some(Arc::new(f));
+        self
+    }
+
+    /// Sets `prefix`, which goes before every job name.
+    pub fn prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.prefix = prefix.into();
+        self
+    }
+
+    /// Sets `job_name`: the CronWatch name for a job.
+    pub fn job_name(mut self, f: impl Fn(&PgCronJob) -> String + Send + Sync + 'static) -> Self {
+        self.job_name = Some(Arc::new(f));
+        self
+    }
+
+    /// Sets `options`: job options for every job.
+    pub fn options(mut self, options: JobOptions) -> Self {
+        self.options = options;
+        self
+    }
+
+    /// Sets `options_for`: job options per job.
+    pub fn options_for(mut self, f: impl Fn(&PgCronJob) -> JobOptions + Send + Sync + 'static) -> Self {
+        self.options_for = Some(Arc::new(f));
+        self
+    }
+
+    /// Sets `timezone`: the zone pg_cron reads its cron expressions in.
+    pub fn timezone(mut self, zone: impl Into<String>) -> Self {
+        self.timezone = Some(zone.into());
+        self
+    }
 }
 
 impl fmt::Debug for PgCronOptions {
@@ -133,7 +200,12 @@ const MAX_PAGES: usize = 10;
 /// How long a run pg_cron has queued but not started (no start time yet) is
 /// waited for. After that it is copied as running from when it was first
 /// seen, so a run that never starts is marked stuck like any other.
-pub const HOLD: Duration = Duration::from_secs(10 * 60);
+pub(crate) const HOLD_FOR: Duration = Duration::from_secs(10 * 60);
+
+/// `HOLD_FOR`'s public name before 1.0.
+#[doc(hidden)]
+#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 1.0")]
+pub const HOLD: Duration = HOLD_FOR;
 
 const JOBS_SQL: &str = "SELECT jobid, jobname, schedule, database, username, active FROM cron.job ORDER BY jobid";
 // pg_settings has no row for a setting the role may not read, where
@@ -171,7 +243,7 @@ fn finished(status: &str) -> bool {
 /// reads only the first five fields of an expression and ignores the rest,
 /// so only those are kept (a sixth would otherwise be read as seconds).
 /// `None` for one that has no cadence to watch (`@reboot`).
-pub fn schedule(schedule: &str) -> Option<String> {
+pub(crate) fn cron_schedule(schedule: &str) -> Option<String> {
     let text = js_trim(schedule);
     // /^(\d+)\s*seconds?$/i
     let digits = text.bytes().take_while(u8::is_ascii_digit).count();
@@ -199,8 +271,15 @@ pub fn schedule(schedule: &str) -> Option<String> {
     Some(fields.join(" "))
 }
 
+/// `cron_schedule`'s public name before 1.0.
+#[doc(hidden)]
+#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 1.0")]
+pub fn schedule(schedule: &str) -> Option<String> {
+    cron_schedule(schedule)
+}
+
 /// The default CronWatch name for a pg_cron job, before the prefix.
-pub fn job_name(job: &PgCronJob) -> String {
+pub(crate) fn default_name(job: &PgCronJob) -> String {
     let safe = |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | ':' | '-');
     let mut cleaned = String::new();
     let mut in_run = false;
@@ -223,7 +302,7 @@ pub fn job_name(job: &PgCronJob) -> String {
 /// no start time (pg_cron writes these for runs a server restart cut off,
 /// "server restarted") starts at its end time, else at `fallback_at` (the
 /// reader passes the job's newest run's start, or now).
-pub fn run_of(row: &PgCronRow, job: &str, id_prefix: &str, fallback_at: i64) -> Option<Run> {
+pub(crate) fn run_from(row: &PgCronRow, job: &str, id_prefix: &str, fallback_at: i64) -> Option<Run> {
     let done = finished(&row.status);
     if row.start_time.is_none() && !done {
         return None;
@@ -236,19 +315,28 @@ pub fn run_of(row: &PgCronRow, job: &str, id_prefix: &str, fallback_at: i64) -> 
         _ => RunStatus::Running,
     };
     let end = done.then(|| started_at.max(row.end_time.unwrap_or(started_at)));
-    Some(Run {
-        id: format!("{id_prefix}{}", row.run_id),
-        job: job.to_string(),
-        error: (status == RunStatus::Failed)
-            .then(|| message.clone().unwrap_or_else(|| "pg_cron reported the run as failed".into())),
-        output: if status == RunStatus::Ok { message } else { None },
-        status,
-        started_at,
-        finished_at: end,
-        duration_ms: end.map(|e| cronwatch::run_duration(started_at, e)),
-        metrics: Metrics::new(),
-        trigger: "pg_cron".into(),
-    })
+    let mut run = Run::new(format!("{id_prefix}{}", row.run_id), job, status.clone(), started_at);
+    run.error = (status == RunStatus::Failed)
+        .then(|| message.clone().unwrap_or_else(|| "pg_cron reported the run as failed".into()));
+    run.output = if status == RunStatus::Ok { message } else { None };
+    run.finished_at = end;
+    run.duration_ms = end.map(|e| cronwatch::__private::run_duration(started_at, e));
+    run.trigger = "pg_cron".into();
+    Some(run)
+}
+
+/// `default_name`'s public name before 1.0.
+#[doc(hidden)]
+#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 1.0")]
+pub fn job_name(job: &PgCronJob) -> String {
+    default_name(job)
+}
+
+/// `run_from`'s public name before 1.0.
+#[doc(hidden)]
+#[deprecated(note = "internal to the pg_cron source, outside the 1.x promise; no longer public from 1.0")]
+pub fn run_of(row: &PgCronRow, job: &str, id_prefix: &str, fallback_at: i64) -> Option<Run> {
+    run_from(row, job, id_prefix, fallback_at)
 }
 
 /// What the source reads through: the app's pool, or a fake in the tests.
@@ -439,7 +527,7 @@ impl PgCron {
         }
         let base = match &self.o.job_name {
             Some(f) => guarded("job_name", || f(j))?,
-            None => job_name(j),
+            None => default_name(j),
         };
         let extra = match &self.o.options_for {
             Some(f) => guarded("the options callback", || f(j))?,
@@ -502,15 +590,15 @@ impl PgCron {
         };
         let run = if row.start_time.is_none() && !finished(&row.status) {
             let since = st.held.get(&row.run_id).copied().unwrap_or(now);
-            if now - since < HOLD.as_millis() as i64 {
+            if now - since < HOLD_FOR.as_millis() as i64 {
                 st.held.insert(row.run_id, since);
                 return;
             }
             row.start_time = Some(since);
-            run_of(&row, &name, &self.id_prefix, now)
+            run_from(&row, &name, &self.id_prefix, now)
         } else {
             let fallback = st.last_at.get(&row.job_id).copied().unwrap_or(now);
-            run_of(&row, &name, &self.id_prefix, fallback)
+            run_from(&row, &name, &self.id_prefix, fallback)
         };
         st.held.remove(&row.run_id);
         let Some(run) = run else { return };
@@ -623,7 +711,7 @@ impl PgCron {
                 name = format!("{name}:{}", j.job_id);
             }
             used.insert(name.clone());
-            let sched = if j.active && recording { schedule(&j.schedule) } else { None };
+            let sched = if j.active && recording { cron_schedule(&j.schedule) } else { None };
             let paused = if j.active { "" } else { " (paused)" };
             let base_options = JobOptions::new()
                 .description(format!("pg_cron job {} in {} as {}{paused}", j.job_id, j.database, j.username))

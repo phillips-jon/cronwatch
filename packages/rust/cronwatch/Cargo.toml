@@ -28,7 +28,7 @@ triage = ["__transport"]
 # tonic's HTTP stack and lambda_http.
 tower = ["dep:http", "dep:http-body", "dep:http-body-util", "dep:bytes", "dep:tower-service"]
 # tower, and the mount axum records when the dashboard is nested
-# (NestedPath and OriginalUri), and Routes::into_router().
+# (NestedPath and OriginalUri); Routes::into_router(), deprecated.
 axum = ["tower", "dep:axum"]
 # What the channels and triage share: reqwest on rustls with the platform's
 # roots, and the WHATWG URL parser fetch reads URLs with. Not for apps to

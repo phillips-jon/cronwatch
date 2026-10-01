@@ -11,10 +11,7 @@
 //! # let _guard = _rt.enter();
 //! use cronwatch::alerts::{self, SlackOptions};
 //!
-//! let slack = alerts::slack(SlackOptions {
-//!     webhook_url: std::env::var("SLACK_WEBHOOK_URL")?,
-//!     ..Default::default()
-//! })?;
+//! let slack = alerts::slack(SlackOptions::new().webhook_url(std::env::var("SLACK_WEBHOOK_URL")?))?;
 //! let cw = cronwatch::Client::builder().alert(slack).build()?;
 //! # Ok(())
 //! # }
@@ -31,9 +28,11 @@
 //! Resend's idempotency key, Sentry's event id and Rollbar's UUID let a
 //! provider drop an alert it already took.
 //!
-//! Each options struct has a `transport`: `None` for the default
-//! [`ReqwestTransport`], or a [`Transport`] of the app's own (a proxy, a
-//! test's recorder).
+//! Each options struct is `#[non_exhaustive]`, so a release can add an
+//! option without breaking an app's build: start from `new()` and set what
+//! you need with its builder methods, one per field, named after it. Each
+//! has a `transport`: `None` for the default [`ReqwestTransport`], or a
+//! [`Transport`] of the app's own (a proxy, a test's recorder).
 //!
 //! With only the `triage` feature, this module holds the transport alone.
 
@@ -98,9 +97,97 @@ pub use {
     ses::{SesOptions, ses},
     shared::LinkFn,
     slack::{SlackOptions, slack},
-    twilio::{MAX_SEGMENTS, TwilioOptions, twilio},
+    twilio::{TwilioOptions, twilio},
     webhook::{WebhookOptions, signature, webhook},
 };
+
+/// The most SMS segments a Twilio message may use.
+#[cfg(feature = "alerts")]
+#[doc(hidden)]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+pub const MAX_SEGMENTS: u32 = twilio::SEGMENTS_MAX;
+
+/// Builder methods for an options struct, one per field, named after it, and
+/// `new()`, the defaults. The structs are `#[non_exhaustive]`, so a release
+/// can add an option without breaking an app's build: an app starts from
+/// `new()` (or `Default::default()`) and sets what it needs.
+macro_rules! setters {
+    ($ty:ident { $($kind:ident $field:ident $(: $t:ty)?),* $(,)? }) => {
+        impl $ty {
+            /// The options with every field at its default.
+            pub fn new() -> Self {
+                Self::default()
+            }
+            $($crate::alerts::setters!(@one $kind $field $(: $t)?);)*
+        }
+    };
+    (@one text $field:ident) => {
+        #[doc = concat!("Sets `", stringify!($field), "`.")]
+        pub fn $field(mut self, value: impl Into<String>) -> Self {
+            self.$field = value.into();
+            self
+        }
+    };
+    (@one texts $field:ident) => {
+        #[doc = concat!("Sets `", stringify!($field), "`.")]
+        pub fn $field<I, S>(mut self, values: I) -> Self
+        where
+            I: IntoIterator<Item = S>,
+            S: Into<String>,
+        {
+            self.$field = values.into_iter().map(Into::into).collect();
+            self
+        }
+    };
+    (@one pairs $field:ident) => {
+        #[doc = concat!("Sets `", stringify!($field), "`, in order.")]
+        pub fn $field<I, K, V>(mut self, values: I) -> Self
+        where
+            I: IntoIterator<Item = (K, V)>,
+            K: Into<String>,
+            V: Into<String>,
+        {
+            self.$field = values.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
+            self
+        }
+    };
+    (@one flag $field:ident) => {
+        #[doc = concat!("Sets `", stringify!($field), "`.")]
+        pub fn $field(mut self, value: bool) -> Self {
+            self.$field = value;
+            self
+        }
+    };
+    (@one some $field:ident : $t:ty) => {
+        #[doc = concat!("Sets `", stringify!($field), "`.")]
+        pub fn $field(mut self, value: $t) -> Self {
+            self.$field = Some(value);
+            self
+        }
+    };
+    (@one value $field:ident : $t:ty) => {
+        #[doc = concat!("Sets `", stringify!($field), "`.")]
+        pub fn $field(mut self, value: $t) -> Self {
+            self.$field = value;
+            self
+        }
+    };
+    (@one link $field:ident) => {
+        #[doc = concat!("Sets `", stringify!($field), "`: the link an alert carries.")]
+        pub fn $field(mut self, f: impl Fn(&$crate::Alert) -> String + Send + Sync + 'static) -> Self {
+            self.$field = Some(std::sync::Arc::new(f));
+            self
+        }
+    };
+    (@one clock $field:ident) => {
+        #[doc = concat!("Sets `", stringify!($field), "`, a clock in epoch milliseconds, for tests.")]
+        pub fn $field(mut self, f: impl Fn() -> i64 + Send + Sync + 'static) -> Self {
+            self.$field = Some(std::sync::Arc::new(f));
+            self
+        }
+    };
+}
+pub(crate) use setters;
 
 /// `Debug` for options that hold credentials: the type's name only, so an
 /// app's own configuration can derive `Debug` without printing them.

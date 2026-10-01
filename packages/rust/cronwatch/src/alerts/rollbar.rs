@@ -16,6 +16,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`rollbar`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct RollbarOptions {
     /// A project access token with the `post_server_item` scope.
     pub access_token: String,
@@ -28,6 +29,14 @@ pub struct RollbarOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(RollbarOptions {
+    text access_token,
+    text environment,
+    flag skip_recovered,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Rollbar {
     o: RollbarOptions,

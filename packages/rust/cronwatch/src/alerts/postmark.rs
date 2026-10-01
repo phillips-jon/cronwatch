@@ -15,6 +15,7 @@ use crate::types::Alert;
 
 /// Configures [`postmark`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct PostmarkOptions {
     /// A server API token, from the server's API Tokens tab.
     pub server_token: String,
@@ -24,6 +25,13 @@ pub struct PostmarkOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(PostmarkOptions {
+    text server_token,
+    text message_stream,
+    value email: EmailOptions,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Postmark {
     o: PostmarkOptions,

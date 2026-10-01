@@ -168,7 +168,7 @@ async fn a_handles_finish_dropped_part_way_still_finishes() {
 async fn start_holds_its_interval_at_the_sdks_longest() {
     let store = Arc::new(TestStore::default());
     let k = Kit::with(|b| b.store_arc(store.clone()));
-    k.cw.start(Duration::MAX);
+    k.cw.start_checking(Duration::MAX);
     tokio::time::sleep(Duration::from_secs(2)).await;
     assert_eq!(store.running_runs_calls.load(Ordering::SeqCst), 1, "the first check ran");
     k.cw.stop();
@@ -179,7 +179,7 @@ async fn a_long_check_is_not_followed_by_the_ticks_it_missed() {
     let store = Arc::new(TestStore::default());
     let k = Kit::with(|b| b.store_arc(store.clone()));
     let gate = store.running_runs_gate.lock().await;
-    k.cw.start(Duration::from_secs(5));
+    k.cw.start_checking(Duration::from_secs(5));
     // The first check, a second in, waits on the store for half a minute.
     tokio::time::sleep(Duration::from_secs(31)).await;
     assert_eq!(store.running_runs_calls.load(Ordering::SeqCst), 1);

@@ -2,7 +2,7 @@
 
 [apalis](https://crates.io/crates/apalis) watched by [`cronwatch`](https://crates.io/crates/cronwatch), the Rust port of the library behind [cronwatch.dev](https://cronwatch.dev): each attempt of a worker's tasks is recorded as a run through a tower layer, and apalis-cron is given CronWatch's own schedules, so you are told when a job fails, runs late, never runs, gets stuck or runs slow.
 
-apalis 1.0 has not shipped: this crate is built against its release candidates, pinned exactly (`apalis-core 1.0.0-rc.10`, `apalis-cron 1.0.0-rc.9`), since each changes the API. Rust 1.85 or newer; the `cron` feature needs 1.87 (the `cron` crate does).
+apalis 1.0 has not shipped: this crate is built against its release candidates, pinned exactly (`apalis-core 1.0.0-rc.10`, `apalis-cron 1.0.0-rc.9`), since each changes the API. Unlike the rest of the workspace, this crate stays below 1.0 while apalis 1.0 is a release candidate: it is left out of 1.0's promise, and a release of it may change its API to follow a new candidate. It will join the promise once apalis 1.0 is final. Rust 1.85 or newer; the `cron` feature needs 1.87 (the `cron` crate does).
 
 ```toml
 [dependencies]
@@ -34,7 +34,7 @@ let worker = WorkerBuilder::new("nightly-report")
     .retry(RetryPolicy::retries(3))
     .layer(watcher.layer()) // after .retry, so each attempt is a run
     .build(nightly_report);
-tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start(...)
+tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start_checking(...)
 worker.run().await?;
 # Ok(())
 # }

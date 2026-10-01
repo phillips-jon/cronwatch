@@ -23,7 +23,7 @@ Rust 1.85 or newer for `cronwatch`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 doe
 | `alerts` | Slack, Discord, webhook, email, SMS and error tracker channels, over reqwest on rustls (whose aws-lc-rs needs a C compiler) |
 | `triage` | Claude triage, over the same transport |
 | `tower` | the dashboard and job handlers as `tower::Service`s, for hyper, tonic and `lambda_http` |
-| `axum` | `tower`, and the mount point read from axum's nesting, and `Routes::into_router()` |
+| `axum` | `tower`, and the mount point read from axum's nesting |
 | `blocking` | a blocking client, for a program with no runtime of its own |
 | `regex` | `expect_match` takes a `regex::Regex` |
 | `serde` | `Serialize` and `Deserialize` on the public types (the SDK's JSON, field for field), for your own use |
@@ -49,10 +49,7 @@ use cronwatch_sqlx::SqlStore;
 let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL")?).await?;
 let cw = Client::builder()
     .store(SqlStore::postgres(pool)) // or SqlStore::sqlite(pool), SqlStore::mysql(pool)
-    .alert(alerts::slack(SlackOptions {
-        webhook_url: std::env::var("SLACK_WEBHOOK_URL")?,
-        ..Default::default()
-    })?)
+    .alert(alerts::slack(SlackOptions::new().webhook_url(std::env::var("SLACK_WEBHOOK_URL")?))?)
     .retention("30d")
     .build()?;
 ```
@@ -106,10 +103,10 @@ Rust cancels a future by dropping it, inside `tokio::time::timeout`, say, or in 
 A job that never starts cannot report itself, so something has to look. A long-running service (an axum server, a worker, a process running a scheduler) checks in a task:
 
 ```rust
-cw.start(Duration::from_secs(60)); // until cw.stop() or cw.close()
+cw.start_checking(Duration::from_secs(60)); // until cw.stop() or cw.close()
 ```
 
-The first check runs a second after `start`, then one every interval (a minute when zero, five seconds at least). A second `start` does nothing, and `stop` lets a check in flight finish. One process checking is enough; running `start` in every replica is harmless, since a check judges each run once. A serverless function does not run between requests, so call `cw.check()` from a cron there instead, or point one at the dashboard's `/api/check`.
+The first check runs a second after `start_checking`, then one every interval (a minute when zero, five seconds at least). A second call does nothing, and `stop` lets a check in flight finish. One process checking is enough; running `start_checking` in every replica is harmless, since a check judges each run once. A serverless function does not run between requests, so call `cw.check()` from a cron there instead, or point one at the dashboard's `/api/check`.
 
 A program run from a crontab exits when it is done, so nothing inside it notices the run that never happened. Add a second crontab line that checks, on a store both reach. Both commands declare the job, so the check knows its schedule before its first run:
 
@@ -177,10 +174,10 @@ use cronwatch::web::RoutesOptions;
 let routes = cw.routes(RoutesOptions::new().token(std::env::var("CRONWATCH_TOKEN")?))?;
 let app = axum::Router::new()
     .route("/", axum::routing::get(home))
-    .nest_service("/cronwatch", routes); // or routes.into_router(), mounted at /cronwatch
+    .nest_service("/cronwatch", routes);
 ```
 
-The base path its links use is found from the mount: axum records the nesting, which the `axum` feature reads, so a mount under a path parameter (`/t/{tenant}/cron`) or nested twice works. `base_path("/ops/cron")` wins over the mount (`""` for the root), and without either the base is `/cronwatch`. `routes.into_router()` is an axum `Router` nested at that base.
+The base path its links use is found from the mount: axum records the nesting, which the `axum` feature reads, so a mount under a path parameter (`/t/{tenant}/cron`) or nested twice works. `base_path("/ops/cron")` wins over the mount (`""` for the root), and without either the base is `/cronwatch`.
 
 With the `tower` feature (which `axum` turns on), `Routes` is a `tower::Service<http::Request<B>>` for any body, answering `http::Response<Full<Bytes>>`, so hyper serves it directly, and so does anything built on tower. Without either feature, `routes.handle(web::Request)` answers a `web::Response`, plain types for an adapter of your own (`web::Request::with_mount` says where it is mounted). actix-web does not use tower; an adapter there would be made on request.
 
@@ -192,7 +189,7 @@ With the `tower` feature (which `axum` turns on), `Routes` is a `tower::Service<
 - `origin("https://app.example.com")`: the public origin, pinned whatever a request says, for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line. An HTTP/1 server does not tell tower whether it came over TLS, so behind TLS set this, or `trust_proxy()`.
 - `trust_proxy()`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
 
-`routes` returns an error only for an `origin` that is not an http or https URL. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP. A body over 1 MiB is answered 413. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
+`routes` returns an error only for an `origin` that is not an http or https URL. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP. `GET /api` answers `{"ok":true,"library":"cronwatch","language":"rust","version":"...","api":1}`, and silencing or unsilencing a job over the API answers its summary, `{"ok":true,"job":{...}}`. A body over 1 MiB is answered 413. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
 
 ## Jobs a URL starts
 
@@ -245,7 +242,7 @@ A function EventBridge Scheduler invokes directly has no headers to carry a bear
 
 The tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on the client's first use. `.prefix("app_cron_")?` names them: lowercase letters, digits and underscores, not starting with a digit, at most 47 characters (Postgres cuts a name at 63, and the longest the store makes adds 16). On Postgres and MySQL each statement runs on the pool on its own, in autocommit, so a run recorded inside a transaction of yours stays recorded if it rolls back. On SQLite the store holds one connection of the pool for its statements, so give the pool room for the app too. MySQL 8's default sign-in over a connection without TLS needs sqlx's `mysql-rsa` feature, or TLS.
 
-A store of your own implements `cronwatch::Store`: `init`, `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune` and `close`, with epoch milliseconds for every time; each returns a boxed future, so the trait is object safe without `async-trait`. Three provided methods default to `Unsupported` and are what keep processes sharing a store from judging a run twice or losing each other's updates: `update_run_if`, `compare_and_set_state` and `delete_run_if` (which takes back a queue attempt given back without failing; see [Rust schedulers](/docs/rust-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. With the `storetest` feature, `cronwatch::storetest::run(|| store).await` runs the contract test the built-in stores pass.
+A store of your own implements `cronwatch::Store`: `init`, `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune` and `close`, with epoch milliseconds for every time; each returns a boxed future, so the trait is object safe without `async-trait`. Three provided methods default to `Unsupported` and are what keep processes sharing a store from judging a run twice or losing each other's updates: `update_run_if`, `compare_and_set_state` and `delete_run_if` (which takes back a queue attempt given back without failing; see [Rust schedulers](/docs/rust-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. The types a store reads and writes are `#[non_exhaustive]`, so a release can add a field to stored data without breaking your build: write each with its `to_json()` (or the definition's and state's `to_json_without_nul()`), and read it back with `from_json` (`Definition`, `JobState`, `Run`, `Metrics`), or make one with `Run::new(id, job, status, started_at)` and `StoredJob::new(definition, created_at, updated_at)` and set the rest of its fields. With the `storetest` feature, `cronwatch::storetest::run(|| store).await` runs the contract test the built-in stores pass; it is the one promised name in `storetest`.
 
 ## Alerts
 
@@ -258,17 +255,17 @@ use std::sync::Arc;
 
 let cw = Client::builder()
     .store(store)
-    .alert(alerts::slack(SlackOptions {
-        webhook_url: std::env::var("SLACK_WEBHOOK_URL")?,
-        link: Some(Arc::new(|a: &Alert| format!("https://app.example.com/cronwatch/jobs/{}", a.job))),
-        ..Default::default()
-    })?)
-    .alert(alerts::discord(DiscordOptions { webhook_url: std::env::var("DISCORD_WEBHOOK_URL")?, ..Default::default() })?)
-    .alert(alerts::webhook(WebhookOptions {
-        url: "https://hooks.example.com/cronwatch".into(),
-        secret: std::env::var("CRONWATCH_WEBHOOK_SECRET")?,
-        ..Default::default()
-    })?)
+    .alert(alerts::slack(
+        SlackOptions::new()
+            .webhook_url(std::env::var("SLACK_WEBHOOK_URL")?)
+            .link(|a: &Alert| format!("https://app.example.com/cronwatch/jobs/{}", a.job)),
+    )?)
+    .alert(alerts::discord(DiscordOptions::new().webhook_url(std::env::var("DISCORD_WEBHOOK_URL")?))?)
+    .alert(alerts::webhook(
+        WebhookOptions::new()
+            .url("https://hooks.example.com/cronwatch")
+            .secret(std::env::var("CRONWATCH_WEBHOOK_SECRET")?),
+    )?)
     .alert(channel_fn("pagerduty", |alert| async move {
         if alert.alert_type == AlertType::Recovered {
             return Ok(());
@@ -286,37 +283,42 @@ The first `alert` replaces the default console channel, and `alerts(vec![])` sen
 ```rust
 use cronwatch::alerts::*;
 
-let email = EmailOptions { from: "CronWatch <alerts@example.com>".into(), to: vec!["ops@example.com".into()], ..Default::default() };
+let email = EmailOptions::new().from("CronWatch <alerts@example.com>").to(["ops@example.com"]);
 
 // Email. Each takes the EmailOptions.
-alerts::resend(ResendOptions { api_key: env("RESEND_API_KEY"), email: email.clone(), ..Default::default() })?;
-alerts::postmark(PostmarkOptions { server_token: env("POSTMARK_SERVER_TOKEN"), email: email.clone(), ..Default::default() })?;
-alerts::sendgrid(SendgridOptions { api_key: env("SENDGRID_API_KEY"), email: email.clone(), ..Default::default() })?;
-alerts::mailgun(MailgunOptions { api_key: env("MAILGUN_API_KEY"), domain: "mg.example.com".into(),
-    region: "eu".into(), email: email.clone(), ..Default::default() })?;
-alerts::ses(SesOptions { region: "us-east-1".into(), access_key_id: env("AWS_ACCESS_KEY_ID"),
-    secret_access_key: env("AWS_SECRET_ACCESS_KEY"), email, ..Default::default() })?;
+alerts::resend(ResendOptions::new().api_key(env("RESEND_API_KEY")).email(email.clone()))?;
+alerts::postmark(PostmarkOptions::new().server_token(env("POSTMARK_SERVER_TOKEN")).email(email.clone()))?;
+alerts::sendgrid(SendgridOptions::new().api_key(env("SENDGRID_API_KEY")).email(email.clone()))?;
+alerts::mailgun(MailgunOptions::new().api_key(env("MAILGUN_API_KEY")).domain("mg.example.com")
+    .region("eu").email(email.clone()))?;
+alerts::ses(SesOptions::new().region("us-east-1").access_key_id(env("AWS_ACCESS_KEY_ID"))
+    .secret_access_key(env("AWS_SECRET_ACCESS_KEY")).email(email))?;
 
-// SMS, one message per number, all at once. recovered: true texts recoveries too.
-alerts::twilio(TwilioOptions { account_sid: env("TWILIO_ACCOUNT_SID"), auth_token: env("TWILIO_AUTH_TOKEN"),
-    from: "+15005550006".into(), to: vec!["+15551110000".into()], ..Default::default() })?;
+// SMS, one message per number, all at once. recovered(true) texts recoveries too.
+alerts::twilio(TwilioOptions::new().account_sid(env("TWILIO_ACCOUNT_SID")).auth_token(env("TWILIO_AUTH_TOKEN"))
+    .from("+15005550006").to(["+15551110000"]))?;
 
 // Error trackers: one issue per job and alert type.
-alerts::sentry(SentryOptions { dsn: env("SENTRY_DSN"), ..Default::default() })?;
-alerts::honeybadger(HoneybadgerOptions { api_key: env("HONEYBADGER_API_KEY"), ..Default::default() })?;
-alerts::datadog(DatadogOptions { api_key: env("DD_API_KEY"), site: "datadoghq.eu".into(),
-    tags: vec!["env:prod".into()], ..Default::default() })?;
-alerts::rollbar(RollbarOptions { access_token: env("ROLLBAR_ACCESS_TOKEN"), ..Default::default() })?;
-alerts::bugsnag(BugsnagOptions { api_key: env("BUGSNAG_API_KEY"), ..Default::default() })?;
-alerts::newrelic(NewRelicOptions { account_id: env("NEW_RELIC_ACCOUNT_ID"),
-    api_key: env("NEW_RELIC_LICENSE_KEY"), ..Default::default() })?;
+alerts::sentry(SentryOptions::new().dsn(env("SENTRY_DSN")))?;
+alerts::honeybadger(HoneybadgerOptions::new().api_key(env("HONEYBADGER_API_KEY")))?;
+alerts::datadog(DatadogOptions::new().api_key(env("DD_API_KEY")).site("datadoghq.eu").tags(["env:prod"]))?;
+alerts::rollbar(RollbarOptions::new().access_token(env("ROLLBAR_ACCESS_TOKEN")))?;
+alerts::bugsnag(BugsnagOptions::new().api_key(env("BUGSNAG_API_KEY")))?;
+alerts::newrelic(NewRelicOptions::new().account_id(env("NEW_RELIC_ACCOUNT_ID")).api_key(env("NEW_RELIC_LICENSE_KEY")))?;
 ```
 
-The options are the SDK's in Rust's case: `subject_prefix` and `link` in `EmailOptions`; `message_stream` (Postmark); `region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `session_token` and `configuration_set_name` (SES); `api_key_sid`, `api_key_secret`, `messaging_service_sid` and `segments` (Twilio, 1 to 10, `None` for the default of 3); `environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `release` (Sentry); `headers` (the webhook, extra request headers such as an `Authorization`); `endpoint` (Honeybadger, Bugsnag); `host` (Datadog); `release_stage` (Bugsnag); `event_type` (New Relic); and `recovered` and `link` wherever the SDK has them. `Default::default()` is always the SDK's default, so where the SDK sends recoveries unless told not to, Rust has the negative: `skip_recovered` for Sentry and Rollbar. No options struct prints its credentials with `{:?}`.
+The options are the SDK's in Rust's case: `subject_prefix` and `link` in `EmailOptions`; `message_stream` (Postmark); `region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `session_token` and `configuration_set_name` (SES); `api_key_sid`, `api_key_secret`, `messaging_service_sid` and `segments` (Twilio, 1 to 10, `None` for the default of 3); `environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `release` (Sentry); `headers` (the webhook, extra request headers such as an `Authorization`); `endpoint` (Honeybadger, Bugsnag); `host` (Datadog); `release_stage` (Bugsnag); `event_type` (New Relic); and `recovered` and `link` wherever the SDK has them. Each options struct starts from `new()`, the SDK's defaults, and has a builder method per field, named after it; the structs are `#[non_exhaustive]`, so a release can add an option without breaking your build. Where the SDK sends recoveries unless told not to, Rust has the negative: `skip_recovered` for Sentry and Rollbar. No options struct prints its credentials with `{:?}`.
 
-Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the crate's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request names only the URL's origin, never its path, with the channel's keys cut out. Every options struct takes a `transport`: `ReqwestTransport::with_client(client)` wraps a `reqwest::Client` of your own (a proxy, a custom root; build it with `redirect::Policy::none()`), or implement `Transport` for a test. The default transport honours `HTTP_PROXY` and `HTTPS_PROXY`, as reqwest does. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
+Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the crate's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request names only the URL's origin, never its path, with the channel's keys cut out. Every options struct takes a `transport`: `None` for the default, reqwest on rustls with the platform's roots, which honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` as reqwest does; or implement `Transport` (one POST: the URL, the headers in order and the body) over a client of your own, or for a test. No public type of the crate is reqwest's, so a new reqwest never breaks an app's build. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
-A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`. `alerts::signature(secret, body)` is that hex, for a receiver in Rust; compare it in constant time.
+The webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same fields every CronWatch library sends, described by its [JSON Schema](/schemas/webhook/1.json). Parse the fields (`type`, `details`), not `title` and `message`, whose wording is not promised. With a `secret` it signs the body with `X-CronWatch-Signature: sha256=<hex>`. `alerts::signature(secret, body)` is that hex, for a receiver in Rust; hash the raw body as it arrived and compare in constant time:
+
+```rust
+let expected = format!("sha256={}", cronwatch::alerts::signature(&secret, &raw_body));
+let received = headers.get("x-cronwatch-signature").and_then(|v| v.to_str().ok()).unwrap_or("");
+let ok = expected.len() == received.len()
+    && expected.bytes().zip(received.bytes()).fold(0u8, |diff, (a, b)| diff | (a ^ b)) == 0;
+```
 
 ### Processes that cannot send
 
@@ -336,9 +338,9 @@ pg_cron runs jobs inside Postgres, where nothing can wrap them. The pg_cron sour
 use cronwatch_sqlx::{PgCron, PgCronOptions, SqlStore};
 use std::sync::Arc;
 
-let source = PgCron::new(pool.clone(), PgCronOptions { prefix: "db:".into(), ..Default::default() });
+let source = PgCron::new(pool.clone(), PgCronOptions::new().prefix("db:"));
 let cw = Client::builder().store(SqlStore::postgres(pool)).source(Arc::new(source)).build()?;
-cw.start(Duration::from_secs(60));
+cw.start_checking(Duration::from_secs(60));
 ```
 
 It reads through a `sqlx::PgPool` on the database pg_cron runs in (its `cron.database_name`). Settings are read from `pg_settings`, so a setting the role may not read never fails the check. `PgCronOptions` has `jobs`, `job_ids` and `pick` to choose jobs, `prefix`, `job_name`, `options` and `options_for` (job options for every job, or per job; the schedule and zone always come from pg_cron) and `timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
@@ -360,10 +362,9 @@ A function given to `redact` replaces the default; call `cronwatch::redact_secre
 ```rust
 use cronwatch::triage::{self, AnthropicOptions};
 
-let diagnose = triage::anthropic(AnthropicOptions {
-    context: "A Rust service on Fly.io with a Postgres database.".into(),
-    ..Default::default()
-})?; // an error without ANTHROPIC_API_KEY
+let diagnose = triage::anthropic(
+    AnthropicOptions::new().context("A Rust service on Fly.io with a Postgres database."),
+)?; // an error without ANTHROPIC_API_KEY
 let cw = Client::builder().alert(slack).triage(diagnose).build()?;
 ```
 
@@ -400,7 +401,9 @@ There is no Anthropic crate to add: the Messages API is one POST, and it sends t
 | `on_error(f)` | standard error | `Fn(&cronwatch::Error, &str)` for failures outside jobs: the store, a channel, triage |
 | `clock(f)` | the system clock | a function returning epoch milliseconds; for tests |
 
-`JobOptions::new()` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone, from `$TZ` or `/etc/localtime`, by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget(metric, ceiling)`, `expect(text)` (the output must contain it), `expect_match(m)` (a `regex::Regex` with the `regex` feature, or anything implementing `cronwatch::Matcher`; stored as `matches /source/`), `expect_fn(|output| bool)` (a panic in it fails the run), `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/). `cronwatch::describe_job(name, &options)` is the definition options give, without a client.
+`JobOptions::new()` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone, from `$TZ` or `/etc/localtime`, by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget(metric, ceiling)`, `expect(text)` (the output must contain it), `expect_match(m)` (a `regex::Regex` with the `regex` feature, or anything implementing `cronwatch::Matcher`; stored as `matches /source/`), `expect_fn(|output| bool)` (a panic in it fails the run), `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+
+`timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `.max_duration("10m").timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
 The client (every call that can reach the store is `async` and returns a `Result`):
 
@@ -409,19 +412,33 @@ The client (every call that can reach the store is `async` and returns a `Result
 | `job(name, options)` | declare a job and get its handle |
 | `run(name, options, f)` | run without keeping a handle |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `start(every)`, `stop()` | check in a task; the interval is at least five seconds |
+| `start_checking(every)`, `stop()` | check in a task; the interval is at least five seconds. `start(every)` is its old name, deprecated |
 | `jobs()`, `jobs_with_runs(limit)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, d)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
 | `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resume_run(name, run_id)` | `resume` for a job declared in this process |
-| `record_run(run, options)` | record a run that happened elsewhere, for a source; returns the alerts it sent. A metric that is not a finite number is an error and nothing is recorded |
+| `record_run(run, options)` | record a run that happened elsewhere, for a source; returns the alerts it sent. A run id that is not 1 to 200 characters, or holds a NUL, or a metric that is not a finite number is an error and nothing is recorded |
 | `sync_job(name)` | write a declaration to the store now, unless it already holds it |
 | `routes(options)` | the dashboard and JSON API |
 | `defined_jobs()` | the definitions declared in this process |
 | `close()` | stop the check task, wait for a check already under way, then close the store |
 
 Errors are `cronwatch::Error`: `Invalid` (an option, name, schedule or run id the SDK refuses, with its message), `Store` (the store's own error, kept as its source) and `Other`. Nothing panics for a bad option or a store failure. Rust errors carry no stack frames on stable, so a failed run's error has none; call `cronwatch::capture_panic_frames()` once at startup to keep a panic's backtrace with its run.
+
+### Deprecated, and what changed for 1.0
+
+These still work and are marked `#[deprecated]`, so the compiler names the replacement. A rename goes in 2.0; a name that was public by accident goes at 1.0.
+
+| Deprecated | Use instead | Goes in |
+|---|---|---|
+| `Client::start(every)`, `blocking::Client::start(every)` | `start_checking(every)` | 2.0 |
+| `Routes::into_router()` | `Router::new().nest_service("/cronwatch", routes)`: axum is below 1.0, so none of its types is in the crate's API | 1.0 |
+| `ReqwestTransport::with_client(client)` | the default transport, or a `Transport` of your own: reqwest is below 1.0 | 1.0 |
+| `describe_job`, `run_duration`, `state_version`, `js::ParseError`, `alerts::MAX_SEGMENTS`, `alerts::post::{TIMEOUT, MAX_BODY, origin}`, `triage::{SYSTEM, REQUEST_TIMEOUT, FALLBACK_BETA}`, `cronwatch_sqlx::pgcron::{HOLD, schedule, job_name, run_of}` | nothing: internal (`JsonError` for `ParseError`) | 1.0 |
+| everything in `storetest` but `run` | `storetest::run` | 1.0 |
+
+The data types (`Run`, `StoredJob`, `Alert`, `JobState`, `JobSummary` and the rest), `AlertDetails`'s variants and every options struct are `#[non_exhaustive]`, so a 1.x release can add a field without breaking your build. Code that built one with a struct literal before 1.0 uses its constructor now (`Run::new`, `StoredJob::new`, `Alert::new`, `AlertDetails::failure` and the others) or, for options, `new()` and a builder method per field: `SlackOptions::new().webhook_url(url)`. `cronwatch::bridge`, which the [scheduler integrations](/docs/rust-schedulers/) are built on, is for integration authors and outside the 1.x promise, and `cronwatch-apalis` stays below 1.0 while apalis is a release candidate.
 
 ## Runs that span calls
 
@@ -445,9 +462,11 @@ run.finish().await; // or run.fail(&err), or run.finish_with(result)
 
 The SQL store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Elixir, Java and .NET stores (the MySQL tables are the PHP and Go ports', which the Elixir, Java and .NET ports share): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The crate's tests share a SQLite file with the built SDK, and have a Node client and a Rust client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
+A 1.x release keeps what it does not know in stored data: a field a newer release added to a job's definition or state, a condition it does not know in the state's open conditions, a run status or trigger it does not know. Each is written back as it was, so any 1.x release of any language can share a store with any other, in either direction. 0.x releases are not covered: upgrade every process to 1.0 together.
+
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
-The public types write the SDK's JSON with `to_json()`, not serde_json, whose numbers and key order differ; with the `serde` feature they also serialize through that same JSON. The cron reader matches croner with two exceptions, both for schedules that never make sense: a date no month has (`0 0 30 2 *`) is a schedule that never fires, where croner gives up; and a one-time date in place of a cron expression (`2026-12-01T00:00:00`) is refused.
+The public types write the SDK's JSON with `to_json()`, not serde_json, whose numbers and key order differ; with the `serde` feature they also serialize through that same JSON. The cron reader matches croner and the SDK, including the two [schedules that never make sense](/docs/schedules/#schedule-syntax): a date no month has never fires, and a one-time date is refused.
 
 ## Kept in step
 

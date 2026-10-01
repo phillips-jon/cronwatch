@@ -1,6 +1,5 @@
-use std::fmt;
-
 use super::format_number;
+use crate::types::JsonError;
 
 /// A JSON value as JavaScript holds one: numbers are `f64`, and objects keep
 /// JavaScript's key order.
@@ -311,17 +310,11 @@ fn quote_into(b: &mut String, s: &str) {
     b.push('"');
 }
 
-/// Why text is not JSON, with `JSON.parse`'s wording and the byte position.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ParseError(String);
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for ParseError {}
+/// [`parse`]'s error before 1.0, now the one JSON error every reader
+/// answers.
+#[doc(hidden)]
+#[deprecated(note = "use cronwatch::JsonError, which js::parse answers; this name goes at 1.0")]
+pub type ParseError = JsonError;
 
 /// How deep arrays and objects may nest. The parser, `to_json` and `Drop`
 /// all recurse, so text nested thousands deep (a request body, a stored
@@ -333,7 +326,7 @@ pub(crate) const MAX_DEPTH: usize = 256;
 /// its first place and its last value). A lone surrogate escape (`\ud800`)
 /// becomes U+FFFD. Arrays and objects nested more than 256 deep are
 /// refused.
-pub fn parse(text: &str) -> Result<Value, ParseError> {
+pub fn parse(text: &str) -> Result<Value, JsonError> {
     let mut p = Parser { s: text.as_bytes(), text, i: 0 };
     p.space();
     let v = p.value(0)?;
@@ -351,8 +344,8 @@ struct Parser<'a> {
 }
 
 impl Parser<'_> {
-    fn fail(&self, what: &str) -> ParseError {
-        ParseError(format!("{what} at position {}", self.i))
+    fn fail(&self, what: &str) -> JsonError {
+        JsonError(format!("{what} at position {}", self.i))
     }
 
     fn space(&mut self) {
@@ -365,9 +358,9 @@ impl Parser<'_> {
         self.i < self.s.len() && self.s[self.i] == c
     }
 
-    fn value(&mut self, depth: usize) -> Result<Value, ParseError> {
+    fn value(&mut self, depth: usize) -> Result<Value, JsonError> {
         if depth >= MAX_DEPTH {
-            return Err(ParseError("JSON nested too deeply".into()));
+            return Err(JsonError("JSON nested too deeply".into()));
         }
         if self.i >= self.s.len() {
             return Err(self.fail("Unexpected end of JSON input"));
@@ -457,7 +450,7 @@ impl Parser<'_> {
         self.i - from
     }
 
-    fn number(&mut self) -> Result<Value, ParseError> {
+    fn number(&mut self) -> Result<Value, JsonError> {
         let start = self.i;
         if self.at(b'-') {
             self.i += 1;
@@ -496,7 +489,7 @@ impl Parser<'_> {
         Some(n)
     }
 
-    fn string(&mut self) -> Result<String, ParseError> {
+    fn string(&mut self) -> Result<String, JsonError> {
         self.i += 1; // the opening quote
         let mut b = String::new();
         let mut start = self.i;

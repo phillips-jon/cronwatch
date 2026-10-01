@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 
 use cronwatch::js::{self, Value};
-use cronwatch::storetest::{Capture, Clock, Errors, T0};
+use cronwatch::storetest::kit::{Capture, Clock, Errors, T0};
 use cronwatch::{AlertType, CheckResult, Client, JobOptions, JobSummary, MemoryStore, Run, RunStatus, Store};
 
 use super::*;
@@ -249,7 +249,7 @@ fn conformance_pgcron_json() {
     for c in get(f, "schedules").as_array().unwrap() {
         let o = c.as_object().unwrap();
         let input = get(o, "schedule");
-        let got = schedule(input.as_str().unwrap()).map_or(Value::Null, Value::from);
+        let got = cron_schedule(input.as_str().unwrap()).map_or(Value::Null, Value::from);
         assert_eq!(got.to_json(), get(o, "result").to_json(), "schedule {}", input.to_json());
         count += 1;
     }
@@ -262,7 +262,12 @@ fn conformance_pgcron_json() {
             job_name: get(j, "jobname").as_str().map(str::to_string),
             ..Default::default()
         };
-        assert_eq!(job_name(&job), get(o, "name").as_str().unwrap(), "name of {}", Value::Object(j.clone()).to_json());
+        assert_eq!(
+            default_name(&job),
+            get(o, "name").as_str().unwrap(),
+            "name of {}",
+            Value::Object(j.clone()).to_json()
+        );
         count += 1;
     }
     // A number, or the number a string holds, as the fixture has both.
@@ -284,11 +289,11 @@ fn conformance_pgcron_json() {
             end_time: when("end_time"),
         };
         let fallback = get(o, "fallbackAt").as_f64().map_or(T0, |n| n as i64);
-        let got = run_of(&row, "db:j", "pgcron:db:", fallback).map_or(Value::Null, |r| r.to_value());
+        let got = run_from(&row, "db:j", "pgcron:db:", fallback).map_or(Value::Null, |r| r.to_value());
         assert_eq!(got.to_json(), get(o, "run").to_json(), "run of {}", Value::Object(r.clone()).to_json());
         count += 1;
     }
-    assert_eq!(HOLD.as_millis() as f64, get(f, "holdMs").as_f64().unwrap());
+    assert_eq!(HOLD_FOR.as_millis() as f64, get(f, "holdMs").as_f64().unwrap());
     assert_eq!(count + 1, 30, "every case replayed");
 }
 
@@ -774,10 +779,10 @@ async fn the_sources_queries() {
 
 #[test]
 fn the_helpers_read_as_the_sdk_does() {
-    assert_eq!(schedule(" 1  2 * * * 7 ").as_deref(), Some("1 2 * * *"));
-    assert_eq!(schedule("0 0 $ * *").as_deref(), Some("0 0 L * *"));
-    assert_eq!(schedule("5 Seconds").as_deref(), Some("every 5s"));
-    assert_eq!(schedule("@REBOOT"), None);
+    assert_eq!(cron_schedule(" 1  2 * * * 7 ").as_deref(), Some("1 2 * * *"));
+    assert_eq!(cron_schedule("0 0 $ * *").as_deref(), Some("0 0 L * *"));
+    assert_eq!(cron_schedule("5 Seconds").as_deref(), Some("every 5s"));
+    assert_eq!(cron_schedule("@REBOOT"), None);
     assert_eq!(description_job_id("pg_cron job 12 in cw as postgres"), Some(12));
     assert_eq!(description_job_id("pg_cron job x in cw"), None);
     assert_eq!(array_of([1, 22, 3]), "{1,22,3}");
@@ -789,5 +794,5 @@ fn the_helpers_read_as_the_sdk_does() {
     assert_eq!(source.run_id_of("pgcron:db:1.5"), None);
     assert_eq!(source.run_id_of("pgcron:other:1"), None);
     let job = PgCronJob { job_id: 3, job_name: name("  --weird name!! v2 "), ..Default::default() };
-    assert_eq!(job_name(&job), "weird-name-v2-");
+    assert_eq!(default_name(&job), "weird-name-v2-");
 }

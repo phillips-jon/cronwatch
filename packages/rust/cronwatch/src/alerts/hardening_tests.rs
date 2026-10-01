@@ -283,7 +283,7 @@ async fn every_channel_refuses_to_follow_a_redirect() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn one_deadline_for_the_whole_request() {
-    assert_eq!(post::TIMEOUT, Duration::from_secs(10));
+    assert_eq!(post::DEADLINE, Duration::from_secs(10));
     let hang = Server::start(|_| Reply::Hang).await;
     let t = ReqwestTransport::new().unwrap();
     let started = std::time::Instant::now();
@@ -325,8 +325,9 @@ async fn an_answer_is_read_to_one_mebibyte_at_most() {
     let zipped = z.finish().unwrap();
     let bomb =
         Server::start(move |_| Reply::Answer(500, vec![("content-encoding", "gzip".into())], zipped.clone())).await;
-    let answer = fetch(&ReqwestTransport::new().unwrap(), post::TIMEOUT, &bomb.url, &[], b"{}".to_vec()).await.unwrap();
-    assert_eq!((answer.status, answer.body.len()), (500, post::MAX_BODY));
+    let answer =
+        fetch(&ReqwestTransport::new().unwrap(), post::DEADLINE, &bomb.url, &[], b"{}".to_vec()).await.unwrap();
+    assert_eq!((answer.status, answer.body.len()), (500, post::ANSWER_MAX));
     let rb = rollbar(RollbarOptions { access_token: "rb-secret".into(), transport: to(&bomb), ..Default::default() })
         .unwrap();
     let err = rb.send(&sample(), &quiet()).await.unwrap_err().to_string();
@@ -374,7 +375,7 @@ async fn a_url_that_cannot_be_posted_to_is_refused_without_quoting_it() {
         ("http://hooks.example.com:8080/x".into(), "http://hooks.example.com:8080"),
         ("not a url".into(), "(invalid URL)"),
     ] {
-        assert_eq!(post::origin(&raw), want, "{raw:?}");
+        assert_eq!(post::origin_of(&raw), want, "{raw:?}");
     }
 }
 
@@ -833,4 +834,28 @@ fn the_webhook_signature_is_hmac_sha256() {
         signature("Jefe", "what do ya want for nothing?"),
         "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
     );
+    // The vector every port's docs give for `signature`.
+    assert_eq!(
+        crate::alerts::signature("key", "The quick brown fox jumps over the lazy dog"),
+        "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+    );
+}
+
+/// The names deprecated before 1.0 still work until then.
+#[tokio::test]
+#[allow(deprecated)]
+async fn the_deprecated_transport_names_still_work() {
+    let own = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).build().unwrap();
+    let server = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/hook", server.local_addr().unwrap());
+    tokio::spawn(async move {
+        let (mut socket, _) = server.accept().await.unwrap();
+        let mut buf = vec![0u8; 4096];
+        let _ = socket.read(&mut buf).await;
+        let _ = socket.write_all(b"HTTP/1.1 204 No Content\r\ncontent-length: 0\r\n\r\n").await;
+    });
+    let answer = fetch(&ReqwestTransport::with_client(own), post::TIMEOUT, &url, &[], b"{}".to_vec()).await.unwrap();
+    assert_eq!(answer.status, 204);
+    assert_eq!(post::origin(&url), post::origin_of(&url));
+    assert_eq!((post::MAX_BODY, MAX_SEGMENTS), (post::ANSWER_MAX, 10));
 }

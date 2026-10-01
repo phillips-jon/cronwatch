@@ -24,10 +24,12 @@ Both need Rust 1.85 or newer. A program that a crontab runs needs no integration
 
 - **Jobs are declared from the scheduler.** Each job you make through the integration is a CronWatch job with the schedule you gave the scheduler, so a job that stops running is reported missed without you writing a cron expression twice. Where the scheduler reads the expression itself, it is checked against the scheduler's own fire times; one that differs is reported once to the error handler and the job is watched without a schedule, so its failures, duration and budgets still alert but it is never reported missed.
 - **Jobs gone lose their schedule.** A job taken out of the scheduler, in this process or since an earlier deploy, is declared again without its schedule and with ` (no longer scheduled)` after its description, so it keeps its history and is never reported missed; a missed alert already open closes with a recovery.
+- **Runs and jobs say where they came from.** Each run an integration records has its name as the run's trigger (`tokio-cron-scheduler`, `apalis`), and job names are the ones you give (for apalis, the worker's name), never prefixed. These spellings are stored, so they do not change within a major release; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names).
 - **Jobs belong to an app.** Every job is tagged with the integration (`tokio-cron-scheduler`, `apalis`) and the app (`apalis:billing`), so two apps sharing a store never take each other's jobs for gone. The app is `Options::app`, else `CRONWATCH_APP_ID`, else the running executable's file name. Set `CRONWATCH_APP_ID` when one app's processes are different executables, or two apps' executables share a name.
 - **Nothing runs unwatched.** A name or option CronWatch refuses is an error from the constructor, with the SDK's message, and nothing is made. So is a schedule the scheduler refuses, and for apalis, whose worker runs on CronWatch's own reading of the expression, one CronWatch refuses. tokio-cron-scheduler reads the expression itself, so one it takes and CronWatch cannot read is reported once and its job watched without a schedule, as one whose fire times differ is.
 - **Declarations reach the store** in the background. Each watcher's `wait().await` waits for those writes, for tests and a clean exit.
-- **Options per job.** `Options::defaults` are job options for every job, and each constructor takes the job's own `JobOptions` after them.
+- **Options per job.** `Options::new().defaults(...)` are job options for every job, and each constructor takes the job's own `JobOptions` after them. `Options` is `#[non_exhaustive]`: start from `Options::new()` and set `app` and `defaults` (and, for apalis, `job(name, options)`) with its builder methods.
+- **Built on `cronwatch::bridge`**, which a scheduler integration of your own can use too. It is for integration authors and outside the 1.x promise: it may change in a minor release.
 
 ### Retries
 
@@ -35,7 +37,7 @@ For apalis, every attempt is a run of its own. An attempt that fails (an error, 
 
 ### The check
 
-Each integration has a check job of its own, which also declares again without their schedules the jobs this app's scheduler no longer runs. A service can just as well call `cw.start(Duration::from_secs(60))` beside the scheduler.
+Each integration has a check job of its own, which also declares again without their schedules the jobs this app's scheduler no longer runs. A service can just as well call `cw.start_checking(Duration::from_secs(60))` beside the scheduler.
 
 ## tokio-cron-scheduler
 
@@ -62,7 +64,7 @@ scheduler
     )?)
     .await?;
 scheduler.add(watcher.repeated("poll", Duration::from_secs(300), |_| poll(), JobOptions::new())?).await?;
-scheduler.add(watcher.check_job(Duration::from_secs(60))?).await?; // or cw.start(...)
+scheduler.add(watcher.check_job(Duration::from_secs(60))?).await?; // or cw.start_checking(...)
 watcher.follow(&scheduler);
 scheduler.start().await?;
 ```
@@ -100,11 +102,11 @@ let worker = WorkerBuilder::new("nightly-report")
     .retry(RetryPolicy::retries(3))
     .layer(watcher.layer()) // after .retry, so each attempt is a run
     .build(nightly_report);
-tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start(...)
+tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start_checking(...)
 worker.run().await?;
 ```
 
-apalis 1.0 has not shipped: the crate is built against its release candidates, pinned exactly (`apalis` and `apalis-core` 1.0.0-rc.10, `apalis-cron` 1.0.0-rc.9), since each candidate has changed the API, so pin the same ones:
+apalis 1.0 has not shipped: the crate is built against its release candidates, pinned exactly (`apalis` and `apalis-core` 1.0.0-rc.10, `apalis-cron` 1.0.0-rc.9), since each candidate has changed the API, so pin the same ones. Unlike the other CronWatch crates, `cronwatch-apalis` stays below 1.0 while apalis is a release candidate, outside 1.0's promise: a release of it may change its API to follow a new candidate. It joins the promise once apalis 1.0 is final.
 
 ```toml
 [dependencies]

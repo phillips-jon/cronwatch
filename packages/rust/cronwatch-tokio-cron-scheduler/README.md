@@ -44,7 +44,7 @@ scheduler
     )?)
     .await?;
 scheduler.add(watcher.repeated("poll", Duration::from_secs(300), |_| poll(), JobOptions::new())?).await?;
-scheduler.add(watcher.check_job(Duration::from_secs(60))?).await?; // or cw.start(...)
+scheduler.add(watcher.check_job(Duration::from_secs(60))?).await?; // or cw.start_checking(...)
 watcher.follow(&scheduler);
 scheduler.start().await?;
 # Ok(())

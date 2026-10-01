@@ -1,5 +1,5 @@
 //! start-finish.test.ts, and the tests of finish-once.test.ts after its
-//! backend loops (those are `storetest::finish_once`), as the Go port has
+//! backend loops (those are `storetest::kit::finish_once`), as the Go port has
 //! them.
 
 mod common;
@@ -322,18 +322,9 @@ async fn a_store_without_update_run_if_falls_back_to_a_read_and_a_write() {
 }
 
 fn pg_run(id: &str, at: i64, status: RunStatus) -> Run {
-    Run {
-        id: id.into(),
-        job: "db:vacuum".into(),
-        status,
-        started_at: at,
-        finished_at: None,
-        duration_ms: None,
-        error: None,
-        output: None,
-        metrics: Default::default(),
-        trigger: "pg_cron".into(),
-    }
+    let mut run = Run::new(id, "db:vacuum", status, at);
+    run.trigger = "pg_cron".into();
+    run
 }
 
 #[tokio::test]

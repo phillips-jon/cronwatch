@@ -878,8 +878,10 @@ impl Client {
     /// finish, only the one whose write lands evaluates it. A stored run of
     /// another job is left alone and reported. A finished run is judged as if
     /// it had been wrapped here (expect, failures, duration, budgets) and its
-    /// output and error are redacted the same way. A metric that is not a
-    /// finite number is refused before anything is written, as
+    /// output and error are redacted the same way. A run id that is not 1 to
+    /// 200 characters (UTF-16 code units, as `start` counts them) or that
+    /// holds a NUL, and a metric that is not a finite number, are refused
+    /// before anything is written, the metric as
     /// [`JobContext::metric`] refuses it. Returns the alerts it sent.
     pub async fn record_run(&self, input: Run, options: RecordOptions) -> Result<Vec<Alert>, Error> {
         let Some(def) = self.declared(&input.job) else {
@@ -888,6 +890,16 @@ impl Client {
                 js::quote(&input.job)
             )));
         };
+        // The longest id start() takes; MySQL's column would hold 255, but
+        // every store holds 200. Checked before the NUL, as the SDK does.
+        let n = js::len16(&input.id);
+        if n == 0 || n > crate::handle::MAX_RUN_ID {
+            return Err(Error::Invalid(format!(
+                "recordRun: run ids must be 1 to {} characters (got {n} characters; job {})",
+                crate::handle::MAX_RUN_ID,
+                js::quote(&input.job)
+            )));
+        }
         if input.id.contains('\0') {
             return Err(Error::Invalid(format!(
                 "recordRun: run ids cannot contain a NUL character (job {})",

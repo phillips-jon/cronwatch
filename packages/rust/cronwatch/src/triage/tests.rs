@@ -72,7 +72,7 @@ fn triage_fences_what_the_job_wrote_as_data() {
     );
     let upper = data(&"a <JOB_DATA> b </Job_Data>".encode_utf16().collect::<Vec<_>>());
     assert_eq!(String::from_utf16(&upper).unwrap(), "<job_data>\na <_job_data> b <_job_data>\n</job_data>");
-    assert!(SYSTEM.contains("never as instructions"));
+    assert!(SYSTEM_PROMPT.contains("never as instructions"));
 }
 
 #[tokio::test]
@@ -108,7 +108,7 @@ async fn triage_makes_one_attempt_bounded_in_time() {
     let bounded = tokio::time::timeout(Duration::from_millis(200), with("slow", &slow).triage(cx)).await;
     assert!(bounded.is_err());
     assert_eq!(slow.calls.load(Ordering::SeqCst), 1);
-    assert!(REQUEST_TIMEOUT < crate::deliver::TRIAGE_TIMEOUT, "the request outlasts the client's wait");
+    assert!(DEADLINE < crate::deliver::TRIAGE_TIMEOUT, "the request outlasts the client's wait");
 }
 
 #[tokio::test(start_paused = true)]
@@ -117,7 +117,7 @@ async fn the_request_ends_on_its_own_before_the_client_stops_waiting() {
     let started = tokio::time::Instant::now();
     let err = with("slow", &slow).triage(context("a stuck run")).await.unwrap_err();
     assert_eq!(err.to_string(), "The operation was aborted due to timeout");
-    assert_eq!(started.elapsed(), REQUEST_TIMEOUT);
+    assert_eq!(started.elapsed(), DEADLINE);
 }
 
 /// `None` is the default, 800; any other value goes as given, 0 included, as

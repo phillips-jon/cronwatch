@@ -193,7 +193,7 @@ impl Statements {
         // same millisecond, and byte order for names on both, whatever the
         // database's collation.
         let (seq, by_name) = if pg { ("seq", "name COLLATE \"C\"") } else { ("rowid", "name") };
-        // The version inside a state's JSON, as cronwatch::state_version
+        // The version inside a state's JSON, as cronwatch's state_version
         // reads it: a whole number from 0 to 2^53 - 1, else 0 (none, or a
         // foreign row's 1.5 or "x", which must neither fail the statement
         // nor refuse every write for good). Each CASE tests the JSON type
@@ -262,7 +262,7 @@ impl Statements {
 
     /// MySQL's statements, the PHP and Go ports' text.
     fn mysql(p: &str) -> Statements {
-        // The version inside a state's JSON text, as cronwatch::state_version
+        // The version inside a state's JSON text, as cronwatch's state_version
         // reads it: a whole number from 0 to 2^53 - 1, else 0. JSON_TYPE is
         // tested before any arithmetic; MySQL's JSON_EXTRACT answers JSON and
         // MariaDB's text, and `+ 0` makes either a number.

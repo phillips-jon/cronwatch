@@ -236,9 +236,15 @@ impl Client {
     }
 
     /// Checks on an interval on the client's runtime thread (see
-    /// [`crate::Client::start`]).
+    /// [`crate::Client::start_checking`]).
+    pub fn start_checking(&self, every: Duration) {
+        self.inner.start_checking(every);
+    }
+
+    /// `start_checking`'s old name. Does exactly what `start_checking` does.
+    #[deprecated(note = "renamed start_checking, since a job's start opens a run; this name goes in 2.0")]
     pub fn start(&self, every: Duration) {
-        self.inner.start(every);
+        self.start_checking(every);
     }
 
     /// Stops the interval.

@@ -10,6 +10,7 @@ use crate::types::Alert;
 
 /// The options every email channel takes.
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct EmailOptions {
     /// The sender, `alerts@example.com` or `CronWatch <alerts@example.com>`.
     /// The provider must allow it.
@@ -22,6 +23,13 @@ pub struct EmailOptions {
     /// is put in a mail.
     pub link: Option<LinkFn>,
 }
+
+super::setters!(EmailOptions {
+    text from,
+    texts to,
+    text subject_prefix,
+    link link,
+});
 
 /// One alert as a mail.
 pub(crate) struct Email {

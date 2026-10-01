@@ -132,10 +132,19 @@ impl Channel for Console {
 
 /// What a triage function is given.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct TriageContext {
     pub alert: Alert,
     /// The job's five newest runs.
     pub recent_runs: Vec<Run>,
+}
+
+impl TriageContext {
+    /// `alert` and its job's newest runs, for a test of a triage of the
+    /// app's own.
+    pub fn new(alert: Alert, recent_runs: Vec<Run>) -> TriageContext {
+        TriageContext { alert, recent_runs }
+    }
 }
 
 /// Diagnoses an alert in a few sentences, or answers `""` for no diagnosis.

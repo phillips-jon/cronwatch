@@ -132,17 +132,21 @@ impl JobOptions {
         self.put("grace", v)
     }
 
-    /// How long a run may go on before it is treated as stuck and marked
-    /// timeout. Default 1h. [`JobContext::cancelled`](crate::JobContext::cancelled)
-    /// resolves when it passes.
+    /// How long a run may go on before it is given up on: the next check
+    /// marks a run still going after this `timeout` (a failure) and the job
+    /// is stuck. Default 1h. [`JobContext::cancelled`](crate::JobContext::cancelled)
+    /// resolves when it passes. Set it well above
+    /// [`max_duration`](Self::max_duration), which is for runs that finished.
     pub fn timeout(self, d: impl Into<DurationSpec>) -> Self {
         let v = d.into().to_value();
         self.put("timeout", v)
     }
 
-    /// Alerts when a successful run takes longer. Without it, a run is slow
-    /// when it takes more than twice the p95 of recent runs (and over 10s),
-    /// once there are five runs to compare against.
+    /// Alerts when a run that finished successfully took longer: it stays
+    /// `ok` and the job is slow. Without it, a run is slow when it takes
+    /// more than twice the p95 of recent runs (and over 10s), once there are
+    /// five runs to compare against. A run still going is
+    /// [`timeout`](Self::timeout)'s, not this.
     pub fn max_duration(self, d: impl Into<DurationSpec>) -> Self {
         let v = d.into().to_value();
         self.put("maxDuration", v)
