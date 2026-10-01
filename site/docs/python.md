@@ -446,7 +446,7 @@ The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sq
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store.
 
-The cron reader matches croner with two exceptions, both for schedules that never make sense: a date no month has (`0 0 30 2 *`) is a schedule that never fires, where croner gives up; and a one-time date in place of a cron expression (`2026-12-01T00:00:00`) is refused.
+The cron reader matches croner and the SDK, including the two schedules that never make sense (a one-time date is refused, a date no month has never fires): see [Schedule syntax](/docs/schedules/#schedule-syntax).
 
 ## Kept in step
 

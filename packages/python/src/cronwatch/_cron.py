@@ -506,7 +506,7 @@ class Cron:
             # Croner reads a string with a colon after its first character as a
             # one-time date to fire at, not as a cron expression.
             if _ISO_DATE.match(text):
-                raise CronError("CronPattern: a one-time date is not supported by the Python port")
+                raise CronError("CronPattern: a one-time date is not supported")
             raise CronError("Invalid ISO8601 passed to timezone parser.")
         self.timezone = timezone or None
         self.pattern = CronPattern(text)
