@@ -86,7 +86,7 @@ Two options of `run/3` change where the function runs. `isolate: true` runs it i
 
 ## Run the check
 
-A job that never starts cannot report itself, so something has to look. `check_every:` on the instance runs the check on an interval: the first a second after it starts, then one every interval, five seconds at least. Leave it out where another process checks, and call `Cronwatch.check/1` there, or start the interval later with `Cronwatch.start(every: "1m")` and `Cronwatch.stop/0`:
+A job that never starts cannot report itself, so something has to look. `check_every:` on the instance runs the check on an interval: the first a second after it starts, then one every interval, five seconds at least. Leave it out where another process checks, and call `Cronwatch.check/1` there, or start the interval later with `Cronwatch.start_checking(every: "1m")` and `Cronwatch.stop/0`:
 
 ```elixir
 {:ok, result} = Cronwatch.check()   # %Cronwatch.CheckResult{checked_at, jobs, alerts, pruned}
@@ -355,7 +355,9 @@ The instance's options:
 | `on_error` | `Logger.error` | a function of the error and where, for failures outside jobs: the store, a channel, triage |
 | `clock` | the system clock | a function answering epoch milliseconds; for tests |
 
-A job's options: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA, matched without regard to case; the zone `$TZ` or `/etc/localtime` names by default, else UTC), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (a keyword list of metric and ceiling, `[cost: 2]`), `expect`, `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+A job's options: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA, matched without regard to case; the zone `$TZ` or `/etc/localtime` names by default, else UTC), `grace` (`"10m"`), `timeout` (`"1h"`) and `max_duration` (see below), `budget` (a keyword list of metric and ceiling, `[cost: 2]`), `expect`, `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+
+`timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `max_duration: "10m", timeout: "1h"` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
 The functions, each taking `instance:` among its options:
 
@@ -365,7 +367,7 @@ The functions, each taking `instance:` among its options:
 | `run(job_or_name, fun, options)` | run as a recorded run; `trigger`, `isolate`, `kill_at_timeout` and `discard_when` among the options |
 | `current()`, `log/1,2`, `metric/2,3`, `cancelled?/1` | the run in progress |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `start(every: d)`, `stop()` | check on an interval, for an instance started without `check_every` |
+| `start_checking(every: d)`, `stop()` | check on an interval, for an instance started without `check_every`; a second call while it runs is ignored |
 | `jobs()`, `jobs_with_runs(limit)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, d)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath |
@@ -374,6 +376,14 @@ The functions, each taking `instance:` among its options:
 | `record_run(run, options)` | record a run that happened elsewhere, for a source; answers the alerts it sent; a run id of 1 to 200 characters, and a metric that is a finite number, else it is refused and nothing is recorded |
 | `sync_job(name)` | write a declaration to the store now, unless it already holds it |
 | `defined_jobs()` | the jobs declared in this instance |
+
+### Deprecated
+
+These still work through 1.x, marked deprecated, and go in 2.0:
+
+| Deprecated | Use | |
+|---|---|---|
+| `Cronwatch.start()` and `Cronwatch.start(every: d)` | `Cronwatch.start_checking(every: d)` | `start(job, options)`, which opens a run, is unchanged. `start/0` is marked `@deprecated`, so the compiler warns; a keyword list given to `start/1` warns when it is called |
 
 `Cronwatch.Error` has a `kind`: `:invalid` (an option, name, schedule or run id the SDK refuses, with its message), `:store` (the store's own error as `reason`) and `:other`. A failed run's error is written `Name: message` from the exception's module (`RuntimeError: disk full`), with up to five frames of its stacktrace, each `Module.function/arity (file:line)`; a throw is written `throw: <value>`, an exit `exit: <reason>`, and a returned `{:error, reason}` as its reason (an exception in it as the exception, `:error` alone as `error`).
 

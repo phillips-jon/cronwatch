@@ -287,14 +287,14 @@ defmodule Cronwatch.HardeningTest do
     assert Capture.types(alerts) == ["failed", "recovered"]
   end
 
-  test "stop also cancels the first check start schedules, and start checks a second in" do
+  test "stop also cancels the first check start_checking schedules, and start_checking checks a second in" do
     %{cw: cw} = make()
     ref = events(cw, [[:cronwatch, :check, :start]])
-    Cronwatch.start(instance: cw)
+    Cronwatch.start_checking(instance: cw)
     Cronwatch.stop(instance: cw)
     Process.sleep(1_200)
     refute_received {:event, ^ref, _, _, _}
-    Cronwatch.start(instance: cw)
+    Cronwatch.start_checking(instance: cw)
     assert_receive {:event, ^ref, _, _, _}, 2_000
     Cronwatch.stop(instance: cw)
   end
@@ -448,14 +448,14 @@ defmodule Cronwatch.HardeningTest do
     assert wheres(errors) == ["alert queue for q"]
   end
 
-  test "start with deliver: :check says once that another process must send" do
+  test "start_checking with deliver: :check says once that another process must send" do
     %{cw: cw} = make(deliver: :check)
 
     log =
       capture_log(fn ->
-        Cronwatch.start(instance: cw)
+        Cronwatch.start_checking(instance: cw)
         Cronwatch.stop(instance: cw)
-        Cronwatch.start(instance: cw)
+        Cronwatch.start_checking(instance: cw)
         Cronwatch.stop(instance: cw)
       end)
 
@@ -465,7 +465,7 @@ defmodule Cronwatch.HardeningTest do
     %{cw: cw2} = make()
 
     assert capture_log(fn ->
-             Cronwatch.start(instance: cw2)
+             Cronwatch.start_checking(instance: cw2)
              Cronwatch.stop(instance: cw2)
            end) == "",
            "a delivering instance says nothing"
@@ -487,10 +487,27 @@ defmodule Cronwatch.HardeningTest do
     end
   end
 
-  test "start with an interval longer than a timer can hold does not check every millisecond" do
+  test "start/0 and start/1 with a keyword list still start the checks, deprecated" do
     %{cw: cw} = make()
     ref = events(cw, [[:cronwatch, :check, :start]])
-    Cronwatch.start(every: "30d", instance: cw)
+
+    warning =
+      ExUnit.CaptureIO.capture_io(:stderr, fn ->
+        assert Cronwatch.start(instance: cw) == :ok
+      end)
+
+    assert warning =~ "Cronwatch.start/1 with a keyword list is deprecated, use Cronwatch.start_checking/1 instead"
+    assert_receive {:event, ^ref, _, _, _}, 2_000
+    assert Cronwatch.start_checking(instance: cw) == :ok, "a second start is ignored"
+    Cronwatch.stop(instance: cw)
+
+    assert {:start, 0} in Enum.map(Cronwatch.__info__(:deprecated), &elem(&1, 0))
+  end
+
+  test "start_checking with an interval longer than a timer can hold does not check every millisecond" do
+    %{cw: cw} = make()
+    ref = events(cw, [[:cronwatch, :check, :start]])
+    Cronwatch.start_checking(every: "30d", instance: cw)
     assert_receive {:event, ^ref, _, _, _}, 2_000
     Process.sleep(300)
     refute_received {:event, ^ref, _, _, _}
