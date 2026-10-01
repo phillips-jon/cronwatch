@@ -55,7 +55,7 @@ internal sealed class WebKit : IAsyncDisposable
     public static List<KeyValuePair<string, string>> With(params List<KeyValuePair<string, string>>[] sets) => sets.SelectMany(s => s).ToList();
 
     /// <summary>A request for a full URL, as a server would hand it over.</summary>
-    public static WebRequest Request(string method, string url, IEnumerable<KeyValuePair<string, string>> headers, string body, string? mount = null)
+    public static CronwatchRequest Request(string method, string url, IEnumerable<KeyValuePair<string, string>> headers, string body, string? mount = null)
     {
         bool tls = url.StartsWith("https://", StringComparison.Ordinal);
         string rest = url[(url.IndexOf("://", StringComparison.Ordinal) + 3)..];
@@ -65,19 +65,19 @@ internal sealed class WebKit : IAsyncDisposable
         var all = new List<KeyValuePair<string, string>> { new("host", host) };
         all.AddRange(headers);
         return body.Length > 0
-            ? new WebRequest(method, path) { Headers = all, IsTls = tls, Body = Encoding.UTF8.GetBytes(body), Mount = mount }
-            : new WebRequest(method, path) { Headers = all, IsTls = tls, Mount = mount };
+            ? new CronwatchRequest(method, path) { Headers = all, IsTls = tls, Body = Encoding.UTF8.GetBytes(body), Mount = mount }
+            : new CronwatchRequest(method, path) { Headers = all, IsTls = tls, Mount = mount };
     }
 
-    public static Task<WebResponse> Serve(Routes routes, string method, string url, IEnumerable<KeyValuePair<string, string>> headers, string body = "") =>
+    public static Task<CronwatchResponse> Serve(Routes routes, string method, string url, IEnumerable<KeyValuePair<string, string>> headers, string body = "") =>
         routes.HandleAsync(Request(method, url, headers, body));
 
-    public Task<WebResponse> Send(string method, string path, IEnumerable<KeyValuePair<string, string>> headers, string body = "") =>
+    public Task<CronwatchResponse> Send(string method, string path, IEnumerable<KeyValuePair<string, string>> headers, string body = "") =>
         Serve(Routes, method, "http://app.test" + path, headers, body);
 
-    public Task<WebResponse> Get(string path, params KeyValuePair<string, string>[] headers) => Send("GET", path, headers);
+    public Task<CronwatchResponse> Get(string path, params KeyValuePair<string, string>[] headers) => Send("GET", path, headers);
 
-    public static JsObject JsonOf(WebResponse r)
+    public static JsObject JsonOf(CronwatchResponse r)
     {
         object? v = Json.Parse(r.Text());
         return Assert.IsType<JsObject>(v);
@@ -95,7 +95,7 @@ internal sealed class WebKit : IAsyncDisposable
         return v;
     }
 
-    public static void Status(string what, WebResponse r, int want)
+    public static void Status(string what, CronwatchResponse r, int want)
     {
         string text = r.Text();
         Assert.True(r.Status == want, what + ": " + r.Status + ", want " + want + ": " + text[..Math.Min(300, text.Length)]);
@@ -128,7 +128,7 @@ public class RoutesTests
 
     private static List<KeyValuePair<string, string>> Hs(params KeyValuePair<string, string>[] p) => WebKit.Headers(p);
 
-    private static void Status(string what, WebResponse r, int want) => WebKit.Status(what, r, want);
+    private static void Status(string what, CronwatchResponse r, int want) => WebKit.Status(what, r, want);
 
     private static void Contains(string what, string? text, string want) => WebKit.Contains(what, text, want);
 
@@ -161,19 +161,19 @@ public class RoutesTests
     {
         await using var w = new WebKit();
         string cookie = WebKit.TokenCookie();
-        WebResponse res = await w.Get("/cronwatch/?token=tok");
+        CronwatchResponse res = await w.Get("/cronwatch/?token=tok");
         Status("sign-in", res, 303);
         Assert.Equal("/cronwatch/", res.Header("location"));
         string set = res.Header("set-cookie")!;
         Assert.Equal(cookie, set[..set.IndexOf(';', StringComparison.Ordinal)]);
         Contains("cookie", set, "; Path=/cronwatch; HttpOnly; SameSite=Lax; Max-Age=2592000");
-        WebResponse page = await w.Get("/cronwatch/", H("cookie", "other=1; " + cookie));
+        CronwatchResponse page = await w.Get("/cronwatch/", H("cookie", "other=1; " + cookie));
         Status("with the cookie", page, 200);
         Contains("type", page.Header("content-type"), "text/html");
         Status("the raw token is not a cookie", await w.Get("/cronwatch/", H("cookie", "cronwatch_token=tok")), 401);
         // HTTP/2 may send each cookie as a header of its own.
         Status("split cookies", await w.Get("/cronwatch/", H("cookie", "other=1"), H("cookie", cookie)), 200);
-        WebResponse other = await w.Get("/cronwatch/jobs/x?view=all&token=tok&a=b+c");
+        CronwatchResponse other = await w.Get("/cronwatch/jobs/x?view=all&token=tok&a=b+c");
         Assert.Equal("/cronwatch/jobs/x?view=all&a=b+c", other.Header("location"));
     }
 
@@ -207,7 +207,7 @@ public class RoutesTests
         {
             Contains("dashboard", dash, want);
         }
-        WebResponse page = await w.Get("/cronwatch/jobs/broken", Auth);
+        CronwatchResponse page = await w.Get("/cronwatch/jobs/broken", Auth);
         Status("job page", page, 200);
         string html = page.Text();
         Contains("escaped", html, "kaboom &lt;script&gt;");
@@ -277,7 +277,7 @@ public class RoutesTests
         string want = "{\"ok\":true,\"library\":\"Cronwatch\",\"language\":\"dotnet\",\"version\":" + Json.Quote(CronwatchClient.Version) + ",\"api\":1}";
         foreach (string path in new[] { "/cronwatch/api", "/cronwatch/api/" })
         {
-            WebResponse r = await w.Get(path, Auth);
+            CronwatchResponse r = await w.Get(path, Auth);
             Status(path, r, 200);
             Assert.Equal(want, r.Text());
         }
@@ -290,11 +290,11 @@ public class RoutesTests
     {
         await using var w = new WebKit();
         await w.Ok("f");
-        WebResponse res = await w.Send("POST", "/cronwatch/jobs/f/silence", Hs(Auth, Form, H("referer", "http://app.test/cronwatch/jobs/f")), "for=4h");
+        CronwatchResponse res = await w.Send("POST", "/cronwatch/jobs/f/silence", Hs(Auth, Form, H("referer", "http://app.test/cronwatch/jobs/f")), "for=4h");
         Status("silence", res, 303);
         Assert.Equal("http://app.test/cronwatch/jobs/f", res.Header("location"));
         Assert.Equal(JobHealth.Silenced, (await w.Summary("f"))!.Health);
-        WebResponse elsewhere = await w.Send("POST", "/cronwatch/jobs/f/unsilence", Hs(Auth, H("referer", "https://evil.example/phish")));
+        CronwatchResponse elsewhere = await w.Send("POST", "/cronwatch/jobs/f/unsilence", Hs(Auth, H("referer", "https://evil.example/phish")));
         Assert.Equal("/cronwatch/", elsewhere.Header("location"));
         const string multipart = "--b\r\nContent-Disposition: form-data; name=\"for\"\r\n\r\n2h\r\n--b--\r\n";
         res = await w.Send("POST", "/cronwatch/jobs/f/silence", Hs(Auth, H("content-type", "multipart/form-data; boundary=b")), multipart);
@@ -328,7 +328,7 @@ public class RoutesTests
         Status("run check now", await w.Send("POST", "/cronwatch/check", WebKit.With(Hs(cookie), same)), 303);
         Status("api client", await w.Send("POST", "/cronwatch/api/jobs/x/unsilence", Hs(Auth)), 200);
         Status("none", await w.Send("POST", "/cronwatch/api/check", Hs(Auth, H("sec-fetch-site", "none"))), 200);
-        WebResponse refused = await w.Send("POST", "/cronwatch/api/check", Hs(Auth, H("origin", "https://evil.example")));
+        CronwatchResponse refused = await w.Send("POST", "/cronwatch/api/check", Hs(Auth, H("origin", "https://evil.example")));
         Assert.Equal("{\"ok\":false,\"error\":\"Cross-site request refused\"}", refused.Text());
     }
 
@@ -338,7 +338,7 @@ public class RoutesTests
         await using var w = new WebKit();
         await w.Ok("x");
         var cookie = H("cookie", WebKit.TokenCookie());
-        WebResponse viaCookie = await w.Get("/cronwatch/api/check", cookie);
+        CronwatchResponse viaCookie = await w.Get("/cronwatch/api/check", cookie);
         Status("cookie GET", viaCookie, 405);
         Assert.Equal("POST", viaCookie.Header("allow"));
         Status("cookie POST", await w.Send("POST", "/cronwatch/api/check", Hs(cookie)), 200);
@@ -359,7 +359,7 @@ public class RoutesTests
         Status("cookie", await w.Get("/cronwatch/", H("cookie", "cronwatch_token=%E0%A4%A")), 401);
         Status("cookie %", await w.Get("/cronwatch/api/jobs", H("cookie", "cronwatch_token=%")), 401);
         Status("path", await w.Get("/cronwatch/jobs/%E0%A4%A", Auth), 400);
-        WebResponse api = await w.Get("/cronwatch/api/jobs/%zz", Auth);
+        CronwatchResponse api = await w.Get("/cronwatch/api/jobs/%zz", Auth);
         Status("api path", api, 400);
         Assert.Equal(false, WebKit.JsonOf(api).Get("ok"));
         Status("api silence", await w.Send("POST", "/cronwatch/api/jobs/%zz/silence", Hs(Auth)), 400);
@@ -390,10 +390,10 @@ public class RoutesTests
         await using (var w = new WebKit(new RoutesOptions { Token = "tok" }, store))
         {
             store.Break("listJobs");
-            WebResponse api = await w.Get("/cronwatch/api/jobs", Auth);
+            CronwatchResponse api = await w.Get("/cronwatch/api/jobs", Auth);
             Status("api", api, 500);
             Assert.Equal("{\"ok\":false,\"error\":\"Internal error\"}", api.Text());
-            WebResponse page = await w.Get("/cronwatch/", Auth);
+            CronwatchResponse page = await w.Get("/cronwatch/", Auth);
             Status("page", page, 500);
             Contains("type", page.Header("content-type"), "text/html");
             Assert.DoesNotContain("store down", page.Text(), StringComparison.Ordinal);
@@ -432,7 +432,7 @@ public class RoutesTests
         await using var w = new WebKit();
         await w.Ok("s");
         string body = new string('[', 100_000) + new string(']', 100_000);
-        WebResponse res = await Task.Run(() => w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), body));
+        CronwatchResponse res = await Task.Run(() => w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), body));
         Status("deep", res, 200);
         Assert.Equal(T0 + Hour, (await w.Summary("s"))!.SilencedUntil);
     }
@@ -450,7 +450,7 @@ public class RoutesTests
         await w.Ok("s");
         foreach (string bad in new[] { "\"forever\"", "\"2 hours\"", "\"\"", "\"-5\"", "\"1h then some\"", "true" })
         {
-            WebResponse res = await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), "{\"for\":" + bad + "}");
+            CronwatchResponse res = await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), "{\"for\":" + bad + "}");
             Status(bad, res, 400);
             Contains(bad, (string?)WebKit.Field(WebKit.JsonOf(res), "error"), "silence duration");
         }
@@ -461,7 +461,7 @@ public class RoutesTests
         Assert.Equal(Hour, await Until(w, "{}"));
         Assert.Equal(2 * Hour, await Until(w, "﻿{\"for\":\"2h\"}"));
         // The SDK's 64-character cap: longer text is refused before it is read, quoting its start.
-        WebResponse longText = await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), "{\"for\":\"" + new string('1', 65) + "h\"}");
+        CronwatchResponse longText = await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), "{\"for\":\"" + new string('1', 65) + "h\"}");
         Status("65 characters", longText, 400);
         Contains("65 characters", (string?)WebKit.Field(WebKit.JsonOf(longText), "error"), "silence duration");
         Status("query", await w.Send("POST", "/cronwatch/api/jobs/s/silence?for=forever", Hs(Auth)), 400);
@@ -476,7 +476,7 @@ public class RoutesTests
     {
         await using var w = new WebKit();
         await w.Ok("s");
-        var req = new WebRequest("POST", "/cronwatch/api/jobs/s/silence")
+        var req = new CronwatchRequest("POST", "/cronwatch/api/jobs/s/silence")
         {
             Headers = Hs(H("host", "app.test"), Auth, Form),
             DeclaredLength = 6,
@@ -493,7 +493,7 @@ public class RoutesTests
         await using var w = new WebKit();
         await w.Ok("s");
         var f = Hs(H("cookie", WebKit.TokenCookie()), Form);
-        WebResponse bad = await w.Send("POST", "/cronwatch/jobs/s/silence", f, "for=forever");
+        CronwatchResponse bad = await w.Send("POST", "/cronwatch/jobs/s/silence", f, "for=forever");
         Status("bad", bad, 400);
         Contains("type", bad.Header("content-type"), "text/html");
         Contains("message", bad.Text(), "silence duration &quot;forever&quot;");
@@ -507,16 +507,16 @@ public class RoutesTests
     {
         await using var w = new WebKit();
         await w.Ok("s");
-        string big = "{\"for\":\"2h\",\"pad\":\"" + new string('x', WebRequest.MaxBody) + "\"}";
-        WebResponse api = await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), big);
+        string big = "{\"for\":\"2h\",\"pad\":\"" + new string('x', CronwatchRequest.MaxBody) + "\"}";
+        CronwatchResponse api = await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), big);
         Status("api", api, 413);
         Assert.Equal("{\"ok\":false,\"error\":\"Request body too large\"}", api.Text());
-        WebResponse page = await w.Send("POST", "/cronwatch/jobs/s/silence", Hs(Auth, Form), "for=2h&pad=" + new string('x', WebRequest.MaxBody));
+        CronwatchResponse page = await w.Send("POST", "/cronwatch/jobs/s/silence", Hs(Auth, Form), "for=2h&pad=" + new string('x', CronwatchRequest.MaxBody));
         Status("form", page, 413);
         Contains("form body", page.Text(), "The request was too large.");
         // Without a length, by reading one byte past the cap.
         byte[] data = Encoding.UTF8.GetBytes(big);
-        var chunked = new WebRequest("POST", "/cronwatch/api/jobs/s/silence")
+        var chunked = new CronwatchRequest("POST", "/cronwatch/api/jobs/s/silence")
         {
             Headers = Hs(H("host", "app.test"), Auth, JsonType),
             BodyReader = (limit, ct) => Task.FromResult(data[..Math.Min(data.Length, limit + 1)]),
@@ -524,12 +524,12 @@ public class RoutesTests
         Status("chunked", await w.Routes.HandleAsync(chunked), 413);
         // A body of exactly the cap is read.
         string exact = "for=2h&pad=";
-        exact += new string('x', WebRequest.MaxBody - exact.Length);
+        exact += new string('x', CronwatchRequest.MaxBody - exact.Length);
         Status("exactly the cap", await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, Form), exact), 200);
         await w.Cw.UnsilenceAsync("s");
         // Refused before the body is read: no token, no read.
         int read = 0;
-        var noToken = new WebRequest("POST", "/cronwatch/api/jobs/s/silence")
+        var noToken = new CronwatchRequest("POST", "/cronwatch/api/jobs/s/silence")
         {
             Headers = Hs(H("host", "app.test"), JsonType),
             BodyReader = (limit, ct) =>
@@ -549,7 +549,7 @@ public class RoutesTests
         await w.Ok("h");
         foreach (string path in new[] { "/cronwatch/", "/cronwatch/jobs/h", "/cronwatch/nope" })
         {
-            WebResponse res = await w.Get(path, Auth);
+            CronwatchResponse res = await w.Get(path, Auth);
             Assert.Equal(
                 "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
                 res.Header("content-security-policy"));
@@ -561,7 +561,7 @@ public class RoutesTests
             Assert.Equal(1, text.Split("<script").Length - 1);
             Contains(path, text, "<script src=\"/cronwatch/app.js\" defer></script>");
         }
-        WebResponse api = await w.Get("/cronwatch/api/jobs", Auth);
+        CronwatchResponse api = await w.Get("/cronwatch/api/jobs", Auth);
         Assert.Equal("nosniff", api.Header("x-content-type-options"));
         Assert.Equal("no-store", api.Header("cache-control"));
     }
@@ -589,7 +589,7 @@ public class RoutesTests
 
     private const string Internal = "http://10.0.0.5:8080";
 
-    private static Task<WebResponse> SendInternal(WebKit w, string method, string path, List<KeyValuePair<string, string>> hs, string body = "") =>
+    private static Task<CronwatchResponse> SendInternal(WebKit w, string method, string path, List<KeyValuePair<string, string>> hs, string body = "") =>
         WebKit.Serve(w.Routes, method, Internal + path, WebKit.With(hs, Hs(H("cookie", WebKit.TokenCookie()))), body);
 
     private static async Task<WebKit> App(string? origin = null, bool trustProxy = false)
@@ -606,7 +606,7 @@ public class RoutesTests
         Status("foreign", await SendInternal(w, "POST", "/cronwatch/jobs/x/silence", Hs(Form, H("origin", "https://app.example.com")), "for=1h"), 403);
         Assert.Null((await w.Summary("x"))!.SilencedUntil);
         Status("own", await SendInternal(w, "POST", "/cronwatch/jobs/x/silence", Hs(Form, H("origin", Internal)), "for=1h"), 303);
-        WebResponse set = await SendInternal(w, "GET", "/cronwatch/?token=tok", []);
+        CronwatchResponse set = await SendInternal(w, "GET", "/cronwatch/?token=tok", []);
         Assert.DoesNotContain("Secure", set.Header("set-cookie")!, StringComparison.Ordinal);
     }
 
@@ -617,11 +617,11 @@ public class RoutesTests
         Status("internal", await SendInternal(w, "POST", "/cronwatch/jobs/x/silence", Hs(Form, H("origin", Internal)), "for=1h"), 403);
         Assert.Null((await w.Summary("x"))!.SilencedUntil);
         const string referer = "https://app.example.com/cronwatch/jobs/x";
-        WebResponse res = await SendInternal(w, "POST", "/cronwatch/jobs/x/silence", Hs(Form, H("origin", "https://app.example.com"), H("referer", referer)), "for=2h");
+        CronwatchResponse res = await SendInternal(w, "POST", "/cronwatch/jobs/x/silence", Hs(Form, H("origin", "https://app.example.com"), H("referer", referer)), "for=2h");
         Status("public", res, 303);
         Assert.Equal(referer, res.Header("location"));
         Assert.Equal(T0 + (2 * Hour), (await w.Summary("x"))!.SilencedUntil);
-        WebResponse signIn = await SendInternal(w, "GET", "/cronwatch/jobs/x?token=tok", []);
+        CronwatchResponse signIn = await SendInternal(w, "GET", "/cronwatch/jobs/x?token=tok", []);
         Assert.Equal("/cronwatch/jobs/x", signIn.Header("location"));
         Assert.EndsWith("; Secure", signIn.Header("set-cookie")!, StringComparison.Ordinal);
     }
@@ -667,11 +667,11 @@ public class RoutesTests
         var cookie = H("cookie", WebKit.TokenCookie());
         var spoofed = Hs(H("x-forwarded-host", "evil.example"), H("x-forwarded-proto", "https"));
         Status("foreign", await w.Send("POST", "/cronwatch/jobs/x/silence", WebKit.With(Hs(cookie, Form), spoofed, Hs(H("origin", "https://evil.example"))), "for=1h"), 403);
-        WebResponse back = await w.Send("POST", "/cronwatch/check", WebKit.With(Hs(cookie), spoofed, Hs(H("origin", "http://app.test"), H("referer", "https://evil.example/cronwatch/jobs/x"))));
+        CronwatchResponse back = await w.Send("POST", "/cronwatch/check", WebKit.With(Hs(cookie), spoofed, Hs(H("origin", "http://app.test"), H("referer", "https://evil.example/cronwatch/jobs/x"))));
         Assert.Equal("/cronwatch/", back.Header("location"));
         Assert.DoesNotContain("Secure", (await w.Send("GET", "/cronwatch/?token=tok", spoofed)).Header("set-cookie")!, StringComparison.Ordinal);
         // TLS makes the request's own origin https.
-        WebResponse tls = await WebKit.Serve(w.Routes, "GET", "https://app.test/cronwatch/?token=tok", []);
+        CronwatchResponse tls = await WebKit.Serve(w.Routes, "GET", "https://app.test/cronwatch/?token=tok", []);
         Assert.EndsWith("; Secure", tls.Header("set-cookie")!, StringComparison.Ordinal);
     }
 
@@ -716,7 +716,7 @@ public class RoutesTests
         }
         // As a server reads it: each byte of its UTF-8 one character.
         string host = Encoding.Latin1.GetString(Encoding.UTF8.GetBytes(chars.ToString()));
-        WebRequest Req(params KeyValuePair<string, string>[] more) =>
+        CronwatchRequest Req(params KeyValuePair<string, string>[] more) =>
             new("POST", "/cronwatch/api/check") { Headers = WebKit.With(Hs(H("host", host), Auth), Hs(more)) };
         Status("answered", await w.Routes.HandleAsync(Req()), 200);
         // The origin a browser sends is the host's own bytes, which the routes read as UTF-8.
@@ -736,9 +736,9 @@ public class RoutesTests
             Status(path, await WebKit.Serve(k.Routes, "GET", url, []), 200);
             Status(path, await WebKit.Serve(k.Routes, "HEAD", url, []), 200);
         }
-        WebResponse sw = await WebKit.Serve(k.Routes, "GET", "http://app.test/cronwatch/sw.js", []);
+        CronwatchResponse sw = await WebKit.Serve(k.Routes, "GET", "http://app.test/cronwatch/sw.js", []);
         Assert.Equal("/cronwatch/", sw.Header("service-worker-allowed"));
-        WebResponse svg = await WebKit.Serve(k.Routes, "GET", "http://app.test/cronwatch/icons/icon.svg", []);
+        CronwatchResponse svg = await WebKit.Serve(k.Routes, "GET", "http://app.test/cronwatch/icons/icon.svg", []);
         Assert.Equal("default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'", svg.Header("content-security-policy"));
         Assert.Equal("public, max-age=31536000, immutable", svg.Header("cache-control"));
     }
@@ -759,7 +759,7 @@ public class RoutesTests
 
     private static async Task<string> ManifestId(Routes routes, string path, string? mount = null)
     {
-        WebResponse res = await routes.HandleAsync(new WebRequest("GET", path) { Mount = mount });
+        CronwatchResponse res = await routes.HandleAsync(new CronwatchRequest("GET", path) { Mount = mount });
         return res.Status != 200 ? res.Status.ToString(System.Globalization.CultureInfo.InvariantCulture) : (string)WebKit.Field(WebKit.JsonOf(res), "id")!;
     }
 
@@ -784,7 +784,7 @@ public class RoutesTests
         await w.Ok("x");
         foreach (string path in new[] { "/cronwatch/./jobs/x", "/cronwatch/nope/../jobs/x", "/cronwatch\\jobs\\x", "/cronwatch/%2e/jobs/x", "/cronwatch/jobs/%78" })
         {
-            WebResponse res = await w.Get(path, Auth);
+            CronwatchResponse res = await w.Get(path, Auth);
             Status(path, res, 200);
             Contains(path, res.Text(), "<h1 class=\"jobname\">x</h1>");
         }
@@ -834,7 +834,7 @@ public class RoutesTests
         Assert.DoesNotContain(token, new HandlerOptions { Secret = token }.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(token, ((DashboardToken)token).ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(token, ((HandlerSecret)token).ToString(), StringComparison.Ordinal);
-        var req = new WebRequest("GET", "/cronwatch/?token=" + token)
+        var req = new CronwatchRequest("GET", "/cronwatch/?token=" + token)
         {
             Headers = Hs(H("authorization", "Bearer " + token), H("cookie", "cronwatch_token=" + token)),
             Body = Encoding.UTF8.GetBytes(token),
@@ -845,14 +845,14 @@ public class RoutesTests
         Assert.DoesNotContain(token, w.Routes.ToString(), StringComparison.Ordinal);
         Handler handler = w.Cw.Job("h").Handler((j, r, ct) => Task.CompletedTask, new HandlerOptions { Secret = token });
         Assert.DoesNotContain(token, handler.ToString(), StringComparison.Ordinal);
-        WebResponse r = new WebResponse(200).WithHeader("set-cookie", "cronwatch_token=" + token).WithBody(token);
+        CronwatchResponse r = new CronwatchResponse(200).WithHeader("set-cookie", "cronwatch_token=" + token).WithBody(token);
         Assert.DoesNotContain(token, r.ToString(), StringComparison.Ordinal);
         // A URL's credentials: an origin given with them, and a target in the absolute form.
         var withUser = new RoutesOptions { Token = "tok", Origin = "https://ops:" + token + "@app.example" };
         Assert.DoesNotContain(token, withUser.ToString(), StringComparison.Ordinal);
         await using var o = new WebKit(withUser);
         Assert.Contains("origin https://app.example", o.Routes.ToString(), StringComparison.Ordinal);
-        var absolute = new WebRequest("GET", "http://ops:" + token + "@app.example/cronwatch/");
+        var absolute = new CronwatchRequest("GET", "http://ops:" + token + "@app.example/cronwatch/");
         Assert.DoesNotContain(token, absolute.ToString(), StringComparison.Ordinal);
         Assert.Equal("/cronwatch/", absolute.Path);
     }

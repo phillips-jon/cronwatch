@@ -10,9 +10,9 @@ namespace Cronwatch.Web;
 /// A job as an HTTP handler, the SDK's <c>job.handler()</c>, for a platform cron that calls a URL
 /// (a Kubernetes CronJob with <c>curl</c>, Render, Fly.io, a scheduler in front of Azure Container
 /// Apps). Framework-free like the dashboard: <see cref="HandleAsync"/> takes a
-/// <see cref="WebRequest"/> and answers a <see cref="WebResponse"/>, and
+/// <see cref="CronwatchRequest"/> and answers a <see cref="CronwatchResponse"/>, and
 /// <c>Cronwatch.AspNetCore</c>'s <c>MapCronwatchHandler</c> serves it. Made by
-/// <see cref="Job.Handler(Func{JobContext, WebRequest, CancellationToken, Task}, HandlerOptions?)"/>.
+/// <see cref="Job.Handler(Func{JobContext, CronwatchRequest, CancellationToken, Task}, HandlerOptions?)"/>.
 /// Safe to share between threads.
 /// </summary>
 /// <remarks>
@@ -29,11 +29,11 @@ namespace Cronwatch.Web;
 public sealed class Handler
 {
     private readonly Job _job;
-    private readonly Func<JobContext, WebRequest, CancellationToken, Task<object?>> _fn;
+    private readonly Func<JobContext, CronwatchRequest, CancellationToken, Task<object?>> _fn;
     private readonly string _secret;
     private readonly bool _optedOut;
 
-    internal Handler(Job job, Func<JobContext, WebRequest, CancellationToken, Task<object?>> fn, HandlerOptions options)
+    internal Handler(Job job, Func<JobContext, CronwatchRequest, CancellationToken, Task<object?>> fn, HandlerOptions options)
     {
         _job = job;
         _fn = fn;
@@ -70,8 +70,8 @@ public sealed class Handler
     public override string ToString() => "Handler(" + _job.Name + ")";
 
     /// <summary>The SDK's <c>json()</c>: the body, with its type and <c>no-store</c>.</summary>
-    private static WebResponse Json(JsObject body, int status) =>
-        new WebResponse(status)
+    private static CronwatchResponse Json(JsObject body, int status) =>
+        new CronwatchResponse(status)
             .WithHeader("content-type", "application/json; charset=utf-8")
             .WithHeader("cache-control", "no-store")
             .WithOwnedBody(Js.Utf8(body.ToJson()));
@@ -81,7 +81,7 @@ public sealed class Handler
     /// linked into the run's, so a request whose client goes away cancels the job as a platform's
     /// timeout would.
     /// </summary>
-    public async Task<WebResponse> HandleAsync(WebRequest request, CancellationToken cancellationToken = default)
+    public async Task<CronwatchResponse> HandleAsync(CronwatchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         CronwatchClient cw = _job.Client;
@@ -108,7 +108,13 @@ public sealed class Handler
             new RunOptions { Trigger = "handler" },
             (ctx, ct) => _fn(ctx, request, ct),
             cancellationToken).ConfigureAwait(false);
-        if (thrown == null && value is WebResponse answer)
+#pragma warning disable CS0618 // the former name, kept through 1.x
+        if (value is WebResponse former)
+        {
+            value = (CronwatchResponse)former;
+        }
+#pragma warning restore CS0618
+        if (thrown == null && value is CronwatchResponse answer)
         {
             return answer;
         }

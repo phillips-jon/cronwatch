@@ -10,7 +10,7 @@ namespace Cronwatch.Web;
 /// <c>Cronwatch.AspNetCore</c> uses it, and so can an adapter for a server this library has none
 /// for.
 /// </summary>
-public static class WebAdapters
+public static class Adapters
 {
     /// <summary>
     /// The request target as sent, from the text a server read: a server that reads the request

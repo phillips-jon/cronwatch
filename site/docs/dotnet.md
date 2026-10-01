@@ -194,11 +194,11 @@ app.MapCronwatch("/cronwatch");   // the token from CRONWATCH_TOKEN or Cronwatch
 
 `MapCronwatch` maps the path and everything beneath it on endpoint routing, which minimal APIs, MVC, Razor Pages and Blazor all use, and answers the convention builder. Under a route group (`app.MapGroup("/admin").MapCronwatch()`) the group sets the base path. The endpoints skip antiforgery (the dashboard has its own cross-site check) and are left out of OpenAPI. While the dashboard has a token they allow anonymous requests, so an app whose fallback policy requires a signed-in user still reaches the dashboard's own sign-in; `Token = DashboardToken.None` serves it open, and then it takes the app's authorization policy. `app.UseCronwatch("/cronwatch")` serves it as middleware instead, ahead of the app's other middleware: middleware is no endpoint, so an open dashboard served that way is behind your sign-in only when `UseAuthentication` and `UseAuthorization`, with a fallback policy, come before it.
 
-Without ASP.NET Core, the routes are framework-free: any server hands them a `WebRequest` and writes the `WebResponse` back.
+Without ASP.NET Core, the routes are framework-free: any server hands them a `CronwatchRequest` and writes the `CronwatchResponse` back.
 
 ```csharp
 Routes routes = cw.Routes(new RoutesOptions { Token = Environment.GetEnvironmentVariable("CRONWATCH_TOKEN") });
-WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/api/jobs")
+CronwatchResponse answer = await routes.HandleAsync(new CronwatchRequest("GET", "/cronwatch/api/jobs")
 {
     Headers = [new("host", "app.example.com"), new("authorization", "Bearer " + token)],
 });
@@ -229,9 +229,9 @@ app.MapCronwatchHandler("/cron/nightly", "nightly-report", async (JobContext job
 });
 ```
 
-The job is looked up by name on the app's client, so declare it first (or pass the `Job` itself). Without ASP.NET Core, `job.Handler((job, request, ct) => ...)` answers a framework-free `Handler` whose `HandleAsync` takes a `WebRequest`. The secret is `HandlerOptions.Secret`, else the client's `CronSecret` (`CRON_SECRET` by default), compared in constant time; `""` counts as unset. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 rather than let anyone on the internet run the job; `HandlerSecret.None` (or the client's `CronSecret.None`) opts out on purpose, for an endpoint your platform already protects, and then the endpoint takes the app's authorization policy.
+The job is looked up by name on the app's client, so declare it first (or pass the `Job` itself). Without ASP.NET Core, `job.Handler((job, request, ct) => ...)` answers a framework-free `Handler` whose `HandleAsync` takes a `CronwatchRequest`. The secret is `HandlerOptions.Secret`, else the client's `CronSecret` (`CRON_SECRET` by default), compared in constant time; `""` counts as unset. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 rather than let anyone on the internet run the job; `HandlerSecret.None` (or the client's `CronSecret.None`) opts out on purpose, for an endpoint your platform already protects, and then the endpoint takes the app's authorization policy.
 
-A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, and the error's first line as `"error"` for a caller who sent the secret. A `string` the function returns is the run's output when nothing was logged; a `WebResponse` or an `IResult` it returns is the answer itself, and a status of 400 or more fails the run. The request's `RequestAborted` token is linked into the run's, so a caller that goes away cancels the job as a platform's timeout would.
+A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, and the error's first line as `"error"` for a caller who sent the secret. A `string` the function returns is the run's output when nothing was logged; a `CronwatchResponse` or an `IResult` it returns is the answer itself, and a status of 400 or more fails the run. The request's `RequestAborted` token is linked into the run's, so a caller that goes away cancels the job as a platform's timeout would.
 
 ## Stores
 
@@ -474,6 +474,8 @@ These names still work through every 1.x release, marked `[Obsolete]` so the com
 | Deprecated | Use |
 |---|---|
 | `cw.Start(every)` | `cw.StartChecking(every)`, since a job's `StartAsync` opens a run |
+| `Cronwatch.Web.WebRequest`, `WebResponse` | `CronwatchRequest`, `CronwatchResponse`, since `System.Net` has types of those names; each converts to and from its replacement, so `WebResponse answer = await routes.HandleAsync(new WebRequest(...))` still compiles, and a handler's function may still return a `WebResponse`. A handler function whose lambda names the request's type must say `CronwatchRequest` |
+| `Cronwatch.Web.WebAdapters` | `Adapters`, the Java port's name |
 
 ## Kept in step
 

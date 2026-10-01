@@ -225,7 +225,7 @@ public class SqliteStoreTests
             file,
             "INSERT INTO cronwatch_runs (id, job, status, started_at, finished_at, duration_ms, metrics, trigger) VALUES "
             + "('m', 'odd', 'ok', 5, 6, 1, '{\"rows\":null,\"label\":\"abc\",\"cost\":1.25,\"n\":3}', 'source')");
-        Cronwatch.Web.WebResponse page = await w.Get("/cronwatch/jobs/odd", Web.WebKit.Auth);
+        Cronwatch.Web.CronwatchResponse page = await w.Get("/cronwatch/jobs/odd", Web.WebKit.Auth);
         Web.WebKit.Status("job page", page, 200);
         string text = page.Text();
         int cost = text.IndexOf("<span class=\"k\">cost</span> 1.2500", StringComparison.Ordinal);

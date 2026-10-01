@@ -50,7 +50,7 @@ public class ReadmeTests
         await using var cw = new CronwatchClient(new CronwatchOptions { ProcessExitHook = false, Alerts = [] });
 
         Routes routes = cw.Routes(new RoutesOptions { Token = "letmein-example" });
-        WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/api/jobs")
+        CronwatchResponse answer = await routes.HandleAsync(new CronwatchRequest("GET", "/cronwatch/api/jobs")
         {
             Headers = [new("host", "app.example.com"), new("authorization", "Bearer letmein-example")],
         });

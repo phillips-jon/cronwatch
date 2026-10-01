@@ -16,7 +16,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using WebResponse = Cronwatch.Web.WebResponse;
+using CronwatchResponse = Cronwatch.Web.CronwatchResponse;
 
 namespace Cronwatch.AspNetCore.Tests;
 
@@ -46,7 +46,7 @@ public class GoldenTests
         foreach (Capture c in Golden.Captures())
         {
             string path = await Golden.ResolveAsync(seeded.Client, c.Path);
-            WebResponse a = await routes.HandleAsync(Golden.Request(c, path, "/cronwatch/"));
+            CronwatchResponse a = await routes.HandleAsync(Golden.Request(c, path, "/cronwatch/"));
             Golden.Compare(c, a.Status, a.Headers, a.Body.ToArray(), ids, new HashSet<string>());
         }
         Golden.NoErrors(seeded);

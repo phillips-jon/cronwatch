@@ -13,12 +13,12 @@ namespace Cronwatch.Web;
 /// which is then the handler's answer, and fails the run at 400 or more.
 /// </summary>
 [DebuggerDisplay("{ToString(),nq}")]
-public sealed class WebResponse
+public sealed class CronwatchResponse
 {
     private readonly KeyValuePair<string, string>[] _headers;
     private readonly byte[] _body;
 
-    private WebResponse(int status, KeyValuePair<string, string>[] headers, byte[] body, object? result)
+    private CronwatchResponse(int status, KeyValuePair<string, string>[] headers, byte[] body, object? result)
     {
         Status = status;
         _headers = headers;
@@ -27,7 +27,7 @@ public sealed class WebResponse
     }
 
     /// <summary>An answer with this status, no headers and no body.</summary>
-    public WebResponse(int status)
+    public CronwatchResponse(int status)
         : this(status, [], [], null)
     {
     }
@@ -37,10 +37,10 @@ public sealed class WebResponse
     /// is the framework's own (an ASP.NET Core <c>IResult</c>), and <paramref name="status"/> is the
     /// status it answers with, which fails the run at 400 or more.
     /// </summary>
-    public static WebResponse Carrying(object result, int status)
+    public static CronwatchResponse Carrying(object result, int status)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return new WebResponse(status, [], [], result);
+        return new CronwatchResponse(status, [], [], result);
     }
 
     /// <summary>The status.</summary>
@@ -56,31 +56,31 @@ public sealed class WebResponse
     public ReadOnlyMemory<byte> Body => _body;
 
     /// <summary>A copy with a header added, its name lowercased.</summary>
-    public WebResponse WithHeader(string name, string value)
+    public CronwatchResponse WithHeader(string name, string value)
     {
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(value);
         var headers = new KeyValuePair<string, string>[_headers.Length + 1];
         _headers.CopyTo(headers, 0);
         headers[^1] = new(name.ToLowerInvariant(), value);
-        return new WebResponse(Status, headers, _body, Result);
+        return new CronwatchResponse(Status, headers, _body, Result);
     }
 
     /// <summary>A copy with this body.</summary>
-    public WebResponse WithBody(byte[] body)
+    public CronwatchResponse WithBody(byte[] body)
     {
         ArgumentNullException.ThrowIfNull(body);
-        return new WebResponse(Status, _headers, (byte[])body.Clone(), Result);
+        return new CronwatchResponse(Status, _headers, (byte[])body.Clone(), Result);
     }
 
     /// <summary>A copy with this body, written as UTF-8.</summary>
-    public WebResponse WithBody(string body)
+    public CronwatchResponse WithBody(string body)
     {
         ArgumentNullException.ThrowIfNull(body);
-        return new WebResponse(Status, _headers, Js.Utf8(body), Result);
+        return new CronwatchResponse(Status, _headers, Js.Utf8(body), Result);
     }
 
-    internal WebResponse WithOwnedBody(byte[] body) => new(Status, _headers, body, Result);
+    internal CronwatchResponse WithOwnedBody(byte[] body) => new(Status, _headers, body, Result);
 
     /// <summary>The first value of a header, its name matched without regard to case, or null.</summary>
     public string? Header(string name)
@@ -107,6 +107,6 @@ public sealed class WebResponse
         {
             names.Add(h.Key);
         }
-        return "WebResponse(" + Status + ", headers [" + string.Join(", ", names) + "], " + _body.Length + " bytes)";
+        return "CronwatchResponse(" + Status + ", headers [" + string.Join(", ", names) + "], " + _body.Length + " bytes)";
     }
 }

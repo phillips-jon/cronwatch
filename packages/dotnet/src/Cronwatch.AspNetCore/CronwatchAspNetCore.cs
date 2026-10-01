@@ -175,14 +175,14 @@ public static class CronwatchAspNetCore
 
     /// <summary>An <see cref="IResult"/> carried through the handler; anything else as it is.</summary>
     private static object? Answer(object? value) =>
-        value is IResult result ? WebResponse.Carrying(result, (result as IStatusCodeHttpResult)?.StatusCode ?? StatusCodes.Status200OK) : value;
+        value is IResult result ? CronwatchResponse.Carrying(result, (result as IStatusCodeHttpResult)?.StatusCode ?? StatusCodes.Status200OK) : value;
 
-    private static HttpContext ContextOf(WebRequest request) =>
+    private static HttpContext ContextOf(CronwatchRequest request) =>
         Contexts.TryGetValue(request, out HttpContext? context) ? context : throw new InvalidOperationException("the request did not come through Cronwatch.AspNetCore");
 
     // The HttpContext each request came with, for a handler's function; held weakly, so a
     // request's context goes with it.
-    private static readonly ConditionalWeakTable<WebRequest, HttpContext> Contexts = [];
+    private static readonly ConditionalWeakTable<CronwatchRequest, HttpContext> Contexts = [];
 
     private static Routes MakeRoutes(IServiceProvider services, RoutesOptions? options) =>
         services.GetRequiredService<CronwatchClient>().Routes(options ?? services.GetService<RoutesOptions>() ?? new RoutesOptions());
@@ -199,8 +199,8 @@ public static class CronwatchAspNetCore
         return (context.Request.PathBase.Value ?? "") + prefix.TrimEnd('/');
     }
 
-    /// <summary>The request as a <see cref="WebRequest"/>, its body read only when a route wants it.</summary>
-    internal static WebRequest RequestOf(HttpContext context, string? mount)
+    /// <summary>The request as a <see cref="CronwatchRequest"/>, its body read only when a route wants it.</summary>
+    internal static CronwatchRequest RequestOf(HttpContext context, string? mount)
     {
         HttpRequest http = context.Request;
         string raw = context.Features.Get<IHttpRequestFeature>()?.RawTarget is { Length: > 0 } t
@@ -215,7 +215,7 @@ public static class CronwatchAspNetCore
                 headers.Add(new(name, v ?? ""));
             }
         }
-        var request = new WebRequest(http.Method, WebAdapters.Target(raw))
+        var request = new CronwatchRequest(http.Method, Adapters.Target(raw))
         {
             Headers = headers,
             IsTls = http.IsHttps,
@@ -256,16 +256,16 @@ public static class CronwatchAspNetCore
                     fields.Add(new(f.Key, v ?? ""));
                 }
             }
-            return WebAdapters.FormBody(fields);
+            return Adapters.FormBody(fields);
         }
         return buffer.WrittenSpan.ToArray();
     }
 
     /// <summary>Answers a request through <paramref name="handle"/>; a client that went away reports nothing.</summary>
-    private static async Task ServeAsync(HttpContext context, Func<WebRequest, CancellationToken, Task<WebResponse>> handle, string? mount)
+    private static async Task ServeAsync(HttpContext context, Func<CronwatchRequest, CancellationToken, Task<CronwatchResponse>> handle, string? mount)
     {
         CancellationToken aborted = context.RequestAborted;
-        WebResponse answer;
+        CronwatchResponse answer;
         try
         {
             answer = await handle(RequestOf(context, mount), aborted).ConfigureAwait(false);
@@ -290,7 +290,7 @@ public static class CronwatchAspNetCore
     }
 
     /// <summary>Writes an answer with its <c>content-length</c>, so it is never framed as chunked.</summary>
-    internal static async Task WriteAsync(HttpContext context, WebResponse answer, CancellationToken ct)
+    internal static async Task WriteAsync(HttpContext context, CronwatchResponse answer, CancellationToken ct)
     {
         HttpResponse response = context.Response;
         response.StatusCode = answer.Status;

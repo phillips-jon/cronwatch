@@ -11,8 +11,8 @@ namespace Cronwatch.Web;
 
 /// <summary>
 /// The dashboard and its small JSON API, the SDK's <c>cw.routes()</c> (<c>routes/index.ts</c>),
-/// framework-free: <see cref="HandleAsync"/> takes a <see cref="WebRequest"/> and answers a
-/// <see cref="WebResponse"/>, with the same URLs, JSON, status codes, headers, cookie, redirects,
+/// framework-free: <see cref="HandleAsync"/> takes a <see cref="CronwatchRequest"/> and answers a
+/// <see cref="CronwatchResponse"/>, with the same URLs, JSON, status codes, headers, cookie, redirects,
 /// cross-site rule and token rules as the SDK's routes, so <c>@cronwatch/mcp</c> works against a
 /// .NET app as it does against a Node one. <c>Cronwatch.AspNetCore</c>'s <c>MapCronwatch</c> and
 /// <c>UseCronwatch</c> are adapters over it, and so can any other server be. Made by
@@ -155,12 +155,12 @@ public sealed class Routes
 
     // ---- answers
 
-    private static WebResponse WithSecurity(WebResponse r) =>
+    private static CronwatchResponse WithSecurity(CronwatchResponse r) =>
         r.WithHeader("x-content-type-options", "nosniff").WithHeader("referrer-policy", "same-origin").WithHeader("x-robots-tag", "noindex");
 
-    private static WebResponse Api(JsObject body, int status, string? extraName = null, string? extraValue = null)
+    private static CronwatchResponse Api(JsObject body, int status, string? extraName = null, string? extraValue = null)
     {
-        WebResponse r = WithSecurity(new WebResponse(status)
+        CronwatchResponse r = WithSecurity(new CronwatchResponse(status)
             .WithHeader("content-type", "application/json; charset=utf-8")
             .WithHeader("cache-control", "no-store"));
         if (extraName != null)
@@ -172,29 +172,29 @@ public sealed class Routes
 
     private static JsObject ErrorBody(string message) => new JsObject().Set("ok", false).Set("error", message);
 
-    private static WebResponse Redirect(string location, string? cookie = null)
+    private static CronwatchResponse Redirect(string location, string? cookie = null)
     {
-        WebResponse r = WithSecurity(new WebResponse(303).WithHeader("location", location).WithHeader("cache-control", "no-store"));
+        CronwatchResponse r = WithSecurity(new CronwatchResponse(303).WithHeader("location", location).WithHeader("cache-control", "no-store"));
         return cookie == null ? r : r.WithHeader("set-cookie", cookie);
     }
 
-    private static WebResponse HtmlAnswer(string body, int status, string cache) =>
-        WithSecurity(new WebResponse(status)
+    private static CronwatchResponse HtmlAnswer(string body, int status, string cache) =>
+        WithSecurity(new CronwatchResponse(status)
             .WithHeader("content-type", "text/html; charset=utf-8")
             .WithHeader("cache-control", cache)
             .WithHeader("content-security-policy", PageCsp)
             .WithHeader("x-frame-options", "DENY"))
         .WithOwnedBody(Js.Utf8(body));
 
-    private static WebResponse Page(string body, int status) => HtmlAnswer(body, status, "no-store");
+    private static CronwatchResponse Page(string body, int status) => HtmlAnswer(body, status, "no-store");
 
-    private static WebResponse Message(string title, string message, string basePath, int status, bool signIn = false) =>
+    private static CronwatchResponse Message(string title, string message, string basePath, int status, bool signIn = false) =>
         Page(Html.MessagePage(title, message, basePath, signIn), status);
 
     /// <summary>An app shell file. The worker may be scoped to the base; the SVGs get a CSP of their own.</summary>
-    private static WebResponse Shell(PwaAsset asset, string basePath)
+    private static CronwatchResponse Shell(PwaAsset asset, string basePath)
     {
-        WebResponse r = WithSecurity(new WebResponse(200).WithHeader("content-type", asset.ContentType).WithHeader("cache-control", asset.Cache));
+        CronwatchResponse r = WithSecurity(new CronwatchResponse(200).WithHeader("content-type", asset.ContentType).WithHeader("cache-control", asset.Cache));
         if (asset.ContentType == "image/svg+xml")
         {
             r = r.WithHeader("content-security-policy", AssetCsp);
@@ -206,13 +206,13 @@ public sealed class Routes
         return r.WithOwnedBody(asset.Body);
     }
 
-    private static WebResponse TooLarge(bool wantsHtml, string basePath) =>
+    private static CronwatchResponse TooLarge(bool wantsHtml, string basePath) =>
         wantsHtml ? Message("Not silenced", "The request was too large.", basePath, 413) : Api(ErrorBody("Request body too large"), 413);
 
     // ---- reading a request
 
     /// <summary>The first entry of a comma-separated header, trimmed, or null when there is none.</summary>
-    private static string? FirstValue(WebRequest req, string name)
+    private static string? FirstValue(CronwatchRequest req, string name)
     {
         string? value = req.Header(name);
         if (value == null)
@@ -225,7 +225,7 @@ public sealed class Routes
     }
 
     /// <summary>The named cookie, decoded, or null; a malformed escape counts as no cookie.</summary>
-    private static string? ReadCookie(WebRequest req, string name)
+    private static string? ReadCookie(CronwatchRequest req, string name)
     {
         string? value = req.Header("cookie");
         if (string.IsNullOrEmpty(value))
@@ -249,7 +249,7 @@ public sealed class Routes
     /// A browser attaches <c>Origin</c> or <c>Sec-Fetch-Site</c> to a cross-site form post, and a
     /// page cannot forge either. Non-browser clients send neither.
     /// </summary>
-    private static bool CrossSite(WebRequest req, string publicOrigin)
+    private static bool CrossSite(CronwatchRequest req, string publicOrigin)
     {
         string? o = req.Header("origin");
         if (o != null && o != publicOrigin)
@@ -280,7 +280,7 @@ public sealed class Routes
     }
 
     /// <summary>The <c>Authorization</c> header without its <c>Bearer </c> (in any case, with any spaces after it), or null.</summary>
-    private static string? Bearer(WebRequest req)
+    private static string? Bearer(CronwatchRequest req)
     {
         string? text = req.Header("authorization");
         if (text == null)
@@ -355,7 +355,7 @@ public sealed class Routes
     }
 
     /// <summary>Where the dashboard is mounted for this request: the option, else the adapter's, else ours.</summary>
-    private string BasePathOf(WebRequest req, string pathname)
+    private string BasePathOf(CronwatchRequest req, string pathname)
     {
         if (_base != null)
         {
@@ -393,7 +393,7 @@ public sealed class Routes
     }
 
     /// <summary>The origin a browser sees: the configured one, the forwarded one under TrustProxy, or ours.</summary>
-    private string PublicOrigin(WebRequest req)
+    private string PublicOrigin(CronwatchRequest req)
     {
         if (_origin != null)
         {
@@ -439,7 +439,7 @@ public sealed class Routes
     /// <paramref name="cancellationToken"/> is cancelled (its client went away) reports nothing and
     /// ends with an <see cref="OperationCanceledException"/>.
     /// </summary>
-    public async Task<WebResponse> HandleAsync(WebRequest request, CancellationToken cancellationToken = default)
+    public async Task<CronwatchResponse> HandleAsync(CronwatchRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var (rawPath, rawQuery) = Requests.Target(request.Target);
@@ -464,7 +464,7 @@ public sealed class Routes
         }
     }
 
-    private Said Read(WebRequest req, string rawQuery)
+    private Said Read(CronwatchRequest req, string rawQuery)
     {
         string publicOrigin = PublicOrigin(req);
         return new Said(
@@ -479,11 +479,11 @@ public sealed class Routes
     }
 
     /// <summary>The body up to the cap, none when it could not be read to its end, or null past the cap.</summary>
-    private static async Task<byte[]?> ReadLimitedAsync(WebRequest req, CancellationToken cancellationToken)
+    private static async Task<byte[]?> ReadLimitedAsync(CronwatchRequest req, CancellationToken cancellationToken)
     {
         try
         {
-            return await req.ReadBodyAsync(WebRequest.MaxBody, cancellationToken).ConfigureAwait(false);
+            return await req.ReadBodyAsync(CronwatchRequest.MaxBody, cancellationToken).ConfigureAwait(false);
         }
         catch (WebBodyTooLargeException)
         {
@@ -523,7 +523,7 @@ public sealed class Routes
         }
     }
 
-    private async Task<WebResponse> ServeAsync(WebRequest req, string pathname, string path, string rawQuery, string basePath, bool wantsHtml, CancellationToken ct)
+    private async Task<CronwatchResponse> ServeAsync(CronwatchRequest req, string pathname, string path, string rawQuery, string basePath, bool wantsHtml, CancellationToken ct)
     {
         Said said = Read(req, rawQuery);
         string method = said.Method;
@@ -726,7 +726,7 @@ public sealed class Routes
         return Message("Not found", path, basePath, 404);
     }
 
-    private static WebResponse RedirectBack(Said said, string basePath) =>
+    private static CronwatchResponse RedirectBack(Said said, string basePath) =>
         said.Referer.StartsWith(said.PublicOrigin + "/", StringComparison.Ordinal) ? Redirect(said.Referer) : Redirect(basePath + "/");
 
     /// <summary>
@@ -754,7 +754,7 @@ public sealed class Routes
         return lanes;
     }
 
-    private async Task<WebResponse> ServeApiAsync(WebRequest req, string method, List<string> rest, Said said, CancellationToken ct)
+    private async Task<CronwatchResponse> ServeApiAsync(CronwatchRequest req, string method, List<string> rest, Said said, CancellationToken ct)
     {
         int n = rest.Count;
         string first = n > 0 ? rest[0] : "";

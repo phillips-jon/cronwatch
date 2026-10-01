@@ -224,11 +224,11 @@ app.MapCronwatchHandler("/cron/nightly", "nightly-report", async (JobContext job
 
 The dashboard asks for its token as `Authorization: Bearer <token>`, or once as `?token=` on a page, which moves it into a cookie. In development with no token it makes one and prints a sign-in link on its first request; outside development with none it answers 503. `Token = DashboardToken.None` serves it open, behind the app's own sign-in: while it has a token its endpoints allow anonymous requests (so an app whose fallback policy requires a signed-in user still reaches the dashboard's sign-in), and open it takes the app's authorization policy. The endpoints skip antiforgery (the dashboard has its own cross-site check) and are left out of OpenAPI. `app.UseCronwatch("/cronwatch")` serves it as middleware instead, and `MapGroup("/admin").MapCronwatch()` under a group; middleware is no endpoint, so an open dashboard served that way is behind the app's sign-in only when `UseAuthentication` and `UseAuthorization`, with a fallback policy, come before it. A job's handler follows the same rule: while it has a secret its endpoint allows anonymous requests, and one open to anyone (`HandlerSecret.None`, or the client's `CronSecret.None`) takes the app's authorization policy. Behind a proxy, `RoutesOptions.Origin` names the public origin, or `TrustProxy` reads `X-Forwarded-Proto` and `X-Forwarded-Host`.
 
-Without ASP.NET Core, the routes and the handler are framework-free: any server hands them a `WebRequest` and writes the `WebResponse` back.
+Without ASP.NET Core, the routes and the handler are framework-free: any server hands them a `CronwatchRequest` and writes the `CronwatchResponse` back.
 
 ```csharp
 Routes routes = cw.Routes(new RoutesOptions { Token = "letmein-example" });
-WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/api/jobs")
+CronwatchResponse answer = await routes.HandleAsync(new CronwatchRequest("GET", "/cronwatch/api/jobs")
 {
     Headers = [new("host", "app.example.com"), new("authorization", "Bearer letmein-example")],
 });
@@ -243,6 +243,8 @@ An `ActivitySource` and a `Meter`, both named `Cronwatch`: an activity around ea
 These names still work through every 1.x release, marked `[Obsolete]`, and go in 2.0:
 
 - `cw.Start(every)`: use `cw.StartChecking(every)`, since a job's `StartAsync` opens a run.
+- `Cronwatch.Web.WebRequest` and `WebResponse`: use `CronwatchRequest` and `CronwatchResponse`, since `System.Net` has types of those names. Each converts to and from its replacement, so code written against them still compiles, except a handler lambda that names the request's type.
+- `Cronwatch.Web.WebAdapters`: use `Adapters`, the Java port's name.
 
 ## Testing this package
 

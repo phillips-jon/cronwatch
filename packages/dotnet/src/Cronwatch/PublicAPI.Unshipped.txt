@@ -572,8 +572,8 @@ Cronwatch.ITriage.TriageAsync(Cronwatch.TriageContext! context, System.Threading
 Cronwatch.Job
 Cronwatch.Job.Client.get -> Cronwatch.CronwatchClient!
 Cronwatch.Job.Definition.get -> Cronwatch.Definition!
-Cronwatch.Job.Handler(System.Func<Cronwatch.JobContext!, Cronwatch.Web.WebRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! fn, Cronwatch.Web.HandlerOptions? options = null) -> Cronwatch.Web.Handler!
-Cronwatch.Job.Handler<T>(System.Func<Cronwatch.JobContext!, Cronwatch.Web.WebRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! fn, Cronwatch.Web.HandlerOptions? options = null) -> Cronwatch.Web.Handler!
+Cronwatch.Job.Handler(System.Func<Cronwatch.JobContext!, Cronwatch.Web.CronwatchRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! fn, Cronwatch.Web.HandlerOptions? options = null) -> Cronwatch.Web.Handler!
+Cronwatch.Job.Handler<T>(System.Func<Cronwatch.JobContext!, Cronwatch.Web.CronwatchRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! fn, Cronwatch.Web.HandlerOptions? options = null) -> Cronwatch.Web.Handler!
 Cronwatch.Job.Name.get -> string!
 Cronwatch.Job.NextFire(long after, long? lastRunAt = null) -> long?
 Cronwatch.Job.OpenAsync(Cronwatch.RunOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.ObservedRun!>!
@@ -984,9 +984,37 @@ Cronwatch.ValueMap<TKey, TValue>.Values.get -> System.Collections.Generic.IEnume
 Cronwatch.ValueMap<TKey, TValue>.With(TKey key, TValue value) -> Cronwatch.ValueMap<TKey, TValue>!
 Cronwatch.ValueMap<TKey, TValue>.Without(TKey key) -> Cronwatch.ValueMap<TKey, TValue>!
 Cronwatch.ValueMap<TKey, TValue>.this[TKey key].get -> TValue
+Cronwatch.Web.Adapters
+Cronwatch.Web.CronwatchRequest
+Cronwatch.Web.CronwatchRequest.Body.init -> void
+Cronwatch.Web.CronwatchRequest.BodyReader.init -> void
+Cronwatch.Web.CronwatchRequest.CronwatchRequest(string! method, string! target) -> void
+Cronwatch.Web.CronwatchRequest.DeclaredLength.get -> long?
+Cronwatch.Web.CronwatchRequest.DeclaredLength.init -> void
+Cronwatch.Web.CronwatchRequest.Header(string! name) -> string?
+Cronwatch.Web.CronwatchRequest.Headers.init -> void
+Cronwatch.Web.CronwatchRequest.IsTls.get -> bool
+Cronwatch.Web.CronwatchRequest.IsTls.init -> void
+Cronwatch.Web.CronwatchRequest.Method.get -> string!
+Cronwatch.Web.CronwatchRequest.Mount.get -> string?
+Cronwatch.Web.CronwatchRequest.Mount.init -> void
+Cronwatch.Web.CronwatchRequest.Path.get -> string!
+Cronwatch.Web.CronwatchRequest.ReadBodyAsync(int limit = 1048576, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
+Cronwatch.Web.CronwatchRequest.Target.init -> void
+Cronwatch.Web.CronwatchResponse
+Cronwatch.Web.CronwatchResponse.Body.get -> System.ReadOnlyMemory<byte>
+Cronwatch.Web.CronwatchResponse.CronwatchResponse(int status) -> void
+Cronwatch.Web.CronwatchResponse.Header(string! name) -> string?
+Cronwatch.Web.CronwatchResponse.Headers.get -> System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<string!, string!>>!
+Cronwatch.Web.CronwatchResponse.Result.get -> object?
+Cronwatch.Web.CronwatchResponse.Status.get -> int
+Cronwatch.Web.CronwatchResponse.Text() -> string!
+Cronwatch.Web.CronwatchResponse.WithBody(byte[]! body) -> Cronwatch.Web.CronwatchResponse!
+Cronwatch.Web.CronwatchResponse.WithBody(string! body) -> Cronwatch.Web.CronwatchResponse!
+Cronwatch.Web.CronwatchResponse.WithHeader(string! name, string! value) -> Cronwatch.Web.CronwatchResponse!
 Cronwatch.Web.DashboardToken
 Cronwatch.Web.Handler
-Cronwatch.Web.Handler.HandleAsync(Cronwatch.Web.WebRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Web.WebResponse!>!
+Cronwatch.Web.Handler.HandleAsync(Cronwatch.Web.CronwatchRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Web.CronwatchResponse!>!
 Cronwatch.Web.Handler.IsOpen.get -> bool
 Cronwatch.Web.Handler.Job.get -> Cronwatch.Job!
 Cronwatch.Web.HandlerOptions
@@ -994,7 +1022,7 @@ Cronwatch.Web.HandlerOptions.HandlerOptions() -> void
 Cronwatch.Web.HandlerOptions.Secret.init -> void
 Cronwatch.Web.HandlerSecret
 Cronwatch.Web.Routes
-Cronwatch.Web.Routes.HandleAsync(Cronwatch.Web.WebRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Web.WebResponse!>!
+Cronwatch.Web.Routes.HandleAsync(Cronwatch.Web.CronwatchRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.Web.CronwatchResponse!>!
 Cronwatch.Web.Routes.IsOpen.get -> bool
 Cronwatch.Web.Routes.Token() -> string?
 Cronwatch.Web.RoutesOptions
@@ -1027,6 +1055,7 @@ Cronwatch.Web.WebRequest.Mount.init -> void
 Cronwatch.Web.WebRequest.Path.get -> string!
 Cronwatch.Web.WebRequest.ReadBodyAsync(int limit = 1048576, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
 Cronwatch.Web.WebRequest.Target.init -> void
+Cronwatch.Web.WebRequest.ToCronwatchRequest() -> Cronwatch.Web.CronwatchRequest!
 Cronwatch.Web.WebRequest.WebRequest(string! method, string! target) -> void
 Cronwatch.Web.WebResponse
 Cronwatch.Web.WebResponse.Body.get -> System.ReadOnlyMemory<byte>
@@ -1035,6 +1064,7 @@ Cronwatch.Web.WebResponse.Headers.get -> System.Collections.Generic.IReadOnlyLis
 Cronwatch.Web.WebResponse.Result.get -> object?
 Cronwatch.Web.WebResponse.Status.get -> int
 Cronwatch.Web.WebResponse.Text() -> string!
+Cronwatch.Web.WebResponse.ToCronwatchResponse() -> Cronwatch.Web.CronwatchResponse!
 Cronwatch.Web.WebResponse.WebResponse(int status) -> void
 Cronwatch.Web.WebResponse.WithBody(byte[]! body) -> Cronwatch.Web.WebResponse!
 Cronwatch.Web.WebResponse.WithBody(string! body) -> Cronwatch.Web.WebResponse!
@@ -1051,6 +1081,7 @@ const Cronwatch.Triage.AnthropicTriage.DefaultEffort = "medium" -> string!
 const Cronwatch.Triage.AnthropicTriage.DefaultMaxTokens = 800 -> long
 const Cronwatch.Triage.AnthropicTriage.DefaultModel = "claude-opus-5" -> string!
 const Cronwatch.Triage.AnthropicTriage.FallbackBeta = "server-side-fallback-2026-07-01" -> string!
+const Cronwatch.Web.CronwatchRequest.MaxBody = 1048576 -> int
 const Cronwatch.Web.Routes.DefaultBasePath = "/cronwatch" -> string!
 const Cronwatch.Web.WebRequest.MaxBody = 1048576 -> int
 override Cronwatch.Alert.Equals(object? obj) -> bool
@@ -1200,6 +1231,8 @@ override Cronwatch.ValueList<T>.ToString() -> string!
 override Cronwatch.ValueMap<TKey, TValue>.Equals(object? obj) -> bool
 override Cronwatch.ValueMap<TKey, TValue>.GetHashCode() -> int
 override Cronwatch.ValueMap<TKey, TValue>.ToString() -> string!
+override Cronwatch.Web.CronwatchRequest.ToString() -> string!
+override Cronwatch.Web.CronwatchResponse.ToString() -> string!
 override Cronwatch.Web.DashboardToken.ToString() -> string!
 override Cronwatch.Web.Handler.ToString() -> string!
 override Cronwatch.Web.HandlerOptions.ToString() -> string!
@@ -1360,13 +1393,22 @@ static Cronwatch.ValueList<T>.Of(params System.ReadOnlySpan<T> items) -> Cronwat
 static Cronwatch.ValueList<T>.implicit operator Cronwatch.ValueList<T>!(T[]! items) -> Cronwatch.ValueList<T>!
 static Cronwatch.ValueMap<TKey, TValue>.Empty.get -> Cronwatch.ValueMap<TKey, TValue>!
 static Cronwatch.ValueMap<TKey, TValue>.Of(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>! entries) -> Cronwatch.ValueMap<TKey, TValue>!
+static Cronwatch.Web.Adapters.FormBody(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, string!>>! fields) -> byte[]!
+static Cronwatch.Web.Adapters.Target(string! rawTarget) -> string!
+static Cronwatch.Web.CronwatchResponse.Carrying(object! result, int status) -> Cronwatch.Web.CronwatchResponse!
 static Cronwatch.Web.DashboardToken.None.get -> Cronwatch.Web.DashboardToken!
 static Cronwatch.Web.DashboardToken.implicit operator Cronwatch.Web.DashboardToken!(string! token) -> Cronwatch.Web.DashboardToken!
 static Cronwatch.Web.HandlerSecret.None.get -> Cronwatch.Web.HandlerSecret!
 static Cronwatch.Web.HandlerSecret.implicit operator Cronwatch.Web.HandlerSecret!(string! secret) -> Cronwatch.Web.HandlerSecret!
 static Cronwatch.Web.WebAdapters.FormBody(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, string!>>! fields) -> byte[]!
 static Cronwatch.Web.WebAdapters.Target(string! rawTarget) -> string!
+static Cronwatch.Web.WebRequest.FromCronwatchRequest(Cronwatch.Web.CronwatchRequest! request) -> Cronwatch.Web.WebRequest!
+static Cronwatch.Web.WebRequest.implicit operator Cronwatch.Web.CronwatchRequest!(Cronwatch.Web.WebRequest! request) -> Cronwatch.Web.CronwatchRequest!
+static Cronwatch.Web.WebRequest.implicit operator Cronwatch.Web.WebRequest!(Cronwatch.Web.CronwatchRequest! request) -> Cronwatch.Web.WebRequest!
 static Cronwatch.Web.WebResponse.Carrying(object! result, int status) -> Cronwatch.Web.WebResponse!
+static Cronwatch.Web.WebResponse.FromCronwatchResponse(Cronwatch.Web.CronwatchResponse! response) -> Cronwatch.Web.WebResponse!
+static Cronwatch.Web.WebResponse.implicit operator Cronwatch.Web.CronwatchResponse!(Cronwatch.Web.WebResponse! response) -> Cronwatch.Web.CronwatchResponse!
+static Cronwatch.Web.WebResponse.implicit operator Cronwatch.Web.WebResponse!(Cronwatch.Web.CronwatchResponse! response) -> Cronwatch.Web.WebResponse!
 static readonly Cronwatch.Bridge.SchedulerBridge.SyncTimeout -> System.TimeSpan
 static readonly Cronwatch.Bridge.Watch.SaveTimeout -> System.TimeSpan
 virtual Cronwatch.AlertDetails.EqualityContract.get -> System.Type!

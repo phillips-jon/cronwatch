@@ -314,14 +314,14 @@ public static partial class Golden
         });
     }
 
-    /// <summary>The capture as a <see cref="WebRequest"/> for <paramref name="path"/>, from <c>app.test</c>.</summary>
-    public static WebRequest Request(Capture c, string path, string? mount = null)
+    /// <summary>The capture as a <see cref="CronwatchRequest"/> for <paramref name="path"/>, from <c>app.test</c>.</summary>
+    public static CronwatchRequest Request(Capture c, string path, string? mount = null)
     {
         var headers = new List<KeyValuePair<string, string>> { new("host", "app.test") };
         headers.AddRange(c.Headers);
         return c.BodyBytes is { } body
-            ? new WebRequest(c.Method, path) { Headers = headers, Body = body, Mount = mount }
-            : new WebRequest(c.Method, path) { Headers = headers, Mount = mount };
+            ? new CronwatchRequest(c.Method, path) { Headers = headers, Body = body, Mount = mount }
+            : new CronwatchRequest(c.Method, path) { Headers = headers, Mount = mount };
     }
 
     /// <summary>
@@ -381,7 +381,7 @@ public static partial class Golden
         foreach (Capture c in Captures())
         {
             string path = await ResolveAsync(seeded.Client, c.Path);
-            WebResponse answer = await routes.HandleAsync(Request(c, path));
+            CronwatchResponse answer = await routes.HandleAsync(Request(c, path));
             // Straight into the routes nothing is added: no content-length, as the SDK's answers.
             Compare(c, answer.Status, answer.Headers, answer.Body.ToArray(), ids, new HashSet<string>());
             matched++;

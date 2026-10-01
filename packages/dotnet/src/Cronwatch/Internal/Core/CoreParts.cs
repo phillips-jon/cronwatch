@@ -238,7 +238,10 @@ internal static class HttpFailure
     public static string? Of(object? value) => value switch
     {
         HttpResponseMessage m => Text((int)m.StatusCode, m.ReasonPhrase),
+        Web.CronwatchResponse w => Text(w.Status),
+#pragma warning disable CS0618 // the former name, kept through 1.x
         Web.WebResponse w => Text(w.Status),
+#pragma warning restore CS0618
         _ => null,
     };
 }
