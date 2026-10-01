@@ -42,6 +42,9 @@ module Cronwatch
     SILENCE_OPTIONS = %i[for].freeze
     # Run ids that start with this belong to the pg_cron source (Sources::PgCron).
     RESERVED_RUN_ID_PREFIX = "pgcron:"
+    # The longest run id, in UTF-16 code units (JavaScript's string length):
+    # what start, resume and record_run take, and every store holds.
+    MAX_RUN_ID = 200
 
     # What execute returns: the recorded run, and the block's own outcome.
     ExecuteResult = Struct.new(:run, :result, :error, :threw, keyword_init: true)
@@ -327,7 +330,12 @@ module Cronwatch
       input = run.is_a?(Run) ? run : Run.from_h(run.is_a?(Hash) ? run.to_h { |k, v| [Naming.camel(k), v] } : run)
       declared = @registry.synchronize { @definitions[input.job] }
       raise ArgumentError, "record_run: job \"#{input.job}\" is not declared; call job first" unless declared
-      if input.id.to_s.include?("\0")
+      # The longest id start takes, and every store holds.
+      unless input.id.is_a?(String) && !input.id.empty? && JS.length16(input.id) <= MAX_RUN_ID
+        got = input.id.is_a?(String) ? "#{JS.length16(input.id)} characters" : input.id.class.to_s
+        raise ArgumentError, "record_run: run ids must be 1 to #{MAX_RUN_ID} characters (got #{got}; job \"#{input.job}\")"
+      end
+      if input.id.include?("\0")
         raise ArgumentError, "record_run: run ids cannot contain a NUL character (job \"#{input.job}\")"
       end
       # Refused as JobContext#metric refuses them: a store keeps NaN and Infinity as null.
@@ -1076,9 +1084,9 @@ module Cronwatch
 
     # Raises for a run id no store could hold, or one reserved for the pg_cron source.
     def check_run_id(job, id, method)
-      unless id.is_a?(String) && !id.empty? && JS.length16(id) <= 200
+      unless id.is_a?(String) && !id.empty? && JS.length16(id) <= MAX_RUN_ID
         got = id.is_a?(String) ? "#{JS.length16(id)} characters" : id.class.to_s
-        raise ArgumentError, "job \"#{job}\": #{method}() needs a run id of 1 to 200 characters (got #{got})"
+        raise ArgumentError, "job \"#{job}\": #{method}() needs a run id of 1 to #{MAX_RUN_ID} characters (got #{got})"
       end
       # Postgres refuses NUL in text, so no store could hold such an id.
       raise ArgumentError, "job \"#{job}\": #{method}() cannot take a run id containing a NUL character" if id.include?("\0")
