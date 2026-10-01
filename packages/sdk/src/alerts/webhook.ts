@@ -46,7 +46,7 @@ export function webhook(options: WebhookOptions): AlertChannel {
       // A pasted Authorization value often carries a stray space or newline, which fetch would refuse.
       for (const [name, value] of Object.entries(options.headers ?? {})) headers[name] = typeof value === "string" ? value.trim() : value;
       if (options.secret) {
-        headers["x-cronwatch-signature"] = `sha256=${await hmacSha256Hex(options.secret, body)}`;
+        headers["x-cronwatch-signature"] = `sha256=${await signature(options.secret, body)}`;
       }
       // A redirect is refused, not followed: the headers (and the signature) would go with it.
       const response = await fetch(postable(options.url), { method: "POST", headers, body, redirect: "error", signal: AbortSignal.timeout(TIMEOUT_MS) });
@@ -56,8 +56,15 @@ export function webhook(options: WebhookOptions): AlertChannel {
   };
 }
 
-/** HMAC-SHA256 as lowercase hex, with Web Crypto so it runs on Workers and Deno too. */
-export async function hmacSha256Hex(secret: string, body: string): Promise<string> {
+/**
+ * The webhook's signature of a body: the HMAC-SHA256 of the body with the
+ * secret, as lowercase hex. A request carries it as
+ * `X-CronWatch-Signature: sha256=<signature>`, so a receiver checks one with
+ * the raw body it got (before any JSON parsing) and a constant-time compare.
+ * Web Crypto, so it runs on Workers and Deno too. Every port has it, named
+ * the same.
+ */
+export async function signature(secret: string, body: string): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(body)));

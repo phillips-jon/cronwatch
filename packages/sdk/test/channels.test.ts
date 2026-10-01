@@ -14,7 +14,7 @@ import { sendgrid } from "../src/alerts/sendgrid.js";
 import { parseDsn, sentry } from "../src/alerts/sentry.js";
 import { ses } from "../src/alerts/ses.js";
 import { smsBody, twilio } from "../src/alerts/twilio.js";
-import { hmacSha256Hex, webhook } from "../src/alerts/webhook.js";
+import { signature, webhook } from "../src/alerts/webhook.js";
 import { composeAlert } from "../src/format.js";
 import type { Alert, AlertChannel, Run } from "../src/types.js";
 import { T0 } from "./helpers.js";
@@ -379,7 +379,7 @@ test("webhook signs with Web Crypto, byte for byte what node:crypto signed befor
   const body = JSON.stringify({ type: "failed", job: "nightly", at: 1767605402000, title: "caf\u00e9 \u{1F600}" });
   const expected = "6adb916e3eeed59c49b4ea555ffb46d5a1a37980b03f078c6b9edaaa46c5ec1d";
   assert.equal(createHmac("sha256", "s3cret").update(body).digest("hex"), expected);
-  assert.equal(await hmacSha256Hex("s3cret", body), expected);
+  assert.equal(await signature("s3cret", body), expected);
   const calls = stubFetch(t);
   const alert = failed();
   await webhook({ url: "https://hooks.example.com/in", secret: "s3cret" }).send(alert);

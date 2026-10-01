@@ -42,17 +42,18 @@ import { webhook } from "@cronwatch/sdk/webhook";
 webhook({ url: "https://hooks.example.com/cronwatch", secret: process.env.CRONWATCH_WEBHOOK_SECRET, headers: { "x-team": "billing" } });
 ```
 
-Verifying on the receiving side:
+Verifying on the receiving side, with `signature(secret, body)` from the same entry point, the HMAC-SHA256 as lowercase hex (every port has it under that name):
 
 ```ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
+import { signature } from "@cronwatch/sdk/webhook";
 
-const expected = Buffer.from("sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex"));
+const expected = Buffer.from(`sha256=${await signature(secret, rawBody)}`);
 const received = Buffer.from(request.headers.get("x-cronwatch-signature") ?? "");
 const ok = received.length === expected.length && timingSafeEqual(received, expected);
 ```
 
-`timingSafeEqual` throws when the two buffers differ in length, so compare the lengths first: a request with no signature, or a short one, is then refused rather than crashing the handler. Hash the raw body as it arrived, before any JSON parsing.
+`timingSafeEqual` throws when the two buffers differ in length, so compare the lengths first: a request with no signature, or a short one, is then refused rather than crashing the handler. Hash the raw body as it arrived, before any JSON parsing. Without the SDK, `createHmac("sha256", secret).update(rawBody).digest("hex")` from `node:crypto` gives the same hex.
 
 ## Email, SMS and error trackers
 

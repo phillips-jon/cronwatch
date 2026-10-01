@@ -134,7 +134,9 @@ Stores: `@cronwatch/sdk/sqlite` (`sqlite`), `/postgres` (`postgres`) and `/d1` (
 
 Sources: `@cronwatch/sdk/pg-cron` (`pgCron`), which reads pg_cron's jobs and runs through the pool you pass it. See [Supabase and pg_cron](/docs/supabase/).
 
-Alert channels, one function each, named after the entry: `/slack`, `/discord`, `/webhook`, `/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses`, `/twilio`, `/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag` and `/newrelic`. None needs a dependency. See [Alerts](/docs/alerts/).
+Alert channels, one function each, named after the entry: `/slack`, `/discord`, `/webhook`, `/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses`, `/twilio`, `/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag` and `/newrelic`. None needs a dependency. `/webhook` also has `signature(secret, body)`, for a receiver checking the [signature header](/docs/alerts/#webhook). See [Alerts](/docs/alerts/).
+
+Each entry point is named after the product it stores in, sends to, reads or triages with, and exports that one function, its options type and nothing else that is promised.
 
 Triage: `@cronwatch/sdk/anthropic` (`anthropic`) needs `@anthropic-ai/sdk`, which you install yourself.
 
@@ -150,3 +152,6 @@ These names still work, and do exactly what their replacements do, through every
 |---|---|
 | `CronWatch`, `CronWatchOptions` | `Cronwatch`, `CronwatchOptions`: the spelling every port uses |
 | `createRoutes(cw, options)` | `cw.routes(options)` |
+| `hmacSha256Hex(secret, body)` from `/webhook` | `signature(secret, body)`, the name every port uses |
+
+These were exported by accident, are internal to their entry points, and are no longer exported from 1.0: `MAX_SEGMENTS`, `MAX_BODY`, `smsSegments` and `smsBody` from `/twilio`; `parseDsn` from `/sentry`; `DESCRIPTION_MAX`, `embedDescription`, `codeBlockSafe` and `escapeMarkdown` from `/discord`; `PG_CRON_HOLD_MS`, `pgCronSchedule`, `pgCronJobName` and `pgCronRun` from `/pg-cron`.

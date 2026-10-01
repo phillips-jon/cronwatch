@@ -83,7 +83,7 @@ An `expect` RegExp runs in your process on the runtime's own engine and, like an
 | `@cronwatch/sdk/d1` | `d1(env.DB)`, the Cloudflare D1 store; needs nothing |
 | `@cronwatch/sdk/pg-cron` | `pgCron(pool)`, a source that reads pg_cron jobs (Supabase Cron included) from Postgres on every check; pass it in `sources` |
 | `@cronwatch/sdk/node` | `toNodeHandler`, `toKoaMiddleware`, `toRequest`, `writeResponse`: fetch handlers on `http.createServer`, Express, Connect, NestJS and Koa |
-| `@cronwatch/sdk/slack`, `/discord`, `/webhook` | chat and signed webhook alert channels |
+| `@cronwatch/sdk/slack`, `/discord`, `/webhook` | chat and signed webhook alert channels; `/webhook` also has `signature(secret, body)` for a receiver |
 | `@cronwatch/sdk/resend`, `/postmark`, `/sendgrid`, `/mailgun`, `/ses` | email alert channels |
 | `@cronwatch/sdk/twilio` | SMS alerts |
 | `@cronwatch/sdk/sentry`, `/honeybadger`, `/datadog`, `/rollbar`, `/bugsnag`, `/newrelic` | alerts as events in an error tracker |
