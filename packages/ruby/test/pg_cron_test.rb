@@ -15,13 +15,14 @@ class PgCronTest < Minitest::Test
 
   # cron.job and cron.job_run_details in memory, answering the reader's queries.
   class FakeCron
-    attr_reader :jobs, :details, :queries, :settings
+    attr_reader :jobs, :details, :queries, :settings, :opened
 
     def initialize
       @jobs = []
       @details = []
       @runid = 0
       @queries = []
+      @opened = []
       @settings = { "cron.timezone" => "GMT", "cron.log_run" => "on" }
     end
 
@@ -48,6 +49,7 @@ class PgCronTest < Minitest::Test
       end
       if text.include?("unnest")
         ids, afters, open = values
+        @opened << open.map(&:to_i)
         after = ids.zip(afters).to_h
         return out(@details.select { |d| (after.key?(d.jobid) && d.runid > after[d.jobid]) || open.map(&:to_i).include?(d.runid) }
                            .sort_by(&:runid).first(500))
@@ -199,6 +201,35 @@ class PgCronTest < Minitest::Test
     assert_equal "0 3 * * *", result.jobs[0].definition.schedule
     assert_equal ["pgcron:3", "pgcron:2"], cw.runs("vacuum").map(&:id), "the runs after the forget"
     assert_equal ["vacuum"], cw.defined_jobs.map(&:name)
+  end
+
+  def test_a_renamed_jobs_old_name_forgotten_while_its_run_is_open_lets_the_run_go_with_no_error
+    clock = Clock.new
+    cron = FakeCron.new
+    cron.job(1, "a", "0 3 * * *")
+    running = cron.add(1, "running", T0 - 5000, nil)
+    errors = []
+    cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], now: clock.to_proc, cron_secret: nil,
+                       on_error: ->(e, where) { errors << "#{where}: #{e.message}" }, sources: [PgCron.new(cron)])
+    cw.check
+    assert_equal "a", cw.get_run("pgcron:#{running.runid}").job
+    cron.jobs[0]["jobname"] = "b"
+    clock.advance(MIN)
+    cw.check
+    assert_match(/renamed to b/, cw.job_summary("a").definition.description)
+    cw.forget("a")
+    running.status = "succeeded"
+    running.end_time = Time.at(Rational(T0, 1000)).utc
+    3.times do
+      clock.advance(MIN)
+      cron.opened.clear
+      cw.check
+    end
+    assert_empty errors
+    assert_nil cw.job_summary("a"), "the forgotten name is not declared again"
+    assert_nil cw.get_run("pgcron:#{running.runid}"), "the run is not recorded"
+    assert(cron.opened.none? { |ids| ids.include?(running.runid) }, "and is no longer read")
+    assert_equal ["b"], cw.defined_jobs.map(&:name)
   end
 
   def test_job_options_apply_and_an_unreadable_schedule_is_reported

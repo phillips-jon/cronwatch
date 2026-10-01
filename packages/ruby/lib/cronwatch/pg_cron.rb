@@ -26,6 +26,8 @@ module Cronwatch
     # A job that is renamed, unscheduled or no longer picked keeps its old
     # name's runs and history, and that name is declared again without a
     # schedule, so it is never reported missed. Its description says why.
+    # Forgetting that old name from the dashboard while a run of it is still
+    # open lets the run go: it is not recorded, and no error is reported.
     #
     #   require "cronwatch/pg_cron"
     #   Cronwatch.configure do |c|
@@ -113,6 +115,8 @@ module Cronwatch
         @declared = {}
         # Names declared again without a schedule by retire, whose open runs are still read.
         @retired = Set.new
+        # The names the host declares, read on each sync after the retires (nil for a host without defined_jobs).
+        @declared_now = nil
         @scanned = false
         @warned = Set.new
         # Jobids whose callback failed, reported once until it works again.
@@ -284,6 +288,10 @@ module Cronwatch
         retire_unused(host, names, definitions, all)
         return [] if !recording || names.empty?
 
+        # The names declared now, after the retires above. A run copied under
+        # a retired name that was then forgotten (the dashboard's forget) has
+        # no job to go to: it is let go, never recorded and never read again.
+        @declared_now = host.respond_to?(:defined_jobs) ? host.defined_jobs.to_set(&:name) : nil
         alerts = []
         start_cursors(host, names, alerts, now)
         read_new(host, names, alerts, now)
@@ -457,10 +465,13 @@ module Cronwatch
           visible = all.map(&:jobid).to_set
           host.store.list_jobs.each do |stored|
             definition = stored.definition
+            # A foreign or damaged definition (not an object, tags not a list) is not one of ours.
+            next if !definition.is_a?(JobDefinition) || definition.unreadable? || !definition.tags.is_a?(Array)
             next if !stored.name.start_with?(@prefix) || in_use.include?(stored.name)
-            next if definition.schedule.nil? || definition.schedule.to_s.empty? || !Array(definition.tags).include?("pg_cron")
+            next if definition.schedule.nil? || definition.schedule.to_s.empty? || !definition.tags.include?("pg_cron")
 
-            match = DESCRIBED.match(definition.description.to_s)
+            description = definition.description
+            match = DESCRIBED.match(description.is_a?(String) ? description : "")
             next unless match
 
             jobid = match[1].to_i
@@ -483,8 +494,10 @@ module Cronwatch
         runid = Integer(row["runid"])
         jobid = Integer(row["jobid"])
         name = @pending[runid] || names[jobid]
-        unless name
+        if name.nil? || (@declared_now && !names.value?(name) && !@declared_now.include?(name))
+          @pending.delete(runid)
           @held.delete(runid)
+          @retired.delete(name) if name
           return
         end
         if row["start_time"].nil? && !PgCron.finished_status?(row["status"])
