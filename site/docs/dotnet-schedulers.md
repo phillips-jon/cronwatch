@@ -115,7 +115,7 @@ builder.Services.AddCronwatchJob<NightlyReport>("nightly-report", new JobOptions
 });
 ```
 
-Each fire is a run with the trigger `schedule`, the class (an `ICronwatchJob`) resolved from a new DI scope, its token cancelled at the job's timeout and at shutdown. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. `AddCronwatch`'s hosted check watches these jobs. [Hosted jobs](/docs/dotnet/#hosted-jobs) on the .NET page has the rest.
+Each fire is a run with the trigger `hosting` (`schedule` before 1.0), the class (an `ICronwatchJob`) resolved from a new DI scope, its token cancelled at the job's timeout and at shutdown. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. `AddCronwatch`'s hosted check watches these jobs. [Hosted jobs](/docs/dotnet/#hosted-jobs) on the .NET page has the rest.
 
 Coravel is not integrated: an invocable that should be watched wraps its body in a run.
 

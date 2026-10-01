@@ -153,7 +153,7 @@ public sealed class NightlyReport(ReportBuilder reports) : ICronwatchJob
 }
 ```
 
-Each fire is a run with the trigger `schedule`, its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
+Each fire is a run with the trigger `hosting` (runs recorded before 1.0 carry `schedule`), its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
 
 ```csharp
 var app = builder.Build();

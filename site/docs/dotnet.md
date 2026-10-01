@@ -129,7 +129,7 @@ public sealed class NightlyReport(ReportBuilder reports) : ICronwatchJob
 }
 ```
 
-Each fire is a run with the trigger `schedule`, its class resolved from a new DI scope and disposed after it. A cron or `every 5m` both work. The jobs are declared as the host starts (a bad schedule stops it, with the SDK's message) and first fire once the host has started. A fire that comes while the previous run is still going is skipped and logged once, so a slow job cannot pile up behind itself; a paused process does not catch up in a burst. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in [Hangfire or Quartz.NET](/docs/dotnet-schedulers/) with a shared store.
+Each fire is a run with the trigger `hosting` (runs recorded before 1.0 carry `schedule`; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)), its class resolved from a new DI scope and disposed after it. A cron or `every 5m` both work. The jobs are declared as the host starts (a bad schedule stops it, with the SDK's message) and first fire once the host has started. A fire that comes while the previous run is still going is skipped and logged once, so a slow job cannot pile up behind itself; a paused process does not catch up in a burst. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in [Hangfire or Quartz.NET](/docs/dotnet-schedulers/) with a shared store.
 
 A loop of your own needs no helper: declare the job with its schedule and call `job.RunAsync` in the loop. `job.NextFire(after, lastRunAt)` answers the job's next fire time in epoch milliseconds, for a scheduler of your own.
 

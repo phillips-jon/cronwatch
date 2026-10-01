@@ -23,13 +23,19 @@ internal sealed class HostedJob(string name, JobOptions options, Type type, Func
 
 /// <summary>
 /// The one hosted service that runs every <c>AddCronwatchJob</c> job at its schedule's fire
-/// times, on the client's clock: each fire a run with the trigger <c>schedule</c>, its class
+/// times, on the client's clock: each fire a run with the trigger <c>hosting</c>, its class
 /// resolved from a new scope, a fire that comes while the previous run is still going skipped.
 /// The jobs are declared as the host starts, and the first fire waits for the host to have
 /// started. Stopping cancels the runs' tokens and waits for them to be recorded.
 /// </summary>
 internal sealed partial class HostedJobs : IHostedService, IDisposable
 {
+    /// <summary>
+    /// The trigger each fire's run records: the integration's name, as every integration's is.
+    /// Runs recorded before 1.0 carry <c>schedule</c>; nothing reads it back.
+    /// </summary>
+    internal const string Trigger = "hosting";
+
     /// <summary>The longest a timer is armed for at once; a later fire is waited for in steps.</summary>
     private static readonly TimeSpan LongestWait = TimeSpan.FromDays(1);
 
@@ -178,7 +184,7 @@ internal sealed partial class HostedJobs : IHostedService, IDisposable
             try
             {
                 await job.RunAsync(
-                    new RunOptions { Trigger = "schedule", Id = id },
+                    new RunOptions { Trigger = Trigger, Id = id },
                     (ctx, ct) => hosted.Resolve(scope.ServiceProvider).RunAsync(ctx, ct),
                     stop).ConfigureAwait(false);
             }
