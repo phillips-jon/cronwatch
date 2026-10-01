@@ -139,7 +139,7 @@ final class PgCronTest extends TestCase
             store: $store ?? new MemoryStore(),
             alerts: $capture !== null ? [$capture] : [],
             now: $clock ?? new Clock(),
-            cronSecret: false,
+            cronSecret: null,
             onError: function (\Throwable $error) use (&$errors): void {
                 if (is_array($errors)) {
                     $errors[] = $error->getMessage();
@@ -291,7 +291,7 @@ final class PgCronTest extends TestCase
         $cron = new FakeCron();
         $cron->settingsDenied = true;
         $errors = [];
-        $cw = new Cronwatch(alerts: [], cronSecret: false, onError: function (\Throwable $e, string $where) use (&$errors): void {
+        $cw = new Cronwatch(alerts: [], cronSecret: null, onError: function (\Throwable $e, string $where) use (&$errors): void {
             $errors[] = "{$where}: {$e->getMessage()}";
         }, sources: [new PgCron($cron)]);
         $cw->check();
@@ -612,7 +612,7 @@ final class PgCronTest extends TestCase
             now: function () use (&$offset) {
                 return Js::nowMs() + $offset;
             },
-            cronSecret: false,
+            cronSecret: null,
             sources: [new PgCron($conn, jobs: fn (array $j) => str_starts_with((string) $j['jobname'], $tag), options: ['grace' => '30s'])],
         );
         try {
@@ -719,7 +719,7 @@ final class PgCronTest extends TestCase
 
             $capture = new Capture();
             $errors = [];
-            $cw = new Cronwatch(store: new MemoryStore(), alerts: [$capture], cronSecret: false, onError: function (\Throwable $e) use (&$errors): void {
+            $cw = new Cronwatch(store: new MemoryStore(), alerts: [$capture], cronSecret: null, onError: function (\Throwable $e) use (&$errors): void {
                 $errors[] = $e->getMessage();
             }, sources: [new PgCron($conn, jobs: fn (array $j) => str_starts_with((string) $j['jobname'], $tag), timezone: 'UTC')]);
             $cw->check();
@@ -771,7 +771,7 @@ final class PgCronTest extends TestCase
             $user = new \PDO($dsn, $role, 'pw', [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
             self::one($user, "SELECT cron.schedule(?, '0 3 * * *', 'SELECT 1')", ["{$role}-job"]);
             $errors = [];
-            $cw = new Cronwatch(store: new MemoryStore(), alerts: [], cronSecret: false, onError: function (\Throwable $e) use (&$errors): void {
+            $cw = new Cronwatch(store: new MemoryStore(), alerts: [], cronSecret: null, onError: function (\Throwable $e) use (&$errors): void {
                 $errors[] = $e->getMessage();
             }, sources: [new PgCron($user)]);
             $user->beginTransaction();
@@ -806,7 +806,7 @@ final class PgCronTest extends TestCase
             $jobid = (int) self::one($admin, "SELECT cron.schedule(?, '0 3 * * *', 'SELECT 1')", [$tag]);
             self::one($admin, 'SELECT cron.alter_job(?, active := false)', [$jobid]);
             self::one($admin, 'INSERT INTO cron.job_run_details (' . self::DETAIL_COLUMNS . ") SELECT ?, nextval('cron.runid_seq'), 'postgres', 'postgres', 'select 1', 'succeeded', '1 row', now() - interval '1 minute', now() - interval '59 seconds' RETURNING runid", [$jobid]);
-            $cw = new Cronwatch(store: $store, alerts: [], cronSecret: false, sources: [new PgCron($url, jobs: [$tag], timezone: 'UTC')]);
+            $cw = new Cronwatch(store: $store, alerts: [], cronSecret: null, sources: [new PgCron($url, jobs: [$tag], timezone: 'UTC')]);
             $cw->check();
             $runs = $cw->runs($tag);
             $this->assertCount(1, $runs);

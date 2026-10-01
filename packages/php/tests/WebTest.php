@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Cronwatch\Tests;
 
 use Cronwatch\Cronwatch;
+use Cronwatch\FromEnv;
 use Cronwatch\Job\JobContext;
 use Cronwatch\JobDefinition;
 use Cronwatch\Js;
@@ -95,7 +96,7 @@ final class WebTest extends TestCase
     }
 
     /** A dashboard whose development token is kept in a file of this test's own, its sign-in line kept in $this->logged. */
-    private function routes(Cronwatch $cw, string|false|null $token = null, ?string $basePath = '/cronwatch', ?string $origin = null, bool $trustProxy = false): Dashboard
+    private function routes(Cronwatch $cw, string|FromEnv|false|null $token = FromEnv::Read, ?string $basePath = '/cronwatch', ?string $origin = null, bool $trustProxy = false): Dashboard
     {
         $file = sys_get_temp_dir() . '/cronwatch-test-token-' . getmypid() . '-' . bin2hex(random_bytes(6));
         $this->tokenFiles[] = $file;
@@ -342,7 +343,7 @@ final class WebTest extends TestCase
     public function testWithoutATokenInDevelopmentAMadeUpTokenIsLoggedOnceKeptAndRequired(string $env): void
     {
         putenv("CRONWATCH_ENV={$env}");
-        $web = $this->routes($this->client(), null, '/cronwatch/');
+        $web = $this->routes($this->client(), FromEnv::Read, '/cronwatch/');
         // Every request is refused without the token, whatever it claims about where it came from.
         foreach ([['http://localhost:3000/cronwatch/api/jobs', []], ['http://localhost:3000/cronwatch/api/jobs', ['x-forwarded-for' => '127.0.0.1']],
             ['http://127.0.0.1:3000/cronwatch/', []], ['http://192.168.1.20:3000/cronwatch/api/jobs', []]] as [$url, $headers]) {
@@ -365,14 +366,14 @@ final class WebTest extends TestCase
         $this->assertSame(200, self::send($web, 'GET', 'http://localhost:3000/cronwatch/api/jobs', ['authorization' => "Bearer {$token}"])->status);
 
         // The next PHP request is a new dashboard: it reads the same token from its file and says nothing.
-        $again = new Dashboard($this->client(), null, '/cronwatch', null, false, function (string $line): void {
+        $again = new Dashboard($this->client(), FromEnv::Read, '/cronwatch', null, false, function (string $line): void {
             $this->logged[] = $line;
         }, end($this->tokenFiles));
         $this->assertSame(200, self::send($again, 'GET', 'http://localhost:3000/cronwatch/api/jobs', ['authorization' => "Bearer {$token}"])->status);
         $this->assertCount(1, $this->logged);
         $this->assertSame('600', substr(sprintf('%o', fileperms(end($this->tokenFiles))), -3), 'only the server can read it');
 
-        $other = $this->routes($this->client(), null, '/');
+        $other = $this->routes($this->client(), FromEnv::Read, '/');
         self::send($other, 'GET', 'https://dev.example:8443/api/jobs');
         $this->assertMatchesRegularExpression('#Sign in: /\?token=([A-Za-z0-9_-]{43}) on this server \(the first request\'s host is not local, so the link leaves it out\)$#D', $this->logged[1], 'no host that is not local, and a root mount');
         preg_match('#token=([A-Za-z0-9_-]{43})#', $this->logged[1], $other);
@@ -397,7 +398,7 @@ final class WebTest extends TestCase
         chmod($target, 0600);
         symlink($target, $link);
         try {
-            $linked = new Dashboard($this->client(), null, '/cronwatch', null, false, function (string $line): void {
+            $linked = new Dashboard($this->client(), FromEnv::Read, '/cronwatch', null, false, function (string $line): void {
                 $this->logged[] = $line;
             }, $link);
             $this->assertSame(401, self::send($linked, 'GET', '/cronwatch/api/jobs', ['authorization' => "Bearer {$planted}"])->status);
@@ -411,7 +412,7 @@ final class WebTest extends TestCase
     {
         putenv('CRONWATCH_ENV=development');
         $base = '/cronwatch-default-' . bin2hex(random_bytes(4));
-        $web = new Dashboard($this->client(), null, $base, null, false, function (string $line): void {
+        $web = new Dashboard($this->client(), FromEnv::Read, $base, null, false, function (string $line): void {
             $this->logged[] = $line;
         });
         $this->assertSame(401, self::send($web, 'GET', "http://localhost{$base}/api/jobs")->status);
@@ -420,7 +421,7 @@ final class WebTest extends TestCase
         $this->assertDirectoryExists($dir);
         $this->assertSame(0, fileperms($dir) & 0077, 'nobody else may list or write it');
         $token = substr($this->logged[0], -43);
-        $again = new Dashboard($this->client(), null, $base, null, false, fn () => null);
+        $again = new Dashboard($this->client(), FromEnv::Read, $base, null, false, fn () => null);
         $this->assertSame(200, self::send($again, 'GET', "http://localhost{$base}/api/jobs", ['authorization' => "Bearer {$token}"])->status, 'kept for the next request');
         foreach (glob("{$dir}/dev-token-*") ?: [] as $file) {
             if (trim((string) file_get_contents($file)) === $token) {
@@ -446,18 +447,28 @@ final class WebTest extends TestCase
         }
     }
 
-    public function testAnEmptyTokenCountsAsUnsetFalseOptsOutExplicitly(): void
+    public function testAnEmptyTokenCountsAsUnsetNullOptsOutExplicitly(): void
     {
         putenv('CRONWATCH_ENV=production');
         putenv('CRONWATCH_TOKEN=');
         $this->assertSame(503, self::send($this->routes($this->client()), 'GET', '/cronwatch/api/jobs')->status);
         $this->assertSame(503, self::send($this->routes($this->client(), ''), 'GET', '/cronwatch/api/jobs')->status);
-        $this->assertSame(200, self::send($this->routes($this->client(), false), 'GET', '/cronwatch/api/jobs')->status, 'token: false serves open');
+        $this->assertSame(503, self::send($this->routes($this->client(), FromEnv::Read), 'GET', '/cronwatch/api/jobs')->status);
+        $this->assertSame(200, self::send($this->routes($this->client(), null), 'GET', '/cronwatch/api/jobs')->status, 'token: null serves open');
+        $this->assertSame(200, self::send($this->routes($this->client(), false), 'GET', '/cronwatch/api/jobs')->status, 'token: false, deprecated, does the same');
+        $this->assertSame(200, self::send($this->client()->routes(token: null, basePath: '/cronwatch'), 'GET', '/cronwatch/api/jobs')->status, 'through routes() too');
 
         putenv('CRONWATCH_ENV=development');
         putenv('CRONWATCH_TOKEN');
-        $this->assertSame(200, self::send($this->routes($this->client(), false), 'GET', '/cronwatch/api/jobs')->status, 'token: false serves open in development too');
+        $this->assertSame(200, self::send($this->routes($this->client(), null), 'GET', '/cronwatch/api/jobs')->status, 'token: null serves open in development too');
+        $this->assertSame(200, self::send($this->routes($this->client(), false), 'GET', '/cronwatch/api/jobs')->status);
         $this->assertSame([], $this->logged, 'and makes no token');
+
+        // null never reads the environment: in 0.x it did.
+        putenv('CRONWATCH_ENV=production');
+        putenv('CRONWATCH_TOKEN=envtok');
+        $this->assertSame(200, self::send($this->routes($this->client(), null), 'GET', '/cronwatch/api/jobs')->status);
+        putenv('CRONWATCH_ENV=development');
 
         putenv('CRONWATCH_TOKEN=envtok');
         $this->assertSame(401, self::send($this->routes($this->client()), 'GET', '/cronwatch/api/jobs')->status, 'a configured token is used in development');
@@ -860,7 +871,7 @@ final class WebTest extends TestCase
             [['/cronwatch', null, true], self::INTERNAL . '/cronwatch/', ['x-forwarded-host' => 'evil.example/.localhost']],
         ];
         foreach ($cases as [[$basePath, $origin, $trustProxy], $url, $headers]) {
-            self::send($this->routes($this->client(), null, $basePath, $origin, $trustProxy), 'GET', $url, $headers);
+            self::send($this->routes($this->client(), FromEnv::Read, $basePath, $origin, $trustProxy), 'GET', $url, $headers);
         }
         // PHP passes a Host header through as sent: it is read as a URL.
         foreach (['localhost:1@evil.example', 'evil.example/.localhost'] as $host) {
@@ -980,7 +991,7 @@ final class WebTest extends TestCase
             $this->assertSame(200, $res->status, $path);
             $this->assertStringNotContainsString('secret-job', $res->body);
         }
-        $this->assertSame(200, self::send($this->app(false)[1], 'GET', '/cronwatch/manifest.webmanifest')->status);
+        $this->assertSame(200, self::send($this->app(null)[1], 'GET', '/cronwatch/manifest.webmanifest')->status);
     }
 
     public function testOnlyGetAndHeadReachTheAppShell(): void
@@ -1111,7 +1122,7 @@ final class WebTest extends TestCase
         $name = "<svg onload=alert(1)>\"&'";
         $store->upsertJob(new JobDefinition(['name' => $name, 'schedule' => '0 * * * *', 'timezone' => 'UTC']), self::T0 - self::HOUR);
         $store->insertRun(new Run('r1', $name, 'failed', self::T0 - 10 * self::MIN, self::T0 - 9 * self::MIN, self::MIN, 'x'));
-        $web = $this->routes($this->client(['store' => $store]), false);
+        $web = $this->routes($this->client(['store' => $store]), null);
         foreach (['/cronwatch/', '/cronwatch/jobs/' . rawurlencode($name)] as $path) {
             $html = self::send($web, 'GET', $path)->body;
             $this->assertStringNotContainsString('<svg onload', $html, $path);
@@ -1125,7 +1136,7 @@ final class WebTest extends TestCase
         for ($i = 0; $i < 33; $i++) {
             $cw->run(sprintf('job-%02d', $i), self::nothing());
         }
-        $html = self::send($this->routes($cw, false), 'GET', '/cronwatch/')->body;
+        $html = self::send($this->routes($cw, null), 'GET', '/cronwatch/')->body;
         $this->assertSame(30, preg_match_all('/<li class="lane">/', $html));
         $this->assertStringContainsString('Showing the first 30 of 33 jobs here', $html);
         $this->assertSame(33, preg_match_all('/<td class="job">/', $html));
@@ -1133,7 +1144,7 @@ final class WebTest extends TestCase
 
     public function testAnEmptyStoreShowsNoTimelineAndHowToDeclareAJob(): void
     {
-        $html = self::send($this->routes($this->client(), false), 'GET', '/cronwatch/')->body;
+        $html = self::send($this->routes($this->client(), null), 'GET', '/cronwatch/')->body;
         $this->assertStringContainsString('No jobs yet.', $html);
         $this->assertStringNotContainsString('class="timeline', $html);
         $this->assertStringContainsString('<code>$cw-&gt;job(&#39;name&#39;, [&#39;schedule&#39; =&gt; &#39;0 2 * * *&#39;])</code>', $html);
@@ -1152,7 +1163,7 @@ final class WebTest extends TestCase
     {
         $cw = $this->client();
         $cw->job('minutely', ['schedule' => '* * * * *'])->run(self::nothing());
-        $html = self::send($this->routes($cw, false), 'GET', '/cronwatch/')->body;
+        $html = self::send($this->routes($cw, null), 'GET', '/cronwatch/')->body;
         $this->assertMatchesRegularExpression('#<line class="cadence"[^>]*><title>minutely: due \* \* \* \* \*, too often to mark each time</title>#', $html);
         $this->assertDoesNotMatchRegularExpression('#class="tick[^"]*" x1="[\d.]+" y1="6"#', $html);
     }
@@ -1161,7 +1172,7 @@ final class WebTest extends TestCase
 
     public function testTheSuperglobalsAreReadAsAServerFillsThem(): void
     {
-        [$cw, $web] = $this->app(false, null);
+        [$cw, $web] = $this->app(null, null);
         $cw->run('x', self::nothing());
         // A path-info URL is mounted at its script.
         $server = ['REQUEST_METHOD' => 'GET', 'REQUEST_URI' => '/tools/cronwatch.php/jobs/x', 'SCRIPT_NAME' => '/tools/cronwatch.php',

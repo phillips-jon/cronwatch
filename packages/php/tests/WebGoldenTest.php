@@ -50,7 +50,7 @@ final class WebGoldenTest extends TestCase
         $cw = new Cronwatch(
             store: new MemoryStore(),
             alerts: [new Custom('capture', fn () => null)],
-            cronSecret: false,
+            cronSecret: null,
             now: $clock,
             onError: function (\Throwable $error, string $context): void {
                 self::$errors[] = "{$context}: {$error->getMessage()}";

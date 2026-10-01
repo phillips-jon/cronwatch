@@ -39,7 +39,7 @@ final class ClientConformanceTest extends TestCase
     {
         $failures = [];
         foreach (self::fixture()->runIds as $i => $c) {
-            $cw = new Cronwatch(alerts: [new Capture()], cronSecret: false, onError: fn () => null, now: new Clock());
+            $cw = new Cronwatch(alerts: [new Capture()], cronSecret: null, onError: fn () => null, now: new Clock());
             $job = $cw->job('j');
             try {
                 match ($c->method) {
@@ -106,7 +106,7 @@ final class ClientConformanceTest extends TestCase
         $cw = new Cronwatch(
             store: $store,
             alerts: [$capture],
-            cronSecret: false,
+            cronSecret: null,
             onError: function (\Throwable $error, string $where) use (&$errors): void {
                 $errors[] = "{$where}: {$error->getMessage()}";
             },

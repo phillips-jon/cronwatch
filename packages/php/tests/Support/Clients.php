@@ -24,7 +24,7 @@ trait Clients
         return new Cronwatch(...array_replace([
             'now' => $this->clock,
             'alerts' => [$this->capture],
-            'cronSecret' => false,
+            'cronSecret' => null,
             'onError' => function (\Throwable $error, string $where): void {
                 $this->errors[] = [$error, $where];
             },

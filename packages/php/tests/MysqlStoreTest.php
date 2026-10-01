@@ -187,7 +187,7 @@ final class MysqlStoreTest extends TestCase
         $backend = $this->backend($kind);
         try {
             $store = $backend->open();
-            $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [], cronSecret: false);
+            $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [], cronSecret: null);
             $app = self::admin($backend);
             $app->exec("CREATE TABLE IF NOT EXISTS {$backend->prefix}orders (id INT PRIMARY KEY)");
             $app->beginTransaction();

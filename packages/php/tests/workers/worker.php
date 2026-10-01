@@ -44,7 +44,7 @@ $errors = [];
 $cw = new Cronwatch(
     store: $store,
     alerts: [$alerts],
-    cronSecret: false,
+    cronSecret: null,
     now: fn () => $config['now'],
     onError: function (\Throwable $error, string $where) use (&$errors): void {
         $errors[] = "{$where}: {$error->getMessage()}";

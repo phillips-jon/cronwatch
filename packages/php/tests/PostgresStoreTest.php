@@ -164,7 +164,7 @@ final class PostgresStoreTest extends TestCase
     {
         $backend = $this->backend();
         try {
-            $cw = new Cronwatch(store: $backend->open(), now: new Clock(), alerts: [], cronSecret: false, onError: function (\Throwable $error): never {
+            $cw = new Cronwatch(store: $backend->open(), now: new Clock(), alerts: [], cronSecret: null, onError: function (\Throwable $error): never {
                 throw $error;
             });
             try {
@@ -198,7 +198,7 @@ final class PostgresStoreTest extends TestCase
         $backend = $this->backend();
         try {
             $store = $backend->open();
-            $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [], cronSecret: false);
+            $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [], cronSecret: null);
             $app = self::admin($backend);
             $app->exec("CREATE TABLE IF NOT EXISTS {$backend->prefix}orders (id INT PRIMARY KEY)");
             $app->beginTransaction();

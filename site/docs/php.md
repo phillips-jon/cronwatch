@@ -86,10 +86,10 @@ The run is recorded when the function returns. What it throws (an `Exception` or
 
 A run cut short by `exit()` or a fatal error, such as memory running out, which no `catch` sees, is recorded as failed when the process ends (`Interrupted: the process exited during the run`, or `Interrupted: Fatal error: <message>` with the file and line), so it is never left running to be reported stuck later. A process killed outright records nothing, and its run is marked stuck after the job's timeout.
 
-`run()` returns what the function returns, and a string it returns is the run's output when nothing was logged. `wrap()` gives a callable whose every call is a run, with `Cronwatch::current()` as its context:
+`run()` returns what the function returns, and a string it returns is the run's output when nothing was logged. `monitor()` gives a callable whose every call is a run, with `Cronwatch::current()` as its context:
 
 ```php
-$report = $nightly->wrap(function (string $day) {
+$report = $nightly->monitor(function (string $day) {
     \Cronwatch\Cronwatch::current()?->log('Report written for', $day);
 });
 $report('2026-09-28');
@@ -147,7 +147,7 @@ $app->add(new \Cronwatch\Web\PsrMiddleware($cw->routes(), $factory, $factory)); 
 
 `$cw->routes(token:, basePath:, origin:, trustProxy:)`:
 
-- `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. `false` serves the routes open, for a mount behind your own auth. Without a token:
+- `token`: leave it out (or pass `Cronwatch\FromEnv::Read`) to read `CRONWATCH_TOKEN`; an empty string counts as unset. Everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. `null` serves the routes open, for a mount behind your own auth, as it does in every language. Without a token:
   - In development, the routes make one and keep it in a file in the system's temporary directory, so every request, in every PHP process, asks for the same one. They write a sign-in link to the server log when they make it.
   - The link names the host only when `origin` is set or the request's host is loopback: `localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`. The host must read as one of these on its own, so a Host header such as `localhost:1@evil.example` does not count. Otherwise the link leaves the host out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`.
   - Anywhere else, they answer 503.
@@ -176,7 +176,7 @@ $cw->job('nightly-report', ['schedule' => '0 2 * * *', 'timezone' => 'UTC'])
 
 `serve()` answers from the superglobals. Called with a request, the handler answers in that request's kind, so a Symfony controller is `return $handler($request);`; `laravel()` is a Laravel route action and `symfony()` a Symfony controller callable, and `new Cronwatch\Web\PsrJobHandler($handler, $factory, $factory)` is a PSR-15 request handler.
 
-The secret is `handler($fn, secret: '...')`, else the client's `cronSecret`, which reads `CRON_SECRET` by default; it is compared in constant time. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 and reports it once to `onError`, rather than let anyone on the internet run the job; `secret: false` opts out on purpose, for an endpoint your platform already protects. A run is answered 200 or 500 with `{"ok", "job", "run", "status", "durationMs"}`, and a function that returns a response of its own is answered with it.
+The secret is `handler($fn, secret: '...')`, else the client's `cronSecret`, which reads `CRON_SECRET` by default; it is compared in constant time. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 and reports it once to `onError`, rather than let anyone on the internet run the job; `secret: null` opts out on purpose, for an endpoint your platform already protects. A run is answered 200 or 500 with `{"ok", "job", "run", "status", "durationMs"}`, and a function that returns a response of its own is answered with it.
 
 A response with a status of 400 or more fails the run, recorded as `HTTP <status>` and its reason (`HTTP 503 Service Unavailable`), whether a handler, `run()` or `finish(['result' => ...])` got it. PSR-7 responses, Symfony's and Laravel's responses, Symfony's HttpClient responses, Laravel's HTTP client responses, a `Cronwatch\Web\Response` and an array such as `['status' => 503, 'body' => 'down']` are all recognised, so a job that calls an API and returns its answer fails when the API does.
 
@@ -375,7 +375,7 @@ A triage of your own is any callable that takes a `Cronwatch\TriageContext` (`al
 | `alerts` | the console | a list of channels or callables. `[]` sends nothing |
 | `triage` | | a callable returning a diagnosis |
 | `sources` | | where runs this process does not wrap come from, such as [pg_cron](#pg-cron). Each is synced at the start of every check; one that throws is reported to `onError` and the check carries on |
-| `cronSecret` | `CRON_SECRET` | the bearer the dashboard's check endpoint accepts beside the token, and the one `handler()` requires. `''` counts as unset; `false` means none on purpose |
+| `cronSecret` | `CRON_SECRET` | the bearer the dashboard's check endpoint accepts beside the token, and the one `handler()` requires. Leave it out (or pass `Cronwatch\FromEnv::Read`) to read `CRON_SECRET`; `''` counts as unset; `null` means none on purpose |
 | `retention` | `'30d'` | how long finished runs are kept. Each job's newest run is always kept |
 | `defaults` | | `grace`, `timeout`, `timezone`, `failuresBeforeAlert` applied to every job that does not set its own |
 | `redact` | secret patterns | a callable applied to output and errors; `false` keeps them as logged. See [Redaction](#redaction) |
@@ -383,13 +383,13 @@ A triage of your own is any callable that takes a `Cronwatch\TriageContext` (`al
 | `onError` | PHP's error log | `fn (Throwable $error, string $where) => ...` for failures outside jobs: the store, a channel, triage |
 | `now` | the system clock | a callable returning epoch milliseconds; for tests |
 
-`$cw->job($name, $options)` takes `schedule` (five or six field cron, a nickname such as `'@hourly'`, or `'every 5m'`), `timezone` (IANA; PHP's default zone, `date.timezone`, when left out), `grace` (`'10m'`), `timeout` (`'1h'`), `maxDuration`, `budget` (`['metric' => ceiling]`), `expect` (a string, a `Pattern` or a callable), `failuresBeforeAlert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options throw `InvalidArgumentException` when the job is declared.
+`$cw->job($name, $options)` takes `schedule` (five or six field cron, a nickname such as `'@hourly'`, or `'every 5m'`), `timezone` (IANA; PHP's default zone, `date.timezone`, when left out), `grace` (`'10m'`), `timeout` (`'1h'`: a run still going after it is given up on, recorded as a failed `timeout`, and the job is stuck), `maxDuration` (a run that finished ok but took longer flags the job slow, and stays ok; set `timeout` well above it), `budget` (`['metric' => ceiling]`), `expect` (a string, a `Pattern` or a callable), `failuresBeforeAlert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options throw `InvalidArgumentException` when the job is declared.
 
 The client:
 
 | Method | |
 |---|---|
-| `job($name, $options)` | declare a job and get its handle: `run()`, `wrap()`, `handler()`, `start()`, `resume()` |
+| `job($name, $options)` | declare a job and get its handle: `run()`, `monitor()`, `handler()`, `start()`, `resume()` |
 | `run($name, $fn, $options)` | run without keeping a handle |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
 | `jobs()`, `jobsWithRuns($limit = 20)`, `jobSummary($name)` | summaries, without alerting |
@@ -404,6 +404,22 @@ The client:
 | `close()` | close the store; called during a check, once the check ends |
 
 There is no `start()` or `stop()`: a PHP process does not stay up between checks, so the check is a crontab line, a scheduler entry or a worker's own loop. A check called from inside a check (by a channel, a source or triage) throws `LogicException`.
+
+Public means documented here or in the README; every other class and method is marked `@internal` and may change in any release.
+
+### Changed in 1.0: `null` turns a secret off
+
+`cronSecret`, the dashboard's `token` and a handler's `secret` read `null` as every other language does: off. In 0.x, `null` was the default and read `CRON_SECRET` or `CRONWATCH_TOKEN`, and `false` turned them off. Leaving the argument out still reads the environment, as does `Cronwatch\FromEnv::Read`, the new default. Code that passed `null` on purpose to mean "read the environment" now turns the secret or the token off: leave the argument out, or pass `FromEnv::Read`.
+
+### Deprecated
+
+Each still works through 1.x and goes in 2.0.
+
+| Deprecated | Use |
+|---|---|
+| `cronSecret: false`, `token: false`, `handler($fn, secret: false)` | `null`, which does the same |
+| `$job->wrap($fn)` | `$job->monitor($fn)`, the same name as Python's decorator |
+| `Cronwatch\Alerts\Webhook::hmacSha256Hex($secret, $body)` | `Webhook::signature($secret, $body)`, the name every language uses |
 
 ## Sharing a database with the other languages
 

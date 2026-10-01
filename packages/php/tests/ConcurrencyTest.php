@@ -37,8 +37,8 @@ final class ConcurrencyTest extends TestCase
         $clock = new Clock();
         $a = new Capture();
         $b = new Capture();
-        $one = new Cronwatch(store: $storeA, now: $clock, alerts: [$a], cronSecret: false);
-        $two = new Cronwatch(store: $storeB, now: $clock, alerts: [$b], cronSecret: false);
+        $one = new Cronwatch(store: $storeA, now: $clock, alerts: [$a], cronSecret: null);
+        $two = new Cronwatch(store: $storeB, now: $clock, alerts: [$b], cronSecret: null);
         $options = ['failuresBeforeAlert' => 2];
         $one->run('shared', fn () => null, $options);
         $two->job('shared', $options);
@@ -109,8 +109,8 @@ final class ConcurrencyTest extends TestCase
         $store = new MemoryStore();
         $clock = new Clock();
         $runnerStore = new FlakyStore($store);
-        $runner = new Cronwatch(store: $runnerStore, now: $clock, alerts: [new Capture()], cronSecret: false);
-        $admin = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: false);
+        $runner = new Cronwatch(store: $runnerStore, now: $clock, alerts: [new Capture()], cronSecret: null);
+        $admin = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: null);
         $runner->run('s', fn () => null);
         $silenced = false;
         $runnerStore->hooks['getState'] = function (\Closure $next, array $args) use (&$silenced, $admin) {
@@ -135,7 +135,7 @@ final class ConcurrencyTest extends TestCase
     public function testAHandleKeptFromAnEarlierDeclarationWritesTheOneThatStandsNotItsOwn(): void
     {
         $store = new MemoryStore();
-        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: false);
+        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: null);
         $earlier = $cw->job('a');
         $cw->job('a', ['schedule' => 'every 5m']);
         $earlier->run(fn () => null);
@@ -147,7 +147,7 @@ final class ConcurrencyTest extends TestCase
     public function testAHandleWhoseJobWasForgottenWritesItsOwnDefinition(): void
     {
         $store = new MemoryStore();
-        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: false);
+        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: null);
         $handle = $cw->job('a', ['schedule' => 'every 5m']);
         $cw->forget('a');
         $handle->run(fn () => null);
@@ -167,7 +167,7 @@ final class ConcurrencyTest extends TestCase
     {
         $inner = new MemoryStore();
         $store = new FlakyStore($inner);
-        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: false);
+        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: null);
         $held = false;
         $store->hooks['upsertJob'] = function (\Closure $next, array $args) use (&$held, $during, $cw) {
             if (!$held) {
@@ -193,7 +193,7 @@ final class ConcurrencyTest extends TestCase
     {
         $inner = new MemoryStore();
         $store = new FlakyStore($inner);
-        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: false);
+        $cw = new Cronwatch(store: $store, now: new Clock(), alerts: [new Capture()], cronSecret: null);
         $forgotten = false;
         $store->hooks['upsertJob'] = function (\Closure $next, array $args) use (&$forgotten, $cw) {
             $next(...$args);
@@ -214,8 +214,8 @@ final class ConcurrencyTest extends TestCase
     {
         $store = new MemoryStore();
         $clock = new Clock();
-        $worker = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: false);
-        $web = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: false);
+        $worker = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: null);
+        $web = new Cronwatch(store: $store, now: $clock, alerts: [new Capture()], cronSecret: null);
         $handle = $worker->job('nightly', ['schedule' => '0 2 * * *']);
         $handle->run(fn () => null);
         $comesBack = [

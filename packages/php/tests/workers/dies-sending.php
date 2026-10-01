@@ -29,7 +29,7 @@ $cw = new Cronwatch(
     store: new SqliteStore($file),
     now: fn () => (int) $now,
     alerts: [$channel],
-    cronSecret: false,
+    cronSecret: null,
     triage: $mode === 'triage' ? function (): never {
         exit(0);
     } : null,

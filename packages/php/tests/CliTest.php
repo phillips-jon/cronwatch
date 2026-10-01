@@ -40,7 +40,7 @@ final class CliTest extends TestCase
         for ($i = 1; $i <= $jobs; $i++) {
             $declare .= "\$cw->job('job-{$i}', ['schedule' => '0 * * * *']);\n";
         }
-        $body = "\$cw = new Cronwatch\\Cronwatch(store: new Cronwatch\\Store\\SqliteStore('{$this->dir}/cw.db'), alerts: [fn () => null], cronSecret: false, now: fn () => {$now});\n{$declare}";
+        $body = "\$cw = new Cronwatch\\Cronwatch(store: new Cronwatch\\Store\\SqliteStore('{$this->dir}/cw.db'), alerts: [fn () => null], cronSecret: null, now: fn () => {$now});\n{$declare}";
         $php = $callable ? "<?php\nreturn function () {\n{$body}return \$cw;\n};\n" : "<?php\n{$body}return \$cw;\n";
         file_put_contents("{$this->dir}/{$name}", $php);
     }

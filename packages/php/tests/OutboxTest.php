@@ -81,7 +81,7 @@ final class OutboxTest extends TestCase
         // Another process's checks leave it alone while its sender's lease runs.
         $clock = new Clock();
         $sent = new Capture();
-        $server = new Cronwatch(store: $store, now: $clock, alerts: [$sent], cronSecret: false, triage: fn () => 'The disk is full.');
+        $server = new Cronwatch(store: $store, now: $clock, alerts: [$sent], cronSecret: null, triage: fn () => 'The disk is full.');
         $clock->advance(self::MIN);
         $server->check();
         $this->assertSame([], $sent->types());
@@ -111,7 +111,7 @@ final class OutboxTest extends TestCase
         $this->assertSame('failed', $taken);
         $clock = new Clock(self::T0 + Evaluate::SEND_LEASE_MS + 1);
         $sent = new Capture();
-        $server = new Cronwatch(store: new SqliteStore($file), now: $clock, alerts: [$sent], cronSecret: false);
+        $server = new Cronwatch(store: new SqliteStore($file), now: $clock, alerts: [$sent], cronSecret: null);
         $server->check();
         $this->assertSame(['failed'], $sent->types(), 'sent a second time: the one duplicate a crash can cause');
     }
@@ -121,7 +121,7 @@ final class OutboxTest extends TestCase
         $clock = new Clock();
         $shared = new MemoryStore();
         $other = new Capture();
-        $server = new Cronwatch(store: $shared, now: $clock, alerts: [$other], cronSecret: false);
+        $server = new Cronwatch(store: $shared, now: $clock, alerts: [$other], cronSecret: null);
         $sent = [];
         $worker = null;
         // While the worker's channel holds the alert, a check in another process and one in the worker itself run.
@@ -133,7 +133,7 @@ final class OutboxTest extends TestCase
             }
             $sent[] = $alert->type;
         });
-        $worker = new Cronwatch(store: $shared, now: $clock, alerts: [$held], cronSecret: false);
+        $worker = new Cronwatch(store: $shared, now: $clock, alerts: [$held], cronSecret: null);
         try {
             $worker->run('nightly', function (): never {
                 throw new \RuntimeException('x');
@@ -159,7 +159,7 @@ final class OutboxTest extends TestCase
         $down = new Custom('down', function (): never {
             throw new \RuntimeException('down');
         });
-        $cw = new Cronwatch(store: $shared, now: new Clock(), alerts: [$down], cronSecret: false, onError: function (): void {
+        $cw = new Cronwatch(store: $shared, now: new Clock(), alerts: [$down], cronSecret: null, onError: function (): void {
         }, triage: fn () => 'Look at the disk.');
         try {
             $cw->run('nightly', function (): never {
@@ -181,7 +181,7 @@ final class OutboxTest extends TestCase
             $writes++;
             return $next(...$args);
         };
-        $recorder = new Cronwatch(store: $counting, now: new Clock(), deliver: 'check', cronSecret: false);
+        $recorder = new Cronwatch(store: $counting, now: new Clock(), deliver: 'check', cronSecret: null);
         try {
             $recorder->run('backup', function (): never {
                 throw new \RuntimeException('disk full');

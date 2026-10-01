@@ -30,10 +30,10 @@ final class EmbeddedDashboardTest extends TestCase
 
     private static function dashboard(): Dashboard
     {
-        $cw = new Cronwatch(store: new MemoryStore(), alerts: [], cronSecret: false);
+        $cw = new Cronwatch(store: new MemoryStore(), alerts: [], cronSecret: null);
         $cw->job('nightly:report', ['schedule' => '0 2 * * *', 'timezone' => 'UTC']);
         $cw->run('nightly:report', fn () => 'done');
-        return new Dashboard($cw, token: false, basePath: EmbeddedDashboard::MARKER, origin: 'https://site.example');
+        return new Dashboard($cw, token: null, basePath: EmbeddedDashboard::MARKER, origin: 'https://site.example');
     }
 
     public function testTheRequestIsTheDashboardsPathWithTheHostsKeysLeftOut(): void

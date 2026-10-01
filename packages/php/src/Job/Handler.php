@@ -30,9 +30,10 @@ use Cronwatch\Web\ResponseStatus;
  *
  * The caller must send `Authorization: Bearer <secret>`, compared in
  * constant time. The secret is the handler's own `secret:`, else the
- * client's cronSecret (CRON_SECRET by default); "" counts as unset, and
- * `secret: false` (or a client made with `cronSecret: false`) lets anyone
- * run the job. With no secret at all the handler answers 503 unless the
+ * client's cronSecret (CRON_SECRET by default); "" (the default) counts as
+ * unset, and `secret: null` (or a client made with `cronSecret: null`) lets
+ * anyone run the job. `false` does what null does, deprecated since 1.0 and
+ * removed in 2.0 (in 0.x, null meant the client's secret). With no secret at all the handler answers 503 unless the
  * environment is development (see Env), and reports it once to onError as
  * "handler". A wrong or missing bearer is 401.
  *
@@ -44,7 +45,7 @@ use Cronwatch\Web\ResponseStatus;
  */
 final class Handler
 {
-    public const NO_SECRET = 'CRON_SECRET is not set, so this job will not run for an unauthenticated request. Set it, or pass secret: false to handler() to allow anyone.';
+    public const NO_SECRET = 'CRON_SECRET is not set, so this job will not run for an unauthenticated request. Set it, or pass secret: null to handler() to allow anyone.';
     public const HEADERS = ['content-type' => 'application/json; charset=utf-8', 'cache-control' => 'no-store'];
 
     /** The secret a request must carry, or null when none is required. */
@@ -58,13 +59,13 @@ final class Handler
         private readonly Cronwatch $client,
         private readonly JobDefinition $definition,
         callable $fn,
-        string|false|null $secret = null,
+        string|false|null $secret = '',
     ) {
         $this->fn = \Closure::fromCallable($fn);
         $this->job = (string) $definition->get('name');
-        $own = $secret === false ? null : (string) $secret;
-        $this->secret = $secret === false ? null : ($own !== '' ? $own : $client->cronSecret);
-        $this->optedOut = $secret === false || ($own === '' && $client->secretOptOut);
+        $off = $secret === null || $secret === false;
+        $this->secret = $off ? null : ($secret !== '' ? $secret : $client->cronSecret);
+        $this->optedOut = $off || ($secret === '' && $client->secretOptOut);
     }
 
     // ------------------------------------------------------------ the core
