@@ -523,4 +523,77 @@ class StartFinishTest {
     check.join();
     assertEquals(List.of("send", "close"), order);
   }
+
+  /** A store that logs each call by name into {@code calls}, over a memory store. */
+  private static Store logged(List<String> calls) {
+    MemoryStore inner = new MemoryStore();
+    return (Store)
+        java.lang.reflect.Proxy.newProxyInstance(
+            Store.class.getClassLoader(),
+            new Class<?>[] {Store.class},
+            (proxy, method, args) -> {
+              calls.add(method.getName());
+              try {
+                return method.invoke(inner, args);
+              } catch (java.lang.reflect.InvocationTargetException e) {
+                throw e.getCause();
+              }
+            });
+  }
+
+  @Test
+  void aCheckAskedForAfterCloseIsRefusedAndNeverReachesTheClosedStore() {
+    List<String> calls = new CopyOnWriteArrayList<>();
+    Errors errors = new Errors();
+    Cronwatch cw = Support.builder(new Clock(), new Capture(), errors).store(logged(calls)).build();
+    cw.job("nightly", JobOptions.builder().schedule("0 3 * * *"));
+    cw.check();
+    cw.close();
+    assertEquals("close", calls.get(calls.size() - 1));
+    calls.clear();
+    CronwatchException e = assertThrows(CronwatchException.class, cw::check);
+    assertEquals("the client is closed, so it does not check", e.getMessage());
+    assertEquals(List.of(), calls, "nothing reached the store after its close");
+    assertEquals(List.of(), errors.wheres());
+  }
+
+  @Test
+  void closeFromAChannelReturnsAtOnceAndTheStoreClosesOnceTheCheckEnds() throws Exception {
+    List<String> calls = new CopyOnWriteArrayList<>();
+    List<String> order = new CopyOnWriteArrayList<>();
+    java.util.concurrent.atomic.AtomicReference<Cronwatch> client =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    Channel closing =
+        new Channel() {
+          @Override
+          public String name() {
+            return "closing";
+          }
+
+          @Override
+          public void send(Alert alert, ChannelContext context) {
+            client.get().close();
+            order.add("close returned");
+            order.add("sent");
+          }
+        };
+    Clock clock = new Clock();
+    Errors errors = new Errors();
+    Cronwatch.Builder builder =
+        Support.builder(clock, new Capture(), errors).alerts(List.of(closing)).store(logged(calls));
+    // Long enough that a close waiting on the check would be cut short by the channel's deadline
+    // (reported as timed out, and the alert queued again) well before the test gives up.
+    builder.timings.channelMs = 2000;
+    Cronwatch cw = builder.build();
+    client.set(cw);
+    cw.job("callback", JobOptions.builder().timeout("30m")).start();
+    clock.advance(31 * MIN);
+    CheckResult result = cw.check();
+    assertEquals(List.of("close returned", "sent"), order);
+    assertEquals(1, result.alerts().size(), "the stuck alert went out");
+    assertEquals(List.of(), errors.messages(), "nothing timed out");
+    Support.await("the store to close once the check ended", () -> calls.contains("close"));
+    assertEquals("close", calls.get(calls.size() - 1), "nothing reached the store after it");
+    assertThrows(CronwatchException.class, cw::check);
+  }
 }

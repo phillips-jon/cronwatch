@@ -7,6 +7,8 @@ import dev.cronwatch.Metrics;
 import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
+import dev.cronwatch.internal.core.Access;
+import dev.cronwatch.internal.evaluate.Evaluate;
 import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.internal.output.Output;
 import dev.cronwatch.internal.sql.Dialect;
@@ -424,83 +426,94 @@ public final class SqlStore implements Store {
     };
   }
 
-  /**
-   * A column as a whole number, null for NULL: text is read as a number, and a fraction is cut to
-   * its whole part, held at the ends of the range.
-   */
-  private static @Nullable Long integer(Map<String, Object> row, String name) {
-    return switch (row.get(name)) {
-      case null -> null;
-      case Double d -> Js.toLong(d);
-      case Float f -> Js.toLong(f.doubleValue());
-      case java.math.BigDecimal b -> Js.toLong(b.doubleValue());
-      case Number n -> n.longValue();
-      case Boolean b -> b ? 1L : 0L;
-      case Object o -> {
-        String t = o.toString().trim();
-        try {
-          yield Long.parseLong(t);
-        } catch (NumberFormatException e) {
-          try {
-            yield Js.toLong(Double.parseDouble(t));
-          } catch (NumberFormatException e2) {
-            yield 0L;
-          }
-        }
-      }
-    };
-  }
-
-  private static long integer(Map<String, Object> row, String name, long fallback) {
-    Long v = integer(row, name);
-    return v == null ? fallback : v;
-  }
-
   private static String textOr(Map<String, Object> row, String name) {
     String v = text(row, name);
     return v == null ? "" : v;
   }
 
-  private static StoredJob job(Map<String, Object> row) {
-    String name = textOr(row, "name");
-    Object value;
-    try {
-      value = Json.parse(textOr(row, "definition"));
-    } catch (Json.JsonException e) {
-      throw new IllegalStateException("job " + name + ": " + e.getMessage(), e);
+  /*
+   * Rows are read leniently: a foreign, hand-edited or damaged row (SQLite keeps whatever type it
+   * is given, in any column) must affect only its own job, never every read, as the SDK reads them.
+   */
+
+  /** JSON text as a value, or null when it does not parse; a value that is not text as it is. */
+  private static @Nullable Object json(Map<String, Object> row, String name) {
+    Object v = row.get(name);
+    if (!(v instanceof String s)) {
+      return v;
     }
-    // JSON of another shape (another writer's, or a hand edit) is a definition with nothing in
-    // it, as the SDK reads it: one such row must not fail every read of the jobs.
-    Definition definition = Definition.of(value instanceof JsObject o ? o : new JsObject());
-    return StoredJob.of(
-        name, definition, integer(row, "created_at", 0), integer(row, "updated_at", 0));
+    try {
+      return Json.parse(s);
+    } catch (Json.JsonException e) {
+      return null;
+    }
   }
 
-  private static Run run(Map<String, Object> row) {
-    String id = textOr(row, "id");
-    Metrics metrics = Metrics.empty();
-    String metricsText = text(row, "metrics");
-    if (metricsText != null) {
-      try {
-        // Metrics another writer stored that are not all numbers keep the ones that are, so one
-        // such row (a running one especially, which every check reads) cannot fail the reads it
-        // is part of.
-        metrics = Metrics.lenient(Json.parse(metricsText));
-      } catch (Json.JsonException e) {
-        throw new IllegalStateException("run " + id + ": " + e.getMessage(), e);
-      }
+  /**
+   * A time or a count of milliseconds as a column holds it, the SDK's {@code Number()} of it: a
+   * number as it is, text that is not empty after trimming read as JavaScript reads it (Postgres's
+   * BIGINT comes as text through some drivers), anything else NaN. A value that is not finite then
+   * reads as {@code fallback}; a finite one is cut to its whole part.
+   */
+  private static @Nullable Long time(
+      Map<String, Object> row, String name, @Nullable Long fallback) {
+    Object v = row.get(name);
+    if (v instanceof Long l) {
+      return l;
     }
+    double n =
+        switch (v) {
+          case Number x -> x.doubleValue();
+          case String s -> Js.trim(s).isEmpty() ? Double.NaN : Evaluate.jsNumber(s);
+          case null, default -> Double.NaN;
+        };
+    if (!Double.isFinite(n)) {
+      return fallback;
+    }
+    return Js.toLong(n);
+  }
+
+  /** A column that holds text, or null for anything else. */
+  private static @Nullable String textOrNull(Map<String, Object> row, String name) {
+    return row.get(name) instanceof String s ? s : null;
+  }
+
+  /**
+   * A job's row. A definition that does not parse, or is not a JSON object, is the definition
+   * {@code {name}} marked unreadable: the client reports the job and shows it failing, without
+   * evaluating it. Times that are not finite numbers read as 0.
+   */
+  private static StoredJob job(Map<String, Object> row) {
+    String name = textOr(row, "name");
+    Definition definition =
+        json(row, "definition") instanceof JsObject o
+            ? Definition.of(o)
+            : Access.client().unreadableDefinition(name);
+    return StoredJob.of(
+        name,
+        definition,
+        Objects.requireNonNull(time(row, "created_at", 0L)),
+        Objects.requireNonNull(time(row, "updated_at", 0L)));
+  }
+
+  /**
+   * A run's row. A start that is not a finite number reads as 0, a finish or duration as null; an
+   * error or output that is not text as null; metrics that do not parse to an object as none (and
+   * those that do keep their numbers); a trigger that is not text as {@code run}.
+   */
+  private static Run run(Map<String, Object> row) {
+    String trigger = textOrNull(row, "trigger");
     return Run.of(
-        id,
+        textOr(row, "id"),
         textOr(row, "job"),
         RunStatus.of(textOr(row, "status")),
-        integer(row, "started_at", 0),
-        integer(row, "finished_at"),
-        integer(row, "duration_ms"),
-        text(row, "error"),
-        text(row, "output"),
-        metrics,
-        textOr(row, "trigger"));
+        Objects.requireNonNull(time(row, "started_at", 0L)),
+        time(row, "finished_at", null),
+        time(row, "duration_ms", null),
+        textOrNull(row, "error"),
+        textOrNull(row, "output"),
+        Metrics.lenient(json(row, "metrics")),
+        trigger == null ? "run" : trigger);
   }
 
   private List<Run> runs(String text, List<Param> params) throws SQLException {
@@ -722,7 +735,7 @@ public final class SqlStore implements Store {
   }
 
   /**
-   * The job's state. A state that is not JSON, or not an object, fails the read.
+   * The job's state. A state that is not JSON, or not an object, reads as none.
    *
    * @throws SQLException when the database fails
    */
@@ -732,7 +745,10 @@ public final class SqlStore implements Store {
     if (rows.isEmpty()) {
       return null;
     }
-    return JobState.fromJson(textOr(rows.get(0), "state"));
+    // A state that does not parse, or is not a JSON object, reads as none, so the next write puts
+    // it right.
+    Object state = json(rows.get(0), "state");
+    return state instanceof JsObject ? JobState.fromValue(state) : null;
   }
 
   @Override

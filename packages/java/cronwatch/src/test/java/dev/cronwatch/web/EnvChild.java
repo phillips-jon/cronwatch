@@ -8,8 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.JobOptions;
+import dev.cronwatch.internal.web.Requests;
+import dev.cronwatch.json.Json;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -35,6 +38,11 @@ public final class EnvChild {
         case "handlerClosed" -> handlerClosed();
         case "handlerDevelopment" -> handlerDevelopment();
         case "profileFallback" -> profileFallback();
+        case "blankToken" -> blankToken();
+        case "blankTokenFallsBack" -> blankTokenFallsBack();
+        case "paddedToken" -> paddedToken();
+        case "blankSecret" -> blankSecret();
+        case "blankSecretAtCheck" -> blankSecretAtCheck();
         default -> throw new IllegalArgumentException(args[0]);
       }
       System.out.println("CHILD OK");
@@ -237,6 +245,131 @@ public final class EnvChild {
     try (Cronwatch anyone = client()) {
       Handler h = anyone.job("any", JobOptions.builder()).handler((j, r) -> null);
       assertEquals(200, h.handle(Request.of("GET", "/")).status());
+    }
+  }
+
+  /**
+   * Tokens and secrets of only whitespace, as JavaScript's trim sees it (the no-break space, an em
+   * space and the byte order mark included), which count as unset.
+   */
+  static final List<String> BLANKS =
+      List.of("", " ", "  ", "\t", " \n  \ufeff ", "\u00a0", "\u2003", "\ufeff");
+
+  /** With CRONWATCH_TOKEN blank in production, the routes stay locked, as with it unset. */
+  private static void blankToken() {
+    try (Cronwatch cw = client()) {
+      lockedBy(cw.routes(), "the variable " + Json.stringify(System.getenv("CRONWATCH_TOKEN")));
+      for (String blank : BLANKS) {
+        lockedBy(
+            cw.routes(RoutesOptions.builder().token(blank).build()),
+            "the option " + Json.stringify(blank));
+      }
+    }
+  }
+
+  private static void lockedBy(Routes routes, String what) {
+    String base = "http://app.test/cronwatch";
+    assertNull(routes.token(), what);
+    assertEquals(503, serve(routes, base + "/api/jobs", NONE).status(), what);
+    for (String blank : BLANKS) {
+      Response signIn = serve(routes, base + "/?token=" + Requests.formEncode(blank), NONE);
+      assertEquals(503, signIn.status(), what + ", ?token=" + Json.stringify(blank));
+      assertNull(signIn.header("set-cookie"), what);
+    }
+    Response bearer = serve(routes, base + "/api/jobs", headers(h("authorization", "Bearer  ")));
+    assertEquals(503, bearer.status(), what + ", a blank bearer");
+  }
+
+  /** A blank token in code falls back to CRONWATCH_TOKEN. */
+  private static void blankTokenFallsBack() {
+    try (Cronwatch cw = client()) {
+      for (String blank : BLANKS) {
+        Routes routes = cw.routes(RoutesOptions.builder().token(blank).build());
+        Response res =
+            serve(
+                routes,
+                "http://app.test/cronwatch/api/jobs",
+                headers(h("authorization", "Bearer from-env")));
+        assertEquals(200, res.status(), Json.stringify(blank));
+      }
+    }
+  }
+
+  /** A token that is not blank is used as it is, untrimmed. */
+  private static void paddedToken() {
+    try (Cronwatch cw = client()) {
+      Routes routes = cw.routes();
+      assertEquals(" padded ", routes.token());
+      Response res = serve(routes, "http://app.test/cronwatch/?token=%20padded%20", NONE);
+      assertEquals(303, res.status());
+      Response trimmed = serve(routes, "http://app.test/cronwatch/?token=padded", NONE);
+      assertEquals(401, trimmed.status());
+    }
+  }
+
+  /** A handler that refuses for want of a secret, reported once with where "handler". */
+  private static void refuses(Cronwatch cw, List<String> wheres, String what) {
+    AtomicInteger ran = new AtomicInteger();
+    Handler h =
+        cw.job("closed", JobOptions.builder())
+            .handler(
+                (j, r) -> {
+                  ran.incrementAndGet();
+                  return null;
+                });
+    Response res = h.handle(Request.of("GET", "/"));
+    assertEquals(503, res.status(), what);
+    assertTrue(res.text().contains("CRON_SECRET is not set"), what);
+    h.handle(Request.builder("GET", "/").header("authorization", "Bearer  ").build());
+    assertEquals(0, ran.get(), what);
+    assertEquals(List.of("handler"), wheres, what + ": reported once");
+  }
+
+  /**
+   * With CRON_SECRET blank in production, the client has no cron secret and a handler refuses, as
+   * with it unset; the same with the secret given in code as a blank, which does not fall back.
+   */
+  private static void blankSecret() {
+    String read = Json.stringify(System.getenv("CRON_SECRET"));
+    List<String> wheres = new CopyOnWriteArrayList<>();
+    try (Cronwatch cw =
+        Cronwatch.builder().noShutdownHook().onError((where, e) -> wheres.add(where)).build()) {
+      assertNull(cw.cronSecret(), "the variable " + read);
+      refuses(cw, wheres, "the variable " + read);
+    }
+    for (String blank : BLANKS) {
+      wheres.clear();
+      try (Cronwatch cw =
+          Cronwatch.builder()
+              .cronSecret(blank)
+              .noShutdownHook()
+              .onError((where, e) -> wheres.add(where))
+              .build()) {
+        assertNull(cw.cronSecret(), "the option " + Json.stringify(blank));
+        refuses(cw, wheres, "the option " + Json.stringify(blank));
+      }
+      // With the client's opt-out, a handler's blank secret falls back to it: the job runs.
+      try (Cronwatch cw = client()) {
+        Handler h =
+            cw.job("open", JobOptions.builder())
+                .handler((j, r) -> null, HandlerOptions.builder().secret(blank).build());
+        assertEquals(200, h.handle(Request.of("GET", "/")).status(), Json.stringify(blank));
+      }
+    }
+  }
+
+  /** With CRON_SECRET of spaces, a bearer of spaces is neither the secret nor the token. */
+  private static void blankSecretAtCheck() {
+    try (Cronwatch cw = Cronwatch.builder().noShutdownHook().build()) {
+      Routes routes = cw.routes(RoutesOptions.builder().token("tok").build());
+      Response res =
+          WebKit.serve(
+              routes,
+              "POST",
+              "http://app.test/cronwatch/api/check",
+              headers(h("authorization", "Bearer   ")),
+              "");
+      assertEquals(401, res.status());
     }
   }
 

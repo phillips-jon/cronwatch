@@ -82,11 +82,12 @@ public final class RoutesOptions {
     /**
      * The token the dashboard asks for. Send it as {@code Authorization: Bearer <token>}, or open
      * the dashboard once with {@code ?token=<token>} and a cookie is set. Without it the token is
-     * {@code CRONWATCH_TOKEN}; {@code ""} counts as unset. With no token in development ({@code
-     * CRONWATCH_ENV} or {@code APP_ENV} naming it), the routes make a random one and print a
-     * sign-in link to standard output on their first request; with no token otherwise they answer
-     * 503. {@code /api/check} also takes the client's cron secret as a bearer, so a platform cron
-     * can run checks without the token.
+     * {@code CRONWATCH_TOKEN}; an empty token, or one of only whitespace, given here or in the
+     * variable, counts as unset. With no token in development ({@code CRONWATCH_ENV} or {@code
+     * APP_ENV} naming it), the routes make a random one and print a sign-in link to standard output
+     * on their first request; with no token otherwise they answer 503. {@code /api/check} also
+     * takes the client's cron secret as a bearer, so a platform cron can run checks without the
+     * token.
      */
     public Builder token(String token) {
       this.tokenGiven = true;

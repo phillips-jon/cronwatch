@@ -165,6 +165,14 @@ public final class Js {
     return s.substring(start, end);
   }
 
+  /**
+   * Whether {@code s} is null, empty or only whitespace as {@code String.prototype.trim} sees it: a
+   * token or secret like that counts as unset, so the routes and handlers fail closed.
+   */
+  public static boolean isBlank(@Nullable String s) {
+    return s == null || trim(s).isEmpty();
+  }
+
   /** {@code String.prototype.trimEnd}. */
   public static String trimEnd(String s) {
     int end = s.length();

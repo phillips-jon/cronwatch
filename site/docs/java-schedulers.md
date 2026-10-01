@@ -102,7 +102,7 @@ When your app runs its `@Scheduled` methods on every instance under ShedLock's `
 
 ### The check
 
-The starter runs its own check every `cronwatch.check-every` (a minute by default, the first a second after the context starts, five seconds at least), with each integration's sync before it, from when the context has started until it stops. How it runs across a cluster is `cronwatch.check-mode`:
+The starter runs its own check every `cronwatch.check-every` (a minute by default, the first a second after the context starts, five seconds at least), with each integration's sync before it, from when the context has started until it stops; as the context stops, it waits up to 30 seconds for a check under way, before the client is closed. How it runs across a cluster is `cronwatch.check-mode`:
 
 | Mode | |
 |---|---|
@@ -159,7 +159,7 @@ Call `watch` before the scheduler starts, so no firing goes unrecorded; `close()
 
 **Which jobs.** Every job the scheduler holds with a trigger is a job, named after its `JobKey`: `nightlyReport` in the `DEFAULT` group, `reports.nightly` for `nightly` in `reports`. The jobs are read when the integration starts, again when the scheduler says a job or trigger was added or removed, and every minute besides (`readEvery` sets it). A job with a `CronTrigger` is declared on its expression in the trigger's zone (a `?` read as `*`), checked against Quartz's own fire times. Quartz counts the days of the week from 1 for Sunday, so an expression naming one by number is reported and watched without a schedule: write `MON`, not `2`. A `SimpleTrigger` repeating forever is `every <interval>`; any other trigger, a trigger with a `Calendar`, and several triggers on different schedules make a job without a schedule.
 
-**Runs.** A global `JobListener` opens each firing's run (trigger `quartz`) in the worker thread before `execute` and closes it after, failed with what the job threw (the `JobExecutionException`'s cause when it has one), so `Cronwatch.current()` works inside `execute`. A vetoed firing, and one `@DisallowConcurrentExecution` held back, opens nothing. In a clustered job store, a job a node was running when it died is fired again on another node, and that firing first finishes the earlier run, failed with `Quartz recovered the job after its node stopped`.
+**Runs.** A global `JobListener` opens each firing's run (trigger `quartz`) in the worker thread before `execute` and closes it after, failed with what the job threw (the `JobExecutionException`'s cause when it has one), so `Cronwatch.current()` works inside `execute`. A vetoed firing, and one `@DisallowConcurrentExecution` held back, opens nothing. In a clustered job store, a job a node was running when it died is fired again on another node, and that firing first finishes the earlier run, failed with `Quartz recovered the job after its node stopped`. Only the run of the node that died is finished so: a run of another node still alive, in a cluster of three or more, is left to finish.
 
 **The check.** `CronwatchQuartz.scheduleCheck(scheduler)` schedules `CronwatchCheckJob`, which runs the sync and a check every minute; in a clustered job store Quartz fires it on one node, so it runs once per cluster. Its runs are never a job.
 

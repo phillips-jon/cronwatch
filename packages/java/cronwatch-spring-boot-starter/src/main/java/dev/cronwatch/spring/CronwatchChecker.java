@@ -48,8 +48,18 @@ final class CronwatchChecker implements SmartLifecycle {
   private final Condition wake = lock.newCondition();
   private boolean running;
 
+  /** The thread the interval runs on, while it runs. */
+  private @Nullable Thread loop;
+
   /** The first check's delay after the start; the tests shorten it. */
   volatile Duration firstDelay = Duration.ofSeconds(1);
+
+  /**
+   * How long {@link #stop} waits for a tick under way (its syncs and check) before the context goes
+   * on to close the client: past it the client's own close waits for the check, and refuses one
+   * asked for after it.
+   */
+  volatile Duration stopWait = Duration.ofSeconds(30);
 
   CronwatchChecker(
       Cronwatch cw,
@@ -67,7 +77,7 @@ final class CronwatchChecker implements SmartLifecycle {
   /** The shortest interval between checks. */
   private static final Duration SHORTEST = Duration.ofSeconds(5);
 
-  /** The longest, the SDK's (a timer's 2^31 - 1 ms), as {@code cw.start} holds it. */
+  /** The longest, the SDK's (a timer's 2^31 - 1 ms), as {@code cw.startChecking} holds it. */
   private static final Duration LONGEST = Duration.ofMillis(Integer.MAX_VALUE);
 
   /**
@@ -136,7 +146,14 @@ final class CronwatchChecker implements SmartLifecycle {
     if (!check && scheduling == null) {
       return; // nothing to do here: the check is Quartz's or the app's
     }
-    Thread.ofVirtual().name("cronwatch-check").start(() -> loop(mode));
+    Thread thread = Thread.ofVirtual().name("cronwatch-check").unstarted(() -> loop(mode));
+    lock.lock();
+    try {
+      loop = thread;
+    } finally {
+      lock.unlock();
+    }
+    thread.start();
   }
 
   private void loop(CronwatchProperties.CheckMode mode) {
@@ -156,6 +173,9 @@ final class CronwatchChecker implements SmartLifecycle {
         return;
       } finally {
         lock.unlock();
+      }
+      if (!isRunning()) {
+        return;
       }
       tick(mode);
       wait = every;
@@ -177,7 +197,8 @@ final class CronwatchChecker implements SmartLifecycle {
           if (check && q != null && !q.runsTheCheck()) {
             SchedulerBridge.syncWithin(cw, SchedulerBridge.SYNC_TIMEOUT, "quartz", q::sync);
           }
-          if (check) {
+          // Stopped during the syncs: the context is closing the client, so no check.
+          if (check && isRunning()) {
             try {
               cw.check();
             } catch (RuntimeException e) {
@@ -197,14 +218,29 @@ final class CronwatchChecker implements SmartLifecycle {
     }
   }
 
+  /**
+   * Stops the interval and waits (up to {@link #stopWait}) for a tick under way to end, so its
+   * check does not run on into the client's close.
+   */
   @Override
   public void stop() {
+    Thread thread;
     lock.lock();
     try {
       running = false;
       wake.signalAll();
+      thread = loop;
+      loop = null;
     } finally {
       lock.unlock();
+    }
+    if (thread == null || thread.equals(Thread.currentThread())) {
+      return;
+    }
+    try {
+      thread.join(stopWait);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 

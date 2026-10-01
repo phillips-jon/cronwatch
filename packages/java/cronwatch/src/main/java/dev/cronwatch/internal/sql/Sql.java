@@ -178,8 +178,12 @@ public final class Sql {
           + v
           + "::bigint ELSE 0 END";
     }
+    // Text that is not JSON at all (SQLite holds any) counts as 0 too, before json_type could fail
+    // on it.
     String v = "json_extract(" + column + ", '$.version')";
-    return "CASE WHEN json_type("
+    return "CASE WHEN NOT json_valid("
+        + column
+        + ") THEN 0 WHEN json_type("
         + column
         + ", '$.version') NOT IN ('integer', 'real') THEN 0 WHEN "
         + v

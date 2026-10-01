@@ -10,6 +10,7 @@ import dev.cronwatch.internal.core.Access;
 import dev.cronwatch.internal.duration.Durations;
 import dev.cronwatch.internal.evaluate.Evaluate;
 import dev.cronwatch.internal.js.Js;
+import dev.cronwatch.internal.post.WhatwgUrl;
 import dev.cronwatch.internal.web.Html;
 import dev.cronwatch.internal.web.Origins;
 import dev.cronwatch.internal.web.Pwa;
@@ -119,10 +120,12 @@ public final class Routes implements Endpoint {
     String given = options.token();
     if (optedOut) {
       configured = "";
-    } else if (given != null && !given.isEmpty()) {
+    } else if (given != null && !Js.isBlank(given)) {
       configured = given;
     } else {
-      configured = Objects.requireNonNullElse(System.getenv("CRONWATCH_TOKEN"), "");
+      // A blank token, given or read, counts as unset; one that is not blank is used untrimmed.
+      String read = System.getenv("CRONWATCH_TOKEN");
+      configured = read == null || Js.isBlank(read) ? "" : read;
     }
     // A handler cannot tell a local caller from a remote one (proxies, tunnels and a server
     // listening on every interface all look alike), so development gets a token too: made here,
@@ -355,24 +358,21 @@ public final class Routes implements Endpoint {
   }
 
   /**
-   * The {@code Authorization} header without its {@code Bearer } (in any case, with any spaces
-   * after it), or null when there is none.
+   * The token an {@code Authorization} header carries: what follows the scheme when the scheme is
+   * {@code Bearer} (in any case) and one or more whitespace characters follow it, else null. Any
+   * other scheme (a proxy's Basic auth, say) is not a bearer at all, so the cookie and {@code
+   * ?token=} are read as if no header came.
    */
   private static @Nullable String bearer(Request req) {
     String text = req.header("authorization");
-    if (text == null) {
+    if (text == null || !isBearerPrefix(text)) {
       return null;
     }
-    if (isBearerPrefix(text)) {
-      int i = 6;
-      while (i < text.length() && Js.isSpace(text.charAt(i))) {
-        i++;
-      }
-      if (i > 6) {
-        return text.substring(i);
-      }
+    int i = 6;
+    while (i < text.length() && Js.isSpace(text.charAt(i))) {
+      i++;
     }
-    return text;
+    return i > 6 ? text.substring(i) : null;
   }
 
   /**
@@ -593,6 +593,18 @@ public final class Routes implements Endpoint {
       return api(errorBody("Cross-site request refused"), 403);
     }
 
+    // The sign-in form posts the token here, in the body, so it stays out of the URL and every
+    // access log. Cross-site posts were refused above.
+    if (!token.isEmpty() && method.equals("POST") && path.equals("/signin")) {
+      byte[] data = readLimited(req);
+      String sent = data == null ? null : Requests.bodyField(said.contentType(), data, "token");
+      if (sent == null || !Text.constantTimeEquals(sent, token)) {
+        return signInPage(base);
+      }
+      return redirect(
+          signInReturn(req.header("referer"), said.publicOrigin(), base), signInCookie(said, base));
+    }
+
     if (!token.isEmpty()) {
       // ?token= is only the sign-in that moves the token into a cookie.
       String queryToken =
@@ -614,38 +626,22 @@ public final class Routes implements Endpoint {
         tokenOk = false;
       }
       if (!cronSecretOk && !tokenOk) {
+        if (wantsHtml) {
+          return signInPage(base);
+        }
         if (generated) {
-          if (wantsHtml) {
-            return page(
-                Html.messagePage(
-                    "Sign in",
-                    "CRONWATCH_TOKEN is not set, so this development server made a token. The"
-                        + " sign-in link is in the server log: open it once and this browser stays"
-                        + " signed in.",
-                    base,
-                    true),
-                401);
-          }
           return api(
               errorBody(
                   "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a"
                       + " token; it is in the server log"),
               401);
         }
-        if (wantsHtml) {
-          return page(
-              Html.messagePage(
-                  "Sign in",
-                  "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed"
-                      + " in.",
-                  base,
-                  true),
-              401);
-        }
         return api(errorBody("Unauthorized"), 401);
       }
       if (queryToken != null) {
-        // Move the token from the URL into a cookie so it is not in history or logs.
+        // Move the token from the URL into a cookie, so it is not left in the browser's history.
+        // The request line that carried it may still be in an access log, which is why the
+        // sign-in form posts instead.
         List<String> rest = new ArrayList<>();
         for (Map.Entry<String, String> p : said.query()) {
           if (!p.getKey().equals("token")) {
@@ -653,21 +649,7 @@ public final class Routes implements Endpoint {
           }
         }
         String search = rest.isEmpty() ? "" : "?" + String.join("&", rest);
-        String secure = said.publicOrigin().startsWith("https:") ? "; Secure" : "";
-        String cookiePath = base.isEmpty() ? "/" : base;
-        return redirect(
-            pathname + search,
-            new String[] {
-              "set-cookie",
-              TOKEN_COOKIE
-                  + "="
-                  + cookie
-                  + "; Path="
-                  + cookiePath
-                  + "; HttpOnly; SameSite=Lax; Max-Age="
-                  + COOKIE_MAX_AGE
-                  + secure
-            });
+        return redirect(pathname + search, signInCookie(said, base));
       }
     }
 
@@ -757,6 +739,52 @@ public final class Routes implements Endpoint {
       return serveApi(req, method, parts.subList(1, parts.size()), said);
     }
     return page(Html.messagePage("Not found", path, base, false), 404);
+  }
+
+  /** The sign-in cookie's header, as both sign-ins set it. */
+  private String[] signInCookie(Said said, String base) {
+    String secure = said.publicOrigin().startsWith("https:") ? "; Secure" : "";
+    String cookiePath = base.isEmpty() ? "/" : base;
+    return new String[] {
+      "set-cookie",
+      TOKEN_COOKIE
+          + "="
+          + cookie
+          + "; Path="
+          + cookiePath
+          + "; HttpOnly; SameSite=Lax; Max-Age="
+          + COOKIE_MAX_AGE
+          + secure
+    };
+  }
+
+  /** The 401 sign-in page, with the form that posts the token. */
+  private Response signInPage(String base) {
+    String message =
+        generated
+            ? "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in"
+                + " link is in the server log: open it once, or enter the token from it below, and"
+                + " this browser stays signed in."
+            : "Enter your CRONWATCH_TOKEN and this browser stays signed in.";
+    return page(Html.messagePage("Sign in", message, base, true), 401);
+  }
+
+  /**
+   * Where a sign-in through the form goes next: the page it was posted from (the Referer) when that
+   * is on the public origin and its query has no {@code token} parameter, else the dashboard.
+   */
+  static String signInReturn(@Nullable String referer, String publicOrigin, String base) {
+    if (referer == null || !referer.startsWith(publicOrigin + "/")) {
+      return base + "/";
+    }
+    if (!(WhatwgUrl.parse(referer) instanceof WhatwgUrl.Special special)) {
+      return base + "/";
+    }
+    String query = special.url().query();
+    if (query != null && Requests.param(Requests.parseQuery(query), "token") != null) {
+      return base + "/";
+    }
+    return referer;
   }
 
   private static Response redirectBack(Said said, String base) {

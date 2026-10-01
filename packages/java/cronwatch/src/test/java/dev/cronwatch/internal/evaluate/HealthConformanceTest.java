@@ -121,7 +121,8 @@ class HealthConformanceTest {
     i = 0;
     for (JsObject c : Fixtures.objects(f, "normalizeState")) {
       cases++;
-      JobState input = c.get("state") == null ? null : state(c.get("state"));
+      // A state that is not an object reads as none, as a store reads one.
+      JobState input = c.get("state") instanceof JsObject ? state(c.get("state")) : null;
       fails.same(
           "normalizeState " + i++,
           Evaluate.normalizeState(input, "j").toValue(),
@@ -259,7 +260,7 @@ class HealthConformanceTest {
           Evaluate.silenceEnd(Fixtures.integer(c, "now"), ms),
           c.get("silencedUntil"));
     }
-    assertTrue(cases == 179, "health.json cases: " + cases);
+    assertTrue(cases == 192, "health.json cases: " + cases);
     fails.check("health");
   }
 

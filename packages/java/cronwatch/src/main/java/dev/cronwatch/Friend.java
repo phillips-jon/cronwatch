@@ -109,4 +109,9 @@ final class Friend implements Access.Client {
     }
     return new Expect.Stored(description);
   }
+
+  @Override
+  public Definition unreadableDefinition(String name) {
+    return Definition.unreadable(name);
+  }
 }

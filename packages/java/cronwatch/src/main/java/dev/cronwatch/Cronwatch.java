@@ -569,12 +569,12 @@ public final class Cronwatch implements AutoCloseable {
 
   /**
    * Looks for missed and stuck runs across every job, sends alerts, retries alerts no channel
-   * accepted, and prunes old runs. Call it from an interval ({@link #start}), a cron, or by hand.
-   * Concurrent calls share one check. A job that cannot be evaluated is reported to the error
-   * handler and shown as failing.
+   * accepted, and prunes old runs. Call it from an interval ({@link #startChecking()}), a cron, or
+   * by hand. Concurrent calls share one check. A job that cannot be evaluated is reported to the
+   * error handler and shown as failing.
    *
-   * @throws CronwatchException when the store fails as the check starts, or the caller is
-   *     interrupted while it waits (its interrupt status set again)
+   * @throws CronwatchException when the store fails as the check starts, the client is closed, or
+   *     the caller is interrupted while it waits (its interrupt status set again)
    */
   public CheckResult check() {
     return checks.check();
@@ -758,11 +758,27 @@ public final class Cronwatch implements AutoCloseable {
    * store. A servlet container or Spring context should call it when the app stops, so no thread of
    * the client's holds the app's class loader. Called while the JVM stops (a Spring context closing
    * from its own hook), it first records the runs still open as the shutdown hook would, before the
-   * store is let go.
+   * store is let go. No check starts once it is called: {@link #check} then throws. Called from a
+   * thread of the client's own (a channel's or triage's code, or an error handler called from one),
+   * which the check may be waiting on, it returns at once and the rest finishes on a thread of its
+   * own once the check has ended.
    */
   @Override
   public void close() {
     stop();
+    core.closed.set(true);
+    if (core.ownsThread()) {
+      // From the client's own thread (a channel's or triage's code, or an error handler called
+      // from one): the check may be waiting on this very thread, so the rest (the wait for the
+      // check, then the store) goes on on a thread of its own, and this returns at once.
+      Thread.ofPlatform().name("cronwatch-close").daemon().start(this::finishClose);
+      return;
+    }
+    finishClose();
+  }
+
+  /** {@link #close} past the interval: the waits, then the store and the transport. */
+  private void finishClose() {
     awaitCheck();
     if (shutdownHook != null) {
       try {
@@ -797,12 +813,12 @@ public final class Cronwatch implements AutoCloseable {
 
   /**
    * Waits for the check in flight to end, as the SDK's close awaits {@code this.checking}, so it
-   * never writes to a store already closed. Not from the check itself (an error handler or a
-   * channel's code that closes the client), which would wait for good; an interrupt stops waiting.
+   * never writes to a store already closed; an interrupt stops waiting. {@link #close} does not
+   * call it from a thread of the client's own, which the check may be waiting on.
    */
   private void awaitCheck() {
     CompletableFuture<CheckResult> inFlight = core.checking.get();
-    if (inFlight == null || Thread.currentThread().equals(core.checkThread)) {
+    if (inFlight == null) {
       return;
     }
     try {
@@ -950,8 +966,9 @@ public final class Cronwatch implements AutoCloseable {
     }
 
     /**
-     * The shared secret job handlers' requests must carry. The default is {@code $CRON_SECRET};
-     * {@code ""} counts as unset.
+     * The shared secret job handlers' requests must carry. The default is {@code $CRON_SECRET}. An
+     * empty secret, or one of only whitespace, given here or in the variable, counts as unset;
+     * given here, it means no secret, with no fallback to the variable.
      */
     public Builder cronSecret(String secret) {
       this.secretGiven = true;
@@ -1083,7 +1100,7 @@ public final class Cronwatch implements AutoCloseable {
               triage,
               transport == null ? new LazyTransport() : transport,
               sources,
-              secret == null || secret.isEmpty() ? null : secret,
+              Js.isBlank(secret) ? null : secret,
               optOut,
               retentionMs,
               defaultFields,

@@ -74,6 +74,12 @@ public final class Access {
 
     /** The tags {@code options} gives, in order; none when it gives none or not a list. */
     List<String> tags(JobOptions options);
+
+    /**
+     * The definition {@code {name}} a store reads from a row whose definition is not a JSON object,
+     * marked so the client reports the job rather than evaluate it.
+     */
+    Definition unreadableDefinition(String name);
   }
 
   private static volatile @Nullable Client client;
