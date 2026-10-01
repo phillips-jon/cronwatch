@@ -130,7 +130,7 @@ pub(crate) fn hold_alerts(state: &JobState, alerts: &[Alert], until: i64, deferr
     }
     let mut next = clone_state(state);
     let mut sending = next.sending.take().unwrap_or_default();
-    sending.extend(alerts.iter().map(|a| SendingAlert { until: Some(until), alert: Some(a.clone()) }));
+    sending.extend(alerts.iter().map(|a| SendingAlert::new(Some(until), Some(a.clone()))));
     let (kept, dropped) = newest(sending);
     next.sending = Some(kept);
     (next, dropped)

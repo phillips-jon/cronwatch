@@ -289,6 +289,7 @@ pub(crate) fn compose_alert(draft: AlertDraft, def: &Definition, now: i64) -> Al
         triage: None,
         triage_tried: false,
         at: now,
+        kept: Default::default(),
     }
 }
 

@@ -16,11 +16,12 @@ pub(crate) fn environment() -> String {
 }
 
 /// [`environment`] over variables `read` gives. The first whose value,
-/// trimmed, is not empty wins: a value of only spaces counts as unset, and
-/// the next variable is read, as in every port.
+/// trimmed as `String.prototype.trim` trims, is not empty wins: a value of
+/// only spaces counts as unset, and the next variable is read, as in every
+/// port.
 fn environment_from(read: impl Fn(&str) -> Option<String>) -> String {
     for name in VARIABLES {
-        let value = read(name).unwrap_or_default().trim().to_lowercase();
+        let value = crate::js::trim(&read(name).unwrap_or_default()).to_lowercase();
         if value.is_empty() {
             continue;
         }
@@ -76,5 +77,21 @@ mod tests {
             });
             assert_eq!(got, want, "CRONWATCH_ENV={cronwatch:?} APP_ENV={app:?} RUST_ENV={own:?}");
         }
+    }
+
+    /// Each value is trimmed as `String.prototype.trim` trims it: U+FEFF
+    /// alone counts as unset, and U+0085, which JavaScript keeps, does not.
+    #[test]
+    fn the_environment_is_trimmed_as_javascript_trims() {
+        let read = |first: &'static str| {
+            move |name: &str| match name {
+                "CRONWATCH_ENV" => Some(first.to_string()),
+                "APP_ENV" => Some("production".to_string()),
+                _ => None,
+            }
+        };
+        assert_eq!(environment_from(read("\u{feff}")), "production");
+        assert_eq!(environment_from(read("\u{feff}dev\u{3000}")), "development");
+        assert_eq!(environment_from(read("\u{85}")), "\u{85}");
     }
 }

@@ -162,3 +162,40 @@ async fn a_process_that_queues_its_alerts_for_a_check_elsewhere_writes_them_with
     assert_eq!(s.sending, None);
     assert_eq!(counting.state_writes.load(Ordering::SeqCst), 1, "one write: the failure and its alert together");
 }
+
+#[tokio::test]
+async fn a_queued_alert_keeps_the_fields_a_newer_release_gave_it_through_a_failed_retry_and_into_the_one_that_lands() {
+    use cronwatch::js::Value;
+    let shared = Arc::new(MemoryStore::new());
+    let quiet = Kit::with(|b| b.store_arc(shared.clone()).deliver(Deliver::AtCheck));
+    let job = quiet.cw.job("backup", JobOptions::new()).unwrap();
+    assert!(job.run(|_| async { Err::<(), _>(Boom("disk full")) }).await.is_err());
+    // A newer writer's alert: a field at its top level and one in its details.
+    let mut stored = state(&shared, "backup").await.to_value();
+    let Value::Object(o) = &mut stored else { panic!("a state object") };
+    let Some(Value::Array(queue)) = o.get("undelivered").cloned() else { panic!("a queue") };
+    let mut alert = queue[0].as_object().unwrap().clone();
+    alert.set("futureAlertField", "kept");
+    let mut details = alert.get("details").unwrap().as_object().unwrap().clone();
+    details.set("futureDetail", 1);
+    alert.set("details", details);
+    o.set("undelivered", vec![Value::Object(alert)]);
+    shared.set_state(&cronwatch::JobState::from_value(&stored).unwrap()).await.unwrap();
+
+    let down = channel_fn("down", |_: Alert| async { Err("down".into()) });
+    let failing = Kit::with(|b| b.store_arc(shared.clone()).alerts([down]));
+    failing.advance(MIN);
+    failing.check().await;
+    let kept = state(&shared, "backup").await.to_json();
+    assert!(kept.contains(r#""futureAlertField":"kept""#), "{kept}");
+    assert!(kept.contains(r#","futureDetail":1}"#), "{kept}");
+
+    let sender = Kit::with(|b| b.store_arc(shared.clone()));
+    sender.advance(2 * MIN);
+    sender.check().await;
+    let sent = sender.alert_list();
+    assert_eq!(common::alert_types(&sent), ["failed"]);
+    let body = sent[0].to_json();
+    assert!(body.contains(r#""futureAlertField":"kept""#), "{body}");
+    assert!(body.contains(r#","futureDetail":1}"#), "{body}");
+}

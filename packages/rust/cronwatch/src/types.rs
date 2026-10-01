@@ -567,7 +567,8 @@ const STATE_KEYS: [&str; 8] =
 /// An alert in [`JobState::sending`]. Read leniently, as the SDK's
 /// `releaseSending` treats an entry: one with no numeric `until` has run out,
 /// and one with no alert (or one that is not an alert) is dropped when it
-/// has, so a malformed entry never makes the whole state unreadable.
+/// has, so a malformed entry never makes the whole state unreadable. Until
+/// then it is written back as it was read.
 #[derive(Clone, Debug, Default, PartialEq)]
 #[non_exhaustive]
 pub struct SendingAlert {
@@ -575,31 +576,83 @@ pub struct SendingAlert {
     pub until: Option<i64>,
     /// The alert as composed, never with a triage.
     pub alert: Option<Alert>,
+    /// What a stored entry holds that `until` and `alert` do not: written
+    /// back as read, as the SDK carries an entry along unchanged until the
+    /// next check lets it go.
+    kept: KeptEntry,
+}
+
+/// The parts of a stored `sending` entry the port does not read.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct KeptEntry {
+    /// The entry as stored, when it is not an object.
+    whole: Option<Value>,
+    /// The entry's keys in the order read, each with its stored value when
+    /// the port does not read it (a key it does not know, an `until` that
+    /// is not a number, an `alert` that does not read as one) and `None`
+    /// when `until` or `alert` holds it.
+    keys: Vec<(String, Option<Value>)>,
 }
 
 impl SendingAlert {
     /// `alert`, held by its sender until `until`.
     pub fn new(until: Option<i64>, alert: Option<Alert>) -> SendingAlert {
-        SendingAlert { until, alert }
+        SendingAlert { until, alert, kept: KeptEntry::default() }
     }
 
-    /// The entry as the SDK writes it.
+    /// The entry as the SDK writes it: one read from a store as it was
+    /// read, with `until` and `alert` as they are now.
     pub fn to_value(&self) -> Value {
-        let mut o = Object::new();
-        if let Some(until) = self.until {
-            o.set("until", until);
+        if let (Some(whole), None, None) = (&self.kept.whole, self.until, &self.alert) {
+            return whole.clone();
         }
-        if let Some(alert) = &self.alert {
-            o.set("alert", alert.to_value());
+        let until = || self.until.map(Value::from);
+        let alert = || self.alert.as_ref().map(Alert::to_value);
+        let mut o = Object::new();
+        for (k, stored) in &self.kept.keys {
+            let now = match k.as_str() {
+                "until" => until(),
+                "alert" => alert(),
+                _ => None,
+            };
+            if let Some(v) = now.or_else(|| stored.clone()) {
+                o.set(k.as_str(), v);
+            }
+        }
+        for (k, v) in [("until", until()), ("alert", alert())] {
+            if let (Some(v), false) = (v, o.has(k)) {
+                o.set(k, v);
+            }
         }
         Value::Object(o)
     }
 
     fn from_value(v: &Value) -> SendingAlert {
         let Value::Object(o) = v else {
-            return SendingAlert::default();
+            return SendingAlert { kept: KeptEntry { whole: Some(v.clone()), keys: Vec::new() }, ..Default::default() };
         };
-        SendingAlert { until: nullable_int(o, "until"), alert: o.get("alert").and_then(|a| Alert::from_value(a).ok()) }
+        let until = nullable_int(o, "until");
+        let alert = o.get("alert").and_then(|a| Alert::from_value(a).ok());
+        let mut keys: Vec<(String, Option<Value>)> = o
+            .iter()
+            .map(|(k, v)| {
+                let held = match k {
+                    "until" => until.is_some(),
+                    "alert" => alert.is_some(),
+                    _ => false,
+                };
+                (k.to_string(), (!held).then(|| v.clone()))
+            })
+            .collect();
+        // An entry as the SDK writes it keeps nothing, so it equals one made
+        // with `new`.
+        let written = [until.is_some().then_some("until"), alert.is_some().then_some("alert")];
+        if keys.iter().all(|(_, v)| v.is_none())
+            && keys.iter().map(|(k, _)| k.as_str()).eq(written.into_iter().flatten())
+        {
+            keys.clear();
+        }
+        SendingAlert { until, alert, kept: KeptEntry { whole: None, keys } }
     }
 }
 
@@ -917,6 +970,37 @@ pub struct Alert {
     pub triage: Option<String>,
     pub triage_tried: bool,
     pub at: i64,
+    /// What a stored alert holds that the fields above do not, written back
+    /// as it was read.
+    pub(crate) kept: KeptFields,
+}
+
+/// The parts of a stored alert the port does not read, kept so that a
+/// field a newer release adds survives every write of the queue and goes
+/// out with a retry, as the SDK keeps the JSON it read.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct KeptFields {
+    /// Top-level keys the port does not know, in the order read.
+    top: Vec<(String, Value)>,
+    /// Keys of `details` its variant does not hold, in the order read.
+    details: Vec<(String, Value)>,
+    /// The details as stored, for an alert of a type the port does not know.
+    raw_details: Option<Value>,
+}
+
+const ALERT_KEYS: [&str; 9] = ["type", "run", "details", "job", "definition", "title", "message", "at", "triage"];
+
+/// The details keys each known type's variant holds; `None` for a type the
+/// port does not know, whose details are kept whole.
+fn detail_keys(t: &AlertType) -> Option<&'static [&'static str]> {
+    match t {
+        AlertType::Missed => Some(&["dueAt", "deadline", "graceMs", "lastRunAt"]),
+        AlertType::Failed | AlertType::Stuck => Some(&["consecutiveFailures", "threshold"]),
+        AlertType::Slow => Some(&["durationMs", "thresholdMs", "basis"]),
+        AlertType::OverBudget => Some(&["breaches"]),
+        AlertType::Recovered => Some(&["after", "reason", "since"]),
+        AlertType::Other(_) => None,
+    }
 }
 
 impl Alert {
@@ -935,6 +1019,7 @@ impl Alert {
             triage: None,
             triage_tried: false,
             at,
+            kept: KeptFields::default(),
         }
     }
 
@@ -943,12 +1028,17 @@ impl Alert {
         let mut o = Object::new()
             .with("type", self.alert_type.as_str())
             .with("run", self.run.as_ref().map_or(Value::Null, Run::to_value))
-            .with("details", self.details.to_value())
+            .with("details", self.details_value())
             .with("job", self.job.as_str())
             .with("definition", self.definition.0.clone())
             .with("title", self.title.as_str())
             .with("message", self.message.as_str())
             .with("at", self.at);
+        // A field a newer release added goes before the triage, which the
+        // SDK spreads onto an alert last.
+        for (k, v) in &self.kept.top {
+            o.set(k.as_str(), v.clone());
+        }
         if self.triage_tried || self.triage.is_some() {
             o.set("triage", self.triage.clone());
         }
@@ -958,6 +1048,24 @@ impl Alert {
     /// The SDK's JSON.
     pub fn to_json(&self) -> String {
         self.to_value().to_json()
+    }
+
+    /// The details as written: those of a type the port does not know as
+    /// they were read, and a known type's with the keys its variant does not
+    /// hold after its own.
+    fn details_value(&self) -> Value {
+        if let (AlertType::Other(_), Some(raw)) = (&self.alert_type, &self.kept.raw_details) {
+            return raw.clone();
+        }
+        let mut details = self.details.to_value();
+        if let Value::Object(o) = &mut details {
+            for (k, v) in &self.kept.details {
+                if !o.has(k) {
+                    o.set(k.as_str(), v.clone());
+                }
+            }
+        }
+        details
     }
 
     /// Reads the SDK's JSON.
@@ -985,8 +1093,20 @@ impl Alert {
             Some(r) => Some(Run::from_value(r)?),
         };
         let empty = Object::new();
-        let details =
-            AlertDetails::from_value(&alert_type, o.get("details").and_then(Value::as_object).unwrap_or(&empty));
+        let stored_details = o.get("details");
+        let details_object = stored_details.and_then(Value::as_object);
+        let details = AlertDetails::from_value(&alert_type, details_object.unwrap_or(&empty));
+        let mut kept = KeptFields::default();
+        match detail_keys(&alert_type) {
+            None => kept.raw_details = stored_details.cloned(),
+            Some(known) => {
+                if let Some(d) = details_object {
+                    kept.details =
+                        d.iter().filter(|(k, _)| !known.contains(k)).map(|(k, v)| (k.to_string(), v.clone())).collect();
+                }
+            }
+        }
+        kept.top = o.iter().filter(|(k, _)| !ALERT_KEYS.contains(k)).map(|(k, v)| (k.to_string(), v.clone())).collect();
         Ok(Alert {
             run,
             details,
@@ -998,6 +1118,7 @@ impl Alert {
             triage: nullable_str(o, "triage"),
             at: int_of(o, "at"),
             alert_type,
+            kept,
         })
     }
 }
@@ -1186,6 +1307,50 @@ mod tests {
         let queued = s.undelivered.unwrap();
         assert_eq!(queued.len(), 1);
         assert_eq!(queued[0].run.as_ref().unwrap().metrics.to_json(), r#"{"b":2}"#);
+    }
+
+    /// A queued alert keeps every field a newer writer gave it, at its top
+    /// level and in its details, as the SDK keeps the JSON it read.
+    #[test]
+    fn a_queued_alert_keeps_the_fields_it_does_not_know() {
+        let known = r#"{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1,"futureDetail":[1]},"job":"k","definition":{"a":1},"title":"t","message":"m","at":5,"futureAlertField":{"x":"y"},"triage":null}"#;
+        let unknown = r#"{"type":"future","run":null,"details":{"a_b":1,"x":"y"},"job":"k","definition":{},"title":"t","message":"m","at":6,"futureAlertField":2}"#;
+        let shapeless =
+            r#"{"type":"future","run":null,"details":[1],"job":"k","definition":{},"title":"t","message":"m","at":7}"#;
+        for text in [known, unknown, shapeless] {
+            assert_eq!(Alert::from_json(text).unwrap().to_json(), text);
+        }
+        let state = format!(
+            r#"{{"job":"k","open":{{}},"consecutiveFailures":0,"silencedUntil":null,"lastAlertAt":null,"pendingRecovery":[],"undelivered":[{known},{unknown}]}}"#
+        );
+        assert_eq!(JobState::from_json(&state).unwrap().to_json(), state);
+        // A triage set on a retry goes where the SDK's spread puts it.
+        let mut a = Alert::from_json(unknown).unwrap();
+        a.triage = Some("look".into());
+        assert_eq!(a.to_json(), unknown.replace(r#""futureAlertField":2"#, r#""futureAlertField":2,"triage":"look""#));
+    }
+
+    /// A `sending` entry is written back as it was read: a malformed one
+    /// (not an object, an `until` that is not a number, an alert that does
+    /// not read) and the keys of one the port does not know, until the next
+    /// check lets it go.
+    #[test]
+    fn a_sending_entry_is_written_back_as_it_was_read() {
+        let alert = r#"{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"k","definition":{},"title":"t","message":"m","at":5}"#;
+        let sending = format!(
+            r#"["x",null,{{"until":"x","alert":{alert}}},{{"until":9,"alert":{{"run":"bad"}}}},{{"until":9,"alert":{alert},"futureEntryKey":1}},{{"until":9}}]"#
+        );
+        let state = format!(
+            r#"{{"job":"k","open":{{}},"consecutiveFailures":0,"silencedUntil":null,"lastAlertAt":null,"pendingRecovery":[],"undelivered":[],"sending":{sending}}}"#
+        );
+        let s = JobState::from_json(&state).unwrap();
+        let entries = s.sending.as_ref().unwrap();
+        assert_eq!(entries.len(), 6);
+        assert_eq!((entries[2].until, entries[2].alert.is_some()), (None, true));
+        assert_eq!((entries[3].until, entries[3].alert.is_some()), (Some(9), false));
+        // One as the SDK writes it equals one made with `new`.
+        assert_eq!(entries[5], SendingAlert::new(Some(9), None));
+        assert_eq!(s.to_json(), state);
     }
 
     #[test]

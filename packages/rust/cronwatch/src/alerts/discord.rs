@@ -183,6 +183,7 @@ mod tests {
             triage: Some("*_`~|[]()<>\\".repeat(100)),
             triage_tried: true,
             at: 0,
+            kept: Default::default(),
         };
         let description = String::from_utf16(&embed_description(&alert)).unwrap();
         // The whole triage, escaped: 1000 characters, each one of the escaped.
