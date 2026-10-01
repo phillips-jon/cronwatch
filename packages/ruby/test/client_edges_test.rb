@@ -243,19 +243,80 @@ class ClientEdgesTest < Minitest::Test
   def test_the_environment_is_read_one_way_everywhere
     skip "Rails is loaded" if defined?(::Rails)
 
-    with_env("RAILS_ENV" => "", "RACK_ENV" => "production") do
+    with_env("CRONWATCH_ENV" => nil, "APP_ENV" => nil, "RAILS_ENV" => "", "RACK_ENV" => "production") do
       assert_equal "production", Cronwatch::Environment.name, "an empty RAILS_ENV counts as unset"
       assert_equal "production", Cronwatch::Scheduler.env
       refute Cronwatch::Client.development?
       _, err = capture_io { Cronwatch.new.jobs }
       assert_match(/using the in-memory store/, err)
     end
-    with_env("RAILS_ENV" => "test", "RACK_ENV" => "production") do
+    with_env("CRONWATCH_ENV" => nil, "APP_ENV" => nil, "RAILS_ENV" => "test", "RACK_ENV" => "production") do
       assert Cronwatch::Client.development?, "RAILS_ENV before RACK_ENV"
     end
-    with_env("RAILS_ENV" => nil, "RACK_ENV" => nil) do
+    with_env("CRONWATCH_ENV" => nil, "APP_ENV" => nil, "RAILS_ENV" => nil, "RACK_ENV" => nil) do
       assert_nil Cronwatch::Environment.name
       assert_equal "development", Cronwatch::Scheduler.env
+    end
+  end
+
+  # CRONWATCH_ENV, then APP_ENV, then the app's own (RAILS_ENV here, where
+  # the SDK's table has NODE_ENV): the first that holds more than spaces,
+  # trimmed, lowercased, with the aliases. env.test.ts's cases.
+  ENVIRONMENTS = [
+    [nil, nil, nil, nil],
+    [nil, nil, "development", "development"],
+    [nil, nil, "test", "development"],
+    [nil, nil, "production", "production"],
+    [nil, "local", "production", "development"],
+    %w[production dev development production],
+    ["staging", nil, "development", "staging"],
+    ["  PROD ", nil, nil, "production"],
+    [nil, "Testing", nil, "development"],
+    [nil, "DEV", nil, "development"],
+    ["", "   ", "production", "production"],
+    [" \t", nil, nil, nil],
+  ].freeze
+
+  def test_the_environment_reads_cronwatch_env_then_app_env_then_the_apps_own
+    skip "Rails is loaded" if defined?(::Rails)
+
+    ENVIRONMENTS.each do |cronwatch_env, app_env, own, expected|
+      with_env("CRONWATCH_ENV" => cronwatch_env, "APP_ENV" => app_env, "RAILS_ENV" => own, "RACK_ENV" => nil) do
+        label = [cronwatch_env, app_env, own].inspect
+        if expected.nil?
+          assert_nil Cronwatch::Environment.environment, label
+        else
+          assert_equal expected, Cronwatch::Environment.environment, label
+        end
+        assert_equal expected == "development", Cronwatch::Environment.development?, label
+        assert_equal expected == "production", Cronwatch::Environment.production?, label
+      end
+    end
+  end
+
+  # A server that sets RACK_ENV=development when nothing is set does not
+  # name development by itself; CRONWATCH_ENV or APP_ENV does.
+  def test_rack_env_development_alone_is_not_stated_under_a_server_that_sets_it
+    skip "Rails is loaded" if defined?(::Rails)
+
+    original = Cronwatch::Environment.method(:defaulting_server?)
+    Cronwatch::Environment.define_singleton_method(:defaulting_server?) { true }
+    begin
+      with_env("CRONWATCH_ENV" => nil, "APP_ENV" => nil, "RAILS_ENV" => nil, "RACK_ENV" => "development") do
+        assert Cronwatch::Environment.development?
+        refute Cronwatch::Environment.stated_development?
+      end
+      with_env("CRONWATCH_ENV" => nil, "APP_ENV" => nil, "RAILS_ENV" => nil, "RACK_ENV" => "test") do
+        assert Cronwatch::Environment.stated_development?
+      end
+      with_env("CRONWATCH_ENV" => " Dev", "APP_ENV" => nil, "RAILS_ENV" => nil, "RACK_ENV" => "development") do
+        assert Cronwatch::Environment.stated_development?
+      end
+      with_env("CRONWATCH_ENV" => nil, "APP_ENV" => "local", "RAILS_ENV" => nil, "RACK_ENV" => "production") do
+        assert Cronwatch::Environment.stated_development?
+      end
+    ensure
+      Cronwatch::Environment.define_singleton_method(:defaulting_server?, original)
     end
   end
 

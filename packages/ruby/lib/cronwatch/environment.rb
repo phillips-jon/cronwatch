@@ -1,14 +1,60 @@
 # frozen_string_literal: true
 
 module Cronwatch
-  # The app's environment, read one way everywhere: Rails.env when Rails is
-  # loaded, otherwise RAILS_ENV, then RACK_ENV. The SDK reads NODE_ENV.
+  # The app's environment, read as every CronWatch library reads it: the
+  # first of CRONWATCH_ENV, APP_ENV, then the app's own (Rails.env when Rails
+  # is loaded, else RAILS_ENV, then RACK_ENV) that holds more than spaces,
+  # trimmed and lowercased, with "prod" read as "production" and "dev",
+  # "local", "test" and "testing" as "development". None set is neither,
+  # which is the safe reading. The SDK reads NODE_ENV where this reads the
+  # app's own.
+  #
+  # @api private
   module Environment
-    DEVELOPMENT = %w[development test].freeze
+    # The variables read before the app's own, in order.
+    SHARED = %w[CRONWATCH_ENV APP_ENV].freeze
+    ALIASES = {
+      "prod" => "production", "dev" => "development", "local" => "development", "test" => "development",
+      "testing" => "development",
+    }.freeze
+    private_constant :SHARED, :ALIASES
 
     module_function
 
-    # "production", "development", ... or nil when nothing names one.
+    # "production", "development", "staging", ... or nil when nothing names one.
+    def environment
+      _, value = source
+      return nil if value.nil?
+
+      value = JS.trim(value).downcase
+      ALIASES.fetch(value, value)
+    end
+
+    # Where the environment was read from and its value as set:
+    # ["CRONWATCH_ENV", " dev"], ["Rails.env", "test"], or nil.
+    def source
+      SHARED.each do |variable|
+        value = ENV.fetch(variable, nil)
+        return [variable, value] if present?(value)
+      end
+      if defined?(::Rails) && ::Rails.respond_to?(:env)
+        env = ::Rails.env.to_s
+        return ["Rails.env", env] if present?(env)
+      end
+      %w[RAILS_ENV RACK_ENV].each do |variable|
+        value = ENV.fetch(variable, nil)
+        return [variable, value] if present?(value)
+      end
+      nil
+    end
+
+    def present?(value)
+      !value.nil? && !JS.trim(value).empty?
+    end
+
+    # The framework's own name for the environment, as it sets it: Rails.env
+    # when Rails is loaded, otherwise RAILS_ENV, then RACK_ENV, or nil. The
+    # section of a Solid Queue file is chosen by it, as Solid Queue does.
     def name
       if defined?(::Rails) && ::Rails.respond_to?(:env)
         env = ::Rails.env.to_s
@@ -17,30 +63,29 @@ module Cronwatch
       [ENV.fetch("RAILS_ENV", nil), ENV.fetch("RACK_ENV", nil)].find { |value| value && !value.empty? }
     end
 
-    # Development or test: Cronwatch::Web without a token serves only then.
+    # Development (including test): Cronwatch::Web without a token serves only then.
     def development?
-      DEVELOPMENT.include?(name)
+      environment == "development"
     end
 
     def production?
-      name == "production"
+      environment == "production"
     end
 
-    # Whether development or test was named by the app rather than by its
-    # server, for the dashboard's own token (Cronwatch::Web). Puma, Unicorn,
-    # Thin and rackup set RACK_ENV to "development" when nothing names an
+    # Whether development was named by the app rather than by its server,
+    # for the dashboard's own token (Cronwatch::Web). Puma, Unicorn, Thin
+    # and rackup set RACK_ENV to "development" when nothing names an
     # environment, so under one of them, in production too, RACK_ENV alone
-    # reads "development". There it takes Rails.env, RAILS_ENV or APP_ENV
-    # (Sinatra's) to say development; RACK_ENV "test" still counts, as no
-    # server sets it.
+    # reads "development". There it takes CRONWATCH_ENV, APP_ENV, Rails.env
+    # or RAILS_ENV to say development; any other value of RACK_ENV that reads
+    # as development ("test", "dev") still counts, as no server sets it.
     def stated_development?
       return false unless development?
-      return true if defined?(::Rails) && ::Rails.respond_to?(:env) && !::Rails.env.to_s.empty?
 
-      stated = [ENV.fetch("RAILS_ENV", nil), ENV.fetch("APP_ENV", nil)].find { |value| value && !value.empty? }
-      return DEVELOPMENT.include?(stated) unless stated.nil?
+      variable, value = source
+      return true unless variable == "RACK_ENV" && JS.trim(value).downcase == "development"
 
-      name == "test" || !defaulting_server?
+      !defaulting_server?
     end
 
     # A server that sets RACK_ENV when it is unset is running this process.
