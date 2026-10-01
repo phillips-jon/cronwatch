@@ -75,8 +75,10 @@ final class JobHandle
      * (serve() for a bare script, laravel(), a Symfony controller, PSR-15).
      *
      * @param callable(JobContext, mixed): mixed $fn
+     * @param string|\Cronwatch\FromEnv|false|null $secret "", a string of only whitespace and FromEnv::Read mean the
+     *        client's secret; anything else (true, a number) throws a TypeError
      */
-    public function handler(callable $fn, string|false|null $secret = ''): Handler
+    public function handler(callable $fn, mixed $secret = ''): Handler
     {
         return new Handler($this->client, $this->definition, $fn, $secret);
     }

@@ -6,6 +6,7 @@ namespace Cronwatch\Job;
 
 use Cronwatch\Cronwatch;
 use Cronwatch\Env;
+use Cronwatch\FromEnv;
 use Cronwatch\JobDefinition;
 use Cronwatch\Js;
 use Cronwatch\RunStatus;
@@ -30,10 +31,12 @@ use Cronwatch\Web\ResponseStatus;
  *
  * The caller must send `Authorization: Bearer <secret>`, compared in
  * constant time. The secret is the handler's own `secret:`, else the
- * client's cronSecret (CRON_SECRET by default); "" (the default) counts as
- * unset, and `secret: null` (or a client made with `cronSecret: null`) lets
- * anyone run the job. `false` does what null does, deprecated since 1.0 and
- * removed in 2.0 (in 0.x, null meant the client's secret). With no secret at all the handler answers 503 unless the
+ * client's cronSecret (CRON_SECRET by default); "" (the default), a string
+ * of only whitespace and FromEnv::Read each mean the client's secret, and
+ * `secret: null` (or a client made with `cronSecret: null`) lets anyone run
+ * the job. `false` does what null does, deprecated since 1.0 and removed in
+ * 2.0 (in 0.x, null meant the client's secret). Any other value (true, a
+ * number) throws a TypeError. With no secret at all the handler answers 503 unless the
  * environment is development (see Env), and reports it once to onError as
  * "handler". A wrong or missing bearer is 401.
  *
@@ -59,8 +62,13 @@ final class Handler
         private readonly Cronwatch $client,
         private readonly JobDefinition $definition,
         callable $fn,
-        string|false|null $secret = '',
+        mixed $secret = '',
     ) {
+        // A blank secret, or FromEnv::Read, falls back to the client's; one that is not a string throws.
+        $secret = Env::secretOption($secret, 'handler: secret');
+        if ($secret === FromEnv::Read) {
+            $secret = '';
+        }
         $this->fn = \Closure::fromCallable($fn);
         $this->job = (string) $definition->get('name');
         $off = $secret === null || $secret === false;

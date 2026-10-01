@@ -316,7 +316,7 @@ final class ConformanceTest extends TestCase
 
     public function testNormalizeState(): void
     {
-        $this->eachCase(self::fixture('health.json')->normalizeState, fn (\stdClass $c) => self::differs($c->normalized, Evaluate::normalizeState(self::state($c->state), 'j')));
+        $this->eachCase(self::fixture('health.json')->normalizeState, fn (\stdClass $c) => self::differs($c->normalized, Evaluate::normalizeState($c->state, 'j')));
     }
 
     public function testMuteOpens(): void

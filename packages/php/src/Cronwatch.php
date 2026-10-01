@@ -137,8 +137,9 @@ final class Cronwatch
      * @param callable(TriageContext): ?string|null $triage adds a short diagnosis to every alert but recoveries
      * @param list<Source> $sources where runs this process does not wrap come from; each is synced at the start of every check
      * @param string|FromEnv|false|null $cronSecret the secret the dashboard's check endpoint (routes()) also accepts, and a
-     *        job's handler() requires; the default (FromEnv::Read) reads CRON_SECRET, "" counts as unset, and null lets both
-     *        run without one. false is the same as null, deprecated since 1.0 and removed in 2.0 (in 0.x, null read
+     *        job's handler() requires; the default (FromEnv::Read) reads CRON_SECRET, a value of "" or only whitespace
+     *        (given or read) counts as unset, and null lets both run without one. Anything else (true, a number) throws a
+     *        TypeError. false is the same as null, deprecated since 1.0 and removed in 2.0 (in 0.x, null read
      *        CRON_SECRET and false turned it off; null now means what it means in every other language).
      * @param mixed $retention how long finished runs are kept; default "30d"
      * @param array<string, mixed> $defaults grace, timeout, timezone and failuresBeforeAlert for every job that does not set its own
@@ -156,7 +157,7 @@ final class Cronwatch
         ?array $alerts = null,
         ?callable $triage = null,
         array $sources = [],
-        string|FromEnv|false|null $cronSecret = FromEnv::Read,
+        mixed $cronSecret = FromEnv::Read,
         mixed $retention = '30d',
         array $defaults = [],
         callable|false|null $redact = null,
@@ -182,7 +183,9 @@ final class Cronwatch
             }
         }
         $this->sources = array_values($sources);
-        $secret = $cronSecret === FromEnv::Read ? Env::read('CRON_SECRET') : $cronSecret;
+        // A blank secret, given or read, counts as unset; one given that is not a string throws.
+        $cronSecret = Env::secretOption($cronSecret, 'cronSecret');
+        $secret = $cronSecret === FromEnv::Read ? Env::secret('CRON_SECRET') : $cronSecret;
         $this->cronSecret = is_string($secret) && $secret !== '' ? $secret : null;
         $this->secretOptOut = $cronSecret === null || $cronSecret === false;
         $this->retentionMs = Duration::parse($retention ?? '30d', 'retention');
@@ -495,13 +498,14 @@ final class Cronwatch
      * from a script, handle() with a Web\Request, or put it in a PSR-15 stack
      * with Web\PsrHandler or Web\PsrMiddleware. See Web\Dashboard.
      *
-     * @param string|FromEnv|false|null $token the default (FromEnv::Read) reads CRONWATCH_TOKEN, as "" does, and null serves
-     *        the dashboard open; false is the same as null, deprecated since 1.0 and removed in 2.0
+     * @param string|FromEnv|false|null $token the default (FromEnv::Read) reads CRONWATCH_TOKEN, as "" or only whitespace
+     *        does, and null serves the dashboard open; anything else (true, a number) throws a TypeError. false is the
+     *        same as null, deprecated since 1.0 and removed in 2.0
      * @param string|null $basePath where the dashboard is mounted; default the script of a path-info URL, else "/cronwatch"
      * @param string|null $origin the public origin, for an app behind a proxy
      * @param bool $trustProxy take the public origin from X-Forwarded-Proto and X-Forwarded-Host
      */
-    public function routes(string|FromEnv|false|null $token = FromEnv::Read, ?string $basePath = null, ?string $origin = null, bool $trustProxy = false): Web\Dashboard
+    public function routes(mixed $token = FromEnv::Read, ?string $basePath = null, ?string $origin = null, bool $trustProxy = false): Web\Dashboard
     {
         return new Web\Dashboard($this, token: $token, basePath: $basePath, origin: $origin, trustProxy: $trustProxy);
     }
@@ -1419,7 +1423,11 @@ final class Cronwatch
         foreach ($this->store->runningRuns() as $listed) {
             try {
                 $declared = $this->definitions[$listed->job] ?? null;
-                $judged = $declared !== null ? Serialize::toStored($declared) : $this->store->getJob($listed->job)?->definition;
+                $found = $declared !== null ? null : $this->store->getJob($listed->job);
+                if ($found !== null) {
+                    self::evaluable($found);
+                }
+                $judged = $declared !== null ? Serialize::toStored($declared) : $found?->definition;
                 if ($judged === null || !Evaluate::isStuck($judged, $listed, $at)) {
                     continue;
                 }
@@ -1450,6 +1458,7 @@ final class Cronwatch
         $spent = 0.0;
         foreach ($this->writtenJobs() as $stored) {
             try {
+                self::evaluable($stored);
                 $recent = $this->store->listRuns($stored->name, Evaluate::BASELINE_WINDOW);
                 $nextExpectedAt = null;
                 [$state, $held] = $this->updateState($stored->name, function (JobState $previous) use ($stored, $recent, $at, &$nextExpectedAt): array {
@@ -1462,7 +1471,13 @@ final class Cronwatch
                     return [$next, ['alerts' => $out['alerts'], 'dropped' => $released['dropped'] + $out['dropped']]];
                 });
                 $this->reportDropped($stored->name, $held['dropped']);
-                array_push($alerts, ...$this->retryUndelivered($stored->name, $state, $at, $spent));
+                // A retry that fails (a queued alert no channel can take) is
+                // reported on its own, so the job's new alerts still go out.
+                try {
+                    array_push($alerts, ...$this->retryUndelivered($stored->name, $state, $at, $spent));
+                } catch (\Throwable $error) {
+                    $this->report($error, "retrying alerts for {$stored->name}");
+                }
                 array_push($alerts, ...$this->dispatch($stored->name, $held['alerts'], $at));
                 $jobs[] = Evaluate::summarize($stored, $recent, $state, $nextExpectedAt, $at);
             } catch (\Throwable $error) {
@@ -1489,12 +1504,21 @@ final class Cronwatch
         $recent = [];
         try {
             $recent = $this->store->listRuns($stored->name, max($count, Evaluate::BASELINE_WINDOW));
+            self::evaluable($stored);
             $state = $this->readState($stored->name);
             $nextExpectedAt = Evaluate::onCheck($stored->definition, $stored, $recent[0] ?? null, $state, $at)->nextExpectedAt;
             return new JobWithRuns(Evaluate::summarize($stored, $recent, $state, $nextExpectedAt, $at), array_slice($recent, 0, $count));
         } catch (\Throwable $error) {
             $this->report($error, "reading {$stored->name}");
             return new JobWithRuns($this->unevaluable($stored, $at), array_slice($recent, 0, $count));
+        }
+    }
+
+    /** Throws for a job whose stored definition was not a JSON object: reported, and shown as failing, while the others carry on. */
+    private static function evaluable(StoredJob $stored): void
+    {
+        if (!$stored->isReadable()) {
+            throw new \UnexpectedValueException("job \"{$stored->name}\": its stored definition is not a JSON object");
         }
     }
 

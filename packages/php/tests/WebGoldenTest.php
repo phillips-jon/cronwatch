@@ -130,7 +130,7 @@ final class WebGoldenTest extends TestCase
     {
         $data = json_decode((string) file_get_contents(self::GOLDEN), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(Clock::T0, $data['t0']);
-        $this->assertCount(66, $data['captures']);
+        $this->assertCount(82, $data['captures']);
         $cw = self::seed();
         $web = $cw->routes(token: 'tok', basePath: '/cronwatch');
         $ids = [];
