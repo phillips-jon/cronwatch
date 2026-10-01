@@ -68,7 +68,7 @@ Something has to notice a run that never happened. A long-running service checks
 ```rust
 # use std::time::Duration;
 # fn doc(cw: cronwatch::Client) {
-cw.start(Duration::from_secs(60)); // a task that checks every minute
+cw.start_checking(Duration::from_secs(60)); // a task that checks every minute
 # }
 ```
 

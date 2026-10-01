@@ -35,7 +35,7 @@ For apalis, every attempt is a run of its own. An attempt that fails (an error, 
 
 ### The check
 
-Each integration has a check job of its own, which also declares again without their schedules the jobs this app's scheduler no longer runs. A service can just as well call `cw.start(Duration::from_secs(60))` beside the scheduler.
+Each integration has a check job of its own, which also declares again without their schedules the jobs this app's scheduler no longer runs. A service can just as well call `cw.start_checking(Duration::from_secs(60))` beside the scheduler.
 
 ## tokio-cron-scheduler
 
@@ -62,7 +62,7 @@ scheduler
     )?)
     .await?;
 scheduler.add(watcher.repeated("poll", Duration::from_secs(300), |_| poll(), JobOptions::new())?).await?;
-scheduler.add(watcher.check_job(Duration::from_secs(60))?).await?; // or cw.start(...)
+scheduler.add(watcher.check_job(Duration::from_secs(60))?).await?; // or cw.start_checking(...)
 watcher.follow(&scheduler);
 scheduler.start().await?;
 ```
@@ -100,7 +100,7 @@ let worker = WorkerBuilder::new("nightly-report")
     .retry(RetryPolicy::retries(3))
     .layer(watcher.layer()) // after .retry, so each attempt is a run
     .build(nightly_report);
-tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start(...)
+tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start_checking(...)
 worker.run().await?;
 ```
 

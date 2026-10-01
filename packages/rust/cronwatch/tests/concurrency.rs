@@ -328,8 +328,10 @@ async fn start_checks_after_a_second_then_on_the_interval_until_stop() {
     let store = Arc::new(TestStore::default());
     let k = Kit::with(|b| b.store_arc(store.clone()));
     let calls = || store.running_runs_calls.load(Ordering::SeqCst);
-    k.cw.start(Duration::from_secs(10));
-    k.cw.start(Duration::from_secs(1)); // a second start does nothing
+    k.cw.start_checking(Duration::from_secs(10));
+    k.cw.start_checking(Duration::from_secs(1)); // a second call does nothing
+    #[allow(deprecated)]
+    k.cw.start(Duration::from_secs(1)); // nor does the old name
     tokio::time::sleep(Duration::from_millis(500)).await;
     assert_eq!(calls(), 0, "not before a second");
     tokio::time::sleep(Duration::from_millis(1000)).await;

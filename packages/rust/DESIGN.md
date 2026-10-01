@@ -120,7 +120,7 @@ let path = nightly.run(|job| async move {
 }).await?;
 
 let result = cw.check().await?;          // missed and stuck runs, retries, pruning
-cw.start(Duration::from_secs(60));        // a task that checks every minute (long-running services)
+cw.start_checking(Duration::from_secs(60)); // a task that checks every minute (long-running services)
 cw.silence("nightly-report", Duration::from_secs(2 * 3600)).await?;
 ```
 
@@ -218,7 +218,7 @@ What reading tokio-cron-scheduler 0.15.1 found, which the draft did not know:
 - *Removals.* The scheduler never sends its `Removed` notification in 0.15.1 (nothing emits it), so `watcher.follow(&scheduler)` listens on the scheduler's own `job_created_tx` and `job_deleted_tx` broadcast channels (public fields of its `Context`): a job made here that the scheduler deletes is declared again without its schedule at once, with a sync of the store, and one it adds again after that (a clone of its `Job` keeps its uuid) is declared with its schedule again the same way. Without `follow`, `watcher.sync(&scheduler)` asks the scheduler for each job's next tick; a job it once had and no longer has is gone. A job made and never added is not taken for removed. `follow` spawns its task on the current runtime and returns its `JoinHandle`: the task holds the scheduler, whose channels `shutdown` does not close, so it runs until the app aborts it or the runtime ends.
 - *Its clock.* The scheduler reads `Utc::now()` every half second, so tokio's paused clock cannot drive it; the tests run a real scheduler on the wall clock with jobs every second, a few seconds in all.
 
-`watcher.check_job(every)` is a repeated job that runs `sync` and a check, never itself a job; a service can also just call `cw.start(every)`. The tests (7 unit, 6 against a real scheduler) cover runs, errors and panics recorded, a job removed while the scheduler runs (followed and not), the schedule the earlier release had taken out, another app's job left alone, the check job, refusals, the zone rules around New York's clock changes and Adelaide's half hour, and the schedules the two parsers read differently.
+`watcher.check_job(every)` is a repeated job that runs `sync` and a check, never itself a job; a service can also just call `cw.start_checking(every)`. The tests (7 unit, 6 against a real scheduler) cover runs, errors and panics recorded, a job removed while the scheduler runs (followed and not), the schedule the earlier release had taken out, another app's job left alone, the check job, refusals, the zone rules around New York's clock changes and Adelaide's half hour, and the schedules the two parsers read differently.
 
 ### apalis
 

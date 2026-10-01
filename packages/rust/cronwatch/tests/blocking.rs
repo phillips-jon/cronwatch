@@ -88,3 +88,13 @@ async fn it_works_inside_another_runtime_too() {
     job.run(|_| Ok::<_, DiskFull>(())).unwrap();
     assert_eq!(cw.runs("nested", 1).unwrap()[0].status, RunStatus::Ok);
 }
+
+#[test]
+fn start_checking_and_its_old_name_check_on_an_interval_until_stopped() {
+    let (cw, _) = client();
+    cw.start_checking(std::time::Duration::from_secs(60));
+    #[allow(deprecated)]
+    cw.start(std::time::Duration::from_secs(60)); // a second call does nothing
+    cw.stop();
+    cw.close().unwrap();
+}

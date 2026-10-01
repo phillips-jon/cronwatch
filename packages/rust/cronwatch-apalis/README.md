@@ -34,7 +34,7 @@ let worker = WorkerBuilder::new("nightly-report")
     .retry(RetryPolicy::retries(3))
     .layer(watcher.layer()) // after .retry, so each attempt is a run
     .build(nightly_report);
-tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start(...)
+tokio::spawn(watcher.check_worker(Duration::from_secs(60))?.run()); // or cw.start_checking(...)
 worker.run().await?;
 # Ok(())
 # }

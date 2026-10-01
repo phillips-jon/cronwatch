@@ -28,7 +28,7 @@
 //!     })
 //!     .await?;
 //! cw.check().await?; // missed and stuck runs, retries, pruning
-//! cw.start(Duration::from_secs(60)); // or check every minute in a task
+//! cw.start_checking(Duration::from_secs(60)); // or check every minute in a task
 //! # Ok(())
 //! # }
 //! ```

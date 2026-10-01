@@ -324,8 +324,9 @@ impl Client {
     /// check a second from now, then every `every` (a minute when zero, five
     /// seconds at least). Not for serverless functions, where nothing runs
     /// between requests: call [`check`](Self::check) from a cron there
-    /// instead. A second `start` does nothing.
-    pub fn start(&self, every: Duration) {
+    /// instead. A second call does nothing, under either name; [`stop`](Self::stop)
+    /// stops it.
+    pub fn start_checking(&self, every: Duration) {
         let mut timer = lock(&self.inner.timer);
         if timer.is_some() {
             return;
@@ -336,7 +337,7 @@ impl Client {
             .clamp(Duration::from_secs(5), Duration::from_millis(TIMER_MAX_MS));
         if self.inner.defer_delivery && !self.inner.warned_deferred_start.swap(true, Ordering::Relaxed) {
             eprintln!(
-                "[cronwatch] start() was called with Deliver::AtCheck, so these checks send no alerts. Another process must run checks with Deliver::Now (the default) to send them."
+                "[cronwatch] start_checking() was called with Deliver::AtCheck, so these checks send no alerts. Another process must run checks with Deliver::Now (the default) to send them."
             );
         }
         let client = self.clone();
@@ -360,7 +361,14 @@ impl Client {
         }));
     }
 
-    /// Stops the interval [`start`](Self::start) began. A check in flight
+    /// `start_checking`'s old name, which reads like a job's `start` (which
+    /// opens a run). Does exactly what `start_checking` does.
+    #[deprecated(note = "renamed start_checking, since a job's start opens a run; this name goes in 2.0")]
+    pub fn start(&self, every: Duration) {
+        self.start_checking(every);
+    }
+
+    /// Stops the interval [`start_checking`](Self::start_checking) began. A check in flight
     /// finishes, since it runs in a task of its own.
     pub fn stop(&self) {
         if let Some(timer) = lock(&self.inner.timer).take() {

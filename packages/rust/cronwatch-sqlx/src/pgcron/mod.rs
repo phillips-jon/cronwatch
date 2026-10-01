@@ -12,7 +12,7 @@
 //!
 //! let source = PgCron::new(pool.clone(), PgCronOptions { prefix: "db:".into(), ..Default::default() });
 //! let cw = cronwatch::Client::builder().store(SqlStore::postgres(pool)).source(Arc::new(source)).build()?;
-//! cw.start(std::time::Duration::from_secs(60));
+//! cw.start_checking(std::time::Duration::from_secs(60));
 //! # Ok(())
 //! # }
 //! ```

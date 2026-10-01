@@ -106,10 +106,10 @@ Rust cancels a future by dropping it, inside `tokio::time::timeout`, say, or in 
 A job that never starts cannot report itself, so something has to look. A long-running service (an axum server, a worker, a process running a scheduler) checks in a task:
 
 ```rust
-cw.start(Duration::from_secs(60)); // until cw.stop() or cw.close()
+cw.start_checking(Duration::from_secs(60)); // until cw.stop() or cw.close()
 ```
 
-The first check runs a second after `start`, then one every interval (a minute when zero, five seconds at least). A second `start` does nothing, and `stop` lets a check in flight finish. One process checking is enough; running `start` in every replica is harmless, since a check judges each run once. A serverless function does not run between requests, so call `cw.check()` from a cron there instead, or point one at the dashboard's `/api/check`.
+The first check runs a second after `start_checking`, then one every interval (a minute when zero, five seconds at least). A second call does nothing, and `stop` lets a check in flight finish. One process checking is enough; running `start_checking` in every replica is harmless, since a check judges each run once. A serverless function does not run between requests, so call `cw.check()` from a cron there instead, or point one at the dashboard's `/api/check`.
 
 A program run from a crontab exits when it is done, so nothing inside it notices the run that never happened. Add a second crontab line that checks, on a store both reach. Both commands declare the job, so the check knows its schedule before its first run:
 
@@ -345,7 +345,7 @@ use std::sync::Arc;
 
 let source = PgCron::new(pool.clone(), PgCronOptions { prefix: "db:".into(), ..Default::default() });
 let cw = Client::builder().store(SqlStore::postgres(pool)).source(Arc::new(source)).build()?;
-cw.start(Duration::from_secs(60));
+cw.start_checking(Duration::from_secs(60));
 ```
 
 It reads through a `sqlx::PgPool` on the database pg_cron runs in (its `cron.database_name`). Settings are read from `pg_settings`, so a setting the role may not read never fails the check. `PgCronOptions` has `jobs`, `job_ids` and `pick` to choose jobs, `prefix`, `job_name`, `options` and `options_for` (job options for every job, or per job; the schedule and zone always come from pg_cron) and `timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
@@ -407,7 +407,9 @@ There is no Anthropic crate to add: the Messages API is one POST, and it sends t
 | `on_error(f)` | standard error | `Fn(&cronwatch::Error, &str)` for failures outside jobs: the store, a channel, triage |
 | `clock(f)` | the system clock | a function returning epoch milliseconds; for tests |
 
-`JobOptions::new()` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone, from `$TZ` or `/etc/localtime`, by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget(metric, ceiling)`, `expect(text)` (the output must contain it), `expect_match(m)` (a `regex::Regex` with the `regex` feature, or anything implementing `cronwatch::Matcher`; stored as `matches /source/`), `expect_fn(|output| bool)` (a panic in it fails the run), `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/). `cronwatch::describe_job(name, &options)` is the definition options give, without a client.
+`JobOptions::new()` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone, from `$TZ` or `/etc/localtime`, by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget(metric, ceiling)`, `expect(text)` (the output must contain it), `expect_match(m)` (a `regex::Regex` with the `regex` feature, or anything implementing `cronwatch::Matcher`; stored as `matches /source/`), `expect_fn(|output| bool)` (a panic in it fails the run), `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+
+`timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `.max_duration("10m").timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour. `cronwatch::describe_job(name, &options)` is the definition options give, without a client.
 
 The client (every call that can reach the store is `async` and returns a `Result`):
 
@@ -416,7 +418,7 @@ The client (every call that can reach the store is `async` and returns a `Result
 | `job(name, options)` | declare a job and get its handle |
 | `run(name, options, f)` | run without keeping a handle |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `start(every)`, `stop()` | check in a task; the interval is at least five seconds |
+| `start_checking(every)`, `stop()` | check in a task; the interval is at least five seconds. `start(every)` is its old name, deprecated |
 | `jobs()`, `jobs_with_runs(limit)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, d)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
