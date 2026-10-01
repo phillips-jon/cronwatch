@@ -45,19 +45,28 @@ final class ClientTest extends TestCase
         $this->assertSame(Js::dateUtc(2026, 0, 6, 2, 0), $summary->nextExpectedAt);
     }
 
-    public function testWrapAndCurrentRecordRunsToo(): void
+    public function testMonitorAndCurrentRecordRunsToo(): void
     {
         $cw = $this->make();
         $job = $cw->job('wrapped');
-        $task = $job->wrap(function (int $a, int $b): int {
+        $task = $job->monitor(function (int $a, int $b): int {
             Cronwatch::current()->log("adding {$a} and {$b}");
             return $a + $b;
         });
         $this->assertSame(5, $task(2, 3));
         $this->assertNull(Cronwatch::current(), 'nothing is current outside a run');
         $this->assertSame('adding 2 and 3', $cw->runs('wrapped')[0]->output);
-        $this->assertInstanceOf(\RuntimeException::class, $this->failing(fn () => $job->wrap(self::thrower())()));
+        $this->assertInstanceOf(\RuntimeException::class, $this->failing(fn () => $job->monitor(self::thrower())()));
         $this->assertSame(['ok'], array_slice(array_map(fn ($r) => $r->status, $cw->runs('wrapped')), 1));
+    }
+
+    public function testWrapIsMonitorUnderItsDeprecatedName(): void
+    {
+        $cw = $this->make();
+        $task = $cw->job('old')->wrap(fn (int $a) => $a * 2, 'legacy');
+        $this->assertSame(8, $task(4));
+        $run = $cw->runs('old')[0];
+        $this->assertSame(['ok', 'legacy'], [$run->status, $run->trigger]);
     }
 
     public function testAThrowingJobIsRecordedAsFailedAlertsAndRethrows(): void
