@@ -7,9 +7,10 @@ namespace Cronwatch;
 /**
  * The environment, read in one place (the SDK reads NODE_ENV). PHP has no
  * single convention, so the first of CRONWATCH_ENV, APP_ENV (Laravel,
- * Symfony, Craft) and WP_ENVIRONMENT_TYPE (WordPress) that is set is used,
- * from getenv(), $_ENV or $_SERVER, since frameworks that read a .env file
- * put its values in one of those; failing those, what a framework
+ * Symfony, Craft) and WP_ENVIRONMENT_TYPE (WordPress) whose value, trimmed,
+ * is not empty is used, lowercased (a value of only spaces counts as
+ * unset), from getenv(), $_ENV or $_SERVER, since frameworks that read a
+ * .env file put its values in one of those; failing those, what a framework
  * integration names with setFallback() (the WordPress plugin gives
  * wp_get_environment_type(), which also reads the constant of that name).
  * "development", "dev", "local", "test" and "testing" are development (the
@@ -50,9 +51,10 @@ final class Env
     public static function environment(): ?string
     {
         foreach (self::VARIABLES as $name) {
-            $value = self::read($name);
-            if ($value !== null) {
-                return strtolower(trim($value));
+            // A value of only spaces counts as unset, and the next one is read.
+            $value = Js::trim((string) self::read($name));
+            if ($value !== '') {
+                return strtolower($value);
             }
         }
         if (self::$fallback !== null) {
@@ -61,7 +63,7 @@ final class Env
             } catch (\Throwable) {
                 return null;
             }
-            return is_string($value) && trim($value) !== '' ? strtolower(trim($value)) : null;
+            return is_string($value) && Js::trim($value) !== '' ? strtolower(Js::trim($value)) : null;
         }
         return null;
     }

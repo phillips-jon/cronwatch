@@ -151,7 +151,7 @@ $app->add(new \Cronwatch\Web\PsrMiddleware($cw->routes(), $factory, $factory)); 
   - In development, the routes make one and keep it in a file in the system's temporary directory, so every request, in every PHP process, asks for the same one. They write a sign-in link to the server log when they make it.
   - The link names the host only when `origin` is set or the request's host is loopback: `localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`. The host must read as one of these on its own, so a Host header such as `localhost:1@evil.example` does not count. Otherwise the link leaves the host out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`.
   - Anywhere else, they answer 503.
-  - The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `WP_ENVIRONMENT_TYPE` that is set (where the SDK reads `NODE_ENV` third); `development`, `dev`, `local`, `test` and `testing` count as development.
+  - The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `WP_ENVIRONMENT_TYPE` whose value, trimmed, is not empty (where the SDK reads `NODE_ENV` third), lowercased; `development`, `dev`, `local`, `test` and `testing` count as development, `production` and `prod` as production.
 - `basePath`: where it is mounted. It defaults to the script for a path-info URL (`/cronwatch.php`), else `/cronwatch`.
 - `origin`: the public origin, such as `'https://app.example.com'`, to pin it whatever a request says. It then replaces the request's own for the cross-site check on writes, the cookie's `Secure` flag and redirects.
 - `trustProxy`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Off by default.
