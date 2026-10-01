@@ -13,6 +13,7 @@ module Cronwatch
     # Envelopes: https://develop.sentry.dev/sdk/data-model/envelopes/
     # Event payload: https://develop.sentry.dev/sdk/data-model/event-payloads/
     class Sentry
+      # @api private
       Dsn = Struct.new(:endpoint, :public_key, keyword_init: true)
 
       attr_reader :name

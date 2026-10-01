@@ -11,6 +11,8 @@ module Cronwatch
     #   to:             one address or several
     #   subject_prefix: put in front of the title in the subject, "[prod]" say
     #   link:           ->(alert) { "https://app.example.com/cronwatch/jobs/#{alert.job}" }
+    #
+    # @api private
     module Email
       Message = Struct.new(:from, :to, :subject, :text, :html, keyword_init: true)
 

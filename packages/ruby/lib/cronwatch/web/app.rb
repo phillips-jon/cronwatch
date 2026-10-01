@@ -544,6 +544,8 @@ module Cronwatch
     end
 
     # What the routes need from a Rack env, read the way the SDK reads a fetch Request.
+    #
+    # @api private
     class Request
       attr_reader :env
 

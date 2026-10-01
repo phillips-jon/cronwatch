@@ -3,6 +3,8 @@
 module Cronwatch
   class Client
     # One shared check: the first caller runs it, the others wait for its result.
+    #
+    # @api private
     class Flight
       # The thread running the check.
       attr_reader :owner

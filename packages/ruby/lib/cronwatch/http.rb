@@ -7,6 +7,8 @@ require "uri"
 module Cronwatch
   # POSTs for the alert channels. Anything with `post(url, body, headers)`
   # returning a Response can stand in for it, which is how the tests run.
+  #
+  # @api private
   module HTTP
     TIMEOUT = 10
 

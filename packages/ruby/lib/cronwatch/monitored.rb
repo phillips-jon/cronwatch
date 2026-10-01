@@ -6,6 +6,8 @@ module Cronwatch
   # declared on Cronwatch.client. Needs nothing beyond the core, so Sidekiq
   # without Rails can use it. Loaded by cronwatch/scheduler, which schedule:
   # :from_scheduler and declare_from_scheduler! need.
+  #
+  # @api private
   module Monitored
     # What `cronwatch` is outside a monitored run: it takes log and metric
     # calls and drops them, so the job's code runs the same either way.

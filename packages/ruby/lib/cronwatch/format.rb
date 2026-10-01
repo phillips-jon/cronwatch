@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Cronwatch
+  # @api private
   module Format
     NAMED = /\A[A-Za-z_$][A-Za-z0-9_$]*: /
 

@@ -6,6 +6,8 @@ module Cronwatch
   # webhook bodies, so the gem reproduces them byte for byte: Math.round,
   # String(number), JSON.stringify, String.prototype.trim and lengths counted
   # in UTF-16 code units.
+  #
+  # @api private
   module JS
     # What JavaScript's \s and trim() treat as whitespace.
     WHITESPACE = "\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff"

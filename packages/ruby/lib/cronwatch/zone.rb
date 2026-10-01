@@ -5,6 +5,8 @@ require "fugit"
 module Cronwatch
   # IANA zones through TZInfo (which Fugit brings, by way of et-orbi), or the
   # process's own zone when none is named, as JavaScript's Date does.
+  #
+  # @api private
   module Zone
     @zones = {}
     @names = nil

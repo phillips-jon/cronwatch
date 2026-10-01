@@ -9,6 +9,8 @@ module Cronwatch
     # alerts/sigv4.ts. Spec:
     # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
     # Checked against the AWS SigV4 test suite (test/provider_channels_test.rb).
+    #
+    # @api private
     module SigV4
       SPACES = Regexp.new("[#{JS::WHITESPACE}]+")
 

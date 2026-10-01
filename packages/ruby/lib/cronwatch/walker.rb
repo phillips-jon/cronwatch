@@ -6,6 +6,8 @@ module Cronwatch
     # the next match, a field at a time, spilling into the next month or year
     # as croner does (including its habit of stepping into a day the month
     # does not have and letting the date roll over). Month is 0 based.
+    #
+    # @api private
     class Walker
       DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31].freeze
       # [field, the field above it, offset from a field value to its pattern index]

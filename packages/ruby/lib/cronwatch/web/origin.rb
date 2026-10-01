@@ -10,6 +10,8 @@ module Cronwatch
     # ignored, the host is lowercased (percent escapes decoded, IPv4 numbers
     # written out, IPv6 compressed, a non-ASCII host converted to punycode)
     # and a default port is left out. A port outside 1 to 65535 is refused.
+    #
+    # @api private
     module Origin
       ABSOLUTE = "routes: origin must be an absolute URL such as \"https://app.example.com\", got %s"
       FORBIDDEN_HOST = /[\x00-\x20#%\/:<>?@\[\\\]^|\x7F]/

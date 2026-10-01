@@ -7,6 +7,8 @@ require_relative "walker"
 module Cronwatch
   # A cron expression's fields, and the next time they match. What is
   # accepted, and which times match, follow croner; Fugit parses the values.
+  #
+  # @api private
   class CronPattern
     NICKNAMES = {
       "@yearly" => "0 0 1 1 *", "@annually" => "0 0 1 1 *", "@monthly" => "0 0 1 * *", "@weekly" => "0 0 * * 0",

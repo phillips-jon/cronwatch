@@ -95,6 +95,8 @@ module Cronwatch
   end
 
   # Collects a run's output and metrics while its block runs.
+  #
+  # @api private
   class RunRecorder
     # Lines are dropped from the front once the output is well past the cap;
     # Output.redact_and_cap trims it exactly at the end.

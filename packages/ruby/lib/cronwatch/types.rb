@@ -7,6 +7,8 @@ module Cronwatch
   # Ruby names are snake_case symbols; everything that leaves the process
   # (store rows, JSON, webhook bodies) uses the SDK's camelCase names and
   # string values. Each type's to_h is that JSON shape, and from_h reads it.
+  #
+  # @api private
   module Naming
     module_function
 
@@ -51,6 +53,8 @@ module Cronwatch
   end
 
   # Shared by the structs below.
+  #
+  # @api private
   module Serializable
     def as_json(*)
       to_h
@@ -212,6 +216,8 @@ module Cronwatch
 
   # An alert before it has a title and message. See Format.compose_alert.
   # `details` is a hash with snake_case symbol keys; its JSON is camelCase.
+  #
+  # @api private
   AlertDraft = Struct.new(:type, :run, :details, keyword_init: true) do
     include Serializable
 

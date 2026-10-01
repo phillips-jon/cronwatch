@@ -50,6 +50,8 @@ module Cronwatch
                      :TRIAGE_TIMEOUT_MS
 
     # What execute returns: the recorded run, and the block's own outcome.
+    #
+    # @api private
     ExecuteResult = Struct.new(:run, :result, :error, :threw, keyword_init: true)
     # What a channel's call receives with each alert (the SDK's ChannelContext).
     # on_error(error) reports a problem that did not stop the alert going
@@ -1161,6 +1163,8 @@ module Cronwatch
 
     # Alerts written with the state that opened their conditions, and how
     # many older ones the queue let go.
+    #
+    # @api private
     Outbox = Struct.new(:alerts, :dropped)
 
     # An evaluation as it is written: its drafts composed into alerts and held
@@ -1347,6 +1351,8 @@ module Cronwatch
     end
 
     # The wall-clock milliseconds one check has spent retrying, across its jobs.
+    #
+    # @api private
     RetryBudget = Struct.new(:spent_ms)
 
     # Send the alerts that no channel accepted last time, once each, oldest

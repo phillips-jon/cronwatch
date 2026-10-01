@@ -21,6 +21,8 @@ module Cronwatch
     # Motion is CSS only and says something: marks arrive in time order, the
     # now line drops in last, and open problems (a missed slot, a running bar)
     # breathe slowly. prefers-reduced-motion turns all of it off.
+    #
+    # @api private
     module HTML
       CSS = "\n" + <<~'CSS'
         :root{color-scheme:light dark;--paper:#f4f4f5;--sheet:#fff;--sunk:#fafafa;--rule:#e4e4e7;--rule-2:#d4d4d8;--tick:#909098;--ink:#000;--body:#18181b;--muted:#71717a;--ok:#15803d;--warn:#a16207;--bad:#b91c1c;--serif:"Newsreader",ui-serif,Georgia,Cambria,"Times New Roman",serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--who:200px}

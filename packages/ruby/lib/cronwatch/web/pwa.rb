@@ -7,6 +7,8 @@ module Cronwatch
     # that registers it and a page to show offline. None of it says anything
     # about the jobs, so it is served without the token (a browser fetches the
     # manifest and icons without cookies in some flows).
+    #
+    # @api private
     module PWA
       # The page colours the app's window takes: the paper behind the sheet,
       # and the sheet the header sits on.

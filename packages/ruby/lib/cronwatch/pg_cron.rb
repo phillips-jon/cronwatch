@@ -206,6 +206,8 @@ module Cronwatch
       end
 
       # Queries through the pg gem's PG::Connection#exec_params.
+      #
+      # @api private
       class PGConnection
         def initialize(connection)
           @connection = connection
@@ -219,6 +221,8 @@ module Cronwatch
 
       # Queries through an ActiveRecord connection's exec_query, checking one
       # out of the pool for each query when given a class or a pool.
+      #
+      # @api private
       class ActiveRecordConnection
         def initialize(source)
           @source = source

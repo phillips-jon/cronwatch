@@ -15,6 +15,8 @@ module Cronwatch
     # open, and a visually hidden list says the same things in words.
     #
     # Every time is UTC: without script the page cannot know the viewer's zone.
+    #
+    # @api private
     module Timeline
       HOUR = 3_600_000
       DAY = 24 * HOUR

@@ -11,6 +11,8 @@ module Cronwatch
   # is accepted and how a fire lands on a clock that jumps (daylight saving),
   # so both are ported here and a Node and a Ruby process sharing one store
   # agree on every due time.
+  #
+  # @api private
   module Schedule
     # How early a run may start and still count for the fire it was meant for.
     EARLY_SLACK_MS = 60_000

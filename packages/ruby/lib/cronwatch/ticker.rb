@@ -6,6 +6,8 @@ module Cronwatch
   class Client
     # Calls the block after `first` seconds, then every `interval` seconds
     # counted from the start, in a background thread, until stopped.
+    #
+    # @api private
     class Ticker
       def initialize(interval, first, &tick)
         @lock = Mutex.new

@@ -10,6 +10,8 @@ module Cronwatch
     # SDK's alerts/shared.ts: the POST that names the provider and the URL's
     # origin on failure with every secret cut out, the stable alert id, and
     # the run summary trackers attach. Standard library only.
+    #
+    # @api private
     module Provider
       module_function
 

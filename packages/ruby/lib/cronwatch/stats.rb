@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 module Cronwatch
+  # @api private
   module Stats
     module_function
 

@@ -4,6 +4,8 @@ module Cronwatch
   # Pure decisions about a job's health. Each function takes the current state
   # and returns the new state plus the alerts that should go out. Nothing here
   # touches a store or a network, which is what makes it testable.
+  #
+  # @api private
   module Evaluate
     DEFAULT_GRACE_MS = 10 * 60_000
     DEFAULT_TIMEOUT_MS = 60 * 60_000
