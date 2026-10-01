@@ -330,7 +330,7 @@ Each request gives up 10 seconds after it starts. A refused request raises `"<Pr
 
 One difference from Node: `urllib` honours the `HTTP_PROXY` and `HTTPS_PROXY` environment variables, which Node's `fetch` ignores by default.
 
-The webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same fields in every language, described by its [JSON Schema](/docs/alerts/#the-webhook-39-s-schema). Parse the fields (`type`, `details`), not `title` and `message`, whose wording is not promised.
+The webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same fields in every language, described by its [JSON Schema](/docs/alerts/#the-webhooks-schema). Parse the fields (`type`, `details`), not `title` and `message`, whose wording is not promised.
 
 A webhook with a `secret` signs its body with `X-CronWatch-Signature: sha256=<hex>`. `cronwatch.alerts.webhook.signature(secret, body)` gives the hex, the HMAC-SHA256 of the raw body as it arrived (before any JSON parsing). Verifying it in Python:
 

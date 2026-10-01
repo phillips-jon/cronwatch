@@ -294,7 +294,7 @@ Each sends exactly the request the SDK's does: the same URL, headers and body, b
 
 Every channel takes `http:`, an `Cronwatch\Alerts\Http` to send through (`post($url, $body, $headers, $timeoutMs)`), for a proxy or a test double. `Cronwatch\Alerts\Transport::set($http)` sets the one every channel given none uses.
 
-A webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same body every language posts, described by [its JSON Schema](/docs/alerts/#the-webhook-39-s-schema). Read its fields rather than `title` and `message`, whose wording is not promised. It takes `headers:` for headers of your own (`['Authorization' => 'Bearer ...']`), and with a `secret` signs its body with `X-CronWatch-Signature: sha256=<hex>`. `Webhook::signature($secret, $body)` is that HMAC-SHA256 as lowercase hex; verifying in PHP:
+A webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same body every language posts, described by [its JSON Schema](/docs/alerts/#the-webhooks-schema). Read its fields rather than `title` and `message`, whose wording is not promised. It takes `headers:` for headers of your own (`['Authorization' => 'Bearer ...']`), and with a `secret` signs its body with `X-CronWatch-Signature: sha256=<hex>`. `Webhook::signature($secret, $body)` is that HMAC-SHA256 as lowercase hex; verifying in PHP:
 
 ```php
 use Cronwatch\Alerts\Webhook;

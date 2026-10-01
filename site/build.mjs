@@ -34,7 +34,7 @@ const args = process.argv.slice(2);
 const WATCHING = args.includes("--watch") || args.includes("--serve");
 
 const escape = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const slug = (s) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const slug = (s) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/&#?[a-z0-9]+;/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const hash = (buf) => createHash("sha256").update(buf).digest("hex").slice(0, 10);
 
 /* The footer's columns: the docs to start from, each language's page, the

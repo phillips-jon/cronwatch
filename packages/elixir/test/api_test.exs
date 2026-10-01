@@ -83,7 +83,10 @@ defmodule Cronwatch.APITest do
 
     {_, docs} = docs(Cronwatch.StoreCase)
     assert {:hidden, _} = doc_of(docs, :run_contract, 1)
+    # Called through apply/3 so the deprecated functions compile without a warning.
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
     assert apply(Cronwatch.StoreCase, :canonical, [~s({"b":1,"a":[2]})]) == ~s({"a":[2],"b":1})
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
     assert %Cronwatch.Run{id: "r", status: "ok"} = apply(Cronwatch.StoreCase, :new_run, ["r", "j", "ok", 1])
   end
 end
