@@ -61,6 +61,10 @@ import { errorBody } from "../packages/sdk/src/alerts/shared.ts";
 import { composeEmail } from "../packages/sdk/src/alerts/email.ts";
 import { smsBody, smsSegments } from "../packages/sdk/src/alerts/twilio.ts";
 import { PG_CRON_HOLD_MS, pgCronJobName, pgCronRun, pgCronSchedule } from "../packages/sdk/src/sources/pgcron.ts";
+import { rowToJob, rowToRun, rowToState } from "../packages/sdk/src/stores/sql.ts";
+import { readStoredJob } from "../packages/sdk/src/serialize.ts";
+import { sqlite } from "../packages/sdk/dist/sqlite.js";
+import Database from "better-sqlite3";
 
 if (process.env.TZ !== "UTC") {
   console.error("conformance: run with TZ=UTC (npm run conformance does)");
@@ -979,6 +983,18 @@ function healthCases() {
     { job: "j", open: { failed: 1 }, consecutiveFailures: 2, silencedUntil: null, lastAlertAt: 5 },
     { job: "j", open: {}, consecutiveFailures: 0, silencedUntil: 99, lastAlertAt: null, pendingRecovery: ["missed"] },
     { job: "j", open: { stuck: 7, slow: 8 }, consecutiveFailures: 1, silencedUntil: null, lastAlertAt: 6, pendingRecovery: ["missed", "failed"], undelivered: [] },
+    // A foreign, hand-edited or damaged state: what is not an object reads
+    // as none, and each field of the wrong shape as its empty value, keeping
+    // what is well formed (see normalizeState).
+    5,
+    "x",
+    [],
+    { job: "j", open: [1], consecutiveFailures: "3", silencedUntil: "x", lastAlertAt: "y", pendingRecovery: "missed", undelivered: "nope" },
+    { job: "j", open: "failed", silencedUntil: {}, lastAlertAt: [1], pendingRecovery: null, undelivered: null },
+    {
+      job: "j", open: { failed: 5, slow: "x", stuck: null, missed: 6 }, consecutiveFailures: 1, silencedUntil: 9, lastAlertAt: 4,
+      pendingRecovery: ["missed", 1, null, "failed"], undelivered: [null, 1, "x", [], { type: "failed", at: 5 }], futureField: 1,
+    },
   ];
   const normalized = olds.map((old) => ({ state: old, normalized: clone(normalizeState(old, "j")) }));
   const mutes = [
@@ -1057,6 +1073,16 @@ function healthCases() {
     [queuedAlert("recovered", T0, { after: [] }), state({ open: { failed: T0 } })],
     [queuedAlert("recovered", T0, { after: ["missed"], reason: "unscheduled", since: T0 - HOUR }), state({ open: { failed: T0 } })],
     [queuedAlert("recovered", T0, { after: ["missed"], reason: "unscheduled", since: T0 - HOUR }), state({ open: { missed: T0 + MIN } })],
+    // From a foreign or damaged row: a recovery that does not say what it
+    // recovers from, or says it with something other than strings, and an
+    // alert whose time is not a number, are stale.
+    [queuedAlert("recovered", T0), state()],
+    [{ type: "recovered", at: T0, run: null }, state()],
+    [queuedAlert("recovered", T0, "x"), state()],
+    [queuedAlert("recovered", T0, { after: "failed" }), state()],
+    [queuedAlert("recovered", T0, { after: ["failed", 1] }), state()],
+    [queuedAlert("failed", "x"), state({ open: { failed: T0 } })],
+    [{ type: "failed", run: null, details: {} }, state({ open: { failed: T0 } })],
   ];
   const staleCases = staleInputs.map(([alert, s]) => ({ alert, state: s, stale: staleAlert(alert, s) }));
 
@@ -1531,7 +1557,135 @@ async function storeCases() {
     if (hasNul(out.stored)) throw new Error("nul: a NUL was stored");
     nul.push(out);
   }
-  return { prune: out, compareAndSetState: cas, updateRunIf, foreignVersion, nul };
+  return { prune: out, compareAndSetState: cas, updateRunIf, foreignVersion, nul, foreignRows: await foreignRowCases() };
+}
+
+/**
+ * foreignRows: rows a foreign, hand-edited or damaged writer could leave,
+ * with each column's value as SQLite holds it (a JSON string is TEXT, a
+ * number INTEGER or REAL, null NULL), read leniently so that one row affects
+ * only its own job. `rows` gives each row and what reading it gives: a job
+ * as the client reads it (`readable` false for a definition that is not a
+ * JSON object, which becomes { name }), a run as the store reads it, and a
+ * state as normalizeState reads it. `check` puts the rows in one SQLite
+ * database (prefix cronwatch_) beside a healthy job with a failed run, and a
+ * client that declares nothing checks at `now`, then silences the job whose
+ * state does not parse, then reads every page: the jobs it reports through
+ * onError (by name; every other job is checked as usual), the alerts sent,
+ * each job's health, the states as stored afterwards and each page's status.
+ */
+async function foreignRowCases() {
+  const def = (name, extra = {}) => JSON.stringify({ name, ...extra });
+  const jobRow = (name, definition, createdAt = T0 - DAY, updatedAt = T0 - DAY) => ({ name, definition, created_at: createdAt, updated_at: updatedAt });
+  const runRow = (id, job, extra = {}) => ({
+    id, job, status: "ok", started_at: T0 - 2 * HOUR, finished_at: T0 - 2 * HOUR + 1000, duration_ms: 1000,
+    error: null, output: null, metrics: "{}", trigger: "run", ...extra,
+  });
+  const failedAlert = clone(sdk.composeAlert(
+    { type: "failed", run: sampleRun({ id: "s1", job: "s-entries", status: "failed", startedAt: T0 - HOUR - 1000, finishedAt: T0 - HOUR, durationMs: 1000, error: "Error: boom" }), details: { consecutiveFailures: 1, threshold: 1 } },
+    { name: "s-entries" },
+    T0 - HOUR,
+  ));
+  const jobs = [
+    jobRow("def-unparsed", "{"),
+    jobRow("def-null", "null"),
+    jobRow("def-string", '"nightly"'),
+    jobRow("def-array", "[1]"),
+    jobRow("def-tags-string", def("def-tags-string", { tags: "abc", description: "kept" })),
+    jobRow("def-tags-mixed", def("def-tags-mixed", { tags: ["a", 1, null] })),
+    jobRow("def-tags-ok", def("def-tags-ok", { tags: ["a", "b"] })),
+    jobRow("created-text", def("created-text"), "x", "1e400"),
+    jobRow("created-numeric-text", def("created-numeric-text"), String(T0 - DAY), String(T0)),
+    jobRow("runs", def("runs", { timeout: "5m" })),
+    jobRow("s-unparsed", def("s-unparsed")),
+    jobRow("s-number", def("s-number")),
+    jobRow("s-array", def("s-array")),
+    jobRow("s-fields", def("s-fields")),
+    jobRow("s-entries", def("s-entries")),
+  ];
+  const runs = [
+    runRow("r-metrics-unparsed", "runs", { metrics: "{" }),
+    runRow("r-metrics-array", "runs", { metrics: "[1]" }),
+    runRow("r-metrics-json-null", "runs", { metrics: "null" }),
+    runRow("r-metrics-string", "runs", { metrics: '"x"' }),
+    runRow("r-times-text", "runs", { started_at: "x", finished_at: "y", duration_ms: "1e400" }),
+    runRow("r-times-numeric-text", "runs", { started_at: String(T0 - 3 * HOUR), finished_at: String(T0 - 3 * HOUR + 500), duration_ms: "500" }),
+    runRow("r-running", "runs", { status: "running", started_at: T0 - HOUR, finished_at: null, duration_ms: null, metrics: "{" }),
+    runRow("r-def-null", "def-null", { status: "running", started_at: T0 - HOUR, finished_at: null, duration_ms: null }),
+  ];
+  const states = [
+    { job: "s-unparsed", state: "{" },
+    { job: "s-number", state: "5" },
+    { job: "s-array", state: "[]" },
+    {
+      job: "s-fields",
+      state: JSON.stringify({ job: "s-fields", open: [1], consecutiveFailures: "3", silencedUntil: "x", lastAlertAt: "y", pendingRecovery: "missed", undelivered: "nope", version: 2 }),
+    },
+    {
+      job: "s-entries",
+      state: JSON.stringify({
+        job: "s-entries", open: { failed: T0 - HOUR, slow: "x" }, consecutiveFailures: 1, silencedUntil: null, lastAlertAt: null,
+        pendingRecovery: ["missed", 1, null],
+        undelivered: [null, 1, "x", [], { type: "recovered", at: T0 - 2 * HOUR, details: {} }, { type: "recovered", at: T0 - 2 * HOUR, details: "x" }, { type: "failed", at: "x" }, failedAlert],
+        version: 1, futureField: { kept: true },
+      }),
+    },
+  ];
+  const rows = [
+    ...jobs.map((row) => {
+      const { job, readable } = readStoredJob(rowToJob(row));
+      return { table: "jobs", row, read: clone(job), readable };
+    }),
+    ...runs.map((row) => ({ table: "runs", row, read: clone(rowToRun(row)) })),
+    ...states.map((row) => ({ table: "state", row, read: clone(normalizeState(rowToState(row), row.job)) })),
+  ];
+
+  // The whole check, on SQLite.
+  const db = new Database(":memory:");
+  const store = sqlite({ database: db });
+  await store.init();
+  const insert = (table, row) => {
+    const keys = Object.keys(row);
+    db.prepare(`INSERT INTO cronwatch_${table} (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`).run(...keys.map((k) => row[k]));
+  };
+  const fine = { name: "fine", definition: def("fine"), created_at: T0 - DAY, updated_at: T0 - DAY };
+  const fineRun = runRow("f1", "fine", { status: "failed", started_at: T0 - 10 * MIN, finished_at: T0 - 10 * MIN + 1000, error: "Error: boom" });
+  for (const row of [...jobs, fine]) insert("jobs", row);
+  for (const row of [...runs, fineRun]) insert("runs", row);
+  for (const row of states) insert("state", row);
+  const sent = [];
+  const errors = [];
+  const cw = sdk.cronwatch({
+    store, now: () => T0, cronSecret: null,
+    alerts: [sdk.custom("capture", (alert) => { sent.push(alert); })],
+    onError: (error, where) => errors.push(where),
+  });
+  const names = [...jobs.map((j) => j.name), "fine"];
+  const reportedJobs = () => [...new Set(errors.splice(0).map((where) => names.find((n) => where.endsWith(` ${n}`)) ?? where))].sort();
+  const result = await cw.check();
+  const check = {
+    reported: reportedJobs(),
+    alerts: sent.splice(0).map((a) => ({ type: a.type, job: a.job, at: a.at })),
+    health: Object.fromEntries(result.jobs.map((j) => [j.name, j.health])),
+  };
+  await cw.silence("s-unparsed", "1h");
+  const silence = { job: "s-unparsed", for: "1h", reported: reportedJobs(), state: clone(await store.getState("s-unparsed")) };
+  const stored = {};
+  for (const { job } of states) stored[job] = clone(await store.getState(job));
+  const routes = cw.routes({ token: "tok" });
+  const pages = [];
+  for (const path of ["/cronwatch/", "/cronwatch/api/jobs", ...names.flatMap((n) => [`/cronwatch/jobs/${n}`, `/cronwatch/api/jobs/${n}`])]) {
+    const res = await routes.handler(new Request(`http://app.test${path}`, { headers: { authorization: "Bearer tok" } }));
+    await res.text();
+    pages.push({ path, status: res.status });
+  }
+  const read = { reported: reportedJobs(), pages };
+  await cw.close();
+  db.close();
+  return {
+    rows,
+    check: { now: T0, extraJobs: [fine], extraRuns: [fineRun], ...check, silence, states: stored, read },
+  };
 }
 
 // ---------------------------------------------------------------- client

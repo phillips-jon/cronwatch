@@ -2006,6 +2006,137 @@
         ],
         "undelivered": []
       }
+    },
+    {
+      "state": 5,
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": "x",
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": [],
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": [
+          1
+        ],
+        "consecutiveFailures": "3",
+        "silencedUntil": "x",
+        "lastAlertAt": "y",
+        "pendingRecovery": "missed",
+        "undelivered": "nope"
+      },
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": "failed",
+        "silencedUntil": {},
+        "lastAlertAt": [
+          1
+        ],
+        "pendingRecovery": null,
+        "undelivered": null
+      },
+      "normalized": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      }
+    },
+    {
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 5,
+          "slow": "x",
+          "stuck": null,
+          "missed": 6
+        },
+        "consecutiveFailures": 1,
+        "silencedUntil": 9,
+        "lastAlertAt": 4,
+        "pendingRecovery": [
+          "missed",
+          1,
+          null,
+          "failed"
+        ],
+        "undelivered": [
+          null,
+          1,
+          "x",
+          [],
+          {
+            "type": "failed",
+            "at": 5
+          }
+        ],
+        "futureField": 1
+      },
+      "normalized": {
+        "job": "j",
+        "open": {
+          "failed": 5,
+          "missed": 6
+        },
+        "consecutiveFailures": 1,
+        "silencedUntil": 9,
+        "lastAlertAt": 4,
+        "pendingRecovery": [
+          "missed",
+          "failed"
+        ],
+        "undelivered": [
+          {
+            "type": "failed",
+            "at": 5
+          }
+        ],
+        "futureField": 1
+      }
     }
   ],
   "muteOpens": [
@@ -3396,6 +3527,141 @@
         "job": "j",
         "open": {
           "missed": 1767605460000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": "x"
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {
+          "after": "failed"
+        }
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "recovered",
+        "at": 1767605400000,
+        "run": null,
+        "details": {
+          "after": [
+            "failed",
+            1
+          ]
+        }
+      },
+      "state": {
+        "job": "j",
+        "open": {},
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "failed",
+        "at": "x",
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000
+        },
+        "consecutiveFailures": 0,
+        "silencedUntil": null,
+        "lastAlertAt": null,
+        "pendingRecovery": [],
+        "undelivered": []
+      },
+      "stale": true
+    },
+    {
+      "alert": {
+        "type": "failed",
+        "run": null,
+        "details": {}
+      },
+      "state": {
+        "job": "j",
+        "open": {
+          "failed": 1767605400000
         },
         "consecutiveFailures": 0,
         "silencedUntil": null,

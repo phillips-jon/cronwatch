@@ -1744,5 +1744,896 @@
         "version": 1
       }
     }
-  ]
+  ],
+  "foreignRows": {
+    "rows": [
+      {
+        "table": "jobs",
+        "row": {
+          "name": "def-unparsed",
+          "definition": "{",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "def-unparsed",
+          "definition": {
+            "name": "def-unparsed"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": false
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "def-null",
+          "definition": "null",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "def-null",
+          "definition": {
+            "name": "def-null"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": false
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "def-string",
+          "definition": "\"nightly\"",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "def-string",
+          "definition": {
+            "name": "def-string"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": false
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "def-array",
+          "definition": "[1]",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "def-array",
+          "definition": {
+            "name": "def-array"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": false
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "def-tags-string",
+          "definition": "{\"name\":\"def-tags-string\",\"tags\":\"abc\",\"description\":\"kept\"}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "def-tags-string",
+          "definition": {
+            "name": "def-tags-string",
+            "description": "kept"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "def-tags-mixed",
+          "definition": "{\"name\":\"def-tags-mixed\",\"tags\":[\"a\",1,null]}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "def-tags-mixed",
+          "definition": {
+            "name": "def-tags-mixed"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "def-tags-ok",
+          "definition": "{\"name\":\"def-tags-ok\",\"tags\":[\"a\",\"b\"]}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "def-tags-ok",
+          "definition": {
+            "name": "def-tags-ok",
+            "tags": [
+              "a",
+              "b"
+            ]
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "created-text",
+          "definition": "{\"name\":\"created-text\"}",
+          "created_at": "x",
+          "updated_at": "1e400"
+        },
+        "read": {
+          "name": "created-text",
+          "definition": {
+            "name": "created-text"
+          },
+          "createdAt": 0,
+          "updatedAt": 0
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "created-numeric-text",
+          "definition": "{\"name\":\"created-numeric-text\"}",
+          "created_at": "1767519000000",
+          "updated_at": "1767605400000"
+        },
+        "read": {
+          "name": "created-numeric-text",
+          "definition": {
+            "name": "created-numeric-text"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767605400000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "runs",
+          "definition": "{\"name\":\"runs\",\"timeout\":\"5m\"}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "runs",
+          "definition": {
+            "name": "runs",
+            "timeout": "5m"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "s-unparsed",
+          "definition": "{\"name\":\"s-unparsed\"}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "s-unparsed",
+          "definition": {
+            "name": "s-unparsed"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "s-number",
+          "definition": "{\"name\":\"s-number\"}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "s-number",
+          "definition": {
+            "name": "s-number"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "s-array",
+          "definition": "{\"name\":\"s-array\"}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "s-array",
+          "definition": {
+            "name": "s-array"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "s-fields",
+          "definition": "{\"name\":\"s-fields\"}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "s-fields",
+          "definition": {
+            "name": "s-fields"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "jobs",
+        "row": {
+          "name": "s-entries",
+          "definition": "{\"name\":\"s-entries\"}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        },
+        "read": {
+          "name": "s-entries",
+          "definition": {
+            "name": "s-entries"
+          },
+          "createdAt": 1767519000000,
+          "updatedAt": 1767519000000
+        },
+        "readable": true
+      },
+      {
+        "table": "runs",
+        "row": {
+          "id": "r-metrics-unparsed",
+          "job": "runs",
+          "status": "ok",
+          "started_at": 1767598200000,
+          "finished_at": 1767598201000,
+          "duration_ms": 1000,
+          "error": null,
+          "output": null,
+          "metrics": "{",
+          "trigger": "run"
+        },
+        "read": {
+          "id": "r-metrics-unparsed",
+          "job": "runs",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598201000,
+          "durationMs": 1000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      },
+      {
+        "table": "runs",
+        "row": {
+          "id": "r-metrics-array",
+          "job": "runs",
+          "status": "ok",
+          "started_at": 1767598200000,
+          "finished_at": 1767598201000,
+          "duration_ms": 1000,
+          "error": null,
+          "output": null,
+          "metrics": "[1]",
+          "trigger": "run"
+        },
+        "read": {
+          "id": "r-metrics-array",
+          "job": "runs",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598201000,
+          "durationMs": 1000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      },
+      {
+        "table": "runs",
+        "row": {
+          "id": "r-metrics-json-null",
+          "job": "runs",
+          "status": "ok",
+          "started_at": 1767598200000,
+          "finished_at": 1767598201000,
+          "duration_ms": 1000,
+          "error": null,
+          "output": null,
+          "metrics": "null",
+          "trigger": "run"
+        },
+        "read": {
+          "id": "r-metrics-json-null",
+          "job": "runs",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598201000,
+          "durationMs": 1000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      },
+      {
+        "table": "runs",
+        "row": {
+          "id": "r-metrics-string",
+          "job": "runs",
+          "status": "ok",
+          "started_at": 1767598200000,
+          "finished_at": 1767598201000,
+          "duration_ms": 1000,
+          "error": null,
+          "output": null,
+          "metrics": "\"x\"",
+          "trigger": "run"
+        },
+        "read": {
+          "id": "r-metrics-string",
+          "job": "runs",
+          "status": "ok",
+          "startedAt": 1767598200000,
+          "finishedAt": 1767598201000,
+          "durationMs": 1000,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      },
+      {
+        "table": "runs",
+        "row": {
+          "id": "r-times-text",
+          "job": "runs",
+          "status": "ok",
+          "started_at": "x",
+          "finished_at": "y",
+          "duration_ms": "1e400",
+          "error": null,
+          "output": null,
+          "metrics": "{}",
+          "trigger": "run"
+        },
+        "read": {
+          "id": "r-times-text",
+          "job": "runs",
+          "status": "ok",
+          "startedAt": 0,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      },
+      {
+        "table": "runs",
+        "row": {
+          "id": "r-times-numeric-text",
+          "job": "runs",
+          "status": "ok",
+          "started_at": "1767594600000",
+          "finished_at": "1767594600500",
+          "duration_ms": "500",
+          "error": null,
+          "output": null,
+          "metrics": "{}",
+          "trigger": "run"
+        },
+        "read": {
+          "id": "r-times-numeric-text",
+          "job": "runs",
+          "status": "ok",
+          "startedAt": 1767594600000,
+          "finishedAt": 1767594600500,
+          "durationMs": 500,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      },
+      {
+        "table": "runs",
+        "row": {
+          "id": "r-running",
+          "job": "runs",
+          "status": "running",
+          "started_at": 1767601800000,
+          "finished_at": null,
+          "duration_ms": null,
+          "error": null,
+          "output": null,
+          "metrics": "{",
+          "trigger": "run"
+        },
+        "read": {
+          "id": "r-running",
+          "job": "runs",
+          "status": "running",
+          "startedAt": 1767601800000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      },
+      {
+        "table": "runs",
+        "row": {
+          "id": "r-def-null",
+          "job": "def-null",
+          "status": "running",
+          "started_at": 1767601800000,
+          "finished_at": null,
+          "duration_ms": null,
+          "error": null,
+          "output": null,
+          "metrics": "{}",
+          "trigger": "run"
+        },
+        "read": {
+          "id": "r-def-null",
+          "job": "def-null",
+          "status": "running",
+          "startedAt": 1767601800000,
+          "finishedAt": null,
+          "durationMs": null,
+          "error": null,
+          "output": null,
+          "metrics": {},
+          "trigger": "run"
+        }
+      },
+      {
+        "table": "state",
+        "row": {
+          "job": "s-unparsed",
+          "state": "{"
+        },
+        "read": {
+          "job": "s-unparsed",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        }
+      },
+      {
+        "table": "state",
+        "row": {
+          "job": "s-number",
+          "state": "5"
+        },
+        "read": {
+          "job": "s-number",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        }
+      },
+      {
+        "table": "state",
+        "row": {
+          "job": "s-array",
+          "state": "[]"
+        },
+        "read": {
+          "job": "s-array",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": []
+        }
+      },
+      {
+        "table": "state",
+        "row": {
+          "job": "s-fields",
+          "state": "{\"job\":\"s-fields\",\"open\":[1],\"consecutiveFailures\":\"3\",\"silencedUntil\":\"x\",\"lastAlertAt\":\"y\",\"pendingRecovery\":\"missed\",\"undelivered\":\"nope\",\"version\":2}"
+        },
+        "read": {
+          "job": "s-fields",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": [],
+          "version": 2
+        }
+      },
+      {
+        "table": "state",
+        "row": {
+          "job": "s-entries",
+          "state": "{\"job\":\"s-entries\",\"open\":{\"failed\":1767601800000,\"slow\":\"x\"},\"consecutiveFailures\":1,\"silencedUntil\":null,\"lastAlertAt\":null,\"pendingRecovery\":[\"missed\",1,null],\"undelivered\":[null,1,\"x\",[],{\"type\":\"recovered\",\"at\":1767598200000,\"details\":{}},{\"type\":\"recovered\",\"at\":1767598200000,\"details\":\"x\"},{\"type\":\"failed\",\"at\":\"x\"},{\"type\":\"failed\",\"run\":{\"id\":\"s1\",\"job\":\"s-entries\",\"status\":\"failed\",\"startedAt\":1767601799000,\"finishedAt\":1767601800000,\"durationMs\":1000,\"error\":\"Error: boom\",\"output\":null,\"metrics\":{},\"trigger\":\"run\"},\"details\":{\"consecutiveFailures\":1,\"threshold\":1},\"job\":\"s-entries\",\"definition\":{\"name\":\"s-entries\"},\"title\":\"s-entries failed\",\"message\":\"Started 2026-01-05 08:29:59 UTC (now), ran 1s.\\nError: boom\",\"at\":1767601800000}],\"version\":1,\"futureField\":{\"kept\":true}}"
+        },
+        "read": {
+          "job": "s-entries",
+          "open": {
+            "failed": 1767601800000
+          },
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": null,
+          "pendingRecovery": [
+            "missed"
+          ],
+          "undelivered": [
+            {
+              "type": "recovered",
+              "at": 1767598200000,
+              "details": {}
+            },
+            {
+              "type": "recovered",
+              "at": 1767598200000,
+              "details": "x"
+            },
+            {
+              "type": "failed",
+              "at": "x"
+            },
+            {
+              "type": "failed",
+              "run": {
+                "id": "s1",
+                "job": "s-entries",
+                "status": "failed",
+                "startedAt": 1767601799000,
+                "finishedAt": 1767601800000,
+                "durationMs": 1000,
+                "error": "Error: boom",
+                "output": null,
+                "metrics": {},
+                "trigger": "run"
+              },
+              "details": {
+                "consecutiveFailures": 1,
+                "threshold": 1
+              },
+              "job": "s-entries",
+              "definition": {
+                "name": "s-entries"
+              },
+              "title": "s-entries failed",
+              "message": "Started 2026-01-05 08:29:59 UTC (now), ran 1s.\nError: boom",
+              "at": 1767601800000
+            }
+          ],
+          "version": 1,
+          "futureField": {
+            "kept": true
+          }
+        }
+      }
+    ],
+    "check": {
+      "now": 1767605400000,
+      "extraJobs": [
+        {
+          "name": "fine",
+          "definition": "{\"name\":\"fine\"}",
+          "created_at": 1767519000000,
+          "updated_at": 1767519000000
+        }
+      ],
+      "extraRuns": [
+        {
+          "id": "f1",
+          "job": "fine",
+          "status": "failed",
+          "started_at": 1767604800000,
+          "finished_at": 1767604801000,
+          "duration_ms": 1000,
+          "error": "Error: boom",
+          "output": null,
+          "metrics": "{}",
+          "trigger": "run"
+        }
+      ],
+      "reported": [
+        "def-array",
+        "def-null",
+        "def-string",
+        "def-unparsed"
+      ],
+      "alerts": [
+        {
+          "type": "stuck",
+          "job": "runs",
+          "at": 1767605400000
+        },
+        {
+          "type": "failed",
+          "job": "s-entries",
+          "at": 1767601800000
+        }
+      ],
+      "health": {
+        "created-numeric-text": "never_ran",
+        "created-text": "never_ran",
+        "def-array": "failing",
+        "def-null": "failing",
+        "def-string": "failing",
+        "def-tags-mixed": "never_ran",
+        "def-tags-ok": "never_ran",
+        "def-tags-string": "never_ran",
+        "def-unparsed": "failing",
+        "fine": "failing",
+        "runs": "stuck",
+        "s-array": "never_ran",
+        "s-entries": "failing",
+        "s-fields": "never_ran",
+        "s-number": "never_ran",
+        "s-unparsed": "never_ran"
+      },
+      "silence": {
+        "job": "s-unparsed",
+        "for": "1h",
+        "reported": [],
+        "state": {
+          "job": "s-unparsed",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": 1767609000000,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": [],
+          "version": 1
+        }
+      },
+      "states": {
+        "s-unparsed": {
+          "job": "s-unparsed",
+          "open": {},
+          "consecutiveFailures": 0,
+          "silencedUntil": 1767609000000,
+          "lastAlertAt": null,
+          "pendingRecovery": [],
+          "undelivered": [],
+          "version": 1
+        },
+        "s-number": 5,
+        "s-array": [],
+        "s-fields": {
+          "job": "s-fields",
+          "open": [
+            1
+          ],
+          "consecutiveFailures": "3",
+          "silencedUntil": "x",
+          "lastAlertAt": "y",
+          "pendingRecovery": "missed",
+          "undelivered": "nope",
+          "version": 2
+        },
+        "s-entries": {
+          "job": "s-entries",
+          "open": {
+            "failed": 1767601800000
+          },
+          "consecutiveFailures": 1,
+          "silencedUntil": null,
+          "lastAlertAt": 1767605400000,
+          "pendingRecovery": [
+            "missed"
+          ],
+          "undelivered": [],
+          "version": 2,
+          "futureField": {
+            "kept": true
+          }
+        }
+      },
+      "read": {
+        "reported": [
+          "def-array",
+          "def-null",
+          "def-string",
+          "def-unparsed"
+        ],
+        "pages": [
+          {
+            "path": "/cronwatch/",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/def-unparsed",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/def-unparsed",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/def-null",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/def-null",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/def-string",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/def-string",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/def-array",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/def-array",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/def-tags-string",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/def-tags-string",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/def-tags-mixed",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/def-tags-mixed",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/def-tags-ok",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/def-tags-ok",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/created-text",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/created-text",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/created-numeric-text",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/created-numeric-text",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/runs",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/runs",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/s-unparsed",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/s-unparsed",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/s-number",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/s-number",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/s-array",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/s-array",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/s-fields",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/s-fields",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/s-entries",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/s-entries",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/jobs/fine",
+            "status": 200
+          },
+          {
+            "path": "/cronwatch/api/jobs/fine",
+            "status": 200
+          }
+        ]
+      }
+    }
+  }
 }
