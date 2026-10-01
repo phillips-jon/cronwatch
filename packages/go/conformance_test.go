@@ -26,7 +26,7 @@ var conformanceDir = filepath.Join("..", "..", "conformance")
 // replayed are the fixtures this package and the internal ones replay;
 // elsewhere are those the alerts, triage and pgcron packages replay.
 var (
-	replayed  = []string{"duration", "evaluate", "format", "health", "output", "schedule", "store"}
+	replayed  = []string{"client", "duration", "evaluate", "format", "health", "output", "schedule", "store"}
 	elsewhere = []string{"channels", "pgcron", "triage"}
 )
 

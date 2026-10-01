@@ -19,11 +19,15 @@ import (
 // run may use it.
 const ReservedRunIDPrefix = "pgcron:"
 
+// maxRunID is the longest run id, in UTF-16 code units (JavaScript's string
+// length): what Start, Resume and RecordRun take, and every store holds.
+const maxRunID = 200
+
 // checkRunID is the SDK's error for a run id no store could hold, or one
 // reserved for the pg_cron source.
 func checkRunID(job, id, method string) error {
-	if n := js.Length16(id); n == 0 || n > 200 {
-		return fmt.Errorf("job %s: %s() needs a run id of 1 to 200 characters (got %d characters)", js.Quote(job), method, n)
+	if n := js.Length16(id); n == 0 || n > maxRunID {
+		return fmt.Errorf("job %s: %s() needs a run id of 1 to %d characters (got %d characters)", js.Quote(job), method, maxRunID, n)
 	}
 	// Postgres refuses NUL in text, so no store could hold such an id.
 	if strings.Contains(id, "\x00") {

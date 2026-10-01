@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	cronwatch "cronwatch.dev/go"
+	"cronwatch.dev/go/internal/clientreplay"
 	"cronwatch.dev/go/sqlstore"
 	"cronwatch.dev/go/storetest"
 )
@@ -66,6 +67,21 @@ func TestServerConformance(t *testing.T) {
 	eachServer(t, func(t *testing.T, b backend) {
 		db := b.open(t)
 		storetest.ReplayFixture(t, fixturePath, func(t *testing.T) cronwatch.Store { return newStore(t, db, b.dialect, prefix("fixture")) })
+	})
+}
+
+// conformance/client.json's unknownFields: what a newer release wrote
+// survives this release's client over the SQL store on each dialect.
+
+var clientFixturePath = filepath.Join("..", "..", "..", "conformance", "client.json")
+
+func TestSQLiteUnknownFields(t *testing.T) {
+	clientreplay.UnknownFields(t, clientFixturePath, sqliteFile(t))
+}
+
+func TestServerUnknownFields(t *testing.T) {
+	eachServer(t, func(t *testing.T, b backend) {
+		clientreplay.UnknownFields(t, clientFixturePath, newStore(t, b.open(t), b.dialect, prefix("unknown")))
 	})
 }
 

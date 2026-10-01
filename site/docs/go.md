@@ -414,7 +414,7 @@ The client:
 | `Silence(ctx, name, d)`, `Unsilence(ctx, name)` | stop alerts for a while; state keeps updating underneath. The end is a whole millisecond, held at 2^53 - 1 |
 | `Forget(ctx, name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `ResumeRun(ctx, name, runID)` | `Resume` for a job declared in this process |
-| `RecordRun(ctx, run, options...)` | record a run that happened elsewhere, for a source; returns the alerts it sent. A metric that is not a finite number is refused before anything is written |
+| `RecordRun(ctx, run, options...)` | record a run that happened elsewhere, for a source; returns the alerts it sent. Its id is 1 to 200 characters with no NUL (a `pgcron:` id is fine here), and a metric that is not a finite number is refused, before anything is written |
 | `SyncJob(ctx, name)` | write a declaration to the store now, unless it already holds it |
 | `Routes(options...)`, `MustRoutes` | the dashboard and JSON API |
 | `DefinedJobs()`, `Declares(name)` | the definitions declared in this process, and whether one of that name is |
@@ -452,6 +452,8 @@ h.Finish(ctx) // or h.Fail(ctx, err), or h.FinishWith(ctx, result)
 The SQL store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Rust, Elixir, Java and .NET stores (the MySQL tables are the PHP port's, which the Rust, Elixir, Java and .NET ports share): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The module's tests share a SQLite file with the built SDK, and have a Node client and a Go client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
+
+A 1.x release keeps what it does not know of what another wrote: a key in a job's definition or state, an open condition, a run's status or trigger. It writes them back as they were, never alerts on or closes an unknown condition, and leaves a run with an unknown status alone. So any 1.x of any language can share a store with any other. The 0.x releases before it are not covered: upgrade every process to 1.0 together.
 
 The public types write the SDK's JSON through their `MarshalJSON`. Call it directly, or use a `json.Encoder` with `SetEscapeHTML(false)`, when the bytes must match: `json.Marshal` passes a type's own JSON through its HTML escaping, which rewrites `<`, `>` and `&`.
 
