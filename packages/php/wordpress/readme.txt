@@ -138,6 +138,7 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 * The webhook's body starts with `"schema": 1`, the payload's version; its JSON Schema is at https://cronwatch.dev/schemas/webhook/1.json.
 * A job's stored state keeps the fields a newer release wrote, so sites and apps on different 1.x releases can share one database.
 * A blank `CRONWATCH_ENV` or `APP_ENV` counts as unset.
+* The webhook signing secret is saved exactly as typed. Before, saving it escaped `<`, removed `%XX` and collapsed spaces, so every signature failed at the receiver. A secret with a line break, a tab or another control character is refused, and the saved one kept.
 
 = 0.10.0 =
 

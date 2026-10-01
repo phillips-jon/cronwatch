@@ -595,6 +595,15 @@ final class WordPressTest extends TestCase
             Admin::render();
             $notices = ob_get_clean();
             $out['bothNotices'] = [str_contains($notices, 'The grace was not a duration'), str_contains($notices, 'The API token was not saved')];
+            // The webhook secret is saved exactly as typed, or refused with a control character in it.
+            $out['exact'] = Admin::saveSettings(['webhook_secret' => ' a<b%41c  d&amp; ']);
+            $out['exactSaved'] = get_option('cronwatch_settings')['webhook_secret'];
+            $out['control'] = Admin::saveSettings(['webhook_secret' => "line\nbreak", 'grace' => 'soon']);
+            $out['controlKept'] = get_option('cronwatch_settings')['webhook_secret'];
+            $_GET = ['cronwatch_notice' => $out['control']];
+            ob_start();
+            Admin::render();
+            $out['controlNotice'] = str_contains(ob_get_clean(), 'The webhook signing secret was not saved');
             $_GET = [];
             ob_start();
             Admin::render();
@@ -624,6 +633,11 @@ final class WordPressTest extends TestCase
         $this->assertSame('shh-its-a-secret', $result['kept']['webhook_secret'], 'a blank secret keeps the saved one');
         $this->assertSame('grace-token', $result['both']);
         $this->assertSame([true, true], $result['bothNotices'], 'a grace and a token refused together are both named');
+        $this->assertSame('saved', $result['exact']);
+        $this->assertSame(' a<b%41c  d&amp; ', $result['exactSaved'], 'the webhook secret is saved as typed: no escaping, no %XX stripped, no spaces collapsed');
+        $this->assertSame('grace-secret', $result['control']);
+        $this->assertSame(' a<b%41c  d&amp; ', $result['controlKept'], 'a secret with a control character is refused and the saved one kept');
+        $this->assertTrue($result['controlNotice']);
         $this->assertSame('1h30m', $result['kept']['grace'], 'a grace that does not parse is not saved');
         $this->assertFalse($result['pageHasSecret'], 'the secret is never shown');
         $this->assertTrue($result['pageHasNonce']);
