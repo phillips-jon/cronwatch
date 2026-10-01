@@ -74,13 +74,14 @@ final class ScheduledMessages
     private array $checkIn = [];
     /** @var array<string, true> */
     private array $reported = [];
+    private readonly bool $named;
 
     /**
      * @param \Closure(): Cronwatch $client
      * @param iterable<string, ScheduleProviderInterface> $providers every schedule, by name
      * @param array<string, mixed> $config the bundle's scheduler settings
      * @param string|null $app this app's name in its jobs' tags (the bundle's app_id), or null (see appTag())
-     * @param object|null $parameters the container's parameter bag, to read kernel.secret from
+     * @param object|null $parameters the container's parameter bag, to read kernel.secret from (see secretTag())
      */
     public function __construct(
         private readonly \Closure $client,
@@ -91,30 +92,53 @@ final class ScheduledMessages
         private readonly ?object $parameters = null,
         private readonly string $projectDir = '',
     ) {
+        $this->named = $app !== null;
     }
 
     /**
      * This app's tag under the scheduler's ("symfony-scheduler:<app>"), so
      * two apps sharing a store never take each other's jobs for their own.
      * The bundle's `app_id` names the app; without one it is "app-" and 12
-     * hex characters of a hash of the kernel's secret (APP_SECRET), which
-     * stays the same across deploys and differs between apps, else of the
-     * project directory (see DESIGN.md).
+     * hex characters of a hash of the project directory, the directory a
+     * deploy tool gives each release (`<root>/releases/<name>`, as Deployer,
+     * Capistrano and Envoyer lay it out) read as its root, so the tag stays
+     * the same across deploys. Nothing secret goes into it: the tag is shown
+     * on the dashboard and in the API (see DESIGN.md).
      */
     public function appTag(): string
     {
-        if ($this->app === null) {
-            $secret = null;
-            try {
-                if ($this->parameters !== null && method_exists($this->parameters, 'has') && $this->parameters->has('kernel.secret')) {
-                    $secret = $this->parameters->get('kernel.secret');
-                }
-            } catch (\Throwable) {
-                // An APP_SECRET that is not set: the project directory instead.
-            }
-            $this->app = 'app-' . substr(hash('sha256', is_string($secret) && $secret !== '' ? "cronwatch:secret:{$secret}" : "cronwatch:dir:{$this->projectDir}"), 0, 12);
-        }
+        $this->app ??= 'app-' . substr(hash('sha256', 'cronwatch:dir:' . self::deployRoot($this->projectDir)), 0, 12);
         return Unscheduled::appTag(self::TAG, $this->app);
+    }
+
+    /**
+     * The tag releases before 1.0 gave this app without an `app_id`, from a
+     * hash of the kernel's secret (APP_SECRET), which published part of a
+     * fast hash of the secret; read only to recognise this app's jobs that
+     * still carry it. Null with an `app_id`, or with no secret.
+     */
+    private function secretTag(): ?string
+    {
+        if ($this->named) {
+            return null;
+        }
+        try {
+            if ($this->parameters !== null && method_exists($this->parameters, 'has') && $this->parameters->has('kernel.secret')) {
+                $secret = $this->parameters->get('kernel.secret');
+                if (is_string($secret) && $secret !== '') {
+                    return Unscheduled::appTag(self::TAG, 'app-' . substr(hash('sha256', "cronwatch:secret:{$secret}"), 0, 12));
+                }
+            }
+        } catch (\Throwable) {
+            // An APP_SECRET that is not set.
+        }
+        return null;
+    }
+
+    /** A release's directory (`<root>/releases/<name>`) as its root; any other directory as it is. */
+    private static function deployRoot(string $dir): string
+    {
+        return preg_match('#^(.+)[/\\\\]releases[/\\\\][^/\\\\]+[/\\\\]?$#D', $dir, $m) === 1 ? $m[1] : $dir;
     }
 
     private function cw(): Cronwatch
@@ -162,7 +186,15 @@ final class ScheduledMessages
     {
         $this->declare();
         $cw = $this->cw();
-        Unscheduled::declare($cw, self::TAG, $this->appTag(), fn (\Throwable $e, string $where) => $cw->onError($e, $where));
+        $report = fn (\Throwable $e, string $where) => $cw->onError($e, $where);
+        Unscheduled::declare($cw, self::TAG, $this->appTag(), $report);
+        // Jobs this app tagged before 1.0, from its secret: taken out of the
+        // schedule since, they are declared without it here, as they would be
+        // under the tag they carry now.
+        $secretTag = $this->secretTag();
+        if ($secretTag !== null && $secretTag !== $this->appTag()) {
+            Unscheduled::declare($cw, self::TAG, $secretTag, $report);
+        }
         return $cw;
     }
 

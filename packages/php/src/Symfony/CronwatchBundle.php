@@ -46,7 +46,7 @@ final class CronwatchBundle extends AbstractBundle
     {
         $definition->rootNode()
             ->children()
-                ->scalarNode('app_id')->defaultNull()->info('This app\'s name in its scheduled jobs\' tags (symfony-scheduler:<app_id>), so apps sharing a store and table prefix never take each other\'s jobs for their own; default a hash of the kernel secret, else of the project directory')->end()
+                ->scalarNode('app_id')->defaultNull()->info('This app\'s name in its scheduled jobs\' tags (symfony-scheduler:<app_id>), so apps sharing a store and table prefix never take each other\'s jobs for their own; default a hash of the project directory')->end()
                 ->scalarNode('store')->defaultNull()->info('A store URL (mysql://, postgresql://, sqlite:///path, memory); default DATABASE_URL, else var/cronwatch.db')->end()
                 ->scalarNode('store_service')->defaultNull()->info('The id of a Cronwatch\Store\Store service to use instead')->end()
                 ->scalarNode('table_prefix')->defaultValue('cronwatch_')->end()
