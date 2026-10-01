@@ -84,7 +84,7 @@ defmodule MyApp.StoreTest do
 end
 ```
 
-The `use` is what 1.x promises; the functions `Cronwatch.StoreCase` had besides are deprecated since 1.0.
+The `use` is what 1.x promises; the functions `Cronwatch.StoreCase` had besides are deprecated, and go in 1.0.
 
 ### Alerts and triage
 

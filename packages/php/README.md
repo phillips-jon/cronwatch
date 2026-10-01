@@ -82,7 +82,7 @@ Public means documented here or on the [PHP page of the docs](https://cronwatch.
 
 `cronSecret`, the dashboard's `token` and a handler's `secret` read `null` as every other language does: off. In 0.x `null` was the default and read the environment, and `false` turned them off. Leaving the argument out, or passing `Cronwatch\FromEnv::Read`, still reads `CRON_SECRET` or `CRONWATCH_TOKEN`.
 
-Deprecated, working through 1.x and gone in 2.0: `false` for those three (use `null`), `$job->wrap($fn)` (use `$job->monitor($fn)`) and `Alerts\Webhook::hmacSha256Hex()` (use `Webhook::signature()`).
+Deprecated, working through 1.x and gone in 2.0: `false` for those three (use `null`) and `$job->wrap($fn)` (use `$job->monitor($fn)`). Deprecated and gone in 1.0, since they were public by accident: `Alerts\Webhook::hmacSha256Hex()` (use `Webhook::signature()`) and the Twilio, Sentry and Discord channels' and the pg_cron source's static helpers and constants.
 
 ### Stores
 

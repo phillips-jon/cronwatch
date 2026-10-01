@@ -240,16 +240,19 @@ An `ActivitySource` and a `Meter`, both named `Cronwatch`: an activity around ea
 
 ## Deprecated
 
-These names still work through every 1.x release, marked `[Obsolete]`, and go in 2.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
+Each name here still works, marked `[Obsolete]` so the compiler points at the replacement. A rename keeps working through every 1.x release and goes in 2.0; a helper that was public by accident goes in 1.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
 
 - `cw.Start(every)`: use `cw.StartChecking(every)`, since a job's `StartAsync` opens a run.
 - `Cronwatch.Web.WebRequest` and `WebResponse`: use `CronwatchRequest` and `CronwatchResponse`, since `System.Net` has types of those names. Each converts to and from its replacement, so code written against them still compiles, except a handler lambda that names the request's type.
 - `Cronwatch.Web.WebAdapters`: use `Adapters`, the Java port's name.
 - `Cronwatch.Hosting.CronwatchServiceCollectionExtensions` and `Cronwatch.AspNetCore.CronwatchAspNetCore`, the former classes of the extension methods, which are in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder` now: `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods.
 - `Slack.Webhook(url)` and `Discord.Webhook(url)`: use `SlackChannel.Webhook(url)` and `DiscordChannel.Webhook(url)`, on the channel types.
-- `Json.Quote`, `Json.Kind`, `Json.Copy`, `Json.TryNumber` and `Json.MaxDepth`: internal helpers, no longer promised; `Json.Parse`, `Json.ParseObject` and `Json.Stringify` are (`Json.Stringify(text)` quotes a string as `Quote` did).
-- `StoreContract.NewRun` and `ForeignRows`: fixture helpers, no longer promised; the store kit promises `StoreContract.RunAsync`, `StoreReplay` and `FinishOnce`.
 - `IConditionalRunStore`, `IStateCasStore` and `IRunDeletingStore`: use `IUpdateRunIfStore`, `ICompareAndSetStateStore` and `IDeleteRunIfStore`, named after their methods. Each former interface extends its replacement, so a store of your own that implements it is still used.
+
+These were public by accident, and go in 1.0:
+
+- `Json.Quote`, `Json.Kind`, `Json.Copy`, `Json.TryNumber` and `Json.MaxDepth`: internal helpers; `Json.Parse`, `Json.ParseObject` and `Json.Stringify` are promised (`Json.Stringify(text)` quotes a string as `Quote` did).
+- `StoreContract.NewRun` and `ForeignRows`: fixture helpers; the store kit promises `StoreContract.RunAsync`, `StoreReplay` and `FinishOnce`.
 
 ## Testing this package
 

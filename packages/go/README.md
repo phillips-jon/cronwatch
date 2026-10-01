@@ -210,7 +210,7 @@ Each still works and is marked `Deprecated:` in its doc comment:
 | Deprecated | Use instead | Goes in |
 |---|---|---|
 | `cw.Start(every)` | `cw.StartChecking(every)`: a job's `Start` opens a run, so the client's is named for what it starts | 2.0 |
-| `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 1.0 |
+| `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 2.0 |
 | `cwgocron.Converted` | `robfigcron.Converted`, the same type, which every integration's `Convert` returns | 1.0 |
 | `cwgocron.Panic` | `cwgocron.PanicError`, the same type | 1.0 |
 | `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics` and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |

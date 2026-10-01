@@ -1,6 +1,6 @@
-"""Names kept working after 1.0 made them internal or renamed them. Each
-warns with a DeprecationWarning when used and goes in 2.0 (see the docs'
-Deprecated section)."""
+"""Names that were public by accident before 1.0, now internal. Each still
+answers under its old name, warning with a DeprecationWarning, until 1.0
+removes it (see the docs' Deprecated section)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def module(old: str, new: str) -> tuple[Callable[[str], Any], Callable[[], list[
     def __getattr__(name: str) -> Any:
         if name.startswith("__") and name != "__all__":
             raise AttributeError(name)
-        warnings.warn(f"{old} is internal and deprecated (it goes in 2.0): use what the cronwatch package documents", DeprecationWarning, stacklevel=2)
+        warnings.warn(f"{old} is internal and deprecated (it is removed in 1.0): use what the cronwatch package documents", DeprecationWarning, stacklevel=2)
         return getattr(importlib.import_module(new), name)
 
     def __dir__() -> list[str]:
@@ -36,7 +36,7 @@ def names(module_name: str, scope: Mapping[str, Any], renamed: Mapping[str, str]
         new = renamed.get(name)
         if new is None:
             raise AttributeError(f"module {module_name!r} has no attribute {name!r}")
-        warnings.warn(f"{module_name}.{name} is internal and deprecated (it goes in 2.0)", DeprecationWarning, stacklevel=2)
+        warnings.warn(f"{module_name}.{name} is internal and deprecated (it is removed in 1.0)", DeprecationWarning, stacklevel=2)
         return scope[new]
 
     return __getattr__

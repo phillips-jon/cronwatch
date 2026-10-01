@@ -387,12 +387,15 @@ The package's API is what this page and the README name, and nothing else; every
 
 ### Deprecated
 
-These still work through 1.x, marked deprecated, and go in 2.0:
+These still work, marked deprecated. A rename of documented API works through 1.x and goes in 2.0; a function that was public by accident goes in 1.0.
 
-| Deprecated | Use | |
-|---|---|---|
-| `Cronwatch.start()` and `Cronwatch.start(every: d)` | `Cronwatch.start_checking(every: d)` | `start(job, options)`, which opens a run, is unchanged. `start/0` is marked `@deprecated`, so the compiler warns; a keyword list given to `start/1` warns when it is called |
-| `Cronwatch.StoreCase.contract/1`, `replay_fixture/2`, `make/1`, `scenarios/0`, `new_run/4` and `canonical/1` | `use Cronwatch.StoreCase, store: ..., fixture: ...` | the tests the template defines run them; called directly, the compiler warns |
+| Deprecated | Use | Goes in | |
+|---|---|---|---|
+| `Cronwatch.start()` and `Cronwatch.start(every: d)` | `Cronwatch.start_checking(every: d)` | 2.0 | `start(job, options)`, which opens a run, is unchanged. `start/0` is marked `@deprecated`, so the compiler warns; a keyword list given to `start/1` warns when it is called |
+| `Cronwatch.StoreCase.contract/1`, `replay_fixture/2`, `make/1`, `scenarios/0`, `new_run/4` and `canonical/1` | `use Cronwatch.StoreCase, store: ..., fixture: ...` | 1.0 | the tests the template defines run them; called directly, the compiler warns |
+| `Alerts.Twilio.max_segments/0`, `sms_segments/1`, `sms_body/3`; `Alerts.Discord.embed_description/1`; `Alerts.Email.escape_html/1`; `Alerts.Webhook.body/1`; `Sources.PgCron.hold_ms/0`, `schedule/1`, `job_name/1`, `run_of/4`; `Triage.Anthropic.default_model/0`, `system/0` | nothing: internal to their channel, source or triage | 1.0 | hidden from HexDocs; called directly, the compiler warns |
+
+The modules and functions HexDocs stopped showing in 1.0 that the package itself calls across modules (`Cronwatch.JS`, `JSRE`, `Cron`, `Zone`, `Duration`, `Schedule`, `Output`, `Serialize`, `Alerts.Post`, `Store.SQL`, and helpers such as `Transport.check/2` and `JobState.sending/2`) carry no deprecation: they are internal, and may change in any release.
 
 `Cronwatch.Error` has a `kind`: `:invalid` (an option, name, schedule or run id the SDK refuses, with its message), `:store` (the store's own error as `reason`) and `:other`. A failed run's error is written `Name: message` from the exception's module (`RuntimeError: disk full`), with up to five frames of its stacktrace, each `Module.function/arity (file:line)`; a throw is written `throw: <value>`, an exit `exit: <reason>`, and a returned `{:error, reason}` as its reason (an exception in it as the exception, `:error` alone as `error`).
 

@@ -463,12 +463,12 @@ The cron reader matches croner, and the SDK, on every expression: a date no mont
 
 ## Deprecated
 
-These still work, each marked `Deprecated:` in its doc comment so editors and `staticcheck` point at it. A rename keeps its old name as an alias; a name that was public by accident (a test hook, an internal helper) goes when 1.0 makes it internal. Public means documented on this page, the [Go schedulers](/docs/go-schedulers/) page or the module's README; everything else is internal. `cronwatch.dev/go/bridge` is outside the 1.x promise altogether.
+These still work, each marked `Deprecated:` in its doc comment so editors and `staticcheck` point at it. A rename of documented API keeps its old name as an alias through 1.x and goes in 2.0; a name that was public by accident (a test hook, an internal helper, a name the docs never showed) goes when 1.0 makes it internal. Public means documented on this page, the [Go schedulers](/docs/go-schedulers/) page or the module's README; everything else is internal. `cronwatch.dev/go/bridge` is outside the 1.x promise altogether.
 
 | Deprecated | Use instead | Goes in |
 |---|---|---|
 | `cw.Start(every)` | `cw.StartChecking(every)`: a job's `Start` opens a run, so the client's is named for what it starts | 2.0 |
-| `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 1.0 |
+| `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 2.0 |
 | `cwgocron.Converted` | `robfigcron.Converted`, the same type, which every integration's `Convert` returns | 1.0 |
 | `cwgocron.Panic` | `cwgocron.PanicError`, the same type | 1.0 |
 | `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics` and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |

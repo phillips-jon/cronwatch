@@ -38,6 +38,6 @@ class CronwatchConfig(AppConfig):
         autodiscover_modules(_JOBS_MODULE)
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"JOBS_MODULE": "_JOBS_MODULE"})

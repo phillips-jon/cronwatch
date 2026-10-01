@@ -766,6 +766,6 @@ def check(self: Any) -> str:
     return f"cronwatch: checked {jobs} job{'' if jobs == 1 else 's'}, sent {alerts} alert{'' if alerts == 1 else 's'}"
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"TRIGGER": "_TRIGGER", "SKIPPED_TASKS": "_SKIPPED_TASKS", "REFRESH_S": "_REFRESH_S", "BeatEntry": "_BeatEntry", "cron_text": "_cron_text", "convert": "_convert", "default_client": "_default_client"})

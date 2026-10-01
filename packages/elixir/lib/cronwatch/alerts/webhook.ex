@@ -74,8 +74,12 @@ defmodule Cronwatch.Alerts.Webhook do
   @schema 1
 
   @doc false
-  @spec body(Alert.t()) :: String.t()
-  def body(%Alert{} = alert) do
+  @deprecated "Internal to the webhook channel, public by accident; removed in 1.0"
+  def body(alert), do: payload(alert)
+
+  @doc false
+  @spec payload(Alert.t()) :: String.t()
+  def payload(%Alert{} = alert) do
     %JS.Object{pairs: pairs} = Alert.to_value(alert)
     JS.stringify(%JS.Object{pairs: [{"schema", @schema} | pairs]})
   end
@@ -91,7 +95,7 @@ defmodule Cronwatch.Alerts.Webhook do
 
   @impl true
   def send(%__MODULE__{} = o, %Alert{} = alert, ctx) do
-    body = body(alert)
+    body = payload(alert)
     headers = [{"content-type", "application/json"}, {"user-agent", "cronwatch"}]
 
     # A pasted Authorization value often carries a stray space or newline,

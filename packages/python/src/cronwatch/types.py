@@ -582,6 +582,6 @@ class JobWithRuns:
         return {"job": self.job.to_dict(), "runs": [r.to_dict() for r in self.runs]}
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"camel": "_camel", "snake": "_snake", "details_to_json": "_details_to_json", "details_from_json": "_details_from_json", "CONDITIONS": "_CONDITIONS"})

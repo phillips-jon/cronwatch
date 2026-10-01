@@ -130,7 +130,8 @@ func New(cw *cronwatch.Client, options Options) *Watcher {
 // Watch is New(cw, options).Option(), for gocron.NewScheduler.
 //
 // Deprecated: Use New(cw, options).Option(), which does the same and keeps
-// the Watcher for its Sync and Wait. Watch goes in 1.0.
+// the Watcher for its Sync and Wait. Watch still works through 1.x and
+// goes in 2.0.
 func Watch(cw *cronwatch.Client, options Options) gocron.SchedulerOption {
 	return New(cw, options).Option()
 }

@@ -14,7 +14,11 @@ use Cronwatch\Js;
  */
 final class Discord implements AlertChannel
 {
-    /** The longest embed description Discord takes. The title (under 256) and it stay well inside the embed's 6000. */
+    /**
+     * The longest embed description Discord takes. The title (under 256) and it stay well inside the embed's 6000.
+     *
+     * @deprecated Internal to the Discord channel, public by accident; removed in 1.0.
+     */
     public const DESCRIPTION_MAX = 4096;
 
     private const COLOR = [
@@ -73,6 +77,8 @@ final class Discord implements AlertChannel
      * and escaping can grow both, so the whole is held to DESCRIPTION_MAX (in
      * UTF-16 units) by cutting the message's block, never the triage: Discord
      * refuses a longer one on every retry.
+     *
+     * @deprecated Internal to the Discord channel, public by accident; removed in 1.0.
      */
     public static function embedDescription(Alert $alert): string
     {
@@ -81,13 +87,21 @@ final class Discord implements AlertChannel
         return "```\n" . Shared::cut(self::codeBlockSafe(Js::slice16($alert->message, 3800)), self::DESCRIPTION_MAX - $fences - Js::length16($triage)) . "\n```" . $triage;
     }
 
-    /** Breaks up ``` so text inside a code block cannot close it. */
+    /**
+     * Breaks up ``` so text inside a code block cannot close it.
+     *
+     * @deprecated Internal to the Discord channel, public by accident; removed in 1.0.
+     */
     public static function codeBlockSafe(string $text): string
     {
         return str_replace('```', "`\u{200B}`\u{200B}`", $text);
     }
 
-    /** Escapes the characters Discord reads as markdown, links included. */
+    /**
+     * Escapes the characters Discord reads as markdown, links included.
+     *
+     * @deprecated Internal to the Discord channel, public by accident; removed in 1.0.
+     */
     public static function escapeMarkdown(string $text): string
     {
         return (string) preg_replace('/[\\\\`*_~|\[\]()<>]/', '\\\\$0', $text);

@@ -246,7 +246,10 @@ defmodule Cronwatch do
   def start(job_or_opts, opts \\ [])
 
   def start(opts, []) when is_list(opts) do
-    IO.warn("Cronwatch.start/1 with a keyword list is deprecated, use Cronwatch.start_checking/1 instead")
+    IO.warn(
+      "Cronwatch.start/1 with a keyword list is deprecated, use Cronwatch.start_checking/1 instead; removed in 2.0"
+    )
+
     start_checking(opts)
   end
 
@@ -256,7 +259,7 @@ defmodule Cronwatch do
   end
 
   @doc "`start_checking/1` with its defaults, by its old name."
-  @deprecated "Use Cronwatch.start_checking/1 instead"
+  @deprecated "Use Cronwatch.start_checking/1 instead; removed in 2.0"
   @spec start() :: :ok | {:error, Error.t()}
   def start, do: start_checking([])
 

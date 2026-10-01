@@ -80,10 +80,12 @@ defmodule Cronwatch.Triage.Anthropic do
 
   @doc false
   # The model triage asks unless told otherwise.
+  @deprecated "Internal to Claude triage, public by accident; removed in 1.0"
   def default_model, do: @default_model
 
   @doc false
   # The system prompt, the SDK's word for word.
+  @deprecated "Internal to Claude triage, public by accident; removed in 1.0"
   def system, do: @system
 
   @doc "Checks the options once, when the instance starts: an API key must be given or in `ANTHROPIC_API_KEY`."

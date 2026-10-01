@@ -66,6 +66,6 @@ def signature(secret: str, body: str) -> str:
 
 
 def hmac_sha256_hex(secret: str, body: str) -> str:
-    """Deprecated: use :func:`signature`, which this calls. Goes in 2.0."""
-    warnings.warn("hmac_sha256_hex() is deprecated: use cronwatch.alerts.webhook.signature()", DeprecationWarning, stacklevel=2)
+    """Deprecated: use :func:`signature`, which this calls. Removed in 1.0."""
+    warnings.warn("hmac_sha256_hex() is deprecated and removed in 1.0: use cronwatch.alerts.webhook.signature()", DeprecationWarning, stacklevel=2)
     return signature(secret, body)

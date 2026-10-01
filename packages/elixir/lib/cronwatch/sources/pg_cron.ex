@@ -124,7 +124,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     @doc false
     # How long a queued run is held before it is copied as running: ten minutes, in milliseconds.
-    @spec hold_ms() :: pos_integer()
+    @deprecated "Internal to the pg_cron source, public by accident; removed in 1.0"
     def hold_ms, do: @hold_ms
 
     @impl Cronwatch.Source
@@ -133,13 +133,17 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     ## The SDK's helpers
 
     @doc false
+    @deprecated "Internal to the pg_cron source, public by accident; removed in 1.0"
+    def schedule(schedule), do: schedule_of(schedule)
+
+    @doc false
     # A pg_cron schedule as a CronWatch one: a cron expression, `$` for the
     # last day of the month read as `L`, or `N seconds` as `every Ns`. pg_cron
     # reads only the first five fields of an expression and ignores the rest,
     # so only those are kept (a sixth would otherwise be read as seconds). nil
     # for one that has no cadence to watch (`@reboot`).
-    @spec schedule(String.t()) :: String.t() | nil
-    def schedule(schedule) when is_binary(schedule) do
+    @spec schedule_of(String.t()) :: String.t() | nil
+    def schedule_of(schedule) when is_binary(schedule) do
       text = JS.trim(schedule)
 
       case seconds(text) do
@@ -205,12 +209,16 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     end
 
     @doc false
+    @deprecated "Internal to the pg_cron source, public by accident; removed in 1.0"
+    def job_name(job), do: default_name(job)
+
+    @doc false
     # The default CronWatch name for a pg_cron job, before the prefix: its
     # jobname with each run of anything other than letters, digits, `.`, `_`,
     # `:` and `-` turned into `-`, leading punctuation dropped, at most 100
     # characters, or `pg_cron:<jobid>` when nothing is left.
-    @spec job_name(Job.t() | map()) :: String.t()
-    def job_name(%{job_id: id} = job) do
+    @spec default_name(Job.t() | map()) :: String.t()
+    def default_name(%{job_id: id} = job) do
       {cleaned, _} =
         (Map.get(job, :job_name) || "")
         |> String.to_charlist()
@@ -236,6 +244,10 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     defp safe?(c), do: alnum?(c) or c in [?., ?_, ?:, ?-]
 
     @doc false
+    @deprecated "Internal to the pg_cron source, public by accident; removed in 1.0"
+    def run_of(row, job, id_prefix, fallback_at), do: to_run(row, job, id_prefix, fallback_at)
+
+    @doc false
     # A row of `cron.job_run_details` as a CronWatch run, or nil for one that
     # has not started (no start time, not finished). The row is a map of the
     # table's columns (`"runid"`, `"jobid"`, `"status"`, `"return_message"`,
@@ -244,8 +256,8 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     # runs a server restart cut off, "server restarted") starts at its end
     # time, else at `fallback_at` (the source passes the job's newest run's
     # start, or now).
-    @spec run_of(map(), String.t(), String.t(), integer()) :: Run.t() | nil
-    def run_of(row, job, id_prefix, fallback_at) do
+    @spec to_run(map(), String.t(), String.t(), integer()) :: Run.t() | nil
+    def to_run(row, job, id_prefix, fallback_at) do
       status = text(row["status"])
       start_time = time(row["start_time"])
       end_time = time(row["end_time"])
@@ -706,7 +718,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       end
     end
 
-    defp base_name(o, job), do: if(is_function(o[:job_name], 1), do: o[:job_name].(job), else: job_name(job))
+    defp base_name(o, job), do: if(is_function(o[:job_name], 1), do: o[:job_name].(job), else: default_name(job))
 
     defp returned(nil), do: "nil"
     defp returned(other), do: inspect(other)
@@ -753,7 +765,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     defp declare_picked(c, job, {name, extra}, {recording, timezone}, {order, names, definitions, used}) do
       name = if MapSet.member?(used, name), do: "#{name}:#{job.job_id}", else: name
       used = MapSet.put(used, name)
-      sched = if job.active and recording, do: schedule(job.schedule)
+      sched = if job.active and recording, do: schedule_of(job.schedule)
       paused = if job.active, do: "", else: " (paused)"
 
       unscheduled_options =
@@ -991,12 +1003,12 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
             update_st(&%{&1 | held: Map.put(&1.held, runid, since)})
             []
           else
-            record_run(c, jobid, runid, run_of(Map.put(row, "start_time", since), name, id_prefix, now), evaluate)
+            record_run(c, jobid, runid, to_run(Map.put(row, "start_time", since), name, id_prefix, now), evaluate)
           end
 
         true ->
           fallback = Map.get(st().last_at, jobid, now)
-          record_run(c, jobid, runid, run_of(row, name, id_prefix, fallback), evaluate)
+          record_run(c, jobid, runid, to_run(row, name, id_prefix, fallback), evaluate)
       end
     end
 

@@ -111,7 +111,7 @@ pub mod __private {
 /// The stored definition `options` give a job named `name`, without a
 /// client.
 #[doc(hidden)]
-#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+#[deprecated(note = "no longer part of the API; documented before 1.0, so it still works through 1.x and goes in 2.0")]
 pub fn describe_job(name: &str, options: &JobOptions) -> Definition {
     client::describe_job(name, options)
 }

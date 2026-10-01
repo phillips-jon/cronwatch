@@ -965,6 +965,6 @@ def _multipart(kind: str, data: bytes) -> dict[str, str]:
     return out
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"UNSET": "_UNSET", "COOKIE": "_COOKIE", "DEFAULT_RUNS": "_DEFAULT_RUNS", "MAX_RUNS": "_MAX_RUNS", "BOARD_PAGE_RUNS": "_BOARD_PAGE_RUNS", "COOKIE_MAX_AGE": "_COOKIE_MAX_AGE", "MAX_BODY": "_MAX_BODY", "CSP": "_CSP", "ASSET_CSP": "_ASSET_CSP", "SECURITY_HEADERS": "_SECURITY_HEADERS", "LOCKED": "_LOCKED", "url_origin": "_url_origin", "request_path": "_request_path", "parse_query": "_parse_query", "safe_decode": "_safe_decode", "constant_time_equal": "_constant_time_equal", "cookie_value": "_cookie_value", "development_token": "_development_token", "development_sign_in_line": "_development_sign_in_line", "is_loopback_origin": "_is_loopback_origin", "too_large": "_too_large", "read_asgi_body": "_read_asgi_body"})

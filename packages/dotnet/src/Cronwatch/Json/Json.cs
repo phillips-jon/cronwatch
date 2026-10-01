@@ -51,7 +51,7 @@ public static class Json
     public const int MaxDepth = JsonText.MaxDepth;
 
     /// <summary>The message on the helpers 1.0 made internal.</summary>
-    private const string Internal = "An internal helper, not part of the 1.x promise: only Parse, ParseObject and Stringify are. It still works through 1.x and goes in 2.0.";
+    private const string Internal = "An internal helper, public by accident: only Parse, ParseObject and Stringify are promised. It still works, and is removed in 1.0.";
 
     /// <summary>
     /// <c>JSON.stringify</c> of a value: <c>null</c>, a <see cref="bool"/>, a number, a

@@ -38,29 +38,44 @@ use Cronwatch\Store\PostgresStore;
  */
 final class PgCron implements Source
 {
-    /** How many of a job's newest runs are copied, without alerting, the first time it is seen. */
+    /**
+     * How many of a job's newest runs are copied, without alerting, the first time it is seen.
+     *
+     * @deprecated Internal to the pg_cron source, public by accident; removed in 1.0.
+     */
     public const BACKFILL = 20;
-    /** Run details read per query, and the most pages read in one sync. */
+    /**
+     * Run details read per query, and the most pages read in one sync.
+     *
+     * @deprecated Internal to the pg_cron source, public by accident; removed in 1.0.
+     */
     public const PAGE = 500;
+    /** @deprecated Internal to the pg_cron source, public by accident; removed in 1.0. */
     public const MAX_PAGES = 10;
     /**
      * How long a run pg_cron has queued but not started (no start_time yet)
      * is waited for. After that it is copied as running from when it was
      * first seen, so a run that never starts is marked stuck like any other.
+     *
+     * @deprecated Internal to the pg_cron source, public by accident; removed in 1.0.
      */
     public const HOLD_MS = 10 * 60_000;
 
+    /** @deprecated Internal to the pg_cron source, public by accident; removed in 1.0. */
     public const JOBS_SQL = 'SELECT jobid, jobname, schedule, database, username, active FROM cron.job ORDER BY jobid';
     // pg_settings has no row for a setting the role may not read, where
     // current_setting() raises an error that would abort the caller's transaction.
+    /** @deprecated Internal to the pg_cron source, public by accident; removed in 1.0. */
     public const SETTING_SQL = 'SELECT setting FROM pg_settings WHERE name = $1';
     private const COLUMNS = 'd.runid, d.jobid, d.status, d.return_message, d.start_time, d.end_time';
     // Every tracked job's runs after its cursor, and any run still open here, whatever its job.
+    /** @deprecated Internal to the pg_cron source, public by accident; removed in 1.0. */
     public const RUNS_SQL = 'SELECT ' . self::COLUMNS . '
   FROM cron.job_run_details d
   LEFT JOIN unnest($1::bigint[], $2::bigint[]) AS c(jobid, after) ON d.jobid = c.jobid
   WHERE d.runid > c.after OR d.runid = ANY($3::bigint[])
   ORDER BY d.runid LIMIT ' . self::PAGE;
+    /** @deprecated Internal to the pg_cron source, public by accident; removed in 1.0. */
     public const NEWEST_SQL = 'SELECT ' . self::COLUMNS . ' FROM cron.job_run_details d WHERE d.jobid = $1 ORDER BY d.runid DESC LIMIT ' . self::BACKFILL;
 
     /** The options of a definition that are declared again, without its schedule, for a name no longer in use. */
@@ -127,7 +142,11 @@ final class PgCron implements Source
         $this->options = is_callable($options) ? \Closure::fromCallable($options) : $options;
     }
 
-    /** What queries go through: an object with query() as it is, or a PDO (given or opened from a URL) wrapped. */
+    /**
+     * What queries go through: an object with query() as it is, or a PDO (given or opened from a URL) wrapped.
+     *
+     * @deprecated Internal to the pg_cron source, public by accident; removed in 1.0.
+     */
     public static function adapter(mixed $db): object
     {
         if ($db instanceof \PDO) {
@@ -159,6 +178,8 @@ final class PgCron implements Source
      * schedule, or null for one that has no cadence to watch. pg_cron reads
      * only the first five fields of an expression and ignores the rest, so
      * only those are kept (a sixth would otherwise be read as seconds).
+     *
+     * @deprecated Internal to the pg_cron source, public by accident; removed in 1.0.
      */
     public static function schedule(string $schedule): ?string
     {
@@ -183,6 +204,7 @@ final class PgCron implements Source
      * The default CronWatch name for a pg_cron job, before the prefix.
      *
      * @param array<string, mixed> $job a cron.job row (jobid and jobname are read)
+     * @deprecated Internal to the pg_cron source, public by accident; removed in 1.0.
      */
     public static function jobName(array $job): string
     {
@@ -203,6 +225,8 @@ final class PgCron implements Source
      * whose fraction is taken as pg's postgres-date takes it, the
      * milliseconds 1000 * the fraction, cut to a whole number), an ISO 8601
      * string as Date parses it, a DateTimeInterface, or a number.
+     *
+     * @deprecated Internal to the pg_cron source, public by accident; removed in 1.0.
      */
     public static function epochMs(mixed $value): int|float
     {
@@ -246,6 +270,7 @@ final class PgCron implements Source
      * reader passes the job's newest run's start, or now).
      *
      * @param array<string, mixed>|\stdClass $row
+     * @deprecated Internal to the pg_cron source, public by accident; removed in 1.0.
      */
     public static function run(array|\stdClass $row, string $job, string $idPrefix, int|float|null $fallbackAt = null): ?Run
     {

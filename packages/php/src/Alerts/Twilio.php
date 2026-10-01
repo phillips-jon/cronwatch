@@ -30,9 +30,17 @@ use Cronwatch\Js;
  */
 final class Twilio implements AlertChannel
 {
-    /** The most segments a message may use, which keeps it inside Twilio's 1600 character Body limit. */
+    /**
+     * The most segments a message may use, which keeps it inside Twilio's 1600 character Body limit.
+     *
+     * @deprecated Internal to the Twilio channel, public by accident; removed in 1.0.
+     */
     public const MAX_SEGMENTS = 10;
-    /** Twilio refuses a Body longer than this. */
+    /**
+     * Twilio refuses a Body longer than this.
+     *
+     * @deprecated Internal to the Twilio channel, public by accident; removed in 1.0.
+     */
     public const MAX_BODY = 1600;
 
     // The GSM 03.38 alphabet: a message in it takes 153 characters a segment
@@ -133,14 +141,22 @@ final class Twilio implements AlertChannel
         }
     }
 
-    /** A number with all but its last four digits hidden, for an error message. */
+    /**
+     * A number with all but its last four digits hidden, for an error message.
+     *
+     * @deprecated Internal to the Twilio channel, public by accident; removed in 1.0.
+     */
     public static function maskNumber(string $number): string
     {
         $length = Js::length16($number);
         return $length <= 4 ? $number : str_repeat('*', min($length - 4, 8)) . Js::tail16($number, 4);
     }
 
-    /** A segment count clamped to 1 to MAX_SEGMENTS; 3 for anything not a number. */
+    /**
+     * A segment count clamped to 1 to MAX_SEGMENTS; 3 for anything not a number.
+     *
+     * @deprecated Internal to the Twilio channel, public by accident; removed in 1.0.
+     */
     public static function segmentBudget(mixed $segments): int
     {
         $n = Js::isFinite($segments) ? (int) floor($segments) : 3;
@@ -158,6 +174,8 @@ final class Twilio implements AlertChannel
      * extension character (two septets) or a surrogate pair (two UCS-2
      * units) that would straddle a boundary starts the next segment, as
      * phones pack them.
+     *
+     * @deprecated Internal to the Twilio channel, public by accident; removed in 1.0.
      */
     public static function smsSegments(string $text): int
     {
@@ -193,7 +211,11 @@ final class Twilio implements AlertChannel
         return $count;
     }
 
-    /** Whether `text` fits in `segments` SMS segments and Twilio's Body limit. */
+    /**
+     * Whether `text` fits in `segments` SMS segments and Twilio's Body limit.
+     *
+     * @deprecated Internal to the Twilio channel, public by accident; removed in 1.0.
+     */
     public static function fits(string $text, int $segments): bool
     {
         return Js::length16($text) <= self::MAX_BODY && self::smsSegments($text) <= $segments;
@@ -203,6 +225,8 @@ final class Twilio implements AlertChannel
      * The title, then as many lines of the message (and the triage) as fit,
      * then the link. The link is kept whole; the text before it is cut to
      * make room. `segments` is clamped to 1 to 10.
+     *
+     * @deprecated Internal to the Twilio channel, public by accident; removed in 1.0.
      */
     public static function smsBody(Alert $alert, ?string $link, mixed $segments = 3): string
     {

@@ -215,8 +215,8 @@ defmodule Cronwatch.Alerts.ProvidersServerTest do
 
   test "SMS bodies stay inside Twilio's limits" do
     long = %{sample() | title: "j failed", message: String.duplicate("x", 3000)}
-    assert Cronwatch.JS.len16(Alerts.Twilio.sms_body(long, "", 12)) <= 1530, "segments capped at 10"
-    assert Cronwatch.JS.len16(Alerts.Twilio.sms_body(long, "", :nan)) <= 459, "not a number is the default 3"
+    assert Cronwatch.JS.len16(Alerts.Twilio.body_of(long, "", 12)) <= 1530, "segments capped at 10"
+    assert Cronwatch.JS.len16(Alerts.Twilio.body_of(long, "", :nan)) <= 459, "not a number is the default 3"
 
     for {text, want} <- [
           {String.duplicate("a", 160), 1},
@@ -225,14 +225,14 @@ defmodule Cronwatch.Alerts.ProvidersServerTest do
           {String.duplicate("\u{1F600}", 35), 1},
           {String.duplicate("a", 66) <> "\u{1F600}" <> String.duplicate("a", 66), 3}
         ] do
-      assert Alerts.Twilio.sms_segments(text) == want
+      assert Alerts.Twilio.segments_of(text) == want
     end
 
     packed = %{sample() | title: "t", message: String.duplicate(String.duplicate("a", 152) <> "{", 3)}
-    assert Alerts.Twilio.sms_segments(Alerts.Twilio.sms_body(packed, "", 3)) <= 3
+    assert Alerts.Twilio.segments_of(Alerts.Twilio.body_of(packed, "", 3)) <= 3
     short = %{sample() | message: "m"}
 
-    assert Cronwatch.JS.len16(Alerts.Twilio.sms_body(short, "https://example.com/" <> String.duplicate("p", 2000), 10)) <=
+    assert Cronwatch.JS.len16(Alerts.Twilio.body_of(short, "https://example.com/" <> String.duplicate("p", 2000), 10)) <=
              1600
   end
 end

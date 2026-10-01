@@ -1,7 +1,6 @@
 """Deprecated: ``cronwatch.output`` (the output cap and redaction:
-redact_secrets is cronwatch.redact_secrets) is internal from 1.0, as
-``cronwatch._output``. Its names still work through 1.x, each warning with a
-DeprecationWarning, and the module goes in 2.0."""
+redact_secrets is cronwatch.redact_secrets) is internal, as
+``cronwatch._output``. Its names still work, each warning with a DeprecationWarning, until 1.0 removes the module."""
 
 from ._deprecated import module
 

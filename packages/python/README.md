@@ -209,7 +209,7 @@ It answers `{"ok", "job", "run", "status", "durationMs"}` with 200 or 500, 401 w
 
 ### Deprecated
 
-`cw.start(every)` (now `start_checking`), `cronwatch.web.Web(client)` (now `cw.routes()`), `AnthropicTriage` (now `Anthropic`), `Slack(url)` and `Discord(url)` with the URL positional (now `webhook_url=`), and `hmac_sha256_hex` (now `signature`) still work through 1.x, each with a `DeprecationWarning`, and go in 2.0. So do the modules and helpers 1.0 made internal under their old names (`cronwatch.evaluate`, `cronwatch.types.camel`, ...): public means what this README and the [docs](https://cronwatch.dev/docs/python/#deprecated) document, and each module's `__all__` lists it.
+`cw.start(every)` (now `start_checking`), `cronwatch.web.Web(client)` (now `cw.routes()`), `AnthropicTriage` (now `Anthropic`), `Slack(url)` and `Discord(url)` with the URL positional (now `webhook_url=`) still work through 1.x, each with a `DeprecationWarning`, and go in 2.0. `hmac_sha256_hex` (now `signature`) and the modules and helpers that were public by accident, under their old names (`cronwatch.evaluate`, `cronwatch.types.camel`, ...), still work with a `DeprecationWarning` too, and go in 1.0: public means what this README and the [docs](https://cronwatch.dev/docs/python/#deprecated) document, and each module's `__all__` lists it.
 
 ## Testing
 
