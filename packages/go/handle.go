@@ -15,9 +15,16 @@ import (
 	"cronwatch.dev/go/internal/output"
 )
 
-// ReservedRunIDPrefix starts the run ids of the pg_cron source, so no other
+// reservedRunIDPrefix starts the run ids of the pg_cron source, so no other
 // run may use it.
-const ReservedRunIDPrefix = "pgcron:"
+const reservedRunIDPrefix = "pgcron:"
+
+// ReservedRunIDPrefix starts the run ids of the pg_cron source, so Start and
+// Resume refuse it.
+//
+// Deprecated: ReservedRunIDPrefix is internal, and goes in 1.0. The prefix
+// ("pgcron:") is documented with Start and does not change.
+const ReservedRunIDPrefix = reservedRunIDPrefix
 
 // maxRunID is the longest run id, in UTF-16 code units (JavaScript's string
 // length): what Start, Resume and RecordRun take, and every store holds.
@@ -33,8 +40,8 @@ func checkRunID(job, id, method string) error {
 	if strings.Contains(id, "\x00") {
 		return fmt.Errorf("job %s: %s() cannot take a run id containing a NUL character", js.Quote(job), method)
 	}
-	if strings.HasPrefix(id, ReservedRunIDPrefix) {
-		return fmt.Errorf("job %s: %s() cannot take a run id starting with %s, which the pg_cron source uses for its runs", js.Quote(job), method, js.Quote(ReservedRunIDPrefix))
+	if strings.HasPrefix(id, reservedRunIDPrefix) {
+		return fmt.Errorf("job %s: %s() cannot take a run id starting with %s, which the pg_cron source uses for its runs", js.Quote(job), method, js.Quote(reservedRunIDPrefix))
 	}
 	return nil
 }

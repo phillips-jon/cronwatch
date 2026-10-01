@@ -501,11 +501,11 @@ func TestRoutesTheSilenceFormShowsAnError(t *testing.T) {
 func TestRoutesABodyPastTheCapIs413(t *testing.T) {
 	w := newWeb(t, nil)
 	check(t, w.cw.Run(bg, "s", ok))
-	big := `{"for":"2h","pad":"` + strings.Repeat("x", cronwatch.MaxBody) + `"}`
+	big := `{"for":"2h","pad":"` + strings.Repeat("x", cronwatch.MaxRequestBody) + `"}`
 	api := w.send("POST", "/cronwatch/api/jobs/s/silence", join(auth, hdr{"content-type": "application/json"}), big)
 	status(t, "api", api, 413)
 	eq(t, "api body", api.Body.String(), `{"ok":false,"error":"Request body too large"}`)
-	page := w.send("POST", "/cronwatch/jobs/s/silence", join(auth, form), "for=2h&pad="+strings.Repeat("x", cronwatch.MaxBody))
+	page := w.send("POST", "/cronwatch/jobs/s/silence", join(auth, form), "for=2h&pad="+strings.Repeat("x", cronwatch.MaxRequestBody))
 	status(t, "form", page, 413)
 	contains(t, "form body", page.Body.String(), "The request was too large.")
 	// Without a Content-Length, by reading one byte past the cap.
@@ -576,9 +576,7 @@ func devEnv(t *testing.T) *bytes.Buffer {
 	t.Setenv("CRONWATCH_ENV", "development")
 	t.Setenv("CRONWATCH_TOKEN", "")
 	out := &bytes.Buffer{}
-	before := cronwatch.Stdout
-	cronwatch.Stdout = out
-	t.Cleanup(func() { cronwatch.Stdout = before })
+	t.Cleanup(cronwatch.SwapStdout(out))
 	return out
 }
 

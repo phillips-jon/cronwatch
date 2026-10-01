@@ -458,8 +458,11 @@ func TestTwilioTextsEveryNumberAtOnceAndReportsTheRefusals(t *testing.T) {
 	}
 	// Without a client's context, a refusal goes to standard error.
 	var buf bytes.Buffer
+	//lint:ignore SA1019 the hook this module's own tests use
 	saved := cronwatch.Stderr
+	//lint:ignore SA1019 the hook this module's own tests use
 	cronwatch.Stderr = &buf
+	//lint:ignore SA1019 the hook this module's own tests use
 	defer func() { cronwatch.Stderr = saved }()
 	rec.answer = func(body string) (int, string) {
 		values, _ := url.ParseQuery(body)

@@ -49,10 +49,18 @@ const (
 )
 
 // Stderr is where the default error handler, the in-memory store's
-// warning and the console channel's failures go. Tests may replace it.
+// warning and the console channel's failures go.
+//
+// Deprecated: Stderr is a hook for this module's own tests. Give the client
+// WithErrorHandler, and a channel of your own in place of Console, to send
+// what they write elsewhere. It goes in 1.0.
 var Stderr io.Writer = os.Stderr
 
 // Stdout is where the console channel writes recoveries.
+//
+// Deprecated: Stdout is a hook for this module's own tests. Give the client
+// a channel of your own in place of Console to send recoveries elsewhere.
+// It goes in 1.0.
 var Stdout io.Writer = os.Stdout
 
 // Client watches an app's jobs: it records their runs in a store, judges

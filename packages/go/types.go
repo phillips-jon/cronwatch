@@ -126,6 +126,9 @@ func (m Metrics) merged(over Metrics) Metrics {
 }
 
 // JSValue is the metrics as a JSON object.
+//
+// Deprecated: JSValue is how this module writes the SDK's JSON, and goes in
+// 1.0. Use MarshalJSON, or encoding/json, for the same bytes.
 func (m Metrics) JSValue() any {
 	o := &js.Object{}
 	for _, e := range m {
@@ -204,6 +207,9 @@ func (r Run) clone() Run {
 }
 
 // JSValue is the run as the SDK writes it.
+//
+// Deprecated: JSValue is how this module writes the SDK's JSON, and goes in
+// 1.0. Use MarshalJSON, or encoding/json, for the same bytes.
 func (r Run) JSValue() any {
 	return js.NewObject(
 		"id", r.ID, "job", r.Job, "status", string(r.Status), "startedAt", r.StartedAt,
@@ -292,6 +298,9 @@ func (d Definition) get(key string) (any, bool) { return d.o.Get(key) }
 func (d Definition) clone() Definition { return Definition{d.o.Clone()} }
 
 // JSValue is the definition as a JSON object.
+//
+// Deprecated: JSValue is how this module writes the SDK's JSON, and goes in
+// 1.0. Use MarshalJSON, or encoding/json, for the same bytes.
 func (d Definition) JSValue() any {
 	if d.o == nil {
 		return &js.Object{}
@@ -487,6 +496,9 @@ func (s JobState) clone() JobState {
 }
 
 // JSValue is the state as the SDK writes it.
+//
+// Deprecated: JSValue is how this module writes the SDK's JSON, and goes in
+// 1.0. Use MarshalJSON, or encoding/json, for the same bytes.
 func (s JobState) JSValue() any {
 	open := &js.Object{}
 	for _, c := range s.Open {
@@ -763,6 +775,9 @@ func (a Alert) clone() Alert {
 }
 
 // JSValue is the alert as the SDK writes it.
+//
+// Deprecated: JSValue is how this module writes the SDK's JSON, and goes in
+// 1.0. Use MarshalJSON, or encoding/json, for the same bytes.
 func (a Alert) JSValue() any {
 	var run any
 	if a.Run != nil {
@@ -887,6 +902,9 @@ type JobSummary struct {
 }
 
 // JSValue is the summary as the SDK writes it.
+//
+// Deprecated: JSValue is how this module writes the SDK's JSON, and goes in
+// 1.0. Use MarshalJSON, or encoding/json, for the same bytes.
 func (s JobSummary) JSValue() any {
 	open := make([]any, len(s.Open))
 	for i, c := range s.Open {
@@ -914,6 +932,9 @@ type CheckResult struct {
 }
 
 // JSValue is the result as the SDK writes it.
+//
+// Deprecated: JSValue is how this module writes the SDK's JSON, and goes in
+// 1.0. Use MarshalJSON, or encoding/json, for the same bytes.
 func (c CheckResult) JSValue() any {
 	jobs := make([]any, len(c.Jobs))
 	for i, j := range c.Jobs {
