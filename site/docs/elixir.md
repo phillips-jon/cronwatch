@@ -371,7 +371,7 @@ The functions, each taking `instance:` among its options:
 | `silence(name, d)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath |
 | `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `start(job, options)`, `resume(job, id)`, `resume_run(name, id)` | runs that span calls |
-| `record_run(run, options)` | record a run that happened elsewhere, for a source; answers the alerts it sent; a metric that is not a finite number is refused and nothing is recorded |
+| `record_run(run, options)` | record a run that happened elsewhere, for a source; answers the alerts it sent; a run id of 1 to 200 characters, and a metric that is a finite number, else it is refused and nothing is recorded |
 | `sync_job(name)` | write a declaration to the store now, unless it already holds it |
 | `defined_jobs()` | the jobs declared in this instance |
 
@@ -395,6 +395,8 @@ Cronwatch.finish(run)                                         # or Cronwatch.fai
 ## Sharing a database with the other languages
 
 The Ecto store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Rust, Java and .NET stores (the MySQL tables are the PHP, Go, Rust, Java and .NET ports'): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and an Elixir client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+
+A 1.x release keeps what it does not know in the stored data: a field of a job's state or definition, a condition, a run status or a trigger that a newer release wrote is read, kept and written back as it was (a status or trigger stays a string, never an atom), so any 1.x release of any language can share a store with any other. The 0.x releases are not covered: upgrade every process to 1.0 together.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 

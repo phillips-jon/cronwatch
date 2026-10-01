@@ -5,7 +5,7 @@ defmodule Cronwatch.Conformance.FixturesTest do
 
   # Every fixture the SDK writes; this port replays each of them, so a new
   # fixture fails the test below until it is placed.
-  @replayed ~w(channels duration evaluate format health output pgcron schedule store triage)
+  @replayed ~w(channels client duration evaluate format health output pgcron schedule store triage)
 
   test "every fixture in conformance/ is known to this port" do
     names =

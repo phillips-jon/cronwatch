@@ -318,7 +318,16 @@ defmodule Cronwatch.Check do
       raise Error.invalid("record_run: job #{Cronwatch.JS.quote(input.job)} is not declared; call job() first")
     end
 
-    if is_binary(input.id) and String.contains?(input.id, <<0>>) do
+    # The longest id start/2 takes; MySQL's column would hold 255, but every store holds 200.
+    if not is_binary(input.id) or input.id == "" or Cronwatch.JS.len16(input.id) > 200 do
+      got = if is_binary(input.id), do: "#{Cronwatch.JS.len16(input.id)} characters", else: inspect(input.id)
+
+      raise Error.invalid(
+              "record_run: run ids must be 1 to 200 characters (got #{got}; job #{Cronwatch.JS.quote(input.job)})"
+            )
+    end
+
+    if String.contains?(input.id, <<0>>) do
       raise Error.invalid("record_run: run ids cannot contain a NUL character (job #{Cronwatch.JS.quote(input.job)})")
     end
 

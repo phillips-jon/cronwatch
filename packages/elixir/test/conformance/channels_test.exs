@@ -151,20 +151,33 @@ defmodule Cronwatch.Conformance.ChannelsTest do
 
     failures =
       Enum.flat_map(cases, fn c ->
-        {module, state} = build("webhook", Object.new([{"url", "https://hooks.example.com/x"}, {"secret", field(c, "secret")}]), Rec.spec(rec))
+        {module, state} =
+          build(
+            "webhook",
+            Object.new([{"url", "https://hooks.example.com/x"}, {"secret", field(c, "secret")}]),
+            Rec.spec(rec)
+          )
+
         Rec.answer_with(rec, 200, "")
         :ok = module.send(state, Map.fetch!(alerts, field(c, "alert")), ctx())
         [got] = Rec.taken(rec)
         {_, signature} = List.keyfind(got.headers, "x-cronwatch-signature", 0)
 
         cond do
-          got.body != field(c, "body") -> ["#{field(c, "alert")}: body #{got.body}\n  want #{field(c, "body")}"]
-          signature != field(c, "signature") -> ["#{field(c, "alert")}: signature #{signature}, want #{field(c, "signature")}"]
-          true -> []
+          got.body != field(c, "body") ->
+            ["#{field(c, "alert")}: body #{got.body}\n  want #{field(c, "body")}"]
+
+          signature != field(c, "signature") ->
+            ["#{field(c, "alert")}: signature #{signature}, want #{field(c, "signature")}"]
+
+          true ->
+            []
         end
       end)
 
-    assert failures == [], "channels.json webhookPayloads: #{length(failures)} cases differ:\n" <> Enum.join(failures, "\n")
+    assert failures == [],
+           "channels.json webhookPayloads: #{length(failures)} cases differ:\n" <> Enum.join(failures, "\n")
+
     assert length(cases) == 15
 
     assert Webhook.signature("key", "The quick brown fox jumps over the lazy dog") ==

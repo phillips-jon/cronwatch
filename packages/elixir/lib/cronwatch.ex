@@ -286,8 +286,9 @@ defmodule Cronwatch do
 
   @doc """
   Records a run that happened outside this process, for a source: the SDK's
-  `recordRun()`. Its job must be declared first, and every metric must be a
-  finite number, as with `metric/3` (else nothing is recorded). Runs are
+  `recordRun()`. Its job must be declared first, its id 1 to 200
+  characters with no NUL, and every metric a finite number, as with
+  `metric/3` (else nothing is recorded). Runs are
   keyed by id: a new one is inserted, a stored one still running (or marked
   timeout by a check) is finished when this one is not running, and anything
   else is left alone.
