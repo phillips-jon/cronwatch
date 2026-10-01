@@ -41,7 +41,11 @@ async function replay(store: Store) {
     if (step.op === "check") await cw.check();
     else if (step.op === "silence") await cw.silence("keep", step.for!);
     else if (step.op === "unsilence") await cw.unsilence("keep");
-    else if (step.op === "summary") assert.deepEqual(clone(await cw.jobSummary("keep")), step.summary, "summary");
+    else if (step.op === "summary") {
+      // `open` follows the stored state's key order, which Postgres's JSONB does not keep: compared as a set.
+      const sorted = (summary: { open: string[] }) => ({ ...summary, open: [...summary.open].sort() });
+      assert.deepEqual(sorted(clone((await cw.jobSummary("keep"))!)), sorted(step.summary as { open: string[] }), "summary");
+    }
     else if (step.op === "declareAndRun") {
       now = step.startedAt!;
       const handle = await cw.job("keep", step.declared).start({ id: step.id! });
