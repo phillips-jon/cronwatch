@@ -10,17 +10,18 @@ defmodule Cronwatch.Cron do
   ports do, so they agree on every expression they read, every one they
   refuse and every fire time.
 
-  Where it cannot match croner:
+  Two answers are the SDK's rather than croner's, as every port's are:
 
   - A date no month has (`0 0 30 2 *`) makes croner, which walks by
-    recursion a year at a time, run out of stack before the year 3000. This
-    port walks in a loop and answers that the expression never fires.
+    recursion a year at a time, run out of stack before the year 3000. The
+    SDK and this port answer that the expression never fires (this port
+    walks in a loop).
   - Croner reads a string with a colon after its first character as a
-    one-time date, through JavaScript's lenient `Date.parse`. This port
-    refuses every such string: one that looks like an ISO date with
-    "CronPattern: a one-time date is not supported by the Elixir port",
-    anything else with the message croner gives for text `Date.parse` cannot
-    read, "Invalid ISO8601 passed to timezone parser.".
+    one-time date, through JavaScript's lenient `Date.parse`. The SDK and
+    this port refuse every such string: one that looks like an ISO date with
+    "CronPattern: a one-time date is not supported", anything else with the
+    message croner gives for text `Date.parse` cannot read, "Invalid ISO8601
+    passed to timezone parser.".
   """
 
   alias Cronwatch.Cron.Date
@@ -41,7 +42,7 @@ defmodule Cronwatch.Cron do
       # Croner reads a string with a colon after its first character as a
       # one-time date to fire at, not as a cron expression.
       if iso_date?(text),
-        do: {:error, "CronPattern: a one-time date is not supported by the Elixir port"},
+        do: {:error, "CronPattern: a one-time date is not supported"},
         else: {:error, "Invalid ISO8601 passed to timezone parser."}
     else
       with {:ok, pattern} <- Pattern.new(text), do: {:ok, %__MODULE__{pattern: pattern, zone: zone}}

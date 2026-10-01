@@ -390,7 +390,7 @@ The Ecto store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cro
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
-A map given where the SDK keeps an object's order (a `budget`, metrics) is written in its keys' term order, since Elixir maps have none; a keyword list keeps the order given. The cron reader matches croner with two exceptions, both for schedules that never make sense: a date no month has (`0 0 30 2 *`) is a schedule that never fires, where croner gives up; and a one-time date in place of a cron expression (`2026-12-01T00:00:00`) is refused.
+A map given where the SDK keeps an object's order (a `budget`, metrics) is written in its keys' term order, since Elixir maps have none; a keyword list keeps the order given. The cron reader matches croner, and the SDK, on every schedule, including the two that never make sense (see [Schedules](/docs/schedules/#schedule-syntax)).
 
 ## Kept in step
 

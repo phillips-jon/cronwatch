@@ -348,7 +348,7 @@ Phase 1 has the first of these jobs' core: `elixir` on Elixir 1.18.5 with OTP 27
 
 What is known before any code, mostly shared with the Go and Rust ports; phase 5 completes the list.
 
-- The croner port answers that a schedule naming a date no month has (`0 0 30 2 *`) never fires, where croner runs out of stack; a one-time date string is refused (`CronPattern: a one-time date is not supported by the Elixir port`); a bad zone is refused when the expression is read rather than when a fire time is asked for. These are the Go and Rust ports' answers, for the same reasons.
+- A bad zone is refused when the expression is read rather than when a fire time is asked for. This is the Go and Rust ports' answer, for the same reason. (A date no month has, `0 0 30 2 *`, never fires, and a one-time date string is refused with `CronPattern: a one-time date is not supported`: these were differences until 1.0, when the SDK took the same answers.)
 - Zones come from tz's copy of the IANA database, which is as new as the tz release the app locked, where Node's comes with its ICU; a zone that changed its rules recently can differ until the app updates tz. Without a `timezone`, a cron is read in the zone `$TZ` or `/etc/localtime` names, else UTC.
 - Error names are Elixir module names (`RuntimeError`, `DBConnection.ConnectionError`), frames are `Module.function/arity (file:line)`, and a throw, an exit and `{:error, reason}` have forms of their own (see Rules), not JavaScript's classes.
 - `{:error, reason}` and `:error` returned from a job's function fail the run; the SDK has no such convention.
