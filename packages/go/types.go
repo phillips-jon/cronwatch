@@ -350,6 +350,9 @@ type SendingAlert struct {
 	raw     any
 	noUntil bool
 	noAlert bool
+	// read is the entry as read when it holds a key this release does not
+	// write, so a newer release's key is written back where it stood.
+	read *js.Object
 }
 
 // lapsed is whether the entry's lease ran out by now.
@@ -359,6 +362,7 @@ func (e SendingAlert) clone() SendingAlert {
 	c := e
 	c.Alert = e.Alert.clone()
 	c.raw = js.CloneValue(e.raw)
+	c.read = e.read.Clone()
 	return c
 }
 
@@ -366,8 +370,11 @@ func (e SendingAlert) jsValue() any {
 	if e.raw != nil || e.noUntil || e.noAlert {
 		return js.CloneValue(e.raw)
 	}
-	return js.NewObject("until", e.Until, "alert", e.Alert.JSValue())
+	return keepUnknown(js.NewObject("until", e.Until, "alert", e.Alert.JSValue()), e.read, sendingKeys)
 }
+
+// sendingKeys are the keys of an entry of sending this release writes.
+var sendingKeys = map[string]bool{"until": true, "alert": true}
 
 // sendingFrom reads an entry of "sending" leniently, as releaseSending
 // treats one: a malformed entry never makes the state unreadable.
@@ -401,7 +408,47 @@ func sendingFrom(v any) SendingAlert {
 	if e.noUntil || e.noAlert {
 		e.raw = o.Clone()
 	}
+	e.read = unknownOnly(o, sendingKeys)
 	return e
+}
+
+// unknownOnly is a copy of o when it has a key outside known, so a write
+// can keep it, and nil when it has none.
+func unknownOnly(o *js.Object, known map[string]bool) *js.Object {
+	for _, k := range o.Keys() {
+		if !known[k] {
+			return o.Clone()
+		}
+	}
+	return nil
+}
+
+// keepUnknown is written with what a newer release wrote, kept as the SDK
+// keeps an object it carries: the keys of read in their order, those this
+// release writes taking written's value (and left out where written leaves
+// them out), the others as they were read; then written's other keys.
+func keepUnknown(written, read *js.Object, known map[string]bool) *js.Object {
+	if read == nil {
+		return written
+	}
+	out := &js.Object{}
+	for _, k := range read.Keys() {
+		if known[k] {
+			if v, ok := written.Get(k); ok {
+				out.Set(k, v)
+			}
+			continue
+		}
+		v, _ := read.Get(k)
+		out.Set(k, js.CloneValue(v))
+	}
+	for _, k := range written.Keys() {
+		if !out.Has(k) {
+			v, _ := written.Get(k)
+			out.Set(k, v)
+		}
+	}
+	return out
 }
 
 // JobState is what the checks remember about a job between runs.
@@ -747,6 +794,12 @@ type Alert struct {
 	// rawAt is a stored at that is not a whole number (a foreign row's),
 	// written back and keyed as it was.
 	rawAt *float64
+	// read is the alert as read from a job's state when it holds a key
+	// this release does not write (one a newer release adds, at the top,
+	// in its details or in a breach) or is of a type this release does not
+	// know, so the queued alert is written back and retried with it, as
+	// the SDK carries the object it read.
+	read *js.Object
 }
 
 func (a Alert) clone() Alert {
@@ -757,6 +810,7 @@ func (a Alert) clone() Alert {
 	}
 	c.Definition = a.Definition.clone()
 	c.Triage = copyStr(a.Triage)
+	c.read = a.read.Clone()
 	// The details' slices and pointers too, so a channel that changes what
 	// it was given changes nothing another channel or a store holds.
 	switch d := a.Details.(type) {
@@ -787,12 +841,97 @@ func (a Alert) JSValue() any {
 	if a.Details != nil {
 		details = a.Details.jsValue()
 	}
+	if a.read != nil {
+		if _, other := a.Details.(otherDetails); other {
+			// An alert of a type this release does not know keeps its
+			// details as they were, whatever they are.
+			details, _ = a.read.Get("details")
+			details = js.CloneValue(details)
+		} else if do, ok := details.(*js.Object); ok {
+			ro, _ := a.read.Get("details")
+			details = keepDetails(a.Type, do, ro)
+		}
+	}
 	o := js.NewObject("type", string(a.Type), "run", run, "details", details, "job", a.Job,
 		"definition", a.Definition.JSValue(), "title", a.Title, "message", a.Message, "at", a.at())
 	if a.TriageTried || a.Triage != nil {
 		o.Set("triage", strOrNull(a.Triage))
 	}
-	return o
+	return keepUnknown(o, a.read, alertKeys)
+}
+
+// alertKeys are the keys of an alert this release writes.
+var alertKeys = map[string]bool{"type": true, "run": true, "details": true, "job": true, "definition": true,
+	"title": true, "message": true, "at": true, "triage": true}
+
+// detailKeys are the keys of each type's details this release writes.
+var detailKeys = map[AlertType]map[string]bool{
+	AlertMissed:     {"dueAt": true, "deadline": true, "graceMs": true, "lastRunAt": true},
+	AlertFailed:     {"consecutiveFailures": true, "threshold": true},
+	AlertStuck:      {"consecutiveFailures": true, "threshold": true},
+	AlertSlow:       {"durationMs": true, "thresholdMs": true, "basis": true},
+	AlertOverBudget: {"breaches": true},
+	AlertRecovered:  {"after": true, "reason": true, "since": true},
+}
+
+// breachKeys are the keys of a breach this release writes.
+var breachKeys = map[string]bool{"metric": true, "value": true, "limit": true, "basis": true}
+
+// keepDetails is a known type's details as written, with the keys a newer
+// release added to them, and to each breach of over_budget, as read.
+func keepDetails(t AlertType, written *js.Object, read any) any {
+	ro, ok := read.(*js.Object)
+	if !ok {
+		return written
+	}
+	if t == AlertOverBudget {
+		wl, _ := written.Get("breaches")
+		rl, _ := ro.Get("breaches")
+		wb, _ := wl.([]any)
+		rb, _ := rl.([]any)
+		if len(wb) == len(rb) {
+			list := make([]any, len(wb))
+			for i, b := range wb {
+				list[i] = b
+				bo, _ := b.(*js.Object)
+				if r, ok := rb[i].(*js.Object); ok && bo != nil {
+					list[i] = keepUnknown(bo, r, breachKeys)
+				}
+			}
+			written = written.Clone()
+			written.Set("breaches", list)
+		}
+	}
+	return keepUnknown(written, ro, detailKeys[t])
+}
+
+// otherDetails are the details of an alert of a type this release does not
+// know: a newer release's, written back as they were read.
+type otherDetails struct{}
+
+func (otherDetails) jsValue() any { return &js.Object{} }
+
+// keepsUnknown is whether an alert as read is of a type this release does
+// not know, or holds a key it does not write, at its top, in its details
+// or in a breach of over_budget.
+func keepsUnknown(t AlertType, o *js.Object) bool {
+	known, ok := detailKeys[t]
+	if !ok || unknownOnly(o, alertKeys) != nil {
+		return true
+	}
+	d, _ := get(o, "details").(*js.Object)
+	if unknownOnly(d, known) != nil {
+		return true
+	}
+	if t == AlertOverBudget {
+		list, _ := get(d, "breaches").([]any)
+		for _, b := range list {
+			if bo, ok := b.(*js.Object); ok && unknownOnly(bo, breachKeys) != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // at is the alert's time as stored: At, or a foreign row's fraction.
@@ -845,6 +984,9 @@ func alertFrom(v any) (Alert, error) {
 		a.TriageTried = true
 		a.Triage = nullableStr(o, "triage")
 	}
+	if keepsUnknown(a.Type, o) {
+		a.read = o.Clone()
+	}
 	return a, nil
 }
 
@@ -875,7 +1017,7 @@ func detailsFrom(t AlertType, o *js.Object) AlertDetails {
 		}
 		return d
 	}
-	return FailureDetails{}
+	return otherDetails{}
 }
 
 // Stats summarize a job's last twenty runs of any status; the percentiles
