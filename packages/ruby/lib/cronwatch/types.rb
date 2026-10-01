@@ -293,16 +293,13 @@ module Cronwatch
                         :undelivered, :version, :sending, :extra, keyword_init: true) do
     include Serializable
 
-    # The fields this version reads, as stored.
-    KNOWN = %w[job open consecutiveFailures silencedUntil lastAlertAt pendingRecovery undelivered version sending].freeze
-
     def self.from_h(hash)
       return hash if hash.is_a?(JobState)
 
       pending = Naming.fetch(hash, "pendingRecovery")
       undelivered = Naming.fetch(hash, "undelivered")
       sending = Naming.fetch(hash, "sending")
-      extra = hash.each_with_object({}) { |(k, v), out| out[k.to_s] = v unless KNOWN.include?(k.to_s) }
+      extra = hash.each_with_object({}) { |(k, v), out| out[k.to_s] = v unless JobState::KNOWN.include?(k.to_s) }
       new(
         extra: extra.empty? ? nil : extra,
         job: Naming.fetch(hash, "job"),
@@ -354,10 +351,14 @@ module Cronwatch
           entry.is_a?(Hash) ? entry.transform_values { |v| v.is_a?(Alert) ? v.to_h : v } : entry
         end
       end
-      extra&.each { |key, value| out[key] = value unless out.key?(key) || KNOWN.include?(key) }
+      extra&.each { |key, value| out[key] = value unless out.key?(key) || JobState::KNOWN.include?(key) }
       out
     end
   end
+
+  # The fields this version reads from a stored state; the rest are kept in `extra`.
+  # @api private
+  JobState::KNOWN = %w[job open consecutiveFailures silencedUntil lastAlertAt pendingRecovery undelivered version sending].freeze
 
   JobStats = Struct.new(:runs, :ok_rate, :p50_ms, :p95_ms, keyword_init: true) do
     include Serializable
