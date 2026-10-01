@@ -8,9 +8,12 @@
 //                   client hung up
 //   chunked         200 with "hello world" in two chunks, and the connection
 //                   left open after the last one
+//   chunkline       200 chunked, then a chunk-size line that never ends, as
+//                   fast as it is read, for at most 8 seconds; prints "sent <n>"
+//   continue        "100 Continue" blocks, one after another, the same way
 //   tls <cert>      over TLS with that certificate and key: 201 "ok"
 //
-//     php raw.php trickle|chunked|tls [cert.pem]
+//     php raw.php trickle|chunked|chunkline|continue|tls [cert.pem]
 
 declare(strict_types=1);
 
@@ -64,6 +67,22 @@ if ($mode === 'trickle') {
     // Left open: the client ends at the last chunk, not at the end of the stream.
     fread($client, 1);
     echo "done\n";
+} elseif ($mode === 'chunkline' || $mode === 'continue') {
+    // As fast as the client reads, for at most 8 seconds: a chunk-size line
+    // that never ends, or one "100 Continue" after another.
+    stream_set_blocking($client, true);
+    $piece = $mode === 'chunkline' ? str_repeat('f', 65536) : str_repeat("HTTP/1.1 100 Continue\r\n\r\n", 2048);
+    @fwrite($client, $mode === 'chunkline' ? "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" : '');
+    $until = microtime(true) + 8;
+    $sent = 0;
+    while (microtime(true) < $until) {
+        $n = @fwrite($client, $piece);
+        if ($n === false || $n === 0 || feof($client)) {
+            break;
+        }
+        $sent += $n;
+    }
+    echo "sent {$sent}\n";
 } elseif ($mode === 'tls') {
     fwrite($client, "HTTP/1.1 201 Created\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
     echo "done\n";
