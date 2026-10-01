@@ -41,7 +41,7 @@ defmodule Cronwatch.Web.GoldenTest do
     golden = JS.parse!(File.read!(@golden))
     assert Object.get(golden, "t0") == @t0, "golden.json's t0"
     captures = Object.get(golden, "captures")
-    assert length(captures) == 63, "golden.json's captures"
+    assert length(captures) == 66, "golden.json's captures"
 
     Enum.map(captures, fn c ->
       %{
@@ -51,9 +51,18 @@ defmodule Cronwatch.Web.GoldenTest do
         body: Object.get(c, "body"),
         status: Object.get(c, "status"),
         response_headers: Object.to_list(Object.get(c, "responseHeaders")),
-        response_body: Object.get(c, "responseBody")
+        response_body: placeholders(Object.get(c, "responseBody"))
       }
     end)
+  end
+
+  # GET /api names what is serving it; the fixture holds placeholders for
+  # each port's own values.
+  defp placeholders(body) do
+    body
+    |> String.replace("<library>", "cronwatch")
+    |> String.replace("<language>", "elixir")
+    |> String.replace("<version>", Cronwatch.version())
   end
 
   # The seed in golden.mjs, step for step.

@@ -45,11 +45,11 @@ defmodule Cronwatch.JobState do
           undelivered: [Alert.t()] | nil,
           sending: [sending()] | nil,
           version: integer() | nil,
-          extra: [{String.t(), JS.value()}]
+          extra: [{String.t(), Cronwatch.JS.Object.value()}]
         }
 
   @typedoc "An alert in the outbox (`sending`), held there while it is sent."
-  @type sending :: %{until: term(), alert: Alert.t() | nil, value: JS.value()}
+  @type sending :: %{until: term(), alert: Alert.t() | nil, value: Cronwatch.JS.Object.value()}
 
   @known [
     "job",
@@ -62,7 +62,8 @@ defmodule Cronwatch.JobState do
     "sending"
   ]
 
-  @doc "An outbox entry: `alert`, left to this process to send until `until`."
+  @doc false
+  # An outbox entry: `alert`, left to this process to send until `until`.
   @spec sending(Alert.t(), integer()) :: sending()
   def sending(%Alert{} = alert, until), do: %{until: until, alert: alert, value: nil}
 

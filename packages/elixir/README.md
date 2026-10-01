@@ -84,6 +84,8 @@ defmodule MyApp.StoreTest do
 end
 ```
 
+The `use` is what 1.x promises; the functions `Cronwatch.StoreCase` had besides are deprecated since 1.0.
+
 ### Alerts and triage
 
 The SDK's channels, request for request: `Cronwatch.Alerts.Slack`, `Discord`, `Webhook` (signed), `Resend`, `Postmark`, `SendGrid`, `Mailgun`, `SES`, `Twilio`, `Sentry`, `Honeybadger`, `Datadog`, `Rollbar`, `Bugsnag` and `NewRelic`, each given as `{module, opts}` with the SDK's options in snake_case, checked when the instance starts:
@@ -99,6 +101,8 @@ triage: {Cronwatch.Triage.Anthropic, context: "A Phoenix app with a Postgres dat
 ```
 
 Requests go through a small HTTP/1.1 client of the package's own, over OTP's `:gen_tcp` and `:ssl`, with one ten second deadline, redirects refused, at most 1 MiB of any answer read as it arrives, TLS always verified, and only a URL's origin in any error; no credential is printed by `inspect`. `transport:` on a channel or the instance takes a `Cronwatch.Transport` of your own (over Req or Finch, say). `Cronwatch.Triage.Anthropic` reads `ANTHROPIC_API_KEY` unless given `api_key:`.
+
+The webhook posts the alert with `"schema": 1` as its first field, the payload every CronWatch library sends ([its JSON Schema](https://cronwatch.dev/schemas/webhook/1.json)); read its fields, not `title` and `message`, whose wording is not promised. With a `secret:` it is signed, and `Cronwatch.Alerts.Webhook.signature(secret, raw_body)` gives a receiver the hex to compare with `Plug.Crypto.secure_compare/2`.
 
 ### pg_cron
 

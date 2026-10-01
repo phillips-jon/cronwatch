@@ -12,9 +12,9 @@ defmodule Cronwatch.Transport.HTTP do
     * A redirect is never followed: its 3xx is the answer, and the channel
       fails on it.
     * The answer's head is held to 64 KiB and 256 lines; its body is handed
-      to `Cronwatch.Alerts.Post` a chunk at a time as it arrives, whatever
+      to the channel's request a chunk at a time as it arrives, whatever
       the status and however it is framed (a `content-length`, chunked, or
-      up to the connection's close), so `Post` stops reading at 1 MiB.
+      up to the connection's close), so the request stops reading at 1 MiB.
     * No `accept-encoding` is sent and nothing is decompressed, so a
       compressed answer cannot grow in memory.
     * TLS is always verified: `verify: :verify_peer` against the system's

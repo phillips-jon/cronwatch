@@ -1,35 +1,36 @@
 defmodule Cronwatch.JSRE do
-  @moduledoc """
-  A small backtracking regular expression engine with JavaScript's semantics,
-  for the SDK's secret redaction patterns and a job's stored
-  `matches /source/flags` expect rule.
-
-  Elixir's `Regex` cannot run them the same way: it is PCRE, which counts in
-  bytes or code points, reads `$` as matching before a final newline, has its
-  own `\\s` and `\\b`, and moved from PCRE to PCRE2 with OTP 28. This engine
-  matches over UTF-16 code units, as V8 does without the `u` flag, so an emoji
-  counts as two characters to a bounded quantifier and to a negated class,
-  and the SDK's patterns are written here verbatim. It is the Go port's
-  `internal/jsre`, as carried over and hardened by the Rust port.
-
-  It reads the subset of JavaScript's syntax those patterns use, in
-  non-unicode mode: literals and escapes (`\\d \\s \\w \\b` and their
-  negations, `\\n \\t \\r \\f \\v \\0 \\xHH \\uHHHH`, and any escaped
-  punctuation), character classes with ranges and negation, capturing and
-  non-capturing groups, lookahead, fixed-length lookbehind, alternation,
-  greedy quantifiers (`? * + {n} {n,} {n,m}`), and the flags `g` and `i` (which
-  folds ASCII letters only, as JavaScript's `/i` without `u` does for
-  patterns whose letters are ASCII). What it does not implement it refuses
-  rather than read as something else: lazy quantifiers, named groups,
-  backreferences, `\\c`, `\\p{...}` and `\\u{...}`.
-
-  The bounds are the Rust port's: a pattern longer than 4096 characters, or
-  with groups nested more than 100 deep, is not read; and a match gives up
-  past 512 frames of recursion. A budgeted match (`try_match?/2`) gives up
-  past #{10_000_000} steps (each attempt at a node, and each code unit
-  a repeat scans), a fifth of the Rust port's budget, since a step costs the
-  BEAM far more.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # A small backtracking regular expression engine with JavaScript's semantics,
+  # for the SDK's secret redaction patterns and a job's stored
+  # `matches /source/flags` expect rule.
+  #
+  # Elixir's `Regex` cannot run them the same way: it is PCRE, which counts in
+  # bytes or code points, reads `$` as matching before a final newline, has its
+  # own `\\s` and `\\b`, and moved from PCRE to PCRE2 with OTP 28. This engine
+  # matches over UTF-16 code units, as V8 does without the `u` flag, so an emoji
+  # counts as two characters to a bounded quantifier and to a negated class,
+  # and the SDK's patterns are written here verbatim. It is the Go port's
+  # `internal/jsre`, as carried over and hardened by the Rust port.
+  #
+  # It reads the subset of JavaScript's syntax those patterns use, in
+  # non-unicode mode: literals and escapes (`\\d \\s \\w \\b` and their
+  # negations, `\\n \\t \\r \\f \\v \\0 \\xHH \\uHHHH`, and any escaped
+  # punctuation), character classes with ranges and negation, capturing and
+  # non-capturing groups, lookahead, fixed-length lookbehind, alternation,
+  # greedy quantifiers (`? * + {n} {n,} {n,m}`), and the flags `g` and `i` (which
+  # folds ASCII letters only, as JavaScript's `/i` without `u` does for
+  # patterns whose letters are ASCII). What it does not implement it refuses
+  # rather than read as something else: lazy quantifiers, named groups,
+  # backreferences, `\\c`, `\\p{...}` and `\\u{...}`.
+  #
+  # The bounds are the Rust port's: a pattern longer than 4096 characters, or
+  # with groups nested more than 100 deep, is not read; and a match gives up
+  # past 512 frames of recursion. A budgeted match (`try_match?/2`) gives up
+  # past #{10_000_000} steps (each attempt at a node, and each code unit
+  # a repeat scans), a fifth of the Rust port's budget, since a step costs the
+  # BEAM far more.
 
   import Bitwise
 

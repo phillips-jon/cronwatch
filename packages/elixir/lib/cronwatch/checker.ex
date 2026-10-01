@@ -58,7 +58,7 @@ defmodule Cronwatch.Checker do
 
     if config.deliver == :check and Cronwatch.Runs.flag(s.instance, :warned_deferred_start) do
       Logger.warning(
-        "[cronwatch] start() was called with deliver: :check, so these checks send no alerts. " <>
+        "[cronwatch] start_checking() was called with deliver: :check, so these checks send no alerts. " <>
           "Another process must run checks with deliver: :now (the default) to send them."
       )
     end

@@ -41,6 +41,38 @@ defmodule Cronwatch.Web.EnvTest do
 
   defp announced(out), do: out |> String.split("\n") |> Enum.filter(&String.starts_with?(&1, "[cronwatch]"))
 
+  test "the environment: CRONWATCH_ENV, then APP_ENV, then MIX_ENV, trimmed and lowercased" do
+    # The SDK's env.test.ts table, MIX_ENV in NODE_ENV's place.
+    cases = [
+      {nil, nil, nil, nil},
+      {nil, nil, "development", "development"},
+      {nil, nil, "test", "development"},
+      {nil, nil, "production", "production"},
+      {nil, "local", "production", "development"},
+      {"production", "dev", "development", "production"},
+      {"staging", nil, "development", "staging"},
+      {"  PROD ", nil, nil, "production"},
+      {nil, "Testing", nil, "development"},
+      {nil, "DEV", nil, "development"},
+      {"", "   ", "production", "production"},
+      {" \t", nil, nil, nil}
+    ]
+
+    for {cronwatch_env, app_env, mix_env, want} <- cases do
+      vars =
+        Enum.reject(
+          [{"CRONWATCH_ENV", cronwatch_env}, {"APP_ENV", app_env}, {"MIX_ENV", mix_env}],
+          &(elem(&1, 1) == nil)
+        )
+
+      with_env(vars, fn ->
+        assert Cronwatch.Env.environment() == want, inspect(vars)
+        assert Cronwatch.Env.development?() == (want == "development"), inspect(vars)
+        assert Cronwatch.Env.production?() == (want == "production"), inspect(vars)
+      end)
+    end
+  end
+
   test "the dashboard is locked without a token outside development" do
     %{cw: cw} = make()
 

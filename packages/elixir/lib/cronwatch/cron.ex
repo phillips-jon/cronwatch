@@ -1,27 +1,29 @@
 defmodule Cronwatch.Cron do
-  @moduledoc """
-  A port of croner 10, the cron library the SDK uses: its reading of an
-  expression (`Cronwatch.Cron.Pattern`, with its checks and its messages
-  word for word) and its walk to the next matching time
-  (Cronwatch.Cron.Date, internal), habits included: a day the month does not have
-  rolls over, a wall-clock time in a spring-forward gap moves forward by the
-  gap, and a time that happens twice is the earlier one. The names and the
-  order of every step follow croner's source, as the Go, Python, PHP and Rust
-  ports do, so they agree on every expression they read, every one they
-  refuse and every fire time.
-
-  Where it cannot match croner:
-
-  - A date no month has (`0 0 30 2 *`) makes croner, which walks by
-    recursion a year at a time, run out of stack before the year 3000. This
-    port walks in a loop and answers that the expression never fires.
-  - Croner reads a string with a colon after its first character as a
-    one-time date, through JavaScript's lenient `Date.parse`. This port
-    refuses every such string: one that looks like an ISO date with
-    "CronPattern: a one-time date is not supported by the Elixir port",
-    anything else with the message croner gives for text `Date.parse` cannot
-    read, "Invalid ISO8601 passed to timezone parser.".
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # A port of croner 10, the cron library the SDK uses: its reading of an
+  # expression (`Cronwatch.Cron.Pattern`, with its checks and its messages
+  # word for word) and its walk to the next matching time
+  # (Cronwatch.Cron.Date, internal), habits included: a day the month does not have
+  # rolls over, a wall-clock time in a spring-forward gap moves forward by the
+  # gap, and a time that happens twice is the earlier one. The names and the
+  # order of every step follow croner's source, as the Go, Python, PHP and Rust
+  # ports do, so they agree on every expression they read, every one they
+  # refuse and every fire time.
+  #
+  # Two answers are the SDK's rather than croner's, as every port's are:
+  #
+  # - A date no month has (`0 0 30 2 *`) makes croner, which walks by
+  #   recursion a year at a time, run out of stack before the year 3000. The
+  #   SDK and this port answer that the expression never fires (this port
+  #   walks in a loop).
+  # - Croner reads a string with a colon after its first character as a
+  #   one-time date, through JavaScript's lenient `Date.parse`. The SDK and
+  #   this port refuse every such string: one that looks like an ISO date with
+  #   "CronPattern: a one-time date is not supported", anything else with the
+  #   message croner gives for text `Date.parse` cannot read, "Invalid ISO8601
+  #   passed to timezone parser.".
 
   alias Cronwatch.Cron.Date
   alias Cronwatch.Cron.Pattern
@@ -41,7 +43,7 @@ defmodule Cronwatch.Cron do
       # Croner reads a string with a colon after its first character as a
       # one-time date to fire at, not as a cron expression.
       if iso_date?(text),
-        do: {:error, "CronPattern: a one-time date is not supported by the Elixir port"},
+        do: {:error, "CronPattern: a one-time date is not supported"},
         else: {:error, "Invalid ISO8601 passed to timezone parser."}
     else
       with {:ok, pattern} <- Pattern.new(text), do: {:ok, %__MODULE__{pattern: pattern, zone: zone}}

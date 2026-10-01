@@ -239,19 +239,15 @@ defmodule Cronwatch do
   records nothing and answers a handle on that run. Store failures go to the
   error handler; it never fails for them.
 
-  Called with a keyword list instead of a job, it is the SDK's `start()`:
-  checks on an interval (`every:`, default a minute), for an instance
-  started without `check_every`.
+  Called with a keyword list instead of a job, it is `start_checking/1`, a
+  form deprecated since 1.0 (it warns once each call) and removed in 2.0.
   """
   @spec start(Job.t() | String.t() | keyword(), keyword()) :: {:ok, RunHandle.t()} | {:error, Error.t()} | :ok
-  def start(job_or_opts \\ [], opts \\ [])
+  def start(job_or_opts, opts \\ [])
 
   def start(opts, []) when is_list(opts) do
-    inst = instance(opts)
-
-    with {:ok, ms} <- Options.duration_ms(Keyword.get(opts, :every, "1m"), "check interval") do
-      Checker.start(inst, ms |> max(5_000) |> min(2_147_483_647) |> Cronwatch.JS.to_int())
-    end
+    IO.warn("Cronwatch.start/1 with a keyword list is deprecated, use Cronwatch.start_checking/1 instead")
+    start_checking(opts)
   end
 
   def start(job, opts) do
@@ -259,7 +255,27 @@ defmodule Cronwatch do
     RunHandle.start(resolve!(job, [], run_opts), opts)
   end
 
-  @doc "Stops the interval `start/1` began."
+  @doc "`start_checking/1` with its defaults, by its old name."
+  @deprecated "Use Cronwatch.start_checking/1 instead"
+  @spec start() :: :ok | {:error, Error.t()}
+  def start, do: start_checking([])
+
+  @doc """
+  Checks on an interval, for an instance started without `check_every`: the
+  SDK's `startChecking()`. Options: `every` (a duration, default a minute,
+  five seconds at least) and `instance`. A second call while it runs is
+  ignored; `stop/1` stops it.
+  """
+  @spec start_checking(keyword()) :: :ok | {:error, Error.t()}
+  def start_checking(opts \\ []) do
+    inst = instance(opts)
+
+    with {:ok, ms} <- Options.duration_ms(Keyword.get(opts, :every, "1m"), "check interval") do
+      Checker.start(inst, ms |> max(5_000) |> min(2_147_483_647) |> Cronwatch.JS.to_int())
+    end
+  end
+
+  @doc "Stops the interval `start_checking/1` began."
   @spec stop(keyword()) :: :ok
   def stop(opts \\ []), do: Checker.stop(instance(opts))
 
@@ -286,8 +302,9 @@ defmodule Cronwatch do
 
   @doc """
   Records a run that happened outside this process, for a source: the SDK's
-  `recordRun()`. Its job must be declared first, and every metric must be a
-  finite number, as with `metric/3` (else nothing is recorded). Runs are
+  `recordRun()`. Its job must be declared first, its id 1 to 200
+  characters with no NUL, and every metric a finite number, as with
+  `metric/3` (else nothing is recorded). Runs are
   keyed by id: a new one is inserted, a stored one still running (or marked
   timeout by a check) is finished when this one is not running, and anything
   else is left alone.

@@ -122,7 +122,8 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     @known [:repo, :dynamic_repo, :query, :jobs, :job_ids, :pick, :prefix, :job_name, :options, :timezone]
 
-    @doc "How long a queued run is held before it is copied as running: ten minutes, in milliseconds."
+    @doc false
+    # How long a queued run is held before it is copied as running: ten minutes, in milliseconds.
     @spec hold_ms() :: pos_integer()
     def hold_ms, do: @hold_ms
 
@@ -131,13 +132,12 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
 
     ## The SDK's helpers
 
-    @doc """
-    A pg_cron schedule as a CronWatch one: a cron expression, `$` for the
-    last day of the month read as `L`, or `N seconds` as `every Ns`. pg_cron
-    reads only the first five fields of an expression and ignores the rest,
-    so only those are kept (a sixth would otherwise be read as seconds). nil
-    for one that has no cadence to watch (`@reboot`).
-    """
+    @doc false
+    # A pg_cron schedule as a CronWatch one: a cron expression, `$` for the
+    # last day of the month read as `L`, or `N seconds` as `every Ns`. pg_cron
+    # reads only the first five fields of an expression and ignores the rest,
+    # so only those are kept (a sixth would otherwise be read as seconds). nil
+    # for one that has no cadence to watch (`@reboot`).
     @spec schedule(String.t()) :: String.t() | nil
     def schedule(schedule) when is_binary(schedule) do
       text = JS.trim(schedule)
@@ -204,12 +204,11 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       end
     end
 
-    @doc """
-    The default CronWatch name for a pg_cron job, before the prefix: its
-    jobname with each run of anything other than letters, digits, `.`, `_`,
-    `:` and `-` turned into `-`, leading punctuation dropped, at most 100
-    characters, or `pg_cron:<jobid>` when nothing is left.
-    """
+    @doc false
+    # The default CronWatch name for a pg_cron job, before the prefix: its
+    # jobname with each run of anything other than letters, digits, `.`, `_`,
+    # `:` and `-` turned into `-`, leading punctuation dropped, at most 100
+    # characters, or `pg_cron:<jobid>` when nothing is left.
     @spec job_name(Job.t() | map()) :: String.t()
     def job_name(%{job_id: id} = job) do
       {cleaned, _} =
@@ -236,16 +235,15 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     defp alnum?(c), do: c in ?a..?z or c in ?A..?Z or c in ?0..?9
     defp safe?(c), do: alnum?(c) or c in [?., ?_, ?:, ?-]
 
-    @doc """
-    A row of `cron.job_run_details` as a CronWatch run, or nil for one that
-    has not started (no start time, not finished). The row is a map of the
-    table's columns (`"runid"`, `"jobid"`, `"status"`, `"return_message"`,
-    `"start_time"`, `"end_time"`), times as `DateTime`s, epoch milliseconds
-    or ISO text. A finished row with no start time (pg_cron writes these for
-    runs a server restart cut off, "server restarted") starts at its end
-    time, else at `fallback_at` (the source passes the job's newest run's
-    start, or now).
-    """
+    @doc false
+    # A row of `cron.job_run_details` as a CronWatch run, or nil for one that
+    # has not started (no start time, not finished). The row is a map of the
+    # table's columns (`"runid"`, `"jobid"`, `"status"`, `"return_message"`,
+    # `"start_time"`, `"end_time"`), times as `DateTime`s, epoch milliseconds
+    # or ISO text. A finished row with no start time (pg_cron writes these for
+    # runs a server restart cut off, "server restarted") starts at its end
+    # time, else at `fallback_at` (the source passes the job's newest run's
+    # start, or now).
     @spec run_of(map(), String.t(), String.t(), integer()) :: Run.t() | nil
     def run_of(row, job, id_prefix, fallback_at) do
       status = text(row["status"])

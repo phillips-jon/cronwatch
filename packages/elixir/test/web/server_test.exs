@@ -67,7 +67,7 @@ defmodule Cronwatch.Web.ServerTest do
 
       json = [{"host", "app.test"}, {"authorization", "Bearer tok"}, {"content-type", "application/json"}]
       {200, _, body} = HTTP.request(port, "POST", "/cronwatch/api/jobs/x/silence", json, ~s({"for":"2h"}))
-      assert body |> JS.parse!() |> Object.get("state") |> Object.get("silencedUntil") == @t0 + 2 * @hour, label
+      assert body |> JS.parse!() |> Object.get("job") |> Object.get("silencedUntil") == @t0 + 2 * @hour, label
 
       if label == "phoenix" do
         # Phoenix's parsers read the body first, under the endpoint's own

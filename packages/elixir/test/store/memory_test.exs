@@ -12,7 +12,7 @@ defmodule Cronwatch.Store.MemoryTest do
     start_supervised!({Memory, name: name})
     {:ok, a} = Memory.new([server: name], :one)
     {:ok, b} = Memory.new([server: name], :two)
-    run = Cronwatch.StoreCase.new_run("r", "j", "running", 1)
+    run = Cronwatch.StoreCase.test_run("r", "j", "running", 1)
     :ok = Memory.insert_run(a, run)
     assert {:ok, ^run} = Memory.get_run(b, "r")
   end

@@ -155,7 +155,7 @@ defmodule Cronwatch.CorrectnessTest do
   test "stop cancels the first check start scheduled" do
     %{cw: cw} = make()
     ref = events(cw, [[:cronwatch, :check, :start]])
-    :ok = Cronwatch.start(instance: cw)
+    :ok = Cronwatch.start_checking(instance: cw)
     :ok = Cronwatch.stop(instance: cw)
     Process.sleep(1_300)
     refute_received {:event, ^ref, _, _, _}

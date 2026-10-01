@@ -168,7 +168,7 @@ defmodule Cronwatch.ScheduleTest do
 
   test "one-time dates are refused" do
     for {text, want} <- [
-          {"2026-12-01T00:00:00", "CronPattern: a one-time date is not supported by the Elixir port"},
+          {"2026-12-01T00:00:00", "CronPattern: a one-time date is not supported"},
           {"0 2:30 * * *", "Invalid ISO8601 passed to timezone parser."}
         ] do
       {:error, err} = Schedule.parse(text, nil)

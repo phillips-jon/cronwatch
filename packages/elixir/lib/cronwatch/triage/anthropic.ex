@@ -78,10 +78,12 @@ defmodule Cronwatch.Triage.Anthropic do
 
   @type t :: %__MODULE__{}
 
-  @doc "The model triage asks unless told otherwise."
+  @doc false
+  # The model triage asks unless told otherwise.
   def default_model, do: @default_model
 
-  @doc "The system prompt, the SDK's word for word."
+  @doc false
+  # The system prompt, the SDK's word for word.
   def system, do: @system
 
   @doc "Checks the options once, when the instance starts: an API key must be given or in `ANTHROPIC_API_KEY`."

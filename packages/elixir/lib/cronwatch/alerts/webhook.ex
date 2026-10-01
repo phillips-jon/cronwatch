@@ -8,7 +8,12 @@ defmodule Cronwatch.Alerts.Webhook do
        secret: System.fetch_env!("CRONWATCH_WEBHOOK_SECRET"),
        headers: [{"authorization", "Bearer " <> token}]}
 
-  The body is the alert as the SDK writes it (`Cronwatch.Alert.to_json/1`).
+  The body is `{"schema":1,` followed by the alert as the SDK writes it
+  (`Cronwatch.Alert.to_json/1`): `schema` is the payload's version, which
+  goes up only if a major release changes the payload in a way that is not
+  additive. The payload's JSON Schema is
+  <https://cronwatch.dev/schemas/webhook/1.json>; a receiver reads its
+  fields, not `title` and `message`, whose wording is not promised.
 
   Options:
 
@@ -65,6 +70,16 @@ defmodule Cronwatch.Alerts.Webhook do
   @impl true
   def name(_), do: "webhook"
 
+  # The payload's version, sent as its first field.
+  @schema 1
+
+  @doc false
+  @spec body(Alert.t()) :: String.t()
+  def body(%Alert{} = alert) do
+    %JS.Object{pairs: pairs} = Alert.to_value(alert)
+    JS.stringify(%JS.Object{pairs: [{"schema", @schema} | pairs]})
+  end
+
   @doc """
   The webhook's signature of a body: the HMAC-SHA256 of the body with the
   secret, as lowercase hex. The request carries it as
@@ -76,7 +91,7 @@ defmodule Cronwatch.Alerts.Webhook do
 
   @impl true
   def send(%__MODULE__{} = o, %Alert{} = alert, ctx) do
-    body = Alert.to_json(alert)
+    body = body(alert)
     headers = [{"content-type", "application/json"}, {"user-agent", "cronwatch"}]
 
     # A pasted Authorization value often carries a stray space or newline,

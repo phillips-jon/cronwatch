@@ -19,8 +19,10 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     published package cannot read from the repository, so the caller hands
     it in; without it the replay is left out.
 
-    The functions `contract/1` and `replay_fixture/2` can also be called from
-    a test of your own.
+    `use Cronwatch.StoreCase` is what 1.x promises. The functions this
+    module had besides (`contract`, `replay_fixture`, `make`, `scenarios`,
+    `new_run` and `canonical`) are deprecated since 1.0 and go in 2.0: the
+    tests the template defines run what they ran.
     """
 
     use ExUnit.CaseTemplate
@@ -39,21 +41,21 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
 
       quote do
         @doc false
-        def __cronwatch_store__, do: Cronwatch.StoreCase.make(unquote(store))
+        def __cronwatch_store__, do: Cronwatch.StoreCase.store_for(unquote(store))
 
         test "store conformance" do
-          Cronwatch.StoreCase.contract(__cronwatch_store__())
+          Cronwatch.StoreCase.run_contract(__cronwatch_store__())
         end
 
         if unquote(fixture != nil) do
           test "conformance/store.json" do
-            assert Cronwatch.StoreCase.replay_fixture(unquote(fixture), &__cronwatch_store__/0) > 0
+            assert Cronwatch.StoreCase.run_replay(unquote(fixture), &__cronwatch_store__/0) > 0
           end
         end
 
         # Scenarios over several instances on one store (the SDK's
         # finish-once tests, a client end to end). See scenarios/0.
-        for {name, _} <- Cronwatch.StoreCase.scenarios() do
+        for {name, _} <- Cronwatch.StoreCase.scenario_list() do
           @cronwatch_scenario name
           test name do
             Cronwatch.StoreCase.scenario(@cronwatch_scenario, &__cronwatch_store__/0)
@@ -62,15 +64,19 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       end
     end
 
-    @doc """
-    Where the scenarios over several instances sharing one store go (the
-    SDK's finish-once tests, a client end to end): a list of `{name, fun}`,
-    each `fun` given the zero-arity function that makes a store. Each
-    scenario makes one store and runs several instances over it (through
-    `Cronwatch.StoreCase.Shared`), as several processes share one database.
-    """
+    @doc false
+    @deprecated "use Cronwatch.StoreCase, which runs the scenarios"
     @spec scenarios() :: [{String.t(), ((-> Store.t()) -> term())}]
-    def scenarios do
+    def scenarios, do: scenario_list()
+
+    @doc false
+    # Where the scenarios over several instances sharing one store go (the
+    # SDK's finish-once tests, a client end to end): a list of `{name, fun}`,
+    # each `fun` given the zero-arity function that makes a store. Each
+    # scenario makes one store and runs several instances over it (through
+    # Cronwatch.StoreCase.Shared), as several processes share one database.
+    @spec scenario_list() :: [{String.t(), ((-> Store.t()) -> term())}]
+    def scenario_list do
       [
         {"two instances finishing one run: one records and judges it, the other reports it already finished",
          &two_finishing_one_run/1},
@@ -229,19 +235,23 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
 
     @doc false
     def scenario(name, make) do
-      {_, fun} = List.keyfind(scenarios(), name, 0)
+      {_, fun} = List.keyfind(scenario_list(), name, 0)
       fun.(make)
     end
 
-    @doc """
-    A store from a `store:` option: `{module, opts}` made with `module.new/2`
-    (and started under the running test when the module has `child_spec/1`),
-    or a zero-arity function answering `{module, handle}`.
-    """
+    @doc false
+    @deprecated "use Cronwatch.StoreCase with store:, which makes the stores"
     @spec make(term()) :: Store.t()
-    def make(fun) when is_function(fun, 0), do: fun.()
+    def make(store), do: store_for(store)
 
-    def make({module, opts}) do
+    @doc false
+    # A store from a `store:` option: `{module, opts}` made with `module.new/2`
+    # (and started under the running test when the module has `child_spec/1`),
+    # or a zero-arity function answering `{module, handle}`.
+    @spec store_for(term()) :: Store.t()
+    def store_for(fun) when is_function(fun, 0), do: fun.()
+
+    def store_for({module, opts}) do
       Code.ensure_loaded(module)
       instance = Module.concat(__MODULE__, "S#{System.unique_integer([:positive])}")
 
@@ -260,14 +270,18 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       {module, handle}
     end
 
-    def make(module) when is_atom(module), do: make({module, []})
+    def store_for(module) when is_atom(module), do: store_for({module, []})
 
-    @doc """
-    A run as the contract test writes them: finished ten milliseconds after
-    it started unless it is running, with one metric.
-    """
+    @doc false
+    @deprecated "build a %Cronwatch.Run{} of your own"
     @spec new_run(String.t(), String.t(), String.t(), integer()) :: Run.t()
-    def new_run(id, job, status, started_at) do
+    def new_run(id, job, status, started_at), do: test_run(id, job, status, started_at)
+
+    @doc false
+    # A run as the contract test writes them: finished ten milliseconds after
+    # it started unless it is running, with one metric.
+    @spec test_run(String.t(), String.t(), String.t(), integer()) :: Run.t()
+    def test_run(id, job, status, started_at) do
       finished = status != "running"
 
       %Run{
@@ -282,20 +296,22 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       }
     end
 
-    @doc """
-    JSON text with every object's keys sorted, so two values compare
-    whatever order a JSON column (Postgres's JSONB) gave an object's keys
-    back in.
-    """
-    @spec canonical(String.t() | JS.value()) :: String.t()
-    def canonical(text) when is_binary(text) do
+    @doc false
+    @deprecated "compare JSON values of your own"
+    @spec canonical(String.t() | Cronwatch.JS.Object.value()) :: String.t()
+    def canonical(v), do: canonical_json(v)
+
+    # JSON text with every object's keys sorted, so two values compare
+    # whatever order a JSON column (Postgres's JSONB) gave an object's keys
+    # back in.
+    defp canonical_json(text) when is_binary(text) do
       case JS.parse(text) do
         {:ok, v} -> sorted(v)
         {:error, _} -> text
       end
     end
 
-    def canonical(v), do: sorted(v)
+    defp canonical_json(v), do: sorted(v)
 
     defp sorted(%Object{pairs: pairs}) do
       body =
@@ -310,7 +326,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     defp sorted(v), do: JS.stringify(v)
 
     defp same_json(what, got, want) do
-      assert canonical(got) == canonical(want), "#{what}:\n got #{got}\nwant #{want}"
+      assert canonical_json(got) == canonical_json(want), "#{what}:\n got #{got}\nwant #{want}"
     end
 
     defp must({:ok, v}), do: v
@@ -331,13 +347,17 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     defp json_of(nil, _), do: "null"
     defp json_of(v, fun), do: fun.(v)
 
-    @doc """
-    The contract test: `store-conformance.ts`, step for step, against one
-    store, which must be empty. Fails the running test, as an assertion
-    does, at the first thing the store gets wrong.
-    """
+    @doc false
+    @deprecated "use Cronwatch.StoreCase, which runs the contract"
     @spec contract(Store.t()) :: :ok
-    def contract({module, _} = store) do
+    def contract(store), do: run_contract(store)
+
+    @doc false
+    # The contract test: `store-conformance.ts`, step for step, against one
+    # store, which must be empty. Fails the running test, as an assertion
+    # does, at the first thing the store gets wrong.
+    @spec run_contract(Store.t()) :: :ok
+    def run_contract({module, _} = store) do
       if function_exported?(module, :init, 1), do: must(c(store, :init))
       assert must(c(store, :get_job, ["a"])) == nil, "no job yet"
       must(c(store, :upsert_job, [definition(~s({"name":"a","schedule":"every 5m"})), 100]))
@@ -351,12 +371,12 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       assert names == ["B", "_c", "a", "b"], "byte order, not locale"
 
       for r <- [
-            new_run("r1", "a", "ok", 1000),
-            new_run("r2", "a", "failed", 2000),
-            new_run("r3", "a", "running", 3000),
-            new_run("r4", "b", "ok", 1500),
-            new_run("rb", "B", "running", 2000),
-            new_run("rc", "_c", "running", 2000)
+            test_run("r1", "a", "ok", 1000),
+            test_run("r2", "a", "failed", 2000),
+            test_run("r3", "a", "running", 3000),
+            test_run("r4", "b", "ok", 1500),
+            test_run("rb", "B", "running", 2000),
+            test_run("rc", "_c", "running", 2000)
           ],
           do: must(c(store, :insert_run, [r]))
 
@@ -369,7 +389,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       same_json("metrics", JS.stringify(r1.metrics), ~s({"n":1}))
       assert r1.duration_ms == 10
 
-      updated = %{new_run("r3", "a", "ok", 3000) | output: "line1\nline2", metrics: Object.new([{"cost", 0.25}])}
+      updated = %{test_run("r3", "a", "ok", 3000) | output: "line1\nline2", metrics: Object.new([{"cost", 0.25}])}
       must(c(store, :update_run, [updated]))
       r3 = must(c(store, :get_run, ["r3"]))
       assert r3.status == "ok"
@@ -379,21 +399,21 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
 
       # update_run_if writes only over a row whose status is one of those
       # given, and says whether it did.
-      assert {:error, _} = c(store, :insert_run, [new_run("r3", "a", "running", 3000)]),
+      assert {:error, _} = c(store, :insert_run, [test_run("r3", "a", "running", 3000)]),
              "an id already recorded is refused"
 
       must(c(store, :upsert_job, [definition(~s({"name":"q"})), 300]))
-      must(c(store, :insert_run, [new_run("rx", "q", "running", 2500)]))
+      must(c(store, :insert_run, [test_run("rx", "q", "running", 2500)]))
 
       if Store.has?(store, :update_run_if, 2) do
-        first = %{new_run("rx", "q", "failed", 2500) | error: "first"}
+        first = %{test_run("rx", "q", "failed", 2500) | error: "first"}
         assert must(c(store, :update_run_if, [first, ["running"]])) == true
-        second = %{new_run("rx", "q", "ok", 2500) | output: "second"}
+        second = %{test_run("rx", "q", "ok", 2500) | output: "second"}
         assert must(c(store, :update_run_if, [second, ["running"]])) == false, "a second finish is refused"
         assert must(c(store, :get_run, ["rx"])).error == "first"
-        late = %{new_run("rx", "q", "ok", 2500) | output: "late"}
+        late = %{test_run("rx", "q", "ok", 2500) | output: "late"}
         assert must(c(store, :update_run_if, [late, ["running", "timeout"]])) == false
-        must(c(store, :update_run, [%{new_run("rx", "q", "timeout", 2500) | error: "stuck"}]))
+        must(c(store, :update_run, [%{test_run("rx", "q", "timeout", 2500) | error: "stuck"}]))
         late = %{late | metrics: Object.new([{"m", 2}])}
         assert must(c(store, :update_run_if, [late, ["running", "timeout"]])) == true, "any of the statuses given"
 
@@ -404,11 +424,11 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
             ~s("error":null,"output":"late","metrics":{"m":2},"trigger":"run"})
         )
 
-        missing = new_run("missing", "q", "ok", 1)
+        missing = test_run("missing", "q", "ok", 1)
         assert must(c(store, :update_run_if, [missing, ["running"]])) == false, "a run not there is not written"
         assert must(c(store, :get_run, ["missing"])) == nil
 
-        assert must(c(store, :update_run_if, [new_run("rx", "q", "failed", 2500), []])) == false,
+        assert must(c(store, :update_run_if, [test_run("rx", "q", "failed", 2500), []])) == false,
                "no statuses, no write"
 
         assert must(c(store, :get_run, ["rx"])).status == "ok"
@@ -417,7 +437,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       # delete_run_if, for a store that has it, takes back only a run still
       # of the job and in the status given.
       if Store.has?(store, :delete_run_if, 3) do
-        must(c(store, :insert_run, [new_run("rd", "q", "running", 2600)]))
+        must(c(store, :insert_run, [test_run("rd", "q", "running", 2600)]))
         assert must(c(store, :delete_run_if, ["rd", "a", "running"])) == false, "not another job's"
         assert must(c(store, :delete_run_if, ["rd", "q", "ok"])) == false, "not in another status"
         assert must(c(store, :delete_run_if, ["rx", "q", "running"])) == false, "not a finished run"
@@ -432,7 +452,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       # Forgetting a job while one of its runs is in flight: the run
       # finishing later changes nothing.
       must(c(store, :delete_job, ["B"]))
-      must(c(store, :update_run, [%{new_run("rb", "B", "ok", 2000) | output: "late"}]))
+      must(c(store, :update_run, [%{test_run("rb", "B", "ok", 2000) | output: "late"}]))
       assert must(c(store, :get_run, ["rb"])) == nil, "a forgotten run stays gone"
       assert must(c(store, :list_runs, ["B", 10])) == []
       assert ids(must(c(store, :running_runs))) == ["rc"]
@@ -507,7 +527,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
         must(c(store, :delete_job, ["w"]))
       end
 
-      must(c(store, :insert_run, [new_run("r5", "a", "running", 500)]))
+      must(c(store, :insert_run, [test_run("r5", "a", "running", 500)]))
       assert must(c(store, :prune, [2500])) == 2, "r1 and r2 pruned; running r5 kept, and b's r4 kept"
       assert ids(must(c(store, :list_runs, ["a", 10]))) == ["r3", "r5"]
       assert ids(must(c(store, :list_runs, ["b", 10]))) == ["r4"]
@@ -540,15 +560,19 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
       if function_exported?(module, :close, 1), do: must(c(store, :close))
     end
 
-    @doc """
-    Replays the store cases of `conformance/store.json` (its text) against
-    stores from `make`, a zero-arity function answering an empty store each
-    call: prune scripts, `compare_and_set_state` steps and `update_run_if`
-    steps, each read back and compared with what the SDK's memory store
-    answered. Answers how many cases were replayed.
-    """
+    @doc false
+    @deprecated "use Cronwatch.StoreCase with fixture:, which replays it"
     @spec replay_fixture(String.t(), (-> Store.t())) :: pos_integer()
-    def replay_fixture(text, make) do
+    def replay_fixture(text, make), do: run_replay(text, make)
+
+    @doc false
+    # Replays the store cases of `conformance/store.json` (its text) against
+    # stores from `make`, a zero-arity function answering an empty store each
+    # call: prune scripts, `compare_and_set_state` steps and `update_run_if`
+    # steps, each read back and compared with what the SDK's memory store
+    # answered. Answers how many cases were replayed.
+    @spec run_replay(String.t(), (-> Store.t())) :: pos_integer()
+    def run_replay(text, make) do
       fix = JS.parse!(text)
 
       prune =
@@ -615,7 +639,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
 
       store = make.()
       init(store)
-      must(c(store, :insert_run, [%{new_run("u1", "a", "running", 1000) | metrics: Object.new()}]))
+      must(c(store, :insert_run, [%{test_run("u1", "a", "running", 1000) | metrics: Object.new()}]))
 
       update =
         fix
@@ -712,14 +736,15 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
 end
 
 defmodule Cronwatch.StoreCase.Shared do
-  @moduledoc """
-  A store made elsewhere, handed to an instance as it is:
-  `store: {Cronwatch.StoreCase.Shared, store: {module, handle}}`. Several
-  instances given one store share its data, as several processes share one
-  database; `Cronwatch.StoreCase`'s scenarios run that way. Each call goes
-  to the store given, and a conditional write it lacks is answered as the
-  client's fallback expects.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # A store made elsewhere, handed to an instance as it is:
+  # `store: {Cronwatch.StoreCase.Shared, store: {module, handle}}`. Several
+  # instances given one store share its data, as several processes share one
+  # database; `Cronwatch.StoreCase`'s scenarios run that way. Each call goes
+  # to the store given, and a conditional write it lacks is answered as the
+  # client's fallback expects.
   @behaviour Cronwatch.Store
 
   alias Cronwatch.Store

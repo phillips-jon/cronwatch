@@ -1,22 +1,23 @@
 defmodule Cronwatch.Alerts.Post do
-  @moduledoc """
-  The one POST the alert channels and Claude triage make, as the SDK makes
-  it with fetch (`alerts/shared.ts`), the Go port's `internal/post` and the
-  Rust port's `alerts::post`: the URL read as fetch reads it, only http and
-  https, headers checked as fetch checks them, one ten second deadline for
-  the whole request, a redirect refused rather than followed, at most 1 MiB
-  of an answer read, and an error that names only the URL's origin, with
-  every secret the caller holds cut out of a quoted answer before it is cut
-  to 200 characters.
-
-  The request goes out through a `Cronwatch.Transport`, in a process of its
-  own that is killed past the deadline, so the deadline holds whatever the
-  transport does, while connecting, sending or reading the answer.
-
-  Errors are `Cronwatch.Error`s of kind `:other`; one past the deadline has
-  the reason `:timeout` and fetch's message, `The operation was aborted due
-  to timeout`.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # The one POST the alert channels and Claude triage make, as the SDK makes
+  # it with fetch (`alerts/shared.ts`), the Go port's `internal/post` and the
+  # Rust port's `alerts::post`: the URL read as fetch reads it, only http and
+  # https, headers checked as fetch checks them, one ten second deadline for
+  # the whole request, a redirect refused rather than followed, at most 1 MiB
+  # of an answer read, and an error that names only the URL's origin, with
+  # every secret the caller holds cut out of a quoted answer before it is cut
+  # to 200 characters.
+  #
+  # The request goes out through a `Cronwatch.Transport`, in a process of its
+  # own that is killed past the deadline, so the deadline holds whatever the
+  # transport does, while connecting, sending or reading the answer.
+  #
+  # Errors are `Cronwatch.Error`s of kind `:other`; one past the deadline has
+  # the reason `:timeout` and fetch's message, `The operation was aborted due
+  # to timeout`.
 
   alias Cronwatch.Alerts.URL
   alias Cronwatch.JS

@@ -151,7 +151,7 @@ defmodule Cronwatch.Audit.StoresPgTest do
         answer =
           PgRepo.transaction(fn ->
             inside = Store.call(store, :prune, [too_big])
-            :ok = EctoStore.insert_run(h, Cronwatch.StoreCase.new_run("kept", "j", "running", 1))
+            :ok = EctoStore.insert_run(h, Cronwatch.StoreCase.test_run("kept", "j", "running", 1))
             PgRepo.rollback(inside)
           end)
 

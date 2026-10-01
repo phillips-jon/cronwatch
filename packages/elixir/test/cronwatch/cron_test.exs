@@ -52,7 +52,7 @@ defmodule Cronwatch.CronTest do
       {"0 0 * * 1#2.5", "CronPattern: configuration entry 5 (1#2.5) contains illegal characters."},
       {"@reboot",
        "CronPattern: @reboot is not supported in this environment. This is an event-based trigger that requires system startup detection."},
-      # Croner takes this for a one-time date; the port refuses it (see Cronwatch.Cron).
+      # Croner takes this for a one-time date; the SDK and the port refuse it (see Cronwatch.Cron).
       {"0 12:30 * * *", "Invalid ISO8601 passed to timezone parser."}
     ]
 
