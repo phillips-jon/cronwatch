@@ -21,7 +21,11 @@ public static class StoreContract
     /// A run as the contract writes them: finished ten milliseconds after it started unless it is
     /// running, with one metric, <c>n</c>, of 1.
     /// </summary>
-    public static Run NewRun(string id, string job, RunStatus status, long startedAt)
+    [Obsolete("A fixture helper, not part of the 1.x promise, which covers RunAsync. It still works through 1.x and goes in 2.0.")]
+    public static Run NewRun(string id, string job, RunStatus status, long startedAt) => MakeRun(id, job, status, startedAt);
+
+    /// <summary>A run as the contract writes them (see <see cref="NewRun"/>).</summary>
+    internal static Run MakeRun(string id, string job, RunStatus status, long startedAt)
     {
         bool finished = status != RunStatus.Running;
         return new Run
@@ -68,12 +72,12 @@ public static class StoreContract
 
         foreach (Run r in new[]
         {
-            NewRun("r1", "a", RunStatus.Ok, 1000),
-            NewRun("r2", "a", RunStatus.Failed, 2000),
-            NewRun("r3", "a", RunStatus.Running, 3000),
-            NewRun("r4", "b", RunStatus.Ok, 1500),
-            NewRun("rb", "B", RunStatus.Running, 2000),
-            NewRun("rc", "_c", RunStatus.Running, 2000),
+            MakeRun("r1", "a", RunStatus.Ok, 1000),
+            MakeRun("r2", "a", RunStatus.Failed, 2000),
+            MakeRun("r3", "a", RunStatus.Running, 3000),
+            MakeRun("r4", "b", RunStatus.Ok, 1500),
+            MakeRun("rb", "B", RunStatus.Running, 2000),
+            MakeRun("rc", "_c", RunStatus.Running, 2000),
         })
         {
             await Must("insertRun " + r.Id, () => store.InsertRunAsync(r)).ConfigureAwait(false);
@@ -89,7 +93,7 @@ public static class StoreContract
         SameJson("metrics", r1.Metrics.ToJson(), "{\"n\":1}");
         Eq("durationMs", r1.DurationMs, 10L);
 
-        Run updated = With(NewRun("r3", "a", RunStatus.Ok, 3000), null, "line1\nline2", Metrics.Of([new("cost", 0.25)]));
+        Run updated = With(MakeRun("r3", "a", RunStatus.Ok, 3000), null, "line1\nline2", Metrics.Of([new("cost", 0.25)]));
         await Must("updateRun", () => store.UpdateRunAsync(updated)).ConfigureAwait(false);
         Run r3 = await Get("getRun", () => store.GetRunAsync("r3")).ConfigureAwait(false)
             ?? throw new StoreContractException("run r3 was lost");
@@ -101,7 +105,7 @@ public static class StoreContract
         bool refused = false;
         try
         {
-            await store.InsertRunAsync(NewRun("r3", "a", RunStatus.Running, 3000)).ConfigureAwait(false);
+            await store.InsertRunAsync(MakeRun("r3", "a", RunStatus.Running, 3000)).ConfigureAwait(false);
         }
         catch (Exception)
         {
@@ -109,7 +113,7 @@ public static class StoreContract
         }
         Eq("an id already recorded is refused", refused, true);
         await Must("upsertJob q", () => store.UpsertJobAsync(Definition.FromJson("{\"name\":\"q\"}"), 300)).ConfigureAwait(false);
-        await Must("insertRun rx", () => store.InsertRunAsync(NewRun("rx", "q", RunStatus.Running, 2500))).ConfigureAwait(false);
+        await Must("insertRun rx", () => store.InsertRunAsync(MakeRun("rx", "q", RunStatus.Running, 2500))).ConfigureAwait(false);
 
         // updateRunIf writes only over a row whose status is one of those given, and says whether
         // it did.
@@ -117,25 +121,25 @@ public static class StoreContract
         {
             RunStatus[] running = [RunStatus.Running];
             RunStatus[] both = [RunStatus.Running, RunStatus.Timeout];
-            Run first = With(NewRun("rx", "q", RunStatus.Failed, 2500), "first", null, null);
+            Run first = With(MakeRun("rx", "q", RunStatus.Failed, 2500), "first", null, null);
             Eq("first finish", await Get("updateRunIf", () => conditional.UpdateRunIfAsync(first, running)).ConfigureAwait(false), true);
-            Run second = With(NewRun("rx", "q", RunStatus.Ok, 2500), null, "second", null);
+            Run second = With(MakeRun("rx", "q", RunStatus.Ok, 2500), null, "second", null);
             Eq("a second finish over the first is refused", await Get("updateRunIf", () => conditional.UpdateRunIfAsync(second, running)).ConfigureAwait(false), false);
             Run? kept = await Get("getRun", () => store.GetRunAsync("rx")).ConfigureAwait(false);
             Eq("first error kept", kept?.Error, "first");
-            Run late = With(NewRun("rx", "q", RunStatus.Ok, 2500), null, "late", null);
+            Run late = With(MakeRun("rx", "q", RunStatus.Ok, 2500), null, "late", null);
             Eq("not over failed", await Get("updateRunIf", () => conditional.UpdateRunIfAsync(late, both)).ConfigureAwait(false), false);
-            await Must("updateRun", () => store.UpdateRunAsync(With(NewRun("rx", "q", RunStatus.Timeout, 2500), "stuck", null, null))).ConfigureAwait(false);
-            Run lateAgain = With(NewRun("rx", "q", RunStatus.Ok, 2500), null, "late", Metrics.Of([new("m", 2)]));
+            await Must("updateRun", () => store.UpdateRunAsync(With(MakeRun("rx", "q", RunStatus.Timeout, 2500), "stuck", null, null))).ConfigureAwait(false);
+            Run lateAgain = With(MakeRun("rx", "q", RunStatus.Ok, 2500), null, "late", Metrics.Of([new("m", 2)]));
             Eq("any of the statuses given", await Get("updateRunIf", () => conditional.UpdateRunIfAsync(lateAgain, both)).ConfigureAwait(false), true);
             SameJson(
                 "late finish",
                 JsonOf(await Get("getRun", () => store.GetRunAsync("rx")).ConfigureAwait(false)),
                 "{\"id\":\"rx\",\"job\":\"q\",\"status\":\"ok\",\"startedAt\":2500,\"finishedAt\":2510,\"durationMs\":10,\"error\":null,\"output\":\"late\",\"metrics\":{\"m\":2},\"trigger\":\"run\"}");
-            Run missing = NewRun("missing", "q", RunStatus.Ok, 1);
+            Run missing = MakeRun("missing", "q", RunStatus.Ok, 1);
             Eq("a run that is not there is not written", await Get("updateRunIf", () => conditional.UpdateRunIfAsync(missing, running)).ConfigureAwait(false), false);
             Eq("still missing", await Get("getRun", () => store.GetRunAsync("missing")).ConfigureAwait(false), null);
-            Run failed = NewRun("rx", "q", RunStatus.Failed, 2500);
+            Run failed = MakeRun("rx", "q", RunStatus.Failed, 2500);
             Eq("no statuses, no write", await Get("updateRunIf", () => conditional.UpdateRunIfAsync(failed, Array.Empty<RunStatus>())).ConfigureAwait(false), false);
             Run? stillOk = await Get("getRun", () => store.GetRunAsync("rx")).ConfigureAwait(false);
             Eq("still ok", stillOk?.Status, RunStatus.Ok);
@@ -143,7 +147,7 @@ public static class StoreContract
 
         // deleteRunIf, for a store that has it, takes back only a run still of the job and in the
         // status given.
-        await Must("insertRun rd", () => store.InsertRunAsync(NewRun("rd", "q", RunStatus.Running, 2600))).ConfigureAwait(false);
+        await Must("insertRun rd", () => store.InsertRunAsync(MakeRun("rd", "q", RunStatus.Running, 2600))).ConfigureAwait(false);
         if (store is IDeleteRunIfStore deleting)
         {
             Eq("not another job's", await Get("deleteRunIf", () => deleting.DeleteRunIfAsync("rd", "a", RunStatus.Running)).ConfigureAwait(false), false);
@@ -159,7 +163,7 @@ public static class StoreContract
         // Forgetting a job while one of its runs is in flight: the run finishing later changes
         // nothing.
         await Must("deleteJob B", () => store.DeleteJobAsync("B")).ConfigureAwait(false);
-        await Must("updateRun", () => store.UpdateRunAsync(With(NewRun("rb", "B", RunStatus.Ok, 2000), null, "late", null))).ConfigureAwait(false);
+        await Must("updateRun", () => store.UpdateRunAsync(With(MakeRun("rb", "B", RunStatus.Ok, 2000), null, "late", null))).ConfigureAwait(false);
         Eq("forgotten run stays gone", await Get("getRun", () => store.GetRunAsync("rb")).ConfigureAwait(false), null);
         EqList("no runs of a forgotten job", Ids(await Get("listRuns", () => store.ListRunsAsync("B", 10)).ConfigureAwait(false)));
         EqList("running after forgetting", Ids(await Get("runningRuns", () => store.RunningRunsAsync()).ConfigureAwait(false)), "rc");
@@ -203,7 +207,7 @@ public static class StoreContract
             await Must("deleteJob w", () => store.DeleteJobAsync("w")).ConfigureAwait(false);
         }
 
-        await Must("insertRun r5", () => store.InsertRunAsync(NewRun("r5", "a", RunStatus.Running, 500))).ConfigureAwait(false);
+        await Must("insertRun r5", () => store.InsertRunAsync(MakeRun("r5", "a", RunStatus.Running, 500))).ConfigureAwait(false);
         Eq("r1 and r2 pruned; running r5 kept, and b's r4 kept as b's newest run", await Get("prune", () => store.PruneAsync(2500)).ConfigureAwait(false), 2L);
         EqList("a after prune", Ids(await Get("listRuns", () => store.ListRunsAsync("a", 10)).ConfigureAwait(false)), "r3", "r5");
         EqList("b after prune", Ids(await Get("listRuns", () => store.ListRunsAsync("b", 10)).ConfigureAwait(false)), "r4");

@@ -481,6 +481,7 @@ These names still work through every 1.x release, marked `[Obsolete]` so the com
 | `Cronwatch.Hosting.CronwatchServiceCollectionExtensions`, `Cronwatch.AspNetCore.CronwatchAspNetCore` | the extension methods' classes in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder`; `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods |
 | `Slack.Webhook(url)`, `Discord.Webhook(url)` | `SlackChannel.Webhook(url)`, `DiscordChannel.Webhook(url)`, on the channel types |
 | `Json.Quote`, `Json.Kind`, `Json.Copy`, `Json.TryNumber`, `Json.MaxDepth` | internal now: `Json.Parse`, `Json.ParseObject` and `Json.Stringify` are the JSON the library promises (`Json.Stringify(text)` quotes a string as `Quote` did) |
+| `StoreContract.NewRun`, `ForeignRows` | fixture helpers, no longer promised: the store kit promises `StoreContract.RunAsync`, `StoreReplay` and `FinishOnce` |
 | `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it is still used |
 
 ## Kept in step

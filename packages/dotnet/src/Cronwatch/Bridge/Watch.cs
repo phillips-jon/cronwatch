@@ -12,6 +12,7 @@ namespace Cronwatch.Bridge;
 /// it, the jobs a worker runs that another process declared, and the problems it reported. The Go
 /// port's <c>bridge/watch.go</c> and <c>Fallback</c> through the Java port's <c>Watch</c>, with
 /// their audits' fixes. Safe to use from many threads at once.
+/// For integration authors, outside the 1.x promise: the bridge changes as the integrations need, in any minor release.
 /// </summary>
 [DebuggerDisplay("{ToString(),nq}")]
 public sealed class Watch

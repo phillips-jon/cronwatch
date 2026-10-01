@@ -137,3 +137,7 @@ A program a crontab runs needs no integration: the job's line wraps its work in 
 ```
 
 The program hands `CronwatchCli.RunAsync` the factory for your client, or in a Generic Host app returns `await app.RunCronwatchCommandAsync(args)`, which checks from the host's own services without starting it; `check` runs one check, prints what it did and answers non-zero when it fails. [From a crontab](/docs/dotnet/#from-a-crontab) on the .NET page has both sides.
+
+## Another scheduler
+
+The two integrations are built on `Cronwatch.Bridge` (`SchedulerBridge`, `Watch`, `Entry`), which declares a scheduler's entries as jobs and checks their schedules against the scheduler's own fire times. It is public for integration authors, but outside the 1.x promise: it changes as the integrations need, in any minor release. A scheduler of your own can wrap each job's work in `job.RunAsync`, which is promised.

@@ -110,6 +110,13 @@ public class DeprecatedTests
     }
 
     [Fact]
+    public void The_store_kits_fixture_helpers_still_answer()
+    {
+        Assert.Equal(StoreTesting.StoreContract.MakeRun("r", "j", RunStatus.Ok, 5), StoreTesting.StoreContract.NewRun("r", "j", RunStatus.Ok, 5));
+        Assert.Equal(StoreTesting.ForeignRowChecks.FarStarts, StoreTesting.ForeignRows.FarStarts);
+    }
+
+    [Fact]
     public void WebAdapters_is_Adapters()
     {
         Assert.Equal(Adapters.Target("/cafÃ©"), WebAdapters.Target("/cafÃ©"));

@@ -170,7 +170,7 @@ public class SqliteStoreTests
             await store.InitAsync();
             foreach (string id in new[] { "b", "a", "c" })
             {
-                await store.InsertRunAsync(StoreContract.NewRun(id, "j", RunStatus.Running, 1000));
+                await store.InsertRunAsync(StoreContract.MakeRun(id, "j", RunStatus.Running, 1000));
             }
             Assert.Equal(["c", "a", "b"], (await store.ListRunsAsync("j", 10)).Select(r => r.Id));
             Assert.Equal(["b", "a", "c"], (await store.RunningRunsAsync()).Select(r => r.Id));
@@ -303,16 +303,16 @@ public class SqliteStoreTests
         var store = SqlStore.Sqlite(Source(file));
         await using (store)
         {
-            await ForeignRows.CheckOverForeignRowsAsync(store, "cronwatch_", sql => Exec(file, sql));
+            await ForeignRowChecks.CheckOverForeignRowsAsync(store, "cronwatch_", sql => Exec(file, sql));
         }
         int n = 0;
-        foreach (string start in ForeignRows.FarStarts)
+        foreach (string start in ForeignRowChecks.FarStarts)
         {
             string each = dir.File("cron" + n++ + ".db");
             var cron = SqlStore.Sqlite(Source(each));
             await using (cron)
             {
-                await ForeignRows.CronOverForeignRowAsync(cron, "cronwatch_", start, sql => Exec(each, sql));
+                await ForeignRowChecks.CronOverForeignRowAsync(cron, "cronwatch_", start, sql => Exec(each, sql));
             }
         }
     }

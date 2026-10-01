@@ -12,7 +12,8 @@ namespace Cronwatch.Bridge;
 /// <summary>
 /// What the scheduler integrations share (<c>Cronwatch.Hangfire</c>, <c>Cronwatch.Quartz</c>),
 /// carried over from the Go, Rust, Elixir and Java ports' bridge. An app does not need it; a
-/// scheduler integration of the app's own can.
+/// scheduler integration of the app's own can. For integration authors, outside the 1.x promise: the bridge changes as the integrations need, in any minor release. Every type in
+/// <c>Cronwatch.Bridge</c> is.
 /// </summary>
 /// <remarks>
 /// <see cref="Watch"/> declares a scheduler's entries as jobs, one per name, tagged with the

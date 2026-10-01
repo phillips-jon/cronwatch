@@ -5,6 +5,7 @@ namespace Cronwatch.Bridge;
 /// <summary>
 /// A scheduler's schedule that cannot be read, or cannot be taken as CronWatch's exactly: the job
 /// is watched without a schedule, and the message reported once.
+/// For integration authors, outside the 1.x promise: the bridge changes as the integrations need, in any minor release.
 /// </summary>
 public sealed class ScheduleException : Exception
 {
