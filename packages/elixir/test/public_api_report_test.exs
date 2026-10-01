@@ -46,6 +46,13 @@ defmodule Cronwatch.PublicAPIReportTest do
   defp deprecated(%{deprecated: _}), do: " (deprecated)"
   defp deprecated(_), do: ""
 
+  # api.txt records the build with each optional dependency at its newest
+  # release; the CI entry that pins the oldest ones (CRONWATCH_PIN_*) builds
+  # other docs for them, so it skips this check.
+  if Enum.any?(System.get_env(), fn {name, _} -> String.starts_with?(name, "CRONWATCH_PIN_") end) do
+    @tag skip: "api.txt records the newest optional dependencies"
+  end
+
   test "the public API is recorded in api.txt" do
     text = report()
     if System.get_env("CRONWATCH_WRITE_API"), do: File.write!(@api, text)
