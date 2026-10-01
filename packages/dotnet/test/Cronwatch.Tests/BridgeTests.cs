@@ -331,6 +331,41 @@ public class BridgeTests
         Assert.Equal("{\"grace\":\"1m\",\"tags\":[\"river\",\"river:search\"],\"name\":\"report\"}", made.Definition.ToJson());
     }
 
+    // The cross-port check: a fallback forgotten from the dashboard was kept, so the client never
+    // declared it again, and UnscheduleAsync then took the schedule another process stored out.
+    [Fact]
+    public async Task A_forgotten_fallback_is_declared_again_and_keeps_its_schedule()
+    {
+        var store = new MemoryStore();
+        string before;
+        await using (var scheduler = Make(store))
+        {
+            scheduler.Cw.Job("report", new JobOptions { Schedule = "0 2 * * *", Tags = ["river", "river:billing"] });
+            await scheduler.Cw.CheckAsync();
+            before = await Stored(store, "report");
+        }
+        await using var worker = Make(store);
+        var w = new Watch(worker.Cw, "river", "billing", "River");
+        Job? first = await w.FallbackAsync("report", new JobOptions());
+        Assert.NotNull(first);
+        await worker.Cw.ForgetAsync("report");
+        Assert.Null(w.Job("report"));
+        await using (var scheduler = Make(store))
+        {
+            scheduler.Cw.Job("report", new JobOptions { Schedule = "0 2 * * *", Tags = ["river", "river:billing"] });
+            await scheduler.Cw.CheckAsync();
+        }
+        Job? again = await w.FallbackAsync("report", new JobOptions());
+        Assert.NotNull(again);
+        Assert.NotSame(first, again);
+        Assert.Equal(before, again.Definition.ToJson());
+        await again.RunAsync((ctx, ct) => Task.CompletedTask);
+        w.Declare([E("invoices", "x", "0 1 * * *")]);
+        Assert.True(await w.SettleAsync(Settle));
+        Assert.Empty(await w.UnscheduleAsync());
+        Assert.Equal(before, await Stored(store, "report"));
+    }
+
     // The Go audit: a process that only schedules neither runs nor checks, and kept its
     // declarations in memory, so the store never held its jobs.
     [Fact]

@@ -117,12 +117,26 @@ public sealed class Watch
         }
     }
 
-    /// <summary>The job declared under <paramref name="name"/>, or one declared for a run of it (<see cref="FallbackAsync"/>).</summary>
+    /// <summary>
+    /// The job declared under <paramref name="name"/>, or one declared for a run of it (<see cref="FallbackAsync"/>)
+    /// while the client still declares it: one forgotten since (the dashboard's forget) is dropped,
+    /// so <see cref="FallbackAsync"/> declares it again.
+    /// </summary>
     public Job? Job(string name)
     {
+        bool live = _cw.Declared(name) != null;
         lock (_lock)
         {
-            return _jobs.TryGetValue(name, out var d) ? d.Job : _fallback.GetValueOrDefault(name);
+            if (_jobs.TryGetValue(name, out var d))
+            {
+                return d.Job;
+            }
+            if (live)
+            {
+                return _fallback.GetValueOrDefault(name);
+            }
+            _fallback.Remove(name);
+            return null;
         }
     }
 
