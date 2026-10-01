@@ -428,7 +428,7 @@ Every call that can reach the store takes a `context.Context` first and returns 
 
 `job.Run(ctx, fn, options...)`, `cronwatch.RunValue` and `job.Start` take run options after the function:
 
-- `cronwatch.WithTrigger(t)`: what started the run, shown with it. `"run"` for `Run` and `"start"` for `Start` by default; the scheduler integrations set their own.
+- `cronwatch.WithTrigger(t)`: what started the run, shown with it. `"run"` for `Run`, `"start"` for `Start` and `"handler"` for a job's handler by default; the scheduler integrations set their own, and the pg_cron source `pg_cron` (see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)).
 - `cronwatch.WithRunID(id)`: your own stable id, for `Start` only (see [Runs that span calls](#runs-that-span-calls)).
 - `cronwatch.DiscardWhen(fn)`: take the run back rather than judge it when the function returns an error `fn` answers true for, such as a queue's attempt given back without failing: its row is deleted, no alert is sent, the failures in a row are left as they were, and the error is still returned. It needs a store with `DeleteRunIf`. `Run` and `RunValue` only.
 
