@@ -1081,7 +1081,8 @@ def test_the_asgi_app_answers_as_the_wsgi_app_does() -> None:
 
 
 def test_the_asgi_app_completes_the_lifespan() -> None:
-    web = Web(None, token=None)
+    cw, _, _ = make()
+    web = cw.routes(token=None)
     sent: list[str] = []
     messages = [{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}]
 
@@ -1102,8 +1103,10 @@ def test_a_web_without_a_client_uses_the_process_client(monkeypatch: pytest.Monk
     cw = cronwatch.configure(alerts=[], cron_secret=None)
     try:
         cw.run("proc", lambda ctx: None)
-        web = Web(token="tok")
+        with pytest.warns(DeprecationWarning, match=r"use cw\.routes\(\)"):
+            web = Web(token="tok")
         assert [j["name"] for j in send(web, "GET", "/api/jobs", BEARER).json()["jobs"]] == ["proc"]
+        assert [j["name"] for j in send(cronwatch.client().routes(token="tok"), "GET", "/api/jobs", BEARER).json()["jobs"]] == ["proc"]
     finally:
         cw.stop()
 

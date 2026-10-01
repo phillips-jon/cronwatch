@@ -52,6 +52,7 @@ import re
 import secrets
 import sys
 import threading
+import warnings
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from email.parser import BytesParser
@@ -511,10 +512,35 @@ def _html_response(body: str, status: int = 200, cache: str = "no-store") -> Res
 
 
 class Web:
-    """The dashboard and JSON API. Call it as a WSGI app, mount .asgi as an
-    ASGI app, or hand .handle a Request. See the module's docstring for the options."""
+    """The dashboard and JSON API, as ``cw.routes()`` makes it. Call it as a
+    WSGI app, mount .asgi as an ASGI app, or hand .handle a Request. See the
+    module's docstring for the options.
+
+    Making one directly, ``Web(client)``, is deprecated (it warns, and goes in
+    2.0): ``cw.routes()`` is the one way, and ``cronwatch.client().routes()``
+    for the process's client."""
 
     def __init__(
+        self,
+        client: Any = None,
+        *,
+        token: str | None = UNSET,
+        base_path: str | None = None,
+        origin: str | None = None,
+        trust_proxy: bool = False,
+    ) -> None:
+        if type(self) is Web:
+            warnings.warn("cronwatch.web.Web(client) is deprecated: use cw.routes()", DeprecationWarning, stacklevel=2)
+        self._setup(client, token=token, base_path=base_path, origin=origin, trust_proxy=trust_proxy)
+
+    @classmethod
+    def _for(cls, client: Any, **options: Any) -> Web:
+        """What cw.routes() makes, without the warning Web(client) gives."""
+        web = cls.__new__(cls)
+        web._setup(client, **options)
+        return web
+
+    def _setup(
         self,
         client: Any = None,
         *,

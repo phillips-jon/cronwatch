@@ -818,7 +818,7 @@ class Cronwatch:
         token, base_path, origin and trust_proxy (see cronwatch.web)."""
         from .web import Web
 
-        return Web(self, **options)
+        return Web._for(self, **options)
 
     def start(self, every: Duration = "1m") -> None:
         """Check on an interval, in a daemon thread, for long-running processes.
