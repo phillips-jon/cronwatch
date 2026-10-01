@@ -41,10 +41,10 @@ const hash = (buf) => createHash("sha256").update(buf).digest("hex").slice(0, 10
    registries every package is on, and the project itself. A link off the
    site opens in a new tab. */
 const FOOTER = [
-  ["Docs", [["Getting started", "/docs/"], ["Schedules", "/docs/schedules/"], ["Alerts", "/docs/alerts/"], ["Dashboard", "/docs/dashboard/"], ["MCP server", "/docs/mcp/"], ["Agent skill", "/docs/agent-skill/"]]],
+  ["Docs", [["Getting started", "/docs/"], ["Schedules", "/docs/schedules/"], ["Alerts", "/docs/alerts/"], ["Dashboard", "/docs/dashboard/"], ["MCP server", "/docs/mcp/"], ["Agent skill", "/docs/agent-skill/"], ["Stability", "/docs/stability/"]]],
   ["Languages", [["TypeScript", "/docs/node/"], ["Ruby", "/docs/ruby/"], ["Python", "/docs/python/"], ["PHP", "/docs/php/"], ["Go", "/docs/go/"], ["Rust", "/docs/rust/"], ["Elixir", "/docs/elixir/"], ["Java", "/docs/java/"], [".NET", "/docs/dotnet/"]]],
   ["Packages", [["npm", "https://www.npmjs.com/package/@cronwatch/sdk"], ["RubyGems", "https://rubygems.org/gems/cronwatch"], ["PyPI", "https://pypi.org/project/cronwatch-sdk/"], ["Packagist", "https://packagist.org/packages/cronwatch/cronwatch"], ["pkg.go.dev", "https://pkg.go.dev/cronwatch.dev/go"], ["crates.io", "https://crates.io/crates/cronwatch"], ["Hex", "https://hex.pm/packages/cronwatch"], ["Maven Central", "https://central.sonatype.com/artifact/dev.cronwatch/cronwatch"], ["NuGet", "https://www.nuget.org/packages/Cronwatch"]]],
-  ["Project", [["GitHub", GITHUB], ["Releases", `${GITHUB}/releases`], ["Contact", "/contact/"], ["Terms", "/terms/"], ["Privacy", "/privacy/"]]],
+  ["Project", [["GitHub", GITHUB], ["Releases", `${GITHUB}/releases`], ["Changelog", `${GITHUB}/blob/main/CHANGELOG.md`], ["Contact", "/contact/"], ["Terms", "/terms/"], ["Privacy", "/privacy/"]]],
 ];
 const FOOTER_COLUMNS = FOOTER.map(([head, items]) =>
   `<div><p class="foot-head">${head}</p><ul>${items.map(([label, href]) => `<li><a href="${href}"${href.startsWith("http") ? ` target="_blank" rel="noopener"` : ""}>${label}</a></li>`).join("")}</ul></div>`).join("");
