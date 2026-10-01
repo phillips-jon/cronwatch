@@ -130,8 +130,7 @@ func New(cw *cronwatch.Client, options Options) *Watcher {
 // Watch is New(cw, options).Option(), for gocron.NewScheduler.
 //
 // Deprecated: Use New(cw, options).Option(), which does the same and keeps
-// the Watcher for its Sync and Wait. Watch still works through 1.x and goes
-// in 2.0.
+// the Watcher for its Sync and Wait. Watch goes in 1.0.
 func Watch(cw *cronwatch.Client, options Options) gocron.SchedulerOption {
 	return New(cw, options).Option()
 }
@@ -380,7 +379,7 @@ func (p PanicError) Error() string { return fmt.Sprint(p.Value) }
 // Panic is PanicError, under its name before 1.0.
 //
 // Deprecated: Use PanicError, which follows Go's naming for error types.
-// Panic still works through 1.x and goes in 2.0.
+// Panic goes in 1.0.
 type Panic = PanicError
 
 func (w *Watcher) panicked(id uuid.UUID, _ string, recovered any) {

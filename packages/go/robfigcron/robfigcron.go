@@ -115,8 +115,7 @@ func New(cw *cronwatch.Client, options Options) *Watcher {
 // Watch is New(cw, options).Option(), for cron.New.
 //
 // Deprecated: Use New(cw, options).Option(), which does the same and keeps
-// the Watcher for its Sync and Wait. Watch still works through 1.x and goes
-// in 2.0.
+// the Watcher for its Sync and Wait. Watch goes in 1.0.
 func Watch(cw *cronwatch.Client, options Options) cron.Option { return New(cw, options).Option() }
 
 // Option is the cron.Option that attaches the watcher to the cron it is

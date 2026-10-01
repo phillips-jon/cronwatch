@@ -461,6 +461,22 @@ The public types write the SDK's JSON through their `MarshalJSON`. Call it direc
 
 The cron reader matches croner, and the SDK, on every expression: a date no month has (`0 0 30 2 *`) never fires, and a one-time date in place of a cron expression is refused, as the [schedules page](/docs/schedules/) says.
 
+## Deprecated
+
+These still work, each marked `Deprecated:` in its doc comment so editors and `staticcheck` point at it. A rename keeps its old name as an alias; a name that was public by accident (a test hook, an internal helper) goes when 1.0 makes it internal. Public means documented on this page, the [Go schedulers](/docs/go-schedulers/) page or the module's README; everything else is internal. `cronwatch.dev/go/bridge` is outside the 1.x promise altogether.
+
+| Deprecated | Use instead | Goes in |
+|---|---|---|
+| `cw.Start(every)` | `cw.StartChecking(every)`: a job's `Start` opens a run, so the client's is named for what it starts | 2.0 |
+| `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 1.0 |
+| `cwgocron.Converted` | `robfigcron.Converted`, the same type, which every integration's `Convert` returns | 1.0 |
+| `cwgocron.Panic` | `cwgocron.PanicError`, the same type | 1.0 |
+| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics` and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |
+| `cronwatch.Stderr`, `cronwatch.Stdout` | `WithErrorHandler`, and a channel of your own in place of `Console` | 1.0 |
+| `cronwatch.MaxBody`, `cronwatch.ReservedRunIDPrefix` | nothing: the 1 MiB limit and the `pgcron:` prefix are documented and do not change | 1.0 |
+| `pgcron.Hold`, `pgcron.Schedule`, `pgcron.JobName`, `pgcron.RunOf` | nothing: they are the source's internals | 1.0 |
+| `triage.System` | nothing: the prompt is not part of the promise | 1.0 |
+
 ## Kept in step
 
 The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, redaction, each channel's requests, stats and health) into `conformance/` in the repository, and the Go tests replay every one, as the Ruby gem's and the Python, PHP, Rust, Elixir, Java and .NET packages' do; the dashboard is checked against the SDK's pages byte for byte. Cron parsing is also checked against croner itself on thousands of generated expressions. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).

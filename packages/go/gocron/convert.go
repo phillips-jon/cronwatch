@@ -16,8 +16,7 @@ import (
 // integration's Convert returns, robfigcron.Converted.
 //
 // Deprecated: Use robfigcron.Converted, the same type, which river and
-// asynq's Convert return too. Converted still works through 1.x and goes in
-// 2.0.
+// asynq's Convert return too. Converted goes in 1.0.
 type Converted = robfigcron.Converted
 
 // cronParser reads a crontab as gocron does, with or without a seconds

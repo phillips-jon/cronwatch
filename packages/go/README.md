@@ -203,6 +203,24 @@ h.Log("done")
 h.Finish(ctx) // or h.Fail(ctx, err); a run is judged once, however many processes finish it
 ```
 
+## Deprecated
+
+Each still works and is marked `Deprecated:` in its doc comment:
+
+| Deprecated | Use instead | Goes in |
+|---|---|---|
+| `cw.Start(every)` | `cw.StartChecking(every)`: a job's `Start` opens a run, so the client's is named for what it starts | 2.0 |
+| `robfigcron.Watch(cw, o)`, `cwgocron.Watch(cw, o)` | `robfigcron.New(cw, o).Option()`, `cwgocron.New(cw, o).Option()` | 1.0 |
+| `cwgocron.Converted` | `robfigcron.Converted`, the same type, which every integration's `Convert` returns | 1.0 |
+| `cwgocron.Panic` | `cwgocron.PanicError`, the same type | 1.0 |
+| `JSValue()` on `Alert`, `CheckResult`, `Definition`, `JobState`, `JobSummary`, `Metrics` and `Run` | `MarshalJSON`, or `encoding/json`, for the same bytes | 1.0 |
+| `cronwatch.Stderr`, `cronwatch.Stdout` | `WithErrorHandler`, and a channel of your own in place of `Console` | 1.0 |
+| `cronwatch.MaxBody`, `cronwatch.ReservedRunIDPrefix` | nothing: the 1 MiB limit and the `pgcron:` prefix are documented and do not change | 1.0 |
+| `pgcron.Hold`, `pgcron.Schedule`, `pgcron.JobName`, `pgcron.RunOf` | nothing: they are the source's internals | 1.0 |
+| `triage.System` | nothing: the prompt is not part of the promise | 1.0 |
+
+`cronwatch.dev/go/bridge`, what the scheduler integrations share, is outside the 1.x promise: it may change in any minor release.
+
 ## Testing
 
 ```bash
