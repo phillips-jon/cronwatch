@@ -141,7 +141,9 @@ impl ClientBuilder {
     }
 
     /// The shared secret job handlers' requests must carry. The default is
-    /// `$CRON_SECRET`; `""` counts as unset.
+    /// `$CRON_SECRET`; an empty string, or one of only whitespace, given here
+    /// or in the variable, counts as unset (one given here does not fall
+    /// back to the variable).
     pub fn cron_secret(mut self, secret: impl Into<String>) -> Self {
         self.cron_secret = Some(Some(secret.into()));
         self
@@ -232,11 +234,13 @@ impl ClientBuilder {
         let retention_ms = schedule::parse_duration(&self.retention.to_value(), "retention").map_err(Error::Invalid)?;
         let default_store = self.store.is_none();
         let secret_opt_out = self.cron_secret == Some(None);
+        // A blank secret (empty or only whitespace), given or read, counts as
+        // unset; one given blank does not fall back to the variable.
         let cron_secret = match self.cron_secret {
             Some(secret) => secret,
-            None => std::env::var("CRON_SECRET").ok(),
+            None => crate::env::secret_var("CRON_SECRET"),
         }
-        .filter(|s| !s.is_empty());
+        .filter(|s| !crate::env::is_blank(s));
         Ok(Client {
             inner: Arc::new(Inner {
                 store: self.store.unwrap_or_else(|| Arc::new(MemoryStore::new())),
@@ -510,7 +514,7 @@ impl Client {
         let listed: HashSet<&str> = jobs.iter().map(|j| j.name.as_str()).collect();
         let missing: Vec<&Arc<JobDef>> = declared.iter().filter(|d| !listed.contains(d.name.as_str())).collect();
         if missing.is_empty() {
-            return Ok(jobs);
+            return Ok(jobs.into_iter().map(StoredJob::read_leniently).collect());
         }
         for def in missing {
             // Not one forgotten or declared again here meanwhile.
@@ -523,7 +527,15 @@ impl Client {
             }
             self.sync(def).await?;
         }
-        self.inner.store.list_jobs().await.map_err(Error::store)
+        Ok(self
+            .inner
+            .store
+            .list_jobs()
+            .await
+            .map_err(Error::store)?
+            .into_iter()
+            .map(StoredJob::read_leniently)
+            .collect())
     }
 
     /// Writes the definition declared in this process under `name` to the
@@ -627,7 +639,7 @@ impl Client {
         }
     }
 
-    /// Stops the interval [`start`](Self::start) began, waits for a check
+    /// Stops the interval [`start_checking`](Self::start_checking) began, waits for a check
     /// already under way (bounded by its own channel, triage and retry
     /// timeouts; what it fails with was given to whoever started it), then
     /// closes the store, so that check neither writes after the store is

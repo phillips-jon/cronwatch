@@ -65,6 +65,7 @@ Go and Elixir have no breaking changes beyond those every language shares.
 - The webhook's body starts with `"schema": 1`, and its JSON Schema is published at [cronwatch.dev/schemas/webhook/1.json](https://cronwatch.dev/schemas/webhook/1.json). A receiver can check the `X-CronWatch-Signature` header with `signature(secret, body)`, new in TypeScript (`@cronwatch/sdk/webhook`), Ruby (`Cronwatch::Alerts::Webhook.signature`), Python (`cronwatch.alerts.webhook.signature`) and PHP (`Webhook::signature`), as Go, Rust, Elixir, Java and .NET already had.
 - Ruby: `client.routes(**options)`, the dashboard as a Rack app.
 - Rust: constructors and builder methods for every data and options type.
+- Rust: `StoredJob::read(name, text, created_at, updated_at)` reads a stored definition as the built-in stores do, for a store of the app's own that holds it as JSON text, and `StoredJob::is_readable` says whether it was a JSON object.
 - Java: a static `of` on each record that may grow.
 - Drupal: Ultimate Cron's jobs are recorded, each on its own rules read as Ultimate Cron reads them (`drupal:<module>` for a module's `hook_cron`, `drupal:job:<id>` for any other, triggers `ultimate-cron` and `ultimate-cron-manual`), and every cron run is still `drupal:cron`. Before, the module left a site running Ultimate Cron alone.
 - The [Stability](https://cronwatch.dev/docs/stability/), [Environment variables](https://cronwatch.dev/docs/environment/) and [Deprecations](https://cronwatch.dev/docs/deprecations/) pages.
@@ -98,6 +99,7 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - One malformed job, run or state row (a hand edit, another writer, a damaged database) affects only its own job, in every language: it no longer stops every check or makes the whole dashboard answer 500. A definition that does not parse or is not an object reads as `{ name }`, and that job is reported and shown as failing; tags that are not a list of strings are left out; unparseable metrics read as `{}`; a time that is not a number reads as 0 (a start) or empty (a finish or duration); a state that does not parse reads as none and is replaced by the next write; and a queued alert that is not an object, a recovery that does not say what it recovers from, and an alert without a numeric time are dropped instead of blocking the job's alerts.
 - An `Authorization` header that is not a bearer, such as a proxy's Basic auth, no longer locks the dashboard: the cookie and `?token=` sign in as if no header came.
 - pg_cron: forgetting the old name of a renamed job while a run of it is open lets the run go, where every check after reported `job is not declared`.
+- Rust: a scheduler integration's worker that declares a job from the stored definition (one another process schedules) keeps the fields it has no option for, an app's `JobOptions::field` or one a newer release added, where it wrote the definition back without them.
 
 ## 0.10.0 and earlier
 

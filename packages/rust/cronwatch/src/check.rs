@@ -20,9 +20,9 @@ use crate::types::{Alert, CheckResult, JobState, JobSummary, Run, RunStatus, Sto
 
 /// How often a check prunes old runs.
 const PRUNE_INTERVAL: i64 = 60 * 60_000;
-/// How long `start` waits before its first check.
+/// How long `start_checking` waits before its first check.
 const FIRST_CHECK_DELAY: Duration = Duration::from_secs(1);
-/// The longest interval `start` checks on, the SDK's: setInterval's longest
+/// The longest interval `start_checking` checks on, the SDK's: setInterval's longest
 /// delay, 2^31 - 1 ms (some 24.8 days).
 const TIMER_MAX_MS: u64 = (1 << 31) - 1;
 
@@ -40,7 +40,7 @@ pub struct JobWithRuns {
 impl Client {
     /// Looks for missed and stuck runs across every job, sends alerts, retries
     /// alerts no channel accepted, and prunes old runs. Call it from an
-    /// interval ([`start`](Self::start)), a cron, or by hand. Concurrent calls
+    /// interval ([`start_checking`](Self::start_checking)), a cron, or by hand. Concurrent calls
     /// share one check. A job that cannot be evaluated is reported to the
     /// error handler and shown as failing; the error returned is for the
     /// store failing as the check starts.
@@ -142,7 +142,10 @@ impl Client {
         let def = match self.declared(&listed.job) {
             Some(declared) => declared.stored.clone(),
             None => match self.inner.store.get_job(&listed.job).await.map_err(Error::store)? {
-                Some(stored) => stored.definition,
+                Some(stored) => {
+                    evaluable(&stored)?;
+                    stored.read_leniently().definition
+                }
                 None => return Ok(()),
             },
         };
@@ -173,6 +176,7 @@ impl Client {
         now: i64,
         spent: &mut Duration,
     ) -> Result<(JobSummary, Vec<Alert>), Error> {
+        evaluable(job)?;
         let recent = self.inner.store.list_runs(&job.name, BASELINE_WINDOW).await.map_err(Error::store)?;
         let last = recent.first();
         let (state, ((held, dropped), next_expected_at)) = self
@@ -200,6 +204,7 @@ impl Client {
         let read = async {
             let recent =
                 self.inner.store.list_runs(&job.name, runs.max(BASELINE_WINDOW)).await.map_err(Error::store)?;
+            evaluable(job)?;
             let state = self.read_state(&job.name).await?;
             let out = on_check(&job.definition, job, recent.first(), &state, now).map_err(Error::Other)?;
             let summary = summarize(job, &recent, &state, out.next_expected_at, now).map_err(Error::Other)?;
@@ -256,7 +261,7 @@ impl Client {
         let Some(stored) = self.inner.store.get_job(name).await.map_err(Error::store)? else {
             return Ok(None);
         };
-        Ok(Some(self.snapshot(&stored, self.now(), 0).await.job))
+        Ok(Some(self.snapshot(&stored.read_leniently(), self.now(), 0).await.job))
     }
 
     /// A job's runs, newest first. `limit` is 1 to 500.
@@ -376,4 +381,14 @@ impl Client {
             timer.abort();
         }
     }
+}
+
+/// An error for a job whose stored definition was not a JSON object
+/// (`StoredJob::read`): reported, and shown as failing, while the others
+/// carry on.
+fn evaluable(job: &StoredJob) -> Result<(), Error> {
+    if job.is_readable() {
+        return Ok(());
+    }
+    Err(Error::Other(format!("job \"{}\": its stored definition is not a JSON object", job.name)))
 }

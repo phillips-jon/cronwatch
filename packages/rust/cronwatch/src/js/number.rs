@@ -70,9 +70,87 @@ pub(crate) fn to_i64(n: f64) -> i64 {
     if n.is_nan() { 0 } else { n as i64 }
 }
 
+/// A string read as a number the way JavaScript's `Number()` reads one,
+/// except that a string empty after `trim()` is NaN (where `Number("")` is
+/// 0): how the SDK reads a time a SQL store gave back as text (Postgres's
+/// BIGINT, or a foreign row's).
+pub fn number_of_text(s: &str) -> f64 {
+    let t = super::trim(s);
+    let radix = |digits: &str, base: u32| {
+        if digits.is_empty() {
+            return f64::NAN;
+        }
+        digits
+            .chars()
+            .try_fold(0.0_f64, |n, c| c.to_digit(base).map(|d| n * f64::from(base) + f64::from(d)))
+            .unwrap_or(f64::NAN)
+    };
+    match t.get(..2) {
+        Some("0x" | "0X") => return radix(&t[2..], 16),
+        Some("0o" | "0O") => return radix(&t[2..], 8),
+        Some("0b" | "0B") => return radix(&t[2..], 2),
+        _ => {}
+    }
+    match t {
+        "" => return f64::NAN,
+        "Infinity" | "+Infinity" => return f64::INFINITY,
+        "-Infinity" => return f64::NEG_INFINITY,
+        _ => {}
+    }
+    // The decimal grammar alone: Rust's parser also takes "inf" and "nan",
+    // which JavaScript does not.
+    let b = t.as_bytes();
+    let mut i = usize::from(matches!(b.first(), Some(b'+' | b'-')));
+    let digits = |i: &mut usize| {
+        let start = *i;
+        while b.get(*i).is_some_and(u8::is_ascii_digit) {
+            *i += 1;
+        }
+        *i - start
+    };
+    let mut mantissa = digits(&mut i);
+    if b.get(i) == Some(&b'.') {
+        i += 1;
+        mantissa += digits(&mut i);
+    }
+    if mantissa == 0 {
+        return f64::NAN;
+    }
+    if matches!(b.get(i), Some(b'e' | b'E')) {
+        i += 1;
+        if matches!(b.get(i), Some(b'+' | b'-')) {
+            i += 1;
+        }
+        if digits(&mut i) == 0 {
+            return f64::NAN;
+        }
+    }
+    if i != b.len() {
+        return f64::NAN;
+    }
+    t.parse().unwrap_or(f64::NAN)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_is_read_as_javascript_number_reads_it() {
+        assert_eq!(number_of_text("1767603000000"), 1_767_603_000_000.0);
+        assert_eq!(number_of_text(" \u{feff}42\n"), 42.0);
+        assert_eq!(number_of_text("1.5e3"), 1500.0);
+        assert_eq!(number_of_text(".5"), 0.5);
+        assert_eq!(number_of_text("5."), 5.0);
+        assert_eq!(number_of_text("-7"), -7.0);
+        assert_eq!(number_of_text("0x1F"), 31.0);
+        assert_eq!(number_of_text("0b101"), 5.0);
+        assert_eq!(number_of_text("1e400"), f64::INFINITY);
+        assert_eq!(number_of_text("-Infinity"), f64::NEG_INFINITY);
+        for nan in ["", "  ", "x", "inf", "nan", "NaN", "1e", "1_000", "0x", "-0x1", "1 2", "e5", "."] {
+            assert!(number_of_text(nan).is_nan(), "{nan:?}");
+        }
+    }
 
     #[test]
     fn numbers_print_as_javascript_prints_them() {

@@ -57,6 +57,29 @@ impl Row {
         }
     }
 
+    /// A time or a count of milliseconds, as the SDK reads one from a row:
+    /// a number is kept (a fraction cut to its whole part, as every time
+    /// here is whole), text is read as JavaScript's `Number()` reads it
+    /// (Postgres's BIGINT can come as text), and anything that is not a
+    /// finite number (NULL, `"x"`, `"1e400"`) is `None`.
+    pub(crate) fn number(&self, name: &str) -> Option<i64> {
+        let n = match self.get(name) {
+            Cell::Int(n) | Cell::Time(n) => return Some(*n),
+            Cell::Real(f) => *f,
+            Cell::Text(t) => js::number_of_text(t),
+            Cell::Null | Cell::Bool(_) => return None,
+        };
+        n.is_finite().then_some(n as i64)
+    }
+
+    /// A column that holds text, `None` for anything else (NULL, a number).
+    pub(crate) fn string(&self, name: &str) -> Option<String> {
+        match self.get(name) {
+            Cell::Text(t) => Some(t.clone()),
+            _ => None,
+        }
+    }
+
     /// A boolean column, however the driver sent it.
     #[cfg_attr(not(feature = "pgcron"), allow(dead_code))]
     pub(crate) fn boolean(&self, name: &str) -> bool {

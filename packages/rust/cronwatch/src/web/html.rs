@@ -572,14 +572,14 @@ fn failures_row(job: &JobSummary) -> String {
     format!("<dt>Failures in a row</dt><dd>{}</dd>", num(job.consecutive_failures as f64))
 }
 
-/// A page with one message. With `sign_in`, a form under it takes the token
-/// and sends it as `?token=`, which the routes move into the cookie: the
-/// way in where there is no address bar to open a link with, such as an app
-/// on an iPhone's home screen.
+/// A page with one message. With `sign_in`, a form under it posts the token
+/// to `<base>/signin` in the body, keeping it out of the URL and access
+/// logs, and the routes set the cookie: the way in where there is no address
+/// bar to open a link with, such as an app on an iPhone's home screen.
 pub(crate) fn message_page(title: &str, message: &str, base: &str, sign_in: bool) -> String {
     let form = if sign_in {
         format!(
-            r#"<form class="signin" method="get" action="{}/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>"#,
+            r#"<form class="signin" method="post" action="{}/signin"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>"#,
             h(base)
         )
     } else {

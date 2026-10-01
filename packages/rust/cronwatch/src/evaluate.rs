@@ -610,6 +610,11 @@ pub(crate) fn apply_silence(previous: &JobState, e: Evaluation, now: i64) -> Eva
 /// time other than the alert's). A recovery is stale when any condition it
 /// names is open again; while they all stay closed it is kept.
 pub(crate) fn stale_alert(alert: &Alert, state: &JobState) -> bool {
+    // From a foreign or damaged row: a recovery whose details do not say
+    // what it recovers from, and an alert with no numeric time, are stale.
+    if alert.kept.unjudgeable {
+        return true;
+    }
     if alert.alert_type == AlertType::Recovered {
         let AlertDetails::Recovered { after, .. } = &alert.details else {
             return false;

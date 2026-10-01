@@ -34,6 +34,21 @@ fn environment_from(read: impl Fn(&str) -> Option<String>) -> String {
     String::new()
 }
 
+/// Whether a token or secret is blank: empty, or only the whitespace
+/// `String.prototype.trim` removes (not U+0085, and U+FEFF included, which
+/// Rust's own `trim` has the other way round). A blank one counts as unset.
+pub(crate) fn is_blank(value: &str) -> bool {
+    crate::js::trim(value).is_empty()
+}
+
+/// A secret from the environment (`CRONWATCH_TOKEN`, `CRON_SECRET`): `None`
+/// when the variable is unset, empty or only whitespace (see [`is_blank`]),
+/// so a blank value counts as not set and the routes and handlers fail
+/// closed. Any other value is used as it is, untrimmed.
+pub(crate) fn secret_var(name: &str) -> Option<String> {
+    std::env::var(name).ok().filter(|v| !is_blank(v))
+}
+
 /// Claude triage's API key and base URL, from the variables the official
 /// Anthropic client reads: `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL`,
 /// `""` when unset.
@@ -45,7 +60,18 @@ pub(crate) fn anthropic() -> (String, String) {
 
 #[cfg(test)]
 mod tests {
-    use super::environment_from;
+    use super::{environment_from, is_blank};
+
+    /// Blank as JavaScript's `trim` sees it (the second review, Medium 1).
+    #[test]
+    fn a_secret_of_only_whitespace_is_blank() {
+        for blank in ["", " ", "  ", "\t", " \n  \u{feff} ", "\u{a0}", "\u{2003}", "\u{feff}", "\u{3000}\u{2028}"] {
+            assert!(is_blank(blank), "{blank:?}");
+        }
+        for set in ["x", " padded ", "\u{85}", "\u{180e}", "\u{1c}"] {
+            assert!(!is_blank(set), "{set:?}");
+        }
+    }
 
     /// The SDK's cases (packages/sdk/test/env.test.ts, plan D8), with
     /// `RUST_ENV` in `NODE_ENV`'s place.

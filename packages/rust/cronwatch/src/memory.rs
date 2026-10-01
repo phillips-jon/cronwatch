@@ -79,7 +79,7 @@ impl Store for MemoryStore {
         let created_at = inner.jobs.get(&name).map_or(now, |j| j.created_at);
         inner.jobs.insert(
             name.clone(),
-            StoredJob { name, definition: definition.without_nul(), created_at, updated_at: now },
+            StoredJob { name, definition: definition.without_nul(), created_at, updated_at: now, unreadable: false },
         );
         ready(())
     }

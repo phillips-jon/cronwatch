@@ -579,6 +579,7 @@ impl PgCron {
         st: &mut State,
         host: &Client,
         names: &HashMap<i64, String>,
+        declared_now: &HashSet<String>,
         mut row: PgCronRow,
         evaluate: bool,
         now: i64,
@@ -588,6 +589,15 @@ impl PgCron {
             st.held.remove(&row.run_id);
             return;
         };
+        // A run copied under a name this sync no longer uses, which was then
+        // forgotten (the dashboard's forget), has no job to go to: it is let
+        // go, never recorded and never read again.
+        if !names.values().any(|n| *n == name) && !declared_now.contains(&name) {
+            st.pending.remove(&row.run_id);
+            st.held.remove(&row.run_id);
+            st.retired.remove(&name);
+            return;
+        }
         let run = if row.start_time.is_none() && !finished(&row.status) {
             let since = st.held.get(&row.run_id).copied().unwrap_or(now);
             if now - since < HOLD_FOR.as_millis() as i64 {
@@ -815,6 +825,8 @@ impl PgCron {
         }
 
         let mut alerts = Vec::new();
+        // The names declared now, after the retires above (see record).
+        let declared_now: HashSet<String> = host.defined_jobs().iter().map(|d| d.name().to_string()).collect();
 
         // Where each job left off. Found from the store the first time, so a
         // restart carries on.
@@ -851,7 +863,7 @@ impl PgCron {
                     continue;
                 }
                 let evaluate = last_finished.is_none_or(|lf| i >= lf);
-                self.record(st, host, &names, row.clone(), evaluate, now, &mut alerts).await;
+                self.record(st, host, &names, &declared_now, row.clone(), evaluate, now, &mut alerts).await;
             }
             st.cursors.insert(jobid, ordered.last().map_or(0, |r| r.run_id));
         }
@@ -883,7 +895,7 @@ impl PgCron {
                 let row = row_of(r);
                 open.remove(&row.run_id);
                 let (run_id, job_id) = (row.run_id, row.job_id);
-                self.record(st, host, &names, row, true, now, &mut alerts).await;
+                self.record(st, host, &names, &declared_now, row, true, now, &mut alerts).await;
                 // Held or not, the cursor moves on: a held run is read again
                 // by its runid.
                 if names.contains_key(&job_id) && run_id > st.cursors.get(&job_id).copied().unwrap_or(0) {

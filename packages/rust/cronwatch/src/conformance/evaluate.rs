@@ -185,6 +185,7 @@ fn conformance_evaluate() {
                 definition: def.clone(),
                 created_at,
                 updated_at: created_at,
+                unreadable: false,
             },
             state: empty_state(def.name()),
             def,
