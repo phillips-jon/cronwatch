@@ -792,7 +792,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # The core's rust-version, 1.94, and the current stable.
+        # The workspace's rust-version, 1.85 (the core's and the two
+        # integrations'), 1.94 and the current stable.
         # cronwatch-tokio-cron-scheduler is tested on 1.85 too, and
         # cronwatch-apalis's library is linted there without its `cron`
         # feature (the cron crate needs 1.87) or its tests (apalis's

@@ -115,7 +115,7 @@ The built-in stores pass the same conformance test, in [`packages/sdk/test/store
 
 ## Other languages
 
-Every port writes the same three tables with the same bytes, so any of them can share a store with the others:
+Every port writes the same three tables with the same bytes, so processes in any two languages can share a store, as long as both have a store for that database: TypeScript, Ruby and Python have none for MySQL or MariaDB, so a MySQL store is shared among PHP, Go, Rust, Elixir, Java and .NET, while SQLite and Postgres can be shared by all nine (TypeScript's D1 store is SQLite too, but only a Worker reaches it). Each language's stores:
 
 | Language | Stores |
 |---|---|

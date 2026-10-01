@@ -1,9 +1,10 @@
 /**
  * Writes conformance/*.json: cases produced by running the TypeScript SDK,
- * which the Ruby gem (packages/ruby/test/conformance_test.rb) and the Python
- * package (packages/python/tests/test_conformance.py) replay to prove they
- * behave the same. A behaviour change lands in TypeScript first, these files
- * are regenerated, and the ports are fixed until they pass.
+ * which every port (Ruby, Python, PHP, Go, Rust, Elixir, Java and .NET)
+ * replays in its own tests to prove it behaves the same. A behaviour change
+ * lands in TypeScript first, these files are regenerated, and the ports are
+ * fixed until they pass. The files are test material that holds the ports
+ * to the SDK, not a published specification.
  *
  * The public API comes from the built package (packages/sdk/dist). The pure
  * functions it does not export are imported from packages/sdk/src, so this
