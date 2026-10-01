@@ -587,15 +587,15 @@ public class HardeningTests
             ProcessExitHook = false,
             Clock = Clock(),
         });
-        deferred.Start();
+        deferred.StartChecking();
         deferred.Stop();
-        deferred.Start();
+        deferred.StartChecking();
         deferred.Stop();
         string warning = Assert.Single(warnings);
         Assert.Equal(
-            "[cronwatch] Start() was called with Deliver.AtCheck, so these checks send no alerts. Another process must run checks with Deliver.Now (the default) to send them.",
+            "[cronwatch] StartChecking() was called with Deliver.AtCheck, so these checks send no alerts. Another process must run checks with Deliver.Now (the default) to send them.",
             warning);
-        delivering.Start();
+        delivering.StartChecking();
         delivering.Stop();
         Assert.Single(warnings);
     }
@@ -626,8 +626,8 @@ public class HardeningTests
     {
         var counter = new CountingSource();
         await using var m = Make(sources: [counter]);
-        m.Cw.Start(TimeSpan.FromMinutes(1));
-        m.Cw.Start("5s"); // a second start does nothing
+        m.Cw.StartChecking(TimeSpan.FromMinutes(1));
+        m.Cw.StartChecking("5s"); // a second start does nothing
         m.Clock.Advance(999);
         await Task.Delay(20);
         Assert.Equal(0, counter.Syncs);
@@ -645,18 +645,34 @@ public class HardeningTests
     }
 
     [Fact]
+    public async Task Start_is_StartChecking_under_its_former_name()
+    {
+        var counter = new CountingSource();
+        await using var m = Make(sources: [counter]);
+#pragma warning disable CS0618 // the deprecated name, kept through 1.x
+        m.Cw.Start("5s");
+        m.Cw.StartChecking("1m"); // a second start, under either name, does nothing
+#pragma warning restore CS0618
+        m.Clock.Advance(1000);
+        await Eventually("the first check", () => counter.Syncs == 1 && !m.Cw.Checking);
+        m.Clock.Advance(5000);
+        await Eventually("the check on the interval Start gave", () => counter.Syncs == 2);
+        m.Cw.Stop();
+    }
+
+    [Fact]
     public async Task Start_again_after_stop_checks_and_a_long_interval_does_not_check_every_millisecond()
     {
         var counter = new CountingSource();
         await using var m = Make(sources: [counter]);
-        m.Cw.Start("30d");
+        m.Cw.StartChecking("30d");
         m.Clock.Advance(1000);
         await Eventually("the first check", () => counter.Syncs == 1 && !m.Cw.Checking);
         m.Clock.Advance(Hour);
         await Task.Delay(50);
         Assert.Equal(1, counter.Syncs);
         m.Cw.Stop();
-        m.Cw.Start();
+        m.Cw.StartChecking();
         m.Clock.Advance(1000);
         await Eventually("the first check after starting again", () => counter.Syncs == 2 && !m.Cw.Checking);
     }
@@ -666,7 +682,7 @@ public class HardeningTests
     {
         var counter = new CountingSource();
         await using var m = Make(sources: [counter]);
-        m.Cw.Start(TimeSpan.FromDays(100_000));
+        m.Cw.StartChecking(TimeSpan.FromDays(100_000));
         m.Clock.Advance(1000);
         await Eventually("the first check", () => counter.Syncs == 1 && !m.Cw.Checking);
         m.Clock.Advance(CronwatchClient.TimerMaxMs);
@@ -679,7 +695,7 @@ public class HardeningTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var counter = new CountingSource { Hold = release.Task };
         await using var m = Make(sources: [counter]);
-        m.Cw.Start("5s");
+        m.Cw.StartChecking("5s");
         m.Clock.Advance(1000);
         await counter.Entered.Task;
         // The first check waits on the source through several ticks, which share it.

@@ -23,11 +23,11 @@ internal sealed class CronwatchCheckService(CronwatchClient client, CronwatchHos
         Duration every = options.CheckEvery ?? TimeSpan.FromMinutes(1);
         if (lifetime == null)
         {
-            client.Start(every);
+            client.StartChecking(every);
         }
         else
         {
-            _started = lifetime.ApplicationStarted.Register(() => client.Start(every));
+            _started = lifetime.ApplicationStarted.Register(() => client.StartChecking(every));
         }
         return Task.CompletedTask;
     }

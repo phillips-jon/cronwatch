@@ -748,7 +748,7 @@ Java (Java 21 or newer)
 4. Run the check every few minutes so missed and stuck runs are noticed:
    AddCronwatch does it as a hosted service (CheckEvery, a minute by
    default); with Hangfire or Quartz.NET their check job above runs it once
-   per cluster, so set o.NoCheck = true in AddCronwatch; cw.Start() in any
+   per cluster, so set o.NoCheck = true in AddCronwatch; cw.StartChecking() in any
    other long-running process; or, for a program a crontab runs, a second
    crontab line running the app with the arguments "cronwatch check". In a
    Generic Host app, end Main with return await

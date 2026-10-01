@@ -67,7 +67,7 @@ public class ReadmeTests
             });
 
             CheckResult result = await cw.CheckAsync(); // missed and stuck runs, retries, pruning
-            cw.Start(TimeSpan.FromMinutes(1)); // a check every minute, for a long-running process
+            cw.StartChecking(TimeSpan.FromMinutes(1)); // a check every minute, for a long-running process
             await cw.SilenceAsync("nightly-report", "2h");
             // End of the README's example.
 

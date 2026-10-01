@@ -56,7 +56,7 @@ string path = await nightly.RunAsync(async (job, ct) =>
 });
 
 CheckResult result = await cw.CheckAsync(); // missed and stuck runs, retries, pruning
-cw.Start(TimeSpan.FromMinutes(1)); // a check every minute, for a long-running process
+cw.StartChecking(TimeSpan.FromMinutes(1)); // a check every minute, for a long-running process
 await cw.SilenceAsync("nightly-report", "2h");
 ```
 
@@ -237,6 +237,12 @@ WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/
 ### Telemetry
 
 An `ActivitySource` and a `Meter`, both named `Cronwatch`: an activity around each run and each check, and counters of runs, alerts and checks with a histogram of run durations. Add `.AddSource("Cronwatch")` and `.AddMeter("Cronwatch")` to an OpenTelemetry setup.
+
+## Deprecated
+
+These names still work through every 1.x release, marked `[Obsolete]`, and go in 2.0:
+
+- `cw.Start(every)`: use `cw.StartChecking(every)`, since a job's `StartAsync` opens a run.
 
 ## Testing this package
 

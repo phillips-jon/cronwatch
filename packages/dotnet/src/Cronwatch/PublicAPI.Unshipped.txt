@@ -469,6 +469,7 @@ Cronwatch.CronwatchClient.RunAsync<T>(string! name, System.Func<Cronwatch.JobCon
 Cronwatch.CronwatchClient.RunsAsync(string! name, int limit = 50, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Run!>!>!
 Cronwatch.CronwatchClient.SilenceAsync(string! name, Cronwatch.Duration duration, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.JobState!>!
 Cronwatch.CronwatchClient.Start(Cronwatch.Duration? every = null) -> void
+Cronwatch.CronwatchClient.StartChecking(Cronwatch.Duration? every = null) -> void
 Cronwatch.CronwatchClient.Stop() -> void
 Cronwatch.CronwatchClient.Store.get -> Cronwatch.IStore!
 Cronwatch.CronwatchClient.SyncJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!

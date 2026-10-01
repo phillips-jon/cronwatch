@@ -525,12 +525,17 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
 
     /// <summary>
     /// Checks on an interval (a minute by default, five seconds at least, at most 2^31 - 1 ms),
-    /// the first a second from now, on the client's clock: the SDK's <c>start()</c>, for a
-    /// long-running process. A second call does nothing.
+    /// the first a second from now, on the client's clock: the SDK's <c>startChecking()</c>, for a
+    /// long-running process. A second call does nothing. (A job's <c>StartAsync</c> opens a run;
+    /// this starts the checks.)
     /// </summary>
-    public void Start(Duration? every = null) => StartInterval(every is { } e ? e.Milliseconds("check interval") : 60_000);
+    public void StartChecking(Duration? every = null) => StartInterval(every is { } e ? e.Milliseconds("check interval") : 60_000);
 
-    /// <summary>Stops the interval.</summary>
+    /// <summary><see cref="StartChecking"/>, under its former name.</summary>
+    [Obsolete("Renamed StartChecking, since a job's StartAsync opens a run. This name still works through 1.x and goes in 2.0.")]
+    public void Start(Duration? every = null) => StartChecking(every);
+
+    /// <summary>Stops the checks <see cref="StartChecking"/> began.</summary>
     public void Stop() => StopInterval();
 
     // ---- what a source uses

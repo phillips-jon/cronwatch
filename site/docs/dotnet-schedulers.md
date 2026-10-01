@@ -31,7 +31,7 @@ Every attempt is a run of its own. An attempt that fails is a failed run with it
 
 ### The check
 
-Each integration's check runs a sync first: the scheduler's jobs are declared again, and the jobs of this app's that the store holds with a schedule the scheduler no longer has are declared again without it. It runs once a minute across the cluster, on the scheduler's own lock. `AddCronwatch`'s hosted check and `cw.Start()` check too, but without the sync, so a job taken out of the scheduler by a deploy keeps its schedule and is reported missed; prefer the integration's check, and give `AddCronwatch` `NoCheck = true` so each instance does not check again.
+Each integration's check runs a sync first: the scheduler's jobs are declared again, and the jobs of this app's that the store holds with a schedule the scheduler no longer has are declared again without it. It runs once a minute across the cluster, on the scheduler's own lock. `AddCronwatch`'s hosted check and `cw.StartChecking()` check too, but without the sync, so a job taken out of the scheduler by a deploy keeps its schedule and is reported missed; prefer the integration's check, and give `AddCronwatch` `NoCheck = true` so each instance does not check again.
 
 ## Hangfire
 

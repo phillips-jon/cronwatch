@@ -49,7 +49,7 @@ await using var cw = new CronwatchClient(new CronwatchOptions
     Alerts = { Slack.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
     Retention = "30d",
 });
-cw.Start();                                                  // check every minute, in a long-running service
+cw.StartChecking();                                          // check every minute, in a long-running service
 ```
 
 Every option has the SDK's default, and the constructor checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to the console. `DisposeAsync` stops the check, records the runs still open in this process, waits up to five seconds for sends in flight, and lets go of the store.
@@ -135,7 +135,7 @@ A loop of your own needs no helper: declare the job with its schedule and call `
 
 ## Run the check
 
-A job that never starts cannot report itself, so something has to look. `AddCronwatch` runs the check as a hosted service every minute. Outside the host, `cw.Start()` checks every minute, the first a second after it is called; `cw.Start("5m")` or a `TimeSpan` sets the interval (five seconds at least), and `Stop()` ends it. Where another process checks, call `CheckAsync()` there:
+A job that never starts cannot report itself, so something has to look. `AddCronwatch` runs the check as a hosted service every minute. Outside the host, `cw.StartChecking()` checks every minute, the first a second after it is called; `cw.StartChecking("5m")` or a `TimeSpan` sets the interval (five seconds at least), and `Stop()` ends it. (`Start` is its former name, deprecated.) Where another process checks, call `CheckAsync()` there:
 
 ```csharp
 CheckResult result = await cw.CheckAsync();   // CheckedAt, Jobs, Alerts, Pruned
@@ -466,6 +466,14 @@ await again.FinishAsync();                                                      
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 
 A 1.x release keeps what it does not know in the stored data: a field of a job's state or definition a newer release added, a condition it does not alert on, a run status or trigger it has not seen. It writes them back as they were, never treating an unknown status as running, so any 1.x release of any language can share a store with any other. 0.x releases are not covered: upgrade every process to 1.0 together.
+
+## Deprecated
+
+These names still work through every 1.x release, marked `[Obsolete]` so the compiler points at the replacement, and go in 2.0.
+
+| Deprecated | Use |
+|---|---|
+| `cw.Start(every)` | `cw.StartChecking(every)`, since a job's `StartAsync` opens a run |
 
 ## Kept in step
 
