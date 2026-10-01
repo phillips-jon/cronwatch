@@ -501,13 +501,49 @@ pub struct StoredJob {
     pub definition: Definition,
     pub created_at: i64,
     pub updated_at: i64,
+    /// The stored definition was not a JSON object (see [`StoredJob::read`]).
+    pub(crate) unreadable: bool,
 }
 
 impl StoredJob {
     /// The job `definition` names, first stored at `created_at` and last
     /// declared at `updated_at`.
     pub fn new(definition: Definition, created_at: i64, updated_at: i64) -> StoredJob {
-        StoredJob { name: definition.name().to_string(), definition, created_at, updated_at }
+        StoredJob { name: definition.name().to_string(), definition, created_at, updated_at, unreadable: false }
+    }
+
+    /// The job named `name` as a store read its row, with its definition as
+    /// the JSON text the row holds, leniently, so a foreign, hand-edited or
+    /// damaged row affects only its own job. A definition that does not
+    /// parse, or is not a JSON object, becomes `{"name": <name>}` and the job
+    /// is not readable ([`is_readable`](Self::is_readable)): the client
+    /// reports it and shows it as failing, without evaluating it. `tags` is
+    /// kept only when it is a list of strings; every other field is kept as
+    /// stored.
+    pub fn read(name: impl Into<String>, definition: &str, created_at: i64, updated_at: i64) -> StoredJob {
+        let name = name.into();
+        let (definition, unreadable) = match js::parse(definition) {
+            Ok(Value::Object(o)) => (Definition(o), false),
+            _ => (Definition(Object::new().with("name", name.as_str())), true),
+        };
+        StoredJob { name, definition, created_at, updated_at, unreadable }.read_leniently()
+    }
+
+    /// Whether the job's stored definition was a JSON object. One that was
+    /// not ([`read`](Self::read)) is reported by a check and shown as
+    /// failing.
+    pub fn is_readable(&self) -> bool {
+        !self.unreadable
+    }
+
+    /// The job as the client reads it (the SDK's `readStoredJob`): `tags`
+    /// that is not a list of strings is left out.
+    pub(crate) fn read_leniently(mut self) -> StoredJob {
+        let odd = |v: &Value| !matches!(v, Value::Array(list) if list.iter().all(|t| t.as_str().is_some()));
+        if self.definition.0.get("tags").is_some_and(odd) {
+            self.definition.0.remove("tags");
+        }
+        self
     }
 }
 
@@ -737,15 +773,25 @@ impl JobState {
         JobState::from_value(&js::parse(text)?)
     }
 
-    /// Reads the SDK's JSON value.
+    /// Reads the SDK's JSON value, leniently, as the SDK's `normalizeState`
+    /// reads a stored state, so a foreign, hand-edited or damaged one affects
+    /// only its own job: an `open` entry whose time is not a number is not
+    /// open, a `silencedUntil` or `lastAlertAt` that is not a number is
+    /// none, and `pendingRecovery` and `undelivered` keep only their entries
+    /// of the right shape. Only a value that is not an object is an error
+    /// (a store reads such a state as none).
     pub fn from_value(v: &Value) -> Result<JobState, JsonError> {
         let Value::Object(o) = v else {
             return Err(JsonError(format!("a job state must be an object, not {}", v.kind())));
         };
         let mut s = JobState { job: str_of(o, "job"), ..Default::default() };
         if let Some(Value::Object(open)) = o.get("open") {
+            // Only the entries whose time is a number: another (a foreign or
+            // damaged row's) is not an open condition.
             for (k, at) in open.iter() {
-                s.open.push(OpenCondition { condition: Condition::parse(k), since: to_int(at) });
+                if let Value::Number(n) = at {
+                    s.open.push(OpenCondition { condition: Condition::parse(k), since: js::to_i64(*n) });
+                }
             }
         }
         s.consecutive_failures = failure_count(o.get("consecutiveFailures"));
@@ -984,8 +1030,16 @@ pub(crate) struct KeptFields {
     top: Vec<(String, Value)>,
     /// Keys of `details` its variant does not hold, in the order read.
     details: Vec<(String, Value)>,
-    /// The details as stored, for an alert of a type the port does not know.
+    /// The details as stored, for an alert of a type the port does not know,
+    /// and for a recovery whose details do not say what it recovers from.
     raw_details: Option<Value>,
+    /// `at` as stored when it is not a number (`Some(None)` when absent),
+    /// written back as it was read.
+    raw_at: Option<Option<Value>>,
+    /// Read from a foreign or damaged row in a shape no retry can judge: a
+    /// recovery whose `details.after` is not a list of strings, or an alert
+    /// whose `at` is not a number. Such an alert is stale (`stale_alert`).
+    pub(crate) unjudgeable: bool,
 }
 
 const ALERT_KEYS: [&str; 9] = ["type", "run", "details", "job", "definition", "title", "message", "at", "triage"];
@@ -1032,8 +1086,12 @@ impl Alert {
             .with("job", self.job.as_str())
             .with("definition", self.definition.0.clone())
             .with("title", self.title.as_str())
-            .with("message", self.message.as_str())
-            .with("at", self.at);
+            .with("message", self.message.as_str());
+        match &self.kept.raw_at {
+            None => o.set("at", self.at),
+            Some(Some(raw)) => o.set("at", raw.clone()),
+            Some(None) => {}
+        }
         // A field a newer release added goes before the triage, which the
         // SDK spreads onto an alert last.
         for (k, v) in &self.kept.top {
@@ -1054,7 +1112,7 @@ impl Alert {
     /// they were read, and a known type's with the keys its variant does not
     /// hold after its own.
     fn details_value(&self) -> Value {
-        if let (AlertType::Other(_), Some(raw)) = (&self.alert_type, &self.kept.raw_details) {
+        if let (AlertType::Other(_) | AlertType::Recovered, Some(raw)) = (&self.alert_type, &self.kept.raw_details) {
             return raw.clone();
         }
         let mut details = self.details.to_value();
@@ -1107,6 +1165,26 @@ impl Alert {
             }
         }
         kept.top = o.iter().filter(|(k, _)| !ALERT_KEYS.contains(k)).map(|(k, v)| (k.to_string(), v.clone())).collect();
+        // From a foreign or damaged row: a recovery that does not say what it
+        // recovers from, with a list of strings, and an alert with no
+        // numeric time, cannot be judged, and are stale. Each is written
+        // back as it was read until a retry drops it.
+        if alert_type == AlertType::Recovered {
+            let after = details_object.and_then(|d| d.get("after"));
+            let judged = matches!(after, Some(Value::Array(list)) if list.iter().all(|c| c.as_str().is_some()));
+            if !judged {
+                kept.unjudgeable = true;
+                kept.raw_details = stored_details.cloned();
+                kept.details.clear();
+            }
+        }
+        match o.get("at") {
+            Some(Value::Number(_)) => {}
+            other => {
+                kept.unjudgeable = true;
+                kept.raw_at = Some(other.cloned());
+            }
+        }
         Ok(Alert {
             run,
             details,
@@ -1351,6 +1429,29 @@ mod tests {
         // One as the SDK writes it equals one made with `new`.
         assert_eq!(entries[5], SendingAlert::new(Some(9), None));
         assert_eq!(s.to_json(), state);
+    }
+
+    /// A queued alert a retry cannot judge (a recovery that does not say
+    /// what it recovers from, an alert with no numeric time) is stale, and
+    /// written back as it was read until the retry drops it; a state's open
+    /// entry whose time is not a number is not open (the second review).
+    #[test]
+    fn an_alert_no_retry_can_judge_is_stale_and_written_back_as_read() {
+        let state = JobState::from_json(r#"{"job":"j","open":{"failed":5,"slow":"x","stuck":null}}"#).unwrap();
+        assert_eq!(state.open, vec![OpenCondition::new(Condition::Failed, 5)]);
+        for text in [
+            r#"{"type":"recovered","run":null,"details":{},"job":"j","definition":{},"title":"","message":"","at":5}"#,
+            r#"{"type":"recovered","run":null,"details":"x","job":"j","definition":{},"title":"","message":"","at":5}"#,
+            r#"{"type":"recovered","run":null,"details":{"after":["failed",1]},"job":"j","definition":{},"title":"","message":"","at":5}"#,
+            r#"{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"j","definition":{},"title":"","message":"","at":"x"}"#,
+            r#"{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"j","definition":{},"title":"","message":""}"#,
+        ] {
+            let alert = Alert::from_json(text).unwrap();
+            assert!(crate::evaluate::stale_alert(&alert, &state), "{text}");
+            assert_eq!(alert.to_json(), text);
+        }
+        let judged = r#"{"type":"failed","run":null,"details":{"consecutiveFailures":1,"threshold":1},"job":"j","definition":{},"title":"","message":"","at":5}"#;
+        assert!(!crate::evaluate::stale_alert(&Alert::from_json(judged).unwrap(), &state));
     }
 
     #[test]

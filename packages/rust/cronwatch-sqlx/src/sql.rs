@@ -196,8 +196,9 @@ impl Statements {
         // The version inside a state's JSON, as cronwatch's state_version
         // reads it: a whole number from 0 to 2^53 - 1, else 0 (none, or a
         // foreign row's 1.5 or "x", which must neither fail the statement
-        // nor refuse every write for good). Each CASE tests the JSON type
-        // before any cast. The SDK's text, byte for byte.
+        // nor refuse every write for good; on SQLite, also text that is not
+        // JSON, before json_type could fail on it). Each CASE tests the JSON
+        // type before any cast. The SDK's text, byte for byte.
         let version = |column: &str| {
             if pg {
                 let v = format!("({column}->>'version')::numeric");
@@ -207,7 +208,7 @@ impl Statements {
             } else {
                 let v = format!("json_extract({column}, '$.version')");
                 format!(
-                    "CASE WHEN json_type({column}, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN {v} = CAST({v} AS INTEGER) AND {v} BETWEEN 0 AND 9007199254740991 THEN CAST({v} AS INTEGER) ELSE 0 END"
+                    "CASE WHEN NOT json_valid({column}) THEN 0 WHEN json_type({column}, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN {v} = CAST({v} AS INTEGER) AND {v} BETWEEN 0 AND 9007199254740991 THEN CAST({v} AS INTEGER) ELSE 0 END"
                 )
             }
         };
@@ -377,7 +378,7 @@ mod tests {
         let q = Statements::new(Dialect::Sqlite, "cw_");
         assert_eq!(
             &*q.cas_update,
-            "UPDATE cw_state SET state = ? WHERE job = ? AND CASE WHEN json_type(state, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN json_extract(state, '$.version') = CAST(json_extract(state, '$.version') AS INTEGER) AND json_extract(state, '$.version') BETWEEN 0 AND 9007199254740991 THEN CAST(json_extract(state, '$.version') AS INTEGER) ELSE 0 END = ?"
+            "UPDATE cw_state SET state = ? WHERE job = ? AND CASE WHEN NOT json_valid(state) THEN 0 WHEN json_type(state, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN json_extract(state, '$.version') = CAST(json_extract(state, '$.version') AS INTEGER) AND json_extract(state, '$.version') BETWEEN 0 AND 9007199254740991 THEN CAST(json_extract(state, '$.version') AS INTEGER) ELSE 0 END = ?"
         );
         let q = Statements::new(Dialect::Postgres, "cw_");
         assert_eq!(&*q.list_runs, "SELECT * FROM cw_runs WHERE job = $1 ORDER BY started_at DESC, seq DESC LIMIT $2");

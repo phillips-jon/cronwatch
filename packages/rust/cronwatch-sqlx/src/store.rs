@@ -191,49 +191,41 @@ impl SqlStore {
 }
 
 fn job_of(row: &Row) -> Result<StoredJob, BoxError> {
-    let name = row.text("name").unwrap_or_default();
-    let text = row.text("definition").unwrap_or_default();
-    // JSON of another shape (another writer's, or a hand edit) is a
-    // definition with nothing in it, as the SDK reads it: one such row must
-    // not fail every read of the jobs, and with it every check.
-    let definition = match js::parse(&text) {
-        Ok(Value::Object(o)) => Definition::from_object(o),
-        Ok(_) => Definition::default(),
-        Err(err) => return Err(format!("job {name}: {err}").into()),
-    };
-    let mut job = StoredJob::new(definition, row.int("created_at").unwrap_or(0), row.int("updated_at").unwrap_or(0));
-    job.name = name;
-    Ok(job)
+    // Read leniently, as the SDK reads a row, so one row another writer (or
+    // a hand edit) left must not fail every read of the jobs, and with it
+    // every check: a definition that is not a JSON object makes the job
+    // unreadable (StoredJob::read), which the client reports for that job
+    // alone; a time that is not a finite number reads as 0.
+    Ok(StoredJob::read(
+        row.text("name").unwrap_or_default(),
+        &row.text("definition").unwrap_or_default(),
+        row.number("created_at").unwrap_or(0),
+        row.number("updated_at").unwrap_or(0),
+    ))
 }
 
+/// A run's row, read leniently as the SDK reads one: a start that is not a
+/// finite number reads as 0, a finish or duration as none; an error or
+/// output that is not text as none; metrics that do not parse to an object
+/// as none, and of one that does, only the values that are numbers; a
+/// trigger that is not text as `run`.
 fn run_of(row: &Row) -> Result<Run, BoxError> {
-    let id = row.text("id").unwrap_or_default();
-    let mut metrics = Metrics::new();
-    if let Some(text) = row.text("metrics") {
-        metrics = match Metrics::from_json(&text) {
-            Ok(m) => m,
-            // Metrics another writer stored that are not all numbers keep the
-            // ones that are, so one such row (a running one especially, which
-            // every check reads) cannot fail the reads it is part of.
-            Err(err) => match js::parse(&text) {
-                Ok(Value::Object(o)) => o.iter().filter_map(|(k, v)| v.as_f64().map(|n| (k.to_string(), n))).collect(),
-                Ok(_) => Metrics::new(),
-                Err(_) => return Err(format!("run {id}: {err}").into()),
-            },
-        };
-    }
+    let metrics = match row.text("metrics").map(|text| js::parse(&text)) {
+        Some(Ok(Value::Object(o))) => o.iter().filter_map(|(k, v)| v.as_f64().map(|n| (k.to_string(), n))).collect(),
+        _ => Metrics::new(),
+    };
     let mut run = Run::new(
-        id,
+        row.text("id").unwrap_or_default(),
         row.text("job").unwrap_or_default(),
         RunStatus::parse(&row.text("status").unwrap_or_default()),
-        row.int("started_at").unwrap_or(0),
+        row.number("started_at").unwrap_or(0),
     );
-    run.finished_at = row.int("finished_at");
-    run.duration_ms = row.int("duration_ms");
-    run.error = row.text("error");
-    run.output = row.text("output");
+    run.finished_at = row.number("finished_at");
+    run.duration_ms = row.number("duration_ms");
+    run.error = row.string("error");
+    run.output = row.string("output");
     run.metrics = metrics;
-    run.trigger = row.text("trigger").unwrap_or_default();
+    run.trigger = row.string("trigger").unwrap_or_else(|| "run".into());
     Ok(run)
 }
 
@@ -438,8 +430,14 @@ impl Store for SqlStore {
             let Some(row) = rows.first() else {
                 return Ok(None);
             };
+            // Text that does not parse, or is not an object (a foreign or
+            // damaged row's), is no state, as the SDK's normalizeState reads
+            // it: the next write puts it right.
             let text = row.text("state").unwrap_or_default();
-            Ok(Some(JobState::from_json(&text)?))
+            Ok(match js::parse(&text) {
+                Ok(v @ Value::Object(_)) => Some(JobState::from_value(&v)?),
+                _ => None,
+            })
         })
     }
 

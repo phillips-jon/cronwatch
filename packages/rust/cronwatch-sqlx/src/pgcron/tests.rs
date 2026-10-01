@@ -46,6 +46,8 @@ struct Tables {
     settings: HashMap<String, String>,
     runid: i64,
     queries: Vec<String>,
+    /// The open runids each runs query asked for.
+    opened: Vec<Vec<i64>>,
 }
 
 /// `cron.job`, `cron.job_run_details` and the settings a role can read, in
@@ -165,6 +167,7 @@ impl Reader for FakeCron {
             detail_rows(&list)
         } else if sql.contains("unnest") {
             let (ids, afters, open) = (array(&params[0]), array(&params[1]), array(&params[2]));
+            t.opened.push(open.clone());
             let after: HashMap<i64, i64> = ids.into_iter().zip(afters).collect();
             let mut list: Vec<&Detail> = t
                 .details
@@ -427,6 +430,43 @@ async fn a_job_forgotten_from_the_dashboard_is_declared_again_and_its_runs_recor
     let ids: Vec<String> = k.runs("vacuum", 50).await.into_iter().map(|r| r.id).collect();
     assert_eq!(ids, [pid(3), pid(2)], "the runs after the forget");
     assert_eq!(k.cw.defined_jobs().iter().map(|d| d.name().to_string()).collect::<Vec<_>>(), ["vacuum"]);
+}
+
+// The second review: a run copied under a name a rename retired, which was
+// then forgotten, was reported as not declared on every check and read
+// until the process restarted.
+#[tokio::test]
+async fn a_renamed_jobs_old_name_forgotten_while_its_run_is_open_lets_the_run_go_with_no_error() {
+    let c = Clock::new(T0);
+    let cron = FakeCron::new();
+    cron.job(1, name("a"), "0 3 * * *", true);
+    let running = cron.add(1, "running", T0 - 5000, -1, None);
+    let k = Kit::new(&cron, Some(&c), Some(Arc::new(MemoryStore::new())), PgCronOptions::default());
+    k.check().await;
+    assert_eq!(k.run(&pid(running)).await.expect("copied").job, "a");
+    cron.update_job(1, |j| j.jobname = name("b"));
+    c.advance(MIN);
+    k.check().await;
+    let old = k.cw.job_summary("a").await.unwrap().expect("a is retired");
+    assert!(old.definition.description().contains("renamed to b"), "{}", old.definition.description());
+    k.cw.forget("a").await.unwrap();
+    cron.update(running, |d| {
+        d.status = "succeeded".into();
+        d.end = Some(T0);
+    });
+    for i in 0..3 {
+        c.advance(MIN);
+        cron.tables().opened.clear();
+        k.check().await;
+        // Read by the first check after the forget, which lets it go.
+        if i > 0 {
+            assert!(cron.tables().opened.iter().all(|ids| !ids.contains(&running)), "the run is no longer read");
+        }
+    }
+    assert_eq!(k.errors.list(), Vec::<String>::new());
+    assert!(k.cw.job_summary("a").await.unwrap().is_none(), "the forgotten name is not declared again");
+    assert!(k.run(&pid(running)).await.is_none(), "the run is not recorded");
+    assert_eq!(k.cw.defined_jobs().iter().map(|d| d.name().to_string()).collect::<Vec<_>>(), ["b"]);
 }
 
 #[tokio::test]

@@ -96,8 +96,10 @@ impl RoutesOptions {
 
     /// The token the dashboard asks for. Send it as
     /// `Authorization: Bearer <token>`, or open the dashboard once with
-    /// `?token=<token>` and a cookie is set. Without it the token is
-    /// `CRONWATCH_TOKEN`; `""` counts as unset. With no token in development
+    /// `?token=<token>`, or enter it in the sign-in page's form, and a
+    /// cookie is set. Without it the token is `CRONWATCH_TOKEN`; an empty
+    /// string, or one of only whitespace, given here or in the variable,
+    /// counts as unset. With no token in development
     /// (`CRONWATCH_ENV`, `APP_ENV` or `RUST_ENV` naming it), the routes make
     /// a random one and print a sign-in link to standard output on their
     /// first request; with no token otherwise they answer 503. `/api/check`
@@ -194,10 +196,12 @@ impl Client {
     pub fn routes(&self, options: RoutesOptions) -> Result<Routes, Error> {
         let origin = configured_origin(options.origin.as_deref().unwrap_or("")).map_err(Error::Invalid)?;
         let opted_out = options.token == Some(None);
+        // A blank token (empty or only whitespace), given or read, counts as
+        // unset; any other is used as it is, untrimmed.
         let configured = match options.token {
             Some(None) => String::new(),
-            Some(Some(t)) if !t.is_empty() => t,
-            _ => std::env::var("CRONWATCH_TOKEN").unwrap_or_default(),
+            Some(Some(t)) if !crate::env::is_blank(&t) => t,
+            _ => crate::env::secret_var("CRONWATCH_TOKEN").unwrap_or_default(),
         };
         // A handler cannot tell a local caller from a remote one (proxies,
         // tunnels and a server listening on every interface all look alike),
@@ -374,8 +378,11 @@ fn cross_site(req: &Request, public_origin: &str) -> bool {
     header(req, "sec-fetch-site").is_some_and(|s| *s != *b"same-origin" && *s != *b"none")
 }
 
-/// The `Authorization` header without its `Bearer ` (in any case, with any
-/// spaces after it), or `None` when there is none.
+/// The token an `Authorization` header carries: what follows the scheme
+/// when the scheme is `Bearer` (in any case) and one or more whitespace
+/// characters follow it, else `None`. Any other scheme (a proxy's Basic
+/// auth, say) is not a bearer at all, so the cookie and `?token=` are read
+/// as if no header came.
 fn bearer(req: &Request) -> Option<String> {
     let text = latin1(&header(req, "authorization")?);
     if text.len() > 6 && text.is_char_boundary(6) && text[..6].eq_ignore_ascii_case("bearer") {
@@ -384,7 +391,30 @@ fn bearer(req: &Request) -> Option<String> {
             return Some(rest.to_string());
         }
     }
-    Some(text)
+    None
+}
+
+/// Where a sign-in through the form goes next: the page it was posted from
+/// (the `Referer`) when that is on the public origin and its query has no
+/// `token` parameter, else the dashboard.
+fn sign_in_return(referer: &[u8], public_origin: &str, base: &str) -> Vec<u8> {
+    let prefix = format!("{public_origin}/");
+    if !referer.starts_with(prefix.as_bytes()) {
+        return format!("{base}/").into_bytes();
+    }
+    // The URL parser drops tabs and newlines before it reads the query.
+    let parsed: Vec<u8> = referer.iter().copied().filter(|c| !matches!(c, b'\t' | b'\n' | b'\r')).collect();
+    let query = match parsed.iter().position(|&c| c == b'?') {
+        Some(i) => {
+            let rest = &parsed[i + 1..];
+            &rest[..rest.iter().position(|&c| c == b'#').unwrap_or(rest.len())]
+        }
+        None => &[][..],
+    };
+    if parse_form(query).iter().any(|(name, _)| name == "token") {
+        return format!("{base}/").into_bytes();
+    }
+    referer.to_vec()
 }
 
 /// What `GET <base>/api` says is serving it: the package as its registry
@@ -610,6 +640,39 @@ impl Routes {
             return Ok(api(error_body("Cross-site request refused"), 403));
         }
 
+        let cookie_path = if base.is_empty() { "/" } else { base };
+        let secure = if said.public_origin.starts_with("https:") { "; Secure" } else { "" };
+        let sign_in_cookie = || {
+            pair(
+                "set-cookie",
+                format!(
+                    "{TOKEN_COOKIE}={}; Path={cookie_path}; HttpOnly; SameSite=Lax; Max-Age={COOKIE_MAX_AGE}{secure}",
+                    rt.cookie
+                ),
+            )
+        };
+        let sign_in_page = || {
+            let message = if rt.generated {
+                "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once, or enter the token from it below, and this browser stays signed in."
+            } else {
+                "Enter your CRONWATCH_TOKEN and this browser stays signed in."
+            };
+            page(message_page("Sign in", message, base, true), 401)
+        };
+
+        // The sign-in form posts the token here, in the body, so it stays out
+        // of the URL and every access log. Cross-site posts were refused
+        // above.
+        if !rt.token.is_empty() && method == "POST" && path == "/signin" {
+            // A body past the cap carries no token.
+            let data = read_limited(req.take_body()).await.unwrap_or_default();
+            let sent = body_field(&said.content_type, &data, "token");
+            if !sent.is_some_and(|t| constant_time_eq(&t, &rt.token)) {
+                return Ok(sign_in_page());
+            }
+            return Ok(redirect(sign_in_return(&said.referer, &said.public_origin, base), vec![sign_in_cookie()]));
+        }
+
         if !rt.token.is_empty() {
             // ?token= is only the sign-in that moves the token into a cookie.
             let query_token = if wants_html && method == "GET" { param(&said.query, "token") } else { None };
@@ -625,18 +688,10 @@ impl Routes {
                 _ => false,
             };
             if !cron_secret_ok && !token_ok {
+                if wants_html {
+                    return Ok(sign_in_page());
+                }
                 if rt.generated {
-                    if wants_html {
-                        return Ok(page(
-                            message_page(
-                                "Sign in",
-                                "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.",
-                                base,
-                                true,
-                            ),
-                            401,
-                        ));
-                    }
                     return Ok(api(
                         error_body(
                             "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log",
@@ -644,21 +699,13 @@ impl Routes {
                         401,
                     ));
                 }
-                if wants_html {
-                    return Ok(page(
-                        message_page(
-                            "Sign in",
-                            "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.",
-                            base,
-                            true,
-                        ),
-                        401,
-                    ));
-                }
                 return Ok(api(error_body("Unauthorized"), 401));
             }
             if query_token.is_some() {
-                // Move the token from the URL into a cookie so it is not in history or logs.
+                // Move the token from the URL into a cookie, so it is not
+                // left in the browser's history. The request line that
+                // carried it may still be in an access log, which is why the
+                // sign-in form posts instead.
                 let rest: Vec<String> = said
                     .query
                     .iter()
@@ -666,18 +713,7 @@ impl Routes {
                     .map(|(n, v)| format!("{}={}", form_encode(n), form_encode(v)))
                     .collect();
                 let search = if rest.is_empty() { String::new() } else { format!("?{}", rest.join("&")) };
-                let secure = if said.public_origin.starts_with("https:") { "; Secure" } else { "" };
-                let cookie_path = if base.is_empty() { "/" } else { base };
-                return Ok(redirect(
-                    format!("{pathname}{search}"),
-                    vec![pair(
-                        "set-cookie",
-                        format!(
-                            "{TOKEN_COOKIE}={}; Path={cookie_path}; HttpOnly; SameSite=Lax; Max-Age={COOKIE_MAX_AGE}{secure}",
-                            rt.cookie
-                        ),
-                    )],
-                ));
+                return Ok(redirect(format!("{pathname}{search}"), vec![sign_in_cookie()]));
             }
         }
 

@@ -48,7 +48,8 @@ impl HandlerOptions {
 
     /// The secret the handler's requests must carry, as
     /// `Authorization: Bearer <secret>`, in place of the client's cron
-    /// secret. `""` counts as unset.
+    /// secret. An empty string, or one of only whitespace, counts as unset
+    /// and falls back to the client's.
     pub fn secret(mut self, secret: impl Into<String>) -> Self {
         self.secret = Some(Some(secret.into()));
         self
@@ -119,7 +120,7 @@ impl Job {
         let client = &self.client;
         let (secret, opted_out) = match options.secret {
             Some(None) => (String::new(), true),
-            Some(Some(own)) if !own.is_empty() => (own, false),
+            Some(Some(own)) if !crate::env::is_blank(&own) => (own, false),
             _ => (client.cron_secret().unwrap_or("").to_string(), client.inner.secret_opt_out),
         };
         let job = self.clone();

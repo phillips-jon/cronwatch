@@ -9,7 +9,8 @@ mod common;
 
 use std::sync::Arc;
 
-use common::{TempDir, memory_pool, pool, repo, store};
+use common::{TempDir, memory_pool, pool, repo, sorted, store};
+use cronwatch::js::Value;
 use cronwatch::storetest::{
     self,
     kit::{Clock, Process, Shared, T0},
@@ -151,7 +152,8 @@ async fn rows_of_another_shape_are_read_as_the_sdk_reads_them() {
     .await
     .unwrap();
     let job = s.get_job("odd").await.unwrap().expect("the job");
-    assert_eq!(job.definition.to_json(), "{}", "a definition that is not an object is an empty one");
+    assert_eq!(job.definition.to_json(), r#"{"name":"odd"}"#, "a definition that is not an object is its name alone");
+    assert!(!job.is_readable(), "and the job is unreadable");
     assert_eq!(job.updated_at, 2);
     let running = s.running_runs().await.unwrap();
     assert_eq!(running.len(), 1);
@@ -206,4 +208,230 @@ async fn a_client_records_and_checks_on_sqlite_and_another_reads_it() {
     let summary = two.client.job_summary("nightly").await.unwrap().expect("a summary");
     assert_eq!(summary.consecutive_failures, 1);
     assert!(one.errors.list().is_empty() && two.errors.list().is_empty(), "{:?}", one.errors.list());
+}
+
+// ---- store.json foreignRows: rows a foreign, hand-edited or damaged writer
+// could leave, each read leniently, one affecting only its own job.
+
+fn foreign_rows() -> cronwatch::js::Object {
+    let text = std::fs::read_to_string(repo().join("conformance/store.json")).expect("conformance/store.json");
+    let fixture = cronwatch::js::parse(&text).expect("JSON");
+    fixture.as_object().and_then(|o| o.get("foreignRows")).and_then(Value::as_object).cloned().expect("foreignRows")
+}
+
+fn list<'a>(o: &'a cronwatch::js::Object, key: &str) -> &'a Vec<Value> {
+    o.get(key).and_then(Value::as_array).unwrap_or_else(|| panic!("{key}"))
+}
+
+fn text<'a>(o: &'a cronwatch::js::Object, key: &str) -> &'a str {
+    o.get(key).and_then(Value::as_str).unwrap_or_else(|| panic!("{key}"))
+}
+
+/// One row into `cronwatch_<table>`, each value as SQLite holds it: a string
+/// as TEXT, a whole number as INTEGER, another as REAL, null as NULL.
+async fn insert_row(p: &sqlx::SqlitePool, table: &str, row: &cronwatch::js::Object) {
+    let keys: Vec<&str> = row.keys().collect();
+    let sql = format!(
+        "INSERT INTO cronwatch_{table} ({}) VALUES ({})",
+        keys.join(", "),
+        keys.iter().map(|_| "?").collect::<Vec<_>>().join(", ")
+    );
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql));
+    for k in &keys {
+        q = match row.get(k).unwrap() {
+            Value::String(s) => q.bind(s.clone()),
+            Value::Number(n) if n.fract() == 0.0 => q.bind(*n as i64),
+            Value::Number(n) => q.bind(*n),
+            Value::Null => q.bind(None::<String>),
+            other => panic!("a column cannot hold {}", other.to_json()),
+        };
+    }
+    q.execute(p).await.unwrap();
+}
+
+fn stored_job_value(job: &cronwatch::StoredJob) -> String {
+    Value::Object(
+        cronwatch::js::Object::new()
+            .with("name", job.name.as_str())
+            .with("definition", job.definition.as_object().clone())
+            .with("createdAt", job.created_at)
+            .with("updatedAt", job.updated_at),
+    )
+    .to_json()
+}
+
+/// A state as the client reads it (none for no row, every list present).
+fn read_state(s: Option<cronwatch::JobState>, job: &str) -> String {
+    let mut s = s.unwrap_or_else(|| cronwatch::JobState::new(job));
+    s.pending_recovery.get_or_insert_with(Vec::new);
+    s.undelivered.get_or_insert_with(Vec::new);
+    s.to_json()
+}
+
+/// The fixture's state with each queued alert as this port writes one
+/// (whole, every field, as an alert it composed): which alerts are kept is
+/// the SDK's.
+fn want_state(v: &Value) -> String {
+    let mut o = v.as_object().expect("a state").clone();
+    if let Some(Value::Array(alerts)) = o.get("undelivered") {
+        let read: Vec<Value> =
+            alerts.iter().map(|a| cronwatch::Alert::from_value(a).expect("an alert").to_value()).collect();
+        o.set("undelivered", read);
+    }
+    Value::Object(o).to_json()
+}
+
+#[tokio::test]
+async fn each_foreign_row_reads_leniently_store_json_foreign_rows() {
+    let fixture = foreign_rows();
+    for c in list(&fixture, "rows") {
+        let c = c.as_object().unwrap();
+        let table = text(c, "table");
+        let row = c.get("row").and_then(Value::as_object).unwrap();
+        let label = format!("{table} {}", Value::Object(row.clone()).to_json());
+        let dir = TempDir::new();
+        let file = dir.file("row.db");
+        let s = store(&file, "cronwatch_");
+        s.init().await.unwrap();
+        insert_row(&pool(&file), table, row).await;
+        let read = c.get("read").unwrap();
+        match table {
+            "jobs" => {
+                let job = s.get_job(text(row, "name")).await.unwrap().expect("the job");
+                assert_eq!(stored_job_value(&job), read.to_json(), "{label}");
+                let readable = !matches!(c.get("readable"), Some(Value::Bool(false)));
+                assert_eq!(job.is_readable(), readable, "{label}");
+                let listed: Vec<String> = s.list_jobs().await.unwrap().iter().map(stored_job_value).collect();
+                assert_eq!(listed, vec![read.to_json()], "{label}");
+            }
+            "runs" => {
+                let run = s.get_run(text(row, "id")).await.unwrap().expect("the run");
+                assert_eq!(run.to_json(), read.to_json(), "{label}");
+                let runs: Vec<String> =
+                    s.list_runs(text(row, "job"), 10).await.unwrap().iter().map(|r| r.to_json()).collect();
+                assert_eq!(runs, vec![read.to_json()], "{label}");
+            }
+            _ => {
+                let job = text(row, "job");
+                assert_eq!(read_state(s.get_state(job).await.unwrap(), job), want_state(read), "{label}");
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_check_a_silence_and_every_page_over_foreign_rows_store_json_foreign_rows() {
+    use std::sync::Mutex;
+    let fixture = foreign_rows();
+    let c = fixture.get("check").and_then(Value::as_object).unwrap();
+    let rows: Vec<&cronwatch::js::Object> = list(&fixture, "rows").iter().map(|r| r.as_object().unwrap()).collect();
+    let of = |table: &str| -> Vec<cronwatch::js::Object> {
+        rows.iter()
+            .filter(|r| r.get("table").and_then(Value::as_str) == Some(table))
+            .map(|r| r.get("row").and_then(Value::as_object).unwrap().clone())
+            .collect()
+    };
+    let extra = |key: &str| list(c, key).iter().map(|r| r.as_object().unwrap().clone()).collect::<Vec<_>>();
+    let jobs: Vec<_> = of("jobs").into_iter().chain(extra("extraJobs")).collect();
+    let runs: Vec<_> = of("runs").into_iter().chain(extra("extraRuns")).collect();
+    let dir = TempDir::new();
+    let file = dir.file("check.db");
+    let s = Arc::new(store(&file, "cronwatch_"));
+    s.init().await.unwrap();
+    let p = pool(&file);
+    for row in &jobs {
+        insert_row(&p, "jobs", row).await;
+    }
+    for row in &runs {
+        insert_row(&p, "runs", row).await;
+    }
+    for row in &of("state") {
+        insert_row(&p, "state", row).await;
+    }
+    let names: Vec<String> = jobs.iter().map(|j| text(j, "name").to_string()).collect();
+    let wheres = Arc::new(Mutex::new(Vec::<String>::new()));
+    let reported = || -> Vec<String> {
+        let mut out: Vec<String> = wheres
+            .lock()
+            .unwrap()
+            .drain(..)
+            .map(|w| names.iter().find(|n| w.ends_with(&format!(" {n}"))).cloned().unwrap_or(w))
+            .collect();
+        out.sort();
+        out.dedup();
+        out
+    };
+    let strings =
+        |v: &Value| -> Vec<String> { v.as_array().unwrap().iter().map(|s| s.as_str().unwrap().to_string()).collect() };
+    let sent = cronwatch::storetest::kit::Capture::default();
+    let now = c.get("now").and_then(Value::as_f64).unwrap() as i64;
+    let w = wheres.clone();
+    let cw = cronwatch::Client::builder()
+        .store_arc(s.clone())
+        .clock(move || now)
+        .alerts([Arc::new(sent.clone()) as Arc<dyn cronwatch::Channel>])
+        .no_cron_secret()
+        .on_error(move |_, where_| w.lock().unwrap().push(where_.to_string()))
+        .build()
+        .unwrap();
+
+    let result = cw.check().await.expect("the check");
+    assert_eq!(reported(), strings(c.get("reported").unwrap()), "reported by the check");
+    let alerts: Vec<String> = sent
+        .list()
+        .iter()
+        .map(|a| {
+            let o = cronwatch::js::Object::new()
+                .with("type", a.alert_type.as_str())
+                .with("job", a.job.as_str())
+                .with("at", a.at);
+            Value::Object(o).to_json()
+        })
+        .collect();
+    let want: Vec<String> = list(c, "alerts").iter().map(Value::to_json).collect();
+    assert_eq!(alerts, want, "the alerts sent");
+    let mut health: Vec<(String, String)> =
+        result.jobs.iter().map(|j| (j.name.clone(), j.health.as_str().to_string())).collect();
+    health.sort();
+    let mut want_health: Vec<(String, String)> = c
+        .get("health")
+        .and_then(Value::as_object)
+        .unwrap()
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.as_str().unwrap().to_string()))
+        .collect();
+    want_health.sort();
+    assert_eq!(health, want_health, "each job's health");
+
+    let silence = c.get("silence").and_then(Value::as_object).unwrap();
+    let job = text(silence, "job");
+    cw.silence(job, text(silence, "for")).await.expect("the silence");
+    assert_eq!(reported(), strings(silence.get("reported").unwrap()), "reported by the silence");
+    let stored = s.get_state(job).await.unwrap().expect("the silenced state");
+    assert_eq!(stored.to_json(), silence.get("state").unwrap().to_json(), "the silenced state");
+
+    // The states as stored: some were never rewritten and are still the
+    // foreign values, since a read that changes nothing writes nothing.
+    for (job, want) in c.get("states").and_then(Value::as_object).unwrap().iter() {
+        let (stored,): (String,) =
+            sqlx::query_as("SELECT state FROM cronwatch_state WHERE job = ?").bind(job).fetch_one(&p).await.unwrap();
+        assert_eq!(sorted(&stored), sorted(&want.to_json()), "the stored state of {job}");
+    }
+
+    let read = c.get("read").and_then(Value::as_object).unwrap();
+    let routes = cw.routes(cronwatch::web::RoutesOptions::new().token("tok")).unwrap();
+    for page in list(read, "pages") {
+        let page = page.as_object().unwrap();
+        let path = text(page, "path");
+        let res = routes
+            .handle(
+                cronwatch::web::Request::new("GET", path)
+                    .with_header("host", "app.test")
+                    .with_header("authorization", "Bearer tok"),
+            )
+            .await;
+        assert_eq!(f64::from(res.status), page.get("status").and_then(Value::as_f64).unwrap(), "GET {path}");
+    }
+    assert_eq!(reported(), strings(read.get("reported").unwrap()), "reported by the pages");
+    cw.close().await.unwrap();
 }

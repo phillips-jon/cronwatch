@@ -480,7 +480,7 @@ impl Watcher {
 
     /// A job that runs [`sync`](Self::sync) and a CronWatch check every
     /// `every` (a minute is a good interval), for a service that does not
-    /// call `Client::start`. Its runs are never a job; a failure is
+    /// call `Client::start_checking`. Its runs are never a job; a failure is
     /// reported to the client's error handler.
     pub fn check_job(&self, every: Duration) -> Result<Job, Error> {
         let watcher = self.clone();

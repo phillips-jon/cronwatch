@@ -68,6 +68,7 @@ Go and Elixir have no breaking changes beyond those every language shares.
 - The webhook's body starts with `"schema": 1`, and its JSON Schema is published at [cronwatch.dev/schemas/webhook/1.json](https://cronwatch.dev/schemas/webhook/1.json). A receiver can check the `X-CronWatch-Signature` header with `signature(secret, body)`, new in TypeScript (`@cronwatch/sdk/webhook`), Ruby (`Cronwatch::Alerts::Webhook.signature`), Python (`cronwatch.alerts.webhook.signature`) and PHP (`Webhook::signature`), as Go, Rust, Elixir, Java and .NET already had.
 - Ruby: `client.routes(**options)`, the dashboard as a Rack app.
 - Rust: constructors and builder methods for every data and options type.
+- Rust: `StoredJob::read(name, text, created_at, updated_at)` reads a stored definition as the built-in stores do, for a store of the app's own that holds it as JSON text, and `StoredJob::is_readable` says whether it was a JSON object.
 - Java: a static `of` on each record that may grow.
 - PHP: a handler's `secret:` takes `Cronwatch\FromEnv::Read`, meaning the client's secret, as the 1.0 notes say to pass; it threw a `TypeError`.
 - Drupal: Ultimate Cron's jobs are recorded, each on its own rules read as Ultimate Cron reads them (`drupal:<module>` for a module's `hook_cron`, `drupal:job:<id>` for any other, triggers `ultimate-cron` and `ultimate-cron-manual`), and every cron run is still `drupal:cron`. Before, the module left a site running Ultimate Cron alone.
@@ -117,6 +118,7 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - Laravel: `CRONWATCH_TOKEN=null` or `CRON_SECRET=null` in `.env` (or `(null)`, `empty`, `true`), which Laravel's `env()` reads as no value, no longer makes the word itself the dashboard's token or the cron secret. The token and secret are read only as Laravel reads them: a value the config gives is used or, when blank, means none, and only a config value of null reads the variable, through `env()`.
 - Go: a queued alert's run keeps the fields a newer release added to it (an `attempt`, say) when the state is written back, as the alert's own fields and its details already did.
 - Go: an alert of a type the release does not know leaves out Datadog's `alert_type`, Honeybadger's error class and Discord's embed colour, as the SDK does, where it sent them empty (or a colour of 0).
+- Rust: a scheduler integration's worker that declares a job from the stored definition (one another process schedules) keeps the fields it has no option for, an app's `JobOptions::field` or one a newer release added, where it wrote the definition back without them.
 
 ## 0.10.0 and earlier
 

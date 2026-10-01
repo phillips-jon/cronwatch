@@ -22,5 +22,6 @@ pub use json::{Object, Value, parse, stringify};
 pub(crate) use json::{array_index, quote};
 #[cfg(any(feature = "alerts", feature = "triage"))]
 pub(crate) use lone::*;
+pub use number::number_of_text;
 pub(crate) use number::*;
 pub(crate) use text::*;

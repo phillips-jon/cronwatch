@@ -344,3 +344,160 @@ async fn child_handler_development() {
     assert_eq!(h.handle(Request::new("GET", "/")).await.status, 200, "development lets it run");
     assert!(k.wheres().is_empty());
 }
+
+// The second review, Medium 1: a token or cron secret of only whitespace
+// (as JavaScript's trim sees it) counts as unset, in the variable or given
+// in code, so the routes and handlers fail closed.
+
+const BLANK_TOKENS: [&str; 5] = ["", " ", "  ", "\t", " \n  \u{feff} "];
+const BLANK_SECRETS: [&str; 4] = ["", " ", "\t\n", " \u{feff}"];
+
+/// `s` as `encodeURIComponent` writes it.
+fn uri_encoded(s: &str) -> String {
+    s.bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&b) {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn a_cronwatch_token_or_token_of_only_whitespace_counts_as_unset() {
+    for blank in BLANK_TOKENS {
+        child(
+            "child_blank_token",
+            &[("CRONWATCH_ENV", "production"), ("CRONWATCH_TOKEN", blank), ("CRONWATCH_TEST_BLANK", blank)],
+        );
+        child(
+            "child_blank_token_in_code",
+            &[("CRONWATCH_ENV", "production"), ("CRONWATCH_TOKEN", "from-env"), ("CRONWATCH_TEST_BLANK", blank)],
+        );
+    }
+    child("child_padded_token", &[("CRONWATCH_ENV", "production"), ("CRONWATCH_TOKEN", " padded ")]);
+}
+
+fn blank() -> String {
+    std::env::var("CRONWATCH_TEST_BLANK").unwrap()
+}
+
+#[tokio::test]
+#[ignore = "run by a_cronwatch_token_or_token_of_only_whitespace_counts_as_unset, in an environment of its own"]
+async fn child_blank_token() {
+    if !in_child() {
+        return;
+    }
+    let blank = blank();
+    let cw = client();
+    for (label, options) in [("the variable", RoutesOptions::new()), ("in code", RoutesOptions::new().token(&blank))] {
+        let routes = cw.routes(options).unwrap();
+        assert_eq!(routes.token(), None, "{label}");
+        let api = serve(&routes, "GET", "http://app.test/cronwatch/api/jobs", &[]).await;
+        assert_eq!(api.status, 503, "{label}");
+        let url = format!("http://app.test/cronwatch/?token={}", uri_encoded(&blank));
+        let page = serve(&routes, "GET", &url, &[]).await;
+        assert_eq!(page.status, 503, "{label}: ?token=");
+        assert_eq!(page.header("set-cookie"), None, "{label}: no cookie");
+        let bearer =
+            serve(&routes, "GET", "http://app.test/cronwatch/api/jobs", &[("authorization", "Bearer  ")]).await;
+        assert_eq!(bearer.status, 503, "{label}: a blank bearer");
+    }
+}
+
+#[tokio::test]
+#[ignore = "run by a_cronwatch_token_or_token_of_only_whitespace_counts_as_unset, in an environment of its own"]
+async fn child_blank_token_in_code() {
+    if !in_child() {
+        return;
+    }
+    let routes = client().routes(RoutesOptions::new().token(blank())).unwrap();
+    let res =
+        serve(&routes, "GET", "http://app.test/cronwatch/api/jobs", &[("authorization", "Bearer from-env")]).await;
+    assert_eq!(res.status, 200, "a blank token in code falls back to the variable");
+}
+
+#[tokio::test]
+#[ignore = "run by a_cronwatch_token_or_token_of_only_whitespace_counts_as_unset, in an environment of its own"]
+async fn child_padded_token() {
+    if !in_child() {
+        return;
+    }
+    let routes = client().routes(RoutesOptions::new()).unwrap();
+    assert_eq!(routes.token(), Some(" padded "), "used as it is, untrimmed");
+    let res = serve(&routes, "GET", "http://app.test/cronwatch/?token=%20padded%20", &[]).await;
+    assert_eq!(res.status, 303);
+    assert!(res.header("set-cookie").is_some());
+}
+
+#[test]
+fn a_cron_secret_or_secret_of_only_whitespace_counts_as_unset() {
+    for blank in BLANK_SECRETS {
+        child(
+            "child_blank_cron_secret",
+            &[("CRONWATCH_ENV", "production"), ("CRON_SECRET", blank), ("CRONWATCH_TEST_BLANK", blank)],
+        );
+    }
+    child("child_blank_cron_secret_is_no_bearer", &[("CRONWATCH_ENV", "production"), ("CRON_SECRET", "  ")]);
+}
+
+/// A client with the cron secret `secret` sets up (the variable's when it
+/// does nothing), and what it reports, as `where`.
+fn secret_client(
+    secret: impl FnOnce(cronwatch::ClientBuilder) -> cronwatch::ClientBuilder,
+) -> (Client, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+    let wheres = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let kept = wheres.clone();
+    let cw = secret(Client::builder().on_error(move |_, where_| kept.lock().unwrap().push(where_.to_string())))
+        .build()
+        .unwrap();
+    (cw, wheres)
+}
+
+#[tokio::test]
+#[ignore = "run by a_cron_secret_or_secret_of_only_whitespace_counts_as_unset, in an environment of its own"]
+async fn child_blank_cron_secret() {
+    if !in_child() {
+        return;
+    }
+    let blank = blank();
+    let given = blank.clone();
+    type Secret = Box<dyn FnOnce(cronwatch::ClientBuilder) -> cronwatch::ClientBuilder>;
+    let cases: [(&str, Secret); 2] =
+        [("the variable", Box::new(|b| b)), ("in code", Box::new(move |b| b.cron_secret(given)))];
+    for (label, secret) in cases {
+        let (cw, wheres) = secret_client(secret);
+        assert_eq!(cw.cron_secret(), None, "{label}");
+        let h = cw
+            .job("j", JobOptions::new())
+            .unwrap()
+            .handler(|_, _| async { Ok::<_, std::io::Error>(()) }, HandlerOptions::new());
+        let res = h.handle(Request::new("GET", "/")).await;
+        assert_eq!(res.status, 503, "{label}");
+        assert!(res.text().contains("CRON_SECRET is not set"), "{label}: {}", res.text());
+        h.handle(Request::new("GET", "/").with_header("authorization", "Bearer ")).await;
+        assert_eq!(*wheres.lock().unwrap(), ["handler"], "{label}: reported once");
+    }
+    // A blank handler secret falls back to the client's, here none at all.
+    let (cw, wheres) = secret_client(|b| b.no_cron_secret());
+    let h = cw
+        .job("open", JobOptions::new())
+        .unwrap()
+        .handler(|_, _| async { Ok::<_, std::io::Error>(()) }, HandlerOptions::new().secret(&blank));
+    assert_eq!(h.handle(Request::new("GET", "/")).await.status, 200, "the handler runs");
+    assert!(wheres.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+#[ignore = "run by a_cron_secret_or_secret_of_only_whitespace_counts_as_unset, in an environment of its own"]
+async fn child_blank_cron_secret_is_no_bearer() {
+    if !in_child() {
+        return;
+    }
+    let (cw, _) = secret_client(|b| b);
+    let routes = cw.routes(RoutesOptions::new().token("tok")).unwrap();
+    let res = serve(&routes, "POST", "http://app.test/cronwatch/api/check", &[("authorization", "Bearer   ")]).await;
+    assert_eq!(res.status, 401, "no secret, and it is not the token");
+}

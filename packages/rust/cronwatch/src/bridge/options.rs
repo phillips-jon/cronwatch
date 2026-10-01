@@ -12,6 +12,20 @@ use crate::types::Definition;
 /// as the PHP and Go ports keep them.
 const KEPT: [&str; 6] = ["tags", "grace", "timeout", "maxDuration", "budget", "failuresBeforeAlert"];
 
+/// The fields an option gives, which `options_of` reads through it.
+const KNOWN: [&str; 10] = [
+    "schedule",
+    "timezone",
+    "grace",
+    "timeout",
+    "maxDuration",
+    "budget",
+    "failuresBeforeAlert",
+    "description",
+    "tags",
+    "expect",
+];
+
 /// The options that declare a job again without its schedule: its
 /// description followed by ` (no longer scheduled)` (`A scheduled task`
 /// when it had none), its tags, grace, timeout, maxDuration, budget and
@@ -39,11 +53,18 @@ pub fn unscheduled(def: &Definition) -> JobOptions {
 /// `expect`, a pattern as a matcher of the same source, run by the
 /// JavaScript regular expression engine the redaction uses, and a custom
 /// function as one that passes every output, since the function is the
-/// other process's). Fields no option gives are left out.
+/// other process's). A field no option gives (one the app set with
+/// [`JobOptions::field`], or one a newer release added) is carried as it is
+/// stored, so declaring the job again does not write it out of the store.
 pub fn options_of(def: &Definition) -> JobOptions {
     let mut options = JobOptions::new();
     for key in def.keys() {
         options = match key {
+            "name" => options,
+            _ if !KNOWN.contains(&key) => match def.get(key) {
+                Some(value) => options.field(key, value.clone()),
+                None => options,
+            },
             "schedule" | "timezone" | "description" => match def.get(key).and_then(Value::as_str) {
                 Some(text) => match key {
                     "schedule" => options.schedule(text),

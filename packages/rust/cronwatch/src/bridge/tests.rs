@@ -504,6 +504,36 @@ async fn unschedule_keeps_an_entry_declared_meanwhile() {
     assert!(stored(&*store, "added").await.contains(r#""schedule":"0 2 * * *""#));
 }
 
+// The second review, Low 21: a worker's fallback declared the job again
+// from the ten fields it knew, and wrote that over the stored definition,
+// losing the app's own `.field()`s and any a newer release adds.
+#[tokio::test]
+async fn a_fallback_keeps_the_fields_it_has_no_option_for() {
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
+    let (scheduler, _) = client(store.clone());
+    let future = crate::js::parse(r#"{"kept":[1,"two"]}"#).unwrap();
+    scheduler
+        .job(
+            "report",
+            JobOptions::new()
+                .schedule("0 2 * * *")
+                .field("owner", "billing-team")
+                .tags(["river", "river:billing"])
+                .field("futureField", future),
+        )
+        .unwrap();
+    scheduler.check().await.unwrap();
+    let before = stored(&*store, "report").await;
+    assert!(before.contains(r#""owner":"billing-team""#) && before.contains(r#""futureField":{"kept":[1,"two"]}"#));
+
+    let (worker, _) = client(store.clone());
+    let w = Watch::new(&worker, "river", Some("billing"), "River");
+    let job = w.fallback("report", JobOptions::new()).await.unwrap();
+    assert_eq!(job.definition().to_json(), before);
+    job.run(|_| async { Ok::<_, std::io::Error>(()) }).await.unwrap();
+    assert_eq!(stored(&*store, "report").await, before, "the stored definition is unchanged");
+}
+
 #[test]
 fn options_of_rebuilds_an_expect_pattern_and_a_custom_function() {
     struct Pattern;

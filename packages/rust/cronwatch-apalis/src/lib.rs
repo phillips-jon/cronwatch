@@ -314,7 +314,7 @@ impl Watcher {
 
     /// A worker, named [`CHECK_WORKER`], that runs [`sync`](Self::sync)
     /// and a CronWatch check every `every` (a minute is a good interval),
-    /// for a service that does not call `Client::start`. Run it beside the
+    /// for a service that does not call `Client::start_checking`. Run it beside the
     /// others (`worker.run()`, or a `Monitor`). Its runs are never a job; a
     /// failure is reported to the client's error handler.
     pub fn check_worker(
