@@ -11,11 +11,20 @@ use Drupal\Core\DependencyInjection\ServiceProviderBase;
 /**
  * Makes core's cron service WatchedCron, which records each run.
  *
- * Only when the service is core's own class: a module that replaced it
- * (Ultimate Cron runs each job itself) is left alone, and the container
- * parameter cronwatch.watching_cron says so, for the settings page.
+ * Only when the service is core's own class. A module that replaces it
+ * after this has run is seen by CronServicePass, which runs once every
+ * module's alter() has: Ultimate Cron's service is watched there, and any
+ * other is left alone, the container parameter cronwatch.watching_cron
+ * saying so, for the settings page.
  */
 class CronwatchServiceProvider extends ServiceProviderBase {
+
+  /**
+   * {@inheritdoc}
+   */
+  public function register(ContainerBuilder $container) {
+    $container->addCompilerPass(new CronServicePass());
+  }
 
   /**
    * {@inheritdoc}

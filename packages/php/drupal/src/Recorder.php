@@ -39,6 +39,11 @@ use Psr\Log\LoggerInterface;
  * - Queue workers opt in (the settings' list, or #[Cronwatch\Watch] on the
  *   worker's class), and then every item processed is a run of
  *   "drupal:queue:<worker id>", in cron, `drush queue:run` or anywhere else.
+ * - Under Ultimate Cron, which runs each job on a schedule of its own, every
+ *   cron run is still "drupal:cron" (WatchedUltimateCron), and each run of
+ *   one of its jobs is a run of that job (WatchedCronJob): "drupal:<module>"
+ *   for a module's hook_cron, "drupal:job:<id>" for any other, each with
+ *   the job's own schedule.
  */
 final class Recorder {
 
@@ -55,7 +60,31 @@ final class Recorder {
 
   public const TAG_QUEUE = 'drupal-queue';
 
+  /**
+   * An Ultimate Cron job's run launched by a cron run.
+   */
+  public const TRIGGER_ULTIMATE_CRON = 'ultimate-cron';
+
+  /**
+   * An Ultimate Cron job's run launched on its own: its "Run" button, or
+   * `drush cron:run <job>`.
+   */
+  public const TRIGGER_ULTIMATE_CRON_MANUAL = 'ultimate-cron-manual';
+
   private ?Cronwatch $client = NULL;
+
+  /**
+   * Whether a cron run is going in this process (between cronStarted() and
+   * cronFinished()), so an Ultimate Cron job knows who launched it.
+   */
+  private bool $inCron = FALSE;
+
+  /**
+   * Problems reported once per process, by where and message.
+   *
+   * @var array<string, true>
+   */
+  private array $reported = [];
 
   /**
    * The open run of the whole cron run, its execution key.
@@ -84,6 +113,33 @@ final class Recorder {
     private readonly LanguageManagerInterface $languages,
     private readonly QueueWorkerManagerInterface $queues,
   ) {
+  }
+
+  /**
+   * The recorder, or null when it cannot be had (a broken container).
+   */
+  public static function service(): ?self {
+    try {
+      $recorder = \Drupal::service('cronwatch.recorder');
+      return $recorder instanceof self ? $recorder : NULL;
+    }
+    catch (\Throwable) {
+      return NULL;
+    }
+  }
+
+  /**
+   * Which cron service runs cron: "core", "ultimate_cron", or "" for one
+   * CronWatch does not know (see CronServicePass).
+   */
+  public function cronService(): string {
+    try {
+      $container = \Drupal::getContainer();
+      return $container->hasParameter('cronwatch.cron_service') ? (string) $container->getParameter('cronwatch.cron_service') : 'core';
+    }
+    catch (\Throwable) {
+      return 'core';
+    }
   }
 
   /**
@@ -282,7 +338,10 @@ final class Recorder {
    */
   public function cronJob(): JobHandle {
     [$schedule] = $this->cronSchedule();
-    $options = ['description' => 'Drupal cron: every hook_cron, then the queues cron processes'];
+    $options = ['description' => $this->cronService() === 'ultimate_cron'
+      ? 'Drupal cron, run by Ultimate Cron: each of its jobs that is due'
+      : 'Drupal cron: every hook_cron, then the queues cron processes',
+    ];
     if ($schedule !== NULL) {
       $options['schedule'] = $schedule;
     }
@@ -309,6 +368,76 @@ final class Recorder {
       'description' => "hook_cron of the {$module} module",
       'tags' => [self::TAG_CRON, $this->appTag(self::TAG_CRON)],
     ], ['kind' => 'module', 'module' => $module]);
+  }
+
+  /**
+   * The CronWatch job name of an Ultimate Cron job: "drupal:<module>" for
+   * the job Ultimate Cron made for a module's hook_cron (its id
+   * "<module>_cron", its callback "<module>#cron", or "<module>_cron" before
+   * Ultimate Cron's update to that form), so the module's history goes on
+   * from core's cron; "drupal:job:<id>" for any other.
+   */
+  public static function ultimateJobName(string $id, string $module, string $callback): string {
+    if ($module !== '' && $id === "{$module}_cron" && ($callback === "{$module}#cron" || $callback === "{$module}_cron")) {
+      return 'drupal:' . $module;
+    }
+    return JobName::clean('drupal:job:' . $id);
+  }
+
+  /**
+   * The job of an Ultimate Cron job, with the job's own schedule.
+   *
+   * The schedule is its rules as a cron expression in the site's time zone
+   * (UltimateCron\Rules). A job Ultimate Cron does not run (disabled) has
+   * none; a job whose rules cannot be said as one is declared without, and
+   * that is reported once.
+   *
+   * @param \Drupal\ultimate_cron\Entity\CronJob $job
+   *   The job.
+   */
+  public function ultimateJob(object $job): JobHandle {
+    $id = (string) $job->id();
+    $module = (string) $job->getModule();
+    $callback = (string) $job->getCallbackString();
+    $name = self::ultimateJobName($id, $module, $callback);
+    if (isset($this->handles[$name])) {
+      return $this->handles[$name];
+    }
+    $options = ['description' => $name === 'drupal:' . $module
+      ? "hook_cron of the {$module} module, run by Ultimate Cron"
+      : 'Ultimate Cron: ' . (string) $job->getTitle(),
+    ];
+    if ($job->status()) {
+      [$schedule, $problem] = UltimateCron\Rules::schedule($job);
+      if ($schedule !== NULL) {
+        $options['schedule'] = $schedule;
+        $options['timezone'] = $this->siteTimezone();
+      }
+      else {
+        $this->reportOnce(new \RuntimeException("Ultimate Cron job {$id}: {$problem}, so the job is watched without a schedule"), "declaring {$name}");
+      }
+    }
+    $options['tags'] = [self::TAG_CRON, $this->appTag(self::TAG_CRON)];
+    return $this->declare($name, $options, ['kind' => 'ultimate_cron', 'job' => $id, 'module' => $module]);
+  }
+
+  /**
+   * The zone Ultimate Cron reads its rules in: PHP's, which Drupal sets to
+   * the site's default time zone for cron.
+   */
+  private function siteTimezone(): string {
+    $zone = (string) ($this->configFactory->get('system.date')->get('timezone.default') ?? '');
+    return $zone !== '' ? $zone : date_default_timezone_get();
+  }
+
+  /**
+   * Ultimate Cron's jobs, enabled or not.
+   *
+   * @return array<string, \Drupal\ultimate_cron\Entity\CronJob>
+   *   The jobs, by id.
+   */
+  private function ultimateJobs(): array {
+    return \Drupal::entityTypeManager()->getStorage('ultimate_cron_job')->loadMultiple();
   }
 
   /**
@@ -364,16 +493,33 @@ final class Recorder {
   /**
    * What a check starts with: every job declared, and old ones unscheduled.
    *
-   * The cron run, every module's hook_cron and every watched queue worker is
-   * declared, and jobs of this module's no longer declared (a schedule taken
-   * away, a queue no longer watched) are declared again without their
-   * schedule, so they are never reported missed.
+   * The cron run, every module's hook_cron (under Ultimate Cron, each of its
+   * jobs instead) and every watched queue worker is declared, and jobs of
+   * this module's no longer declared (a schedule taken away, a queue no
+   * longer watched, Ultimate Cron's jobs once it is gone) are declared again
+   * without their schedule, so they are never reported missed.
    */
   public function prepare(): Cronwatch {
     $cw = $this->client();
     $declarations = [self::CRON_JOB => fn () => $this->cronJob()];
-    foreach ($this->cronModules() as $module) {
-      $declarations['drupal:' . $module] = fn () => $this->moduleJob($module);
+    if ($this->cronService() === 'ultimate_cron') {
+      try {
+        foreach ($this->ultimateJobs() as $id => $job) {
+          // Only jobs whose runs are recorded (a module that swapped the
+          // entity's class too is left alone), else they would be missed.
+          if ($job instanceof UltimateCron\WatchedCronJob) {
+            $declarations['Ultimate Cron job ' . $id] = fn () => $this->ultimateJob($job);
+          }
+        }
+      }
+      catch (\Throwable $error) {
+        $this->safeReport($error, 'reading the Ultimate Cron jobs');
+      }
+    }
+    else {
+      foreach ($this->cronModules() as $module) {
+        $declarations['drupal:' . $module] = fn () => $this->moduleJob($module);
+      }
     }
     foreach ($this->queues->getDefinitions() as $id => $definition) {
       $class = (string) ($definition['cronwatch_class'] ?? '');
@@ -406,11 +552,13 @@ final class Recorder {
   // ------------------------------------------------------------ a cron run
 
   /**
-   * The cron lock was taken and hook_cron is about to run.
+   * The cron lock was taken and hook_cron is about to run (under Ultimate
+   * Cron, which takes no lock: a cron run is about to launch its jobs).
    */
   public function cronStarted(): void {
     $this->modules = [];
     $this->cronKey = NULL;
+    $this->inCron = TRUE;
     try {
       $this->cronKey = $this->client()->startExecution($this->cronJob()->definition, self::TRIGGER_CRON);
     }
@@ -467,11 +615,12 @@ final class Recorder {
   public function cronFinished(?\Throwable $error): bool {
     $key = $this->cronKey;
     $this->cronKey = NULL;
+    $this->inCron = FALSE;
     if ($key === NULL) {
       return FALSE;
     }
     $failed = array_keys(array_filter($this->modules));
-    $output = 'hook_cron: ' . ($this->modules === [] ? 'none' : implode(', ', array_keys($this->modules)));
+    $output = ($this->cronService() === 'ultimate_cron' ? 'jobs: ' : 'hook_cron: ') . ($this->modules === [] ? 'none' : implode(', ', array_keys($this->modules)));
     if ($failed !== []) {
       $output .= "\nfailed: " . implode(', ', $failed);
     }
@@ -482,6 +631,49 @@ final class Recorder {
       $this->safeReport($problem, 'finishing ' . self::CRON_JOB);
     }
     return TRUE;
+  }
+
+  /**
+   * An Ultimate Cron job is about to run its callback (it holds its lock);
+   * returns its run's key, or null.
+   *
+   * Launched by a cron run, the trigger is "ultimate-cron" and the job is
+   * listed in the cron run's output; launched on its own (its "Run" button,
+   * `drush cron:run <job>`), "ultimate-cron-manual".
+   *
+   * @param \Drupal\ultimate_cron\Entity\CronJob $job
+   *   The job.
+   */
+  public function ultimateJobStarted(object $job): ?int {
+    $id = (string) $job->id();
+    if ($this->inCron) {
+      $this->modules[$id] ??= FALSE;
+    }
+    try {
+      return $this->client()->startExecution($this->ultimateJob($job)->definition, $this->inCron ? self::TRIGGER_ULTIMATE_CRON : self::TRIGGER_ULTIMATE_CRON_MANUAL);
+    }
+    catch (\Throwable $error) {
+      $this->safeReport($error, "starting the Ultimate Cron job {$id}");
+      return NULL;
+    }
+  }
+
+  /**
+   * An Ultimate Cron job's callback ended: ok, or failed with what it threw.
+   */
+  public function ultimateJobFinished(?int $key, string $id, ?\Throwable $error): void {
+    if ($error !== NULL && $this->inCron) {
+      $this->modules[$id] = TRUE;
+    }
+    if ($key === NULL) {
+      return;
+    }
+    try {
+      $this->client()->finishExecution($key, NULL, $error, $error !== NULL);
+    }
+    catch (\Throwable $problem) {
+      $this->safeReport($problem, "finishing the Ultimate Cron job {$id}");
+    }
   }
 
   /**
@@ -526,6 +718,18 @@ final class Recorder {
       $this->client()->finishExecution($key, is_string($result) ? $result : NULL);
     }
     return $result;
+  }
+
+  /**
+   * Reports a problem once in this process, however often it is met.
+   */
+  private function reportOnce(\Throwable $error, string $where): void {
+    $key = $where . "\n" . $error->getMessage();
+    if (isset($this->reported[$key])) {
+      return;
+    }
+    $this->reported[$key] = TRUE;
+    $this->safeReport($error, $where);
   }
 
   /**

@@ -35,7 +35,9 @@ function hook_cronwatch_alerts_alter(array &$channels): void {
  * @param string $name
  *   The job's name: drupal:cron, drupal:<module> or drupal:queue:<worker>.
  * @param array<string, string> $context
- *   What the job is: "kind" (cron, module or queue), and "module" or "queue".
+ *   What the job is: "kind" (cron, module, queue or ultimate_cron), and
+ *   "module" or "queue", or for an Ultimate Cron job "job" (its id) and
+ *   "module".
  */
 function hook_cronwatch_job_options_alter(array &$options, string $name, array $context): void {
   if ($name === 'drupal:search') {

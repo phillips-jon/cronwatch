@@ -39,7 +39,7 @@ function mymodule_cron(): void {
 }
 ```
 
-A site whose cron service another module replaced (Ultimate Cron, which runs each job on a schedule of its own) is left alone, and the settings page says CronWatch cannot record cron there. The Scheduler module's publishing runs in its `hook_cron`, so it is watched as `drupal:scheduler` like any other.
+A site running Ultimate Cron is watched too, each of its jobs on its own schedule (see [Ultimate Cron](#ultimate-cron)). A site whose cron service another module replaced is left alone, and the settings page says CronWatch cannot record cron there. The Scheduler module's publishing runs in its `hook_cron`, so it is watched as `drupal:scheduler` like any other.
 
 ## Options per job
 
@@ -57,7 +57,25 @@ function mymodule_cronwatch_job_options_alter(array &$options, string $name, arr
 }
 ```
 
-The options are the library's (`schedule`, `grace`, `timeout`, `maxDuration`, `budget`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)); `$context` says what the job is (`kind` is `cron`, `module` or `queue`, with `module` or `queue`).
+The options are the library's (`schedule`, `grace`, `timeout`, `maxDuration`, `budget`, `expect`, `failuresBeforeAlert`, `description`, `tags`; see [PHP](/docs/php/#api)); `$context` says what the job is (`kind` is `cron`, `module`, `queue` or `ultimate_cron`, with `module`, `queue`, or `job` and `module`).
+
+## Ultimate Cron
+
+[Ultimate Cron](https://www.drupal.org/project/ultimate_cron) (2.0.0-beta1 and newer) replaces Drupal's cron service with its own, which runs each of its jobs (one per module's `hook_cron`, and any a site adds) when its own rules say, each under a lock of its own. CronWatch records them with no code:
+
+- **Each job's runs.** Every run of an Ultimate Cron job is a run of its job: `drupal:<module>` for a module's `hook_cron`, the same job as without Ultimate Cron, so its history goes on; `drupal:job:<id>` for any other job. The trigger is `"ultimate-cron"` for a run a cron run launched, and `"ultimate-cron-manual"` for one launched on its own, from the job's "Run" button or `drush cron:run <job>`. What the job logs through `Cronwatch::current()` is its output, and what it throws, an exception or an `\Error`, fails the run; Ultimate Cron still catches it and logs it as before.
+- **Each job's schedule.** A job is expected on its own rules, read as Ultimate Cron reads them, in the site's time zone. Ultimate Cron's `@` (a skew from 0 to 255 fixed per job, which spreads jobs across the hour) and `+N` (an offset) are worked out to the minutes they name, so `*/15+@ * * * *` for a job whose skew is 7 is `7,22,37,52 * * * *`. The Simple scheduler's intervals are such rules too. A job whose rules no cron expression can say (several rules naming different times, a scheduler plugin of another module, a rule that never matches) is watched without a schedule, and the site's log says why, once; a disabled job has no schedule, since Ultimate Cron does not run it.
+- **Cron itself.** Every cron run is still a run of `drupal:cron`, with the trigger `"drupal-cron"` and the jobs it launched (and those that failed) as its output, on the schedule under the settings, else Automated Cron's interval, as without Ultimate Cron. The check runs after it as before.
+- **Skipped jobs.** A job Ultimate Cron skips because it is locked or still running is no run; the one still running is recorded already, and is reported stuck if it never ends.
+
+Ultimate Cron runs a job at the first cron run after its time, so a job is only on time when cron runs at least as often as the job: run cron every minute from the server's crontab, as Ultimate Cron asks, or a job every 15 minutes on a cron every 3 hours is reported missed, as it is.
+
+```
+* * * * *    cd /var/www/site && vendor/bin/drush cron --quiet
+*/5 * * * *  cd /var/www/site && vendor/bin/drush cronwatch:check --quiet
+```
+
+With Ultimate Cron's queue handling on, each queue is a job of its own (`drupal:job:ultimate_cron_queue_<worker>`), and the items of a watched worker are still runs of `drupal:queue:<worker>`. Uninstall Ultimate Cron and Drupal's cron is recorded as before: the modules' jobs go on without a schedule, and the other jobs keep their history and are never reported missed.
 
 ## Queues
 

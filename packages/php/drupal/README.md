@@ -66,7 +66,14 @@ The JSON API that [`@cronwatch/mcp`](https://www.npmjs.com/package/@cronwatch/mc
 
 ## Ultimate Cron
 
-A site running Ultimate Cron has its own cron service, which runs each job on its own schedule; CronWatch leaves it alone (the settings page says so) and cannot record those runs yet. The Scheduler module's publishing runs in its `hook_cron`, so it is watched as `drupal:scheduler` like any other module.
+Ultimate Cron (2.0.0-beta1 and newer) runs each of its jobs on a schedule of its own, and CronWatch records them with no code:
+
+- **Each job.** Every run of an Ultimate Cron job is a run of its own job: `drupal:<module>` for a module's `hook_cron` (the same job as without Ultimate Cron, so its history goes on), `drupal:job:<id>` for any other. A run a cron run launched has the trigger `ultimate-cron`; one launched on its own (the job's "Run" button, `drush cron:run <job>`) has `ultimate-cron-manual`. A job that throws, an exception or an `\Error`, fails its run with what it threw, and Ultimate Cron logs it as before.
+- **Its schedule.** Each job is expected on its own rules, read as Ultimate Cron reads them, the `@` skew included, in the site's time zone: `*/15+@ * * * *` for a job whose skew is 7 is `7,22,37,52 * * * *`. A job whose rules no cron expression can say (several rules at different times, another scheduler plugin) is watched without a schedule, which the site's log says once; a disabled job has none. Ultimate Cron runs a job at the first cron run after its time, so run cron at least as often as your most frequent job (every minute, as Ultimate Cron asks), or that job is reported missed.
+- **Cron itself.** Every cron run is still a run of `drupal:cron`, its output the jobs it launched, on the schedule under the settings (else Automated Cron's interval).
+- **Skipped jobs.** A job Ultimate Cron skips, because it is still running or locked, is no run.
+
+The Scheduler module's publishing runs in its `hook_cron`, so it is watched as `drupal:scheduler` like any other module.
 
 ## License
 

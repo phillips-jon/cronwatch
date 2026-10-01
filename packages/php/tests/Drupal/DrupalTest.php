@@ -38,6 +38,9 @@ use PHPUnit\Framework\TestCase;
  */
 final class DrupalTest extends TestCase
 {
+    /** The Ultimate Cron release the module's support for it was written against, installed for its tests only. */
+    private const ULTIMATE_CRON = '2.0.0-beta1';
+
     private static ?string $skip = null;
     private static string $root = '';
     private static string $web = '';
@@ -138,7 +141,7 @@ final class DrupalTest extends TestCase
      */
     private static function project(string $constraint): string
     {
-        $dir = sys_get_temp_dir() . '/cronwatch-drupal-' . substr(md5($constraint . '|' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '|' . dirname(__DIR__, 2)), 0, 10);
+        $dir = sys_get_temp_dir() . '/cronwatch-drupal-' . substr(md5($constraint . '|' . PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '|' . dirname(__DIR__, 2) . '|' . self::ULTIMATE_CRON), 0, 10);
         if (is_file("{$dir}/vendor/autoload.php") && is_file("{$dir}/vendor/bin/drush")) {
             return $dir;
         }
@@ -159,6 +162,7 @@ final class DrupalTest extends TestCase
                 'drupal/core-composer-scaffold' => $constraint,
                 'drupal/core-recommended' => $constraint,
                 'drupal/cronwatch' => $version,
+                'drupal/ultimate_cron' => self::ULTIMATE_CRON,
                 'drush/drush' => '^13.3',
             ],
             'minimum-stability' => 'stable',
@@ -855,6 +859,222 @@ final class DrupalTest extends TestCase
         $this->assertSame(200, $status);
         $this->assertStringContainsString('"ok":true', $body);
         $this->assertGreaterThan($before, $declared());
+    }
+
+    // ------------------------------------------------------------ Ultimate Cron
+
+    /** Runs PHP in Drupal with Ultimate Cron's job class at hand. */
+    private static function job(string $id, string $code): mixed
+    {
+        return self::inDrupal('$job = \Drupal\ultimate_cron\Entity\CronJob::load(' . var_export($id, true) . '); ' . $code);
+    }
+
+    /** Gives an Ultimate Cron job a scheduler and its rules. */
+    private static function setRules(string $id, string $scheduler, array $rules): void
+    {
+        self::job($id, '$job->set("scheduler", ["id" => ' . var_export($scheduler, true) . ', "configuration" => ["rules" => ' . var_export($rules, true) . ', "catch_up" => 0]])->save(); echo json_encode(TRUE);');
+    }
+
+    /** The rule "*\/15+@" for a job, worked out here: every 15 minutes from its skew. */
+    private static function quarterHours(string $id): string
+    {
+        $minute = (hexdec(substr(sha1($id), -8)) & 0xff) % 60;
+        $minutes = [];
+        for ($i = 0; $i < 4; $i++) {
+            $minutes[] = ($minute + 15 * $i) % 60;
+        }
+        sort($minutes);
+        return implode(',', $minutes) . ' * * * *';
+    }
+
+    public function testUltimateCronRunsEachJobOnItsOwnSchedule(): void
+    {
+        $before = count(self::runs('drupal:cwt_fixtures'));
+        $this->must(['pm:install', 'ultimate_cron', '-y']);
+        $this->assertSame(['ultimate_cron', 'Drupal\cronwatch\UltimateCron\WatchedUltimateCron', 'Drupal\cronwatch\UltimateCron\WatchedCronJob'], self::inDrupal(
+            'echo json_encode([\Drupal::getContainer()->getParameter("cronwatch.cron_service"), get_class(\Drupal::service("cron")), get_class(\Drupal\ultimate_cron\Entity\CronJob::load("cwt_fixtures_cron"))]);'
+        ));
+        // A job made for something other than a hook_cron.
+        self::inDrupal('\Drupal\ultimate_cron\Entity\CronJob::create(["id" => "cwt_nightly", "title" => "Nightly report", "module" => "cwt_fixtures", "callback" => "Drupal\\\\cwt_fixtures\\\\Nightly::run", "scheduler" => ["id" => "crontab", "configuration" => ["rules" => ["30 2 * * *"], "catch_up" => 0]]])->save(); echo json_encode(TRUE);');
+
+        // The first cron run under Ultimate Cron launches every job, none having run yet.
+        $this->must(['cron']);
+        $cron = self::last('drupal:cron');
+        $this->assertSame('ok', $cron['status']);
+        $this->assertSame('drupal-cron', $cron['trigger']);
+        $this->assertStringStartsWith('jobs: ', (string) $cron['output']);
+        $this->assertStringContainsString('cwt_fixtures_cron', (string) $cron['output']);
+        $this->assertStringContainsString('cwt_nightly', (string) $cron['output']);
+
+        $mine = self::runs('drupal:cwt_fixtures');
+        $this->assertCount($before + 1, $mine, 'the module\'s hook_cron goes on as the same job');
+        $this->assertSame('ok', end($mine)['status']);
+        $this->assertSame('ultimate-cron', end($mine)['trigger']);
+        $this->assertSame('cwt cron ran', end($mine)['output']);
+        $this->assertGreaterThanOrEqual((int) $cron['started_at'], (int) end($mine)['started_at']);
+
+        $zone = (string) self::inDrupal('echo json_encode(\Drupal::config("system.date")->get("timezone.default"));');
+        $definition = self::definition('drupal:cwt_fixtures');
+        $this->assertSame(self::quarterHours('cwt_fixtures_cron'), $definition['schedule'], 'Simple\'s default, every 15 minutes at the job\'s skew');
+        $this->assertSame($zone, $definition['timezone']);
+        $this->assertSame('The fixture module', $definition['description'], 'the alter hook still applies');
+        $this->assertSame('drupal-cron', $definition['tags'][0]);
+        $this->assertSame(self::quarterHours('system_cron'), self::definition('drupal:system')['schedule']);
+
+        $nightly = self::runs('drupal:job:cwt_nightly');
+        $this->assertSame(['ok'], array_column($nightly, 'status'));
+        $this->assertSame('nightly ran', $nightly[0]['output']);
+        $definition = self::definition('drupal:job:cwt_nightly');
+        $this->assertSame('30 2 * * *', $definition['schedule']);
+        $this->assertSame('Ultimate Cron: Nightly report', $definition['description']);
+
+        self::signIn('admin');
+        [$status, , $form] = self::http('GET', '/admin/config/system/cronwatch', 'admin');
+        $this->assertSame(200, $status);
+        $this->assertStringContainsString('Ultimate Cron runs cron here', $form);
+
+        // A job run on its own (the Run button, drush cron:run) is a run too.
+        $this->must(['cron:run', 'cwt_fixtures_cron', '--force']);
+        $this->assertSame('ultimate-cron-manual', self::last('drupal:cwt_fixtures')['trigger']);
+        $this->assertCount($before + 2, self::runs('drupal:cwt_fixtures'));
+    }
+
+    public function testUltimateCronRulesAreReadAsUltimateCronReadsThem(): void
+    {
+        $cases = [
+            ['*/15+@ * * * *', 7, '7,22,37,52 * * * *'],
+            ['*/15+@ * * * *', 250, '10,25,40,55 * * * *'],
+            ['0+@ */3 * * *', 75, '15 */3 * * *'],
+            ['0+@ 0 * * 0', 3, '3 0 * * 0'],
+            ['* * * * *', 9, '* * * * *'],
+            ['*/10 2-5 * jan-mar mon-fri', 0, '*/10 2-5 * 1-3 1-5'],
+            ['0 12 1 */2 1', 0, '0 12 1 */2 1'],
+            ['0 0 1 * 7', 0, '0 0 1 * 0'],
+            // Every day of the month named: Ultimate Cron goes by the weekday alone.
+            ['0 0 1-31 * 1', 0, '0 0 * * 1'],
+            ['nonsense', 0, null],
+            ['0 0 * 0 *', 0, null],
+            // Days 2 to 31 and Monday, both at once: no cron expression says that.
+            ['0 0 1-31+1 * 1', 0, null],
+        ];
+        $read = (array) self::inDrupal('echo json_encode(array_map(fn ($c) => \Drupal\cronwatch\UltimateCron\Rules::expression($c[0], $c[1]), ' . var_export(array_map(fn ($c) => [$c[0], $c[1]], $cases), true) . '));');
+        foreach ($cases as $i => [$rule, $skew, $expected]) {
+            $this->assertSame($expected, $read[$i][0], "{$rule} at skew {$skew}");
+            if ($expected === null) {
+                $this->assertIsString($read[$i][1]);
+            }
+        }
+    }
+
+    public function testAFailingUltimateCronJobIsRecordedFailed(): void
+    {
+        self::setState('cwt.alerts', []);
+        self::setState('cwt.cron_mode', 'throw');
+        try {
+            $this->must(['cron:run', 'cwt_fixtures_cron', '--force']);
+            $last = self::last('drupal:cwt_fixtures');
+            $this->assertSame('failed', $last['status']);
+            $this->assertStringStartsWith('RuntimeException: cwt cron broke', (string) $last['error']);
+            $this->assertStringContainsString('cwt cron ran', (string) $last['output']);
+            // Ultimate Cron still logs the failure as it did.
+            $this->assertSame(3, (int) self::job('cwt_fixtures_cron', 'echo json_encode($job->loadLatestLogEntry()->severity);'));
+            $this->assertSame([['failed', 'drupal:cwt_fixtures']], array_map(fn ($a) => [$a['type'], $a['job']], self::alerts()));
+
+            // An \Error too, which Ultimate Cron catches as it catches an exception.
+            self::setState('cwt.cron_mode', 'error');
+            $this->must(['cron:run', 'cwt_fixtures_cron', '--force']);
+            $this->assertStringStartsWith('TypeError: cwt cron hit a type error', (string) self::last('drupal:cwt_fixtures')['error']);
+
+            self::setState('cwt.cron_mode', 'ok');
+            $this->must(['cron:run', 'cwt_fixtures_cron', '--force']);
+            $this->assertSame('ok', self::last('drupal:cwt_fixtures')['status']);
+            $this->assertSame(['failed', 'recovered'], array_column(self::alerts(), 'type'));
+        } finally {
+            self::setState('cwt.cron_mode', 'ok');
+        }
+    }
+
+    public function testAnUltimateCronJobThatIsLockedIsNoRun(): void
+    {
+        $count = count(self::runs('drupal:cwt_fixtures'));
+        // Another process holds the job (it is still running there).
+        $lock = (string) self::inDrupal('$lock = \Drupal::service("ultimate_cron.lock"); $id = $lock->lock("cwt_fixtures_cron", 3600); $lock->persist($id); echo json_encode($id);');
+        try {
+            $this->assertNotSame('', $lock);
+            $this->must(['cron:run', 'cwt_fixtures_cron', '--force']);
+            $this->must(['cron']);
+            $this->assertCount($count, self::runs('drupal:cwt_fixtures'), 'Ultimate Cron skipped it, so nothing ran');
+        } finally {
+            self::inDrupal('\Drupal::service("ultimate_cron.lock")->unlock(' . var_export($lock, true) . '); echo json_encode(TRUE);');
+        }
+        $this->must(['cron:run', 'cwt_fixtures_cron', '--force']);
+        $this->assertCount($count + 1, self::runs('drupal:cwt_fixtures'));
+    }
+
+    public function testTheCheckReportsAnUltimateCronJobMissed(): void
+    {
+        self::setState('cwt.alerts', []);
+        $this->must(['config:set', 'cronwatch.settings', 'check_on_cron', '0', '-y']);
+        try {
+            // The job last ran, and was first seen, three hours ago: its rule
+            // (every 15 minutes) has come round since, past the grace.
+            $pdo = self::pdo();
+            $pdo->exec('UPDATE ' . self::table('runs') . " SET started_at = started_at - 10800000, finished_at = finished_at - 10800000 WHERE job = 'drupal:cwt_fixtures'");
+            $pdo->exec('UPDATE ' . self::table('jobs') . " SET created_at = created_at - 10800000 WHERE name = 'drupal:cwt_fixtures'");
+            $this->must(['cronwatch:check']);
+            $mine = fn (): array => array_values(array_column(array_filter(self::alerts(), fn ($a) => $a['job'] === 'drupal:cwt_fixtures'), 'type'));
+            $this->assertSame(['missed'], $mine());
+            $this->must(['cron:run', 'cwt_fixtures_cron', '--force']);
+            $this->assertSame(['missed', 'recovered'], $mine());
+        } finally {
+            $this->must(['config:set', 'cronwatch.settings', 'check_on_cron', '1', '-y']);
+        }
+    }
+
+    public function testAnUltimateCronRuleWithNoCronExpressionIsReportedOnce(): void
+    {
+        self::setRules('cwt_fixtures_cron', 'crontab', ['0 * * * *', '30 2 * * *']);
+        try {
+            $reports = (int) self::inDrupal(<<<'PHP'
+                $recorder = \Drupal::service('cronwatch.recorder');
+                $recorder->prepare();
+                $recorder->reset();
+                $recorder->prepare();
+                $count = 0;
+                foreach (\Drupal::database()->select('watchdog', 'w')->fields('w', ['variables'])->condition('type', 'cronwatch')->execute()->fetchCol() as $variables) {
+                  $count += str_contains((string) $variables, 'Ultimate Cron job cwt_fixtures_cron') ? 1 : 0;
+                }
+                echo json_encode($count);
+                PHP);
+            $this->assertSame(1, $reports, 'reported once, however often the job is declared');
+            $this->must(['cron:run', 'cwt_fixtures_cron', '--force']);
+            $this->assertSame('ok', self::last('drupal:cwt_fixtures')['status'], 'its runs are still recorded');
+            $this->assertArrayNotHasKey('schedule', self::definition('drupal:cwt_fixtures'));
+
+            // A disabled job is not run by Ultimate Cron, so it is never due.
+            self::setRules('cwt_fixtures_cron', 'simple', ['*/15+@ * * * *']);
+            self::job('cwt_fixtures_cron', '$job->disable()->save(); echo json_encode(TRUE);');
+            $this->must(['cronwatch:check']);
+            $this->assertArrayNotHasKey('schedule', self::definition('drupal:cwt_fixtures'));
+        } finally {
+            self::setRules('cwt_fixtures_cron', 'simple', ['*/15+@ * * * *']);
+            self::job('cwt_fixtures_cron', '$job->enable()->save(); echo json_encode(TRUE);');
+        }
+        $this->must(['cronwatch:check']);
+        $this->assertSame(self::quarterHours('cwt_fixtures_cron'), self::definition('drupal:cwt_fixtures')['schedule']);
+    }
+
+    public function testUninstallingUltimateCronGivesCronBackToCore(): void
+    {
+        $this->must(['pm:uninstall', 'ultimate_cron', '-y']);
+        $this->assertSame(['core', 'Drupal\cronwatch\WatchedCron'], self::inDrupal('echo json_encode([\Drupal::getContainer()->getParameter("cronwatch.cron_service"), get_class(\Drupal::service("cron"))]);'));
+        $this->must(['cron']);
+        $this->assertStringStartsWith('hook_cron: ', (string) self::last('drupal:cron')['output']);
+        $this->assertSame('drupal-cron', self::last('drupal:cwt_fixtures')['trigger']);
+        $this->assertArrayNotHasKey('schedule', self::definition('drupal:cwt_fixtures'), 'a hook_cron has no schedule of its own again');
+        $nightly = self::definition('drupal:job:cwt_nightly');
+        $this->assertArrayNotHasKey('schedule', $nightly, 'a job Ultimate Cron took with it is never missed');
+        $this->assertStringEndsWith('(no longer scheduled)', $nightly['description']);
     }
 
     public function testUninstallDropsTheTables(): void

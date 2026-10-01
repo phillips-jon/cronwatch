@@ -70,17 +70,27 @@ final class SettingsForm extends ConfigFormBase {
     $config = $this->config('cronwatch.settings');
     [$schedule, $source] = $this->recorder->cronSchedule();
 
+    $where = [
+      '%schedule' => (string) $schedule,
+      '@source' => $source === 'settings' ? $this->t('set below') : $this->t("Automated Cron's interval"),
+    ];
+    if (!$this->watchingCron) {
+      $status = $this->t('Another module has replaced the cron service, so CronWatch cannot record cron runs. Queue workers and the check still work.');
+    }
+    elseif ($this->recorder->cronService() === 'ultimate_cron') {
+      $status = $schedule === NULL
+        ? $this->t("Ultimate Cron runs cron here. Each run of its jobs is recorded, each job expected on its own rules, and each cron run too, but cron itself has no schedule to be missed against: set one below, or turn on Automated Cron. The jobs' rules need cron to run at least as often as the most frequent of them.")
+        : $this->t("Ultimate Cron runs cron here. Each run of its jobs is recorded, each job expected on its own rules, and each cron run too, expected on the schedule %schedule (@source), plus the grace. The jobs' rules need cron to run at least as often as the most frequent of them.", $where);
+    }
+    else {
+      $status = $schedule === NULL
+        ? $this->t('Each cron run and hook_cron is recorded, but cron has no schedule to be missed against: set one below, or turn on Automated Cron.')
+        : $this->t('Each cron run and hook_cron is recorded. Cron is expected on the schedule %schedule (@source), plus the grace.', $where);
+    }
     $form['status'] = [
       '#type' => 'item',
       '#title' => $this->t('Cron'),
-      '#markup' => $this->watchingCron
-        ? ($schedule === NULL
-          ? $this->t('Each cron run and hook_cron is recorded, but cron has no schedule to be missed against: set one below, or turn on Automated Cron.')
-          : $this->t('Each cron run and hook_cron is recorded. Cron is expected on the schedule %schedule (@source), plus the grace.', [
-            '%schedule' => $schedule,
-            '@source' => $source === 'settings' ? $this->t('set below') : $this->t("Automated Cron's interval"),
-          ]))
-        : $this->t('Another module has replaced the cron service, so CronWatch cannot record cron runs. Queue workers and the check still work.'),
+      '#markup' => $status,
     ];
     $form['dashboard'] = [
       '#type' => 'item',

@@ -5,14 +5,17 @@
  * CronWatch: every cron run, each hook_cron and chosen queue workers watched.
  *
  * The cron runs are recorded by the cron service itself (WatchedCron, set by
- * CronwatchServiceProvider); these hooks watch queue workers, build the
- * alert email, and describe the module.
+ * CronwatchServiceProvider, or WatchedUltimateCron under Ultimate Cron, set
+ * by CronServicePass); these hooks watch Ultimate Cron's jobs and queue
+ * workers, build the alert email, and describe the module.
  */
 
 declare(strict_types=1);
 
+use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\cronwatch\Recorder;
+use Drupal\cronwatch\UltimateCron\WatchedCronJob;
 use Drupal\cronwatch\WatchedQueueWorker;
 
 /**
@@ -35,6 +38,20 @@ function cronwatch_queue_info_alter(array &$queues): void {
 }
 
 /**
+ * Implements hook_entity_type_alter().
+ *
+ * Under Ultimate Cron, its job entity is made WatchedCronJob, which records
+ * each run of a job's callback; only when the class is still Ultimate
+ * Cron's own, so a module that replaced it is left alone.
+ */
+function cronwatch_entity_type_alter(array &$entity_types): void {
+  $type = $entity_types['ultimate_cron_job'] ?? NULL;
+  if ($type instanceof EntityTypeInterface && ltrim((string) $type->getClass(), '\\') === 'Drupal\ultimate_cron\Entity\CronJob') {
+    $type->setClass(WatchedCronJob::class);
+  }
+}
+
+/**
  * Implements hook_mail().
  *
  * The alert email: the library's subject and plain text body.
@@ -53,6 +70,6 @@ function cronwatch_help(string $route_name, RouteMatchInterface $route_match): ?
   if ($route_name !== 'help.page.cronwatch') {
     return NULL;
   }
-  return '<p>' . t('CronWatch records every cron run as a run of the job <em>drupal:cron</em>, and each module\'s hook_cron in it as a run of <em>drupal:&lt;module&gt;</em>, in the site\'s own database. It alerts you when cron is missed, when a hook_cron fails, gets stuck or runs much slower than usual, and again when it recovers. Queue workers you choose are watched too, each item a run.') . '</p>'
+  return '<p>' . t('CronWatch records every cron run as a run of the job <em>drupal:cron</em>, and each module\'s hook_cron in it as a run of <em>drupal:&lt;module&gt;</em>, in the site\'s own database. It alerts you when cron is missed, when a hook_cron fails, gets stuck or runs much slower than usual, and again when it recovers. Queue workers you choose are watched too, each item a run. Under Ultimate Cron, each run of its jobs is recorded, each job expected on its own rules.') . '</p>'
     . '<p>' . t('A check every few minutes finds missed and stuck runs. It runs at the end of each cron run, and from <code>drush cronwatch:check</code>; a check that runs with cron cannot notice cron not running, so run it from the server\'s crontab as well.') . '</p>';
 }

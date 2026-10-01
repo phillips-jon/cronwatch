@@ -64,6 +64,7 @@ Go and Elixir have no breaking changes beyond those every language shares.
 - Ruby: `client.routes(**options)`, the dashboard as a Rack app.
 - Rust: constructors and builder methods for every data and options type.
 - Java: a static `of` on each record that may grow.
+- Drupal: Ultimate Cron's jobs are recorded, each on its own rules read as Ultimate Cron reads them (`drupal:<module>` for a module's `hook_cron`, `drupal:job:<id>` for any other, triggers `ultimate-cron` and `ultimate-cron-manual`), and every cron run is still `drupal:cron`. Before, the module left a site running Ultimate Cron alone.
 - The [Stability](https://cronwatch.dev/docs/stability/), [Environment variables](https://cronwatch.dev/docs/environment/) and [Deprecations](https://cronwatch.dev/docs/deprecations/) pages.
 - CI checks each package's public API: a committed report of it for TypeScript, Python and Elixir (`api.txt`), apidiff for the Go modules and cargo-semver-checks for the Rust crates, beside .NET's `PublicAPI.Unshipped.txt`.
 
