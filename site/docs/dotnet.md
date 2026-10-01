@@ -318,7 +318,14 @@ The options are the SDK's in PascalCase: `SubjectPrefix` and `Link` among the em
 
 Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for the whole request, reads at most 1 MiB of the answer, follows no redirect (so credentials never reach another address), uses no proxy, and always verifies TLS. A refused request names only the URL's origin, never its path, with the channel's keys cut out. The requests go through the client's `ITransport`, by default an `HttpClientTransport` over one `HttpClient` the client makes on its first send and disposes with itself; `Transport` on the client's options, or on one channel's or triage's, takes one of your own, for `IHttpClientFactory`, a proxy or your own trust store. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
-A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`. `WebhookChannel.Signature(secret, body)` is that hex, for a receiver in .NET; compare it with `CryptographicOperations.FixedTimeEquals`.
+A webhook posts the alert as JSON with `"schema": 1` as its first field, the same body every CronWatch library posts, described by its [JSON Schema](/docs/alerts/#the-webhook-39-s-schema); parse the fields, not `Title` and `Message`, whose wording is not promised. It signs the body with `X-CronWatch-Signature: sha256=<hex>`. `WebhookChannel.Signature(secret, body)` is that hex, for a receiver in .NET; compare it with `CryptographicOperations.FixedTimeEquals`:
+
+```csharp
+string body = await new StreamReader(request.Body).ReadToEndAsync();
+byte[] want = Encoding.ASCII.GetBytes("sha256=" + WebhookChannel.Signature(secret, body));
+byte[] got = Encoding.ASCII.GetBytes(request.Headers["X-CronWatch-Signature"].ToString());
+bool genuine = CryptographicOperations.FixedTimeEquals(want, got);
+```
 
 ### Processes that cannot send
 

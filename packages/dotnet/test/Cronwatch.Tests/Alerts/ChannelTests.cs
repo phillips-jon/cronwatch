@@ -139,12 +139,14 @@ public class ChannelTests
         Alert alert = ChannelsConformanceTests.Sample();
         await channel.SendAsync(alert, new ChannelContext(_ => { }), CancellationToken.None);
         TransportRequest sent = Assert.Single(rec.Taken());
+        // The payload's version first, then the alert's own fields.
+        string body = "{\"schema\":1," + alert.ToJson()[1..];
         Assert.Equal(
-            ["content-type: application/cloudevents+json", "user-agent: cronwatch", "x-one: 2", "x-cronwatch-signature: sha256=" + WebhookChannel.Signature("s3cret", alert.ToJson())],
+            ["content-type: application/cloudevents+json", "user-agent: cronwatch", "x-one: 2", "x-cronwatch-signature: sha256=" + WebhookChannel.Signature("s3cret", body)],
             sent.Headers.Select(h => h.Key + ": " + h.Value).ToList());
-        Assert.Equal(alert.ToJson(), Recorder.Body(sent));
+        Assert.Equal(body, Recorder.Body(sent));
         // The receiver's check, as the SDK documents it: HMAC-SHA256 of the raw body, hex.
-        Assert.Equal(ChannelShared.Hex(System.Security.Cryptography.HMACSHA256.HashData("s3cret"u8, sent.Body.Span)), WebhookChannel.Signature("s3cret", alert.ToJson()));
+        Assert.Equal(ChannelShared.Hex(System.Security.Cryptography.HMACSHA256.HashData("s3cret"u8, sent.Body.Span)), WebhookChannel.Signature("s3cret", body));
     }
 
     [Fact]
