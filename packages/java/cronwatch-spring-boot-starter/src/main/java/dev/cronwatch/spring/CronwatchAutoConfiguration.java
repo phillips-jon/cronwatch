@@ -82,8 +82,11 @@ public class CronwatchAutoConfiguration {
     if (properties.getRetention() != null) {
       b.retention(properties.getRetention());
     }
-    if (properties.getCronSecret() != null) {
-      b.cronSecret(properties.getCronSecret());
+    // A blank cronwatch.cron-secret (a placeholder that came out empty) counts as not set, so the
+    // client falls back to CRON_SECRET, which it reads by the same rule.
+    String secret = properties.getCronSecret();
+    if (secret != null && !blank(secret)) {
+      b.cronSecret(secret);
     }
     b.deliver(deliver(properties.getDeliver()));
     if (!properties.isRedact()) {
@@ -115,6 +118,33 @@ public class CronwatchAutoConfiguration {
       }
     }
     return active.length == 0 ? null : active[0];
+  }
+
+  /**
+   * Whether {@code s} is empty or only whitespace as JavaScript's {@code trim} sees it (U+0009 to
+   * U+000D, U+0020, U+00A0, U+1680, U+2000 to U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 and
+   * U+FEFF), the core's rule for a blank token or secret.
+   */
+  static boolean blank(String s) {
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      boolean space =
+          (c >= '\t' && c <= '\r')
+              || c == ' '
+              || c == ' '
+              || c == ' '
+              || (c >= ' ' && c <= ' ')
+              || c == ' '
+              || c == ' '
+              || c == ' '
+              || c == ' '
+              || c == '　'
+              || c == '﻿';
+      if (!space) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private static Deliver deliver(String text) {

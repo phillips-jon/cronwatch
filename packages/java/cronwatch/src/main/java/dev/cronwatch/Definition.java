@@ -16,8 +16,50 @@ import org.jspecify.annotations.Nullable;
 public final class Definition {
   private final JsObject fields;
 
+  /** False for one a store read from a row whose definition was not a JSON object. */
+  private final boolean readable;
+
   private Definition(JsObject fields) {
+    this(fields, true);
+  }
+
+  private Definition(JsObject fields, boolean readable) {
     this.fields = fields;
+    this.readable = readable;
+  }
+
+  /**
+   * The definition {@code {name}} a store reads from a row whose definition is not a JSON object (a
+   * foreign, hand-edited or damaged row): the client reports the job and shows it failing, without
+   * evaluating it.
+   */
+  static Definition unreadable(String name) {
+    return new Definition(new JsObject().set("name", name), false);
+  }
+
+  /** Whether the definition was read from a JSON object ({@link #unreadable}). */
+  boolean readable() {
+    return readable;
+  }
+
+  /** Whether the definition has {@code tags} that are not a list of strings. */
+  boolean badTags() {
+    return fields.has("tags")
+        && !(fields.get("tags") instanceof List<?> list
+            && list.stream().allMatch(String.class::isInstance));
+  }
+
+  /**
+   * The definition as the client reads a stored one: {@code tags} kept only when it is a list of
+   * strings, every other field as stored.
+   */
+  Definition read() {
+    if (!badTags()) {
+      return this;
+    }
+    JsObject copy = fields.copy();
+    copy.remove("tags");
+    return new Definition(copy, readable);
   }
 
   /** A definition holding a copy of these fields. */

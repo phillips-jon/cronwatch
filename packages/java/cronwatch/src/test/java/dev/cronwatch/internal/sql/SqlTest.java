@@ -67,8 +67,8 @@ class SqlTest {
     assertTrue(q.updateRunIf(2).endsWith("WHERE id = ? AND status IN (?, ?)"));
     Sql.Statements l = new Sql.Statements(Dialect.SQLITE, "cw_");
     assertEquals(
-        "UPDATE cw_state SET state = ? WHERE job = ? AND CASE WHEN json_type(state, '$.version')"
-            + " NOT IN ('integer', 'real') THEN 0 WHEN json_extract(state, '$.version') ="
+        "UPDATE cw_state SET state = ? WHERE job = ? AND CASE WHEN NOT json_valid(state) THEN 0"
+            + " WHEN json_type(state, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN json_extract(state, '$.version') ="
             + " CAST(json_extract(state, '$.version') AS INTEGER) AND json_extract(state,"
             + " '$.version') BETWEEN 0 AND 9007199254740991 THEN CAST(json_extract(state,"
             + " '$.version') AS INTEGER) ELSE 0 END = ?",

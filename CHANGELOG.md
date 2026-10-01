@@ -123,6 +123,9 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - Elixir: a channel's, triage's or the instance's `transport:` options, which can hold a proxy's password, are left out when the struct is inspected (`IO.inspect`, a crash report).
 - Elixir: the webhook body of a queued alert that carries a `schema` key of its own (another writer's) has one `schema` key, first, as the SDK writes it, where it had two and its signature differed.
 - Elixir: `Cronwatch.Release.check/2` and `mix cronwatch.check` send alerts whatever the configuration's `deliver` says, so job nodes given `deliver: :check` have them sent; with `deliver: :check` they queued every alert and printed "sent". Called into a running instance that delivers at check time, the line says the alerts were queued, with a warning on standard error.
+- Java: a check asked for after `close()` (a Spring Boot app stopping while the starter's tick was between its syncs and its check, say) throws, where it ran in the caller against the closed store and on SQLite opened a connection nothing closed again; the starter's `stop()` waits up to 30 seconds for a tick under way. A `close()` from a channel's code, or an error handler called from it, returns at once and finishes once the check has ended, where it waited for the channel's 15-second deadline and the alert was counted failed and sent again.
+- Java: in a Quartz cluster of three or more nodes, a recovering firing fails only the run of the node that died, read from the name Quartz gives the recovering trigger, where it also failed a live node's run started in the same minute and dropped that run's real result.
+- Java: a blank `cronwatch.cron-secret` in the Spring Boot starter falls back to `CRON_SECRET`, as a blank `cronwatch.web.token` falls back to `CRONWATCH_TOKEN`.
 
 ## 0.10.0 and earlier
 

@@ -140,7 +140,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   /**
    * Schedules the check as a recurring job of its own, every minute: a sync and a CronWatch check,
    * once per minute across the servers sharing the storage provider, in place of {@link
-   * Cronwatch#start()} on each. Scheduling it again changes nothing.
+   * Cronwatch#startChecking()} on each. Scheduling it again changes nothing.
    */
   public static void scheduleCheck(JobScheduler scheduler) {
     scheduler.scheduleRecurrently(CHECK_ID, "* * * * *", CronwatchJobRunr::runCheck);

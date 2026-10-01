@@ -735,16 +735,25 @@ public final class Evaluate {
    * condition it names is open again; while they all stay closed it is kept.
    */
   public static boolean staleAlert(Alert alert, JobState state) {
+    // Judged by the alert as it is written: a foreign or damaged one read from a store is written
+    // as it was stored (Alert.toValue).
+    JsObject written = alert.toValue();
     if (alert.type().equals(AlertType.RECOVERED)) {
-      if (!(alert.details() instanceof AlertDetails.Recovered r)) {
-        return false;
+      // One whose details say nothing of what it recovers from cannot be judged, and goes.
+      if (!(written.get("details") instanceof JsObject details)
+          || !(details.get("after") instanceof List<?> after)) {
+        return true;
       }
-      for (Condition c : r.after()) {
-        if (state.openAt(c) != null) {
+      for (Object c : after) {
+        if (!(c instanceof String s) || state.openAt(Condition.of(s)) != null) {
           return true;
         }
       }
       return false;
+    }
+    // One with no time cannot match an open condition.
+    if (!(written.get("at") instanceof Number)) {
+      return true;
     }
     Long openedAt = state.openAt(Condition.of(alert.type().value()));
     return openedAt == null || openedAt != alert.at();

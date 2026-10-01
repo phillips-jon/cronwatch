@@ -703,16 +703,17 @@ public final class Html {
   }
 
   /**
-   * A page with one message. With {@code signIn}, a form under it takes the token and sends it as
-   * {@code ?token=}, which the routes move into the cookie: the way in where there is no address
-   * bar to open a link with, such as an app on an iPhone's home screen.
+   * A page with one message. With {@code signIn}, a form under it posts the token to {@code
+   * <base>/signin} in the body, keeping it out of the URL and access logs, and the routes set the
+   * cookie: the way in where there is no address bar to open a link with, such as an app on an
+   * iPhone's home screen.
    */
   public static String messagePage(String title, String message, String base, boolean signIn) {
     String form =
         signIn
-            ? "<form class=\"signin\" method=\"get\" action=\""
+            ? "<form class=\"signin\" method=\"post\" action=\""
                 + escapeHtml(base)
-                + "/\"><label for=\"token\">Token</label><input id=\"token\" name=\"token\""
+                + "/signin\"><label for=\"token\">Token</label><input id=\"token\" name=\"token\""
                 + " type=\"password\" autocomplete=\"current-password\" autocapitalize=\"off\""
                 + " spellcheck=\"false\" required><button class=\"primary\" type=\"submit\">Sign"
                 + " in</button></form>"

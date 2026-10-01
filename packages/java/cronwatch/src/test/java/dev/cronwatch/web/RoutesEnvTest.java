@@ -142,6 +142,28 @@ class RoutesEnvTest {
     child("handlerDevelopment", Map.of("APP_ENV", "local"));
   }
 
+  /** The blanks of {@link EnvChild#BLANKS} an environment variable can hold everywhere. */
+  private static final List<String> BLANK_VARS = List.of("", " ", "  ", "\t", " \n  \ufeff ");
+
+  @Test
+  void aCronwatchTokenOrTokenOfOnlyWhitespaceCountsAsUnsetSoTheRoutesStayLocked() throws Exception {
+    for (String blank : BLANK_VARS) {
+      child("blankToken", Map.of("CRONWATCH_ENV", "production", "CRONWATCH_TOKEN", blank));
+    }
+    child(
+        "blankTokenFallsBack",
+        Map.of("CRONWATCH_ENV", "production", "CRONWATCH_TOKEN", "from-env"));
+    child("paddedToken", Map.of("CRONWATCH_ENV", "production", "CRONWATCH_TOKEN", " padded "));
+  }
+
+  @Test
+  void aCronSecretOrSecretOfOnlyWhitespaceCountsAsUnset() throws Exception {
+    for (String blank : List.of("", " ", "\t\n", " \ufeff")) {
+      child("blankSecret", Map.of("CRONWATCH_ENV", "production", "CRON_SECRET", blank));
+    }
+    child("blankSecretAtCheck", Map.of("CRONWATCH_ENV", "production", "CRON_SECRET", "  "));
+  }
+
   @Test
   void theStartersFallbackNamesTheEnvironmentWhenNoVariableDoes() throws Exception {
     child("profileFallback", Map.of());

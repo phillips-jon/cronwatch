@@ -443,6 +443,13 @@ final class PgCronSource implements Source {
     }
 
     List<Alert> alerts = new ArrayList<>();
+    // The names a run may be recorded under: this sync's, and those the client declares now, after
+    // the retires above. A run copied under a retired name that was then forgotten (the
+    // dashboard's forget) has no job to go to: it is let go, never recorded and never read again.
+    Set<String> recordable = new HashSet<>(inUse);
+    for (Definition d : host.definedJobs()) {
+      recordable.add(d.name());
+    }
 
     // Where each job left off. Found from the store the first time, so a restart carries on.
     for (Map.Entry<Long, String> e : names.entrySet()) {
@@ -492,7 +499,7 @@ final class PgCronSource implements Source {
         if (host.store().getRun(idPrefix + row.runId()) != null) {
           continue;
         }
-        record(host, names, row, i >= lastFinished, now, alerts);
+        record(host, names, recordable, row, i >= lastFinished, now, alerts);
       }
       cursors.put(jobId, ordered.isEmpty() ? 0 : ordered.get(ordered.size() - 1).runId());
     }
@@ -521,7 +528,7 @@ final class PgCronSource implements Source {
       for (Map<String, @Nullable Object> r : found) {
         PgCronRow row = PgCron.rowOf(r);
         open.remove(row.runId());
-        record(host, names, row, true, now, alerts);
+        record(host, names, recordable, row, true, now, alerts);
         // Held or not, the cursor moves on: a held run is read again by its runid.
         if (names.containsKey(row.jobId()) && row.runId() > cursors.getOrDefault(row.jobId(), 0L)) {
           cursors.put(row.jobId(), row.runId());
@@ -614,6 +621,7 @@ final class PgCronSource implements Source {
   private void record(
       Cronwatch host,
       Map<Long, String> names,
+      Set<String> recordable,
       PgCronRow row,
       boolean evaluate,
       long now,
@@ -621,8 +629,12 @@ final class PgCronSource implements Source {
     long runId = row.runId();
     long jobId = row.jobId();
     String name = pending.containsKey(runId) ? pending.get(runId) : names.get(jobId);
-    if (name == null) {
+    if (name == null || !recordable.contains(name)) {
+      pending.remove(runId);
       held.remove(runId);
+      if (name != null) {
+        retired.remove(name);
+      }
       return;
     }
     Run run;

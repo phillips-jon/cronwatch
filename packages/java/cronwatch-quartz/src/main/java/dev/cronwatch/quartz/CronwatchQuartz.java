@@ -93,7 +93,8 @@ import org.quartz.listeners.SchedulerListenerSupport;
  *
  * <p>In a clustered job store, a job a node was running when it died is fired again on another node
  * with {@code isRecovering()}: that firing first finishes the earlier firing's run, if it is still
- * running, as failed with {@code Quartz recovered the job after its node stopped}.
+ * running, as failed with {@code Quartz recovered the job after its node stopped}. Only a run of
+ * the instance that died is finished so, never one of a node still running.
  *
  * <p>Jobs are tagged {@code quartz} and {@code quartz:<app>}, the app named by {@link
  * QuartzOptions#app}, else {@code $CRONWATCH_APP_ID}, else the main class, so two apps sharing a
@@ -137,6 +138,9 @@ public final class CronwatchQuartz implements AutoCloseable {
    * a hash.
    */
   private final String instancePart;
+
+  /** Whether the job store is clustered, which decides how {@link #instancePart} was made. */
+  private final boolean clustered;
 
   private final Listener listener = new Listener();
   private final Changes changes = new Changes();
@@ -183,9 +187,15 @@ public final class CronwatchQuartz implements AutoCloseable {
     this.options = options;
     this.instanceId = instanceId;
     this.watch = new Watch(cw, TAG, options.app, SCHEDULER);
+    this.clustered = clustered;
     String part =
         clustered ? instanceId : instanceId + "." + HexFormat.of().formatHex(randomBytes(4));
-    this.instancePart = part.length() > 100 ? "h" + sha256(part).substring(0, 32) : part;
+    this.instancePart = shortPart(part);
+  }
+
+  /** An instance part as run ids hold it: one too long for a run id is a hash. */
+  private static String shortPart(String part) {
+    return part.length() > 100 ? "h" + sha256(part).substring(0, 32) : part;
   }
 
   private static byte[] randomBytes(int n) {
@@ -228,7 +238,7 @@ public final class CronwatchQuartz implements AutoCloseable {
   /**
    * Schedules {@link CronwatchCheckJob} on {@code scheduler} every minute, unless it is scheduled
    * already: a sync and a CronWatch check, once per minute across a cluster sharing a JDBC job
-   * store, in place of {@link Cronwatch#start()} on every node.
+   * store, in place of {@link Cronwatch#startChecking()} on every node.
    *
    * @throws SchedulerException when the scheduler refuses the job
    */
@@ -651,9 +661,62 @@ public final class CronwatchQuartz implements AutoCloseable {
   }
 
   /**
+   * The scheduler instance that died, as Quartz names the trigger of a recovering firing: {@code
+   * recover_<instance id>_<n>} in the {@code RECOVERING_JOBS} group, made by the node that found
+   * the instance gone (or by an instance recovering its own firings as it starts again). Null for
+   * any other name.
+   */
+  static @Nullable String deadInstance(@Nullable TriggerKey key) {
+    if (key == null
+        || !Scheduler.DEFAULT_RECOVERY_GROUP.equals(key.getGroup())
+        || !key.getName().startsWith("recover_")) {
+      return null;
+    }
+    String name = key.getName();
+    int sep = name.lastIndexOf('_');
+    if (sep <= "recover_".length() || sep == name.length() - 1) {
+      return null;
+    }
+    for (int i = sep + 1; i < name.length(); i++) {
+      if (name.charAt(i) < '0' || name.charAt(i) > '9') {
+        return null;
+      }
+    }
+    return name.substring("recover_".length(), sep);
+  }
+
+  /**
+   * Where the runs of a dead instance's firings start: {@code quartz:<app>:<its part>:}, its part
+   * as {@link #instancePart} is made (a clustered store's id; a store that is not clustered gives
+   * the id a random part of each process's own, so the start is {@code quartz:<app>:<id>.}). Null
+   * when a hash stands for the part, which cannot be matched by its start.
+   */
+  @Nullable String deadPrefix(String prefix, String dead) {
+    if (clustered) {
+      return prefix + shortPart(dead) + ":";
+    }
+    String start = dead + ".";
+    return start.length() + 8 > 100 ? null : prefix + start;
+  }
+
+  /**
+   * Whether a recovering firing fails this run: a running run of this app, not this instance's,
+   * started within a minute of the original firing, and, when the dead instance is known, one of
+   * that instance's firings; a run of an instance still alive (a third node) is left to finish.
+   */
+  static boolean recovers(
+      Run run, String prefix, String mine, @Nullable String deadPrefix, long firedAt) {
+    return run.status().equals(RunStatus.RUNNING)
+        && run.id().startsWith(prefix)
+        && !run.id().startsWith(mine)
+        && (deadPrefix == null || run.id().startsWith(deadPrefix))
+        && Math.abs(run.startedAt() - firedAt) <= RECOVERY_SLACK_MS;
+  }
+
+  /**
    * A recovering firing finishes the earlier firing's run, if it is still running, as failed: a run
-   * of this job and app from another scheduler instance, started within a minute of the original
-   * firing.
+   * of this job and app from the scheduler instance that died ({@link #deadInstance}), started
+   * within a minute of the original firing.
    */
   private void recover(String name, JobExecutionContext ctx) {
     Object fired =
@@ -670,12 +733,11 @@ public final class CronwatchQuartz implements AutoCloseable {
     }
     String prefix = "quartz:" + watch.appSlug() + ":";
     String mine = prefix + instancePart + ":";
+    String dead = deadInstance(ctx.getTrigger().getKey());
+    String deadPrefix = dead == null ? null : deadPrefix(prefix, dead);
     try {
       for (Run run : cw.runs(name, 50)) {
-        if (run.status().equals(RunStatus.RUNNING)
-            && run.id().startsWith(prefix)
-            && !run.id().startsWith(mine)
-            && Math.abs(run.startedAt() - firedAt) <= RECOVERY_SLACK_MS) {
+        if (recovers(run, prefix, mine, deadPrefix, firedAt)) {
           RunHandle handle = cw.resumeRun(name, run.id());
           handle.fail(RECOVERED);
         }

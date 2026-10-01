@@ -229,9 +229,12 @@ public record JobState(
   }
 
   /**
-   * Reads the SDK's JSON value. A queued entry that is not an alert is dropped rather than fail
-   * every read of the state, since it could never be delivered, and so is an entry of {@code
-   * sending} that is not an object ({@link SendingAlert} reads the rest leniently).
+   * Reads the SDK's JSON value leniently, since a foreign, hand-edited or damaged state must affect
+   * only its own job: an entry of {@code open} whose value is not a number is dropped, and {@code
+   * silencedUntil} and {@code lastAlertAt} that are not numbers read as null. A queued entry that
+   * is not an alert is dropped rather than fail every read of the state, since it could never be
+   * delivered, and so is an entry of {@code sending} that is not an object ({@link SendingAlert}
+   * reads the rest leniently).
    *
    * @throws Json.JsonException when it is not an object
    */
@@ -241,10 +244,11 @@ public record JobState(
     }
     Map<Condition, Long> open = new LinkedHashMap<>();
     if (o.get("open") instanceof JsObject opened) {
+      // Only the entries whose value is a time: a foreign or damaged one is not a condition.
       for (Map.Entry<String, @Nullable Object> e : opened.entries()) {
-        open.put(
-            Condition.of(e.getKey()),
-            e.getValue() instanceof Number n ? Js.toLong(n.doubleValue()) : 0L);
+        if (e.getValue() instanceof Number n) {
+          open.put(Condition.of(e.getKey()), Js.toLong(n.doubleValue()));
+        }
       }
     }
     List<Condition> pending = null;

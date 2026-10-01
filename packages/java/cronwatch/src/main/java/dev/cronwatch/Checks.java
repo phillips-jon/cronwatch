@@ -5,6 +5,7 @@ import dev.cronwatch.internal.evaluate.Evaluate;
 import dev.cronwatch.internal.evaluate.Evaluate.CheckOutcome;
 import dev.cronwatch.internal.evaluate.Evaluate.Evaluation;
 import dev.cronwatch.internal.evaluate.MutableState;
+import dev.cronwatch.json.Json;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -52,10 +53,20 @@ final class Checks {
    * the next call starts a new one.
    */
   CheckResult check() {
+    if (core.closed.get()) {
+      throw closed();
+    }
     CompletableFuture<CheckResult> mine = new CompletableFuture<>();
     CompletableFuture<CheckResult> shared = core.checking.compareAndExchange(null, mine);
     if (shared == null) {
       shared = mine;
+      // Read after this check is in flight, as close() sets the flag before it reads the check in
+      // flight: either close waits for this check, or this check sees the client closed.
+      if (core.closed.get()) {
+        core.checking.compareAndSet(mine, null);
+        mine.completeExceptionally(closed());
+        throw closed();
+      }
       // The check is let go of before anyone is answered, as the SDK's is: a caller that asks
       // again once answered starts a check of its own rather than joining this finished one.
       core.spawn(
@@ -91,6 +102,15 @@ final class Checks {
       throw new CronwatchException(
           CronwatchException.Kind.OTHER, "the check failed: " + cause, cause);
     }
+  }
+
+  /**
+   * What a check asked for after {@code close()} throws: it would write to the store just closed,
+   * and on SQLite open a connection nothing closes again.
+   */
+  private static CronwatchException closed() {
+    return new CronwatchException(
+        CronwatchException.Kind.OTHER, "the client is closed, so it does not check");
   }
 
   private CheckResult runCheck() {
@@ -154,10 +174,12 @@ final class Checks {
     if (declared != null) {
       def = declared.stored();
     } else {
-      StoredJob stored = Core.call(() -> core.store.getJob(listed.job()));
-      if (stored == null) {
+      StoredJob found = Core.call(() -> core.store.getJob(listed.job()));
+      if (found == null) {
         return;
       }
+      StoredJob stored = readJob(found);
+      evaluable(stored);
       def = stored.definition();
     }
     if (!Evaluate.isStuck(def, listed, now)) {
@@ -186,6 +208,7 @@ final class Checks {
   /** One job's part of a check: missed, then retries and sends. */
   private JobSummary checkJob(
       StoredJob job, long now, Delivery.Budget budget, Consumer<List<Alert>> alerts) {
+    evaluable(job);
     List<Run> recent = Core.call(() -> core.store.listRuns(job.name(), Evaluate.BASELINE_WINDOW));
     Run last = recent.isEmpty() ? null : recent.get(0);
     Long[] nextExpectedAt = {null};
@@ -218,6 +241,7 @@ final class Checks {
       recent =
           Core.call(
               () -> core.store.listRuns(job.name(), Math.max(limit, Evaluate.BASELINE_WINDOW)));
+      evaluable(job);
       JobState state = core.readState(job.name());
       CheckOutcome o =
           Evaluate.onCheck(
@@ -280,7 +304,36 @@ final class Checks {
       core.unmark(def.name());
       core.sync(def);
     }
-    return missing ? Core.call(core.store::listJobs) : jobs;
+    List<StoredJob> out = new ArrayList<>();
+    for (StoredJob job : missing ? Core.call(core.store::listJobs) : jobs) {
+      out.add(readJob(job));
+    }
+    return out;
+  }
+
+  /**
+   * A stored job as the client reads it, so a foreign, hand-edited or damaged row affects only its
+   * own job: {@code tags} kept only when it is a list of strings, every other field as stored. One
+   * whose definition was not a JSON object keeps the definition {@code {name}} the store gave it,
+   * and {@link #evaluable} refuses it.
+   */
+  static StoredJob readJob(StoredJob stored) {
+    Definition definition = stored.definition();
+    if (!definition.badTags()) {
+      return stored;
+    }
+    return StoredJob.of(stored.name(), definition.read(), stored.createdAt(), stored.updatedAt());
+  }
+
+  /**
+   * Throws for a job whose stored definition was not a JSON object: reported, and shown as failing,
+   * while the others carry on.
+   */
+  private static void evaluable(StoredJob stored) {
+    if (!stored.definition().readable()) {
+      throw new IllegalStateException(
+          "job " + Json.stringify(stored.name()) + ": its stored definition is not a JSON object");
+    }
   }
 
   List<JobWithRuns> jobsWithRuns(int limit) {
@@ -301,7 +354,7 @@ final class Checks {
       core.sync(def, true);
     }
     StoredJob stored = Core.call(() -> core.store.getJob(name));
-    return stored == null ? null : snapshot(stored, core.now(), 0).job();
+    return stored == null ? null : snapshot(readJob(stored), core.now(), 0).job();
   }
 
   List<Run> runs(String name, int limit) {
@@ -376,7 +429,13 @@ final class Checks {
                 + " alerts."
                 + " Another process must run checks with Deliver.NOW (the default) to send them.");
       }
-      Runnable tick = () -> core.spawn(this::check, "check");
+      Runnable tick =
+          () -> {
+            // A tick the timer started as close() began: no check after it.
+            if (!core.closed.get()) {
+              core.spawn(this::check, "check");
+            }
+          };
       try {
         firstTick = core.timer.schedule(tick, core.timings.firstCheckMs, TimeUnit.MILLISECONDS);
         ticks = core.timer.scheduleAtFixedRate(tick, ms, ms, TimeUnit.MILLISECONDS);

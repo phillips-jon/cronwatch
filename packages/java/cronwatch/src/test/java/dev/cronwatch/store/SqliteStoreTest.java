@@ -287,7 +287,10 @@ class SqliteStoreTest {
               + " 'running', 5.0, '{\"a\":\"text\",\"b\":2}')");
       StoredJob job = s.getJob("odd");
       assertNotNull(job);
-      assertEquals("{}", job.definition().toJson(), "a definition that is not an object is empty");
+      assertEquals(
+          "{\"name\":\"odd\"}",
+          job.definition().toJson(),
+          "a definition that is not an object is its name alone");
       assertEquals(2, job.updatedAt());
       List<Run> running = s.runningRuns();
       assertEquals(1, running.size());
@@ -320,12 +323,15 @@ class SqliteStoreTest {
   }
 
   @Test
-  void aStateThatIsNotJsonFailsItsReadOnly() throws Exception {
+  void aStateThatIsNotJsonOrNotAnObjectReadsAsNone() throws Exception {
     Path file = dir.resolve("state.db");
     try (SqlStore s = store(file, "cronwatch_")) {
       s.init();
-      exec(file, "INSERT INTO cronwatch_state (job, state) VALUES ('bad', 'not json')");
-      assertThrows(RuntimeException.class, () -> s.getState("bad"));
+      exec(
+          file,
+          "INSERT INTO cronwatch_state (job, state) VALUES ('bad', 'not json'), ('five', '5')");
+      assertEquals(null, s.getState("bad"));
+      assertEquals(null, s.getState("five"));
       assertEquals(null, s.getState("other"));
       s.setState(dev.cronwatch.JobState.empty("ok"));
       assertNotNull(s.getState("ok"));

@@ -51,7 +51,8 @@ public final class HandlerOptions {
 
     /**
      * The secret the handler's requests must carry, as {@code Authorization: Bearer <secret>}, in
-     * place of the client's cron secret. {@code ""} counts as unset.
+     * place of the client's cron secret. An empty secret, or one of only whitespace, counts as
+     * unset and falls back to the client's.
      */
     public Builder secret(String secret) {
       this.secretGiven = true;

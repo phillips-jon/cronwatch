@@ -406,6 +406,50 @@ class PgCronTest {
   }
 
   @Test
+  void aRenamedJobsOldNameForgottenWhileItsRunIsOpenLetsTheRunGoWithNoError() {
+    AtomicLong c = new AtomicLong(T0);
+    FakeCron cron = new FakeCron();
+    FakeCron.Job job = cron.job(1, "a", "0 3 * * *");
+    FakeCron.Detail running = cron.add(1, "running", T0 - 5000, null);
+    // The open run ids each read of new rows asks for.
+    List<List<String>> opened = new CopyOnWriteArrayList<>();
+    PgCron.Query db =
+        (sql, params) -> {
+          if (sql.contains("unnest")) {
+            String open = params.get(2).toString();
+            opened.add(List.of(open.substring(1, open.length() - 1).split(",", -1)));
+          }
+          return cron.query(sql, params);
+        };
+    try (Kit k = kit(new MemoryStore(), c, PgCron.source(db, PgCronOptions.defaults()))) {
+      k.cw.check();
+      assertEquals("a", getRun(k, "pgcron:" + running.runId).job());
+      job.jobName = "b";
+      c.addAndGet(MIN);
+      k.cw.check();
+      assertTrue(
+          String.valueOf(
+                  java.util.Objects.requireNonNull(k.cw.jobSummary("a")).definition().description())
+              .contains("renamed to b"));
+      k.cw.forget("a");
+      running.status = "succeeded";
+      running.end = T0;
+      for (int i = 0; i < 3; i++) {
+        c.addAndGet(MIN);
+        opened.clear();
+        k.cw.check();
+      }
+      assertEquals(List.of(), k.errors);
+      assertNull(k.cw.jobSummary("a"), "the forgotten name is not declared again");
+      assertNull(k.cw.getRun("pgcron:" + running.runId), "the run is not recorded");
+      for (List<String> ids : opened) {
+        assertFalse(ids.contains(Long.toString(running.runId)), "and is no longer read");
+      }
+      assertEquals(List.of("b"), k.cw.definedJobs().stream().map(d -> d.name()).toList());
+    }
+  }
+
+  @Test
   void aJobsOptionsApplyAndAScheduleItCannotReadIsReported() {
     FakeCron cron = new FakeCron();
     cron.job(1, "odd", "not a schedule");

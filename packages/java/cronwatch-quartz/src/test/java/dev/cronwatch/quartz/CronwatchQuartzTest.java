@@ -34,6 +34,7 @@ import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
 import org.quartz.Trigger.CompletedExecutionInstruction;
 import org.quartz.TriggerBuilder;
+import org.quartz.TriggerKey;
 import org.quartz.listeners.TriggerListenerSupport;
 
 /**
@@ -604,5 +605,70 @@ class CronwatchQuartzTest {
     } finally {
       scheduler.shutdown(true);
     }
+  }
+
+  @Test
+  void theDeadInstanceIsReadFromTheRecoveringTriggersName() {
+    String group = Scheduler.DEFAULT_RECOVERY_GROUP;
+    assertEquals("node-a", CronwatchQuartz.deadInstance(new TriggerKey("recover_node-a_0", group)));
+    assertEquals(
+        "host_1_1767605400000",
+        CronwatchQuartz.deadInstance(new TriggerKey("recover_host_1_1767605400000_12", group)));
+    assertNull(CronwatchQuartz.deadInstance(new TriggerKey("recover_node-a_0", "DEFAULT")));
+    assertNull(CronwatchQuartz.deadInstance(new TriggerKey("recover_node-a_x", group)));
+    assertNull(CronwatchQuartz.deadInstance(new TriggerKey("recover__0", group)));
+    assertNull(CronwatchQuartz.deadInstance(new TriggerKey("nightly", group)));
+    assertNull(CronwatchQuartz.deadInstance(null));
+  }
+
+  @Test
+  void aRecoveryFailsOnlyTheDeadNodesRunNotALiveThirdNodesInTheSameMinute() {
+    long t = 1_767_605_400_000L;
+    String prefix = "quartz:billing:";
+    String mine = prefix + "node-b:";
+    Run dead = running(prefix + "node-a:node-a17:0", t + 1_000);
+    Run third = running(prefix + "node-c:node-c4:0", t + 30_000);
+    Run own = running(prefix + "node-b:node-b9:0", t + 2_000);
+    Run otherApp = running("quartz:reports:node-a:node-a18:0", t);
+    Run done =
+        Run.of(
+            prefix + "node-a:node-a16:0",
+            "j",
+            RunStatus.OK,
+            t,
+            t + 5,
+            5L,
+            null,
+            null,
+            dev.cronwatch.Metrics.empty(),
+            "quartz");
+    String deadPrefix = prefix + "node-a:";
+    assertTrue(CronwatchQuartz.recovers(dead, prefix, mine, deadPrefix, t));
+    assertFalse(
+        CronwatchQuartz.recovers(third, prefix, mine, deadPrefix, t),
+        "a run of a node still alive is left to finish");
+    assertFalse(CronwatchQuartz.recovers(own, prefix, mine, deadPrefix, t));
+    assertFalse(CronwatchQuartz.recovers(otherApp, prefix, mine, deadPrefix, t));
+    assertFalse(CronwatchQuartz.recovers(done, prefix, mine, deadPrefix, t));
+    assertFalse(
+        CronwatchQuartz.recovers(
+            running(prefix + "node-a:node-a1:0", t - 61_000), prefix, mine, deadPrefix, t),
+        "outside the minute");
+    // With the dead instance unknown, the rule is the minute's alone, as before.
+    assertTrue(CronwatchQuartz.recovers(third, prefix, mine, null, t));
+  }
+
+  private static Run running(String id, long startedAt) {
+    return Run.of(
+        id,
+        "j",
+        RunStatus.RUNNING,
+        startedAt,
+        null,
+        null,
+        null,
+        null,
+        dev.cronwatch.Metrics.empty(),
+        "quartz");
   }
 }

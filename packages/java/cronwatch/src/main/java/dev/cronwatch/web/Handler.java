@@ -40,7 +40,8 @@ public final class Handler implements Endpoint {
     if (options.secretGiven() && own == null) {
       this.secret = "";
       this.optedOut = true;
-    } else if (own != null && !own.isEmpty()) {
+    } else if (own != null && !Js.isBlank(own)) {
+      // A blank secret falls back to the client's.
       this.secret = own;
       this.optedOut = false;
     } else {

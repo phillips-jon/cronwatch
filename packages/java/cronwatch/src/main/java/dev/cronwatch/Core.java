@@ -21,6 +21,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
@@ -143,6 +144,34 @@ final class Core {
 
   /** The thread the check in flight runs on, so a close from inside it does not wait for itself. */
   volatile @Nullable Thread checkThread;
+
+  /** Set by {@code close()} before it waits for the check: no check starts after it. */
+  final AtomicBoolean closed = new AtomicBoolean();
+
+  /** Set while a task of this client's runs on one of its threads (see {@link #ownsThread}). */
+  private static final ThreadLocal<@Nullable Core> RUNNING_FOR = new ThreadLocal<>();
+
+  /**
+   * Whether the calling thread is running a task of this client's: the check, a channel's send,
+   * triage, or an error handler called from one of them. A close from such a thread cannot wait for
+   * the check, which may be waiting on it.
+   */
+  boolean ownsThread() {
+    return RUNNING_FOR.get() == this || Thread.currentThread().equals(checkThread);
+  }
+
+  /** {@code task} marked as this client's while it runs, the mark the caller had put back after. */
+  private <T> Callable<T> owned(Callable<T> task) {
+    return () -> {
+      Core before = RUNNING_FOR.get();
+      RUNNING_FOR.set(this);
+      try {
+        return task.call();
+      } finally {
+        RUNNING_FOR.set(before);
+      }
+    };
+  }
 
   final AtomicLong lastPruneAt = new AtomicLong(0);
 
@@ -525,7 +554,7 @@ final class Core {
    */
   <T> Future<T> submit(Callable<T> task) {
     try {
-      return executor.submit(task);
+      return executor.submit(owned(task));
     } catch (RejectedExecutionException e) {
       FutureTask<T> inline = new FutureTask<>(task);
       inline.run();
@@ -547,7 +576,20 @@ final class Core {
           }
         };
     try {
-      executor.execute(guarded);
+      Callable<@Nullable Void> marked =
+          owned(
+              () -> {
+                guarded.run();
+                return null;
+              });
+      executor.execute(
+          () -> {
+            try {
+              marked.call();
+            } catch (Exception impossible) {
+              // guarded reports what task throws.
+            }
+          });
     } catch (RejectedExecutionException e) {
       guarded.run();
     }

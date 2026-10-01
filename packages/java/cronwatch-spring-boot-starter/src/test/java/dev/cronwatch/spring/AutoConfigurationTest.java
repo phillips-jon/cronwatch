@@ -70,6 +70,40 @@ class AutoConfigurationTest {
   }
 
   @Test
+  void aCronSecretPropertyOfOnlyWhitespaceCountsAsUnset() {
+    for (String blank : List.of("", " ", "\t", " ", " ", "﻿", " \n　")) {
+      assertTrue(CronwatchAutoConfiguration.blank(blank), blank);
+    }
+    assertTrue(!CronwatchAutoConfiguration.blank(" padded "));
+    assertTrue(!CronwatchAutoConfiguration.blank("\u0085"), "not whitespace to JavaScript");
+    String env = System.getenv("CRON_SECRET");
+    String fromEnv = env == null || CronwatchAutoConfiguration.blank(env) ? null : env;
+    for (String value : List.of(" ", "﻿ ")) {
+      try (ConfigurableApplicationContext ctx =
+          Apps.run(
+              Plain.class,
+              new MemoryStore(),
+              new Apps.Errors(),
+              "cronwatch.cron-secret=" + value,
+              "cronwatch.check-mode=none")) {
+        assertEquals(
+            fromEnv,
+            ctx.getBean(Cronwatch.class).cronSecret(),
+            "a blank property falls back to CRON_SECRET");
+      }
+    }
+    try (ConfigurableApplicationContext ctx =
+        Apps.run(
+            Plain.class,
+            new MemoryStore(),
+            new Apps.Errors(),
+            "cronwatch.cron-secret=s3cret",
+            "cronwatch.check-mode=none")) {
+      assertEquals("s3cret", ctx.getBean(Cronwatch.class).cronSecret());
+    }
+  }
+
+  @Test
   void theEnvironmentIsTheActiveProfile() {
     assertEquals("prod", CronwatchAutoConfiguration.profile(new String[] {"cloud", "prod"}));
     assertEquals("cloud", CronwatchAutoConfiguration.profile(new String[] {"cloud", "eu"}));
@@ -257,6 +291,71 @@ class AutoConfigurationTest {
       CronwatchChecker checker = ctx.getBean(CronwatchChecker.class);
       assertEquals(CronwatchProperties.CheckMode.LOCAL, checker.mode(), "not clustered");
       checker.tick(CronwatchProperties.CheckMode.LOCAL);
+    }
+  }
+
+  @Test
+  void stopWaitsForATickUnderWaySoItsCheckDoesNotRunIntoTheClose() throws Exception {
+    java.util.concurrent.atomic.AtomicInteger checks =
+        new java.util.concurrent.atomic.AtomicInteger();
+    java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    List<String> order = new java.util.concurrent.CopyOnWriteArrayList<>();
+    try (Cronwatch cw =
+        Cronwatch.builder()
+            .noCronSecret()
+            .noShutdownHook()
+            .source(
+                new dev.cronwatch.Source() {
+                  @Override
+                  public String name() {
+                    return "counting";
+                  }
+
+                  @Override
+                  public List<dev.cronwatch.Alert> sync(Cronwatch c) {
+                    checks.incrementAndGet();
+                    return List.of();
+                  }
+                })
+            .build()) {
+      CronwatchProperties properties = new CronwatchProperties();
+      properties.setCheckMode(CronwatchProperties.CheckMode.SHEDLOCK);
+      // The tick holds ShedLock's lock until released: a sync of the app's schedulers, say.
+      CronwatchChecker.ClusterLock lock =
+          work -> {
+            entered.countDown();
+            try {
+              release.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+            work.run();
+            order.add("tick ended");
+            return true;
+          };
+      CronwatchChecker checker = new CronwatchChecker(cw, properties, null, lock, null);
+      checker.firstDelay = Duration.ZERO;
+      checker.start();
+      entered.await();
+      Thread stopping =
+          Thread.ofVirtual()
+              .start(
+                  () -> {
+                    checker.stop();
+                    order.add("stop returned");
+                  });
+      long until = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+      while (stopping.getState() != Thread.State.WAITING
+          && stopping.getState() != Thread.State.TIMED_WAITING
+          && stopping.getState() != Thread.State.TERMINATED
+          && System.nanoTime() < until) {
+        Thread.onSpinWait();
+      }
+      release.countDown();
+      stopping.join();
+      assertEquals(List.of("tick ended", "stop returned"), order);
+      assertEquals(0, checks.get(), "stopped during the tick: no check");
     }
   }
 }

@@ -81,6 +81,15 @@ public record Alert(
    */
   public JsObject toValue() {
     JsObject raw = Kept.get(this);
+    if (raw != null && !intact(raw)) {
+      // A foreign or damaged entry (a field missing or of another type) is carried as it was
+      // stored, as the SDK carries a queued alert, so a retry judges it by what was stored.
+      JsObject kept = raw.copy();
+      if (triageTried || triage != null) {
+        kept.set("triage", triage);
+      }
+      return kept;
+    }
     Object storedDetails = raw == null ? null : raw.get("details");
     Object detailsValue =
         storedDetails != null && !Kept.KNOWN_TYPES.contains(type.value())
@@ -102,6 +111,23 @@ public record Alert(
     return Kept.withUnknown(o, raw);
   }
 
+  /**
+   * Whether a stored alert has every field the SDK writes, each of its JSON type: one that does not
+   * is read with defaults (an empty title, a time of 0) and written back as it was stored.
+   */
+  private static boolean intact(JsObject o) {
+    Object run = o.get("run");
+    return o.get("type") instanceof String
+        && o.has("run")
+        && (run == null || run instanceof JsObject)
+        && o.get("details") instanceof JsObject
+        && o.get("job") instanceof String
+        && o.get("definition") instanceof JsObject
+        && o.get("title") instanceof String
+        && o.get("message") instanceof String
+        && o.get("at") instanceof Number;
+  }
+
   /** The SDK's JSON. */
   public String toJson() {
     return toValue().toJson();
@@ -119,7 +145,8 @@ public record Alert(
   /**
    * Reads the SDK's JSON value. A queued alert's run keeps the metrics that are numbers, as a
    * stored run row does, so one another writer stored otherwise cannot fail every read of the job's
-   * state.
+   * state. A field that is missing or of another type reads as its default (an empty text, a time
+   * of 0), and such an alert writes back as it was stored ({@link #toValue}).
    *
    * @throws Json.JsonException when it is not an object
    */
