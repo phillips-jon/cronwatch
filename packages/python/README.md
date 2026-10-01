@@ -36,7 +36,7 @@ with nightly.run() as ctx:
     ctx.log("Report written:", path)   # kept with the run, shown in alerts
     ctx.metric("cost", 1.2)            # watched against budgets and baselines
 
-cw.start()  # checks for missed and stuck runs every minute, in a daemon thread
+cw.start_checking()  # checks for missed and stuck runs every minute, in a daemon thread
 ```
 
 A run is recorded when the block ends; an exception inside it is recorded as the failure and raised again. A function works the same way, as a decorator (each call is a run, and `cronwatch.current()` is its context) or passed to `run()`, which returns what the function returns:
@@ -49,7 +49,7 @@ def build_report() -> None:
 nightly.run(lambda ctx: sync_accounts(ctx))
 ```
 
-Start the check in exactly one process per store, never once per Gunicorn or uWSGI worker, since two checkers can each send the same alert. A script run from crontab exits when it is done, so instead of `start()`, add a second crontab line that declares the jobs and calls `cw.check()` every five minutes. `cronwatch.configure(...)` makes the process's client once, and `cronwatch.client()` hands it out.
+Start the check in exactly one process per store, never once per Gunicorn or uWSGI worker, since two checkers can each send the same alert. A script run from crontab exits when it is done, so instead of `start_checking()`, add a second crontab line that declares the jobs and calls `cw.check()` every five minutes. `cronwatch.configure(...)` makes the process's client once, and `cronwatch.client()` hands it out.
 
 A run that starts in one call and ends in another (a job that hands work to a queue, a webhook that reports back later) is one run too:
 
@@ -71,7 +71,7 @@ An `expect` pattern is searched in your process by `re`, which backtracks and, l
 
 `Cronwatch(...)`: `store`, `alerts`, `triage` (a function returning a short diagnosis added to each alert), `sources`, `cron_secret` (the bearer `/api/check` and a job's handler accept; default `$CRON_SECRET`), `retention` (default `"30d"`), `defaults`, `redact` (secrets are blanked from output and errors by default; pass your own function, or `False`), `deliver` (`"check"` queues alerts for another process's check to send), `on_error` (store and channel failures; default the `cronwatch` logger), `now`.
 
-The client's methods: `job(name, ...)`, `run(name, fn=None, ...)` (a run without keeping a handle), `check()`, `jobs()`, `jobs_with_runs()`, `job_summary(name)`, `runs(name)`, `get_run(id)`, `silence(name, "2h")`, `unsilence(name)`, `forget(name)`, `resume_run(name, run_id)`, `record_run(run)`, `defined_jobs()` (the jobs declared in this process), `routes()` (the dashboard, below), `start()`, `stop()`, `close()`.
+The client's methods: `job(name, ...)`, `run(name, fn=None, ...)` (a run without keeping a handle), `check()`, `jobs()`, `jobs_with_runs()`, `job_summary(name)`, `runs(name)`, `get_run(id)`, `silence(name, "2h")`, `unsilence(name)`, `forget(name)`, `resume_run(name, run_id)`, `record_run(run)`, `defined_jobs()` (the jobs declared in this process), `routes()` (the dashboard, below), `start_checking()`, `stop()`, `close()`.
 
 ### Stores
 
@@ -184,7 +184,7 @@ import cronwatch.apscheduler
 
 scheduler.add_job(nightly_report, "cron", hour=2, id="nightly-report")
 cronwatch.apscheduler.watch(scheduler, grace="15m", jobs={"nightly-report": {"timeout": "2h"}})
-cw.start()   # checks every minute, in a thread
+cw.start_checking()  # checks every minute, in a thread
 ```
 
 Every job is declared, named after its id, with its trigger as the schedule (cron triggers in their zone, intervals as `every <n>`). A job added, rescheduled or removed later is followed. `jobs=` gives options per job, by id; `exclude=` leaves jobs out, by id or name.

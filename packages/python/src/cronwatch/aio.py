@@ -23,7 +23,7 @@ and write, alert and triage done in a worker thread (asyncio.to_thread), so
 the event loop is never held up by the store or a channel, and async and sync
 code in one process share jobs, locks and state. The job's own coroutine runs
 in the caller's task, where ``cronwatch.current()`` is its context. A plain
-function passed to ``run()`` runs in a worker thread too. ``start()`` checks
+function passed to ``run()`` runs in a worker thread too. ``start_checking()`` checks
 in a daemon thread, as the synchronous client's does.
 
 The synchronous JobHandle takes async functions as well (``async with
@@ -35,6 +35,7 @@ without this module.
 from __future__ import annotations
 
 import asyncio
+import warnings
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -225,9 +226,14 @@ class AsyncCronwatch:
         """The dashboard (cronwatch.web.Web); mount its .asgi, which handles each request in a worker thread."""
         return self.sync.routes(**options)
 
-    def start(self, every: Duration = "1m") -> None:
+    def start_checking(self, every: Duration = "1m") -> None:
         """Check on an interval, in a daemon thread (it never blocks the event loop)."""
-        self.sync.start(every)
+        self.sync.start_checking(every)
+
+    def start(self, every: Duration = "1m") -> None:
+        """Deprecated: renamed start_checking(); goes in 2.0."""
+        warnings.warn("AsyncCronwatch.start(every) is deprecated: use start_checking(every)", DeprecationWarning, stacklevel=2)
+        self.sync.start_checking(every)
 
     def stop(self) -> None:
         self.sync.stop()

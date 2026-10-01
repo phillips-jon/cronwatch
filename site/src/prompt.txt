@@ -240,7 +240,7 @@ Python (Python 3.11 or newer)
 4. Run the check every few minutes so missed and stuck runs are noticed: the
    Celery beat entry above, or a crontab line running
    python manage.py cronwatch_check (Django) or a script calling cw.check(),
-   or cw.start() once in a long-running process. One checker per store.
+   or cw.start_checking() once in a long-running process. One checker per store.
 
 5. Mount the dashboard: in Django,
    path("cronwatch/", include("cronwatch.django.urls")) in urls.py; elsewhere

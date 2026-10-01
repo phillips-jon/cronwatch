@@ -10,7 +10,7 @@
         ctx.log("Report written")
         ctx.metric("cost", 1.2)
 
-    cw.start()  # checks for missed and stuck runs every minute, in a daemon thread
+    cw.start_checking()  # checks for missed and stuck runs every minute, in a daemon thread
 
 The Python port of @cronwatch/sdk: the same rules, the same alert text and
 the same stored rows, so a Python, a Node and a Ruby process can share one

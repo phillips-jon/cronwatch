@@ -117,12 +117,12 @@ async def main() -> None:
 A long-running process (a web server, a worker) checks in a daemon thread:
 
 ```python
-cw.start()          # every minute; cw.start("5m") to change it
+cw.start_checking()  # every minute; cw.start_checking("5m") to change it
 ```
 
-Calling `start` again while it runs does nothing; a different interval is reported to `on_error` and ignored, so call `stop()` first to change it.
+(A job's `start()` opens a run; the client's `start_checking()` starts the checks. `cw.start(every)` is its old name, still working with a `DeprecationWarning` until 2.0.) Calling `start_checking` again while it runs does nothing; a different interval is reported to `on_error` and ignored, so call `stop()` first to change it.
 
-Start the checker in exactly one process per store: one process with `start`, or one scheduled check. Two checkers on one database can each send the same alert. So never call `start` once per Gunicorn or uWSGI worker (in a `post_fork` hook, say): start it in a process of its own, such as a worker or scheduler you already run, or use the crontab check below. A forked child gets a fresh client state and no check thread, so a `start` in the parent before it forks does not carry into the workers either.
+Start the checker in exactly one process per store: one process with `start_checking`, or one scheduled check. Two checkers on one database can each send the same alert. So never call `start_checking` once per Gunicorn or uWSGI worker (in a `post_fork` hook, say): start it in a process of its own, such as a worker or scheduler you already run, or use the crontab check below. A forked child gets a fresh client state and no check thread, so a `start_checking` in the parent before it forks does not carry into the workers either.
 
 A script run from crontab exits when it is done, so nothing inside it notices the run that never happened. Add a second crontab line that checks:
 
@@ -221,7 +221,7 @@ scheduler = BackgroundScheduler(timezone="UTC")
 scheduler.add_job(nightly_report, "cron", hour=2, id="nightly-report")
 watch(scheduler, client=cw)
 scheduler.start()
-cw.start()          # the check, for runs that never happened
+cw.start_checking()  # the check, for runs that never happened
 ```
 
 `pip install "cronwatch-sdk[apscheduler]"` (APScheduler 3.10 or newer). `watch` adds a listener to an APScheduler 3 scheduler (background, blocking, asyncio or any other) and needs no change to your jobs. Every job becomes a CronWatch job named after its id, with its trigger as the schedule: a cron trigger becomes the same cron expression, checked against APScheduler's own fire times; an interval trigger is `every <interval>`; a date trigger runs once. A job added or rescheduled later is followed, and a removed one stops being expected.
@@ -366,7 +366,7 @@ cw = cronwatch.Cronwatch(
     store=PostgresStore(),
     sources=[PgCron(os.environ["DATABASE_URL"], prefix="db:")],
 )
-cw.start()
+cw.start_checking()
 ```
 
 The first argument is a connection string, a psycopg connection or pool, or anything with `query(sql, params)` that returns rows as dicts. On a connection that is not in autocommit mode it never ends a transaction of yours. The options (`jobs`, `prefix`, `job_name`, `options`, `timezone`) and the rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
@@ -428,6 +428,8 @@ A triage of your own is any function that takes the context (`alert`, `recent_ru
 
 `cw.job(name, **options)` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). An `expect` pattern, like an `expect` function, runs in your process with no time limit, so keep it clear of repeats that can backtrack without end (see [expect rules](/docs/conditions/#expect-rules)). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options raise `ValueError` when the job is declared.
 
+`timeout` and `max_duration` both measure a run's length, and are easy to mix up. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `max_duration="10m", timeout="1h"` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
+
 The client:
 
 | Method | |
@@ -435,7 +437,7 @@ The client:
 | `job(name, **options)` | declare a job and get its handle |
 | `run(name, fn=None, **options)` | run without keeping a handle; without `fn`, a context manager |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `start(every="1m")`, `stop()` | check in a daemon thread; the interval is at least 5 seconds |
+| `start_checking(every="1m")`, `stop()` | check in a daemon thread; the interval is at least 5 seconds. (A job's `start()` opens a run; this starts the checks.) |
 | `jobs()`, `jobs_with_runs(limit=20)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit=50)`, `get_run(run_id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, "2h")`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |

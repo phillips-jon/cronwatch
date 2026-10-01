@@ -19,6 +19,7 @@ import re
 import threading
 import time
 import uuid
+import warnings
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
@@ -609,7 +610,7 @@ class Cronwatch:
         self._registry = threading.RLock()
         self._ready = False
         self._last_prune_at = 0
-        # Seconds before start()'s first check, and how long a channel or triage may take. Tests shorten them.
+        # Seconds before start_checking()'s first check, and how long a channel or triage may take. Tests shorten them.
         self._first_tick_s = 1.0
         self._channel_timeout_ms: float = CHANNEL_TIMEOUT_MS
         self._triage_timeout_ms: float = TRIAGE_TIMEOUT_MS
@@ -726,7 +727,7 @@ class Cronwatch:
 
     def check(self) -> CheckResult:
         """Look for missed and stuck runs across every job, send alerts, retry
-        alerts no channel accepted, and prune old runs. Call it from start(), a
+        alerts no channel accepted, and prune old runs. Call it from start_checking(), a
         scheduled task or by hand. Concurrent calls share one check."""
         self._after_fork_check()
         with self._check_lock:
@@ -820,27 +821,28 @@ class Cronwatch:
 
         return Web._for(self, **options)
 
-    def start(self, every: Duration = "1m") -> None:
+    def start_checking(self, every: Duration = "1m") -> None:
         """Check on an interval, in a daemon thread, for long-running processes.
         Default every minute; the first check comes after a second. Calling it
         again while it runs does nothing (a different interval is reported to
         on_error and ignored: stop() first to change it). Not for a cron script
-        that exits when done: call check() from a crontab line there instead."""
+        that exits when done: call check() from a crontab line there instead.
+        (A job's start() opens a run; this starts the checks.)"""
         self._after_fork_check()
         ms = max(5_000, parse_duration(every, "check interval"))
         with self._ticker_lock:
             if self._ticker is not None:
                 if self._ticker_ms is not None and self._ticker_ms != ms:
                     self._report(
-                        ValueError(f"start({every!r}) ignored: already checking every {format_duration(self._ticker_ms)}; call stop() first to change it"),
-                        "start",
+                        ValueError(f"start_checking({every!r}) ignored: already checking every {format_duration(self._ticker_ms)}; call stop() first to change it"),
+                        "start_checking",
                     )
                 return
             self._ticker_ms = ms
             if self._defer_delivery and not self._warned_deferred_start:
                 self._warned_deferred_start = True
                 _log.warning(
-                    'start() was called with deliver="check", so these checks send no alerts. '
+                    'start_checking() was called with deliver="check", so these checks send no alerts. '
                     'Another process must run checks with deliver="now" (the default) to send them.'
                 )
 
@@ -852,7 +854,15 @@ class Cronwatch:
 
             self._ticker = _Ticker(ms / 1000, self._first_tick_s, tick)
 
+    def start(self, every: Duration = "1m") -> None:
+        """Deprecated: renamed start_checking(), since a job's start() opens a
+        run. This name still works through 1.x, with a DeprecationWarning,
+        and goes in 2.0."""
+        warnings.warn("Cronwatch.start(every) is deprecated: use start_checking(every)", DeprecationWarning, stacklevel=2)
+        self.start_checking(every)
+
     def stop(self) -> None:
+        """Stop the checks start_checking() began."""
         self._after_fork_check()
         with self._ticker_lock:
             ticker = self._ticker

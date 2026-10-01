@@ -264,7 +264,7 @@ def test_close_waits_for_the_interval_thread_whose_tick_has_woken_but_not_yet_ch
         return result
 
     cw.check = woken  # type: ignore[method-assign]
-    cw.start("5m")
+    cw.start_checking("5m")
     assert entered.wait(5)
     closing = threading.Thread(target=cw.close)
     closing.start()

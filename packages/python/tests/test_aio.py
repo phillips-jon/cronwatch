@@ -309,3 +309,16 @@ def test_cancelling_an_async_start_that_found_its_id_leaves_that_run_open() -> N
     store.hold = False
     assert [r.id for r in store.running_runs()] == ["one"]
     assert first.finish() is not None
+
+
+def test_start_checking_is_the_sync_clients_and_start_is_its_deprecated_alias() -> None:
+    cw, _, _ = make()
+    cw.check = lambda: cronwatch.CheckResult(checked_at=0, jobs=[], alerts=[], pruned=0)  # type: ignore[method-assign]
+    acw = AsyncCronwatch(cw)
+    acw.start_checking("1m")
+    assert cw._ticker is not None
+    acw.stop()
+    with pytest.warns(DeprecationWarning, match="start_checking"):
+        acw.start("1m")
+    assert cw._ticker is not None
+    acw.stop()

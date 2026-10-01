@@ -10,7 +10,7 @@ or newer in the 3.x line (``pip install "cronwatch-sdk[apscheduler]"``).
     scheduler.add_job(nightly_report, "cron", hour=2, id="nightly-report")
     cronwatch.apscheduler.watch(scheduler, grace="15m")
     scheduler.start()
-    cw.start()          # checks for missed and stuck runs every minute
+    cw.start_checking()  # checks for missed and stuck runs every minute
 
 Every job of the scheduler is then a CronWatch job, named after its id (or,
 for an id APScheduler generated, its name, which is the function's), with its
