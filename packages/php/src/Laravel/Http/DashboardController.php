@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cronwatch\Laravel\Http;
 
+use Cronwatch\FromEnv;
 use Cronwatch\Cronwatch;
 use Cronwatch\Web\HttpFoundation;
 use Illuminate\Contracts\Auth\Access\Gate;
@@ -36,7 +37,7 @@ final class DashboardController
         // than trusted to the route's middleware, which the config may change.
         $open = !Authorize::hasBearer($request) && $this->gate->check(Authorize::GATE, [$request->user()]);
         $dashboard = $this->cw->routes(
-            token: $open ? false : (is_string($token) && $token !== '' ? $token : null),
+            token: $open ? null : (is_string($token) && $token !== '' ? $token : FromEnv::Read),
             basePath: $base,
             origin: $request->getSchemeAndHttpHost(),
         );

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cronwatch\Symfony;
 
+use Cronwatch\FromEnv;
 use Cronwatch\Cronwatch;
 use Cronwatch\Web\HttpFoundation;
 use Symfony\Component\HttpFoundation\Request;
@@ -47,7 +48,7 @@ final class DashboardController
         $bearer = preg_match('/^Bearer\s/i', (string) $request->headers->get('authorization', '')) === 1;
         $open = !$bearer && $this->granted();
         $dashboard = ($this->client)()->routes(
-            token: $open ? false : ($this->token !== null && $this->token !== '' ? $this->token : null),
+            token: $open ? null : ($this->token !== null && $this->token !== '' ? $this->token : FromEnv::Read),
             basePath: $base,
             origin: $request->getSchemeAndHttpHost(),
         );

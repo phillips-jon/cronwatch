@@ -135,4 +135,19 @@ final class ConfigTest extends TestCase
             Env::setFallback(null);
         }
     }
+
+    public function testAnUnsetCronSecretIsReadFromTheEnvironmentAndFalseTurnsItOff(): void
+    {
+        $saved = getenv('CRON_SECRET');
+        try {
+            putenv('CRON_SECRET=from-the-environment');
+            $cw = ClientFactory::client(['store' => 'memory'], sys_get_temp_dir());
+            $this->assertSame('from-the-environment', $cw->cronSecret);
+            $this->assertFalse($cw->secretOptOut);
+            $this->assertTrue(ClientFactory::client(['store' => 'memory', 'cron_secret' => false], sys_get_temp_dir())->secretOptOut);
+        } finally {
+            putenv($saved === false ? 'CRON_SECRET' : "CRON_SECRET={$saved}");
+        }
+    }
+
 }

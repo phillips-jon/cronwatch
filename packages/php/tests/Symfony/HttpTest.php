@@ -104,4 +104,39 @@ final class HttpTest extends TestCase
         $this->assertSame('{"down":true}', $browser->getResponse()->getContent());
         $this->assertSame('HTTP 503 Service Unavailable', $cw->runs('down')[0]->error);
     }
+
+    public function testWithNoTokenConfiguredTheApiStaysLocked(): void
+    {
+        self::withoutSecrets(function (): void {
+            $browser = static::createClient(['cronwatch' => ['store' => 'memory']]);
+            $browser->disableReboot();
+            $this->seeded();
+            $browser->request('GET', '/cronwatch/api/jobs', server: ['HTTP_AUTHORIZATION' => 'Bearer anything']);
+            $this->assertContains($browser->getResponse()->getStatusCode(), [401, 503], 'an unset token reads CRONWATCH_TOKEN; it never turns the token off');
+        });
+    }
+
+    /** Runs $body with CRONWATCH_TOKEN and CRON_SECRET unset everywhere PHP reads them. */
+    private static function withoutSecrets(callable $body): void
+    {
+        $saved = [];
+        foreach (['CRONWATCH_TOKEN', 'CRON_SECRET'] as $name) {
+            $saved[$name] = [getenv($name), $_SERVER[$name] ?? null, $_ENV[$name] ?? null];
+            putenv($name);
+            unset($_SERVER[$name], $_ENV[$name]);
+        }
+        try {
+            $body();
+        } finally {
+            foreach ($saved as $name => [$env, $server, $envArray]) {
+                putenv($env === false ? $name : "{$name}={$env}");
+                if ($server !== null) {
+                    $_SERVER[$name] = $server;
+                }
+                if ($envArray !== null) {
+                    $_ENV[$name] = $envArray;
+                }
+            }
+        }
+    }
 }

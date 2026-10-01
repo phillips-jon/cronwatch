@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cronwatch\Symfony;
 
+use Cronwatch\FromEnv;
 use Cronwatch\Alerts\AlertChannel;
 use Cronwatch\Alerts\Discord;
 use Cronwatch\Alerts\Slack;
@@ -52,7 +53,8 @@ final class ClientFactory
                 model: self::text($triage['model'] ?? null),
                 context: self::text($triage['context'] ?? null),
             ) : null,
-            cronSecret: $secret === false ? false : self::text($secret),
+            // false in the config turns the secret off; unset reads CRON_SECRET.
+            cronSecret: $secret === false ? null : (self::text($secret) ?? FromEnv::Read),
             retention: $config['retention'] ?? '30d',
             defaults: is_array($config['defaults'] ?? null) ? $config['defaults'] : [],
             deliver: (string) ($config['deliver'] ?? 'now'),

@@ -322,4 +322,21 @@ final class ProviderTest extends TestCase
         $this->app['config']->set('cronwatch.store.driver', 'memory');
         $this->assertInstanceOf(MemoryStore::class, $this->app->make(ClientFactory::class)->store());
     }
+
+    public function testAnUnsetCronSecretIsReadFromTheEnvironmentAndFalseTurnsItOff(): void
+    {
+        $saved = getenv('CRON_SECRET');
+        try {
+            putenv('CRON_SECRET=from-the-environment');
+            $this->app['config']->set('cronwatch.cron_secret', null);
+            $cw = $this->app->make(ClientFactory::class)->client();
+            $this->assertSame('from-the-environment', $cw->cronSecret);
+            $this->assertFalse($cw->secretOptOut);
+            $this->app['config']->set('cronwatch.cron_secret', false);
+            $this->assertTrue($this->app->make(ClientFactory::class)->client()->secretOptOut);
+        } finally {
+            putenv($saved === false ? 'CRON_SECRET' : "CRON_SECRET={$saved}");
+        }
+    }
+
 }
