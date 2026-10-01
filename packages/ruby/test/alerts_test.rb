@@ -109,11 +109,13 @@ class AlertsTest < Minitest::Test
                               .call(alert(triage: "db"))
     call = http.calls[0]
     assert_equal "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", "s3cret", call[:body])}", call[:headers]["x-cronwatch-signature"]
+    assert_equal "sha256=#{Cronwatch::Alerts::Webhook.signature("s3cret", call[:body])}", call[:headers]["x-cronwatch-signature"]
     assert_equal "cronwatch", call[:headers]["user-agent"]
     assert_equal "billing", call[:headers]["x-team"]
-    assert_equal %w[type run details job definition title message at triage], call[:json].keys
+    assert_equal %w[schema type run details job definition title message at triage], call[:json].keys
+    assert_equal 1, call[:json]["schema"]
     assert_equal({ "consecutiveFailures" => 1, "threshold" => 1 }, call[:json]["details"])
-    assert_equal call[:body], alert(triage: "db").to_json
+    assert_equal call[:body], Cronwatch::JS.json({ "schema" => 1 }.merge(alert(triage: "db").to_h))
   end
 
   def test_channels_need_their_url
@@ -154,7 +156,7 @@ class AlertsTest < Minitest::Test
     assert_match(%r{\APOST /hook\?key=abc HTTP/1\.1\r\n}, head)
     assert_match(/^content-type: application\/json\r$/i, head)
     assert_match(/^x-cronwatch-signature: sha256=#{OpenSSL::HMAC.hexdigest("SHA256", "k", body)}\r$/i, head)
-    assert_equal alert.to_json, body
+    assert_equal Cronwatch::JS.json({ "schema" => 1 }.merge(alert.to_h)).b, body
   ensure
     thread&.join(1)
     server&.close
