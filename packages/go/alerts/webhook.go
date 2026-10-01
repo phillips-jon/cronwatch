@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
+	"strings"
 
 	cronwatch "cronwatch.dev/go"
 	"cronwatch.dev/go/internal/js"
@@ -30,10 +32,15 @@ type WebhookOptions struct {
 	HTTPClient *http.Client
 }
 
+// webhookSchema is the payload's version, sent as its first field. It goes
+// up only if a major release changes the payload in a way that is not
+// additive; see https://cronwatch.dev/schemas/webhook/1.json.
+const webhookSchema = 1
+
 // Webhook posts each alert as JSON to any URL. The body is the Alert as
-// the SDK writes it: {type, run, details, job, definition, title, message,
-// at, triage}. A redirect is an error: point the URL at where the receiver
-// really is.
+// the SDK writes it after a version: {schema: 1, type, run, details, job,
+// definition, title, message, at, triage}. A redirect is an error: point
+// the URL at where the receiver really is.
 func Webhook(o WebhookOptions) (cronwatch.Channel, error) {
 	if o.URL == "" {
 		return nil, errors.New("alerts.Webhook needs a URL")
@@ -44,7 +51,7 @@ func Webhook(o WebhookOptions) (cronwatch.Channel, error) {
 	}
 	sort.Strings(names)
 	return &channel{name: "webhook", send: func(ctx context.Context, a cronwatch.Alert, _ cronwatch.ChannelContext) error {
-		body := js.Stringify(a)
+		body := webhookBody(a)
 		headers := []header{{Name: "content-type", Value: "application/json"}, {Name: "user-agent", Value: "cronwatch"}}
 		for _, name := range names {
 			// A pasted Authorization value often carries a stray space or newline, which fetch would refuse.
@@ -64,6 +71,13 @@ func Webhook(o WebhookOptions) (cronwatch.Channel, error) {
 		}
 		return nil
 	}}, nil
+}
+
+// webhookBody is the alert's JSON with "schema" as its first key, then the
+// alert's own keys in the SDK's order, written exactly as they are.
+func webhookBody(a cronwatch.Alert) string {
+	body := js.Stringify(a)
+	return `{"schema":` + strconv.Itoa(webhookSchema) + "," + strings.TrimPrefix(body, "{")
 }
 
 // assign sets a header as a JavaScript object's key is set: an exact name

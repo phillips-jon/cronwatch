@@ -294,7 +294,7 @@ The options are the SDK's in Go's case: `SubjectPrefix` and `Link` in `EmailOpti
 
 Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request is `<Provider> <origin> answered <status>: <start of the body>`, never the URL's path, with the channel's keys cut out. Every options struct takes an `HTTPClient` for a proxy or a test; without one, Go's default transport is used, which honours `HTTP_PROXY` and `HTTPS_PROXY`. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
-A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`. `alerts.Signature(secret, body)` is that hex, for a receiver in Go:
+The webhook posts the alert as JSON with `"schema": 1` as its first field, the same body every CronWatch library sends; its [JSON Schema](/docs/alerts/#the-webhook-39-s-schema) is published. Parse the fields, not `title` and `message`, whose wording is not promised. With a `Secret`, it signs the body with `X-CronWatch-Signature: sha256=<hex>`. `alerts.Signature(secret, body)` is that hex, for a receiver in Go, checked with a constant-time compare:
 
 ```go
 body, err := io.ReadAll(r.Body)
