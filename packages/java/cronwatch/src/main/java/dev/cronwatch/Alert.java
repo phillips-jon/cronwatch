@@ -1,6 +1,7 @@
 package dev.cronwatch;
 
 import dev.cronwatch.Run.Values;
+import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import java.util.Objects;
@@ -89,7 +90,7 @@ public record Alert(
    */
   public static Alert fromValue(@Nullable Object v) {
     if (!(v instanceof JsObject o)) {
-      throw new Json.JsonException("an alert must be an object, not " + Json.kind(v));
+      throw new Json.JsonException("an alert must be an object, not " + Js.typeOf(v));
     }
     AlertType type = AlertType.of(Values.string(o, "type"));
     Run run = null;

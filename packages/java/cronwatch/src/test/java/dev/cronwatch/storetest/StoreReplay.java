@@ -28,7 +28,8 @@ import org.jspecify.annotations.Nullable;
  * memory store answered, against a store: prune scripts, {@code compareAndSetState} steps, {@code
  * updateRunIf} steps and text written without NUL ({@link #run}), and states another process wrote
  * with a version that is not a whole number ({@link #foreignVersions}). The caller reads the
- * fixture and passes its text, since a published jar cannot reach the repository:
+ * fixture and passes its text. It is the port's own test, beside {@link StoreContract}, not part of
+ * the published kit:
  *
  * <pre>{@code
  * String fixture = Files.readString(Path.of("conformance/store.json"));

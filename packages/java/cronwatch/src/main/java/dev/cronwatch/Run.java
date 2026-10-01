@@ -115,7 +115,7 @@ public record Run(
    */
   public static Run fromValue(@Nullable Object v) {
     if (!(v instanceof JsObject o)) {
-      throw new Json.JsonException("a run must be an object, not " + Json.kind(v));
+      throw new Json.JsonException("a run must be an object, not " + Js.typeOf(v));
     }
     return new Run(
         Values.string(o, "id"),

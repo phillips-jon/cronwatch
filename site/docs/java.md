@@ -225,7 +225,7 @@ A store of your own implements `dev.cronwatch.store.Store`: `init`, `upsertJob`,
 StoreContract.run(new MyStore());
 ```
 
-`StoreReplay` replays the SDK's recorded store cases (`conformance/store.json`, which your test reads), and `FinishOnce` runs several clients over one database to hold a run to being recorded and judged once.
+`StoreContract.run` is the kit's one entry point, and the only part of `dev.cronwatch.storetest` the 1.x releases promise; the helpers the port's own store tests use beside it are internal.
 
 ## Alerts
 

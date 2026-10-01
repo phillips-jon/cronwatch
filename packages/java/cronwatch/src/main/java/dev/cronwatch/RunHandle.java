@@ -207,7 +207,7 @@ public final class RunHandle implements AutoCloseable {
                 + " of "
                 + name
                 + " belongs to job "
-                + Json.quote(stored.job())
+                + Json.stringify(stored.job())
                 + "; ignored",
             "flushing " + name);
         return;
@@ -354,7 +354,7 @@ public final class RunHandle implements AutoCloseable {
         return null;
       }
       if (!from.job().equals(name)) {
-        ignored("belongs to job " + Json.quote(from.job()));
+        ignored("belongs to job " + Json.stringify(from.job()));
         return null;
       }
       if (from.status().equals(RunStatus.OK) || from.status().equals(RunStatus.FAILED)) {

@@ -158,12 +158,12 @@ public final class Cronwatch implements AutoCloseable {
     if (!NAME.matcher(name).matches()) {
       throw CronwatchException.invalid(
           "job name "
-              + Json.quote(name)
+              + Json.stringify(name)
               + " must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"");
     }
     JsObject fields = core.defaults.copy();
     for (Map.Entry<String, @Nullable Object> e : options.fields.entries()) {
-      fields.set(e.getKey(), Json.copy(e.getValue()));
+      fields.set(e.getKey(), Js.copyJson(e.getValue()));
     }
     fields.set("name", name);
     Definition stored = Expect.toStored(fields, options.expect);
@@ -178,7 +178,7 @@ public final class Cronwatch implements AutoCloseable {
 
   /** The SDK's refusals of options that would otherwise quietly turn a check off. */
   private static void validate(String name, Definition def) {
-    String quoted = Json.quote(name);
+    String quoted = Json.stringify(name);
     try {
       if (def.has("schedule")) {
         Object v = def.get("schedule");
@@ -194,7 +194,7 @@ public final class Cronwatch implements AutoCloseable {
         String tz = def.get("timezone") instanceof String z ? z : "";
         if (!Schedules.isZone(tz)) {
           throw CronwatchException.invalid(
-              "job " + quoted + ": timezone " + Json.quote(tz) + " is not an IANA timezone");
+              "job " + quoted + ": timezone " + Json.stringify(tz) + " is not an IANA timezone");
         }
       }
       if (def.has("grace")) {
@@ -305,7 +305,7 @@ public final class Cronwatch implements AutoCloseable {
     JobDef declared = core.declared(name);
     if (declared == null) {
       throw CronwatchException.invalid(
-          "job " + Json.quote(name) + " is not declared in this process");
+          "job " + Json.stringify(name) + " is not declared in this process");
     }
     core.ensureReady();
     return core.inTurn(
@@ -365,7 +365,7 @@ public final class Cronwatch implements AutoCloseable {
     if (id.isEmpty() || id.length() > MAX_RUN_ID) {
       throw CronwatchException.invalid(
           "job "
-              + Json.quote(job)
+              + Json.stringify(job)
               + ": "
               + method
               + "() needs a run id of 1 to "
@@ -378,7 +378,7 @@ public final class Cronwatch implements AutoCloseable {
     if (id.indexOf('\0') >= 0) {
       throw CronwatchException.invalid(
           "job "
-              + Json.quote(job)
+              + Json.stringify(job)
               + ": "
               + method
               + "() cannot take a run id containing a NUL character");
@@ -386,11 +386,11 @@ public final class Cronwatch implements AutoCloseable {
     if (id.startsWith(RESERVED_RUN_ID_PREFIX)) {
       throw CronwatchException.invalid(
           "job "
-              + Json.quote(job)
+              + Json.stringify(job)
               + ": "
               + method
               + "() cannot take a run id starting with "
-              + Json.quote(RESERVED_RUN_ID_PREFIX)
+              + Json.stringify(RESERVED_RUN_ID_PREFIX)
               + ", which the pg_cron source uses for its runs");
     }
   }
@@ -502,11 +502,11 @@ public final class Cronwatch implements AutoCloseable {
     if (!stored.job().equals(def.name())) {
       throw CronwatchException.invalid(
           "run "
-              + Json.quote(stored.id())
+              + Json.stringify(stored.id())
               + " belongs to job "
-              + Json.quote(stored.job())
+              + Json.stringify(stored.job())
               + ", not "
-              + Json.quote(def.name()));
+              + Json.stringify(def.name()));
     }
     boolean finished =
         stored.status().equals(RunStatus.OK) || stored.status().equals(RunStatus.FAILED);
@@ -530,7 +530,7 @@ public final class Cronwatch implements AutoCloseable {
     JobDef def = core.declared(name);
     if (def == null) {
       throw CronwatchException.invalid(
-          "resumeRun: job " + Json.quote(name) + " is not declared; call job first");
+          "resumeRun: job " + Json.stringify(name) + " is not declared; call job first");
     }
     return resumeHandle(def, runId);
   }
@@ -798,6 +798,7 @@ public final class Cronwatch implements AutoCloseable {
    *
    * @throws CronwatchException for an {@code origin} that is not an http or https URL
    */
+  @SuppressWarnings("removal") // Routes.of is this, under the name it had before 1.0
   public Routes routes(RoutesOptions options) {
     return Routes.of(this, options);
   }

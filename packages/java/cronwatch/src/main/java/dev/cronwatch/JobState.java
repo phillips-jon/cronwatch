@@ -175,7 +175,7 @@ public record JobState(
         }
         continue;
       }
-      o.set(e.getKey(), Json.copy(e.getValue()));
+      o.set(e.getKey(), Js.copyJson(e.getValue()));
     }
     if (version != null && !wroteVersion) {
       o.set("version", version);
@@ -206,7 +206,7 @@ public record JobState(
    */
   public static JobState fromValue(@Nullable Object v) {
     if (!(v instanceof JsObject o)) {
-      throw new Json.JsonException("a job state must be an object, not " + Json.kind(v));
+      throw new Json.JsonException("a job state must be an object, not " + Js.typeOf(v));
     }
     Map<Condition, Long> open = new LinkedHashMap<>();
     if (o.get("open") instanceof JsObject opened) {

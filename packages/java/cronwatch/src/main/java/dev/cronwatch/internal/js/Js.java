@@ -1,5 +1,6 @@
 package dev.cronwatch.internal.js;
 
+import dev.cronwatch.json.JsObject;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -7,6 +8,8 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,6 +27,9 @@ public final class Js {
 
   /** 2^53 - 1, the largest integer JavaScript holds exactly. */
   public static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
+
+  /** How deep {@code Json} lets arrays and objects nest, reading or writing. */
+  public static final int JSON_MAX_DEPTH = 256;
 
   /** The first millisecond written as a date: 0001-01-01T00:00:00.000Z. */
   public static final long FIRST_DATE_MS = -62_135_596_800_000L;
@@ -331,5 +337,31 @@ public final class Js {
   public static String isoOrWords(long ms) {
     String iso = isoTime(ms);
     return iso != null ? iso : beyondDates(ms);
+  }
+
+  /** A value's type as JavaScript's {@code typeof} names it, for messages. */
+  public static String typeOf(@Nullable Object v) {
+    return switch (v) {
+      case null -> "null";
+      case Boolean b -> "boolean";
+      case Number n -> "number";
+      case CharSequence s -> "string";
+      default -> "object";
+    };
+  }
+
+  /** A deep copy of a JSON value: nested objects and lists are copied, the rest is immutable. */
+  public static @Nullable Object copyJson(@Nullable Object value) {
+    if (value instanceof JsObject o) {
+      return o.copy();
+    }
+    if (value instanceof List<?> list) {
+      List<@Nullable Object> out = new ArrayList<>(list.size());
+      for (Object x : list) {
+        out.add(copyJson(x));
+      }
+      return out;
+    }
+    return value;
   }
 }

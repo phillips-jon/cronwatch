@@ -19,11 +19,11 @@ import org.jspecify.annotations.Nullable;
  */
 public final class Json {
   /**
-   * How deep arrays and objects may nest. The reader and writer recurse, so text nested thousands
-   * deep (a request body, a stored row) would overflow a thread's stack; nothing CronWatch or an
-   * app stores comes near this.
+   * How deep arrays and objects may nest: 256. The reader and writer recurse, so text nested
+   * thousands deep (a request body, a stored row) would overflow a thread's stack; nothing
+   * CronWatch or an app stores comes near this.
    */
-  public static final int MAX_DEPTH = 256;
+  private static final int MAX_DEPTH = Js.JSON_MAX_DEPTH;
 
   private Json() {}
 
@@ -105,18 +105,6 @@ public final class Json {
     }
   }
 
-  /** A deep copy of a JSON value: nested objects and lists are copied, the rest is immutable. */
-  public static @Nullable Object copy(@Nullable Object value) {
-    return JsObject.copyValue(value);
-  }
-
-  /** {@code JSON.stringify} of a string. */
-  public static String quote(String s) {
-    StringBuilder b = new StringBuilder(s.length() + 2);
-    quoteInto(b, s);
-    return b.toString();
-  }
-
   private static final char[] HEX = "0123456789abcdef".toCharArray();
 
   private static void quoteInto(StringBuilder b, String s) {
@@ -159,7 +147,7 @@ public final class Json {
    * {@code JSON.parse}: numbers as {@link Double}, objects as {@link JsObject} in JavaScript's key
    * order (a key given twice keeps its first place and its last value), arrays as {@link List}. A
    * lone surrogate escape ({@code \ud800}) is kept, as JavaScript keeps it. Arrays and objects
-   * nested more than {@link #MAX_DEPTH} deep are refused.
+   * nested more than 256 deep are refused.
    *
    * @throws JsonException when the text is not JSON
    */
@@ -184,18 +172,7 @@ public final class Json {
     if (v instanceof JsObject o) {
       return o;
     }
-    throw new JsonException("expected a JSON object, not " + kind(v));
-  }
-
-  /** A value's type as JavaScript's {@code typeof} names it, for messages. */
-  public static String kind(@Nullable Object v) {
-    return switch (v) {
-      case null -> "null";
-      case Boolean b -> "boolean";
-      case Number n -> "number";
-      case CharSequence s -> "string";
-      default -> "object";
-    };
+    throw new JsonException("expected a JSON object, not " + Js.typeOf(v));
   }
 
   private static final class Parser {

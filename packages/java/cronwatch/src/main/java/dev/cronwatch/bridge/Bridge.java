@@ -382,6 +382,6 @@ public final class Bridge {
 
   /** {@code name} as JSON writes it, for messages. */
   static String quote(String name) {
-    return Json.quote(name);
+    return Json.stringify(name);
   }
 }

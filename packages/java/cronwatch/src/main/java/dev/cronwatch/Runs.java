@@ -636,7 +636,7 @@ final class Runs {
           throw e;
         }
         if (!stored.job().equals(run.job())) {
-          return "belongs to job " + dev.cronwatch.json.Json.quote(stored.job());
+          return "belongs to job " + dev.cronwatch.json.Json.stringify(stored.job());
         }
       }
     }
@@ -734,7 +734,7 @@ final class Runs {
     if (def == null) {
       throw CronwatchException.invalid(
           "recordRun: job "
-              + dev.cronwatch.json.Json.quote(input.job())
+              + dev.cronwatch.json.Json.stringify(input.job())
               + " is not declared; call job first");
     }
     // The longest id start() takes; MySQL's column would hold 255, but every store holds 200.
@@ -745,13 +745,13 @@ final class Runs {
               + " characters (got "
               + input.id().length()
               + " characters; job "
-              + dev.cronwatch.json.Json.quote(input.job())
+              + dev.cronwatch.json.Json.stringify(input.job())
               + ")");
     }
     if (input.id().indexOf('\0') >= 0) {
       throw CronwatchException.invalid(
           "recordRun: run ids cannot contain a NUL character (job "
-              + dev.cronwatch.json.Json.quote(input.job())
+              + dev.cronwatch.json.Json.stringify(input.job())
               + ")");
     }
     // Refused as job.metric() refuses them: a store keeps NaN and Infinity as null.
@@ -759,11 +759,11 @@ final class Runs {
       if (!(m.getValue() instanceof Number n) || !Double.isFinite(n.doubleValue())) {
         throw CronwatchException.invalid(
             "recordRun: metric "
-                + dev.cronwatch.json.Json.quote(m.getKey())
+                + dev.cronwatch.json.Json.stringify(m.getKey())
                 + " must be a finite number (job "
-                + dev.cronwatch.json.Json.quote(input.job())
+                + dev.cronwatch.json.Json.stringify(input.job())
                 + ", run "
-                + dev.cronwatch.json.Json.quote(input.id())
+                + dev.cronwatch.json.Json.stringify(input.id())
                 + ")");
       }
     }
@@ -824,7 +824,7 @@ final class Runs {
               + " of "
               + run.job()
               + " belongs to job "
-              + dev.cronwatch.json.Json.quote(stored.job())
+              + dev.cronwatch.json.Json.stringify(stored.job())
               + "; ignored",
           where);
       return List.of();

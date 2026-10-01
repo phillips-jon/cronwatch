@@ -1,6 +1,7 @@
 package dev.cronwatch;
 
 import dev.cronwatch.internal.evaluate.Expect;
+import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.internal.jsre.Regexp;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
@@ -217,7 +218,7 @@ public final class JobOptions {
    */
   public JobOptions field(String key, @Nullable Object value) {
     Json.stringify(value);
-    return put(key, Json.copy(value));
+    return put(key, Js.copyJson(value));
   }
 
   /**
@@ -228,7 +229,7 @@ public final class JobOptions {
    */
   public JobOptions merge(JobOptions other) {
     for (Map.Entry<String, @Nullable Object> e : other.fields.entries()) {
-      fields.set(e.getKey(), Json.copy(e.getValue()));
+      fields.set(e.getKey(), Js.copyJson(e.getValue()));
     }
     if (other.expect != null) {
       expect = other.expect;

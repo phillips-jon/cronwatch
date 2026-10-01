@@ -1,5 +1,6 @@
 package dev.cronwatch;
 
+import dev.cronwatch.internal.js.Js;
 import dev.cronwatch.json.JsObject;
 import dev.cronwatch.json.Json;
 import java.util.ArrayList;
@@ -73,7 +74,7 @@ public final class Definition {
 
   /** A field as JSON reads it: a copy of it, or null when absent (see {@link #has}). */
   public @Nullable Object get(String key) {
-    return Json.copy(fields.get(key));
+    return Js.copyJson(fields.get(key));
   }
 
   /** Whether the field is there. */

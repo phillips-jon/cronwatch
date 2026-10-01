@@ -278,7 +278,7 @@ public final class Requests {
       try {
         value = Json.parse(text);
       } catch (RuntimeException e) {
-        // Not JSON, or nested past Json.MAX_DEPTH: the SDK's readBody reads it as none.
+        // Not JSON, or nested past Js.JSON_MAX_DEPTH: the SDK's readBody reads it as none.
         return null;
       }
       return jsonField(value, name);

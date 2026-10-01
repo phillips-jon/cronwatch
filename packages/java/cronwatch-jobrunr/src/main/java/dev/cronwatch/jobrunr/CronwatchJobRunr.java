@@ -223,7 +223,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
   // ---- the recurring jobs
 
   private static String label(String name) {
-    return "JobRunr recurring job " + Json.quote(name);
+    return "JobRunr recurring job " + Json.stringify(name);
   }
 
   private JobOptions optionsFor(String name) {
@@ -324,7 +324,7 @@ public final class CronwatchJobRunr implements JobServerFilter, AutoCloseable {
       tz = zone.isEmpty() ? ZoneId.systemDefault() : ZoneId.of(zone);
     } catch (RuntimeException e) {
       throw new ScheduleException(
-          "cronwatch: " + label + ": the zone " + Json.quote(zone) + " is not one Java reads");
+          "cronwatch: " + label + ": the zone " + Json.stringify(zone) + " is not one Java reads");
     }
     Instant created = createdAt == null ? Instant.EPOCH : createdAt;
     FireTimes fires =

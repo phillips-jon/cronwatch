@@ -37,7 +37,7 @@ class ClientConformanceTest {
     for (JsObject c : Fixtures.objects(FIXTURE, "runIds")) {
       String method = Objects.requireNonNull(Fixtures.string(c, "method"));
       String id = Objects.requireNonNull(Fixtures.string(c, "id"));
-      String what = "runIds[" + i++ + "] " + method + " " + Json.quote(clip(id));
+      String what = "runIds[" + i++ + "] " + method + " " + Json.stringify(clip(id));
       String error = null;
       try (Cronwatch cw =
           Cronwatch.builder()

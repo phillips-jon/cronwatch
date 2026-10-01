@@ -26,6 +26,7 @@ import dev.cronwatch.storetest.FinishOnce;
 import dev.cronwatch.storetest.ForeignRows;
 import dev.cronwatch.storetest.StoreContract;
 import dev.cronwatch.storetest.StoreReplay;
+import dev.cronwatch.storetest.TestRuns;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -314,7 +315,7 @@ abstract class ServerStoreTests {
     String p = prefix();
     SqlStore store = Servers.store(kind(), p);
     store.init();
-    store.insertRun(StoreContract.newRun("good", "a", RunStatus.RUNNING, 1));
+    store.insertRun(TestRuns.newRun("good", "a", RunStatus.RUNNING, 1));
     store.upsertJob(Definition.fromJson("{\"name\":\"a\",\"schedule\":\"0 * * * *\"}"), 1);
     exec(
         "INSERT INTO "

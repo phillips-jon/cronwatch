@@ -32,8 +32,8 @@ import org.jspecify.annotations.Nullable;
  * }</pre>
  *
  * <p>It throws an {@link AssertionError}, as a test's assertion does, at the first thing the store
- * gets wrong, and depends on no test framework. See {@link StoreReplay} for the SDK's recorded
- * cases.
+ * gets wrong, and depends on no test framework. {@link #run} is the package's one promise: the
+ * helpers the port's own tests use beside it are not part of it.
  */
 public final class StoreContract {
   private StoreContract() {}
@@ -42,7 +42,7 @@ public final class StoreContract {
    * A run as the contract writes them: finished ten milliseconds after it started unless it is
    * running, with one metric, {@code n}, of 1.
    */
-  public static Run newRun(String id, String job, RunStatus status, long startedAt) {
+  static Run newRun(String id, String job, RunStatus status, long startedAt) {
     boolean finished = !status.equals(RunStatus.RUNNING);
     return new Run(
         id,

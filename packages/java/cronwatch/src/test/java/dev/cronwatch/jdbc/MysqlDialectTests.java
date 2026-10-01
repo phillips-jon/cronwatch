@@ -12,7 +12,7 @@ import dev.cronwatch.Run;
 import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
 import dev.cronwatch.json.Json;
-import dev.cronwatch.storetest.StoreContract;
+import dev.cronwatch.storetest.TestRuns;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -161,7 +161,7 @@ abstract class MysqlDialectTests extends ServerStoreTests {
       assertTrue(store.compareAndSetState(landed, 0), "a landed write is counted as written");
 
       // A flush that writes what the row already holds still wrote.
-      Run run = StoreContract.newRun("r", "j", RunStatus.RUNNING, 1).withOutput("same");
+      Run run = TestRuns.newRun("r", "j", RunStatus.RUNNING, 1).withOutput("same");
       store.insertRun(run);
       assertTrue(store.updateRunIf(run, List.of(RunStatus.RUNNING)));
       assertFalse(store.updateRunIf(run, List.of(RunStatus.TIMEOUT)));
@@ -184,7 +184,7 @@ abstract class MysqlDialectTests extends ServerStoreTests {
   void aRunWithALongTriggerIsKept() throws Exception {
     SqlStore store = store();
     store.init();
-    Run run = StoreContract.newRun("r", "j", RunStatus.RUNNING, 1);
+    Run run = TestRuns.newRun("r", "j", RunStatus.RUNNING, 1);
     store.insertRun(
         new Run(
             run.id(),

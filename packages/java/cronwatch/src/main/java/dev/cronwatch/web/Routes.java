@@ -144,7 +144,9 @@ public final class Routes implements Endpoint {
    *
    * @throws CronwatchException for an {@code origin} that is not an http or https URL, with the
    *     SDK's message
+   * @deprecated use {@code cw.routes(options)}, the one way to mount the dashboard; removed in 2.0
    */
+  @Deprecated(since = "1.0", forRemoval = true)
   public static Routes of(Cronwatch cw, RoutesOptions options) {
     return new Routes(cw, options);
   }

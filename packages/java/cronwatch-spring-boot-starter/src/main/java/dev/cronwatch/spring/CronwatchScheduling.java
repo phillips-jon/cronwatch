@@ -206,7 +206,7 @@ public final class CronwatchScheduling
       String label = targetClass.getName() + "#" + method.getName();
       watch.reportOnce(
           "cronwatch: the @Scheduled method "
-              + Json.quote(label)
+              + Json.stringify(label)
               + " runs on a JDK proxy "
               + fits.size()
               + " beans share ("
@@ -264,7 +264,7 @@ public final class CronwatchScheduling
         if (props != null && props.getName() != null && !props.getName().isBlank()) {
           name = props.getName().trim();
         }
-        String label = "@Scheduled method " + Json.quote(name);
+        String label = "@Scheduled method " + Json.stringify(name);
         if (!Bridge.validName(name)) {
           watch.reportOnce(
               "cronwatch: "
@@ -434,7 +434,7 @@ public final class CronwatchScheduling
           "cronwatch: "
               + label
               + " is "
-              + Json.quote(cron)
+              + Json.stringify(cron)
               + ", which Spring cannot read: "
               + e.getMessage());
     }

@@ -43,7 +43,7 @@ public final class Sql {
     if (!ok) {
       throw new IllegalArgumentException(
           "cronwatch: invalid table prefix "
-              + Json.quote(prefix)
+              + Json.stringify(prefix)
               + ". Use lowercase letters, digits and underscores, not starting with a digit, at most "
               + MAX_PREFIX
               + " characters.");

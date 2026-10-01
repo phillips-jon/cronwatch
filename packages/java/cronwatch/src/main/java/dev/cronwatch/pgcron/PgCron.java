@@ -56,7 +56,7 @@ public final class PgCron {
    * minutes. After that it is copied as running from when it was first seen, so a run that never
    * starts is marked stuck like any other.
    */
-  public static final long HOLD_MS = 10 * 60_000L;
+  static final long HOLD_MS = 10 * 60_000L;
 
   /** One query, answering its rows, each a map of lowercase column name to value. */
   @FunctionalInterface
@@ -135,7 +135,7 @@ public final class PgCron {
    * are kept (a sixth would otherwise be read as seconds). Null for one that has no cadence to
    * watch ({@code @reboot}).
    */
-  public static @Nullable String schedule(String schedule) {
+  static @Nullable String schedule(String schedule) {
     String text = Js.trim(schedule);
     String seconds = seconds(text);
     if (seconds != null) {
@@ -206,7 +206,7 @@ public final class PgCron {
    * and {@code -} turned into {@code -}, what leads up to the first letter or digit dropped, at
    * most 100 characters, or {@code pg_cron:<jobid>} when nothing is left.
    */
-  public static String jobName(PgCronJob job) {
+  static String jobName(PgCronJob job) {
     String name = job.jobName() == null ? "" : job.jobName();
     StringBuilder cleaned = new StringBuilder();
     boolean inRun = false;
@@ -242,7 +242,7 @@ public final class PgCron {
    * writes these for runs a server restart cut off, "server restarted") starts at its end time,
    * else at {@code fallbackAt} (the source passes the job's newest run's start, or now).
    */
-  public static @Nullable Run run(PgCronRow row, String job, String idPrefix, long fallbackAt) {
+  static @Nullable Run run(PgCronRow row, String job, String idPrefix, long fallbackAt) {
     Long finishedAt = row.endTime();
     boolean done = finished(row.status());
     if (row.startTime() == null && !done) {

@@ -14,6 +14,7 @@ import dev.cronwatch.RunStatus;
 import dev.cronwatch.StoredJob;
 import dev.cronwatch.storetest.StoreContract;
 import dev.cronwatch.storetest.StoreReplay;
+import dev.cronwatch.storetest.TestRuns;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -214,7 +215,7 @@ class SqliteStoreTest {
     try (SqlStore s = SqlStore.sqlite(source(":memory:"))) {
       s.init();
       for (String id : List.of("b", "a", "c")) {
-        s.insertRun(StoreContract.newRun(id, "j", RunStatus.RUNNING, 1000));
+        s.insertRun(TestRuns.newRun(id, "j", RunStatus.RUNNING, 1000));
       }
       List<String> newest = new ArrayList<>();
       for (Run r : s.listRuns("j", 10)) {

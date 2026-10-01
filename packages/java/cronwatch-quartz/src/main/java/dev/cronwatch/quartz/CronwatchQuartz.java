@@ -393,7 +393,7 @@ public final class CronwatchQuartz implements AutoCloseable {
   }
 
   private static String quote(String s) {
-    return dev.cronwatch.json.Json.quote(s);
+    return dev.cronwatch.json.Json.stringify(s);
   }
 
   /** The options the app gave one job, over the integration's defaults. */
