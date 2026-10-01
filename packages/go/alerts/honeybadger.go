@@ -76,16 +76,19 @@ func Honeybadger(o HoneybadgerOptions) (cronwatch.Channel, error) {
 		about.Set("details", details(a))
 		about.Set("run", runSummary(a))
 		request.Set("context", about)
+		failure := &js.Object{}
+		// Left out for a type this release does not know, as the SDK does.
+		if class, ok := honeybadgerClass[a.Type]; ok {
+			failure.Set("class", class)
+		}
+		failure.Set("message", cut(js.WellFormed(a.Title+"\n"+a.Message), 8000))
+		// No code ran here; one frame naming the job keeps the notice well formed.
+		failure.Set("backtrace", []any{js.NewObject("number", "0", "file", "cronwatch/"+a.Job, "method", string(a.Type))})
+		failure.Set("fingerprint", "cronwatch:"+a.Job+":"+string(a.Type))
+		failure.Set("tags", []any{"cronwatch", string(a.Type)})
 		notice := js.NewObject(
 			"notifier", js.NewObject("name", "cronwatch", "url", "https://cronwatch.dev"),
-			"error", js.NewObject(
-				"class", honeybadgerClass[a.Type],
-				"message", cut(js.WellFormed(a.Title+"\n"+a.Message), 8000),
-				// No code ran here; one frame naming the job keeps the notice well formed.
-				"backtrace", []any{js.NewObject("number", "0", "file", "cronwatch/"+a.Job, "method", string(a.Type))},
-				"fingerprint", "cronwatch:"+a.Job+":"+string(a.Type),
-				"tags", []any{"cronwatch", string(a.Type)},
-			),
+			"error", failure,
 			"request", request,
 			"server", js.NewObject("environment_name", environment),
 		)
