@@ -169,7 +169,7 @@ application = cw.routes()
 - `origin`: the public origin, such as `"https://app.example.com"`, to pin it whatever a request says. It then replaces the request's own for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line.
 - `trust_proxy`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`, as the SDK's option does. Off by default.
 
-The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's `cron_secret` as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). The ASGI app runs each request in a worker thread, so it needs an asyncio server (uvicorn, Hypercorn, Daphne).
+The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` answers `{"ok":true,"library":"cronwatch-sdk","language":"python","version":"<cronwatch.__version__>","api":1}`, and silencing or unsilencing over the API answers the job's summary. `/api/check` also accepts the client's `cron_secret` as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). The ASGI app runs each request in a worker thread, so it needs an asyncio server (uvicorn, Hypercorn, Daphne).
 
 ## Jobs a URL starts
 

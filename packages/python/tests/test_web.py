@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+import cronwatch
 from cronwatch import Run
 from cronwatch._js import date_utc
 from cronwatch.stores import MemoryStore
@@ -66,6 +67,20 @@ def test_the_check_endpoint_also_accepts_the_cron_secret_nothing_else_does() -> 
     assert send(web, "GET", "/cronwatch/api/check", with_cron).status == 200
     assert send(web, "GET", "/cronwatch/api/jobs", with_cron).status == 401
     assert send(web, "GET", "/cronwatch/api/check?token=cron-s3cret").status == 401, "only as a bearer header"
+    assert send(web, "GET", "/cronwatch/api", with_cron).status == 401
+
+
+def test_get_api_names_the_library_language_and_versions() -> None:
+    _, _, web = app()
+    want = '{"ok":true,"library":"cronwatch-sdk","language":"python","version":"' + cronwatch.__version__ + '","api":1}'
+    for path in ("/cronwatch/api", "/cronwatch/api/"):
+        res = send(web, "GET", path, BEARER)
+        assert res.status == 200
+        assert res.text == want
+        assert res.headers["content-type"] == "application/json; charset=utf-8"
+    assert send(web, "GET", "/cronwatch/api").json() == {"ok": False, "error": "Unauthorized"}
+    assert send(web, "POST", "/cronwatch/api", BEARER).json() == {"ok": False, "error": "Not found"}
+    assert send(web, "POST", "/cronwatch/api", BEARER).status == 404
 
 
 def test_token_in_the_query_sets_a_cookie_and_redirects_to_a_clean_url() -> None:
@@ -162,10 +177,15 @@ def test_check_silence_unsilence_and_forget_over_the_api() -> None:
     assert check["ok"] is True
     assert len(check["jobs"]) == 1
     silenced = post("/cronwatch/api/jobs/s/silence", {"for": "2h"}).json()
-    assert silenced["state"]["silencedUntil"] > 0
+    assert list(silenced) == ["ok", "job"]
+    assert silenced["job"]["silencedUntil"] > 0
+    assert silenced["job"]["health"] == "silenced"
+    assert silenced["job"] == cw.job_summary("s").to_dict()
     assert cw.job_summary("s").health == "silenced"
     un = post("/cronwatch/api/jobs/s/unsilence").json()
-    assert un["state"]["silencedUntil"] is None
+    assert list(un) == ["ok", "job"]
+    assert un["job"]["silencedUntil"] is None
+    assert un["job"]["health"] != "silenced"
     assert post("/cronwatch/api/jobs/nope/silence", {"for": "1h"}).status == 404
     deleted = send(web, "DELETE", "/cronwatch/api/jobs/s", BEARER)
     assert deleted.status == 200
@@ -402,7 +422,7 @@ def test_silence_durations_strings_are_validated_numbers_are_milliseconds() -> N
     assert cw.job_summary("s").silenced_until is None, "a bad duration silences nothing"
 
     def until(body: Any) -> Any:
-        return silence(body).json()["state"]["silencedUntil"] - clock.now()
+        return silence(body).json()["job"]["silencedUntil"] - clock.now()
 
     assert until({"for": 7_200_000}) == 7_200_000
     assert until({"for": "60000"}) == 60_000

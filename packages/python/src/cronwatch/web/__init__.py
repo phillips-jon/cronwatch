@@ -76,6 +76,12 @@ class _Unset:
 UNSET: Any = _Unset()
 
 COOKIE = "cronwatch_token"
+#: What GET <base>/api says is serving it: the package, as PyPI names it, and the language.
+_LIBRARY = "cronwatch-sdk"
+_LANGUAGE = "python"
+#: The dashboard JSON API's version, which GET <base>/api answers. It goes up
+#: only for a change that is not additive, and such a change waits for a major release.
+API_VERSION = 1
 DEFAULT_RUNS = 20
 MAX_RUNS = 500
 #: Runs per job the board reads in one go: the table's sparkline, and most jobs' lanes.
@@ -755,6 +761,11 @@ class Web:
         return _html_response(_html.message_page("Not found", path, base), 404)
 
     def _serve_api(self, cw: Any, request: Request, method: str, rest: list[str], bearer: str | None) -> Response:
+        # What is serving the API, so a client such as @cronwatch/mcp can tell.
+        if method == "GET" and rest == []:
+            from .. import __version__
+
+            return _api({"ok": True, "library": _LIBRARY, "language": _LANGUAGE, "version": __version__, "api": API_VERSION})
         if method == "GET" and rest == ["jobs"]:
             return _api({"ok": True, "jobs": cw.jobs()})
         if len(rest) == 2 and rest[0] == "jobs":
@@ -779,9 +790,11 @@ class Web:
                     duration = _silence_duration(body["for"] if "for" in body else request.param("for"))
                 except ValueError as error:
                     return _api({"ok": False, "error": str(error)}, 400)
-                return _api({"ok": True, "state": cw.silence(name, duration)})
+                cw.silence(name, duration)
+                return _api({"ok": True, "job": cw.job_summary(name)})
             if rest[2] == "unsilence":
-                return _api({"ok": True, "state": cw.unsilence(name)})
+                cw.unsilence(name)
+                return _api({"ok": True, "job": cw.job_summary(name)})
         if rest == ["check"]:
             # A page cannot send an Authorization header cross-site, so a GET
             # may only run the check when it carries a bearer (token or cron secret).
