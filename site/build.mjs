@@ -704,6 +704,8 @@ function build() {
   rmSync(DIST, { recursive: true, force: true });
   mkdirSync(path.join(DIST, "assets"), { recursive: true });
   cpSync(path.join(SRC, "assets"), path.join(DIST, "assets"), { recursive: true });
+  // JSON Schemas, served at the URL each names as its $id (/schemas/webhook/1.json).
+  cpSync(path.join(SRC, "schemas"), path.join(DIST, "schemas"), { recursive: true });
 
   const css = readFileSync(path.join(SRC, "style.css"), "utf8");
   assets.css = `/assets/style.${hash(css)}.css`;

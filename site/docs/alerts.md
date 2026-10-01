@@ -35,7 +35,7 @@ Job output is shown inside a code block it cannot break out of, and messages nev
 
 ## Webhook
 
-POSTs the alert as JSON to any URL. With a `secret`, each request carries `X-CronWatch-Signature: sha256=<hex>`, the HMAC-SHA256 of the raw body. A failed request is reported with the URL's origin only, since a webhook's path often holds its credential.
+POSTs the alert as JSON to any URL: the [alert payload](#the-alert-payload) below, with `"schema": 1` as its first field. With a `secret`, each request carries `X-CronWatch-Signature: sha256=<hex>`, the HMAC-SHA256 of the raw body. A failed request is reported with the URL's origin only, since a webhook's path often holds its credential.
 
 ```ts
 import { webhook } from "@cronwatch/sdk/webhook";
@@ -222,6 +222,8 @@ It still records every run and evaluates it, but instead of sending an alert it 
 
 ## The alert payload
 
+What a custom channel is given, and, with `schema` added, what the webhook posts:
+
 ```ts
 interface Alert {
   type: "missed" | "failed" | "stuck" | "slow" | "over_budget" | "recovered";
@@ -251,6 +253,14 @@ custom("latency", (alert) => {
   if (alert.type === "slow") metrics.gauge("job.slow_ms", alert.details.durationMs);
 });
 ```
+
+### The webhook's schema
+
+The webhook's body is the alert after one more field, `"schema": 1`, which comes first: every CronWatch library, in every language, posts the same fields. Its JSON Schema is published at [cronwatch.dev/schemas/webhook/1.json](/schemas/webhook/1.json) (draft 2020-12), for a receiver to validate against or generate types from.
+
+What stays the same within `schema: 1`: every field above, the `details` of each type, the `X-CronWatch-Signature` header and its HMAC-SHA256. A release may add a field, a `details` field, an alert type, a condition or a run status, so ignore what you do not know rather than refusing it. A change that is not additive would come with `"schema": 2`, in a major release.
+
+What is not promised: the wording of `title` and `message`, and what the other channels' messages look like. They are written for people and may read better in any release. Parse the fields, not the text: `type` rather than "failed" in the title, `details.durationMs` rather than the message's duration.
 
 ## Errors outside jobs
 

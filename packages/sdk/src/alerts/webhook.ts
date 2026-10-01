@@ -15,6 +15,13 @@ export interface WebhookOptions {
 
 const TIMEOUT_MS = 10_000;
 
+/**
+ * The payload's version, sent as its first field. It goes up only if a
+ * major release changes the payload in a way that is not additive; see
+ * https://cronwatch.dev/schemas/webhook/1.json.
+ */
+export const WEBHOOK_SCHEMA = 1;
+
 function origin(url: string): string {
   try {
     return new URL(url).origin;
@@ -24,16 +31,17 @@ function origin(url: string): string {
 }
 
 /**
- * POSTs the alert as JSON to any URL. The body is the Alert object:
- * { type, job, title, message, run, details, triage, at, definition }.
- * A redirect is an error: point the url at where the receiver really is.
+ * POSTs the alert as JSON to any URL. The body is the Alert object after a
+ * version: { schema: 1, type, job, title, message, run, details, triage, at,
+ * definition }. A redirect is an error: point the url at where the receiver
+ * really is.
  */
 export function webhook(options: WebhookOptions): AlertChannel {
   if (!options.url) throw new Error("webhook() needs a url");
   return {
     name: "webhook",
     async send(alert) {
-      const body = JSON.stringify(alert);
+      const body = JSON.stringify({ schema: WEBHOOK_SCHEMA, ...alert });
       const headers: Record<string, string> = { "content-type": "application/json", "user-agent": "cronwatch" };
       // A pasted Authorization value often carries a stray space or newline, which fetch would refuse.
       for (const [name, value] of Object.entries(options.headers ?? {})) headers[name] = typeof value === "string" ? value.trim() : value;

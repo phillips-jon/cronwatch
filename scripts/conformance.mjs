@@ -1675,6 +1675,9 @@ async function channelCases() {
   };
   const sends = [];
   const failures = [];
+  // The webhook's body in full, for every alert, with the signature the
+  // secret gives it: {"schema":1, then the alert's own fields}.
+  const webhookPayloads = [];
   const alerts = channelAlerts();
   try {
     for (const config of configs) {
@@ -1683,6 +1686,9 @@ async function channelCases() {
         response = { status: 200, body: "" };
         await channel.send(clone(alert));
         sends.push({ channel: config.channel, options: config.options, alert: name, url: captured.url, headers: captured.headers, body: digest(captured.body) });
+        if (config.channel === "webhook" && config.options.secret) {
+          webhookPayloads.push({ alert: name, secret: config.options.secret, body: captured.body, signature: captured.headers["x-cronwatch-signature"] });
+        }
       }
       for (const [status, body] of [[500, "no"], [400, "x".repeat(300)], [404, ""]]) {
         response = { status, body };
@@ -1698,7 +1704,7 @@ async function channelCases() {
   } finally {
     globalThis.fetch = realFetch;
   }
-  return { alerts, sends, failures, ...(await providerCases(alerts)), ...(await twilioPartialCases(alerts)), ...textCutCases(alerts), urls: urlCases() };
+  return { alerts, sends, failures, webhookPayloads, ...(await providerCases(alerts)), ...(await twilioPartialCases(alerts)), ...textCutCases(alerts), urls: urlCases() };
 }
 
 // A channel posts to its URL as fetch reads it, and the ports that carry

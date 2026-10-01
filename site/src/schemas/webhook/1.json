@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cronwatch.dev/schemas/webhook/1.json",
+  "title": "CronWatch webhook payload, schema 1",
+  "description": "The JSON body the webhook alert channel POSTs, in every CronWatch library. Within schema 1 it only grows: a release may add fields (so objects allow properties not listed here), but never removes or retypes one. With a secret, the request carries X-CronWatch-Signature: sha256=<hex>, the HMAC-SHA256 of the raw body with the secret, as lowercase hex. Times are epoch milliseconds and durations milliseconds. The title and message are for people and their wording may change in any release: read the fields instead.",
+  "type": "object",
+  "required": ["schema", "type", "job", "definition", "run", "title", "message", "details", "at"],
+  "properties": {
+    "schema": { "const": 1, "description": "This payload's version. Always the first field." },
+    "type": { "$ref": "#/$defs/alertType" },
+    "job": { "type": "string", "description": "The job's name." },
+    "definition": { "$ref": "#/$defs/definition" },
+    "run": {
+      "description": "The run the alert is about, or null (a missed run, or a recovery after missed).",
+      "oneOf": [{ "$ref": "#/$defs/run" }, { "type": "null" }]
+    },
+    "title": { "type": "string", "description": "One line for people. Not stable." },
+    "message": { "type": "string", "description": "A few lines for people. Not stable." },
+    "details": { "type": "object", "description": "What the alert's type carries; see the conditionals below." },
+    "triage": {
+      "type": ["string", "null"],
+      "description": "Claude's short diagnosis, when triage is configured: null when it was tried and gave nothing. Absent without triage, and on recoveries."
+    },
+    "at": { "type": "number", "description": "When the alert was made." }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "missed" } } },
+      "then": { "properties": { "details": { "$ref": "#/$defs/missed" } } }
+    },
+    {
+      "if": { "properties": { "type": { "enum": ["failed", "stuck"] } } },
+      "then": { "properties": { "details": { "$ref": "#/$defs/failures" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "slow" } } },
+      "then": { "properties": { "details": { "$ref": "#/$defs/slow" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "over_budget" } } },
+      "then": { "properties": { "details": { "$ref": "#/$defs/overBudget" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "recovered" } } },
+      "then": { "properties": { "details": { "$ref": "#/$defs/recovered" } } }
+    }
+  ],
+  "$defs": {
+    "condition": {
+      "type": "string",
+      "description": "A condition a job can be in. These five today; a later release may add one.",
+      "examples": ["missed", "failed", "stuck", "slow", "over_budget"]
+    },
+    "alertType": {
+      "type": "string",
+      "description": "A condition that opened, or recovered when conditions closed. These six today; a later release may add one, so treat a type you do not know as you would an unknown condition.",
+      "examples": ["missed", "failed", "stuck", "slow", "over_budget", "recovered"]
+    },
+    "duration": {
+      "description": "A duration as the job declared it: a string such as \"15m\" or \"1h30m\", or milliseconds.",
+      "type": ["string", "number"]
+    },
+    "definition": {
+      "type": "object",
+      "description": "The job's definition as stored. Options the job did not set are absent. A release may add options.",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "schedule": { "type": "string", "description": "A cron expression, a nickname such as @hourly, or \"every <duration>\"." },
+        "timezone": { "type": "string", "description": "The IANA zone the cron expression is read in." },
+        "grace": { "$ref": "#/$defs/duration" },
+        "timeout": { "$ref": "#/$defs/duration" },
+        "maxDuration": { "$ref": "#/$defs/duration" },
+        "budget": { "type": "object", "additionalProperties": { "type": "number" } },
+        "expect": { "type": "string", "description": "The expect rule: the string itself, or a description of a pattern or a function." },
+        "failuresBeforeAlert": { "type": "integer", "minimum": 1 },
+        "description": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": ["id", "job", "status", "startedAt", "finishedAt", "durationMs", "error", "output", "metrics", "trigger"],
+      "properties": {
+        "id": { "type": "string" },
+        "job": { "type": "string" },
+        "status": {
+          "type": "string",
+          "description": "running, ok, failed or timeout (a run a check marked stuck). A later release may add one.",
+          "examples": ["running", "ok", "failed", "timeout"]
+        },
+        "startedAt": { "type": "number" },
+        "finishedAt": { "type": ["number", "null"] },
+        "durationMs": { "type": ["number", "null"] },
+        "error": { "type": ["string", "null"], "description": "Redacted, and cut to 16 KB." },
+        "output": { "type": ["string", "null"], "description": "Redacted, and cut to its last 16 KB." },
+        "metrics": { "type": "object", "additionalProperties": { "type": "number" } },
+        "trigger": { "type": "string", "description": "What started the run: run, start, handler, an integration's name, or the app's own." }
+      }
+    },
+    "missed": {
+      "type": "object",
+      "required": ["dueAt", "deadline", "graceMs", "lastRunAt"],
+      "properties": {
+        "dueAt": { "type": "number", "description": "When the schedule wanted a run." },
+        "deadline": { "type": "number", "description": "dueAt plus the grace: when the run counted as missed." },
+        "graceMs": { "type": "number" },
+        "lastRunAt": { "type": ["number", "null"], "description": "When the last run started, or null when it never ran." }
+      }
+    },
+    "failures": {
+      "type": "object",
+      "required": ["consecutiveFailures", "threshold"],
+      "properties": {
+        "consecutiveFailures": { "type": "integer", "minimum": 0 },
+        "threshold": { "type": "integer", "minimum": 1, "description": "The job's failuresBeforeAlert." }
+      }
+    },
+    "slow": {
+      "type": "object",
+      "required": ["durationMs", "thresholdMs", "basis"],
+      "properties": {
+        "durationMs": { "type": "number" },
+        "thresholdMs": { "type": "number" },
+        "basis": { "type": "string", "description": "maxDuration, or how the threshold was worked out from recent runs." }
+      }
+    },
+    "overBudget": {
+      "type": "object",
+      "required": ["breaches"],
+      "properties": {
+        "breaches": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["metric", "value", "limit", "basis"],
+            "properties": {
+              "metric": { "type": "string" },
+              "value": { "type": "number" },
+              "limit": { "type": "number" },
+              "basis": { "type": "string", "description": "budget, or how the limit was worked out from recent runs." }
+            }
+          }
+        }
+      }
+    },
+    "recovered": {
+      "type": "object",
+      "required": ["after"],
+      "properties": {
+        "after": { "type": "array", "items": { "$ref": "#/$defs/condition" }, "description": "The conditions that closed." },
+        "reason": {
+          "const": "unscheduled",
+          "description": "Present when missed alone closed because the job no longer has a schedule. Absent when a successful run closed everything that was open."
+        },
+        "since": { "type": "number", "description": "With reason unscheduled: when missed opened." }
+      }
+    }
+  }
+}
