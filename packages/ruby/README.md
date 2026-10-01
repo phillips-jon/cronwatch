@@ -181,6 +181,10 @@ map("/cronwatch") { run CW.routes }
 
 `client.routes(**options)` (`token:`, `base_path:`, `origin:`) is the one way to build the dashboard, as `routes()` is in every language.
 
+### Public and internal
+
+Public means what this README and the docs at cronwatch.dev name. Everything else is internal and may change in any release: anything marked `@api private` in the source (`Evaluate`, `Schedule`, `Format`, `JS`, `HTTP` and the dashboard's helpers among them), and the constants made private with `private_constant`.
+
 ### Deprecated
 
 These still work through every 1.x release and go in 2.0, each with a warning in Ruby's deprecation category (shown under `ruby -w` or `-W:deprecated`): `Cronwatch::Web.new(client, **options)` (use `client.routes(**options)`), `client.start(every)` (use `client.start_checking(every)`), `client.run(id)` without a block (use `client.get_run(id)`) and `client.silence(name, "2h")` (use `client.silence(name, for: "2h")`). The ActiveJob trigger is `active-job` from 1.0; runs recorded before keep `active_job`.

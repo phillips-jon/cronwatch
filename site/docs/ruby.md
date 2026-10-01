@@ -396,6 +396,10 @@ The client:
 | `routes(**options)` | the dashboard and JSON API as a Rack app; see [the dashboard](#the-dashboard-in-any-rack-app) |
 | `close` | stop the interval, wait for a check already under way, then close the store |
 
+### Public and internal
+
+Public means what this page, [Ruby on Rails](/docs/rails/) and the gem's README name. Everything else is internal and may change in any release: a module, class, method or constant marked `@api private` in the source (`Evaluate`, `Schedule`, `Format`, `JS`, `HTTP` and the dashboard's helpers among them), and the constants made private with `private_constant`.
+
 ### Deprecated
 
 These still work through every 1.x release, and go in 2.0. Each writes a warning in Ruby's deprecation category, which shows under `ruby -w`, `-W:deprecated` or `Warning[:deprecated] = true` and names the line that called it.

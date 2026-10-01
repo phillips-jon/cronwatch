@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 module Cronwatch
+  # A run's output and error on their way to the store: redaction, the cap,
+  # NUL and encoding. `redact_secrets` is public, the default `redact:` and
+  # the one to call from a redact of your own; the rest is @api private.
   module Output
     # Output is capped so a chatty job cannot fill the store. The tail is kept.
     # Counted in UTF-16 code units, as the SDK counts it.
