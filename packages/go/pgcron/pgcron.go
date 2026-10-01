@@ -698,8 +698,15 @@ func (s *Source) Sync(ctx context.Context, host cronwatch.SourceHost) ([]cronwat
 		if !ok {
 			name, ok = names[row.JobID]
 		}
-		if !ok {
+		// A run copied under a name retired since (a rename, a job no
+		// longer picked) and then forgotten (the dashboard's forget) has no
+		// job to go to: it is let go, never recorded and never read again.
+		if !ok || (canTell && !inUse[name] && !declares.Declares(name)) {
+			delete(s.pending, row.RunID)
 			delete(s.held, row.RunID)
+			if ok {
+				delete(s.retired, name)
+			}
 			return
 		}
 		var run *cronwatch.Run

@@ -43,6 +43,8 @@ type fakeCron struct {
 	settings map[string]string
 	runid    int64
 	queries  []string
+	// opens are the open run ids each details query asked for, in turn.
+	opens [][]int64
 }
 
 func newFakeCron() *fakeCron {
@@ -173,6 +175,7 @@ func (c *fakeConn) QueryContext(_ context.Context, query string, args []driver.N
 		return detailRows(list[:min(len(list), 20)]), nil
 	case strings.Contains(query, "unnest"):
 		ids, afters, open := arrayOf(args[0].Value), arrayOf(args[1].Value), arrayOf(args[2].Value)
+		f.opens = append(f.opens, open)
 		after := map[int64]int64{}
 		for i, id := range ids {
 			after[id] = afters[i]
