@@ -17,6 +17,12 @@ public sealed partial class CronwatchClient
 
     private TaskCompletionSource<CheckResult>? _checking;
 
+    /// <summary>
+    /// Set in the check's own flow, which reaches a source's sync, a channel's send and the error
+    /// handler, so a dispose called from there does not wait for the check it is part of.
+    /// </summary>
+    private readonly AsyncLocal<bool> _inCheck = new();
+
     /// <summary>Whether a check is in flight, for the tests.</summary>
     internal bool Checking => Volatile.Read(ref _checking) != null;
     private long _lastPruneAt;
@@ -40,6 +46,7 @@ public sealed partial class CronwatchClient
             Abandon(mine.Task);
             _ = Spawn(async () =>
             {
+                _inCheck.Value = true;
                 try
                 {
                     CheckResult result = await RunCheckAsync().ConfigureAwait(false);
@@ -54,6 +61,27 @@ public sealed partial class CronwatchClient
             });
         }
         return shared.Task.WaitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for the check in flight to end, as the SDK's <c>close()</c> awaits it, so it never
+    /// writes to a store already disposed. Not from the check's own flow (a source, a channel or an
+    /// error handler that disposes the client), which would wait for good.
+    /// </summary>
+    private async Task AwaitCheckAsync()
+    {
+        if (Volatile.Read(ref _checking) is not { } inFlight || _inCheck.Value)
+        {
+            return;
+        }
+        try
+        {
+            await inFlight.Task.ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            // The check's own failure, answered to whoever asked for it.
+        }
     }
 
     private async Task<CheckResult> RunCheckAsync()
@@ -158,6 +186,9 @@ public sealed partial class CronwatchClient
             {
                 return [];
             }
+            // A run of a job stored with an unreadable definition is reported and skipped.
+            stored = ReadStoredJob(stored);
+            Evaluable(stored);
             def = stored.Definition;
         }
         if (!Evaluated(() => Evaluate.IsStuck(def, listed, now)))
@@ -188,6 +219,7 @@ public sealed partial class CronwatchClient
 
     private async Task<JobSummary> CheckJobAsync(StoredJob job, long now, RetryBudget budget, List<Alert> alerts)
     {
+        Evaluable(job);
         var recent = await CallAsync(() => _store.ListRunsAsync(job.Name, Evaluate.BaselineWindow)).ConfigureAwait(false);
         Run? last = recent.Count == 0 ? null : recent[0];
         long? nextExpectedAt = null;
@@ -213,6 +245,7 @@ public sealed partial class CronwatchClient
         try
         {
             recent = await CallAsync(() => _store.ListRunsAsync(job.Name, Math.Max(limit, Evaluate.BaselineWindow))).ConfigureAwait(false);
+            Evaluable(job);
             JobState state = await ReadStateAsync(job.Name).ConfigureAwait(false);
             var runs = recent;
             JobSummary summary = Evaluated(() =>
@@ -287,7 +320,7 @@ public sealed partial class CronwatchClient
             await SyncAsync(def, confirm: true).ConfigureAwait(false);
         }
         StoredJob? stored = await CallAsync(() => _store.GetJobAsync(name)).ConfigureAwait(false);
-        return stored == null ? null : (await SnapshotAsync(stored, Now(), 0).ConfigureAwait(false)).Job;
+        return stored == null ? null : (await SnapshotAsync(ReadStoredJob(stored), Now(), 0).ConfigureAwait(false)).Job;
     }
 
     private async Task<JobState> PatchStateAsync(string name, Action<MutableState> change)

@@ -353,7 +353,7 @@ public sealed partial class CronwatchClient
         {
             await SyncAsync(def).ConfigureAwait(false);
         }
-        var jobs = await CallAsync(() => _store.ListJobsAsync()).ConfigureAwait(false);
+        var jobs = ReadStoredJobs(await CallAsync(() => _store.ListJobsAsync()).ConfigureAwait(false));
         var listed = new HashSet<string>(StringComparer.Ordinal);
         foreach (var job in jobs)
         {
@@ -378,7 +378,48 @@ public sealed partial class CronwatchClient
             await SyncAsync(def).ConfigureAwait(false);
             wrote = true;
         }
-        return wrote ? await CallAsync(() => _store.ListJobsAsync()).ConfigureAwait(false) : jobs;
+        return wrote ? ReadStoredJobs(await CallAsync(() => _store.ListJobsAsync()).ConfigureAwait(false)) : jobs;
+    }
+
+    private static List<StoredJob> ReadStoredJobs(IReadOnlyList<StoredJob> jobs)
+    {
+        var output = new List<StoredJob>(jobs.Count);
+        foreach (var job in jobs)
+        {
+            output.Add(ReadStoredJob(job));
+        }
+        return output;
+    }
+
+    /// <summary>
+    /// A stored job as the client reads it (the SDK's <c>readStoredJob</c>), so a foreign,
+    /// hand-edited or damaged row affects only its own job: <c>tags</c> is kept only when it is a
+    /// list of strings, and every other field as stored. A definition that was not a JSON object
+    /// comes from the store already read as <c>{ name }</c> and marked unreadable.
+    /// </summary>
+    internal static StoredJob ReadStoredJob(StoredJob stored)
+    {
+        JsObject fields = stored.Definition.Fields;
+        if (stored.Definition.Unreadable || !fields.Has("tags"))
+        {
+            return stored;
+        }
+        if (fields.Get("tags") is List<object?> tags && tags.TrueForAll(t => t is string))
+        {
+            return stored;
+        }
+        JsObject kept = fields.Copy();
+        kept.Remove("tags");
+        return stored with { Definition = Definition.Own(kept) };
+    }
+
+    /// <summary>Throws for a job whose stored definition was not a JSON object: reported, and shown as failing, while the others carry on.</summary>
+    internal static void Evaluable(StoredJob stored)
+    {
+        if (stored.Definition.Unreadable)
+        {
+            throw new InvalidOperationException("job " + JsonText.Quote(stored.Name) + ": its stored definition is not a JSON object");
+        }
     }
 
     internal void MarkSynced(JobDef def)

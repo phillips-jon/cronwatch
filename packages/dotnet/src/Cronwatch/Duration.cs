@@ -39,6 +39,14 @@ public readonly struct Duration : IEquatable<Duration>
     /// <summary>The value as stored in a definition: the text, or the milliseconds.</summary>
     internal object JsonValue => _text ?? (object)_ms;
 
+    /// <summary>
+    /// The milliseconds, read as the SDK reads a duration, so a value can be checked before it is
+    /// used (a host checks its check interval as it starts). <paramref name="name"/> names the value
+    /// in the error.
+    /// </summary>
+    /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/>, with the SDK's message.</exception>
+    public double ToMilliseconds(string name = "duration") => Milliseconds(name ?? "duration");
+
     /// <summary>The milliseconds, read as the SDK reads the option <paramref name="label"/>.</summary>
     /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/>, with the SDK's message.</exception>
     internal double Milliseconds(string label)

@@ -40,7 +40,7 @@ builder.Services.AddCronwatch(o =>
 });
 ```
 
-It reads `Retention`, `Token`, `CheckEvery` and `Environment` from the `Cronwatch` section of the configuration, with the code's options applied after; takes every `IChannel` registered in the container as a channel when `Alerts` is left alone; sends the client's own errors and warnings to the app's `ILogger`; runs a check every minute as a hosted service once the host has started (`CheckEvery` sets the interval, `NoCheck = true` runs none, for an app whose checks run elsewhere); and disposes the client when the host stops, after the hosted services have stopped. `AddCronwatch((services, o) => ...)` takes the options from other services, such as the app's own data source. Each run's function runs inside a log scope holding `cronwatch_job` and `cronwatch_run`, so every line the app logs inside a job carries them.
+It reads `Retention`, `Token`, `CheckEvery` and `Environment` from the `Cronwatch` section of the configuration, with the code's options applied after; takes every `IChannel` registered in the container as a channel when `Alerts` is left alone; sends the client's own errors and warnings to the app's `ILogger`; runs a check every minute as a hosted service once the host has started (`CheckEvery` sets the interval, and one that is not a duration stops the host from starting; `NoCheck = true` runs none, for an app whose checks run elsewhere); and disposes the client when the host stops, after the hosted services have stopped. `AddCronwatch((services, o) => ...)` takes the options from other services, such as the app's own data source. Each run's function runs inside a log scope holding `cronwatch_job` and `cronwatch_run`, so every line the app logs inside a job carries them.
 
 Anywhere else, make one and dispose it when the app stops:
 
@@ -54,7 +54,7 @@ await using var cw = new CronwatchClient(new CronwatchOptions
 cw.StartChecking();                                          // check every minute, in a long-running service
 ```
 
-Every option has the SDK's default, and the constructor checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to the console. `DisposeAsync` stops the check, records the runs still open in this process, waits up to five seconds for sends in flight, and lets go of the store.
+Every option has the SDK's default, and the constructor checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to the console. `DisposeAsync` stops the check, waits for a check under way to end, records the runs still open in this process, waits up to five seconds for the other sends in flight, and lets go of the store.
 
 The client's own work (recording a run, sending alerts, checking) runs as tasks of its own, so a caller that stops waiting never cuts a write in half. Everything on `CronwatchClient`, `Job` and a run's `JobContext` is safe to use from any thread and task. Every call that reaches the store or the network is async, takes a `CancellationToken` last, and awaits with `ConfigureAwait(false)`, so a caller that blocks on one cannot deadlock.
 
@@ -208,7 +208,7 @@ CronwatchResponse answer = await routes.HandleAsync(new CronwatchRequest("GET", 
 
 `RoutesOptions`:
 
-- `Token`: the token. Left out, it is `CRONWATCH_TOKEN` (under `AddCronwatch`, `Cronwatch:Token` first). Send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie holds a digest of it. Without a token, in development, the dashboard makes one and prints a sign-in link to standard output on its first request (naming the host only when `Origin` is set or the request came to a loopback host); anywhere else it answers 503. The environment is `CRONWATCH_ENV`, else `APP_ENV`, else the options' `Environment` (under `AddCronwatch`, `Cronwatch:Environment`, else the host's environment, `--environment` included), else `ASPNETCORE_ENVIRONMENT` or `DOTNET_ENVIRONMENT`, and `development`, `dev`, `local`, `test` and `testing` count as development, so ASP.NET Core's `Development` does.
+- `Token`: the token. Left out, it is `CRONWATCH_TOKEN` (under `AddCronwatch`, `Cronwatch:Token` first); a value that is empty or only whitespace, in either place or given here, counts as unset. Send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie holds a digest of it. Without a token, in development, the dashboard makes one and prints a sign-in link to standard output on its first request (naming the host only when `Origin` is set or the request came to a loopback host); anywhere else it answers 503. The environment is `CRONWATCH_ENV`, else `APP_ENV`, else the options' `Environment` (under `AddCronwatch`, `Cronwatch:Environment`, else the host's environment, `--environment` included), else `ASPNETCORE_ENVIRONMENT` or `DOTNET_ENVIRONMENT`, and `development`, `dev`, `local`, `test` and `testing` count as development, so ASP.NET Core's `Development` does.
 - `Token = DashboardToken.None`: serve it to anyone, for a mount behind your own auth.
 - `Origin = "https://app.example.com"`: the public origin, pinned whatever a request says, for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line.
 - `TrustProxy = true`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
@@ -231,7 +231,7 @@ app.MapCronwatchHandler("/cron/nightly", "nightly-report", async (JobContext job
 });
 ```
 
-The job is looked up by name on the app's client, so declare it first (or pass the `Job` itself). Without ASP.NET Core, `job.Handler((job, request, ct) => ...)` answers a framework-free `Handler` whose `HandleAsync` takes a `CronwatchRequest`. The secret is `HandlerOptions.Secret`, else the client's `CronSecret` (`CRON_SECRET` by default), compared in constant time; `""` counts as unset. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 rather than let anyone on the internet run the job; `HandlerSecret.None` (or the client's `CronSecret.None`) opts out on purpose, for an endpoint your platform already protects, and then the endpoint takes the app's authorization policy.
+The job is looked up by name on the app's client, so declare it first (or pass the `Job` itself). Without ASP.NET Core, `job.Handler((job, request, ct) => ...)` answers a framework-free `Handler` whose `HandleAsync` takes a `CronwatchRequest`. The secret is `HandlerOptions.Secret`, else the client's `CronSecret` (`CRON_SECRET` by default), compared in constant time; `""`, or a value of only whitespace, counts as unset. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 rather than let anyone on the internet run the job; `HandlerSecret.None` (or the client's `CronSecret.None`) opts out on purpose, for an endpoint your platform already protects, and then the endpoint takes the app's authorization policy.
 
 A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, and the error's first line as `"error"` for a caller who sent the secret. A `string` the function returns is the run's output when nothing was logged; a `CronwatchResponse` or an `IResult` it returns is the answer itself, and a status of 400 or more fails the run. The request's `RequestAborted` token is linked into the run's, so a caller that goes away cancels the job as a platform's timeout would.
 
@@ -442,7 +442,7 @@ A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname
 | `SyncJobAsync(name)` | write a declaration to the store now, unless it already holds it |
 | `DefinedJobs` | the jobs declared in this client |
 | `Routes()`, `job.Handler(fn)` | the dashboard and a job's handler |
-| `DisposeAsync()` | stop the check, record open runs, wait up to five seconds for a check under way, and let go of the store |
+| `DisposeAsync()` | stop the check, wait for a check under way, record open runs, wait up to five seconds for other sends, and let go of the store |
 
 `CronwatchException` has a `Kind`: `Invalid` (an option, name, schedule or run id the SDK refuses, with its message), `Store` (the store's own exception as `InnerException`) and `Other`. Reads (`JobsAsync`, `JobSummaryAsync`, `RunsAsync`) and `CheckAsync` throw it when the store fails; `RunAsync`, `Start`, `FlushAsync` and `FinishAsync` never do.
 
@@ -482,7 +482,7 @@ These names still work, marked `[Obsolete]` so the compiler points at the replac
 | `Slack.Webhook(url)`, `Discord.Webhook(url)` | `SlackChannel.Webhook(url)`, `DiscordChannel.Webhook(url)`, on the channel types | 2.0 |
 | `Json.Quote`, `Json.Kind`, `Json.Copy`, `Json.TryNumber`, `Json.MaxDepth` | internal: `Json.Parse`, `Json.ParseObject` and `Json.Stringify` are the JSON the library promises (`Json.Stringify(text)` quotes a string as `Quote` did) | 1.0 |
 | `StoreContract.NewRun`, `ForeignRows` | fixture helpers: the store kit promises `StoreContract.RunAsync`, `StoreReplay` and `FinishOnce` | 1.0 |
-| `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it is still used | 2.0 |
+| `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it, even explicitly, still compiles and is used | 2.0 |
 
 ## Kept in step
 

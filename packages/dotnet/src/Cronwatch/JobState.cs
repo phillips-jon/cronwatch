@@ -149,7 +149,14 @@ public sealed record JobState
     /// <exception cref="JsonParseException">When it is not a state.</exception>
     public static JobState FromJson(string text) => FromValue(Json.Parse(text));
 
-    /// <summary>A state read from a JSON value, leniently, as the SDK reads a stored state.</summary>
+    /// <summary>
+    /// A state read from a JSON value, leniently, as the SDK's <c>normalizeState</c> reads a stored
+    /// state: an <c>open</c> entry whose time is not a number is left out, as is a
+    /// <c>pendingRecovery</c> entry that is not a string and an <c>undelivered</c> entry that is
+    /// not an object; <c>silencedUntil</c> and <c>lastAlertAt</c> that are not numbers read as
+    /// null. A value that is not an object is no state at all, which
+    /// <c>Evaluate.NormalizeState</c> reads as a fresh one.
+    /// </summary>
     /// <exception cref="JsonParseException">When it is not an object.</exception>
     public static JobState FromValue(object? v)
     {
@@ -162,7 +169,11 @@ public sealed record JobState
         {
             foreach (var e in opened)
             {
-                open.Add(new(new Condition(e.Key), JsonText.TryNumber(e.Value, out double n) ? Js.ToLong(n) : 0L));
+                // An entry whose time is not a number (a foreign or damaged row's) is not open.
+                if (JsonText.TryNumber(e.Value, out double n))
+                {
+                    open.Add(new(new Condition(e.Key), Js.ToLong(n)));
+                }
             }
         }
         List<Condition>? pending = null;

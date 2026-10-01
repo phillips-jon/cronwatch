@@ -58,6 +58,9 @@ internal sealed class FakeCron
 
     public ConcurrentQueue<string> Queries { get; } = new();
 
+    /// <summary>The open run ids each details query asked for, in order.</summary>
+    public ConcurrentQueue<List<long>> Opened { get; } = new();
+
     public Job AddJob(long jobId, string? jobName, string schedule, bool active = true)
     {
         var j = new Job(jobId, jobName, schedule, active);
@@ -146,6 +149,7 @@ internal sealed class FakeCron
         {
             List<long> ids = Array(parameters[0]);
             List<long> afters = Array(parameters[1]);
+            Opened.Enqueue(Array(parameters[2]));
             var open = Array(parameters[2]).ToHashSet();
             var after = new Dictionary<long, long>();
             for (int i = 0; i < ids.Count; i++)

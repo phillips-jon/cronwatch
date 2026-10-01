@@ -14,7 +14,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// CronWatch in a Generic Host or ASP.NET Core app's container: <c>AddCronwatch</c>, in
 /// Microsoft's namespace as its own registration methods are, so it needs no <c>using</c>.
 /// </summary>
-public static class CronwatchServiceCollectionExtensions
+public static class CronwatchHostingServiceCollectionExtensions
 {
     /// <summary>The configuration section read: <c>Cronwatch:Retention</c>, <c>Cronwatch:Token</c>, <c>Cronwatch:CheckEvery</c>, <c>Cronwatch:Environment</c>.</summary>
     public const string ConfigurationSection = "Cronwatch";
@@ -53,7 +53,8 @@ public static class CronwatchServiceCollectionExtensions
             {
                 o.Retention = retention;
             }
-            if (section["Token"] is { Length: > 0 } token)
+            // A token of only whitespace counts as unset, as CRONWATCH_TOKEN's does.
+            if (section["Token"] is { } token && !IsBlank(token))
             {
                 o.Token = token;
             }
@@ -68,6 +69,24 @@ public static class CronwatchServiceCollectionExtensions
         }
         configure(sp, o);
         return o;
+    }
+
+    /// <summary>
+    /// Empty, or only what JavaScript's <c>String.prototype.trim</c> removes (WhiteSpace and
+    /// LineTerminator: not U+0085, and U+FEFF among them), as the client reads a blank secret.
+    /// </summary>
+    internal static bool IsBlank(string s)
+    {
+        foreach (char c in s)
+        {
+            bool space = c is '\t' or '\n' or '\v' or '\f' or '\r' or ' ' or '\u00a0' or '\u1680' or '\u2028' or '\u2029' or '\u202f' or '\u205f' or '\u3000' or '\ufeff'
+                || (c >= '\u2000' && c <= '\u200a');
+            if (!space)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static CronwatchClient Client(this CronwatchHostOptions o, IServiceProvider sp)

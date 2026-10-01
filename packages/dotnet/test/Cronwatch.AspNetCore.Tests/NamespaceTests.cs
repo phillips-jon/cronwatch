@@ -19,7 +19,7 @@ public class NamespaceTests
     [Fact]
     public void Each_extension_class_is_in_microsofts_namespace()
     {
-        Assert.Equal("Microsoft.Extensions.DependencyInjection", typeof(CronwatchServiceCollectionExtensions).Namespace);
+        Assert.Equal("Microsoft.Extensions.DependencyInjection", typeof(CronwatchHostingServiceCollectionExtensions).Namespace);
         Assert.Equal("Microsoft.Extensions.DependencyInjection", typeof(CronwatchJobServiceCollectionExtensions).Namespace);
         Assert.Equal("Microsoft.Extensions.Hosting", typeof(CronwatchHostExtensions).Namespace);
         Assert.Equal("Microsoft.AspNetCore.Builder", typeof(CronwatchAspNetCoreExtensions).Namespace);

@@ -55,10 +55,10 @@ Java:
 .NET:
 
 - `ICronwatchJob` moved from the `Cronwatch` namespace to `Cronwatch.Hosting`, with no alias: add `using Cronwatch.Hosting;` to a job class.
-- The extension methods moved to Microsoft's namespaces: `AddCronwatch` and `AddCronwatchJob` to `Microsoft.Extensions.DependencyInjection`, `RunCronwatchCommandAsync` to `Microsoft.Extensions.Hosting`, and `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` to `Microsoft.AspNetCore.Builder`. `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods, deprecated.
+- The extension methods moved to Microsoft's namespaces: `AddCronwatch` and `AddCronwatchJob` to `Microsoft.Extensions.DependencyInjection`, `RunCronwatchCommandAsync` to `Microsoft.Extensions.Hosting`, and `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` to `Microsoft.AspNetCore.Builder`. `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods, deprecated. The new class for `AddCronwatch` is `CronwatchHostingServiceCollectionExtensions`, so the former class's name is not ambiguous where both namespaces are imported.
+- A `Cronwatch:Token` of only whitespace counts as unset, as `CRONWATCH_TOKEN` does.
 - `TwilioOptions.Segments` is an `int?`, not a `double?`.
 - A handler function whose lambda names its request's type must say `CronwatchRequest`.
-- A store that implemented `IConditionalRunStore.UpdateRunIfAsync`, `IStateCasStore.CompareAndSetStateAsync` or `IRunDeletingStore.DeleteRunIfAsync` explicitly names the new interface instead, since the method now belongs to it.
 
 Go and Elixir have no breaking changes beyond those every language shares.
 
@@ -71,6 +71,7 @@ Go and Elixir have no breaking changes beyond those every language shares.
 - Rust: `StoredJob::read(name, text, created_at, updated_at)` reads a stored definition as the built-in stores do, for a store of the app's own that holds it as JSON text, and `StoredJob::is_readable` says whether it was a JSON object.
 - Java: a static `of` on each record that may grow.
 - PHP: a handler's `secret:` takes `Cronwatch\FromEnv::Read`, meaning the client's secret, as the 1.0 notes say to pass; it threw a `TypeError`.
+- .NET: `Duration.ToMilliseconds(name)`, a duration read as the client reads one, to check a value before it is used.
 - Drupal: Ultimate Cron's jobs are recorded, each on its own rules read as Ultimate Cron reads them (`drupal:<module>` for a module's `hook_cron`, `drupal:job:<id>` for any other, triggers `ultimate-cron` and `ultimate-cron-manual`), and every cron run is still `drupal:cron`. Before, the module left a site running Ultimate Cron alone.
 - The [Stability](https://cronwatch.dev/docs/stability/), [Environment variables](https://cronwatch.dev/docs/environment/) and [Deprecations](https://cronwatch.dev/docs/deprecations/) pages.
 - CI checks each package's public API: a committed report of it for TypeScript, Python and Elixir (`api.txt`), apidiff for the Go modules and cargo-semver-checks for the Rust crates, beside .NET's `PublicAPI.Unshipped.txt`.
@@ -126,6 +127,10 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - Java: a check asked for after `close()` (a Spring Boot app stopping while the starter's tick was between its syncs and its check, say) throws, where it ran in the caller against the closed store and on SQLite opened a connection nothing closed again; the starter's `stop()` waits up to 30 seconds for a tick under way. A `close()` from a channel's code, or an error handler called from it, returns at once and finishes once the check has ended, where it waited for the channel's 15-second deadline and the alert was counted failed and sent again.
 - Java: in a Quartz cluster of three or more nodes, a recovering firing fails only the run of the node that died, read from the name Quartz gives the recovering trigger, where it also failed a live node's run started in the same minute and dropped that run's real result.
 - Java: a blank `cronwatch.cron-secret` in the Spring Boot starter falls back to `CRON_SECRET`, as a blank `cronwatch.web.token` falls back to `CRONWATCH_TOKEN`.
+- .NET: a `CheckEvery` that is not a duration (`"1 minute"`) stops the host from starting, where it was only logged and the app ran on with no checks at all.
+- .NET: `DisposeAsync` waits for a check under way to end before it disposes the store, as the SDK's `close()` does, where after five seconds the check went on writing to a disposed store.
+- .NET: a process that stops just as a run's row is written records the run failed every time; the run was sometimes listed for the process-exit hook only after its row was written, and stayed running.
+- .NET: a store that implemented a former store interface's method explicitly (`IStateCasStore.CompareAndSetStateAsync`) compiles again, and the deprecated `WebRequest` made from a `CronwatchRequest` reads its `IsTls`, `Mount` and `DeclaredLength`.
 
 ## 0.10.0 and earlier
 

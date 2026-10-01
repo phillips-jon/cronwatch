@@ -123,7 +123,7 @@ public class PagesTests
             Html.MessagePage("You are offline", "CronWatch shows live data from your app, so it needs a connection.", "/cronwatch", false));
         Assert.Equal(
             Body(Capture("GET", "/cronwatch/", 1)),
-            Html.MessagePage("Sign in", "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.", "/cronwatch", true));
+            Html.MessagePage("Sign in", "Enter your CRONWATCH_TOKEN and this browser stays signed in.", "/cronwatch", true));
         Assert.Equal(
             Body(Capture("GET", "/cronwatch/jobs/missing")),
             Html.MessagePage("No such job", "missing is not in the store.", "/cronwatch", false));

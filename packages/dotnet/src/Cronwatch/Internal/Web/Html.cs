@@ -627,16 +627,17 @@ internal static class Html
         job.ConsecutiveFailures <= 0 ? "" : "<dt>Failures in a row</dt><dd>" + WebText.Num(job.ConsecutiveFailures) + "</dd>";
 
     /// <summary>
-    /// A page with one message. With <paramref name="signIn"/>, a form under it takes the token and
-    /// sends it as <c>?token=</c>, which the routes move into the cookie: the way in where there is
-    /// no address bar to open a link with, such as an app on an iPhone's home screen.
+    /// A page with one message. With <paramref name="signIn"/>, a form under it posts the token to
+    /// <c>&lt;base&gt;/signin</c> in the body, keeping it out of the URL and access logs, and the
+    /// routes set the cookie: the way in where there is no address bar to open a link with, such as
+    /// an app on an iPhone's home screen.
     /// </summary>
     public static string MessagePage(string title, string message, string basePath, bool signIn)
     {
         string form = signIn
-            ? "<form class=\"signin\" method=\"get\" action=\""
+            ? "<form class=\"signin\" method=\"post\" action=\""
                 + H(basePath)
-                + "/\"><label for=\"token\">Token</label><input id=\"token\" name=\"token\""
+                + "/signin\"><label for=\"token\">Token</label><input id=\"token\" name=\"token\""
                 + " type=\"password\" autocomplete=\"current-password\" autocapitalize=\"off\""
                 + " spellcheck=\"false\" required><button class=\"primary\" type=\"submit\">Sign"
                 + " in</button></form>"

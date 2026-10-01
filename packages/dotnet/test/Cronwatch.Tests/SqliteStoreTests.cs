@@ -250,7 +250,9 @@ public class SqliteStoreTests
                 "INSERT INTO cronwatch_jobs (name, definition, created_at, updated_at) VALUES ('odd', '[1]', 1, 2)",
                 "INSERT INTO cronwatch_runs (id, job, status, started_at, metrics) VALUES ('x', 'odd', 'running', 5.0, '{\"a\":\"text\",\"b\":2}')");
             StoredJob job = (await store.GetJobAsync("odd"))!;
-            Assert.Equal("{}", job.Definition.ToJson());
+            // A definition that is not an object reads as its name alone, marked unreadable.
+            Assert.Equal("{\"name\":\"odd\"}", job.Definition.ToJson());
+            Assert.True(job.Definition.Unreadable);
             Assert.Equal(2, job.UpdatedAt);
             Run running = Assert.Single(await store.RunningRunsAsync());
             Assert.Equal("{\"b\":2}", running.Metrics.ToJson());
@@ -272,9 +274,13 @@ public class SqliteStoreTests
             Assert.Equal(long.MaxValue, far.DurationMs);
             Assert.Equal(Metrics.Empty, far.Metrics);
 
-            // A state that is not JSON fails its own read only.
-            await Exec(file, "INSERT INTO cronwatch_state (job, state) VALUES ('bad', 'not json')");
-            await Assert.ThrowsAnyAsync<Exception>(() => store.GetStateAsync("bad"));
+            // A state that is not JSON, or not an object, reads as none, and the next write
+            // replaces it.
+            await Exec(file, "INSERT INTO cronwatch_state (job, state) VALUES ('bad', 'not json'), ('five', '5')");
+            Assert.Null(await store.GetStateAsync("bad"));
+            Assert.Null(await store.GetStateAsync("five"));
+            Assert.True(await store.CompareAndSetStateAsync(JobState.Initial("bad") with { Version = 1 }, 0));
+            Assert.Equal(1L, (await store.GetStateAsync("bad"))!.Version);
             Assert.Null(await store.GetStateAsync("other"));
             await store.SetStateAsync(JobState.Initial("ok"));
             Assert.NotNull(await store.GetStateAsync("ok"));

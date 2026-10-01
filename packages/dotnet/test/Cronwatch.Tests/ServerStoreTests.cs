@@ -122,7 +122,9 @@ public abstract class ServerStoreTests
         await server.ExecAsync("INSERT INTO " + p + "jobs (name, definition, created_at, updated_at) VALUES ('odd', '[1]', 1, 2)");
         await server.ExecAsync("INSERT INTO " + p + "runs (id, job, status, started_at, metrics) VALUES ('x', 'odd', 'running', 5, '{\"a\":\"text\",\"b\":2}')");
         StoredJob job = (await store.GetJobAsync("odd"))!;
-        Assert.Equal("{}", job.Definition.ToJson());
+        // A definition that is not an object reads as its name alone, marked unreadable.
+        Assert.Equal("{\"name\":\"odd\"}", job.Definition.ToJson());
+        Assert.True(job.Definition.Unreadable);
         Assert.Equal(2, job.UpdatedAt);
         Run running = Assert.Single(await store.RunningRunsAsync());
         Assert.Equal("{\"b\":2}", running.Metrics.ToJson());
@@ -132,6 +134,15 @@ public abstract class ServerStoreTests
         Assert.Equal(long.MinValue, far.StartedAt);
         Assert.Equal(7L, far.FinishedAt);
         Assert.Equal(long.MaxValue, far.DurationMs);
+        if (DialectName == "mysql")
+        {
+            // MySQL's and MariaDB's LONGTEXT hold text that is not JSON (Postgres's JSONB cannot): it
+            // reads as no state, and its version counts as 0, so the next write replaces it.
+            await server.ExecAsync("INSERT INTO " + p + "state (job, state) VALUES ('bad', 'not json')");
+            Assert.Null(await store.GetStateAsync("bad"));
+            Assert.True(await store.CompareAndSetStateAsync(JobState.Initial("bad") with { Version = 1 }, 0));
+            Assert.Equal(1L, (await store.GetStateAsync("bad"))!.Version);
+        }
     }
 
     [Fact]

@@ -21,6 +21,9 @@ public sealed partial class CronwatchClient
     /// <summary>Runs open in this process, for the process-exit hook.</summary>
     private readonly ConcurrentDictionary<string, OpenRun> _open = new(StringComparer.Ordinal);
 
+    /// <summary>Whether the process-exit hook would find this run open, for the tests.</summary>
+    internal bool IsOpenRun(string id) => _open.ContainsKey(id);
+
     internal sealed class OpenRun(JobDef def, Run run, Recorder recorder, Task<bool> begun)
     {
         public JobDef Def { get; } = def;
@@ -205,10 +208,14 @@ public sealed partial class CronwatchClient
         // stops once the row is there always finds it: the hook waits for the write and records
         // the run failed.
         var recorder = new Recorder();
-        Task<bool> begun = Spawn(() => BeginRunAsync(def, run));
+        // Listed first and written after: written first, the write could end and the process
+        // begin to stop (its hook reading the list) before this thread had listed the run.
+        var begin = new TaskCompletionSource<Task<bool>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<bool> begun = begin.Task.Unwrap();
         var open = new OpenRun(def, run, recorder, begun);
         // A run id already open in this process keeps its place: this run's insert is refused.
         bool listed = _open.TryAdd(run.Id, open);
+        begin.SetResult(Spawn(() => BeginRunAsync(def, run)));
         bool recorded = await begun.ConfigureAwait(false);
         if (!recorded && listed)
         {

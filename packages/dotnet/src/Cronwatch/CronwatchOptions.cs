@@ -37,7 +37,7 @@ public sealed class CronSecret
 
     internal string? Value { get; }
 
-    /// <summary>A secret.</summary>
+    /// <summary>A secret. <c>""</c>, or one of only whitespace, means none (with no fallback to <c>CRON_SECRET</c>).</summary>
     public static implicit operator CronSecret(string secret) => new(secret ?? throw new ArgumentNullException(nameof(secret)));
 
     /// <summary>Says whether a secret is set, never its value.</summary>
@@ -97,7 +97,8 @@ public sealed class CronwatchOptions
 
     /// <summary>
     /// The secret a job's handler requires: a string, <see cref="Cronwatch.CronSecret.None"/>, or
-    /// unset to read <c>CRON_SECRET</c>.
+    /// unset to read <c>CRON_SECRET</c>. A string, given or read, that is empty or only whitespace
+    /// counts as no secret.
     /// </summary>
     public CronSecret? CronSecret { internal get; init; }
 

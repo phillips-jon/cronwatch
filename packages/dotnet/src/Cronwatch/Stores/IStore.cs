@@ -102,20 +102,50 @@ public interface IDeleteRunIfStore
     Task<bool> DeleteRunIfAsync(string id, string job, RunStatus status, CancellationToken cancellationToken = default);
 }
 
-/// <summary><see cref="IUpdateRunIfStore"/>, under its former name.</summary>
+/// <summary>
+/// <see cref="IUpdateRunIfStore"/>, under its former name. It declares the method again, as it did
+/// before the rename, so a store that implemented it explicitly
+/// (<c>IConditionalRunStore.UpdateRunIfAsync</c>) still compiles; the new interface's method
+/// forwards to it.
+/// </summary>
 [Obsolete("Renamed IUpdateRunIfStore, after its method. This name still works through 1.x and goes in 2.0.")]
 public interface IConditionalRunStore : IUpdateRunIfStore
 {
+    /// <inheritdoc cref="IUpdateRunIfStore.UpdateRunIfAsync"/>
+    new Task<bool> UpdateRunIfAsync(Run run, IReadOnlyList<RunStatus> from, CancellationToken cancellationToken = default);
+
+    Task<bool> IUpdateRunIfStore.UpdateRunIfAsync(Run run, IReadOnlyList<RunStatus> from, CancellationToken cancellationToken) =>
+        UpdateRunIfAsync(run, from, cancellationToken);
 }
 
-/// <summary><see cref="ICompareAndSetStateStore"/>, under its former name.</summary>
+/// <summary>
+/// <see cref="ICompareAndSetStateStore"/>, under its former name. It declares the method again, as
+/// it did before the rename, so a store that implemented it explicitly
+/// (<c>IStateCasStore.CompareAndSetStateAsync</c>) still compiles; the new interface's method
+/// forwards to it.
+/// </summary>
 [Obsolete("Renamed ICompareAndSetStateStore, after its method. This name still works through 1.x and goes in 2.0.")]
 public interface IStateCasStore : ICompareAndSetStateStore
 {
+    /// <inheritdoc cref="ICompareAndSetStateStore.CompareAndSetStateAsync"/>
+    new Task<bool> CompareAndSetStateAsync(JobState state, long expected, CancellationToken cancellationToken = default);
+
+    Task<bool> ICompareAndSetStateStore.CompareAndSetStateAsync(JobState state, long expected, CancellationToken cancellationToken) =>
+        CompareAndSetStateAsync(state, expected, cancellationToken);
 }
 
-/// <summary><see cref="IDeleteRunIfStore"/>, under its former name.</summary>
+/// <summary>
+/// <see cref="IDeleteRunIfStore"/>, under its former name. It declares the method again, as it did
+/// before the rename, so a store that implemented it explicitly
+/// (<c>IRunDeletingStore.DeleteRunIfAsync</c>) still compiles; the new interface's method forwards
+/// to it.
+/// </summary>
 [Obsolete("Renamed IDeleteRunIfStore, after its method. This name still works through 1.x and goes in 2.0.")]
 public interface IRunDeletingStore : IDeleteRunIfStore
 {
+    /// <inheritdoc cref="IDeleteRunIfStore.DeleteRunIfAsync"/>
+    new Task<bool> DeleteRunIfAsync(string id, string job, RunStatus status, CancellationToken cancellationToken = default);
+
+    Task<bool> IDeleteRunIfStore.DeleteRunIfAsync(string id, string job, RunStatus status, CancellationToken cancellationToken) =>
+        DeleteRunIfAsync(id, job, status, cancellationToken);
 }

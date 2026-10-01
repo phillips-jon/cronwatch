@@ -152,6 +152,25 @@ public class RoutesEnvTests
         }
     }
 
+    /// <summary>The blanks: empty, spaces, a tab, and JavaScript's whitespace that .NET's Trim reads otherwise.</summary>
+    public static TheoryData<string> Blanks() => ["", " ", "  ", "\t", " \n  \ufeff ", "\u00a0\u2003\ufeff"];
+
+    [Theory]
+    [MemberData(nameof(Blanks))]
+    public async Task A_token_of_only_whitespace_counts_as_unset_so_the_routes_stay_locked(string blank)
+    {
+        await Child("blankToken", ("CRONWATCH_ENV", "production"), ("CRONWATCH_TOKEN", blank), ("CW_BLANK", blank));
+        await Child("blankTokenInCode", ("CRONWATCH_ENV", "production"), ("CRONWATCH_TOKEN", "from-env"), ("CW_BLANK", blank));
+        await Child("paddedToken", ("CRONWATCH_ENV", "production"), ("CRONWATCH_TOKEN", " padded "));
+    }
+
+    [Theory]
+    [MemberData(nameof(Blanks))]
+    public async Task A_cron_secret_of_only_whitespace_counts_as_unset(string blank)
+    {
+        await Child("blankSecret", ("CRONWATCH_ENV", "production"), ("CRON_SECRET", blank), ("CW_BLANK", blank));
+    }
+
     [Fact]
     public async Task A_handler_without_a_secret_fails_closed_outside_development()
     {

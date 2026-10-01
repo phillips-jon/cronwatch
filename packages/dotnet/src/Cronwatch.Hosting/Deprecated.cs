@@ -13,13 +13,13 @@ namespace Cronwatch.Hosting;
 public static class CronwatchServiceCollectionExtensions
 {
     /// <summary>The configuration section read.</summary>
-    public const string ConfigurationSection = Microsoft.Extensions.DependencyInjection.CronwatchServiceCollectionExtensions.ConfigurationSection;
+    public const string ConfigurationSection = Microsoft.Extensions.DependencyInjection.CronwatchHostingServiceCollectionExtensions.ConfigurationSection;
 
     /// <summary><c>services.AddCronwatch(configure)</c>.</summary>
     public static IServiceCollection AddCronwatch(IServiceCollection services, Action<CronwatchHostOptions>? configure = null) =>
-        Microsoft.Extensions.DependencyInjection.CronwatchServiceCollectionExtensions.AddCronwatch(services, configure);
+        Microsoft.Extensions.DependencyInjection.CronwatchHostingServiceCollectionExtensions.AddCronwatch(services, configure);
 
     /// <summary><c>services.AddCronwatch(configure)</c>.</summary>
     public static IServiceCollection AddCronwatch(IServiceCollection services, Action<IServiceProvider, CronwatchHostOptions> configure) =>
-        Microsoft.Extensions.DependencyInjection.CronwatchServiceCollectionExtensions.AddCronwatch(services, configure);
+        Microsoft.Extensions.DependencyInjection.CronwatchHostingServiceCollectionExtensions.AddCronwatch(services, configure);
 }

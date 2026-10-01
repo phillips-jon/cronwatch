@@ -375,6 +375,31 @@ public class ThreadsTests
     }
 
     /// <summary>
+    /// The hook is told of a run before its row is written, every time: the macOS flake of the test
+    /// above, where the row's write ended and the process began to stop before the opening thread
+    /// had listed the run, so the hook found nothing to record and the row stayed running.
+    /// </summary>
+    [Fact]
+    public async Task A_run_is_listed_for_the_hook_before_its_row_is_written()
+    {
+        var store = new Wrapped();
+        await using var m = Make(store: store);
+        int unlisted = 0;
+        store.OnInsert = run =>
+        {
+            if (!m.Cw.IsOpenRun(run.Id))
+            {
+                Interlocked.Increment(ref unlisted);
+            }
+        };
+        Job job = m.Cw.Job("j");
+        // Many at once, so an opening thread is often descheduled between the write and the list.
+        await Parallel.ForAsync(0, 2000, new ParallelOptions { MaxDegreeOfParallelism = 16 }, async (_, ct) =>
+            await job.RunAsync((_, _) => Task.CompletedTask, ct));
+        Assert.Equal(0, unlisted);
+    }
+
+    /// <summary>
     /// A run id given again while its first run is open here: the second's insert is refused, and
     /// while both functions run the first stays on the list the hook and disposal record, rather
     /// than being pushed off it.

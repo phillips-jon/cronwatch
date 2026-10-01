@@ -44,6 +44,18 @@ try
         case "dotNetOrder":
             await Cases.DotNetOrder();
             break;
+        case "blankToken":
+            await Cases.BlankToken();
+            break;
+        case "blankTokenInCode":
+            await Cases.BlankTokenInCode();
+            break;
+        case "paddedToken":
+            await Cases.PaddedToken();
+            break;
+        case "blankSecret":
+            await Cases.BlankSecret();
+            break;
         default:
             throw new ArgumentException(args[0]);
     }
@@ -300,6 +312,96 @@ internal static class Cases
         // With nothing given, the variables are read.
         await using var fallback = Client();
         Check(fallback.Routes().Token() != null, "development from the variables");
+    }
+
+    /// <summary>The blank the parent gave, in <c>CW_BLANK</c> (a variable set to it may be unset on Windows).</summary>
+    private static string Blank => Environment.GetEnvironmentVariable("CW_BLANK") ?? "";
+
+    /// <summary>
+    /// A <c>CRONWATCH_TOKEN</c> of only whitespace counts as unset, and so does such a token in code:
+    /// outside development the routes stay locked, whatever a request sends.
+    /// </summary>
+    public static async Task BlankToken()
+    {
+        await using var cw = Client();
+        foreach (RoutesOptions options in new[] { new RoutesOptions(), new RoutesOptions { Token = Blank } })
+        {
+            Routes routes = cw.Routes(options);
+            Check(routes.Token() == null, "no token");
+            Check((await Serve(routes, "http://app.test/cronwatch/api/jobs", None)).Status == 503, "api 503");
+            CronwatchResponse page = await Serve(routes, "http://app.test/cronwatch/?token=" + Uri.EscapeDataString(Blank), None);
+            Check(page.Status == 503, "?token= of the blank: " + page.Status);
+            Check(page.Header("set-cookie") == null, "no cookie");
+            CronwatchResponse bearer = await Serve(routes, "http://app.test/cronwatch/api/jobs", [H("authorization", "Bearer  " + Blank)]);
+            Check(bearer.Status == 503, "a bearer of the blank: " + bearer.Status);
+        }
+    }
+
+    /// <summary>A token of only whitespace given in code falls back to <c>CRONWATCH_TOKEN</c>.</summary>
+    public static async Task BlankTokenInCode()
+    {
+        await using var cw = Client();
+        Routes routes = cw.Routes(new RoutesOptions { Token = Blank });
+        CronwatchResponse res = await Serve(routes, "http://app.test/cronwatch/api/jobs", [H("authorization", "Bearer from-env")]);
+        Check(res.Status == 200, "the variable's token: " + res.Status);
+    }
+
+    /// <summary>A token that is not blank is used as given, untrimmed.</summary>
+    public static async Task PaddedToken()
+    {
+        await using var cw = Client();
+        Routes routes = cw.Routes();
+        Check(routes.Token() == " padded ", "untrimmed");
+        CronwatchResponse res = await Serve(routes, "http://app.test/cronwatch/?token=%20padded%20", None);
+        Check(res.Status == 303, "signed in: " + res.Status);
+    }
+
+    /// <summary>
+    /// A <c>CRON_SECRET</c> of only whitespace counts as unset, and so does such a secret given to
+    /// the client: a handler answers 503 and reports it once, and <c>/api/check</c> takes the
+    /// token only. A handler's own blank secret falls back to the client's.
+    /// </summary>
+    public static async Task BlankSecret()
+    {
+        foreach (CronSecret? given in new CronSecret?[] { null, Blank })
+        {
+            var wheres = new List<string>();
+            int ran = 0;
+            await using var cw = new CronwatchClient(new CronwatchOptions
+            {
+                CronSecret = given,
+                ProcessExitHook = false,
+                Alerts = [],
+                OnError = (e, where) =>
+                {
+                    lock (wheres)
+                    {
+                        wheres.Add(where);
+                    }
+                },
+            });
+            Handler h = cw.Job("closed").Handler((j, r, ct) =>
+            {
+                ran++;
+                return Task.CompletedTask;
+            });
+            CronwatchResponse res = await h.HandleAsync(new CronwatchRequest("POST", "/") { Headers = [H("authorization", "Bearer  " + Blank)] });
+            Check(res.Status == 503, "503: " + res.Status);
+            Check(res.Text().Contains("CRON_SECRET is not set", StringComparison.Ordinal), res.Text());
+            await h.HandleAsync(new CronwatchRequest("POST", "/"));
+            Check(ran == 0, "ran");
+            Check(wheres.Count == 1 && wheres[0] == "handler", "reported once: " + string.Join(", ", wheres));
+            Routes routes = cw.Routes(new RoutesOptions { Token = "tok" });
+            CronwatchResponse check = await routes.HandleAsync(new CronwatchRequest("POST", "/cronwatch/api/check")
+            {
+                Headers = [H("host", "app.test"), H("authorization", "Bearer   ")],
+            });
+            Check(check.Status == 401, "the check with a blank bearer: " + check.Status);
+        }
+        // Opted out on the client, a handler's blank secret falls back to none, and it runs.
+        await using var open = Client();
+        Handler runs = open.Job("open").Handler((j, r, ct) => Task.CompletedTask, new HandlerOptions { Secret = Blank });
+        Check((await runs.HandleAsync(new CronwatchRequest("POST", "/"))).Status == 200, "runs");
     }
 
     /// <summary>ASP.NET Core's order: <c>ASPNETCORE_ENVIRONMENT</c> (Production here) before <c>DOTNET_ENVIRONMENT</c> (Development).</summary>

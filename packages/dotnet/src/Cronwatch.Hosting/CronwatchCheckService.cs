@@ -6,7 +6,7 @@ using Microsoft.Extensions.Hosting;
 namespace Cronwatch.Hosting;
 
 /// <summary>
-/// The check as a hosted service: the SDK's <c>start()</c>, begun once the host has started (so
+/// The check as a hosted service: the SDK's <c>startChecking()</c>, begun once the host has started (so
 /// no check runs while the app is still starting) and stopped when it stops, before the container
 /// disposes the client.
 /// </summary>
@@ -21,6 +21,9 @@ internal sealed class CronwatchCheckService(CronwatchClient client, CronwatchHos
             return Task.CompletedTask;
         }
         Duration every = options.CheckEvery ?? TimeSpan.FromMinutes(1);
+        // Read now, so a bad interval stops the host: one thrown from the started callback below
+        // is only logged, and the app would run on with no checks at all.
+        _ = every.ToMilliseconds("check interval");
         if (lifetime == null)
         {
             client.StartChecking(every);

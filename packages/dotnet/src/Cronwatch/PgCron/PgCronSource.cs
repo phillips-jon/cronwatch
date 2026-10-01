@@ -611,6 +611,14 @@ public sealed class PgCronSource : ISource
         }
 
         var alerts = new List<Alert>();
+        // The names declared now, after the retires above. A run copied under a retired name that
+        // was then forgotten (the dashboard's forget) has no job to go to: it is let go, never
+        // recorded and never read again.
+        var keep = new HashSet<string>(inUse, StringComparer.Ordinal);
+        foreach (Definition declared in host.DefinedJobs)
+        {
+            keep.Add(declared.Name);
+        }
 
         // Where each job left off. Found from the store the first time, so a restart carries on.
         foreach (long jobId in order)
@@ -666,7 +674,7 @@ public sealed class PgCronSource : ISource
                 {
                     continue;
                 }
-                await RecordAsync(host, names, row, i >= lastFinished, now, alerts, ct).ConfigureAwait(false);
+                await RecordAsync(host, names, keep, row, i >= lastFinished, now, alerts, ct).ConfigureAwait(false);
             }
             _cursors[jobId] = ordered.Count == 0 ? 0 : ordered[^1].RunId;
         }
@@ -693,7 +701,7 @@ public sealed class PgCronSource : ISource
             {
                 PgCronRow row = RowOf(r);
                 open.Remove(row.RunId);
-                await RecordAsync(host, names, row, true, now, alerts, ct).ConfigureAwait(false);
+                await RecordAsync(host, names, keep, row, true, now, alerts, ct).ConfigureAwait(false);
                 // Held or not, the cursor moves on: a held run is read again by its runid.
                 if (names.ContainsKey(row.JobId) && row.RunId > _cursors.GetValueOrDefault(row.JobId, 0))
                 {
@@ -784,15 +792,24 @@ public sealed class PgCronSource : ISource
         return long.TryParse(d.AsSpan(Lead.Length, i - Lead.Length), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id : null;
     }
 
-    /// <summary>Copies one row. A row that cannot be recorded is reported and skipped; it never stops the others.</summary>
-    private async Task RecordAsync(CronwatchClient host, Dictionary<long, string> names, PgCronRow row, bool evaluate, long now, List<Alert> alerts, CancellationToken ct)
+    /// <summary>
+    /// Copies one row. A row that cannot be recorded is reported and skipped; it never stops the
+    /// others. One whose name (the one it was copied under, else its job's) is neither this sync's
+    /// nor declared now, a retired name since forgotten, is let go.
+    /// </summary>
+    private async Task RecordAsync(CronwatchClient host, Dictionary<long, string> names, HashSet<string> keep, PgCronRow row, bool evaluate, long now, List<Alert> alerts, CancellationToken ct)
     {
         long runId = row.RunId;
         long jobId = row.JobId;
         string? name = _pending.TryGetValue(runId, out string? p) ? p : names.GetValueOrDefault(jobId);
-        if (name == null)
+        if (name == null || !keep.Contains(name))
         {
+            _pending.Remove(runId);
             _held.Remove(runId);
+            if (name != null)
+            {
+                _retired.Remove(name);
+            }
             return;
         }
         Run? run;

@@ -282,9 +282,13 @@ internal static class Support
             return Inner.DeleteJobAsync(name, cancellationToken);
         }
 
+        /// <summary>Called as a run's row is written, when set.</summary>
+        public Action<Run>? OnInsert { get; set; }
+
         public Task InsertRunAsync(Run run, CancellationToken cancellationToken = default)
         {
             Check("insertRun");
+            OnInsert?.Invoke(run);
             return Inner.InsertRunAsync(run, cancellationToken);
         }
 
