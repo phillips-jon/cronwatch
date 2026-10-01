@@ -3,6 +3,11 @@
 //! `cronwatch.dev/go/bridge`. An app does not need it; a scheduler
 //! integration of your own can.
 //!
+//! This module is for integration authors and is outside the 1.x promise:
+//! it changes whenever one of the project's own integrations needs
+//! something, in a minor release. Build on it at your own risk, and pin the
+//! release you build against.
+//!
 //! - [`Watch`] declares a scheduler's entries as jobs, one per name, tagged
 //!   with the integration and the app, and declares a job whose entry is
 //!   gone again without its schedule, so it is never reported missed.

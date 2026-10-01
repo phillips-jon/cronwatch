@@ -3,6 +3,11 @@
 //! a tower layer, and apalis-cron given CronWatch's own schedules, so a job
 //! that fails, runs late, never runs, gets stuck or runs slow is reported.
 //!
+//! Unlike the rest of the workspace, this crate stays below 1.0 while apalis
+//! 1.0 is a release candidate: it is left out of 1.0's promise, and a
+//! release of it may change its API to follow a new candidate. It will join
+//! the promise once apalis 1.0 is final.
+//!
 //! ```no_run
 //! use apalis_core::worker::builder::WorkerBuilder;
 //! use apalis_cron::Tick;
