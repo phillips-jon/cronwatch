@@ -15,7 +15,9 @@ answered with how it went:
 
 The caller must send ``Authorization: Bearer <secret>``. The secret is the
 handler's ``secret=``, else the client's cron_secret (which defaults to
-$CRON_SECRET, what Vercel sends its cron requests with); "" counts as unset.
+$CRON_SECRET, what Vercel sends its cron requests with); "" or a string of
+only whitespace counts as unset, and anything but a string or None raises
+TypeError.
 With no secret at all the handler answers 503 unless the environment is
 development or test (see cronwatch._env), and reports it once to on_error as
 "handler". ``secret=None`` lets anyone run the job.
@@ -68,7 +70,9 @@ def make_handler(client: Cronwatch, definition: JobDefinition, fn: Callable[...,
 
     if not callable(fn):
         raise TypeError(f"job {definition.name}: handler() takes a function of (ctx, request)")
-    own = None if secret is None else ("" if secret is _UNSET else str(secret))
+    # A blank secret falls back to the client's; one that is not a string raises.
+    given = _env.secret_option(secret, "handler: secret", _UNSET)
+    own = None if given is None else ("" if given is _UNSET else str(given))
     kind = AsyncHandler if is_async_callable(fn) else Handler
     return kind(client, definition, fn, own)
 

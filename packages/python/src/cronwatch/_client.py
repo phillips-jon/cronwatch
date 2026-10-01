@@ -24,7 +24,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
 
-from . import _js, _zone
+from . import _env, _js, _zone
 from ._env import is_production
 from ._response import response_status
 from .alerts import ChannelContext, Console, _channel_name, _send_to
@@ -557,7 +557,8 @@ class Cronwatch:
     sources:  where runs this process does not wrap come from. Each is synced at the start of every
               check(); one that raises is reported to on_error and the check carries on.
     cron_secret: the secret an outside cron must present to the check endpoint of the web dashboard
-              (routes()). Defaults to $CRON_SECRET; "" counts as unset; None for none.
+              (routes()). Defaults to $CRON_SECRET; "" or only whitespace, given or in the variable, counts as
+              unset; None for none. Anything else (False, a number) raises TypeError.
     retention: how long finished runs are kept. Default "30d".
     defaults: grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
     redact:   applied to every run's output and error before it is stored, shown or sent. The default
@@ -594,8 +595,10 @@ class Cronwatch:
         for source in self.sources:
             if not callable(getattr(source, "sync", None)):
                 raise TypeError("a source must have sync(host)")
-        secret = os.environ.get("CRON_SECRET") if cron_secret is _UNSET else cron_secret
-        self.cron_secret: str | None = str(secret) if secret else None
+        # A blank secret, given or read, counts as unset; one given that is not a string raises.
+        given = _env.secret_option(cron_secret, "cron_secret", _UNSET)
+        secret = _env.read_secret_env("CRON_SECRET") if cron_secret is _UNSET else given
+        self.cron_secret: str | None = secret if isinstance(secret, str) else None
         #: cron_secret was passed as None: handlers may run without a secret.
         self._secret_opt_out = cron_secret is None
         self._warned_no_secret = False

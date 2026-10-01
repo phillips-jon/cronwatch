@@ -14,7 +14,7 @@ from collections.abc import Callable
 
 from . import _js
 
-__all__ = ["environment", "is_development", "is_production", "set_fallback"]
+__all__ = ["environment", "is_development", "is_production", "read_secret_env", "secret_option", "set_fallback"]
 
 _VARIABLES = ("CRONWATCH_ENV", "APP_ENV", "ENVIRONMENT")
 _ALIASES = {"prod": "production", "dev": "development", "local": "development", "test": "development", "testing": "development"}
@@ -45,6 +45,33 @@ def environment() -> str | None:
         except Exception:
             return None
     return None
+
+
+def _blank(value: str) -> bool:
+    """Empty, or only whitespace as JavaScript's String.prototype.trim sees it
+    (not str.strip(), which also strips U+001C to U+001F and U+0085 and keeps U+FEFF)."""
+    return _js.trim(value) == ""
+
+
+def read_secret_env(name: str) -> str | None:
+    """A secret from the environment (CRONWATCH_TOKEN, CRON_SECRET): None when
+    the variable is unset, empty or only whitespace, so a blank value counts as
+    not set and the routes and handlers fail closed. Any other value is used
+    as it is, untrimmed."""
+    value = os.environ.get(name)
+    return None if value is None or _blank(value) else value
+
+
+def secret_option(value: object, what: str, unset: object) -> object:
+    """A token or secret passed in code: a str, None (the opt-out) or `unset`
+    (not given). A str that is empty or only whitespace counts as not given
+    (`unset` comes back). Anything else (False, a number, bytes) raises a
+    TypeError naming the option, so it never becomes a password."""
+    if value is unset or value is None:
+        return value
+    if not isinstance(value, str):
+        raise TypeError(f"{what} must be a string, or None to opt out, not {type(value).__name__}")
+    return unset if _blank(value) else value
 
 
 def is_production() -> bool:

@@ -160,7 +160,7 @@ application = cw.routes()
 
 `cw.routes(token=..., base_path=..., origin=..., trust_proxy=False)`:
 
-- `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. `None` opts out and serves the routes open, for a mount behind your own auth.
+- `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string or one of only whitespace, given here or in the variable, counts as unset, and anything but a string or `None` (`False`, a number) raises `TypeError`. `None` opts out and serves the routes open, for a mount behind your own auth.
 
   Without a token, in development, the routes make a token of their own and print a sign-in link to standard output on the first request. Anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that holds more than spaces (where the SDK reads `NODE_ENV` third), trimmed and lowercased; `development`, `dev`, `local`, `test` and `testing` count as development, and `production` and `prod` as production, as in every CronWatch library.
 
@@ -418,7 +418,7 @@ A triage of your own is any function that takes the context (`alert`, `recent_ru
 | `alerts` | console | a list of channels. `[]` sends nothing |
 | `triage` | | a function returning a diagnosis |
 | `sources` | | where runs this process does not wrap come from, such as [pg_cron](#pg-cron). Each is synced at the start of every check; one that raises is reported to `on_error` and the check carries on |
-| `cron_secret` | `$CRON_SECRET` | the bearer the dashboard's check endpoint accepts beside the token. `""` counts as unset; `None` means none on purpose |
+| `cron_secret` | `$CRON_SECRET` | the bearer the dashboard's check endpoint accepts beside the token. `""` or only whitespace, given here or in the variable, counts as unset; `None` means none on purpose; anything else (`False`, a number) raises `TypeError` |
 | `retention` | `"30d"` | how long finished runs are kept. Each job's newest run is always kept |
 | `defaults` | | `grace`, `timeout`, `timezone`, `failures_before_alert` applied to every job that does not set its own |
 | `redact` | secret patterns | a function applied to output and errors; `False` keeps them as logged. See [Redaction](#redaction) |
