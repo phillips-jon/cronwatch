@@ -123,10 +123,10 @@ class ScheduleConformanceTest {
     }
 
     failures.check("schedule");
-    assertEquals(62, parse.size(), "parse cases");
-    assertEquals(64, fires.size(), "fires cases");
+    assertEquals(75, parse.size(), "parse cases");
+    assertEquals(70, fires.size(), "fires cases");
     assertEquals(4, nextFire.size(), "nextFire cases");
-    assertEquals(572, expectation.size(), "expectation cases");
+    assertEquals(575, expectation.size(), "expectation cases");
     assertEquals(13, runCovers.size(), "runCovers cases");
     assertEquals(8, autumn.size(), "autumn cases");
     DurationConformanceTest.known(

@@ -98,7 +98,7 @@ class CronTest {
       },
       // Croner takes this for a one-time date; the port refuses it (see Cron).
       {"0 12:30 * * *", "Invalid ISO8601 passed to timezone parser."},
-      {"2026-12-01T00:00:00", "CronPattern: a one-time date is not supported by the Java port"},
+      {"2026-12-01T00:00:00", "CronPattern: a one-time date is not supported"},
     };
     for (String[] c : cases) {
       CronException e =

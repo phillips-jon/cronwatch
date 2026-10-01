@@ -342,7 +342,7 @@ Maven Central has no trusted publishing: the Central Publisher Portal authentica
 
 What is known before any code, mostly shared with the Go, Rust and Elixir ports; phase 5 completes the list.
 
-- The croner port answers that a schedule naming a date no month has (`0 0 30 2 *`) never fires, where croner runs out of stack; a one-time date string is refused (`CronPattern: a one-time date is not supported by the Java port`); a bad zone is refused when the expression is read rather than when a fire time is asked for. These are the other ports' answers, for the same reasons.
+- A bad zone is refused when the expression is read rather than when a fire time is asked for. (A schedule naming a date no month has, `0 0 30 2 *`, never fires, and a one-time date string is refused with `CronPattern: a one-time date is not supported`: since 1.0 these are the SDK's own answers, not departures from it.)
 - Zones come from the JDK's copy of the IANA database, which is as new as the JDK's last update, where Node's comes with its ICU; a zone that changed its rules recently can differ until the JVM is updated. Without a `timezone`, a cron is read in `ZoneId.systemDefault()`.
 - Error names are Java's simple class names and frames are Java's (`com.example.Reports.build (Reports.java:42)`), not JavaScript's classes; a cause is not written.
 - Java cannot stop a running function; `interruptAtTimeout()` asks it to stop, and a function that ignores interrupts runs on and is marked stuck by a check, as in the SDK. A run open when the JVM stops is recorded failed by the shutdown hook, where the SDK records nothing; a JVM killed outright records nothing, as a killed Node process does.
