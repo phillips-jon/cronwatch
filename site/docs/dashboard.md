@@ -220,6 +220,36 @@ interface Run {
   error: string | null;
   output: string | null;          // capped at 16 KB, tail kept
   metrics: Record<string, number>;
-  trigger: string;                // "handler", "run", or what you passed
+  trigger: string;                // "run", "start", "handler", an integration's name, or what you passed
 }
 ```
+
+### Triggers, tags and job names
+
+A run's `trigger` says what started it, and a job's `tags` say where it came from. Both are stored with every run and job, shown on the dashboard and filtered on, so their spellings are part of the stored data and do not change within a major release.
+
+The library's own triggers are `run` (`job.run()`, and each port's decorator or wrapper), `start` (`job.start()`) and `handler` (a job's HTTP handler). An integration that starts runs uses its own name as the trigger, and the integrations that declare jobs tag them with the same name, most adding `<name>:<app>` as well, which tells one app's jobs from another's in a shared store. Integration names are lowercase words joined by hyphens, with one exception: `pg_cron`, the Postgres extension's own name.
+
+| Integration | Trigger | Tags |
+|---|---|---|
+| pg_cron source (every language) | `pg_cron` | `pg_cron` |
+| Rails ActiveJob, Solid Queue, sidekiq-cron | `active-job` | |
+| Sidekiq | `sidekiq` | |
+| Celery, APScheduler | `celery`, `apscheduler` | |
+| Laravel scheduler | `laravel-scheduler` | `laravel-scheduler`, `laravel-scheduler:<app>` |
+| Laravel queue | `laravel-queue` | `laravel-queue` |
+| Symfony Scheduler | `symfony-scheduler` | `symfony-scheduler`, `symfony-scheduler:<app>` |
+| Symfony Messenger | `symfony-messenger` | `symfony-messenger` |
+| WordPress | `wp-cron` | `wp-cron` |
+| Drupal cron, Drupal queues | `drupal-cron`, `drupal-queue` | the same, and each with `:<site>` |
+| Craft CMS queue, console commands | `craft-queue`, `craft-command` | the same; jobs declared in config also `craft-config`, `craft-config:<app>` |
+| robfig/cron, gocron, River, Asynq | `robfig-cron`, `gocron`, `river`, `asynq` | the same, and each with `:<app>` |
+| tokio-cron-scheduler, apalis | `tokio-cron-scheduler`, `apalis` | the same, and each with `:<app>` |
+| Oban, Quantum | `oban`, `quantum` | the same, and each with `:<app>` |
+| Spring `@Scheduled`, Quartz, JobRunr | `spring-scheduled`, `quartz`, `jobrunr` | the same, and each with `:<app>` |
+| Hangfire, Quartz.NET | `hangfire`, `quartz` | the same, and each with `:<app>` |
+| .NET `AddCronwatchJob` | `hosting` | |
+
+Releases before 1.0 wrote a few triggers differently: `active_job`, Laravel's `schedule` and `queue`, Symfony's `scheduler` and `messenger`, Drupal's `cron` and `queue`, Craft's `queue` and `command`, Spring's `scheduled` and .NET's `schedule`. Runs recorded then keep the trigger they were given, which is only a label; every 1.x release reads either spelling where it reads one back, so a filter on the trigger should look for both until those runs age out.
+
+Job names are the app's own, or the scheduler's, as they are. An integration adds a prefix only where the platform's names would otherwise collide with the app's: WordPress hooks become `wp:<hook>`, Drupal's jobs `drupal:<module>` (and `drupal:cron`, `drupal:queue:<id>`), Craft's console commands `craft:<command>`, and a pg_cron job with no name `pg_cron:<jobid>`. Every other integration uses the scheduler's own name for the job. A job's name is its identity in the store, so these never change: renaming one would leave its history behind under the old name.

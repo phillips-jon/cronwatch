@@ -85,7 +85,10 @@ export interface Run {
   /** Lines written with job.log(), or the string the job returned. Capped at 16 KB. */
   output: string | null;
   metrics: Record<string, number>;
-  /** What started the run: "handler", "run" or a value you pass. */
+  /**
+   * What started the run: "run", "start", "handler", an integration's name
+   * ("pg_cron" for the pg_cron source) or a value you pass.
+   */
   trigger: string;
 }
 
