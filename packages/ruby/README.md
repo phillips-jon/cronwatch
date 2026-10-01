@@ -50,7 +50,7 @@ end
 CW.start_checking # checks for missed and stuck runs every minute, in a background thread
 ```
 
-`run` returns what the block returns and raises what it raises, after the run is recorded. A script run from crontab exits when it is done, so instead of `start`, add a second crontab line that declares the jobs and calls `CW.check` every five minutes.
+`run` returns what the block returns and raises what it raises, after the run is recorded. A script run from crontab exits when it is done, so instead of `start_checking`, add a second crontab line that declares the jobs and calls `CW.check` every five minutes.
 
 A run that starts in one call and ends in another (a job that hands work to a queue, a webhook that reports back later) is one run too:
 
@@ -64,7 +64,7 @@ run.finish                          # or run.fail(error); finish("text") and fin
 
 Neither raises for the store: failures go to `on_error`, and a finish of a run already finished, not found, or of another job records nothing and returns nil. A run is judged once, however many processes finish it at once, and a store that fails during `finish` leaves the handle active to finish again. A run never finished is marked stuck after the job's `timeout`.
 
-Client options: `store`, `alerts`, `triage`, `cron_secret`, `retention` (default `"30d"`), `defaults`, `sources` (where runs the process does not wrap come from, such as pg_cron), `redact` (default: blank values that look like secrets; `false` keeps output as logged, or pass a callable), `deliver` (`:now` by default; `:check` queues alerts for another process's check to send, for a worker that cannot reach Slack), `on_error` and `now`. Methods: `job`, `run`, `resume_run`, `record_run`, `check`, `start`/`stop`, `silence(name, for: "2h")`/`unsilence`, `forget`, `jobs`, `jobs_with_runs`, `job_summary`, `runs`, `get_run`, `defined_jobs`, `close`. [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/#api) has each one.
+Client options: `store`, `alerts`, `triage`, `cron_secret`, `retention` (default `"30d"`), `defaults`, `sources` (where runs the process does not wrap come from, such as pg_cron), `redact` (default: blank values that look like secrets; `false` keeps output as logged, or pass a callable), `deliver` (`:now` by default; `:check` queues alerts for another process's check to send, for a worker that cannot reach Slack), `on_error` and `now`. Methods: `job`, `run`, `resume_run`, `record_run`, `check`, `start_checking`/`stop`, `silence(name, for: "2h")`/`unsilence`, `forget`, `jobs`, `jobs_with_runs`, `job_summary`, `runs`, `get_run`, `defined_jobs`, `close`. [cronwatch.dev/docs/ruby](https://cronwatch.dev/docs/ruby/#api) has each one.
 
 ## Rails
 

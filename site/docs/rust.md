@@ -162,7 +162,7 @@ backup.run(|run| {
 })?;
 ```
 
-`blocking::Client::with_async(|| async { .. })` makes the builder on the client's runtime, for a store that needs a runtime to be made (a sqlx pool). The blocking client has the async client's methods without `.await` (`check`, `jobs`, `silence`, `start`, `close` and the rest); `as_async()` is the async client inside, for what the blocking client does not carry, such as the dashboard's `routes`. It works inside another runtime too, blocking one of its threads, which is best avoided: there, use the async client.
+`blocking::Client::with_async(|| async { .. })` makes the builder on the client's runtime, for a store that needs a runtime to be made (a sqlx pool). The blocking client has the async client's methods without `.await` (`check`, `jobs`, `silence`, `start_checking`, `close` and the rest); `as_async()` is the async client inside, for what the blocking client does not carry, such as the dashboard's `routes`. It works inside another runtime too, blocking one of its threads, which is best avoided: there, use the async client.
 
 ## The dashboard
 

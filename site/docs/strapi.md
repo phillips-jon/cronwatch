@@ -76,7 +76,7 @@ import { cw } from "./cronwatch";
 export default {
   register() {},
   bootstrap() {
-    cw.start("1m");
+    cw.startChecking("1m");
   },
   async destroy() {
     await cw.close();

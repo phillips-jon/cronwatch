@@ -57,7 +57,7 @@ export const { GET, POST, DELETE } = cw.routes();
 await nightlyReport.run(async (job) => { /* ... */ });
 
 // Missed and stuck runs are found by the check: on an interval, or a cron hitting /cronwatch/api/check
-cw.start();
+cw.startChecking();
 ```
 
 ## What it catches

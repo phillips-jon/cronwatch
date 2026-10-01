@@ -79,9 +79,9 @@ CW.start_checking   # every minute; CW.start_checking("5m") to change it
 at_exit { CW.stop }
 ```
 
-Calling `start` again while it runs does nothing; a different interval is reported to `on_error` and ignored, so call `stop` first to change it. The thread does not survive a fork: in a forking server (Puma with `preload_app!`, Unicorn), call `start` in each worker (`on_worker_boot`). A forked child gets fresh locks and no check in flight, so `start` and `check` work there.
+Calling `start_checking` again while it runs does nothing; a different interval is reported to `on_error` and ignored, so call `stop` first to change it. The thread does not survive a fork: in a forking server (Puma with `preload_app!`, Unicorn), call `start_checking` in each worker (`on_worker_boot`). A forked child gets fresh locks and no check in flight, so `start_checking` and `check` work there.
 
-Run one checker per store: one process with `start`, or one scheduled check, not one per process. Two checkers on one database can each send the same alert.
+Run one checker per store: one process with `start_checking`, or one scheduled check, not one per process. Two checkers on one database can each send the same alert.
 
 A script run from crontab exits when it is done, so nothing inside it notices the run that never happened. Add a second crontab line that checks:
 
@@ -263,7 +263,7 @@ A job can run somewhere that cannot reach Slack or a mail relay: a sandboxed bac
 RECORDER = Cronwatch.new(store: Cronwatch::Stores::ActiveRecord.new, deliver: :check)
 ```
 
-It still records every run and evaluates it, but instead of sending an alert it queues it with the job's state. The next check in a process that sends normally (a `start` thread, `Cronwatch::CheckJob`, or whatever calls the check endpoint) delivers it, adds triage if that process has it, and marks it sent. Both processes must use the same store. Calling `start` in the recording process is allowed but sends nothing, so it warns once on standard error. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send).
+It still records every run and evaluates it, but instead of sending an alert it queues it with the job's state. The next check in a process that sends normally (a `start_checking` thread, `Cronwatch::CheckJob`, or whatever calls the check endpoint) delivers it, adds triage if that process has it, and marks it sent. Both processes must use the same store. Calling `start_checking` in the recording process is allowed but sends nothing, so it warns once on standard error. See [processes that cannot send](/docs/alerts/#processes-that-cannot-send).
 
 An alert no channel accepted waits in the same queue, and each check tries it once more. A queued alert that no longer describes the job is dropped instead of sent late: one whose condition has closed since, or closed and opened again, and a recovery once any condition it names is open again. One check spends at most 20 seconds of retries across all jobs, and whatever is left waits for the next check. More than twenty queued alerts for one job drops the oldest and says so through `on_error` (`"alert queue for <job>"`).
 
@@ -299,7 +299,7 @@ How runs are copied, case by case:
 - A run pg_cron has queued but not started: waited for, up to ten minutes, then copied as running from when it was first seen, so one that never starts is marked stuck. It never holds up the runs after it, which are read by their ids until it starts.
 - A run a server restart cut off (`failed`, `server restarted`, with no `start_time`): a failure starting at its `end_time`, else at the job's newest run before it.
 - A run a check marked stuck: still read, and when pg_cron finishes it the finish is recorded. A success closes stuck with a recovery; a failure is not counted twice.
-- A job renamed, unscheduled or no longer picked by `jobs`: it keeps its old name's runs, and that name is declared again without a schedule, so it is never reported missed again (if it was missed, the check closes missed with a recovered alert saying it is no longer scheduled, `reason: :unscheduled`), its description saying why (`renamed to <new name>`, `no longer watched`, `no longer in cron.job`). Runs it had open are still finished under the old name. A process that starts after the change notices it too, once, from the job id in the stored description.
+- A job renamed, unscheduled or no longer picked by `jobs`: it keeps its old name's runs, and that name is declared again without a schedule, so it is never reported missed again (if it was missed, the check closes missed with a recovered alert saying it is no longer scheduled, `reason: :unscheduled`), its description saying why (`renamed to <new name>`, `no longer watched`, `no longer in cron.job`). Runs it had open are still finished under the old name, unless the old name is forgotten first, which lets them go. A process that starts after the change notices it too, once, from the job id in the stored description.
 - A setting the role may not read: the settings come from `pg_settings`, which simply has no row for one, so a check inside the app's transaction never aborts it. `cron.timezone` is then taken as UTC and `cron.log_run` as on.
 
 It warns once through `on_error` when it cannot read `cron.timezone`, when `cron.log_run` is off, and when `cron.job` shows no jobs (row level security shows a role only the jobs it scheduled). Roles, Supabase and purging are covered in [Supabase and pg_cron](/docs/supabase/).
