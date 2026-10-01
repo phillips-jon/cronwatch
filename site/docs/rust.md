@@ -316,7 +316,14 @@ The options are the SDK's in Rust's case: `subject_prefix` and `link` in `EmailO
 
 Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the crate's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request names only the URL's origin, never its path, with the channel's keys cut out. Every options struct takes a `transport`: `ReqwestTransport::with_client(client)` wraps a `reqwest::Client` of your own (a proxy, a custom root; build it with `redirect::Policy::none()`), or implement `Transport` for a test. The default transport honours `HTTP_PROXY` and `HTTPS_PROXY`, as reqwest does. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
-A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`. `alerts::signature(secret, body)` is that hex, for a receiver in Rust; compare it in constant time.
+The webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same fields every CronWatch library sends, described by its [JSON Schema](/schemas/webhook/1.json). Parse the fields (`type`, `details`), not `title` and `message`, whose wording is not promised. With a `secret` it signs the body with `X-CronWatch-Signature: sha256=<hex>`. `alerts::signature(secret, body)` is that hex, for a receiver in Rust; hash the raw body as it arrived and compare in constant time:
+
+```rust
+let expected = format!("sha256={}", cronwatch::alerts::signature(&secret, &raw_body));
+let received = headers.get("x-cronwatch-signature").and_then(|v| v.to_str().ok()).unwrap_or("");
+let ok = expected.len() == received.len()
+    && expected.bytes().zip(received.bytes()).fold(0u8, |diff, (a, b)| diff | (a ^ b)) == 0;
+```
 
 ### Processes that cannot send
 

@@ -286,6 +286,34 @@ async fn conformance_channels() {
         }
     }
 
+    // The webhook's body in full for every alert, `{"schema":1,` first, and
+    // the signature its secret gives it, through the channel and through
+    // `signature` as a receiver would call it.
+    for c in objects(&f, "webhookPayloads") {
+        let what = format!("webhook payload {}", text(c, "alert"));
+        let secret = text(c, "secret");
+        let o = Object::new().with("url", "https://hooks.example.com/in").with("secret", secret);
+        let ch = build("webhook", &o, transport.clone());
+        rec.answer_with(200, "");
+        if let Err(e) = ch.send(&alerts[text(c, "alert")], &cx).await {
+            failures.push(format!("{what}: {e}"));
+            continue;
+        }
+        let got = rec.taken();
+        let body = String::from_utf8_lossy(&got[0].body).to_string();
+        if body != text(c, "body") {
+            failures.push(format!("{what}:\n  got  {body}\n  want {}", text(c, "body")));
+        }
+        let header = got[0].headers.iter().find(|(n, _)| n == "x-cronwatch-signature").map(|(_, v)| v.as_str());
+        if header != Some(text(c, "signature")) {
+            failures.push(format!("{what}: signature {header:?}, want {}", text(c, "signature")));
+        }
+        if format!("sha256={}", signature(secret, text(c, "body"))) != text(c, "signature") {
+            failures.push(format!("{what}: signature() differs"));
+        }
+        count += 1;
+    }
+
     for key in ["failures", "providerFailures"] {
         for c in objects(&f, key) {
             let o = field(c, "options").as_object().unwrap();
@@ -428,7 +456,7 @@ async fn conformance_channels() {
     assert!(failures.is_empty(), "channels.json: {} cases differ:\n{}", failures.len(), failures.join("\n"));
     // Every case of the fixture, so a case added there is not skipped here.
     let total =
-        ["sends", "providerSends", "failures", "providerFailures"].iter().map(|k| objects(&f, k).len()).sum::<usize>()
+        ["sends", "providerSends", "webhookPayloads", "failures", "providerFailures"].iter().map(|k| objects(&f, k).len()).sum::<usize>()
             + objects(partial, "cases").len()
             + ["errorBodies", "subjects", "smsSegments", "smsBodies", "discordDescriptions"]
                 .iter()

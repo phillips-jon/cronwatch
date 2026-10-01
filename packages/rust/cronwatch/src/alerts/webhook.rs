@@ -29,9 +29,10 @@ pub struct WebhookOptions {
 
 struct Webhook(WebhookOptions);
 
-/// Posts each alert as JSON to any URL. The body is the [`Alert`] as the SDK
-/// writes it (`Alert::to_json`). A redirect is an error: point the URL at
-/// where the receiver really is.
+/// Posts each alert as JSON to any URL. The body is `{"schema":1,` and then
+/// the [`Alert`]'s own fields as the SDK writes them (`Alert::to_json`): the
+/// payload <https://cronwatch.dev/schemas/webhook/1.json> describes. A
+/// redirect is an error: point the URL at where the receiver really is.
 pub fn webhook(options: WebhookOptions) -> Result<Arc<dyn Channel>, Error> {
     if options.url.is_empty() {
         return Err(invalid("alerts::webhook needs a url"));
@@ -44,6 +45,21 @@ pub fn webhook(options: WebhookOptions) -> Result<Arc<dyn Channel>, Error> {
 /// `x-cronwatch-signature: sha256=<signature>`.
 pub fn signature(secret: &str, body: &str) -> String {
     hex(&hmac_sha256(secret.as_bytes(), body))
+}
+
+/// The payload's version, sent as its first field. It goes up only if a
+/// major release changes the payload in a way that is not additive.
+const SCHEMA: i64 = 1;
+
+/// The body the webhook posts: the SDK's `{ schema: 1, ...alert }`.
+pub(crate) fn payload(alert: &Alert) -> String {
+    let mut o = js::Object::new().with("schema", SCHEMA);
+    if let js::Value::Object(fields) = alert.to_value() {
+        for (k, v) in fields.iter() {
+            o.set(k, v.clone());
+        }
+    }
+    o.to_json()
 }
 
 /// Sets a header as a JavaScript object's key is set: an exact name already
@@ -63,7 +79,7 @@ impl Channel for Webhook {
     fn send<'a>(&'a self, alert: &'a Alert, _: &'a ChannelContext) -> BoxFuture<'a, Result<(), BoxError>> {
         Box::pin(async move {
             let o = &self.0;
-            let body = alert.to_json();
+            let body = payload(alert);
             let mut headers = vec![
                 ("content-type".to_string(), "application/json".to_string()),
                 ("user-agent".into(), "cronwatch".into()),
