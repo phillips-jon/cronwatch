@@ -183,6 +183,7 @@ ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta propert
 <link rel="stylesheet" href="${assets.css}">
 <script src="${assets.js}" defer></script>
 <script src="${assets.search}" data-index="${assets.index}" defer></script>
+<script defer src="https://t.cronwatch.dev/script.js" data-website-id="4a5d2570-de1e-4c31-b2ad-18a5107ac7f5"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -729,9 +730,10 @@ function build() {
     return { name, route, meta, html: curlyApostrophes(markdown(body)), order: Number(meta.order ?? 999) };
   }).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 
-  // The docs search index is a script, not JSON: the CSP's connect-src is
-  // 'none', so search.js cannot fetch it, but script-src 'self' lets it add
-  // a script tag the first time the search opens.
+  // The docs search index is a script, not JSON: the CSP's connect-src
+  // allows only the analytics host, so search.js cannot fetch it, but
+  // script-src 'self' lets it add a script tag the first time the search
+  // opens.
   const index = `window.cronwatchSearch=${JSON.stringify(searchIndex(pages))};\n`;
   assets.index = `/assets/search-index.${hash(index)}.js`;
   writeFileSync(path.join(DIST, assets.index), index);
