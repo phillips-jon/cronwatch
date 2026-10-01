@@ -34,11 +34,17 @@ final class EmbeddedDashboard
      * The dashboard's request for the page at `path` (the host's `cw`
      * parameter), from the request the host is answering: its method,
      * headers, body and origin, and its query without the host's own keys.
+     * The Authorization header is left out: the host's sign-in and
+     * permissions stand in front of the dashboard, which is open, so a
+     * bearer the caller sends is not the dashboard's, and must not let a GET
+     * run the check (a GET of /api/check runs it only with a bearer).
      *
      * @param list<string> $reserved the query keys the host uses (the path's, a CSRF token's)
      */
     public static function request(Request $request, string $path, array $reserved): Request
     {
+        $headers = $request->headers;
+        unset($headers['authorization']);
         if (!str_starts_with($path, '/')) {
             $path = '/' . $path;
         }
@@ -53,7 +59,7 @@ final class EmbeddedDashboard
             $request->method,
             Request::normalizePath(self::MARKER . explode('?', $path, 2)[0]),
             implode('&', $query),
-            $request->headers,
+            $headers,
             static fn (): string => $request->body(),
             $request->origin,
             null,

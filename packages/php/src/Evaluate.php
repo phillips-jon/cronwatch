@@ -101,9 +101,17 @@ final class Evaluate
      * A stored state with every field present, or a fresh one. State written
      * by an older version lacks the newer fields. `sending` is the exception:
      * it is there only while it holds an alert (see holdAlerts).
+     *
+     * Read leniently, since a foreign, hand-edited or damaged row must affect
+     * only its own job, and the next write puts it right: a state that is not
+     * an object (a decoded 5, "x" or [], or null) reads as none; the fields
+     * inside are read as JobState::fromJson() reads them.
      */
-    public static function normalizeState(?JobState $state, string $job): JobState
+    public static function normalizeState(mixed $state, string $job): JobState
     {
+        if (!$state instanceof JobState) {
+            $state = JobState::fromStored($state);
+        }
         if ($state === null) {
             return self::emptyState($job);
         }
@@ -631,18 +639,28 @@ final class Evaluate
      * once that condition has closed, or has closed and opened again (it
      * opened at a time other than the alert's). A recovery is stale when any
      * condition it names is open again; while they all stay closed it is kept.
+     * From a foreign or damaged row: an alert whose `at` is not a number, and
+     * a recovery whose `details.after` is not a list of strings, are stale.
      */
     public static function staleAlert(Alert $alert, JobState $state): bool
     {
         if ($alert->type === AlertType::RECOVERED) {
-            foreach ($alert->details['after'] ?? [] as $condition) {
-                if (array_key_exists((string) $condition, $state->open)) {
+            // One whose details say nothing of what it recovers from (a foreign or damaged row's) cannot be judged, and goes.
+            $details = $alert->storedField('details');
+            $after = $details instanceof \stdClass || is_array($details) ? (Js::fields($details)['after'] ?? null) : null;
+            if (!is_array($after) || !array_is_list($after)) {
+                return true;
+            }
+            foreach ($after as $condition) {
+                if (!is_string($condition) || array_key_exists($condition, $state->open)) {
                     return true;
                 }
             }
             return false;
         }
-        return !array_key_exists($alert->type, $state->open) || $state->open[$alert->type] != $alert->at;
+        // One with no time (a foreign or damaged row's) cannot match an open condition.
+        $at = $alert->storedField('at');
+        return !Js::isNumber($at) || !array_key_exists($alert->type, $state->open) || $state->open[$alert->type] != $at;
     }
 
     /** How a job looks at a glance. Silence wins, then stuck, failing and late. */

@@ -447,6 +447,71 @@ final class WebTest extends TestCase
         }
     }
 
+    /** A CRONWATCH_TOKEN or token of only whitespace counts as unset, so the routes stay locked (routes-security.test.ts). */
+    public function testATokenOfOnlyWhitespaceCountsAsUnsetSoTheRoutesStayLocked(): void
+    {
+        putenv('CRONWATCH_ENV=production');
+        foreach (['', ' ', '  ', "\t", " \n  \u{FEFF} ", "\u{A0}", "\u{2003}"] as $blank) {
+            $label = json_encode($blank);
+            putenv("CRONWATCH_TOKEN={$blank}");
+            foreach ([FromEnv::Read, $blank] as $given) {
+                $web = $this->routes($this->client(), $given);
+                $this->assertNull($web->token(), $label);
+                $this->assertSame(503, self::send($web, 'GET', '/cronwatch/api/jobs')->status, $label);
+                $page = self::send($web, 'GET', '/cronwatch/?token=' . rawurlencode($blank));
+                $this->assertSame(503, $page->status, $label);
+                $this->assertNull($page->header('set-cookie'), $label);
+                $this->assertSame(503, self::send($web, 'GET', '/cronwatch/api/jobs', ['authorization' => 'Bearer  '])->status, $label);
+            }
+        }
+        // A blank token in code falls back to the variable.
+        putenv('CRONWATCH_TOKEN=from-env');
+        $this->assertSame(200, self::send($this->routes($this->client(), "  \t"), 'GET', '/cronwatch/api/jobs', ['authorization' => 'Bearer from-env'])->status);
+        // A token that is more than whitespace is used untrimmed.
+        putenv('CRONWATCH_TOKEN= padded ');
+        $web = $this->routes($this->client());
+        $this->assertSame(' padded ', $web->token());
+        $this->assertSame(303, self::send($web, 'GET', '/cronwatch/?token=%20padded%20')->status);
+    }
+
+    /**
+     * The words Laravel's env() reads as null, true, false or empty count as
+     * unset in CRONWATCH_TOKEN, so `CRONWATCH_TOKEN=null` in a .env file is
+     * not the password "null" (Laravel hands the config null and the
+     * variable keeps the word).
+     */
+    public function testATokenThatLaravelReadsAsNullTrueFalseOrEmptyCountsAsUnset(): void
+    {
+        putenv('CRONWATCH_ENV=production');
+        foreach (['null', '(null)', 'NULL', 'true', '(true)', 'false', '(false)', 'empty', '(empty)'] as $word) {
+            putenv("CRONWATCH_TOKEN={$word}");
+            $web = $this->routes($this->client());
+            $this->assertNull($web->token(), $word);
+            $this->assertSame(503, self::send($web, 'GET', '/cronwatch/api/jobs', ['authorization' => "Bearer {$word}"])->status, $word);
+        }
+        putenv('CRONWATCH_TOKEN');
+        $_SERVER['CRONWATCH_TOKEN'] = 'null';
+        $this->assertNull($this->routes($this->client())->token(), 'nor from $_SERVER');
+        unset($_SERVER['CRONWATCH_TOKEN']);
+        // Given in code, the word is the token: only the environment is read Laravel's way.
+        $this->assertSame('null', $this->routes($this->client(), 'null')->token());
+    }
+
+    /** A token given in code that is not a string, null or false throws (routes-security.test.ts). */
+    public function testATokenGivenInCodeThatIsNotAStringOrNullThrows(): void
+    {
+        foreach ([[true, 'boolean'], [5, 'number'], [1.5, 'number'], [['tok'], 'an array'], [new \stdClass(), 'object']] as [$value, $type]) {
+            foreach ([fn () => $this->client()->routes(token: $value), fn () => new Dashboard($this->client(), $value)] as $make) {
+                try {
+                    $make();
+                    $this->fail("token: {$type} was accepted");
+                } catch (\TypeError $error) {
+                    $this->assertSame("routes: token must be a string, or null to opt out, not {$type}", $error->getMessage());
+                }
+            }
+        }
+    }
+
     public function testAnEmptyTokenCountsAsUnsetNullOptsOutExplicitly(): void
     {
         putenv('CRONWATCH_ENV=production');
@@ -1034,11 +1099,59 @@ final class WebTest extends TestCase
         [, $web] = $this->app('tok', '/ops/cron');
         $page = self::send($web, 'GET', '/ops/cron/jobs/x');
         $this->assertSame(401, $page->status);
-        $this->assertMatchesRegularExpression('#<form class="signin" method="get" action="/ops/cron/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password"[^>]*required><button class="primary" type="submit">Sign in</button></form>#', $page->body);
+        // It posts the token in the body, so the token never sits in a URL or an access log.
+        $this->assertMatchesRegularExpression('#<form class="signin" method="post" action="/ops/cron/signin"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password"[^>]*required><button class="primary" type="submit">Sign in</button></form>#', $page->body);
+        $post = fn (string $body, array $headers = []) => self::send($web, 'POST', '/ops/cron/signin', ['content-type' => 'application/x-www-form-urlencoded'] + $headers, $body);
+        // Back to the page it was posted from, with the cookie.
+        $res = $post('token=tok', ['origin' => 'http://app.test', 'referer' => 'http://app.test/ops/cron/jobs/x?view=all']);
+        $this->assertSame([303, 'http://app.test/ops/cron/jobs/x?view=all'], [$res->status, $res->header('location')]);
+        $this->assertMatchesRegularExpression('#^cronwatch_token=[0-9a-f]{64}; Path=/ops/cron; HttpOnly; SameSite=Lax; Max-Age=2592000$#D', (string) $res->header('set-cookie'));
+        // To the dashboard when the page came from elsewhere, had none, or carried a ?token=.
+        foreach ([null, 'https://evil.example/ops/cron/jobs/x', 'http://app.test/ops/cron/?token=wrong', 'http://app.test/ops/cron/?a=1&token='] as $referer) {
+            $r = $post('token=tok', $referer === null ? [] : ['referer' => $referer]);
+            $this->assertSame([303, '/ops/cron/'], [$r->status, $r->header('location')], (string) $referer);
+        }
+        // A wrong or missing token is the sign-in page again, with no cookie.
+        foreach (['token=wrong', '', 'other=tok'] as $body) {
+            $r = $post($body);
+            $this->assertSame(401, $r->status, $body);
+            $this->assertNull($r->header('set-cookie'), $body);
+            $this->assertStringContainsString('class="signin"', $r->body, $body);
+        }
+        // A cross-site post is refused before the token is looked at.
+        $cross = $post('token=tok', ['origin' => 'https://evil.example']);
+        $this->assertSame(403, $cross->status);
+        $this->assertNull($cross->header('set-cookie'));
+        // The ?token= link still signs in, for the development sign-in line.
         $res = self::send($web, 'GET', '/ops/cron/?token=tok');
         $this->assertSame([303, '/ops/cron/'], [$res->status, $res->header('location')]);
         $this->assertStringContainsString('; Path=/ops/cron; HttpOnly; SameSite=Lax', (string) $res->header('set-cookie'));
+        // Other pages do not carry the form.
         $this->assertStringNotContainsString('class="signin"', self::send($web, 'GET', '/ops/cron/offline')->body);
+        // With the routes open there is nothing to sign in to.
+        [, $open] = $this->app(null, '/ops/cron');
+        $this->assertSame(404, self::send($open, 'POST', '/ops/cron/signin', ['content-type' => 'application/x-www-form-urlencoded'], 'token=tok')->status);
+    }
+
+    /**
+     * An Authorization header that is not a bearer (a proxy's Basic auth) is
+     * no bearer at all: the cookie and ?token= sign in as if no header came
+     * (routes-security.test.ts).
+     */
+    public function testAnAuthorizationHeaderThatIsNotABearerLeavesTheCookieAndTheQueryToSignIn(): void
+    {
+        [, $web] = $this->app('tok');
+        $cookie = 'cronwatch_token=' . Dashboard::cookieValue('tok');
+        foreach (['Basic dXNlcjpwYXNz', 'Token tok', 'Bearertok', 'Bearer'] as $header) {
+            $this->assertSame(200, self::send($web, 'GET', '/cronwatch/api/jobs', ['authorization' => $header, 'cookie' => $cookie])->status, $header);
+            $this->assertSame(401, self::send($web, 'GET', '/cronwatch/api/jobs', ['authorization' => $header])->status, $header);
+            $this->assertSame(405, self::send($web, 'GET', '/cronwatch/api/check', ['authorization' => $header, 'cookie' => $cookie])->status, $header);
+            $this->assertSame(303, self::send($web, 'GET', '/cronwatch/?token=tok', ['authorization' => $header])->status, $header);
+        }
+        $this->assertSame(200, self::send($web, 'GET', '/cronwatch/api/jobs', ['authorization' => 'bearer tok'])->status);
+        $this->assertSame(200, self::send($web, 'GET', '/cronwatch/api/jobs', ['authorization' => "BEARER\ttok"])->status);
+        // A bearer that is there still wins over the cookie.
+        $this->assertSame(401, self::send($web, 'GET', '/cronwatch/api/jobs', ['authorization' => 'Bearer wrong', 'cookie' => $cookie])->status);
     }
 
     // ------------------------------------------------------------ routes-timeline.test.ts

@@ -105,6 +105,15 @@ final class PgCron implements Source
     /** @var array<string, true> Names declared again without a schedule by retire(), whose open runs are still read. */
     private array $retired = [];
     private bool $scanned = false;
+    /**
+     * The names this sync copies runs under: its current names and every name
+     * the client declares now, after the retires. A run copied under a retired
+     * name that was then forgotten (the dashboard's forget) has no job to go
+     * to, and is let go: never recorded and never read again.
+     *
+     * @var array<string, true>
+     */
+    private array $recordable = [];
     /** @var array<string, true> */
     private array $warned = [];
     /** @var array<int, true> Jobids whose callback failed, reported once until it works again. */
@@ -332,6 +341,10 @@ final class PgCron implements Source
         $this->retireUnused($host, $names, $definitions, $all, $rows !== []);
         if (!$recording || $names === []) {
             return [];
+        }
+        $this->recordable = array_fill_keys(array_values($names), true);
+        foreach ($host->definedJobs() as $defined) {
+            $this->recordable[(string) $defined->get('name')] = true;
         }
 
         $alerts = [];
@@ -592,7 +605,8 @@ final class PgCron implements Source
                     || !is_array($tags) || !in_array('pg_cron', $tags, true)) {
                     continue;
                 }
-                if (preg_match('/^pg_cron job ([0-9]+) in /', (string) $def->get('description', ''), $m) !== 1) {
+                $description = $def->get('description');
+                if (preg_match('/^pg_cron job ([0-9]+) in /', is_string($description) ? $description : '', $m) !== 1) {
                     continue;
                 }
                 $jobid = (int) $m[1];
@@ -624,8 +638,11 @@ final class PgCron implements Source
         $runid = (int) $row['runid'];
         $jobid = (int) $row['jobid'];
         $name = $this->pending[$runid] ?? $names[$jobid] ?? null;
-        if ($name === null) {
-            unset($this->held[$runid]);
+        if ($name === null || !isset($this->recordable[$name])) {
+            unset($this->pending[$runid], $this->held[$runid]);
+            if ($name !== null) {
+                unset($this->retired[$name]);
+            }
             return;
         }
         if (($row['start_time'] ?? null) === null && !self::finished($row['status'] ?? null)) {

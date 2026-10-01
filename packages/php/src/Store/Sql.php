@@ -168,8 +168,8 @@ final class Sql
             // The version inside a state's JSON, as Evaluate::stateVersion()
             // reads it: a whole number from 0 to 2^53 - 1, else 0 (none, or a
             // foreign row's 1.5 or "x", which must neither fail the statement
-            // nor refuse every write for good). Each CASE tests the JSON type
-            // before any cast.
+            // nor refuse every write for good; on SQLite, also text that is not
+            // JSON). Each CASE tests the JSON type before any cast.
             $version = $pg
                 ? function (string $column): string {
                     $v = "({$column}->>'version')::numeric";
@@ -177,7 +177,8 @@ final class Sql
                 }
                 : function (string $column): string {
                     $v = "json_extract({$column}, '\$.version')";
-                    return "CASE WHEN json_type({$column}, '\$.version') NOT IN ('integer', 'real') THEN 0 WHEN {$v} = CAST({$v} AS INTEGER) AND {$v} BETWEEN 0 AND 9007199254740991 THEN CAST({$v} AS INTEGER) ELSE 0 END";
+                    // Text that is not JSON at all (SQLite holds any) counts as 0 too, before json_type could fail on it.
+                    return "CASE WHEN NOT json_valid({$column}) THEN 0 WHEN json_type({$column}, '\$.version') NOT IN ('integer', 'real') THEN 0 WHEN {$v} = CAST({$v} AS INTEGER) AND {$v} BETWEEN 0 AND 9007199254740991 THEN CAST({$v} AS INTEGER) ELSE 0 END";
                 };
             // Insertion order breaks ties; byte order for names whatever the database's collation.
             $seq = $pg ? 'seq' : 'rowid';
@@ -214,10 +215,12 @@ final class Sql
         // tested first, so nothing but a number is ever converted (a string's
         // conversion warns, which strict mode makes an error in an UPDATE).
         // MySQL's JSON_EXTRACT answers JSON and MariaDB's text; plus 0, both
-        // are a number.
+        // are a number. The column is text, which may hold text that is not
+        // JSON at all (a damaged row's): that counts as 0, tested before
+        // JSON_EXTRACT, which fails on it.
         $version = function (string $column): string {
             $v = "JSON_EXTRACT({$column}, '\$.version') + 0";
-            return "CASE WHEN JSON_TYPE(JSON_EXTRACT({$column}, '\$.version')) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 "
+            return "CASE WHEN NOT JSON_VALID({$column}) THEN 0 WHEN JSON_TYPE(JSON_EXTRACT({$column}, '\$.version')) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 "
                 . "WHEN {$v} = FLOOR({$v}) AND {$v} BETWEEN 0 AND 9007199254740991 THEN CAST({$v} AS SIGNED) ELSE 0 END";
         };
         return [
@@ -330,54 +333,128 @@ final class Sql
         return Output::stripJsonNul(Js::stringify($value));
     }
 
-    /** JSON text as the SDK wrote it. */
+    /**
+     * JSON text as the SDK wrote it. Rows are read leniently: a foreign,
+     * hand-edited or damaged row (SQLite keeps whatever type it is given, in
+     * any column) must affect only its own job, never every read, so text
+     * that does not parse reads as null, which the client takes as no state,
+     * or as an unreadable definition it reports (stores/sql.ts).
+     */
     private static function json(mixed $value): mixed
     {
-        return is_string($value) ? Js::parse($value) : $value;
-    }
-
-    /** A number column: drivers may answer with text. */
-    private static function num(mixed $value): int|float|null
-    {
-        if ($value === null || is_int($value) || is_float($value)) {
+        if (!is_string($value)) {
             return $value;
         }
-        $text = (string) $value;
-        return preg_match('/^-?[0-9]+$/D', $text) === 1 ? (int) $text : (float) $text;
+        try {
+            return Js::parse($value);
+        } catch (\JsonException) {
+            return null;
+        }
     }
 
-    /** @param array<string, mixed> $row */
+    /**
+     * A time, or a count of milliseconds, as a column holds it (drivers may
+     * answer with text, as Postgres's BIGINT does), read as JavaScript's
+     * Number() reads it, or null when that is not a finite number ("x", "",
+     * "1e400").
+     */
+    private static function number(mixed $value): int|float|null
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_float($value)) {
+            return is_finite($value) ? $value : null;
+        }
+        if (!is_string($value)) {
+            return null;
+        }
+        $text = Js::trim($value);
+        if (preg_match('/^[+-]?[0-9]+$/D', $text) === 1) {
+            // Past PHP's integers (or with leading zeros) it is read as a double, as JavaScript reads it.
+            $n = filter_var($text, FILTER_VALIDATE_INT);
+            return is_int($n) ? $n : self::whole((float) $text);
+        }
+        if (preg_match('/^[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$/D', $text) === 1) {
+            $n = (float) $text;
+            return is_finite($n) ? self::whole($n) : null;
+        }
+        if (preg_match('/^0[xX][0-9a-fA-F]+$|^0[oO][0-7]+$|^0[bB][01]+$/D', $text) === 1) {
+            $n = match (strtolower($text[1])) {
+                'x' => hexdec(substr($text, 2)),
+                'o' => octdec(substr($text, 2)),
+                default => bindec(substr($text, 2)),
+            };
+            return is_float($n) ? self::whole($n) : $n;
+        }
+        return null;
+    }
+
+    /** A double holding a safe whole number as an int, which JSON writes the same way. */
+    private static function whole(float $n): int|float
+    {
+        return $n === floor($n) && abs($n) <= Js::MAX_SAFE_INTEGER ? (int) $n : $n;
+    }
+
+    /** A time that must be there: one that is not a finite number reads as 0. */
+    private static function time(mixed $value): int|float
+    {
+        return self::number($value) ?? 0;
+    }
+
+    /**
+     * A job's row. A definition that is not a JSON object (text that does
+     * not parse, a foreign row's null, "nightly" or [1]) is unreadable: the
+     * client reports the job and shows it as failing without evaluating it
+     * (see StoredJob::unreadable()).
+     *
+     * @param array<string, mixed> $row
+     */
     public static function rowToJob(array $row): StoredJob
     {
-        return new StoredJob(
-            (string) $row['name'],
-            JobDefinition::fromJson(self::json($row['definition'])),
-            self::num($row['created_at']) ?? 0,
-            self::num($row['updated_at']) ?? 0,
-        );
+        $name = (string) $row['name'];
+        $definition = self::json($row['definition']);
+        $createdAt = self::time($row['created_at']);
+        $updatedAt = self::time($row['updated_at']);
+        if (!$definition instanceof \stdClass) {
+            return StoredJob::unreadable($name, $createdAt, $updatedAt);
+        }
+        return new StoredJob($name, StoredJob::readDefinition($definition), $createdAt, $updatedAt);
     }
 
-    /** @param array<string, mixed> $row */
+    /**
+     * A run's row. A start that is not a finite number reads as 0, a finish
+     * or duration as null; an error or output that is not text as null;
+     * metrics that do not parse to an object as none; a trigger that is not
+     * text as "run".
+     *
+     * @param array<string, mixed> $row
+     */
     public static function rowToRun(array $row): Run
     {
-        $metrics = $row['metrics'] === null ? [] : Js::fields(self::json($row['metrics']));
+        $metrics = self::json($row['metrics']);
         return new Run(
             id: (string) $row['id'],
             job: (string) $row['job'],
             status: (string) $row['status'],
-            startedAt: self::num($row['started_at']) ?? 0,
-            finishedAt: self::num($row['finished_at']),
-            durationMs: self::num($row['duration_ms']),
-            error: $row['error'],
-            output: $row['output'],
-            metrics: $metrics,
-            trigger: (string) $row['trigger'],
+            startedAt: self::time($row['started_at']),
+            finishedAt: self::number($row['finished_at']),
+            durationMs: self::number($row['duration_ms']),
+            error: is_string($row['error']) ? $row['error'] : null,
+            output: is_string($row['output']) ? $row['output'] : null,
+            metrics: $metrics instanceof \stdClass ? Js::fields($metrics) : [],
+            trigger: is_string($row['trigger']) ? $row['trigger'] : 'run',
         );
     }
 
-    /** @param array<string, mixed> $row */
-    public static function rowToState(array $row): JobState
+    /**
+     * A state's row, or null when it is not a JSON object (text that does not
+     * parse, a foreign row's 5 or []): no state, which the next write replaces.
+     *
+     * @param array<string, mixed> $row
+     */
+    public static function rowToState(array $row): ?JobState
     {
-        return JobState::fromJson(self::json($row['state']));
+        return JobState::fromStored(self::json($row['state']));
     }
 }

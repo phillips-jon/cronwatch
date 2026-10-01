@@ -602,6 +602,39 @@ final class ChannelsTest extends TestCase
         $this->assertLessThan(40, (int) substr($said, 5), 'the client hung up before the headers ended');
     }
 
+    /** @return array<string, array{string}> */
+    public static function neverStops(): array
+    {
+        return ['a chunk-size line that never ends' => ['chunkline'], 'endless 100 Continue' => ['continue']];
+    }
+
+    /**
+     * A peer that never stops sending is cut off at the deadline or a cap,
+     * whichever comes first, with little memory: a chunk-size line that
+     * never ends, and "100 Continue" after "100 Continue" (review 2, medium 5).
+     */
+    #[DataProvider('neverStops')]
+    public function testTheStreamPathStopsAPeerThatNeverStopsSending(string $mode): void
+    {
+        [$process, $out, $port] = $this->raw($mode);
+        memory_reset_peak_usage();
+        $before = memory_get_usage();
+        $started = hrtime(true);
+        try {
+            $response = (new NativeHttp(false))->post("http://127.0.0.1:{$port}/hook", '{}', [], 1000);
+            $this->assertSame('chunkline', $mode, 'only the chunked answer has a status');
+            $this->assertSame([200, ''], [$response->status, $response->body]);
+        } catch (RequestTimeout | \RuntimeException $error) {
+            $this->assertSame('continue', $mode, $error->getMessage());
+        } finally {
+            $elapsed = (hrtime(true) - $started) / 1e9;
+            $said = self::rawDone($process, $out);
+        }
+        $this->assertLessThan(3.0, $elapsed, 'cut off, not read until the peer stopped');
+        $this->assertLessThan(8 * 1024 * 1024, memory_get_peak_usage() - $before, 'without keeping what it read');
+        $this->assertMatchesRegularExpression('/^sent [0-9]+$/', $said);
+    }
+
     public function testTheStreamPathReadsAChunkedAnswerToItsLastChunk(): void
     {
         [$process, $out, $port] = $this->raw('chunked');

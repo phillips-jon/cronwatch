@@ -59,7 +59,7 @@ final class JobState
         $sending = $f['sending'] ?? null;
         $state = new self(
             job: is_scalar($f['job'] ?? null) ? (string) $f['job'] : '',
-            open: Js::fields($f['open'] ?? []),
+            open: self::open($f['open'] ?? null),
             // A foreign row's count may be anything; one that is not a number
             // reads as none. Evaluate::failureCount() says what it counts as.
             consecutiveFailures: Js::isNumber($f['consecutiveFailures'] ?? null) ? $f['consecutiveFailures'] : 0,
@@ -77,10 +77,30 @@ final class JobState
         return $state;
     }
 
-    /** A decoded JSON object (or an array standing for one), or one of this package's alerts. */
+    /**
+     * A stored state as decoded, read leniently (see fromJson()), or null when
+     * it is not an object at all (a foreign row's 5, "x" or [], or text that
+     * did not parse): no state, which Evaluate::normalizeState() reads as a
+     * fresh one.
+     */
+    public static function fromStored(mixed $data): ?self
+    {
+        return $data instanceof self || (self::isObject($data) && !$data instanceof Alert) ? self::fromJson($data) : null;
+    }
+
+    /** `open` as stored: an object keeps only its entries whose value is a number; anything else reads as none. */
+    private static function open(mixed $value): array
+    {
+        if (!self::isObject($value) || $value instanceof Alert) {
+            return [];
+        }
+        return array_filter(Js::fields($value), Js::isNumber(...));
+    }
+
+    /** A decoded JSON object (or a non-empty array standing for one), or one of this package's alerts. */
     private static function isObject(mixed $value): bool
     {
-        return $value instanceof \stdClass || $value instanceof Alert || (is_array($value) && ($value === [] || !array_is_list($value)));
+        return $value instanceof \stdClass || $value instanceof Alert || (is_array($value) && $value !== [] && !array_is_list($value));
     }
 
     /**
@@ -103,7 +123,7 @@ final class JobState
             $out['pendingRecovery'] = array_values($this->pendingRecovery);
         }
         if ($this->undelivered !== null) {
-            $out['undelivered'] = array_map(fn (Alert $a) => $a->toJson(), array_values($this->undelivered));
+            $out['undelivered'] = array_map(fn (Alert $a) => $a->stateJson(), array_values($this->undelivered));
         }
         if ($this->version !== null) {
             $out['version'] = $this->version;

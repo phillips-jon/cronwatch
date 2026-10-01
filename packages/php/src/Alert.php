@@ -19,6 +19,12 @@ final class Alert
     /** @var array<string, mixed> the stored fields this release does not know, as decoded JSON */
     private array $extra = [];
 
+    /**
+     * The alert as it was decoded from a stored state, written back as it is
+     * until its triage changes (see toJson()); null for one made here.
+     */
+    private ?\stdClass $stored = null;
+
     /** @param array<string, mixed> $details see AlertDraft */
     public function __construct(
         public string $type,
@@ -48,6 +54,25 @@ final class Alert
     {
         $this->triage = $diagnosis;
         $this->triageTried = true;
+        $this->stored = null;
+    }
+
+    /**
+     * A field as it was stored (a foreign row's "at" of "x", say), or what
+     * this alert holds for one made here or changed since.
+     *
+     * @internal For Evaluate::staleAlert(), which judges the alert as it was queued.
+     */
+    public function storedField(string $key): mixed
+    {
+        if ($this->stored !== null) {
+            return property_exists($this->stored, $key) ? $this->stored->{$key} : null;
+        }
+        return match ($key) {
+            'details' => $this->details,
+            'at' => $this->at,
+            default => $this->toJson()[$key] ?? null,
+        };
     }
 
     public static function fromJson(array|\stdClass|self $data): self
@@ -66,7 +91,7 @@ final class Alert
         $definition = $f['definition'] ?? null;
         $alert = new self(
             type: self::text($f['type'] ?? null),
-            run: $run instanceof \stdClass || $run instanceof Run || (is_array($run) && $run !== []) ? Run::fromJson($run) : null,
+            run: $run instanceof \stdClass || $run instanceof Run || (is_array($run) && $run !== []) ? Run::fromStored($run) : null,
             details: $details,
             job: self::text($f['job'] ?? null),
             definition: JobDefinition::fromJson($definition instanceof \stdClass || $definition instanceof JobDefinition || is_array($definition) ? $definition : []),
@@ -80,6 +105,11 @@ final class Alert
         // Fields a newer release added are kept, so the queue keeps them and
         // a retry sends them, as the SDK carries a queued alert as it was stored.
         $alert->extra = array_diff_key($f, array_flip(self::KNOWN));
+        // One decoded from a state is written back as it was stored, odd
+        // values and missing fields included, as the SDK keeps a queued alert.
+        if ($data instanceof \stdClass) {
+            $alert->stored = $data;
+        }
         return $alert;
     }
 
@@ -98,8 +128,22 @@ final class Alert
         return Js::obj($details);
     }
 
+    /**
+     * The alert as a state holds it: as it was stored, while unchanged (an
+     * object even when it has no fields), else toJson().
+     *
+     * @internal
+     */
+    public function stateJson(): array|\stdClass
+    {
+        return $this->stored ?? $this->toJson();
+    }
+
     public function toJson(): array
     {
+        if ($this->stored !== null) {
+            return Js::fields($this->stored);
+        }
         $out = [
             'type' => $this->type,
             'run' => $this->run?->toJson(),

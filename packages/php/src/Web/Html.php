@@ -544,16 +544,16 @@ CSS;
     }
 
     /**
-     * A page with one message. With `signIn`, a form under it takes the
-     * token and sends it as ?token=, which the routes move into the cookie:
-     * the way in where there is no address bar to open a link with, such as
+     * A page with one message. With `signIn`, a form under it posts the
+     * token to <base>/signin in the body, keeping it out of the URL and
+     * access logs, and the routes set the cookie: the way in where there is no address bar to open a link with, such as
      * an app on an iPhone's home screen, which keeps its cookies apart from
      * Safari's.
      */
     public static function messagePage(string $title, string $message, string $base, bool $signIn = false, ?\Closure $head = null): string
     {
         $form = $signIn
-            ? '<form class="signin" method="get" action="' . Text::h($base) . '/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>'
+            ? '<form class="signin" method="post" action="' . Text::h($base) . '/signin"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>'
             : '';
         return self::layout($title, '<header class="top">' . self::brand($base) . '</header><main class="message"><h1>' . Text::h($title) . '</h1><p>' . Text::h($message) . "</p>{$form}</main>", $base, null, $head);
     }

@@ -55,6 +55,50 @@ final class Run
         );
     }
 
+    /**
+     * A run inside a queued alert, read leniently: it comes from a stored
+     * state, which a foreign or hand-edited row may hold anything in. A start
+     * that is not a number reads as 0, a finish or duration as null, an error
+     * or output that is not text as null, metrics that are not an object as
+     * none (and of an object, only the numbers), an id, job or status that is
+     * not a string or a number as "", and a trigger that is not text as
+     * "run", so one odd value never makes the job's state unreadable. (fromJson() takes a run given in code, whose
+     * wrong types are an error to report.)
+     *
+     * @internal
+     */
+    public static function fromStored(array|\stdClass|self $data): self
+    {
+        if ($data instanceof self) {
+            return $data;
+        }
+        $f = Js::fields($data);
+        $metrics = [];
+        $stored = $f['metrics'] ?? null;
+        if ($stored instanceof \stdClass || (is_array($stored) && !array_is_list($stored))) {
+            foreach (Js::fields($stored) as $name => $value) {
+                if (Js::isNumber($value)) {
+                    $metrics[$name] = $value;
+                }
+            }
+        }
+        $number = fn (mixed $value): int|float|null => Js::isNumber($value) ? $value : null;
+        $text = fn (mixed $value): ?string => is_string($value) ? $value : null;
+        $name = fn (mixed $value): string => is_string($value) ? $value : (Js::isNumber($value) ? Js::number($value) : '');
+        return new self(
+            id: $name($f['id'] ?? null),
+            job: $name($f['job'] ?? null),
+            status: $name($f['status'] ?? null),
+            startedAt: $number($f['startedAt'] ?? null) ?? 0,
+            finishedAt: $number($f['finishedAt'] ?? null),
+            durationMs: $number($f['durationMs'] ?? null),
+            error: $text($f['error'] ?? null),
+            output: $text($f['output'] ?? null),
+            metrics: $metrics,
+            trigger: $text($f['trigger'] ?? null) ?? 'run',
+        );
+    }
+
     /** The SDK's JSON shape, in its key order. */
     public function toJson(): array
     {

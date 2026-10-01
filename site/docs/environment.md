@@ -78,7 +78,7 @@ Variables are read from `getenv()`, then `$_ENV`, then `$_SERVER`.
 | `ANTHROPIC_BASE_URL` | the API triage posts to | `https://api.anthropic.com` |
 | `CRONWATCH_BOOTSTRAP` | the bootstrap file the `cronwatch` command (`vendor/bin/cronwatch`) loads (`--bootstrap` wins) | `./cronwatch.php`, then `./config/cronwatch.php` |
 
-`cronSecret`, the dashboard's `token` and a handler's `secret` read `CRON_SECRET` and `CRONWATCH_TOKEN` when left out (or given `Cronwatch\FromEnv::Read`); `null` turns them off. The integrations:
+`cronSecret`, the dashboard's `token` and a handler's `secret` read `CRON_SECRET` and `CRONWATCH_TOKEN` when left out (or given `Cronwatch\FromEnv::Read`); `null` turns them off, and so does `false`, deprecated until 2.0. Either variable holding one of the words Laravel's `env()` reads as null, true, false or empty (`null`, `(null)`, `true`, `(true)`, `false`, `(false)`, `empty` or `(empty)`, in any case) counts as not set too, so `CRON_SECRET=null` in a `.env` file is not the password `null`. The integrations:
 
 - **Laravel** reads its settings from `config/cronwatch.php`, whose values come from the variables in the table below.
 - **Symfony** has no variables of its own: write `%env(...)%` in `config/packages/cronwatch.yaml`. Left unset, `cron_secret` reads `CRON_SECRET`, `dashboard.token` reads `CRONWATCH_TOKEN`, and `store` uses `DATABASE_URL`, else `var/cronwatch.db`.

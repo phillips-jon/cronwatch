@@ -49,6 +49,23 @@ final class EmbeddedDashboardTest extends TestCase
         $this->assertSame(EmbeddedDashboard::MARKER . '/', EmbeddedDashboard::request($host, '', ['cw'])->path);
     }
 
+    /**
+     * The host's sign-in and permissions stand in front of the embedded
+     * dashboard, which is open: an Authorization header the browser or a
+     * caller sends is the host's, not a bearer for it, so a GET of
+     * `?cw=/api/check` with `Bearer anything` (from a user who may only
+     * view) does not run the check (review 2, low 11).
+     */
+    public function testTheHostsAuthorizationHeaderIsNotPassedOnSoAGetCannotRunTheCheck(): void
+    {
+        $host = Request::create('GET', 'https://site.example/admin/cw?cw=%2Fapi%2Fcheck', ['authorization' => 'Bearer anything']);
+        $inner = EmbeddedDashboard::request($host, '/api/check', ['cw']);
+        $this->assertNull($inner->header('authorization'));
+        $answer = self::dashboard()->handle($inner);
+        $this->assertSame(405, $answer->status);
+        $this->assertSame('POST', $answer->header('allow'));
+    }
+
     public function testLinksFormsAndRedirectsPointIntoTheHost(): void
     {
         $dashboard = self::dashboard();

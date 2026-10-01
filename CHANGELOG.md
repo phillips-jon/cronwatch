@@ -39,6 +39,8 @@ Python:
 PHP:
 
 - `null` turns the cron secret, the dashboard's token and a handler's secret off, as in every other language. In 0.x `null` read `CRON_SECRET` or `CRONWATCH_TOKEN`, and `false` turned them off. Leaving the argument out still reads the environment, as does the new default, `Cronwatch\FromEnv::Read`; `false` still works, deprecated. Code that passed `null` on purpose to mean "read the environment" now turns the secret off. Laravel's and Symfony's settings are unchanged: an unset token or cron secret there is still read from the environment.
+- `CRON_SECRET` or `CRONWATCH_TOKEN` holding one of the words Laravel's `env()` reads as null, true, false or empty (`null`, `(null)`, `true`, `(true)`, `false`, `(false)`, `empty` or `(empty)`, in any case) counts as unset. With `CRON_SECRET=null` in a Laravel `.env` file, `Authorization: Bearer null` ran every handler and the dashboard's check, since Laravel handed the config null and the variable kept the word.
+- `cronSecret:`, `routes(token:)` and a handler's `secret:` are declared `mixed` and check the value themselves, so a caller without `strict_types` can no longer pass `5` and get the password `"5"`: anything but a string, `null`, `false` or `FromEnv::Read` throws a `TypeError`.
 
 Rust:
 
@@ -67,6 +69,7 @@ Go and Elixir have no breaking changes beyond those every language shares.
 - Ruby: `client.routes(**options)`, the dashboard as a Rack app.
 - Rust: constructors and builder methods for every data and options type.
 - Java: a static `of` on each record that may grow.
+- PHP: a handler's `secret:` takes `Cronwatch\FromEnv::Read`, meaning the client's secret, as the 1.0 notes say to pass; it threw a `TypeError`.
 - Drupal: Ultimate Cron's jobs are recorded, each on its own rules read as Ultimate Cron reads them (`drupal:<module>` for a module's `hook_cron`, `drupal:job:<id>` for any other, triggers `ultimate-cron` and `ultimate-cron-manual`), and every cron run is still `drupal:cron`. Before, the module left a site running Ultimate Cron alone.
 - The [Stability](https://cronwatch.dev/docs/stability/), [Environment variables](https://cronwatch.dev/docs/environment/) and [Deprecations](https://cronwatch.dev/docs/deprecations/) pages.
 - CI checks each package's public API: a committed report of it for TypeScript, Python and Elixir (`api.txt`), apidiff for the Go modules and cargo-semver-checks for the Rust crates, beside .NET's `PublicAPI.Unshipped.txt`.
@@ -103,6 +106,10 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - Python: Celery in a Django project no longer falls back to a client in worker memory when the `CRONWATCH` settings fail to make one (a `STORE` path with a typo, an unknown key, a store factory that raises): the error is raised, so the check task fails naming it, where every run was kept in memory and lost and the check reported success. Only Django settings that are not configured fall back to `cronwatch.client()`.
 - Python: a `DATABASE_URL` (or pg_cron connection string) that libpq cannot read, such as a password with a stray `%`, is reported naming only its host, where libpq's error quoted the password to `on_error` and the log on every check and run.
 - Python: a host or forwarded host of more than 4300 digits is not an origin, where Python's limit on reading such a number made the dashboard answer 500 (and, in development, could keep the sign-in line from being printed).
+- PHP: the HTTP client used without ext-curl keeps its 10 second deadline and its 1 MiB cap while a peer keeps sending. A chunked answer whose size line never ends grew memory without limit, and endless `100 Continue` answers hung the check for good.
+- PHP: a queued alert whose run holds a value of the wrong type (`"startedAt": "x"`, an object error) no longer makes the job's state unreadable, which failed its checks and silence until the row was edited by hand; a failed retry of queued alerts is reported on its own and no longer stops the job's new alerts.
+- PHP: a state row that is not JSON at all, which the MySQL and MariaDB stores' text column can hold as SQLite's can, no longer fails every write of that job's state there.
+- Drupal and Craft CMS: the dashboard in the admin no longer passes the request's `Authorization` header on, so a `GET` of its `/api/check` with any bearer, from a user who may only view the dashboard, no longer runs the check.
 
 ## 0.10.0 and earlier
 

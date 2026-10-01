@@ -270,6 +270,56 @@ final class PgCronTest extends TestCase
         $this->assertSame(['vacuum'], array_map(fn ($d) => $d->name, $cw->definedJobs()));
     }
 
+    /** pgcron.test.ts: "a renamed job's old name forgotten while its run is open lets the run go, with no error". */
+    public function testARenamedJobsOldNameForgottenWhileItsRunIsOpenLetsTheRunGoWithNoError(): void
+    {
+        $clock = new Clock();
+        $cron = new FakeCron();
+        $cron->job(1, 'a', '0 3 * * *');
+        $running = $cron->add(1, 'running', self::T0 - 5000, null);
+        $db = new class ($cron) {
+            /** @var list<list<int>> the open runids each details query asked for */
+            public array $opened = [];
+
+            public function __construct(private readonly FakeCron $cron)
+            {
+            }
+
+            public function query(string $sql, array $params): array
+            {
+                if (str_contains($sql, 'unnest')) {
+                    $this->opened[] = array_map('intval', $params[2]);
+                }
+                return $this->cron->query($sql, $params);
+            }
+        };
+        $errors = [];
+        $cw = new Cronwatch(store: new MemoryStore(), alerts: [new Capture()], now: $clock, cronSecret: null, sources: [new PgCron($db)], onError: function (\Throwable $e, string $where) use (&$errors): void {
+            $errors[] = "{$where}: {$e->getMessage()}";
+        });
+        $cw->check();
+        $this->assertSame('a', $cw->getRun("pgcron:{$running->runid}")?->job);
+        $cron->jobs[0]['jobname'] = 'b';
+        $clock->advance(self::MIN);
+        $cw->check();
+        $this->assertStringContainsString('renamed to b', (string) $cw->jobSummary('a')?->definition->description);
+        $cw->forget('a');
+        $running->status = 'succeeded';
+        $running->end = self::T0;
+        for ($i = 0; $i < 3; $i++) {
+            $clock->advance(self::MIN);
+            $db->opened = [];
+            $cw->check();
+        }
+        foreach ($db->opened as $ids) {
+            $this->assertNotContains($running->runid, $ids, 'and is no longer read');
+        }
+        $this->assertSame([], $errors);
+        $this->assertNull($cw->jobSummary('a'), 'the forgotten name is not declared again');
+        $this->assertNull($cw->getRun("pgcron:{$running->runid}"), 'the run is not recorded');
+        $this->assertSame(['b'], array_map(fn ($d) => $d->name, $cw->definedJobs()));
+    }
+
     public function testJobOptionsApplyAndAnUnreadableScheduleIsReported(): void
     {
         $cron = new FakeCron();

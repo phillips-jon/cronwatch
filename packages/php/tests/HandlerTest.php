@@ -9,6 +9,7 @@ use Cronwatch\Env;
 use Cronwatch\FromEnv;
 use Cronwatch\Job\Handler;
 use Cronwatch\Job\JobContext;
+use Cronwatch\Store\MemoryStore;
 use Cronwatch\Tests\Support\Clients;
 use Cronwatch\Web\PsrJobHandler;
 use Cronwatch\Web\Request;
@@ -168,6 +169,104 @@ final class HandlerTest extends TestCase
             $this->assertSame(200, $opted->job('k')->handler(fn () => null, secret: '')->respond(self::get())->status);
             $this->assertSame(401, $opted->job('m')->handler(fn () => null, secret: 'own')->respond(self::get())->status, 'its own secret still counts');
         }
+    }
+
+    /** make() on a store of its own, so a production environment gets no warning about the default one. */
+    private function quiet(array $options): Cronwatch
+    {
+        return $this->make($options + ['store' => new MemoryStore()]);
+    }
+
+    /** A CRON_SECRET or secret of only whitespace counts as unset (client-hardening.test.ts). */
+    public function testACronSecretOrSecretOfOnlyWhitespaceCountsAsUnset(): void
+    {
+        putenv('CRONWATCH_ENV=production');
+        foreach (['', ' ', "\t\n", " \u{FEFF}", "\u{A0}", "\u{2003}"] as $blank) {
+            $label = json_encode($blank);
+            putenv("CRON_SECRET={$blank}");
+            foreach ([['cronSecret' => FromEnv::Read], ['cronSecret' => $blank]] as $options) {
+                $cw = $this->quiet($options);
+                $this->assertNull($cw->cronSecret, $label);
+                $handler = $cw->job('closed')->handler(fn () => null);
+                $this->assertSame(503, $handler->respond(self::get(['authorization' => 'Bearer ' . $blank]))->status, $label);
+                $handler->respond(self::get());
+                $this->assertSame(['handler'], $this->wheres(), "{$label}: reported once");
+            }
+            // A handler's blank secret falls back to the client's, here none at all.
+            $opted = $this->quiet(['cronSecret' => null]);
+            $this->assertSame(200, $opted->job('open')->handler(fn () => null, secret: $blank)->respond(self::get())->status, $label);
+        }
+        // A blank secret given in code never reads CRON_SECRET.
+        putenv('CRON_SECRET=from-env');
+        $this->assertNull($this->quiet(['cronSecret' => '  '])->cronSecret);
+        // A secret that is more than whitespace is used untrimmed.
+        putenv('CRON_SECRET= padded ');
+        $this->assertSame(' padded ', $this->quiet(['cronSecret' => FromEnv::Read])->cronSecret);
+    }
+
+    /** With CRON_SECRET of only spaces, /api/check takes the token alone: a bearer of spaces is 401. */
+    public function testTheCheckEndpointRefusesABearerOfSpacesWhenCronSecretIsBlank(): void
+    {
+        putenv('CRONWATCH_ENV=production');
+        putenv('CRON_SECRET=  ');
+        $cw = $this->quiet(['cronSecret' => FromEnv::Read]);
+        $web = $cw->routes(token: 'tok', basePath: '/cronwatch');
+        $this->assertSame(401, $web->handle(Request::create('POST', 'http://x/cronwatch/api/check', ['authorization' => 'Bearer   ']))->status);
+        $this->assertSame(200, $web->handle(Request::create('POST', 'http://x/cronwatch/api/check', ['authorization' => 'Bearer tok']))->status);
+    }
+
+    /**
+     * The words Laravel's env() reads as null, true, false or empty count as
+     * unset in CRON_SECRET, so `CRON_SECRET=null` does not let `Bearer null`
+     * run every handler (Laravel hands the config null, and the variable
+     * keeps the word).
+     */
+    public function testACronSecretThatLaravelReadsAsNullTrueFalseOrEmptyCountsAsUnset(): void
+    {
+        putenv('CRONWATCH_ENV=production');
+        foreach (['null', '(null)', 'Null', 'true', '(true)', 'false', '(false)', 'empty', '(empty)'] as $word) {
+            putenv("CRON_SECRET={$word}");
+            $cw = $this->quiet(['cronSecret' => FromEnv::Read]);
+            $this->assertNull($cw->cronSecret, $word);
+            $this->assertSame(503, $cw->job('j')->handler(fn () => null)->respond(self::get(['authorization' => "Bearer {$word}"]))->status, $word);
+        }
+        putenv('CRON_SECRET');
+        $_ENV['CRON_SECRET'] = '(null)';
+        $this->assertNull($this->quiet(['cronSecret' => FromEnv::Read])->cronSecret, 'nor from $_ENV');
+        unset($_ENV['CRON_SECRET']);
+        $this->assertSame('null', $this->quiet(['cronSecret' => 'null'])->cronSecret, 'given in code, the word is the secret');
+    }
+
+    /** A cronSecret or handler secret that is not a string, null or false throws (client-hardening.test.ts). */
+    public function testACronSecretOrHandlerSecretThatIsNotAStringOrNullThrows(): void
+    {
+        $job = $this->make()->job('j');
+        foreach ([[true, 'boolean'], [5, 'number'], [0, 'number'], [['s'], 'an array'], [new \stdClass(), 'object']] as [$value, $type]) {
+            try {
+                $this->make(['cronSecret' => $value]);
+                $this->fail("cronSecret: {$type} was accepted");
+            } catch (\TypeError $error) {
+                $this->assertSame("cronSecret must be a string, or null to opt out, not {$type}", $error->getMessage());
+            }
+            try {
+                $job->handler(fn () => null, secret: $value);
+                $this->fail("secret: {$type} was accepted");
+            } catch (\TypeError $error) {
+                $this->assertSame("handler: secret must be a string, or null to opt out, not {$type}", $error->getMessage());
+            }
+        }
+    }
+
+    /** secret: FromEnv::Read, which the 1.0 migration notes give, means the client's secret. */
+    public function testAHandlersSecretOfFromEnvReadIsTheClientsSecret(): void
+    {
+        $cw = $this->make(['cronSecret' => 's3cret']);
+        $handler = $cw->job('j')->handler(fn () => null, secret: FromEnv::Read);
+        $this->assertSame('s3cret', $handler->secret);
+        $this->assertSame(200, $handler->respond(self::get(['authorization' => 'Bearer s3cret']))->status);
+        $opted = $this->make(['cronSecret' => null])->job('k')->handler(fn () => null, secret: FromEnv::Read);
+        $this->assertNull($opted->secret);
+        $this->assertSame(200, $opted->respond(self::get())->status, 'a client opted out lets it run');
     }
 
     public function testTheBearerIsReadFromEveryKindOfRequest(): void

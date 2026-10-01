@@ -108,7 +108,8 @@ final class Dashboard
 
     /**
      * @param string|FromEnv|false|null $token the dashboard's token; the default (FromEnv::Read) reads CRONWATCH_TOKEN, as ""
-     *        does, and null serves it open (false does the same, deprecated since 1.0 and removed in 2.0)
+     *        or only whitespace does, and null serves it open (false does the same, deprecated since 1.0 and removed in
+     *        2.0); anything else (true, a number) throws a TypeError
      * @param callable(string): void|null $log where the development sign-in line goes; default error_log()
      * @param string|null $developmentTokenFile where a development token is kept between requests; default in the system's temporary directory (DevelopmentToken)
      * @param callable(string): string|null $head the pages' head assets for a host that loads its own (see above)
@@ -116,7 +117,7 @@ final class Dashboard
      */
     public function __construct(
         private readonly Cronwatch $cw,
-        string|FromEnv|false|null $token = FromEnv::Read,
+        mixed $token = FromEnv::Read,
         ?string $basePath = null,
         ?string $origin = null,
         bool $trustProxy = false,
@@ -125,10 +126,12 @@ final class Dashboard
         ?callable $head = null,
         ?string $empty = null,
     ) {
+        // A blank token, given or read, counts as unset; one given that is not a string throws.
+        $token = Env::secretOption($token, 'routes: token');
         $this->optedOut = $token === null || $token === false;
         $configured = null;
         if (!$this->optedOut) {
-            $configured = is_string($token) && $token !== '' ? $token : Env::read('CRONWATCH_TOKEN');
+            $configured = is_string($token) && $token !== '' ? $token : Env::secret('CRONWATCH_TOKEN');
         }
         $this->basePath = $basePath === null ? null : rtrim($basePath, '/');
         $this->origin = Origin::parse($origin);
@@ -323,8 +326,18 @@ final class Dashboard
         }
 
         $cw = $this->cw;
-        $authorization = $request->header('authorization');
-        $bearer = $authorization === null ? null : self::stripBearer($authorization);
+        $bearer = self::bearerToken($request->header('authorization'));
+
+        // The sign-in form posts the token here, in the body, so it stays out of
+        // the URL and every access log. Cross-site posts were refused above.
+        if ($this->token !== null && $method === 'POST' && $path === '/signin') {
+            $sent = $request->bodyTooLarge() ? null : (self::readBody($request)['token'] ?? null);
+            if (!is_string($sent) || !hash_equals($this->token, $sent)) {
+                return $this->signInPage($base);
+            }
+            return self::redirect(self::signInReturn($request->header('referer'), $publicOrigin, $base), ['set-cookie' => $this->signInCookie($publicOrigin, $base)]);
+        }
+
         if ($this->token !== null) {
             // ?token= is only the sign-in that moves the token into a cookie.
             $query = $wantsHtml && $method === 'GET' ? $request->param('token') : null;
@@ -339,22 +352,20 @@ final class Dashboard
                 $tokenOk = $sent !== null && hash_equals(self::cookieValue($this->token), $sent);
             }
             if (!$cronSecretOk && !$tokenOk) {
-                if ($this->generated) {
-                    return $wantsHtml
-                        ? self::html(Html::messagePage('Sign in', 'CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.', $base, true, $this->head), 401)
-                        : self::api(['ok' => false, 'error' => 'Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log'], 401);
+                if ($wantsHtml) {
+                    return $this->signInPage($base);
                 }
-                return $wantsHtml
-                    ? self::html(Html::messagePage('Sign in', 'Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.', $base, true, $this->head), 401)
+                return $this->generated
+                    ? self::api(['ok' => false, 'error' => 'Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log'], 401)
                     : self::api(['ok' => false, 'error' => 'Unauthorized'], 401);
             }
             if ($query !== null) {
-                // Move the token from the URL into a cookie so it is not in history or logs.
+                // Move the token from the URL into a cookie, so it is not left in the
+                // browser's history. The request line that carried it may still be in
+                // an access log, which is why the sign-in form posts instead.
                 $rest = array_filter($request->params(), fn (array $pair) => $pair[0] !== 'token');
                 $search = $rest === [] ? '' : '?' . implode('&', array_map(fn (array $pair) => Request::formEncode($pair[0]) . '=' . Request::formEncode($pair[1]), $rest));
-                $secure = str_starts_with($publicOrigin, 'https:') ? '; Secure' : '';
-                $cookie = self::COOKIE . '=' . self::cookieValue($this->token) . '; Path=' . ($base === '' ? '/' : $base) . '; HttpOnly; SameSite=Lax; Max-Age=' . self::COOKIE_MAX_AGE . $secure;
-                return self::redirect($request->path . $search, ['set-cookie' => $cookie]);
+                return self::redirect($request->path . $search, ['set-cookie' => $this->signInCookie($publicOrigin, $base)]);
             }
         }
 
@@ -538,11 +549,61 @@ final class Dashboard
         return hash('sha256', "cronwatch-cookie:{$token}");
     }
 
-    /** authorization.replace(/^Bearer\s+/i, ""). */
-    private static function stripBearer(string $authorization): string
+    /**
+     * The token an Authorization header carries: what follows the scheme when
+     * the scheme is Bearer (any case) and one or more whitespace characters
+     * follow it, else null. Any other scheme (a proxy's Basic auth, say) is
+     * not a bearer at all, so the cookie and ?token= are read as if no header
+     * came (/^Bearer\s+([\s\S]*)$/i).
+     */
+    private static function bearerToken(?string $authorization): ?string
     {
-        $out = preg_replace('/^Bearer[' . Js::WHITESPACE . ']+/iu', '', $authorization, 1);
-        return $out ?? (string) preg_replace('/^Bearer[\t\n\x0B\f\r ]+/i', '', $authorization, 1);
+        if ($authorization === null) {
+            return null;
+        }
+        $found = preg_match('/^Bearer[' . Js::WHITESPACE . ']+(.*)\z/isu', $authorization, $match);
+        if ($found === false) {
+            // Not UTF-8: only ASCII whitespace can follow the scheme then.
+            $found = preg_match('/^Bearer[\t\n\x0B\f\r ]+(.*)\z/is', $authorization, $match);
+        }
+        return $found === 1 ? $match[1] : null;
+    }
+
+    /** The 401 sign-in page, with the form that posts the token to <base>/signin. */
+    private function signInPage(string $base): Response
+    {
+        $message = $this->generated
+            ? 'CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once, or enter the token from it below, and this browser stays signed in.'
+            : 'Enter your CRONWATCH_TOKEN and this browser stays signed in.';
+        return self::html(Html::messagePage('Sign in', $message, $base, true, $this->head), 401);
+    }
+
+    /** The cookie a sign-in sets: a digest of the token, for thirty days, Secure on an https origin. */
+    private function signInCookie(string $publicOrigin, string $base): string
+    {
+        $secure = str_starts_with($publicOrigin, 'https:') ? '; Secure' : '';
+        return self::COOKIE . '=' . self::cookieValue((string) $this->token) . '; Path=' . ($base === '' ? '/' : $base) . '; HttpOnly; SameSite=Lax; Max-Age=' . self::COOKIE_MAX_AGE . $secure;
+    }
+
+    /**
+     * Where a sign-in through the form goes next: the page it was posted from
+     * (the Referer) when that is on the public origin and its query has no
+     * `token` parameter, else the dashboard.
+     */
+    private static function signInReturn(?string $referer, string $publicOrigin, string $base): string
+    {
+        if ($referer === null || !str_starts_with($referer, $publicOrigin . '/')) {
+            return "{$base}/";
+        }
+        $query = strstr(explode('#', $referer, 2)[0], '?');
+        if ($query !== false) {
+            foreach (Request::parseQuery(substr($query, 1)) as [$key]) {
+                if ($key === 'token') {
+                    return "{$base}/";
+                }
+            }
+        }
+        return $referer;
     }
 
     private static function readCookie(Request $request, string $name): ?string

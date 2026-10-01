@@ -225,9 +225,17 @@ final class NativeHttp implements Http
         }
     }
 
+    /** How many informational (1xx) answers are skipped before the real one; past it the server is not answering. */
+    private const MAX_INFORMATIONAL = 16;
+
+    /** The longest chunk-size line read (its size, extensions and all); a longer one is not a chunked body. */
+    private const MAX_CHUNK_LINE = 4096;
+
     /**
-     * The answer: its status once the headers are in (skipping any 1xx), and
-     * its body, de-chunked, at most MAX_BODY bytes of it.
+     * The answer: its status once the headers are in (skipping any 1xx, up
+     * to MAX_INFORMATIONAL of them), and its body, de-chunked as it arrives,
+     * at most MAX_BODY bytes of it. Every read is under the deadline, however
+     * fast the bytes come, and nothing read is kept past what the body needs.
      *
      * @param resource $socket
      */
@@ -236,6 +244,7 @@ final class NativeHttp implements Http
         $buffer = '';
         $status = 0;
         $headers = [];
+        $informational = 0;
         // The headers: past the deadline before they are all in, no answer came.
         while (true) {
             $end = strpos($buffer, "\r\n\r\n");
@@ -247,6 +256,9 @@ final class NativeHttp implements Http
                 }
                 $status = (int) $m[1];
                 if ($status >= 100 && $status < 200) {
+                    if (++$informational > self::MAX_INFORMATIONAL) {
+                        throw new \RuntimeException('the server sent informational answers and no answer');
+                    }
                     continue;
                 }
                 foreach (array_slice($block, 1) as $line) {
@@ -272,8 +284,17 @@ final class NativeHttp implements Http
         $chunked = str_contains(strtolower($headers['transfer-encoding'] ?? ''), 'chunked');
         $length = !$chunked && isset($headers['content-length']) && ctype_digit($headers['content-length']) ? (int) $headers['content-length'] : null;
         // The body: past the deadline while it arrives, the answer stands with an empty body.
+        $body = '';
+        // For a chunked body: the bytes left of the chunk being read, or null while a size line is.
+        $need = null;
         while (true) {
-            [$body, $complete] = $chunked ? self::dechunk($buffer) : [$buffer, $length !== null && strlen($buffer) >= $length];
+            if ($chunked) {
+                $complete = self::dechunk($buffer, $body, $need);
+            } else {
+                $body .= $buffer;
+                $buffer = '';
+                $complete = $length !== null && strlen($body) >= $length;
+            }
             if ($complete || strlen($body) >= self::MAX_BODY) {
                 return new HttpResponse($status, substr($length !== null ? substr($body, 0, $length) : $body, 0, self::MAX_BODY));
             }
@@ -290,13 +311,17 @@ final class NativeHttp implements Http
 
     /**
      * The next bytes: a string, '' at the end of the stream, or null when the
-     * deadline passed first.
+     * deadline passed first, which is looked at before every read, so a peer
+     * that never stops sending is cut off at it too.
      *
      * @param resource $socket
      */
     private static function read($socket, float $deadline): ?string
     {
         while (true) {
+            if (self::left($deadline) <= 0) {
+                return null;
+            }
             $chunk = @fread($socket, 65536);
             if (is_string($chunk) && $chunk !== '') {
                 return $chunk;
@@ -311,30 +336,45 @@ final class NativeHttp implements Http
     }
 
     /**
-     * A chunked body decoded as far as it has arrived, and whether its last
-     * chunk has.
-     *
-     * @return array{string, bool}
+     * Decodes what has arrived of a chunked body into $out, taking it from
+     * $raw, so each byte is looked at once and only an unfinished size line
+     * is kept. $need is the bytes left of the chunk being read (its CRLF
+     * included), or null while a size line is. Returns whether the body
+     * ended: at its last chunk, or at a size line that is not one (not hex,
+     * or longer than MAX_CHUNK_LINE without its end), where what came before
+     * stands.
      */
-    private static function dechunk(string $raw): array
+    private static function dechunk(string &$raw, string &$out, ?int &$need): bool
     {
-        $out = '';
-        $at = 0;
         while (true) {
-            $eol = strpos($raw, "\r\n", $at);
+            if ($need !== null) {
+                $take = min($need, strlen($raw));
+                // The chunk's data, without the CRLF that ends it.
+                $out .= substr($raw, 0, max(0, min($take, $need - 2)));
+                $raw = substr($raw, $take);
+                $need -= $take;
+                if ($need > 0) {
+                    return false;
+                }
+                $need = null;
+            }
+            $eol = strpos($raw, "\r\n");
             if ($eol === false) {
-                return [$out, false];
+                return strlen($raw) > self::MAX_CHUNK_LINE;
             }
-            $size = hexdec(trim(explode(';', substr($raw, $at, $eol - $at))[0]));
-            if (!is_int($size) || $size === 0) {
-                return [$out, true];
+            if ($eol > self::MAX_CHUNK_LINE) {
+                return true;
             }
-            $start = $eol + 2;
-            $out .= substr($raw, $start, $size);
-            if (strlen($raw) < $start + $size + 2) {
-                return [$out, false];
+            $hex = trim(explode(';', substr($raw, 0, $eol))[0]);
+            $raw = substr($raw, $eol + 2);
+            if ($hex === '' || !ctype_xdigit($hex) || strlen(ltrim($hex, '0')) > 15) {
+                return true;
             }
-            $at = $start + $size + 2;
+            $size = (int) hexdec($hex);
+            if ($size === 0) {
+                return true;
+            }
+            $need = $size + 2;
         }
     }
 }

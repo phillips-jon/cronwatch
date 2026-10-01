@@ -147,7 +147,7 @@ $app->add(new \Cronwatch\Web\PsrMiddleware($cw->routes(), $factory, $factory)); 
 
 `$cw->routes(token:, basePath:, origin:, trustProxy:)`:
 
-- `token`: leave it out (or pass `Cronwatch\FromEnv::Read`) to read `CRONWATCH_TOKEN`; an empty string counts as unset. Everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. `null` serves the routes open, for a mount behind your own auth, as it does in every language. Without a token:
+- `token`: leave it out (or pass `Cronwatch\FromEnv::Read`) to read `CRONWATCH_TOKEN`; an empty string or one of only whitespace counts as unset, given or read, and so does a variable holding a word Laravel's `env()` reads as null, true, false or empty (`null`, `(null)`, `true`, `false`, `(empty)` and the like). Anything else that is not a string (`true`, a number) throws a `TypeError`. Everything needs it, as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. `null` serves the routes open, for a mount behind your own auth, as it does in every language. Without a token:
   - In development, the routes make one and keep it in a file in the system's temporary directory, so every request, in every PHP process, asks for the same one. They write a sign-in link to the server log when they make it.
   - The link names the host only when `origin` is set or the request's host is loopback: `localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`. The host must read as one of these on its own, so a Host header such as `localhost:1@evil.example` does not count. Otherwise the link leaves the host out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`.
   - Anywhere else, they answer 503.
@@ -375,7 +375,7 @@ A triage of your own is any callable that takes a `Cronwatch\TriageContext` (`al
 | `alerts` | the console | a list of channels or callables. `[]` sends nothing |
 | `triage` | | a callable returning a diagnosis |
 | `sources` | | where runs this process does not wrap come from, such as [pg_cron](#pg-cron). Each is synced at the start of every check; one that throws is reported to `onError` and the check carries on |
-| `cronSecret` | `CRON_SECRET` | the bearer the dashboard's check endpoint accepts beside the token, and the one `handler()` requires. Leave it out (or pass `Cronwatch\FromEnv::Read`) to read `CRON_SECRET`; `''` counts as unset; `null` means none on purpose |
+| `cronSecret` | `CRON_SECRET` | the bearer the dashboard's check endpoint accepts beside the token, and the one `handler()` requires. Leave it out (or pass `Cronwatch\FromEnv::Read`) to read `CRON_SECRET`; `''` or only whitespace counts as unset, as does a variable holding a word Laravel's `env()` reads as null, true, false or empty; `null` means none on purpose; another type (`true`, a number) throws a `TypeError` |
 | `retention` | `'30d'` | how long finished runs are kept. Each job's newest run is always kept |
 | `defaults` | | `grace`, `timeout`, `timezone`, `failuresBeforeAlert` applied to every job that does not set its own |
 | `redact` | secret patterns | a callable applied to output and errors; `false` keeps them as logged. See [Redaction](#redaction) |
