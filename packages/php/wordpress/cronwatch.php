@@ -3,7 +3,7 @@
  * Plugin Name:       CronWatch
  * Plugin URI:        https://cronwatch.dev/
  * Description:       Watches WP-Cron: records every scheduled event's runs and tells you when one is missed, fails, gets stuck or runs slow.
- * Version:           0.10.0
+ * Version:           0.11.0
  * Requires at least: 6.1
  * Requires PHP:      8.2
  * Author:            Jon C. Phillips

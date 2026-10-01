@@ -2,7 +2,7 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
-## Unreleased
+## 0.11.0 - 2026-10-01
 
 ### Added
 - Ultimate Cron: each run of its jobs is recorded, `drupal:<module>` for a module's `hook_cron` and `drupal:job:<id>` for any other (triggers `ultimate-cron` and `ultimate-cron-manual`), each job on its own rules, read as Ultimate Cron reads them, and every cron run is still `drupal:cron`. Before, CronWatch left a site running Ultimate Cron alone.

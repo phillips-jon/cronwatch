@@ -1,6 +1,6 @@
 # Release Notes for CronWatch
 
-## Unreleased
+## 0.11.0 - 2026-10-01
 
 ### Added
 - From the library: `GET /cronwatch/api` answers what is serving it: the library, its language and version, and the API's version (`api: 1`).

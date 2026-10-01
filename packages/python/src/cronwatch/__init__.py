@@ -55,7 +55,7 @@ from .types import (
 # function.
 from . import client as _client_module  # noqa: E402, F401
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
 
 #: The internal modules, under their old public names: each still works,
 #: warning when a name of it is used, until 1.0 removes it.

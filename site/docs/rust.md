@@ -31,8 +31,8 @@ Rust 1.85 or newer for `cronwatch`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 doe
 
 ```toml
 [dependencies]
-cronwatch = { version = "0.10", features = ["alerts", "axum"] }
-cronwatch-sqlx = { version = "0.10", features = ["postgres"] }  # or "sqlite", "mysql", "pgcron"
+cronwatch = { version = "0.11", features = ["alerts", "axum"] }
+cronwatch-sqlx = { version = "0.11", features = ["postgres"] }  # or "sqlite", "mysql", "pgcron"
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```

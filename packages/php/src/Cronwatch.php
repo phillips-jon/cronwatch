@@ -40,7 +40,7 @@ use Cronwatch\Store\UpdatesRunIf;
  */
 final class Cronwatch
 {
-    public const VERSION = '0.10.0';
+    public const VERSION = '0.11.0';
 
     /** @internal */
     public const NAME_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/D';
