@@ -13,6 +13,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`discord`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct DiscordOptions {
     /// A channel webhook URL from Server Settings, Integrations, Webhooks. It
     /// is its own credential: errors never quote it.
@@ -22,6 +23,12 @@ pub struct DiscordOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(DiscordOptions {
+    text webhook_url,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Discord(DiscordOptions);
 

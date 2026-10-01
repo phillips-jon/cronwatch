@@ -5,7 +5,6 @@
 //! of its own (`apalis`); each run of this test uses queues of its own and
 //! deletes their tasks at the end.
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -68,8 +67,8 @@ async fn a_queued_job_on_postgres() {
         })])
         .build()
         .unwrap();
-    let jobs = HashMap::from([("invoices".to_string(), JobOptions::new().description("Queued invoices"))]);
-    let watcher = Watcher::new(&cw, Options { app: Some("billing".into()), jobs, ..Options::default() });
+    let options = Options::new().app("billing").job("invoices", JobOptions::new().description("Queued invoices"));
+    let watcher = Watcher::new(&cw, options);
 
     let mut invoices = PostgresStorage::new(&pool).with_config(Config::default().queue(&retried));
     invoices.push(41u32).await.unwrap();

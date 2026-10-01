@@ -12,6 +12,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`slack`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct SlackOptions {
     /// An incoming webhook URL from api.slack.com/messaging/webhooks. It is
     /// its own credential: errors never quote it.
@@ -21,6 +22,12 @@ pub struct SlackOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(SlackOptions {
+    text webhook_url,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Slack(SlackOptions);
 

@@ -98,8 +98,8 @@ use cronwatch::triage::{self, AnthropicOptions};
 # fn doc() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 let cw = Client::builder()
-    .alert(alerts::slack(SlackOptions { webhook_url: std::env::var("SLACK_WEBHOOK_URL")?, ..Default::default() })?)
-    .triage(triage::anthropic(AnthropicOptions { context: "An axum service on Postgres.".into(), ..Default::default() })?) // reads ANTHROPIC_API_KEY
+    .alert(alerts::slack(SlackOptions::new().webhook_url(std::env::var("SLACK_WEBHOOK_URL")?))?)
+    .triage(triage::anthropic(AnthropicOptions::new().context("An axum service on Postgres."))?) // reads ANTHROPIC_API_KEY
     .build()?;
 # Ok(())
 # }

@@ -12,6 +12,7 @@ use crate::types::Alert;
 
 /// Configures [`webhook`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct WebhookOptions {
     /// Where the alert is posted. Errors name only its origin, since a
     /// webhook URL's path or query is often the credential.
@@ -26,6 +27,13 @@ pub struct WebhookOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(WebhookOptions {
+    text url,
+    pairs headers,
+    text secret,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Webhook(WebhookOptions);
 

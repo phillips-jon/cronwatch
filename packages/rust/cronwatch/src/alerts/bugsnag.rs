@@ -15,6 +15,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`bugsnag`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct BugsnagOptions {
     /// A project's notifier API key.
     pub api_key: String,
@@ -33,6 +34,16 @@ pub struct BugsnagOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(BugsnagOptions {
+    text api_key,
+    text release_stage,
+    text endpoint,
+    flag recovered,
+    clock now,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Bugsnag {
     o: BugsnagOptions,

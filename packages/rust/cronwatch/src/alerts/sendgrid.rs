@@ -16,6 +16,7 @@ use crate::types::Alert;
 
 /// Configures [`sendgrid`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct SendgridOptions {
     /// An API key with Mail Send access, `SG...`.
     pub api_key: String,
@@ -25,6 +26,13 @@ pub struct SendgridOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(SendgridOptions {
+    text api_key,
+    text region,
+    value email: EmailOptions,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Sendgrid {
     o: SendgridOptions,

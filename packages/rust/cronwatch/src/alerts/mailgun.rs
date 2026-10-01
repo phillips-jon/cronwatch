@@ -15,6 +15,7 @@ use crate::types::Alert;
 
 /// Configures [`mailgun`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct MailgunOptions {
     /// A sending or account API key.
     pub api_key: String,
@@ -26,6 +27,14 @@ pub struct MailgunOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(MailgunOptions {
+    text api_key,
+    text domain,
+    text region,
+    value email: EmailOptions,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Mailgun {
     o: MailgunOptions,

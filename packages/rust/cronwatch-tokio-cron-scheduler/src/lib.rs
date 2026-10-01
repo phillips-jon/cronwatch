@@ -103,14 +103,36 @@ const SCHEDULER: &str = "tokio-cron-scheduler";
 /// so a store that hangs never holds its task for good.
 const SYNC_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Options for a [`Watcher`].
+/// Options for a [`Watcher`]. `#[non_exhaustive]`, so a release can add an
+/// option: start from [`Options::new`] and set what you need.
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct Options {
     /// Names the app in its tag. Default `$CRONWATCH_APP_ID`, else the
     /// executable's file name ([`cronwatch::bridge::app_name`]).
     pub app: Option<String>,
     /// Job options for every job, before its schedule and its own options.
     pub defaults: JobOptions,
+}
+
+impl Options {
+    /// The defaults: the app from `$CRONWATCH_APP_ID` or the executable's
+    /// name, and no job options.
+    pub fn new() -> Options {
+        Options::default()
+    }
+
+    /// Sets `app`, the name in this app's tag.
+    pub fn app(mut self, app: impl Into<String>) -> Self {
+        self.app = Some(app.into());
+        self
+    }
+
+    /// Sets `defaults`, the job options for every job.
+    pub fn defaults(mut self, defaults: JobOptions) -> Self {
+        self.defaults = defaults;
+        self
+    }
 }
 
 /// Why a job could not be made.

@@ -63,19 +63,16 @@ fn debug_never_prints_a_token_or_secret() {
 #[test]
 fn a_channels_request_and_options_never_debug_a_credential() {
     let key = "not-a-real-key-0123";
-    let request = cronwatch::alerts::Request {
-        url: format!("https://hooks.example.com/services/{key}"),
-        headers: vec![("authorization".into(), format!("Bearer {key}"))],
-        body: key.as_bytes().to_vec(),
-    };
+    let request = cronwatch::alerts::Request::new(
+        format!("https://hooks.example.com/services/{key}"),
+        vec![("authorization".into(), format!("Bearer {key}"))],
+        key.as_bytes(),
+    );
     let text = format!("{request:?}");
     assert!(!text.contains(key), "{text}");
     assert!(text.contains("https://hooks.example.com") && text.contains("authorization"), "{text}");
-    let slack = cronwatch::alerts::SlackOptions {
-        webhook_url: format!("https://hooks.example.com/{key}"),
-        ..Default::default()
-    };
-    let resend = cronwatch::alerts::ResendOptions { api_key: key.into(), ..Default::default() };
+    let slack = cronwatch::alerts::SlackOptions::new().webhook_url(format!("https://hooks.example.com/{key}"));
+    let resend = cronwatch::alerts::ResendOptions::new().api_key(key);
     for text in [format!("{slack:?}"), format!("{resend:?}")] {
         assert!(!text.contains(key), "{text}");
     }

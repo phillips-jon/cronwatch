@@ -15,6 +15,7 @@ use crate::types::Alert;
 
 /// Configures [`newrelic`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct NewRelicOptions {
     /// The account id, the number in your New Relic URLs.
     pub account_id: String,
@@ -29,6 +30,15 @@ pub struct NewRelicOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(NewRelicOptions {
+    text account_id,
+    text api_key,
+    text region,
+    text event_type,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 struct NewRelic {
     o: NewRelicOptions,

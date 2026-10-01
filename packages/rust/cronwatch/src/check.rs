@@ -31,6 +31,7 @@ pub(crate) type CheckResultShared = Result<CheckResult, Error>;
 
 /// A job's summary and its newest runs.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct JobWithRuns {
     pub job: JobSummary,
     pub runs: Vec<Run>,

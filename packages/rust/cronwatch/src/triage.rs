@@ -10,10 +10,9 @@
 //! # let _guard = _rt.enter();
 //! use cronwatch::triage::{self, AnthropicOptions};
 //!
-//! let diagnose = triage::anthropic(AnthropicOptions {
-//!     context: "A Rust service on Fly.io with a Postgres database.".into(),
-//!     ..Default::default()
-//! })?;
+//! let diagnose = triage::anthropic(
+//!     AnthropicOptions::new().context("A Rust service on Fly.io with a Postgres database."),
+//! )?;
 //! let cw = cronwatch::Client::builder().triage(diagnose).build()?;
 //! # Ok(())
 //! # }
@@ -73,6 +72,7 @@ pub const SYSTEM: &str = SYSTEM_PROMPT;
 
 /// Configures [`anthropic`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct AnthropicOptions {
     /// `""` for `$ANTHROPIC_API_KEY`.
     pub api_key: String,
@@ -97,6 +97,17 @@ pub struct AnthropicOptions {
     /// [`ReqwestTransport`](crate::alerts::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+crate::alerts::setters!(AnthropicOptions {
+    text api_key,
+    text model,
+    text effort,
+    some max_tokens: i64,
+    flag no_fallbacks,
+    text context,
+    text base_url,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Anthropic {
     o: AnthropicOptions,

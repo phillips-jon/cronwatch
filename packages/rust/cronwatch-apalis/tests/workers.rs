@@ -35,7 +35,7 @@ fn kit(store: Arc<dyn Store>) -> Kit {
 }
 
 fn options(app: &str) -> Options {
-    Options { app: Some(app.into()), ..Options::default() }
+    Options::new().app(app)
 }
 
 async fn stored(store: &dyn Store, name: &str) -> String {
@@ -211,7 +211,7 @@ impl<S: tower_service::Service<R>, R> tower_service::Service<R> for CountingServ
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_cron_worker_runs_on_cronwatchs_schedule() {
     let k = kit(Arc::new(MemoryStore::new()));
-    let watcher = Watcher::new(&k.cw, Options { defaults: JobOptions::new().grace("1m"), ..options("billing") });
+    let watcher = Watcher::new(&k.cw, options("billing").defaults(JobOptions::new().grace("1m")));
     let backend = watcher.cron("every-second", "* * * * * *", "UTC", JobOptions::new().description("Ticks")).unwrap();
     async fn tick(t: Tick) -> Result<String, BoxDynError> {
         Ok(format!("tick {}", t.get_timestamp() > 0))

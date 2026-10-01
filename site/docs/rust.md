@@ -49,10 +49,7 @@ use cronwatch_sqlx::SqlStore;
 let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL")?).await?;
 let cw = Client::builder()
     .store(SqlStore::postgres(pool)) // or SqlStore::sqlite(pool), SqlStore::mysql(pool)
-    .alert(alerts::slack(SlackOptions {
-        webhook_url: std::env::var("SLACK_WEBHOOK_URL")?,
-        ..Default::default()
-    })?)
+    .alert(alerts::slack(SlackOptions::new().webhook_url(std::env::var("SLACK_WEBHOOK_URL")?))?)
     .retention("30d")
     .build()?;
 ```
@@ -245,7 +242,7 @@ A function EventBridge Scheduler invokes directly has no headers to carry a bear
 
 The tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on the client's first use. `.prefix("app_cron_")?` names them: lowercase letters, digits and underscores, not starting with a digit, at most 47 characters (Postgres cuts a name at 63, and the longest the store makes adds 16). On Postgres and MySQL each statement runs on the pool on its own, in autocommit, so a run recorded inside a transaction of yours stays recorded if it rolls back. On SQLite the store holds one connection of the pool for its statements, so give the pool room for the app too. MySQL 8's default sign-in over a connection without TLS needs sqlx's `mysql-rsa` feature, or TLS.
 
-A store of your own implements `cronwatch::Store`: `init`, `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune` and `close`, with epoch milliseconds for every time; each returns a boxed future, so the trait is object safe without `async-trait`. Three provided methods default to `Unsupported` and are what keep processes sharing a store from judging a run twice or losing each other's updates: `update_run_if`, `compare_and_set_state` and `delete_run_if` (which takes back a queue attempt given back without failing; see [Rust schedulers](/docs/rust-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. With the `storetest` feature, `cronwatch::storetest::run(|| store).await` runs the contract test the built-in stores pass.
+A store of your own implements `cronwatch::Store`: `init`, `upsert_job`, `get_job`, `list_jobs`, `delete_job`, `insert_run`, `update_run`, `get_run`, `list_runs`, `last_run`, `running_runs`, `get_state`, `set_state`, `prune` and `close`, with epoch milliseconds for every time; each returns a boxed future, so the trait is object safe without `async-trait`. Three provided methods default to `Unsupported` and are what keep processes sharing a store from judging a run twice or losing each other's updates: `update_run_if`, `compare_and_set_state` and `delete_run_if` (which takes back a queue attempt given back without failing; see [Rust schedulers](/docs/rust-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. The types a store reads and writes are `#[non_exhaustive]`, so a release can add a field to stored data without breaking your build: write each with its `to_json()` (or the definition's and state's `to_json_without_nul()`), and read it back with `from_json` (`Definition`, `JobState`, `Run`, `Metrics`), or make one with `Run::new(id, job, status, started_at)` and `StoredJob::new(definition, created_at, updated_at)` and set the rest of its fields. With the `storetest` feature, `cronwatch::storetest::run(|| store).await` runs the contract test the built-in stores pass; it is the one promised name in `storetest`.
 
 ## Alerts
 
@@ -258,17 +255,17 @@ use std::sync::Arc;
 
 let cw = Client::builder()
     .store(store)
-    .alert(alerts::slack(SlackOptions {
-        webhook_url: std::env::var("SLACK_WEBHOOK_URL")?,
-        link: Some(Arc::new(|a: &Alert| format!("https://app.example.com/cronwatch/jobs/{}", a.job))),
-        ..Default::default()
-    })?)
-    .alert(alerts::discord(DiscordOptions { webhook_url: std::env::var("DISCORD_WEBHOOK_URL")?, ..Default::default() })?)
-    .alert(alerts::webhook(WebhookOptions {
-        url: "https://hooks.example.com/cronwatch".into(),
-        secret: std::env::var("CRONWATCH_WEBHOOK_SECRET")?,
-        ..Default::default()
-    })?)
+    .alert(alerts::slack(
+        SlackOptions::new()
+            .webhook_url(std::env::var("SLACK_WEBHOOK_URL")?)
+            .link(|a: &Alert| format!("https://app.example.com/cronwatch/jobs/{}", a.job)),
+    )?)
+    .alert(alerts::discord(DiscordOptions::new().webhook_url(std::env::var("DISCORD_WEBHOOK_URL")?))?)
+    .alert(alerts::webhook(
+        WebhookOptions::new()
+            .url("https://hooks.example.com/cronwatch")
+            .secret(std::env::var("CRONWATCH_WEBHOOK_SECRET")?),
+    )?)
     .alert(channel_fn("pagerduty", |alert| async move {
         if alert.alert_type == AlertType::Recovered {
             return Ok(());
@@ -286,33 +283,31 @@ The first `alert` replaces the default console channel, and `alerts(vec![])` sen
 ```rust
 use cronwatch::alerts::*;
 
-let email = EmailOptions { from: "CronWatch <alerts@example.com>".into(), to: vec!["ops@example.com".into()], ..Default::default() };
+let email = EmailOptions::new().from("CronWatch <alerts@example.com>").to(["ops@example.com"]);
 
 // Email. Each takes the EmailOptions.
-alerts::resend(ResendOptions { api_key: env("RESEND_API_KEY"), email: email.clone(), ..Default::default() })?;
-alerts::postmark(PostmarkOptions { server_token: env("POSTMARK_SERVER_TOKEN"), email: email.clone(), ..Default::default() })?;
-alerts::sendgrid(SendgridOptions { api_key: env("SENDGRID_API_KEY"), email: email.clone(), ..Default::default() })?;
-alerts::mailgun(MailgunOptions { api_key: env("MAILGUN_API_KEY"), domain: "mg.example.com".into(),
-    region: "eu".into(), email: email.clone(), ..Default::default() })?;
-alerts::ses(SesOptions { region: "us-east-1".into(), access_key_id: env("AWS_ACCESS_KEY_ID"),
-    secret_access_key: env("AWS_SECRET_ACCESS_KEY"), email, ..Default::default() })?;
+alerts::resend(ResendOptions::new().api_key(env("RESEND_API_KEY")).email(email.clone()))?;
+alerts::postmark(PostmarkOptions::new().server_token(env("POSTMARK_SERVER_TOKEN")).email(email.clone()))?;
+alerts::sendgrid(SendgridOptions::new().api_key(env("SENDGRID_API_KEY")).email(email.clone()))?;
+alerts::mailgun(MailgunOptions::new().api_key(env("MAILGUN_API_KEY")).domain("mg.example.com")
+    .region("eu").email(email.clone()))?;
+alerts::ses(SesOptions::new().region("us-east-1").access_key_id(env("AWS_ACCESS_KEY_ID"))
+    .secret_access_key(env("AWS_SECRET_ACCESS_KEY")).email(email))?;
 
-// SMS, one message per number, all at once. recovered: true texts recoveries too.
-alerts::twilio(TwilioOptions { account_sid: env("TWILIO_ACCOUNT_SID"), auth_token: env("TWILIO_AUTH_TOKEN"),
-    from: "+15005550006".into(), to: vec!["+15551110000".into()], ..Default::default() })?;
+// SMS, one message per number, all at once. recovered(true) texts recoveries too.
+alerts::twilio(TwilioOptions::new().account_sid(env("TWILIO_ACCOUNT_SID")).auth_token(env("TWILIO_AUTH_TOKEN"))
+    .from("+15005550006").to(["+15551110000"]))?;
 
 // Error trackers: one issue per job and alert type.
-alerts::sentry(SentryOptions { dsn: env("SENTRY_DSN"), ..Default::default() })?;
-alerts::honeybadger(HoneybadgerOptions { api_key: env("HONEYBADGER_API_KEY"), ..Default::default() })?;
-alerts::datadog(DatadogOptions { api_key: env("DD_API_KEY"), site: "datadoghq.eu".into(),
-    tags: vec!["env:prod".into()], ..Default::default() })?;
-alerts::rollbar(RollbarOptions { access_token: env("ROLLBAR_ACCESS_TOKEN"), ..Default::default() })?;
-alerts::bugsnag(BugsnagOptions { api_key: env("BUGSNAG_API_KEY"), ..Default::default() })?;
-alerts::newrelic(NewRelicOptions { account_id: env("NEW_RELIC_ACCOUNT_ID"),
-    api_key: env("NEW_RELIC_LICENSE_KEY"), ..Default::default() })?;
+alerts::sentry(SentryOptions::new().dsn(env("SENTRY_DSN")))?;
+alerts::honeybadger(HoneybadgerOptions::new().api_key(env("HONEYBADGER_API_KEY")))?;
+alerts::datadog(DatadogOptions::new().api_key(env("DD_API_KEY")).site("datadoghq.eu").tags(["env:prod"]))?;
+alerts::rollbar(RollbarOptions::new().access_token(env("ROLLBAR_ACCESS_TOKEN")))?;
+alerts::bugsnag(BugsnagOptions::new().api_key(env("BUGSNAG_API_KEY")))?;
+alerts::newrelic(NewRelicOptions::new().account_id(env("NEW_RELIC_ACCOUNT_ID")).api_key(env("NEW_RELIC_LICENSE_KEY")))?;
 ```
 
-The options are the SDK's in Rust's case: `subject_prefix` and `link` in `EmailOptions`; `message_stream` (Postmark); `region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `session_token` and `configuration_set_name` (SES); `api_key_sid`, `api_key_secret`, `messaging_service_sid` and `segments` (Twilio, 1 to 10, `None` for the default of 3); `environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `release` (Sentry); `headers` (the webhook, extra request headers such as an `Authorization`); `endpoint` (Honeybadger, Bugsnag); `host` (Datadog); `release_stage` (Bugsnag); `event_type` (New Relic); and `recovered` and `link` wherever the SDK has them. `Default::default()` is always the SDK's default, so where the SDK sends recoveries unless told not to, Rust has the negative: `skip_recovered` for Sentry and Rollbar. No options struct prints its credentials with `{:?}`.
+The options are the SDK's in Rust's case: `subject_prefix` and `link` in `EmailOptions`; `message_stream` (Postmark); `region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `session_token` and `configuration_set_name` (SES); `api_key_sid`, `api_key_secret`, `messaging_service_sid` and `segments` (Twilio, 1 to 10, `None` for the default of 3); `environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `release` (Sentry); `headers` (the webhook, extra request headers such as an `Authorization`); `endpoint` (Honeybadger, Bugsnag); `host` (Datadog); `release_stage` (Bugsnag); `event_type` (New Relic); and `recovered` and `link` wherever the SDK has them. Each options struct starts from `new()`, the SDK's defaults, and has a builder method per field, named after it; the structs are `#[non_exhaustive]`, so a release can add an option without breaking your build. Where the SDK sends recoveries unless told not to, Rust has the negative: `skip_recovered` for Sentry and Rollbar. No options struct prints its credentials with `{:?}`.
 
 Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the crate's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request names only the URL's origin, never its path, with the channel's keys cut out. Every options struct takes a `transport`: `None` for the default, reqwest on rustls with the platform's roots, which honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` as reqwest does; or implement `Transport` (one POST: the URL, the headers in order and the body) over a client of your own, or for a test. No public type of the crate is reqwest's, so a new reqwest never breaks an app's build. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
@@ -343,7 +338,7 @@ pg_cron runs jobs inside Postgres, where nothing can wrap them. The pg_cron sour
 use cronwatch_sqlx::{PgCron, PgCronOptions, SqlStore};
 use std::sync::Arc;
 
-let source = PgCron::new(pool.clone(), PgCronOptions { prefix: "db:".into(), ..Default::default() });
+let source = PgCron::new(pool.clone(), PgCronOptions::new().prefix("db:"));
 let cw = Client::builder().store(SqlStore::postgres(pool)).source(Arc::new(source)).build()?;
 cw.start_checking(Duration::from_secs(60));
 ```
@@ -367,10 +362,9 @@ A function given to `redact` replaces the default; call `cronwatch::redact_secre
 ```rust
 use cronwatch::triage::{self, AnthropicOptions};
 
-let diagnose = triage::anthropic(AnthropicOptions {
-    context: "A Rust service on Fly.io with a Postgres database.".into(),
-    ..Default::default()
-})?; // an error without ANTHROPIC_API_KEY
+let diagnose = triage::anthropic(
+    AnthropicOptions::new().context("A Rust service on Fly.io with a Postgres database."),
+)?; // an error without ANTHROPIC_API_KEY
 let cw = Client::builder().alert(slack).triage(diagnose).build()?;
 ```
 

@@ -296,7 +296,12 @@ pub(crate) fn failure_count(count: Option<&Value>) -> i64 {
 }
 
 /// One execution of a job, as a store keeps it. Times are epoch milliseconds.
+///
+/// `#[non_exhaustive]`, so a release can add a field: a store of the app's
+/// own makes one with [`Run::new`] and sets the rest, or reads one with
+/// [`Run::from_json`].
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Run {
     pub id: String,
     pub job: String,
@@ -313,6 +318,24 @@ pub struct Run {
 }
 
 impl Run {
+    /// A run of `job` with this id, status and start, and nothing else: not
+    /// finished, no error, output or metrics, trigger `run`. Set the other
+    /// fields on what it returns.
+    pub fn new(id: impl Into<String>, job: impl Into<String>, status: RunStatus, started_at: i64) -> Run {
+        Run {
+            id: id.into(),
+            job: job.into(),
+            status,
+            started_at,
+            finished_at: None,
+            duration_ms: None,
+            error: None,
+            output: None,
+            metrics: Metrics::new(),
+            trigger: "run".into(),
+        }
+    }
+
     /// The run as the SDK writes it.
     pub fn to_value(&self) -> Value {
         Value::Object(
@@ -469,8 +492,10 @@ impl Definition {
     }
 }
 
-/// A job as a store knows it.
+/// A job as a store knows it. `#[non_exhaustive]`: a store makes one with
+/// [`StoredJob::new`].
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct StoredJob {
     pub name: String,
     pub definition: Definition,
@@ -478,15 +503,33 @@ pub struct StoredJob {
     pub updated_at: i64,
 }
 
+impl StoredJob {
+    /// The job `definition` names, first stored at `created_at` and last
+    /// declared at `updated_at`.
+    pub fn new(definition: Definition, created_at: i64, updated_at: i64) -> StoredJob {
+        StoredJob { name: definition.name().to_string(), definition, created_at, updated_at }
+    }
+}
+
 /// A condition that is open, and when it opened.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct OpenCondition {
     pub condition: Condition,
     pub since: i64,
 }
 
-/// What the checks remember about a job between runs.
+impl OpenCondition {
+    /// `condition`, open since `since`.
+    pub fn new(condition: Condition, since: i64) -> OpenCondition {
+        OpenCondition { condition, since }
+    }
+}
+
+/// What the checks remember about a job between runs. Made with
+/// [`JobState::new`] or read with [`JobState::from_json`].
 #[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
 pub struct JobState {
     pub job: String,
     /// Conditions currently open, in the order they opened.
@@ -526,6 +569,7 @@ const STATE_KEYS: [&str; 8] =
 /// and one with no alert (or one that is not an alert) is dropped when it
 /// has, so a malformed entry never makes the whole state unreadable.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
 pub struct SendingAlert {
     /// When the sender's lease runs out, in epoch milliseconds.
     pub until: Option<i64>,
@@ -534,6 +578,11 @@ pub struct SendingAlert {
 }
 
 impl SendingAlert {
+    /// `alert`, held by its sender until `until`.
+    pub fn new(until: Option<i64>, alert: Option<Alert>) -> SendingAlert {
+        SendingAlert { until, alert }
+    }
+
     /// The entry as the SDK writes it.
     pub fn to_value(&self) -> Value {
         let mut o = Object::new();
@@ -684,6 +733,7 @@ impl JobState {
 
 /// One metric over its ceiling or its baseline.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct BudgetBreach {
     pub metric: String,
     pub value: f64,
@@ -693,6 +743,12 @@ pub struct BudgetBreach {
 }
 
 impl BudgetBreach {
+    /// `metric` at `value`, over `limit`; `basis` is `budget`, or how the
+    /// baseline was worked out.
+    pub fn new(metric: impl Into<String>, value: f64, limit: f64, basis: impl Into<String>) -> BudgetBreach {
+        BudgetBreach { metric: metric.into(), value, limit, basis: basis.into() }
+    }
+
     fn to_value(&self) -> Value {
         Value::Object(
             Object::new()
@@ -704,26 +760,59 @@ impl BudgetBreach {
     }
 }
 
-/// What an alert carries beyond its title and message.
+/// What an alert carries beyond its title and message. Each variant is
+/// `#[non_exhaustive]`, so a release can add a field to one: match with
+/// `..`, and make one with its constructor ([`AlertDetails::failure`] and
+/// the others).
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum AlertDetails {
     /// Which run was missed.
+    #[non_exhaustive]
     Missed { due_at: i64, deadline: f64, grace_ms: f64, last_run_at: Option<i64> },
     /// The failures behind a failed or stuck alert.
+    #[non_exhaustive]
     Failure { consecutive_failures: i64, threshold: i64 },
     /// How slow a run was; `basis` is `maxDuration`, or how the baseline was
     /// worked out.
+    #[non_exhaustive]
     Slow { duration_ms: i64, threshold_ms: f64, basis: String },
     /// The metrics over their limits.
+    #[non_exhaustive]
     OverBudget { breaches: Vec<BudgetBreach> },
     /// The conditions that closed. Reason `unscheduled` closes missed alone
     /// because the job no longer has a schedule; `since` is when missed
     /// opened.
+    #[non_exhaustive]
     Recovered { after: Vec<Condition>, reason: Option<String>, since: Option<i64> },
 }
 
 impl AlertDetails {
+    /// [`AlertDetails::Missed`].
+    pub fn missed(due_at: i64, deadline: f64, grace_ms: f64, last_run_at: Option<i64>) -> AlertDetails {
+        AlertDetails::Missed { due_at, deadline, grace_ms, last_run_at }
+    }
+
+    /// [`AlertDetails::Failure`].
+    pub fn failure(consecutive_failures: i64, threshold: i64) -> AlertDetails {
+        AlertDetails::Failure { consecutive_failures, threshold }
+    }
+
+    /// [`AlertDetails::Slow`].
+    pub fn slow(duration_ms: i64, threshold_ms: f64, basis: impl Into<String>) -> AlertDetails {
+        AlertDetails::Slow { duration_ms, threshold_ms, basis: basis.into() }
+    }
+
+    /// [`AlertDetails::OverBudget`].
+    pub fn over_budget(breaches: Vec<BudgetBreach>) -> AlertDetails {
+        AlertDetails::OverBudget { breaches }
+    }
+
+    /// [`AlertDetails::Recovered`].
+    pub fn recovered(after: Vec<Condition>, reason: Option<String>, since: Option<i64>) -> AlertDetails {
+        AlertDetails::Recovered { after, reason, since }
+    }
+
     pub(crate) fn to_value(&self) -> Value {
         let o = match self {
             AlertDetails::Missed { due_at, deadline, grace_ms, last_run_at } => Object::new()
@@ -805,7 +894,11 @@ impl AlertDetails {
 }
 
 /// A condition opening or closing, with the text every channel shows.
+/// `#[non_exhaustive]`: the client makes alerts; a test of a channel of the
+/// app's own makes one with [`Alert::new`] or reads one with
+/// [`Alert::from_json`].
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Alert {
     pub alert_type: AlertType,
     /// The run behind the alert, when there is one.
@@ -827,6 +920,24 @@ pub struct Alert {
 }
 
 impl Alert {
+    /// An alert of `alert_type` for `job` at `at`, with these details and
+    /// nothing else: no run, an empty definition, title and message, no
+    /// triage. Set the other fields on what it returns.
+    pub fn new(alert_type: AlertType, job: impl Into<String>, details: AlertDetails, at: i64) -> Alert {
+        Alert {
+            alert_type,
+            run: None,
+            details,
+            job: job.into(),
+            definition: Definition::default(),
+            title: String::new(),
+            message: String::new(),
+            triage: None,
+            triage_tried: false,
+            at,
+        }
+    }
+
     /// The alert as the SDK writes it.
     pub fn to_value(&self) -> Value {
         let mut o = Object::new()
@@ -894,6 +1005,7 @@ impl Alert {
 /// A job's last twenty runs of any status; the percentiles are over the
 /// successful ones among them.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
 pub struct Stats {
     pub runs: i64,
     pub ok_rate: f64,
@@ -903,6 +1015,7 @@ pub struct Stats {
 
 /// A job and its health, as the dashboard shows it.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct JobSummary {
     pub name: String,
     pub definition: Definition,
@@ -946,6 +1059,7 @@ impl JobSummary {
 
 /// What a check found and sent.
 #[derive(Clone, Debug, Default, PartialEq)]
+#[non_exhaustive]
 pub struct CheckResult {
     pub checked_at: i64,
     pub jobs: Vec<JobSummary>,

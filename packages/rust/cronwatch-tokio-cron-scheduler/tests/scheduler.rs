@@ -24,7 +24,7 @@ fn client(store: Arc<dyn Store>) -> (Client, Arc<Mutex<Vec<String>>>) {
 }
 
 fn options(app: &str) -> Options {
-    Options { app: Some(app.into()), ..Options::default() }
+    Options::new().app(app)
 }
 
 async fn stored(store: &dyn Store, name: &str) -> String {
@@ -59,7 +59,7 @@ impl std::fmt::Display for Failed {
 async fn runs_errors_and_panics_are_recorded() {
     let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
     let (cw, errors) = client(store.clone());
-    let watcher = Watcher::new(&cw, Options { defaults: JobOptions::new().grace("1m"), ..options("billing") });
+    let watcher = Watcher::new(&cw, options("billing").defaults(JobOptions::new().grace("1m")));
     let scheduler = JobScheduler::new().await.unwrap();
     let calls = Arc::new(AtomicUsize::new(0));
     let counted = calls.clone();

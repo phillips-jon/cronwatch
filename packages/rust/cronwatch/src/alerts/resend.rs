@@ -15,6 +15,7 @@ use crate::types::Alert;
 
 /// Configures [`resend`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct ResendOptions {
     /// An API key from resend.com/api-keys, `re_...`.
     pub api_key: String,
@@ -22,6 +23,12 @@ pub struct ResendOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(ResendOptions {
+    text api_key,
+    value email: EmailOptions,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Resend {
     o: ResendOptions,

@@ -270,18 +270,11 @@ async fn a_run_whose_metrics_hold_something_other_than_a_finite_number_still_sho
     metrics.set("label", f64::INFINITY);
     metrics.set("cost", 1.25);
     metrics.set("n", 3.0);
-    let run = Run {
-        id: "odd".into(),
-        job: "imported".into(),
-        status: cronwatch::RunStatus::Ok,
-        started_at: T0,
-        finished_at: Some(T0),
-        duration_ms: Some(0),
-        error: None,
-        output: None,
-        metrics,
-        trigger: "source".into(),
-    };
+    let mut run = Run::new("odd", "imported", cronwatch::RunStatus::Ok, T0);
+    run.finished_at = Some(T0);
+    run.duration_ms = Some(0);
+    run.metrics = metrics;
+    run.trigger = "source".into();
     w.k.cw.store().insert_run(&run).await.unwrap();
     let res = w.get("/cronwatch/jobs/imported", &[AUTH]).await;
     status("job page", &res, 200);

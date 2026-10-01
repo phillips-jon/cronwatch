@@ -18,6 +18,7 @@ use crate::types::Alert;
 
 /// Configures [`ses`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct SesOptions {
     /// The SES region, `us-east-1` say. The from identity must be verified
     /// there.
@@ -35,6 +36,17 @@ pub struct SesOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(SesOptions {
+    text region,
+    text access_key_id,
+    text secret_access_key,
+    text session_token,
+    text configuration_set_name,
+    value email: EmailOptions,
+    clock now,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Ses {
     o: SesOptions,

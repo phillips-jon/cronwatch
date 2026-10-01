@@ -16,6 +16,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`twilio`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct TwilioOptions {
     /// The account SID, `AC...`. It is in the URL whichever credentials sign
     /// the request.
@@ -46,6 +47,20 @@ pub struct TwilioOptions {
     /// Sends the requests; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(TwilioOptions {
+    text account_sid,
+    text auth_token,
+    text api_key_sid,
+    text api_key_secret,
+    text from,
+    text messaging_service_sid,
+    texts to,
+    flag recovered,
+    some segments: u32,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 /// The most segments a message may use, which keeps it inside Twilio's 1600
 /// character Body limit.

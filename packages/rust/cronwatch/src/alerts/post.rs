@@ -45,6 +45,7 @@ pub(crate) const ERROR_BODY_MAX: usize = 200;
 /// URL's origin and the header names only, since the rest carries the
 /// channel's credentials.
 #[derive(Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Request {
     /// An http or https URL, as the WHATWG URL parser (and so fetch) writes
     /// it. Its path or query may be a credential: never quote it.
@@ -56,7 +57,16 @@ pub struct Request {
     pub body: Vec<u8>,
 }
 
+impl Request {
+    /// A POST to `url` with these headers and body, for a test of a
+    /// [`Transport`] of the app's own.
+    pub fn new(url: impl Into<String>, headers: Vec<(String, String)>, body: impl Into<Vec<u8>>) -> Request {
+        Request { url: url.into(), headers, body: body.into() }
+    }
+}
+
 /// An answer: its status, and its body as it arrives.
+#[non_exhaustive]
 pub struct Response {
     pub status: u16,
     pub body: Box<dyn ResponseBody>,

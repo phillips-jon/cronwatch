@@ -110,8 +110,10 @@ const SCHEDULER: &str = "apalis-cron";
 /// it for good.
 const SYNC_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Options for a [`Watcher`].
+/// Options for a [`Watcher`]. `#[non_exhaustive]`, so a release can add an
+/// option: start from [`Options::new`] and set what you need.
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct Options {
     /// Names the app in its tag. Default `$CRONWATCH_APP_ID`, else the
     /// executable's file name ([`cronwatch::bridge::app_name`]).
@@ -122,6 +124,32 @@ pub struct Options {
     /// for (queued tasks), by the worker's name, used when the store holds
     /// no definition of this app's for it.
     pub jobs: HashMap<String, JobOptions>,
+}
+
+impl Options {
+    /// The defaults: the app from `$CRONWATCH_APP_ID` or the executable's
+    /// name, and no job options.
+    pub fn new() -> Options {
+        Options::default()
+    }
+
+    /// Sets `app`, the name in this app's tag.
+    pub fn app(mut self, app: impl Into<String>) -> Self {
+        self.app = Some(app.into());
+        self
+    }
+
+    /// Sets `defaults`, the job options for every job.
+    pub fn defaults(mut self, defaults: JobOptions) -> Self {
+        self.defaults = defaults;
+        self
+    }
+
+    /// Adds to `jobs`: the options for the jobs of the worker `name`.
+    pub fn job(mut self, name: impl Into<String>, options: JobOptions) -> Self {
+        self.jobs.insert(name.into(), options);
+        self
+    }
 }
 
 /// Watches one app's apalis workers. A cheap handle (an `Arc` inside), safe

@@ -101,7 +101,7 @@ For a Rust app, use the `cronwatch` crate (Rust 1.85 or newer, on tokio); it is 
 - **Check:** `cw.start_checking(Duration::from_secs(60))` in a long-running process, the integration's check job (`watcher.check_job(every)?`, `watcher.check_worker(every)?`), or a second crontab line calling `cw.check().await` (or the blocking client's `check()`).
 - **Dashboard:** `cw.routes(RoutesOptions::new())?`, nested with `Router::new().nest_service("/cronwatch", routes)` in axum (it finds its base path from the mount) or served as a tower service. It needs `CRONWATCH_TOKEN` outside development, or `RoutesOptions::no_token()` behind the app's own auth.
 - **Handler:** for a platform that calls a URL, `job.handler(|job, request| async move { .. }, HandlerOptions::new())` is a tower service checked against `CRON_SECRET`, and `lambda_http::run(handler)` runs it on AWS Lambda.
-- **Channels:** in `cronwatch::alerts`, each from an options struct (`alerts::slack(SlackOptions { webhook_url, ..Default::default() })?`); Claude triage is in `cronwatch::triage` and pg_cron in `cronwatch_sqlx::PgCron`.
+- **Channels:** in `cronwatch::alerts`, each from an options struct (`alerts::slack(SlackOptions::new().webhook_url(url))?`); Claude triage is in `cronwatch::triage` and pg_cron in `cronwatch_sqlx::PgCron`.
 
 The MCP server works against it unchanged. Docs: https://cronwatch.dev/docs/rust/ and https://cronwatch.dev/docs/rust-schedulers/
 

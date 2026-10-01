@@ -14,6 +14,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`honeybadger`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct HoneybadgerOptions {
     /// A project API key.
     pub api_key: String,
@@ -29,6 +30,15 @@ pub struct HoneybadgerOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(HoneybadgerOptions {
+    text api_key,
+    text environment,
+    text endpoint,
+    flag recovered,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Honeybadger {
     o: HoneybadgerOptions,

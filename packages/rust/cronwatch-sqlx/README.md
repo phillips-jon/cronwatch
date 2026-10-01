@@ -39,7 +39,7 @@ use std::sync::Arc;
 use cronwatch_sqlx::{PgCron, PgCronOptions, SqlStore};
 # fn doc(pool: sqlx::PgPool) -> Result<(), cronwatch::Error> {
 
-let source = PgCron::new(pool.clone(), PgCronOptions { prefix: "db:".into(), ..Default::default() });
+let source = PgCron::new(pool.clone(), PgCronOptions::new().prefix("db:"));
 let cw = cronwatch::Client::builder().store(SqlStore::postgres(pool)).source(Arc::new(source)).build()?;
 cw.start_checking(std::time::Duration::from_secs(60));
 # Ok(())

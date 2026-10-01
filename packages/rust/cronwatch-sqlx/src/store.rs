@@ -201,12 +201,9 @@ fn job_of(row: &Row) -> Result<StoredJob, BoxError> {
         Ok(_) => Definition::default(),
         Err(err) => return Err(format!("job {name}: {err}").into()),
     };
-    Ok(StoredJob {
-        name,
-        definition,
-        created_at: row.int("created_at").unwrap_or(0),
-        updated_at: row.int("updated_at").unwrap_or(0),
-    })
+    let mut job = StoredJob::new(definition, row.int("created_at").unwrap_or(0), row.int("updated_at").unwrap_or(0));
+    job.name = name;
+    Ok(job)
 }
 
 fn run_of(row: &Row) -> Result<Run, BoxError> {
@@ -225,18 +222,19 @@ fn run_of(row: &Row) -> Result<Run, BoxError> {
             },
         };
     }
-    Ok(Run {
-        job: row.text("job").unwrap_or_default(),
-        status: RunStatus::parse(&row.text("status").unwrap_or_default()),
-        started_at: row.int("started_at").unwrap_or(0),
-        finished_at: row.int("finished_at"),
-        duration_ms: row.int("duration_ms"),
-        error: row.text("error"),
-        output: row.text("output"),
-        metrics,
-        trigger: row.text("trigger").unwrap_or_default(),
+    let mut run = Run::new(
         id,
-    })
+        row.text("job").unwrap_or_default(),
+        RunStatus::parse(&row.text("status").unwrap_or_default()),
+        row.int("started_at").unwrap_or(0),
+    );
+    run.finished_at = row.int("finished_at");
+    run.duration_ms = row.int("duration_ms");
+    run.error = row.text("error");
+    run.output = row.text("output");
+    run.metrics = metrics;
+    run.trigger = row.text("trigger").unwrap_or_default();
+    Ok(run)
 }
 
 // Parameters in statement order, so every dialect binds the same values.

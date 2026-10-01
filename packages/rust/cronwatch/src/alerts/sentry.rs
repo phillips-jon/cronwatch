@@ -17,6 +17,7 @@ use crate::types::{Alert, AlertType};
 
 /// Configures [`sentry`].
 #[derive(Clone, Default)]
+#[non_exhaustive]
 pub struct SentryOptions {
     /// The project's DSN, `https://<key>@o0.ingest.sentry.io/<project>`.
     pub dsn: String,
@@ -30,6 +31,15 @@ pub struct SentryOptions {
     /// Sends the request; `None` for the default [`ReqwestTransport`](super::ReqwestTransport).
     pub transport: Option<Arc<dyn Transport>>,
 }
+
+super::setters!(SentryOptions {
+    text dsn,
+    text environment,
+    text release,
+    flag skip_recovered,
+    link link,
+    some transport: Arc<dyn Transport>,
+});
 
 struct Sentry {
     o: SentryOptions,

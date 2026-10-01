@@ -29,18 +29,16 @@ impl Transport for Recorder {
 async fn a_failure_is_triaged_and_sent_to_slack() {
     let rec = Arc::new(Recorder::default());
     let transport: Arc<dyn Transport> = rec.clone();
-    let slack = alerts::slack(SlackOptions {
-        webhook_url: "https://hooks.slack.example/T/B/x".into(),
-        link: Some(Arc::new(|a| format!("https://app.example/cronwatch/jobs/{}", a.job))),
-        transport: Some(transport.clone()),
-    })
+    let slack = alerts::slack(
+        SlackOptions::new()
+            .webhook_url("https://hooks.slack.example/T/B/x")
+            .link(|a| format!("https://app.example/cronwatch/jobs/{}", a.job))
+            .transport(transport.clone()),
+    )
     .unwrap();
-    let diagnose = triage::anthropic(AnthropicOptions {
-        api_key: "test-key".into(),
-        base_url: "https://api.anthropic.com".into(),
-        transport: Some(transport),
-        ..Default::default()
-    })
+    let diagnose = triage::anthropic(
+        AnthropicOptions::new().api_key("test-key").base_url("https://api.anthropic.com").transport(transport),
+    )
     .unwrap();
     let errors = Arc::new(Mutex::new(Vec::<String>::new()));
     let sink = errors.clone();
