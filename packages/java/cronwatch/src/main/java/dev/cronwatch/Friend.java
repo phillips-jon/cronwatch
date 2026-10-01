@@ -20,6 +20,11 @@ final class Friend implements Access.Client {
   }
 
   @Override
+  public boolean declares(Cronwatch cw, String name) {
+    return cw.core.declared(name) != null;
+  }
+
+  @Override
   public boolean secretOptOut(Cronwatch cw) {
     return cw.core.secretOptOut;
   }

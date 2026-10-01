@@ -26,7 +26,9 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
@@ -750,15 +752,18 @@ public final class Cronwatch implements AutoCloseable {
   }
 
   /**
-   * Stops the interval, waits up to five seconds for sends and recordings in flight, then
-   * interrupts what is left, removes the shutdown hook, and closes the store. A servlet container
-   * or Spring context should call it when the app stops, so no thread of the client's holds the
-   * app's class loader. Called while the JVM stops (a Spring context closing from its own hook), it
-   * first records the runs still open as the shutdown hook would, before the store is let go.
+   * Stops the interval, waits for a check under way to end (bounded by its own channel, triage and
+   * retry timeouts, as the SDK's close awaits it), waits up to five seconds for the other sends and
+   * recordings in flight, then interrupts what is left, removes the shutdown hook, and closes the
+   * store. A servlet container or Spring context should call it when the app stops, so no thread of
+   * the client's holds the app's class loader. Called while the JVM stops (a Spring context closing
+   * from its own hook), it first records the runs still open as the shutdown hook would, before the
+   * store is let go.
    */
   @Override
   public void close() {
     stop();
+    awaitCheck();
     if (shutdownHook != null) {
       try {
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
@@ -787,6 +792,25 @@ public final class Cronwatch implements AutoCloseable {
     // The client's own transport only: one the app gave is the app's to close.
     if (core.transport instanceof LazyTransport own) {
       own.close();
+    }
+  }
+
+  /**
+   * Waits for the check in flight to end, as the SDK's close awaits {@code this.checking}, so it
+   * never writes to a store already closed. Not from the check itself (an error handler or a
+   * channel's code that closes the client), which would wait for good; an interrupt stops waiting.
+   */
+  private void awaitCheck() {
+    CompletableFuture<CheckResult> inFlight = core.checking.get();
+    if (inFlight == null || Thread.currentThread().equals(core.checkThread)) {
+      return;
+    }
+    try {
+      inFlight.get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (ExecutionException | CancellationException e) {
+      // The check's own failure, reported to whoever asked for it.
     }
   }
 
@@ -1068,7 +1092,8 @@ public final class Cronwatch implements AutoCloseable {
               deliver == Deliver.AT_CHECK,
               handler,
               clock == null ? System::currentTimeMillis : clock,
-              timings);
+              timings,
+              environment);
       return new Cronwatch(core, shutdownHook, environment);
     }
 

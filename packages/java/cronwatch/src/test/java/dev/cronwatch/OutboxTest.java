@@ -6,19 +6,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.cronwatch.Support.Capture;
 import dev.cronwatch.Support.Clock;
 import dev.cronwatch.Support.Errors;
 import dev.cronwatch.internal.evaluate.Evaluate;
+import dev.cronwatch.json.JsObject;
+import dev.cronwatch.json.Json;
 import dev.cronwatch.store.MemoryStore;
 import dev.cronwatch.store.Store;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -70,6 +76,81 @@ class OutboxTest {
 
   private static void fail() {
     throw new IllegalStateException("disk full");
+  }
+
+  // The cross-port check: a queued alert lost the fields a newer writer added (and an alert of a
+  // type this release does not know had its details rewritten as a failure's) on the next state
+  // write, and a retry sent it without them. The SDK carries queued alerts as plain objects.
+  @Test
+  void queuedAlertsKeepWhatANewerWriterAddedThroughWritesAndRetries() throws Exception {
+    AtomicBoolean down = new AtomicBoolean(true);
+    List<String> bodies = new CopyOnWriteArrayList<>();
+    Channel flaky =
+        Channel.of(
+            "flaky",
+            (a, ctx) -> {
+              bodies.add(a.toJson());
+              if (down.get()) {
+                throw new IOException("down");
+              }
+            });
+    Support.Made m = Support.make(b -> b.alerts(List.of(flaky)));
+    assertThrows(IllegalStateException.class, () -> m.cw().run("r", j -> fail()));
+    Store store = m.cw().store();
+    JobState written = store.getState("r");
+    assertNotNull(written);
+    JsObject state = Json.parseObject(written.toJson());
+    JsObject failed =
+        (JsObject) ((List<?>) Objects.requireNonNull(state.get("undelivered"))).get(0);
+    failed.set("futureAlertField", "kept");
+    ((JsObject) Objects.requireNonNull(failed.get("details"))).set("futureDetail", 1);
+    JsObject future =
+        failed
+            .copy()
+            .set("type", "future_condition")
+            .set("details", new JsObject().set("x", 1).set("a_b", List.of(2)));
+    ((JsObject) Objects.requireNonNull(state.get("open"))).set("future_condition", T0);
+    JsObject held = future.copy().set("at", T0 - 1);
+    state.set("undelivered", List.of(failed, future));
+    state.set(
+        "sending",
+        List.of(
+            new JsObject()
+                .set("until", T0 + 3_600_000L)
+                .set("alert", held)
+                .set("futureEntryKey", true)));
+
+    // Read and written back as they were.
+    String json = state.toJson();
+    String again = JobState.fromJson(json).toJson();
+    for (String kept :
+        List.of(
+            "\"futureAlertField\":\"kept\"",
+            "\"futureDetail\":1",
+            "\"details\":{\"x\":1,\"a_b\":[2]}",
+            "\"futureEntryKey\":true")) {
+      assertTrue(again.contains(kept), kept + " in " + again);
+    }
+
+    // Retried with them, and still queued with them after the retry fails.
+    store.setState(JobState.fromJson(json));
+    m.clock().advance(MIN);
+    m.cw().check();
+    assertEquals(3, bodies.size(), bodies.toString());
+    assertTrue(bodies.get(1).contains("\"futureAlertField\":\"kept\""), bodies.get(1));
+    assertTrue(bodies.get(1).contains("\"futureDetail\":1"), bodies.get(1));
+    assertTrue(bodies.get(2).contains("\"details\":{\"x\":1,\"a_b\":[2]}"), bodies.get(2));
+    JobState after = store.getState("r");
+    assertNotNull(after);
+    String stored = after.toJson();
+    for (String kept :
+        List.of(
+            "\"futureAlertField\":\"kept\"",
+            "\"futureDetail\":1",
+            "\"details\":{\"x\":1,\"a_b\":[2]}",
+            "\"futureEntryKey\":true")) {
+      assertTrue(stored.contains(kept), kept + " in " + stored);
+    }
   }
 
   @Test

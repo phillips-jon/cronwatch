@@ -676,6 +676,47 @@ class HardeningTest {
     assertEquals(List.of("alert queue for q"), m.errors().wheres());
   }
 
+  // The cross-port check: the in-memory store's warning read only CRONWATCH_ENV and APP_ENV, so a
+  // Spring app whose profile reads as production (the builder's environment) was never warned.
+  @Test
+  void theInMemoryStoresWarningReadsTheBuildersEnvironment() {
+    if (System.getenv("CRONWATCH_ENV") != null || System.getenv("APP_ENV") != null) {
+      return; // a variable wins over the builder's environment, and this JVM cannot unset it
+    }
+    List<String> warnings = new CopyOnWriteArrayList<>();
+    Logger logger = Logger.getLogger("dev.cronwatch");
+    Handler handler =
+        new Handler() {
+          @Override
+          public void publish(LogRecord r) {
+            if (r.getMessage().contains("in-memory store")) {
+              warnings.add(r.getMessage());
+            }
+          }
+
+          @Override
+          public void flush() {}
+
+          @Override
+          public void close() {}
+        };
+    logger.addHandler(handler);
+    try {
+      try (Cronwatch cw = Cronwatch.builder().environment("dev").noShutdownHook().build()) {
+        cw.check();
+      }
+      assertEquals(List.of(), warnings, "not in development");
+      try (Cronwatch cw = Cronwatch.builder().environment("prod").noShutdownHook().build()) {
+        cw.check();
+        cw.check();
+      }
+      assertEquals(1, warnings.size(), warnings.toString());
+      assertTrue(warnings.get(0).contains("runs and state are lost on restart"), warnings.get(0));
+    } finally {
+      logger.removeHandler(handler);
+    }
+  }
+
   @Test
   void startWithDeliverAtCheckSaysOnceThatAnotherProcessMustSend() {
     List<String> warnings = new CopyOnWriteArrayList<>();
