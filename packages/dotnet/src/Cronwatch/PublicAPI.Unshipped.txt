@@ -543,15 +543,16 @@ Cronwatch.Expect
 Cronwatch.IChannel
 Cronwatch.IChannel.Name.get -> string!
 Cronwatch.IChannel.SendAsync(Cronwatch.Alert! alert, Cronwatch.ChannelContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+Cronwatch.ICompareAndSetStateStore
+Cronwatch.ICompareAndSetStateStore.CompareAndSetStateAsync(Cronwatch.JobState! state, long expected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Cronwatch.IConditionalRunStore
-Cronwatch.IConditionalRunStore.UpdateRunIfAsync(Cronwatch.Run! run, System.Collections.Generic.IReadOnlyList<Cronwatch.RunStatus>! from, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+Cronwatch.IDeleteRunIfStore
+Cronwatch.IDeleteRunIfStore.DeleteRunIfAsync(string! id, string! job, Cronwatch.RunStatus status, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Cronwatch.IRunDeletingStore
-Cronwatch.IRunDeletingStore.DeleteRunIfAsync(string! id, string! job, Cronwatch.RunStatus status, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Cronwatch.ISource
 Cronwatch.ISource.Name.get -> string!
 Cronwatch.ISource.SyncAsync(Cronwatch.CronwatchClient! client, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<Cronwatch.Alert!>?>!
 Cronwatch.IStateCasStore
-Cronwatch.IStateCasStore.CompareAndSetStateAsync(Cronwatch.JobState! state, long expected, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Cronwatch.IStore
 Cronwatch.IStore.DeleteJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Cronwatch.IStore.GetJobAsync(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Cronwatch.StoredJob?>!
@@ -569,6 +570,8 @@ Cronwatch.IStore.UpdateRunAsync(Cronwatch.Run! run, System.Threading.Cancellatio
 Cronwatch.IStore.UpsertJobAsync(Cronwatch.Definition! definition, long now, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 Cronwatch.ITriage
 Cronwatch.ITriage.TriageAsync(Cronwatch.TriageContext! context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<string?>!
+Cronwatch.IUpdateRunIfStore
+Cronwatch.IUpdateRunIfStore.UpdateRunIfAsync(Cronwatch.Run! run, System.Collections.Generic.IReadOnlyList<Cronwatch.RunStatus>! from, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 Cronwatch.Job
 Cronwatch.Job.Client.get -> Cronwatch.CronwatchClient!
 Cronwatch.Job.Definition.get -> Cronwatch.Definition!

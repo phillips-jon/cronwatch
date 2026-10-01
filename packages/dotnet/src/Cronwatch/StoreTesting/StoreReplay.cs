@@ -116,7 +116,7 @@ public static class StoreReplay
         }
 
         IStore states = fresh();
-        var cas = Capable<IStateCasStore>(states, "compareAndSetState");
+        var cas = Capable<ICompareAndSetStateStore>(states, "compareAndSetState");
         await Must("init", () => states.InitAsync()).ConfigureAwait(false);
         int i = 0;
         foreach (JsObject step in Objects(fix.Get("compareAndSetState")))
@@ -149,7 +149,7 @@ public static class StoreReplay
         await CloseAsync(states).ConfigureAwait(false);
 
         IStore runs = fresh();
-        var conditional = Capable<IConditionalRunStore>(runs, "updateRunIf");
+        var conditional = Capable<IUpdateRunIfStore>(runs, "updateRunIf");
         await Must("init", () => runs.InitAsync()).ConfigureAwait(false);
         await Must("insertRun u1", () => runs.InsertRunAsync(Run.Running("u1", "a", 1000, "run"))).ConfigureAwait(false);
         i = 0;
@@ -231,7 +231,7 @@ public static class StoreReplay
                 }
                 else
                 {
-                    var cas = Capable<IStateCasStore>(store, "compareAndSetState");
+                    var cas = Capable<ICompareAndSetStateStore>(store, "compareAndSetState");
                     JobState st = JobState.FromValue(step.Get("compareAndSetState"));
                     long expected = Number(step, "expected");
                     Eq(what + ": wrote", (object)await Get(what, () => cas.CompareAndSetStateAsync(st, expected)).ConfigureAwait(false), step.Get("written"));
@@ -252,7 +252,7 @@ public static class StoreReplay
                 }
                 else
                 {
-                    var conditional = Capable<IConditionalRunStore>(store, "updateRunIf");
+                    var conditional = Capable<IUpdateRunIfStore>(store, "updateRunIf");
                     Run r = Run.FromValue(step.Get("updateRunIf"));
                     var from = Statuses(step.Get("from"));
                     Eq(what + ": wrote", (object)await Get(what, () => conditional.UpdateRunIfAsync(r, from)).ConfigureAwait(false), step.Get("written"));
@@ -283,7 +283,7 @@ public static class StoreReplay
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(writeRaw);
         JsObject fix = Json.ParseObject(fixture);
-        var cas = Capable<IStateCasStore>(store, "compareAndSetState");
+        var cas = Capable<ICompareAndSetStateStore>(store, "compareAndSetState");
         await Must("init", () => store.InitAsync()).ConfigureAwait(false);
         int cases = 0;
         foreach (JsObject c in Objects(fix.Get("foreignVersion")))

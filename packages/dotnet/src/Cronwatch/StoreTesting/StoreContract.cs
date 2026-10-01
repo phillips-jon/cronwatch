@@ -113,7 +113,7 @@ public static class StoreContract
 
         // updateRunIf writes only over a row whose status is one of those given, and says whether
         // it did.
-        if (store is IConditionalRunStore conditional)
+        if (store is IUpdateRunIfStore conditional)
         {
             RunStatus[] running = [RunStatus.Running];
             RunStatus[] both = [RunStatus.Running, RunStatus.Timeout];
@@ -144,7 +144,7 @@ public static class StoreContract
         // deleteRunIf, for a store that has it, takes back only a run still of the job and in the
         // status given.
         await Must("insertRun rd", () => store.InsertRunAsync(NewRun("rd", "q", RunStatus.Running, 2600))).ConfigureAwait(false);
-        if (store is IRunDeletingStore deleting)
+        if (store is IDeleteRunIfStore deleting)
         {
             Eq("not another job's", await Get("deleteRunIf", () => deleting.DeleteRunIfAsync("rd", "a", RunStatus.Running)).ConfigureAwait(false), false);
             Eq("not in another status", await Get("deleteRunIf", () => deleting.DeleteRunIfAsync("rd", "q", RunStatus.Ok)).ConfigureAwait(false), false);
@@ -182,7 +182,7 @@ public static class StoreContract
         await Must("setState", () => store.SetStateAsync(State(plain))).ConfigureAwait(false);
 
         // compareAndSetState writes only over the version it was told to expect.
-        if (store is IStateCasStore cas)
+        if (store is ICompareAndSetStateStore cas)
         {
             await CasIs(cas, "no row matches only version 0", V(2, 0), 1, false).ConfigureAwait(false);
             Eq("nothing written", await Get("getState", () => store.GetStateAsync("v")).ConfigureAwait(false), null);
@@ -225,6 +225,6 @@ public static class StoreContract
         "{\"job\":\"v\",\"open\":{},\"consecutiveFailures\":" + failures.ToString(System.Globalization.CultureInfo.InvariantCulture)
         + ",\"silencedUntil\":null,\"lastAlertAt\":null,\"version\":" + version.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}");
 
-    private static async Task CasIs(IStateCasStore store, string what, JobState st, long expected, bool want) =>
+    private static async Task CasIs(ICompareAndSetStateStore store, string what, JobState st, long expected, bool want) =>
         Eq(what, await Get(what, () => store.CompareAndSetStateAsync(st, expected)).ConfigureAwait(false), want);
 }

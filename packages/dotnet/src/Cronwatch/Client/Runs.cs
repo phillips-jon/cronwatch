@@ -349,7 +349,7 @@ public sealed partial class CronwatchClient
     private async Task<bool> DiscardRunAsync(Run run)
     {
         string where = "discarding " + run.Job;
-        if (_store is not IRunDeletingStore deleting)
+        if (_store is not IDeleteRunIfStore deleting)
         {
             Report("the store cannot take back a run (it has no DeleteRunIfAsync); recorded as it ended", where);
             return false;

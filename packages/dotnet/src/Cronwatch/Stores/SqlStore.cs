@@ -44,7 +44,10 @@ namespace Cronwatch;
 /// rollback it caused.
 /// </para>
 /// </remarks>
-public sealed class SqlStore : IStore, IConditionalRunStore, IStateCasStore, IRunDeletingStore, IAsyncDisposable
+public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateStore, IDeleteRunIfStore, IAsyncDisposable,
+#pragma warning disable CS0618 // the former names, kept through 1.x
+    IConditionalRunStore, IStateCasStore, IRunDeletingStore
+#pragma warning restore CS0618
 {
     private static readonly TimeSpan BusyRetry = TimeSpan.FromSeconds(2);
 

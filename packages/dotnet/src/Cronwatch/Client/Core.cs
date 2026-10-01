@@ -436,7 +436,7 @@ public sealed partial class CronwatchClient
 
     private async Task<bool> WriteStateAsync(JobState state, long expected)
     {
-        if (_store is IStateCasStore cas)
+        if (_store is ICompareAndSetStateStore cas)
         {
             return await CallAsync(() => cas.CompareAndSetStateAsync(state, expected)).ConfigureAwait(false);
         }
@@ -446,7 +446,7 @@ public sealed partial class CronwatchClient
 
     internal async Task<bool> WriteRunIfAsync(Run run, IReadOnlyList<RunStatus> from)
     {
-        if (_store is IConditionalRunStore conditional)
+        if (_store is IUpdateRunIfStore conditional)
         {
             return await CallAsync(() => conditional.UpdateRunIfAsync(run, from)).ConfigureAwait(false);
         }

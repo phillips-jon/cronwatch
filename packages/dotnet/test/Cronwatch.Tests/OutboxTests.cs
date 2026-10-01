@@ -23,7 +23,7 @@ public class OutboxTests
     /// A store for a process that is about to die: once <see cref="Kill"/> is called, nothing it
     /// asks of the store ever completes, as when the process is gone. It counts the state writes.
     /// </summary>
-    private sealed class Mortal(MemoryStore inner) : IStore, IConditionalRunStore, IStateCasStore
+    private sealed class Mortal(MemoryStore inner) : IStore, IUpdateRunIfStore, ICompareAndSetStateStore
     {
         private volatile bool _dead;
         private int _stateWrites;

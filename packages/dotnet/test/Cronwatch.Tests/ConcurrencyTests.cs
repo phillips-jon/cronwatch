@@ -15,7 +15,7 @@ namespace Cronwatch.Tests;
 public class ConcurrencyTests
 {
     /// <summary>A store whose state reads take a while, as over a network, without compare-and-set.</summary>
-    private class SlowReads(IStore inner) : IStore, IConditionalRunStore
+    private class SlowReads(IStore inner) : IStore, IUpdateRunIfStore
     {
         protected IStore Inner { get; } = inner;
 
@@ -52,14 +52,14 @@ public class ConcurrencyTests
         public Task<long> PruneAsync(long before, CancellationToken cancellationToken = default) => Inner.PruneAsync(before, cancellationToken);
 
         public Task<bool> UpdateRunIfAsync(Run run, IReadOnlyList<RunStatus> from, CancellationToken cancellationToken = default) =>
-            ((IConditionalRunStore)Inner).UpdateRunIfAsync(run, from, cancellationToken);
+            ((IUpdateRunIfStore)Inner).UpdateRunIfAsync(run, from, cancellationToken);
     }
 
     /// <summary>The same, with compare-and-set.</summary>
-    private sealed class SlowReadsCas(IStore inner) : SlowReads(inner), IStateCasStore
+    private sealed class SlowReadsCas(IStore inner) : SlowReads(inner), ICompareAndSetStateStore
     {
         public Task<bool> CompareAndSetStateAsync(JobState state, long expected, CancellationToken cancellationToken = default) =>
-            ((IStateCasStore)Inner).CompareAndSetStateAsync(state, expected, cancellationToken);
+            ((ICompareAndSetStateStore)Inner).CompareAndSetStateAsync(state, expected, cancellationToken);
     }
 
     private static async Task Fail(CronwatchClient cw, string name) =>

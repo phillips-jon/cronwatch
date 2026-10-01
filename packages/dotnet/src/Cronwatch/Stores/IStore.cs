@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,8 +15,8 @@ namespace Cronwatch;
 /// failure: the client reports it to its error handler and carries on, and never lets it stop a
 /// job. A store holds text without U+0000: it drops every NUL from a run's trigger, output, error
 /// and metric names, and from every key and string of a definition and a state, as it writes
-/// them. The conditional writes are the optional <see cref="IConditionalRunStore"/>,
-/// <see cref="IStateCasStore"/> and <see cref="IRunDeletingStore"/>; without them the client
+/// them. The conditional writes are the optional <see cref="IUpdateRunIfStore"/>,
+/// <see cref="ICompareAndSetStateStore"/> and <see cref="IDeleteRunIfStore"/>; without them the client
 /// falls back to a read and a write, as the SDK does. A store that holds something is
 /// <see cref="System.IAsyncDisposable"/>, and the client disposes it with itself.
 /// </remarks>
@@ -57,7 +58,7 @@ public interface IStore
     /// <summary>A job's state, or null when it has none yet.</summary>
     Task<JobState?> GetStateAsync(string job, CancellationToken cancellationToken = default);
 
-    /// <summary>Writes a job's state unconditionally; used only without <see cref="IStateCasStore"/>.</summary>
+    /// <summary>Writes a job's state unconditionally; used only without <see cref="ICompareAndSetStateStore"/>.</summary>
     Task SetStateAsync(JobState state, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -68,7 +69,7 @@ public interface IStore
 }
 
 /// <summary>A store that writes a run only over a stored status it names, in one step.</summary>
-public interface IConditionalRunStore
+public interface IUpdateRunIfStore
 {
     /// <summary>
     /// Writes the run as <see cref="IStore.UpdateRunAsync"/> does, only when its stored status is
@@ -80,7 +81,7 @@ public interface IConditionalRunStore
 }
 
 /// <summary>A store that writes a state only over the version it was read at.</summary>
-public interface IStateCasStore
+public interface ICompareAndSetStateStore
 {
     /// <summary>
     /// Writes <paramref name="state"/> only when the stored state's version (absent, or no row,
@@ -91,7 +92,7 @@ public interface IStateCasStore
 }
 
 /// <summary>A store that deletes a run given back, only while it is as it was.</summary>
-public interface IRunDeletingStore
+public interface IDeleteRunIfStore
 {
     /// <summary>
     /// Deletes the run <paramref name="id"/> only when its stored job is <paramref name="job"/>
@@ -99,4 +100,22 @@ public interface IRunDeletingStore
     /// status = ?</c>), and says whether it deleted.
     /// </summary>
     Task<bool> DeleteRunIfAsync(string id, string job, RunStatus status, CancellationToken cancellationToken = default);
+}
+
+/// <summary><see cref="IUpdateRunIfStore"/>, under its former name.</summary>
+[Obsolete("Renamed IUpdateRunIfStore, after its method. This name still works through 1.x and goes in 2.0.")]
+public interface IConditionalRunStore : IUpdateRunIfStore
+{
+}
+
+/// <summary><see cref="ICompareAndSetStateStore"/>, under its former name.</summary>
+[Obsolete("Renamed ICompareAndSetStateStore, after its method. This name still works through 1.x and goes in 2.0.")]
+public interface IStateCasStore : ICompareAndSetStateStore
+{
+}
+
+/// <summary><see cref="IDeleteRunIfStore"/>, under its former name.</summary>
+[Obsolete("Renamed IDeleteRunIfStore, after its method. This name still works through 1.x and goes in 2.0.")]
+public interface IRunDeletingStore : IDeleteRunIfStore
+{
 }

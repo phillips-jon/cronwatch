@@ -54,6 +54,41 @@ public class DeprecatedTests
     }
 
     [Fact]
+    public void The_former_store_interfaces_extend_their_replacements()
+    {
+        Assert.True(typeof(IUpdateRunIfStore).IsAssignableFrom(typeof(IConditionalRunStore)));
+        Assert.True(typeof(ICompareAndSetStateStore).IsAssignableFrom(typeof(IStateCasStore)));
+        Assert.True(typeof(IDeleteRunIfStore).IsAssignableFrom(typeof(IRunDeletingStore)));
+        Assert.Empty(typeof(IConditionalRunStore).GetMethods());
+        // The stores the library ships answer to both names.
+        IStore memory = new MemoryStore();
+        Assert.True(memory is IConditionalRunStore and IStateCasStore and IRunDeletingStore);
+        Assert.True(typeof(IStateCasStore).IsAssignableFrom(typeof(SqlStore)));
+    }
+
+    [Fact]
+    public async Task A_store_written_against_a_former_interface_is_still_used()
+    {
+        var store = new FormerCas();
+        await using var m = Support.Make(store: store);
+        m.Cw.Job("j");
+        await m.Cw.SilenceAsync("j", "1h");
+        Assert.True(store.Calls > 0);
+    }
+
+    /// <summary>A store of an app's own, written before 1.0 against <see cref="IStateCasStore"/>.</summary>
+    private sealed class FormerCas : Support.Wrapped, IStateCasStore
+    {
+        public int Calls;
+
+        Task<bool> ICompareAndSetStateStore.CompareAndSetStateAsync(JobState state, long expected, System.Threading.CancellationToken cancellationToken)
+        {
+            System.Threading.Interlocked.Increment(ref Calls);
+            return CompareAndSetStateAsync(state, expected, cancellationToken);
+        }
+    }
+
+    [Fact]
     public void WebAdapters_is_Adapters()
     {
         Assert.Equal(Adapters.Target("/cafÃ©"), WebAdapters.Target("/cafÃ©"));

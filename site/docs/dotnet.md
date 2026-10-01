@@ -252,7 +252,7 @@ var store = SqlStore.Postgres(pg).WithPrefix("app_cron_");
 
 The tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on the client's first use, byte for byte as the SDK makes them. `WithPrefix` names them: lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. An app on EF Core or Dapper gives the store the data source underneath. The store's writes never join a transaction your code has open: each opens its connection with the ambient `TransactionScope` suppressed and never uses your connection, so a run recorded inside a transaction that rolls back stays recorded.
 
-A store of your own implements `IStore`: `InitAsync`, `UpsertJobAsync`, `GetJobAsync`, `ListJobsAsync`, `DeleteJobAsync`, `InsertRunAsync`, `UpdateRunAsync`, `GetRunAsync`, `ListRunsAsync`, `LastRunAsync`, `RunningRunsAsync`, `GetStateAsync`, `SetStateAsync` and `PruneAsync`, with epoch milliseconds for every time. Three capability interfaces keep processes sharing a store from judging a run twice or losing each other's updates: `IConditionalRunStore` (`UpdateRunIfAsync`), `IStateCasStore` (`CompareAndSetStateAsync`) and `IRunDeletingStore` (`DeleteRunIfAsync`, which takes back an attempt a scheduler gave back without failing; see [.NET schedulers](/docs/dotnet-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `Cronwatch.StoreTesting` is the contract the built-in stores pass, from any test framework:
+A store of your own implements `IStore`: `InitAsync`, `UpsertJobAsync`, `GetJobAsync`, `ListJobsAsync`, `DeleteJobAsync`, `InsertRunAsync`, `UpdateRunAsync`, `GetRunAsync`, `ListRunsAsync`, `LastRunAsync`, `RunningRunsAsync`, `GetStateAsync`, `SetStateAsync` and `PruneAsync`, with epoch milliseconds for every time. Three capability interfaces keep processes sharing a store from judging a run twice or losing each other's updates: `IUpdateRunIfStore` (`UpdateRunIfAsync`), `ICompareAndSetStateStore` (`CompareAndSetStateAsync`) and `IDeleteRunIfStore` (`DeleteRunIfAsync`, which takes back an attempt a scheduler gave back without failing; see [.NET schedulers](/docs/dotnet-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `Cronwatch.StoreTesting` is the contract the built-in stores pass, from any test framework:
 
 ```csharp
 await StoreContract.RunAsync(new MyStore());
@@ -476,6 +476,7 @@ These names still work through every 1.x release, marked `[Obsolete]` so the com
 | `cw.Start(every)` | `cw.StartChecking(every)`, since a job's `StartAsync` opens a run |
 | `Cronwatch.Web.WebRequest`, `WebResponse` | `CronwatchRequest`, `CronwatchResponse`, since `System.Net` has types of those names; each converts to and from its replacement, so `WebResponse answer = await routes.HandleAsync(new WebRequest(...))` still compiles, and a handler's function may still return a `WebResponse`. A handler function whose lambda names the request's type must say `CronwatchRequest` |
 | `Cronwatch.Web.WebAdapters` | `Adapters`, the Java port's name |
+| `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it is still used |
 
 ## Kept in step
 

@@ -528,7 +528,7 @@ public class BridgeTests
     /// a declaration's write, holds writes at <see cref="Hang"/>, and runs
     /// <see cref="Meanwhile"/> as it lists the jobs.
     /// </summary>
-    private sealed class OddStore : IStore, IConditionalRunStore, IStateCasStore, IRunDeletingStore
+    private sealed class OddStore : IStore, IUpdateRunIfStore, ICompareAndSetStateStore, IDeleteRunIfStore
     {
         private readonly MemoryStore _inner = new();
 

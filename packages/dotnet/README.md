@@ -245,6 +245,7 @@ These names still work through every 1.x release, marked `[Obsolete]`, and go in
 - `cw.Start(every)`: use `cw.StartChecking(every)`, since a job's `StartAsync` opens a run.
 - `Cronwatch.Web.WebRequest` and `WebResponse`: use `CronwatchRequest` and `CronwatchResponse`, since `System.Net` has types of those names. Each converts to and from its replacement, so code written against them still compiles, except a handler lambda that names the request's type.
 - `Cronwatch.Web.WebAdapters`: use `Adapters`, the Java port's name.
+- `IConditionalRunStore`, `IStateCasStore` and `IRunDeletingStore`: use `IUpdateRunIfStore`, `ICompareAndSetStateStore` and `IDeleteRunIfStore`, named after their methods. Each former interface extends its replacement, so a store of your own that implements it is still used.
 
 ## Testing this package
 
