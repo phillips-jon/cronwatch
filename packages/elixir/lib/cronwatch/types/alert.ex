@@ -14,9 +14,16 @@ defmodule Cronwatch.Alert do
       `"unscheduled"` when missed closed because the job lost its schedule)
       and `since` (when missed opened, for that reason)
 
+  Each details map also holds `extra`, the keys a newer release added, in
+  stored order, when it was read with any; the details of a type this
+  release does not know are the `Cronwatch.JS.Object` as read.
+
   `triage` is a short diagnosis from the triage function; `triage_tried`
   with `triage` nil means triage was tried and gave nothing, so it is not
-  tried again for this alert.
+  tried again for this alert. `extra` keeps the fields after the known ones,
+  in stored order, that a newer release added: a queued alert is written
+  back, and sent on retry, with every field it was read with, as the SDK
+  keeps it.
   """
 
   alias Cronwatch.JS
@@ -36,8 +43,11 @@ defmodule Cronwatch.Alert do
     message: "",
     triage: nil,
     triage_tried: false,
-    at: 0
+    at: 0,
+    extra: []
   ]
+
+  @known ~w(type run details job definition title message at triage)
 
   @type t :: %__MODULE__{
           type: String.t(),
@@ -49,7 +59,8 @@ defmodule Cronwatch.Alert do
           message: String.t(),
           triage: String.t() | nil,
           triage_tried: boolean(),
-          at: integer()
+          at: integer(),
+          extra: [{String.t(), Object.value()}]
         }
 
   @doc "The alert as the SDK writes it."
@@ -67,7 +78,19 @@ defmodule Cronwatch.Alert do
     ]
 
     o = %Object{pairs: pairs}
-    if a.triage_tried or a.triage != nil, do: Object.put(o, "triage", a.triage), else: o
+    o = if a.triage_tried or a.triage != nil, do: Object.put(o, "triage", a.triage), else: o
+    put_extra(o, a.extra)
+  end
+
+  defp put_extra(o, nil), do: o
+  defp put_extra(o, extra), do: Enum.reduce(extra, o, fn {k, v}, o -> Object.put(o, k, v) end)
+
+  # The details map with the keys a newer release added, when there are any.
+  defp with_extra(map, %Object{pairs: pairs}, known) do
+    case Enum.reject(pairs, fn {k, _} -> k in known end) do
+      [] -> map
+      extra -> Map.put(map, :extra, extra)
+    end
   end
 
   @doc "The SDK's JSON."
@@ -75,32 +98,40 @@ defmodule Cronwatch.Alert do
   def to_json(a), do: a |> to_value() |> JS.stringify()
 
   @doc false
-  def details_value("missed", d) do
+  # The details of a type this release does not know, kept as read.
+  def details_value(_type, %Object{} = d), do: d
+
+  def details_value(type, d), do: type |> known_details_value(d) |> put_extra(d[:extra])
+
+  defp known_details_value("missed", d) do
     %Object{
       pairs: [{"dueAt", d.due_at}, {"deadline", d.deadline}, {"graceMs", d.grace_ms}, {"lastRunAt", d.last_run_at}]
     }
   end
 
-  def details_value("slow", d) do
+  defp known_details_value("slow", d) do
     %Object{pairs: [{"durationMs", d.duration_ms}, {"thresholdMs", d.threshold_ms}, {"basis", d.basis}]}
   end
 
-  def details_value("over_budget", d) do
+  defp known_details_value("over_budget", d) do
     breaches =
       Enum.map(d.breaches, fn b ->
-        %Object{pairs: [{"metric", b.metric}, {"value", b.value}, {"limit", b.limit}, {"basis", b.basis}]}
+        put_extra(
+          %Object{pairs: [{"metric", b.metric}, {"value", b.value}, {"limit", b.limit}, {"basis", b.basis}]},
+          b[:extra]
+        )
       end)
 
     %Object{pairs: [{"breaches", breaches}]}
   end
 
-  def details_value("recovered", d) do
+  defp known_details_value("recovered", d) do
     o = %Object{pairs: [{"after", d.after}]}
     o = if d[:reason] in [nil, ""], do: o, else: Object.put(o, "reason", d.reason)
     if d[:since] != nil, do: Object.put(o, "since", d.since), else: o
   end
 
-  def details_value(_type, d) do
+  defp known_details_value(_type, d) do
     %Object{pairs: [{"consecutiveFailures", d.consecutive_failures}, {"threshold", d.threshold}]}
   end
 
@@ -114,6 +145,7 @@ defmodule Cronwatch.Alert do
           grace_ms: Read.float(o, "graceMs"),
           last_run_at: Read.nullable_int(o, "lastRunAt")
         }
+        |> with_extra(o, ~w(dueAt deadline graceMs lastRunAt))
 
       "slow" ->
         %{
@@ -121,6 +153,7 @@ defmodule Cronwatch.Alert do
           threshold_ms: Read.float(o, "thresholdMs"),
           basis: Read.str(o, "basis")
         }
+        |> with_extra(o, ~w(durationMs thresholdMs basis))
 
       "over_budget" ->
         breaches =
@@ -135,13 +168,14 @@ defmodule Cronwatch.Alert do
                   limit: Read.float(b, "limit"),
                   basis: Read.str(b, "basis")
                 }
+                |> with_extra(b, ~w(metric value limit basis))
               end)
 
             _ ->
               []
           end
 
-        %{breaches: breaches}
+        with_extra(%{breaches: breaches}, o, ["breaches"])
 
       "recovered" ->
         after_list =
@@ -150,10 +184,22 @@ defmodule Cronwatch.Alert do
             _ -> []
           end
 
-        %{after: after_list, reason: Read.nullable_str(o, "reason"), since: Read.nullable_int(o, "since")}
+        with_extra(
+          %{after: after_list, reason: Read.nullable_str(o, "reason"), since: Read.nullable_int(o, "since")},
+          o,
+          ~w(after reason since)
+        )
 
+      failure when failure in ["failed", "stuck"] ->
+        with_extra(
+          %{consecutive_failures: Read.int(o, "consecutiveFailures"), threshold: Read.int(o, "threshold")},
+          o,
+          ~w(consecutiveFailures threshold)
+        )
+
+      # A type a newer release added: its details are kept as read.
       _ ->
-        %{consecutive_failures: Read.int(o, "consecutiveFailures"), threshold: Read.int(o, "threshold")}
+        o
     end
   end
 
@@ -173,9 +219,15 @@ defmodule Cronwatch.Alert do
     # read of the job's state.
     run =
       case Object.get(o, "run") do
-        nil -> {:ok, nil}
-        %Object{} = r -> Run.from_value(Object.put(r, "metrics", Metrics.lenient(Object.get(r, "metrics"))))
-        r -> Run.from_value(r)
+        nil ->
+          {:ok, nil}
+
+        %Object{} = r ->
+          with {:ok, run} <- Run.from_value(Object.put(r, "metrics", Metrics.lenient(Object.get(r, "metrics")))),
+               do: {:ok, Run.with_extra(run, r)}
+
+        r ->
+          Run.from_value(r)
       end
 
     with {:ok, run} <- run do
@@ -190,7 +242,8 @@ defmodule Cronwatch.Alert do
          message: Read.str(o, "message"),
          triage_tried: Object.has_key?(o, "triage"),
          triage: Read.nullable_str(o, "triage"),
-         at: Read.int(o, "at")
+         at: Read.int(o, "at"),
+         extra: Enum.reject(o.pairs, fn {k, _} -> k in @known end)
        }}
     end
   end

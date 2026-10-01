@@ -4,7 +4,10 @@ defmodule Cronwatch.Run do
   `status` is the SDK's string (see `Cronwatch.RunStatus`); `output` is the
   lines logged or the text the job returned, capped at 16 KB; `metrics` is a
   `Cronwatch.JS.Object` of numbers; `trigger` is what started the run (`run`,
-  `handler`, `start` or a value of the app's).
+  `handler`, `start` or a value of the app's). `extra` holds the fields after
+  the known ones that a newer release added to the run of a queued alert
+  (`Cronwatch.Alert`), in stored order, written back with it; it is empty for
+  every other run.
   """
 
   alias Cronwatch.JS
@@ -23,7 +26,8 @@ defmodule Cronwatch.Run do
     error: nil,
     output: nil,
     metrics: %Object{},
-    trigger: "run"
+    trigger: "run",
+    extra: []
   ]
 
   @type t :: %__MODULE__{
@@ -36,13 +40,14 @@ defmodule Cronwatch.Run do
           error: String.t() | nil,
           output: String.t() | nil,
           metrics: Object.t(),
-          trigger: String.t()
+          trigger: String.t(),
+          extra: [{String.t(), Object.value()}]
         }
 
   @doc "The run as the SDK writes it."
   @spec to_value(t()) :: Object.t()
   def to_value(%__MODULE__{} = r) do
-    %Object{
+    o = %Object{
       pairs: [
         {"id", r.id},
         {"job", r.job},
@@ -56,7 +61,16 @@ defmodule Cronwatch.Run do
         {"trigger", r.trigger}
       ]
     }
+
+    Enum.reduce(r.extra || [], o, fn {k, v}, o -> Object.put(o, k, v) end)
   end
+
+  @known ~w(id job status startedAt finishedAt durationMs error output metrics trigger)
+
+  @doc false
+  # The run of a queued alert, which keeps the fields a newer release added.
+  def with_extra(%__MODULE__{} = r, %Object{pairs: pairs}),
+    do: %{r | extra: Enum.reject(pairs, fn {k, _} -> k in @known end)}
 
   @doc "The SDK's JSON."
   @spec to_json(t()) :: String.t()
