@@ -815,14 +815,15 @@ const (
 )
 
 // summaryAnswer is the job's summary after a silence or an unsilence, as
-// GET <base>/api/jobs/:name has it.
+// GET <base>/api/jobs/:name has it. The change was made, so a job forgotten
+// since (a DELETE between the two) is ok with a null job, as the SDK has it.
 func summaryAnswer(ctx context.Context, cw *Client, name string) (answer, error) {
 	job, err := cw.JobSummary(ctx, name)
 	if err != nil {
 		return answer{}, err
 	}
 	if job == nil {
-		return apiAnswer(js.NewObject("ok", false, "error", "No such job"), http.StatusNotFound), nil
+		return apiAnswer(js.NewObject("ok", true, "job", nil), http.StatusOK), nil
 	}
 	return apiAnswer(js.NewObject("ok", true, "job", *job), http.StatusOK), nil
 }
