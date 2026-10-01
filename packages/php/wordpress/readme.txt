@@ -138,6 +138,7 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 * The webhook's body starts with `"schema": 1`, the payload's version; its JSON Schema is at https://cronwatch.dev/schemas/webhook/1.json.
 * A job's stored state keeps the fields a newer release wrote, so sites and apps on different 1.x releases can share one database.
 * A blank `CRONWATCH_ENV` or `APP_ENV` counts as unset.
+* One malformed job, run or state row (a hand edit, a damaged database) affects only its own job instead of stopping every check or the whole dashboard, and a state row that is not JSON is replaced by the next write.
 
 = 0.10.0 =
 
