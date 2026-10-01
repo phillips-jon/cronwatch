@@ -254,6 +254,41 @@ test("pg_cron: a job forgotten from the dashboard is declared again and its late
   assert.deepEqual(cw.definedJobs().map((d) => d.name), ["vacuum"]);
 });
 
+test("pg_cron: a renamed job's old name forgotten while its run is open lets the run go, with no error", async () => {
+  const c = clock();
+  const cron = fakeCron();
+  cron.jobs.push(job(1, "a", "0 3 * * *"));
+  const running = cron.add(1, "running", T0 - 5000, null);
+  const errors: string[] = [];
+  const opened: number[][] = [];
+  const db: Queryable = {
+    query(text, values = []) {
+      if (text.includes("unnest")) opened.push((values[2] as number[]).map(Number));
+      return cron.db.query(text, values);
+    },
+  };
+  const cw = cronwatch({ store: memory(), alerts: [capture()], now: c.now, sources: [pgCron(db)], onError: (e, where) => errors.push(`${where}: ${(e as Error).message}`) });
+  await cw.check();
+  assert.equal((await cw.getRun(`pgcron:${running.runid}`))!.job, "a");
+  cron.jobs[0]!.jobname = "b";
+  c.advance(MIN);
+  await cw.check();
+  assert.match((await cw.jobSummary("a"))!.definition.description!, /renamed to b/);
+  await cw.forget("a");
+  running.status = "succeeded";
+  running.end_time = new Date(T0);
+  for (let i = 0; i < 3; i++) {
+    c.advance(MIN);
+    opened.length = 0;
+    await cw.check();
+  }
+  assert.deepEqual(errors, []);
+  assert.equal(await cw.jobSummary("a"), null, "the forgotten name is not declared again");
+  assert.equal(await cw.getRun(`pgcron:${running.runid}`), null, "the run is not recorded");
+  assert.ok(opened.every((ids) => !ids.includes(running.runid)), "and is no longer read");
+  assert.deepEqual(cw.definedJobs().map((d) => d.name), ["b"]);
+});
+
 test("pg_cron: runs a job's options, and reports a schedule it cannot read", async () => {
   const cron = fakeCron();
   cron.jobs.push(job(1, "odd", "not a schedule"));
