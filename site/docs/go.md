@@ -401,6 +401,8 @@ There is no Anthropic SDK to install: the Messages API is one POST, and it sends
 
 `cw.Job(name, options...)` takes `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the process's zone, `time.Local`, by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget(metric, ceiling)` (once per metric), `Expect(text)` (the output must contain it), `ExpectMatch(re)` (a `*regexp.Regexp` it must match, stored as `matches /source/`), `ExpectFunc(fn)` (a function of the output; a panic in it fails the run), `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `cronwatch.DescribeJob(name, options...)` is the definition options give, without a client.
 
+`Timeout` and `MaxDuration` both measure a run's length, and are easy to mix up. `Timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure), the job is stuck, and the job's context is cancelled. `MaxDuration` is for a run that finished: one that succeeded but took longer is slow, and stays a success; without it, slow is more than twice the p95 of recent successful runs. So set `Timeout` well above `MaxDuration`: `MaxDuration("10m"), Timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
+
 The client:
 
 | Method | |
