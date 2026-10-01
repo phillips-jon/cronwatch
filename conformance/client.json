@@ -1,0 +1,186 @@
+{
+  "generatedBy": "scripts/conformance.mjs",
+  "sdkVersion": "0.10.0",
+  "runIds": [
+    {
+      "method": "start",
+      "id": "",
+      "error": "job \"j\": start() needs a run id of 1 to 200 characters (got 0 characters)"
+    },
+    {
+      "method": "start",
+      "id": "a",
+      "ok": true
+    },
+    {
+      "method": "start",
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "ok": true
+    },
+    {
+      "method": "start",
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "job \"j\": start() needs a run id of 1 to 200 characters (got 201 characters)"
+    },
+    {
+      "method": "start",
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "ok": true
+    },
+    {
+      "method": "start",
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀x",
+      "error": "job \"j\": start() needs a run id of 1 to 200 characters (got 201 characters)"
+    },
+    {
+      "method": "start",
+      "id": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "ok": true
+    },
+    {
+      "method": "start",
+      "id": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "error": "job \"j\": start() needs a run id of 1 to 200 characters (got 201 characters)"
+    },
+    {
+      "method": "start",
+      "id": "pgcron:1",
+      "error": "job \"j\": start() cannot take a run id starting with \"pgcron:\", which the pg_cron source uses for its runs"
+    },
+    {
+      "method": "start",
+      "id": "PGCRON:1",
+      "ok": true
+    },
+    {
+      "method": "start",
+      "id": " pgcron:1",
+      "ok": true
+    },
+    {
+      "method": "start",
+      "id": "a\u0000b",
+      "error": "job \"j\": start() cannot take a run id containing a NUL character"
+    },
+    {
+      "method": "resume",
+      "id": "",
+      "error": "job \"j\": resume() needs a run id of 1 to 200 characters (got 0 characters)"
+    },
+    {
+      "method": "resume",
+      "id": "a",
+      "ok": true
+    },
+    {
+      "method": "resume",
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "ok": true
+    },
+    {
+      "method": "resume",
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "job \"j\": resume() needs a run id of 1 to 200 characters (got 201 characters)"
+    },
+    {
+      "method": "resume",
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "ok": true
+    },
+    {
+      "method": "resume",
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀x",
+      "error": "job \"j\": resume() needs a run id of 1 to 200 characters (got 201 characters)"
+    },
+    {
+      "method": "resume",
+      "id": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "ok": true
+    },
+    {
+      "method": "resume",
+      "id": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "error": "job \"j\": resume() needs a run id of 1 to 200 characters (got 201 characters)"
+    },
+    {
+      "method": "resume",
+      "id": "pgcron:1",
+      "error": "job \"j\": resume() cannot take a run id starting with \"pgcron:\", which the pg_cron source uses for its runs"
+    },
+    {
+      "method": "resume",
+      "id": "PGCRON:1",
+      "ok": true
+    },
+    {
+      "method": "resume",
+      "id": " pgcron:1",
+      "ok": true
+    },
+    {
+      "method": "resume",
+      "id": "a\u0000b",
+      "error": "job \"j\": resume() cannot take a run id containing a NUL character"
+    },
+    {
+      "method": "recordRun",
+      "id": "",
+      "error": "recordRun: run ids must be 1 to 200 characters (got 0 characters; job \"j\")"
+    },
+    {
+      "method": "recordRun",
+      "id": "a",
+      "ok": true
+    },
+    {
+      "method": "recordRun",
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "ok": true
+    },
+    {
+      "method": "recordRun",
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "error": "recordRun: run ids must be 1 to 200 characters (got 201 characters; job \"j\")"
+    },
+    {
+      "method": "recordRun",
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "ok": true
+    },
+    {
+      "method": "recordRun",
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀x",
+      "error": "recordRun: run ids must be 1 to 200 characters (got 201 characters; job \"j\")"
+    },
+    {
+      "method": "recordRun",
+      "id": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "ok": true
+    },
+    {
+      "method": "recordRun",
+      "id": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "error": "recordRun: run ids must be 1 to 200 characters (got 201 characters; job \"j\")"
+    },
+    {
+      "method": "recordRun",
+      "id": "pgcron:1",
+      "ok": true
+    },
+    {
+      "method": "recordRun",
+      "id": "PGCRON:1",
+      "ok": true
+    },
+    {
+      "method": "recordRun",
+      "id": " pgcron:1",
+      "ok": true
+    },
+    {
+      "method": "recordRun",
+      "id": "a\u0000b",
+      "error": "recordRun: run ids cannot contain a NUL character (job \"j\")"
+    }
+  ]
+}

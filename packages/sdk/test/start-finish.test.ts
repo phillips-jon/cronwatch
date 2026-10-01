@@ -101,7 +101,12 @@ test("start with an id twice records one run and returns a handle on it", async 
   await assert.rejects(job.resume("01HX\u0000run"), /resume\(\) cannot take a run id containing a NUL character/);
   const nulRun = { id: "x\u0000y", job: "inngest-fn", status: "ok" as const, startedAt: 1, finishedAt: 2, durationMs: 1, error: null, output: null, metrics: {}, trigger: "run" };
   await assert.rejects(cw.recordRun(nulRun), /recordRun: run ids cannot contain a NUL character/);
+  // recordRun holds ids to the same 200 characters as start() and resume().
+  await assert.rejects(cw.recordRun({ ...nulRun, id: "x".repeat(201) }), /^Error: recordRun: run ids must be 1 to 200 characters \(got 201 characters; job "inngest-fn"\)$/);
+  await assert.rejects(cw.recordRun({ ...nulRun, id: "" }), /run ids must be 1 to 200 characters \(got 0 characters/);
   assert.equal((await cw.runs("inngest-fn")).length, 1);
+  await cw.recordRun({ ...nulRun, id: "y".repeat(200) });
+  assert.equal((await cw.runs("inngest-fn")).length, 2);
 });
 
 type Pair = { a: Store; b: Store; done: () => Promise<void> | void };

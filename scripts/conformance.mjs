@@ -1513,6 +1513,48 @@ async function storeCases() {
   return { prune: out, compareAndSetState: cas, updateRunIf, foreignVersion, nul };
 }
 
+// ---------------------------------------------------------------- client
+
+/**
+ * What the client itself does, through its public API, over a memory store
+ * on a fixed clock: the run ids it takes (runIds).
+ */
+async function clientCases() {
+  return { runIds: await runIdCases() };
+}
+
+/**
+ * A run id is 1 to 200 UTF-16 code units (JavaScript's string length, so
+ * an emoji counts two) with no NUL, wherever one is taken. start() and
+ * resume() also refuse the pg_cron source's "pgcron:" prefix; recordRun()
+ * takes it, since that source records its runs through it.
+ */
+async function runIdCases() {
+  const ids = [
+    "", "a", "x".repeat(200), "x".repeat(201), "\u{1F600}".repeat(100), "\u{1F600}".repeat(100) + "x",
+    "é".repeat(200), "é".repeat(201), "pgcron:1", "PGCRON:1", " pgcron:1", "a\u0000b",
+  ];
+  const out = [];
+  for (const method of ["start", "resume", "recordRun"]) {
+    const cw = sdk.cronwatch({ store: sdk.memory(), alerts: [], now: () => T0, onError: () => {} });
+    const job = cw.job("j");
+    for (const id of ids) {
+      let r;
+      try {
+        if (method === "start") await (await job.start({ id })).finish();
+        else if (method === "resume") await job.resume(id);
+        else await cw.recordRun({ id, job: "j", status: "ok", startedAt: T0 - 1000, finishedAt: T0, durationMs: 1000, error: null, output: null, metrics: {}, trigger: "run" });
+        r = { ok: true };
+      } catch (error) {
+        r = { error: error.message };
+      }
+      out.push({ method, id, ...r });
+    }
+    await cw.close();
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- channels
 
 function channelAlerts() {
@@ -1934,6 +1976,7 @@ const files = {
   "channels.json": await channelCases(),
   "triage.json": await triageCases(),
   "pgcron.json": pgcronCases(),
+  "client.json": await clientCases(),
 };
 
 const checking = process.argv.includes("--check");

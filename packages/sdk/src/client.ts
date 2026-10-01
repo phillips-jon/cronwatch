@@ -982,6 +982,11 @@ export class CronWatch {
   async recordRun(input: Run, options: RecordRunOptions = {}): Promise<Alert[]> {
     const declared = this.definitions.get(input.job);
     if (!declared) throw new Error(`recordRun: job "${input.job}" is not declared; call job() first`);
+    // The longest id start() takes; MySQL's column would hold 255, but every store holds 200.
+    if (typeof input.id !== "string" || input.id.length === 0 || input.id.length > MAX_RUN_ID) {
+      const got = typeof input.id === "string" ? `${input.id.length} characters` : typeof input.id;
+      throw new Error(`recordRun: run ids must be 1 to ${MAX_RUN_ID} characters (got ${got}; job "${input.job}")`);
+    }
     if (input.id.includes("\u0000")) throw new Error(`recordRun: run ids cannot contain a NUL character (job "${input.job}")`);
     // Refused as job.metric() refuses them: a store keeps NaN and Infinity as null.
     for (const [metric, value] of Object.entries(input.metrics ?? {})) {
@@ -1425,10 +1430,16 @@ export class CronWatch {
 /** Run ids that start with this belong to the pg_cron source (see @cronwatch/sdk/pg-cron). */
 export const RESERVED_RUN_ID_PREFIX = "pgcron:";
 
+/**
+ * The longest run id, in UTF-16 code units (JavaScript's string length): what
+ * start(), resume() and recordRun() take, and every store holds.
+ */
+const MAX_RUN_ID = 200;
+
 /** Throws for a run id no store could hold, or one reserved for the pg_cron source. */
 function checkRunId(job: string, id: unknown, method: string): void {
-  if (typeof id !== "string" || id.length === 0 || id.length > 200) {
-    throw new Error(`job "${job}": ${method}() needs a run id of 1 to 200 characters (got ${typeof id === "string" ? `${id.length} characters` : typeof id})`);
+  if (typeof id !== "string" || id.length === 0 || id.length > MAX_RUN_ID) {
+    throw new Error(`job "${job}": ${method}() needs a run id of 1 to ${MAX_RUN_ID} characters (got ${typeof id === "string" ? `${id.length} characters` : typeof id})`);
   }
   // Postgres refuses NUL in text, so no store could hold such an id.
   if (id.includes("\u0000")) throw new Error(`job "${job}": ${method}() cannot take a run id containing a NUL character`);
