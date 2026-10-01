@@ -10,6 +10,7 @@ is that JSON shape, with the SDK's key order, and ``from_dict()`` reads it
 
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -333,6 +334,18 @@ class Alert:
     at: int
     triage: str | None = None
     triage_tried: bool = False
+    # Keys a newer release wrote that this one does not know, kept as their
+    # JSON and written back after the known ones, as the SDK carries a queued
+    # alert along whole.
+    _extra: dict[str, Any] = field(default_factory=dict, init=False, compare=False, repr=False)
+    # The details as read, and what they were read as: written back as they
+    # came while unchanged, so a key the snake_case round trip would respell
+    # (a stored "a_b" would come back "aB") is kept.
+    _details_json: Any = field(default=None, init=False, compare=False, repr=False)
+    _details_read: Any = field(default=None, init=False, compare=False, repr=False)
+
+    #: The keys this release reads, as stored.
+    _KEYS: ClassVar[tuple[str, ...]] = ("type", "run", "details", "job", "definition", "title", "message", "at", "triage")
 
     def __post_init__(self) -> None:
         self.type = _enum(AlertType, self.type)
@@ -349,10 +362,11 @@ class Alert:
         if isinstance(data, Alert):
             return data
         run = _get(data, "run")
+        raw_details = _get(data, "details") or {}
         alert = cls(
             type=_get(data, "type"),
             run=Run.from_dict(run) if run else None,
-            details=_details_from_json(_get(data, "details") or {}),
+            details=_details_from_json(raw_details),
             job=_get(data, "job"),
             definition=JobDefinition.from_dict(_get(data, "definition") or {}),
             title=_get(data, "title"),
@@ -361,13 +375,18 @@ class Alert:
         )
         if _has(data, "triage"):
             alert.set_triage(_get(data, "triage"))
+        if isinstance(raw_details, Mapping):
+            alert._details_json = copy.deepcopy(dict(raw_details))
+            alert._details_read = copy.deepcopy(alert.details)
+        known = set(cls._KEYS) | {_snake(k) for k in cls._KEYS}
+        alert._extra = {k: v for k, v in data.items() if k not in known}
         return alert
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
             "type": str(self.type),
             "run": self.run.to_dict() if self.run else None,
-            "details": _details_to_json(self.details),
+            "details": self._details_out(),
             "job": self.job,
             "definition": self.definition.to_dict() if isinstance(self.definition, JobDefinition) else self.definition,
             "title": self.title,
@@ -376,7 +395,14 @@ class Alert:
         }
         if self.triage_tried:
             out["triage"] = self.triage
+        for key, value in self._extra.items():
+            out.setdefault(key, value)
         return out
+
+    def _details_out(self) -> Any:
+        if self._details_json is not None and self.details == self._details_read:
+            return copy.deepcopy(self._details_json)
+        return _details_to_json(self.details)
 
 
 class _Missing:
@@ -399,6 +425,8 @@ class SendingAlert:
 
     until: Any
     alert: Any
+    # Keys a newer release wrote on the entry, written back after the known ones.
+    _extra: dict[str, Any] = field(default_factory=dict, init=False, compare=False, repr=False)
 
     @classmethod
     def from_json(cls, entry: Any) -> Any:
@@ -411,7 +439,9 @@ class SendingAlert:
                 alert = Alert.from_dict(alert)
             except Exception:  # noqa: BLE001, an alert that cannot be read is left as it came
                 pass
-        return cls(until=entry.get("until", MISSING), alert=alert)
+        out = cls(until=entry.get("until", MISSING), alert=alert)
+        out._extra = {k: v for k, v in entry.items() if k not in ("until", "alert")}
+        return out
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {}
@@ -419,6 +449,8 @@ class SendingAlert:
             out["until"] = self.until
         if self.alert is not MISSING:
             out["alert"] = self.alert.to_dict() if isinstance(self.alert, Alert) else self.alert
+        for key, value in self._extra.items():
+            out.setdefault(key, value)
         return out
 
 
