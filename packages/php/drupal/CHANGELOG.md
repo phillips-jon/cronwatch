@@ -17,6 +17,8 @@ All notable changes to the CronWatch module for Drupal, newest first. Each relea
 
 ### Fixed
 - From the library: a job's stored state keeps the fields a newer release wrote, so sites and apps on different 1.x releases can share one database.
+- The dashboard in the admin pages ignores an `Authorization` header, so a user who may only view it can no longer run the check with a GET of `/api/check` and any bearer token. Running the check there needs "administer cronwatch", whatever the path.
+- A check through `/cronwatch/api/check` by GET with the token or `CRON_SECRET` (a platform cron), or by the dashboard's `/api/check` or `/check/` in the admin pages, declares every job first, as a POST to `/check` did. Before, such a check left a removed module's job on its old schedule.
 
 ## 0.10.0 - 2026-09-30
 

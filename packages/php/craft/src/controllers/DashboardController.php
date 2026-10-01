@@ -45,17 +45,20 @@ final class DashboardController extends Controller
         $method = strtoupper($this->request->getMethod());
         $path = (string) $this->request->getQueryParam('cw', '/');
         $recorder = Plugin::getInstance()->getRecorder();
+        // Craft's sign-in stands for the token here, so a bearer means nothing:
+        // left in, it would let a GET of /api/check run the check for a user
+        // who may only look.
+        $inner = self::withoutBearer(EmbeddedDashboard::request(Request::fromGlobals(), $path, ['cw', 'p', $this->request->csrfParam]));
         if ($method !== 'GET' && $method !== 'HEAD') {
             // Craft has checked the CSRF token by now.
             $this->requirePermission(Plugin::PERMISSION_MANAGE);
-            if ($path === '/check') {
+            if (self::isCheck(substr($inner->path, strlen(EmbeddedDashboard::MARKER)))) {
                 // The plugin's check: the settings' jobs declared first.
                 $recorder->prepare();
             }
         }
         $origin = $this->request->getHostInfo();
         $dashboard = new Dashboard($recorder->client(), token: null, basePath: EmbeddedDashboard::MARKER, origin: $origin);
-        $inner = EmbeddedDashboard::request(Request::fromGlobals(), $path, ['cw', 'p', $this->request->csrfParam]);
         $field = '<input type="hidden" name="' . htmlspecialchars($this->request->csrfParam, ENT_QUOTES) . '" value="' . htmlspecialchars((string) $this->request->getCsrfToken(), ENT_QUOTES) . '">';
         $answer = EmbeddedDashboard::rewrite(
             $dashboard->handle($inner),
@@ -72,6 +75,32 @@ final class DashboardController extends Controller
         }
         $response->content = $answer->body;
         return $response;
+    }
+
+    /**
+     * Whether a path of the dashboard's is its check, /check or /api/check,
+     * read as the dashboard reads it: empty segments left out, each one
+     * percent-decoded.
+     *
+     * @internal
+     */
+    public static function isCheck(string $path): bool
+    {
+        $parts = [];
+        foreach (explode('/', $path) as $part) {
+            if ($part !== '') {
+                $parts[] = rawurldecode($part);
+            }
+        }
+        return $parts === ['check'] || $parts === ['api', 'check'];
+    }
+
+    /** The request without its Authorization header. */
+    private static function withoutBearer(Request $request): Request
+    {
+        $headers = $request->headers;
+        unset($headers['authorization']);
+        return new Request($request->method, $request->path, $request->query, $headers, static fn (): string => $request->body(), $request->origin, $request->mount, $request->form);
     }
 
     /**

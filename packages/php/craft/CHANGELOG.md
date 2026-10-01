@@ -15,6 +15,8 @@
 ### Fixed
 - `GET /cronwatch/api`, with no path after it, reaches the JSON API instead of the site's 404 page, so the API's own answer at its root (the library and its version, from 1.0) is served.
 - From the library: a job's stored state keeps the fields a newer release wrote, so sites and apps on different 1.x releases can share one database.
+- The dashboard in the Control Panel ignores an `Authorization` header, so a user who may only view it can no longer run the check with a GET of `/api/check` and any bearer token. Running the check there needs the `cronwatch-manage` permission, whatever the path.
+- A check through `/cronwatch/api/check` by GET with the token or `CRON_SECRET` (a platform cron), or by the dashboard's `/api/check` or `/check/` in the Control Panel, declares the settings' jobs first, as a POST did. Before, such a check left a command taken out of the settings on its old schedule, and never declared a new one.
 
 ## 0.10.0 - 2026-09-30
 

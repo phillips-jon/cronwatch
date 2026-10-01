@@ -8,6 +8,7 @@ use Cronwatch\Bridge\EmbeddedDashboard;
 use Cronwatch\Env;
 use Cronwatch\Web\Dashboard;
 use Cronwatch\Web\HttpFoundation;
+use Cronwatch\Web\Request as InnerRequest;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Site\Settings;
@@ -101,6 +102,10 @@ final class DashboardController extends ControllerBase {
   public function view(Request $request): Response {
     $method = strtoupper($request->getMethod());
     $path = (string) $request->query->get('cw', '/');
+    // Drupal's sign-in stands for the token here, so a bearer means nothing:
+    // left in, it would let a GET of /api/check run the check for a user who
+    // may only look.
+    $inner = self::withoutBearer(EmbeddedDashboard::request(HttpFoundation::toRequest($request), $path, ['cw', 'token']));
     if ($method !== 'GET' && $method !== 'HEAD') {
       if (!$this->currentUser()->hasPermission('administer cronwatch')) {
         throw new AccessDeniedHttpException('Changing CronWatch needs the "administer cronwatch" permission.');
@@ -108,13 +113,12 @@ final class DashboardController extends ControllerBase {
       if (!$this->csrf->validate((string) $request->query->get('token', ''), self::CSRF)) {
         throw new AccessDeniedHttpException('The form has expired. Go back, reload the page and try again.');
       }
-      if ($path === '/check') {
+      if (self::isCheck(substr($inner->path, strlen(EmbeddedDashboard::MARKER)))) {
         // The module's check: every job declared first.
         $this->recorder->prepare();
       }
     }
     $dashboard = new Dashboard($this->recorder->client(), token: NULL, basePath: EmbeddedDashboard::MARKER, origin: $request->getSchemeAndHttpHost());
-    $inner = EmbeddedDashboard::request(HttpFoundation::toRequest($request), $path, ['cw', 'token']);
     $answer = EmbeddedDashboard::rewrite(
       $dashboard->handle($inner),
       fn (string $path, array $query): string => $this->viewUrl($path, $query),
@@ -138,8 +142,10 @@ final class DashboardController extends ControllerBase {
       throw new NotFoundHttpException();
     }
     $cw = $this->recorder->client();
-    $check = strtoupper($request->getMethod()) === 'POST' && str_ends_with(rtrim($inner->path, '/'), '/cronwatch/api/check');
-    if ($check && self::signedIn($request, $token, $cw->cronSecret)) {
+    // POST, or GET with a bearer, as the dashboard runs the check for either.
+    $method = strtoupper($request->getMethod());
+    $check = ($method === 'POST' || $method === 'GET') && self::isCheck(substr($inner->path, $at + strlen('/cronwatch')));
+    if ($check && self::signedIn($request, $token, $cw->cronSecret, $method === 'POST')) {
       $this->recorder->prepare();
     }
     $dashboard = new Dashboard($cw, token: $token, basePath: substr($inner->path, 0, $at) . '/cronwatch');
@@ -152,13 +158,41 @@ final class DashboardController extends ControllerBase {
    * The token or the client's cron secret as a bearer, or the dashboard's
    * cookie, compared in constant time; the dashboard checks again.
    */
-  private static function signedIn(Request $request, string $token, ?string $cronSecret): bool {
+  private static function signedIn(Request $request, string $token, ?string $cronSecret, bool $orCookie = TRUE): bool {
     $authorization = (string) $request->headers->get('authorization', '');
     if (preg_match('/^Bearer\s+(.+)$/is', $authorization, $m) === 1) {
       return hash_equals($token, $m[1]) || ($cronSecret !== NULL && hash_equals($cronSecret, $m[1]));
     }
+    if (!$orCookie) {
+      return FALSE;
+    }
     $cookie = $request->cookies->get(Dashboard::COOKIE);
     return is_string($cookie) && hash_equals(Dashboard::cookieValue($token), $cookie);
+  }
+
+  /**
+   * Whether a path of the dashboard's is its check: /check or /api/check.
+   *
+   * Read as the dashboard reads it: empty segments left out, each one
+   * percent-decoded.
+   */
+  private static function isCheck(string $path): bool {
+    $parts = [];
+    foreach (explode('/', $path) as $part) {
+      if ($part !== '') {
+        $parts[] = rawurldecode($part);
+      }
+    }
+    return $parts === ['check'] || $parts === ['api', 'check'];
+  }
+
+  /**
+   * The request without its Authorization header.
+   */
+  private static function withoutBearer(InnerRequest $request): InnerRequest {
+    $headers = $request->headers;
+    unset($headers['authorization']);
+    return new InnerRequest($request->method, $request->path, $request->query, $headers, static fn (): string => $request->body(), $request->origin, $request->mount, $request->form);
   }
 
   /**
