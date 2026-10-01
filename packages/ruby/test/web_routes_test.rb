@@ -85,6 +85,17 @@ class WebRoutesTest < Minitest::Test
     assert_equal 404, send_request(web, "GET", "/cronwatch/nope", BEARER).status
   end
 
+  def test_get_api_names_the_library_language_and_version
+    _, _, web = app
+    %w[/cronwatch/api /cronwatch/api/].each do |path|
+      res = send_request(web, "GET", path, BEARER)
+      assert_equal 200, res.status
+      assert_equal %({"ok":true,"library":"cronwatch","language":"ruby","version":"#{Cronwatch::VERSION}","api":1}), res.body
+    end
+    assert_equal 401, send_request(web, "GET", "/cronwatch/api", {}).status
+    assert_equal 404, send_request(web, "POST", "/cronwatch/api", BEARER.merge("content-type" => "application/json"), "{}").status
+  end
+
   def test_check_silence_unsilence_and_forget_over_the_api
     cw, _, web = app
     cw.run("s") { nil }
@@ -95,10 +106,12 @@ class WebRoutesTest < Minitest::Test
     assert_equal true, check["ok"]
     assert_equal 1, check["jobs"].length
     silenced = post.call("/cronwatch/api/jobs/s/silence", { for: "2h" }).json
-    assert_operator silenced["state"]["silencedUntil"], :>, 0
+    assert_equal %w[ok job], silenced.keys, "the job's summary, not its stored state"
+    assert_operator silenced["job"]["silencedUntil"], :>, 0
+    assert_equal "silenced", silenced["job"]["health"]
     assert_equal :silenced, cw.job_summary("s").health
     un = post.call("/cronwatch/api/jobs/s/unsilence").json
-    assert_nil un["state"]["silencedUntil"]
+    assert_nil un["job"]["silencedUntil"]
     assert_equal 404, post.call("/cronwatch/api/jobs/nope/silence", { for: "1h" }).status
     del = send_request(web, "DELETE", "/cronwatch/api/jobs/s", BEARER)
     assert_equal 200, del.status
@@ -345,7 +358,7 @@ class WebRoutesTest < Minitest::Test
         env["rack.input"] = OneShotInput.new(body)
         status, _, response = handler.call(env)
         assert_equal 200, status
-        assert_equal clock.now + (5 * MIN), JSON.parse(response.join)["state"]["silencedUntil"], "#{handler.class} #{type}"
+        assert_equal clock.now + (5 * MIN), JSON.parse(response.join)["job"]["silencedUntil"], "#{handler.class} #{type}"
       end
     end
   end
@@ -359,7 +372,7 @@ class WebRoutesTest < Minitest::Test
     post = ->(body) { send_request(web, "POST", "/cronwatch/api/jobs/bytes/silence", BEARER.merge("content-type" => "application/json"), body.b) }
     res = post.call("\xEF\xBB\xBF{\"for\":\"5m\"}")
     assert_equal 200, res.status
-    assert_equal clock.now + (5 * MIN), res.json["state"]["silencedUntil"]
+    assert_equal clock.now + (5 * MIN), res.json["job"]["silencedUntil"]
     res = post.call("{\"for\":\"5m\xFF\"}")
     assert_equal 400, res.status
     assert_equal "silence duration \"5m\u{FFFD}\" is not a duration like \"15m\", \"1h30m\" or \"90s\"", res.json["error"]

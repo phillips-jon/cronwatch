@@ -159,7 +159,7 @@ The link is built from `origin:` when it is set, and otherwise from that request
 
 Open it once and the browser keeps a cookie, as with any token; scripts and the MCP server can send it as a bearer. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a Rack app cannot tell a caller on this machine from one elsewhere (proxies, tunnels and a server bound to every interface all look alike), so the log, which only you can read, is the proof.
 
-`/api/check` also accepts the client's `cron_secret` as a bearer. See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
+`/api/check` also accepts the client's `cron_secret` as a bearer. `GET /api` answers `{"ok":true,"library":"cronwatch","language":"ruby","version":"<the gem's version>","api":1}`, and a silence or unsilence over the API answers the job's summary (`{"ok":true,"job":{...}}`). See [Dashboard and API](/docs/dashboard/) for every endpoint, and [Ruby on Rails](/docs/rails/#mount-the-dashboard) for the details.
 
 ### Behind a proxy
 

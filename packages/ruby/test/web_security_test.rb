@@ -138,7 +138,7 @@ class WebSecurityTest < Minitest::Test
     end
     assert_nil cw.job_summary("s").silenced_until, "a bad duration silences nothing"
 
-    until_ms = ->(body) { silence.call(body).json["state"]["silencedUntil"] - clock.now }
+    until_ms = ->(body) { silence.call(body).json["job"]["silencedUntil"] - clock.now }
     assert_equal 7_200_000, until_ms.call({ for: 7_200_000 })
     assert_equal 60_000, until_ms.call({ for: "60000" })
     assert_equal 90 * 60_000, until_ms.call({ for: "90m" })

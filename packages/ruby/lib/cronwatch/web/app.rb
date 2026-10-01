@@ -67,6 +67,12 @@ module Cronwatch
       "x-content-type-options" => "nosniff", "referrer-policy" => "same-origin", "x-robots-tag" => "noindex",
     }.freeze
     BEARER = Regexp.new("\\ABearer[#{JS::WHITESPACE}]+", Regexp::IGNORECASE)
+    # What GET <base>/api names, so a client such as @cronwatch/mcp can tell
+    # what it is talking to. API_VERSION goes up only with a change that is
+    # not additive, in a major release.
+    LIBRARY = "cronwatch"
+    LANGUAGE = "ruby"
+    API_VERSION = 1
     DECIMAL = /\A[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\z/
     RADIX = { "x" => 16, "o" => 8, "b" => 2 }.freeze
 
@@ -259,7 +265,7 @@ module Cronwatch
           rescue ArgumentError => e
             return html(HTML.message_page("Not silenced", e.message, base), 400)
           end
-          cw.silence(name, duration)
+          cw.silence(name, for: duration)
         else
           cw.unsilence(name)
         end
@@ -273,6 +279,9 @@ module Cronwatch
 
     def serve_api(request, method, rest, bearer)
       cw = client
+      if method == "GET" && rest.empty?
+        return api({ ok: true, library: LIBRARY, language: LANGUAGE, version: VERSION, api: API_VERSION })
+      end
       return api({ ok: true, jobs: cw.jobs }) if method == "GET" && rest[0] == "jobs" && rest.length == 1
 
       if rest[0] == "jobs" && rest.length == 2
@@ -301,9 +310,13 @@ module Cronwatch
           rescue ArgumentError => e
             return api({ ok: false, error: e.message }, 400)
           end
-          return api({ ok: true, state: cw.silence(name, duration) })
+          cw.silence(name, for: duration)
+          return api({ ok: true, job: cw.job_summary(name) })
         end
-        return api({ ok: true, state: cw.unsilence(name) }) if rest[2] == "unsilence"
+        if rest[2] == "unsilence"
+          cw.unsilence(name)
+          return api({ ok: true, job: cw.job_summary(name) })
+        end
       end
       if rest[0] == "check" && rest.length == 1
         # A page cannot send an Authorization header cross-site, so a GET

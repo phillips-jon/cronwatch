@@ -98,7 +98,10 @@ class WebGoldenTest < Minitest::Test
       assert_equal capture["status"], res.status, label
       headers = res.headers.reject { |k, _| IGNORED_HEADERS.include?(k) }
       assert_equal capture["responseHeaders"].sort.to_h, headers.sort.to_h, label
-      assert_equal capture["responseBody"], body, label
+      # GET <base>/api names the library serving it; the fixture holds placeholders.
+      expected = capture["responseBody"].sub('"<library>"', '"cronwatch"').sub('"<language>"', '"ruby"')
+                                        .sub('"<version>"', JSON.generate(Cronwatch::VERSION))
+      assert_equal expected, body, label
     end
   end
 end
