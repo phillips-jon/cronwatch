@@ -16,7 +16,7 @@ class WebOriginTest < Minitest::Test
   # An app that sees its requests on an internal URL, as it does behind a proxy.
   def app(internal = INTERNAL, **options)
     cw, clock, = make
-    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch", **options)
+    web = cw.routes(token: "tok", base_path: "/cronwatch", **options)
     send = ->(method, path, headers = {}, body = nil) { send_request(web, method, "#{internal}#{path}", headers, body) }
     [cw, clock, send]
   end
@@ -85,14 +85,14 @@ class WebOriginTest < Minitest::Test
 
   def test_an_origin_that_is_not_an_http_or_https_url_raises_when_the_app_is_made
     cw, = make
-    error = assert_raises(ArgumentError) { Cronwatch::Web.new(cw, token: "tok", origin: "app.example.com") }
+    error = assert_raises(ArgumentError) { cw.routes(token: "tok", origin: "app.example.com") }
     assert_equal 'routes: origin must be an absolute URL such as "https://app.example.com", got "app.example.com"', error.message
-    error = assert_raises(ArgumentError) { Cronwatch::Web.new(cw, token: "tok", origin: "ftp://app.example.com") }
+    error = assert_raises(ArgumentError) { cw.routes(token: "tok", origin: "ftp://app.example.com") }
     assert_equal 'routes: origin must be http or https, got "ftp://app.example.com"', error.message
-    assert_raises(ArgumentError) { Cronwatch::Web.new(cw, token: "tok", origin: "https://") }
-    assert_raises(ArgumentError) { Cronwatch::Web.new(cw, token: "tok", origin: "https://bad host") }
-    Cronwatch::Web.new(cw, token: "tok", origin: "")
-    Cronwatch::Web.new(cw, token: "tok", origin: nil)
+    assert_raises(ArgumentError) { cw.routes(token: "tok", origin: "https://") }
+    assert_raises(ArgumentError) { cw.routes(token: "tok", origin: "https://bad host") }
+    cw.routes(token: "tok", origin: "")
+    cw.routes(token: "tok", origin: nil)
   end
 
   def test_the_origin_is_normalised_to_scheme_host_and_port
@@ -215,7 +215,7 @@ class WebOriginTest < Minitest::Test
         before = $stdout
         $stdout = StringIO.new
         begin
-          send_request(Cronwatch::Web.new(cw, base_path: "/cronwatch", **options), "GET", url, headers)
+          send_request(cw.routes(base_path: "/cronwatch", **options), "GET", url, headers)
           lines << $stdout.string.chomp
         ensure
           $stdout = before

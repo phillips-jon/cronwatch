@@ -4,6 +4,7 @@ require "json"
 
 require_relative "cronwatch/version"
 require_relative "cronwatch/js"
+require_relative "cronwatch/deprecation"
 require_relative "cronwatch/types"
 require_relative "cronwatch/duration"
 require_relative "cronwatch/stats"

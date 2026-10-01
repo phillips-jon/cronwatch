@@ -171,7 +171,7 @@ Ruby and Rails (Ruby 3.2 or newer, Rails 7.2 or newer)
 
 5. Mount the dashboard in config/routes.rb (no require needed in Rails):
 
-   mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
+   mount Cronwatch.client.routes => "/cronwatch"
 
    Outside development it needs CRONWATCH_TOKEN. Behind the app's own admin
    auth, pass token: nil instead.

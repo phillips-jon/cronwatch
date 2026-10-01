@@ -32,7 +32,7 @@ rescue RuntimeError
   nil
 end
 
-app = Rack::URLMap.new("/cronwatch" => Cronwatch::Web.new(cw, token: "tok"))
+app = Rack::URLMap.new("/cronwatch" => cw.routes(token: "tok"))
 
 handler =
   begin

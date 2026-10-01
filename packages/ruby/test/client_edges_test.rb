@@ -206,14 +206,17 @@ class ClientEdgesTest < Minitest::Test
     cw, = make
     error = assert_raises(ArgumentError) { cw.run("nightly", schedule: "0 2 * * *") }
     assert_match(/needs a block/, error.message)
-    assert_nil cw.run("no-such-run-id")
+    assert_nil assert_deprecated(/run\(id\) without a block/) { cw.run("no-such-run-id") }
   end
 
   def test_silence_takes_for_and_nothing_else
     cw, clock, = make
     cw.run("quiet") { nil }
     assert_equal clock.now + (2 * HOUR), cw.silence("quiet", for: "2h").silenced_until
-    assert_equal clock.now + HOUR, cw.silence("quiet", "1h").silenced_until
+    silenced = assert_deprecated(/silence\(name, duration\) is deprecated and goes in 2\.0; use silence\(name, for: duration\)/) do
+      cw.silence("quiet", "1h")
+    end
+    assert_equal clock.now + HOUR, silenced.silenced_until, "the duration as a second argument still works"
     assert_raises(ArgumentError) { cw.silence("quiet", fro: "2h") }
     assert_raises(ArgumentError) { cw.silence("quiet", "1h", for: "2h") }
   end
@@ -221,11 +224,25 @@ class ClientEdgesTest < Minitest::Test
   def test_a_second_start_with_another_interval_is_reported_and_ignored
     errors = []
     cw, = make(on_error: ->(e, where) { errors << [where, e.message] })
-    cw.start("1m")
-    cw.start("1m")
+    cw.start_checking("1m")
+    cw.start_checking("1m")
     assert_equal [], errors
-    cw.start("5m")
-    assert_equal [["start", 'start("5m") ignored: already checking every 1m; call stop first to change it']], errors
+    cw.start_checking("5m")
+    assert_equal [["start_checking", 'start_checking("5m") ignored: already checking every 1m; call stop first to change it']], errors
+  ensure
+    cw&.stop
+  end
+
+  def test_start_is_the_deprecated_name_of_start_checking
+    errors = []
+    cw, = make(on_error: ->(e, where) { errors << [where, e.message] })
+    assert_nil assert_deprecated(/client\.start\(every\) is deprecated and goes in 2\.0; use client\.start_checking\(every\)/) { cw.start("1m") }
+    cw.start_checking("1m")
+    assert_equal [], errors, "the same checks: a second call does nothing"
+    cw.stop
+    assert_deprecated(/client\.start/) { cw.start }
+    cw.start_checking("5m")
+    assert_equal ["start_checking"], errors.map(&:first), "started by start, with the default interval"
   ensure
     cw&.stop
   end
@@ -299,8 +316,10 @@ class ClientEdgesTest < Minitest::Test
   def test_rack_env_development_alone_is_not_stated_under_a_server_that_sets_it
     skip "Rails is loaded" if defined?(::Rails)
 
-    original = Cronwatch::Environment.method(:defaulting_server?)
-    Cronwatch::Environment.define_singleton_method(:defaulting_server?) { true }
+    methods = Cronwatch::Environment.singleton_class
+    original = methods.instance_method(:defaulting_server?)
+    methods.send(:remove_method, :defaulting_server?)
+    methods.send(:define_method, :defaulting_server?) { true }
     begin
       with_env("CRONWATCH_ENV" => nil, "APP_ENV" => nil, "RAILS_ENV" => nil, "RACK_ENV" => "development") do
         assert Cronwatch::Environment.development?
@@ -316,7 +335,8 @@ class ClientEdgesTest < Minitest::Test
         assert Cronwatch::Environment.stated_development?
       end
     ensure
-      Cronwatch::Environment.define_singleton_method(:defaulting_server?, original)
+      methods.send(:remove_method, :defaulting_server?)
+      methods.send(:define_method, :defaulting_server?, original)
     end
   end
 
@@ -343,7 +363,7 @@ class ClientEdgesTest < Minitest::Test
       checks += 1
       super()
     end
-    cw.start("5s")
+    cw.start_checking("5s")
     wait_for { checks >= 1 }
     slow = true
     in_flight = Thread.new { cw.check }
@@ -354,7 +374,7 @@ class ClientEdgesTest < Minitest::Test
       reader.close
       slow = false
       before = checks
-      cw.start("5s")
+      cw.start_checking("5s")
       deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 2
       sleep 0.01 until checks > before || Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
       ticked = checks > before

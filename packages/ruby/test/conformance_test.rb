@@ -424,7 +424,7 @@ class ConformanceTest < Minitest::Test
     cw.job("j")
     each_case(HEALTH["silenceEnd"]) do |c|
       clock.now = c["now"]
-      differs(c["silencedUntil"], cw.silence("j", c["duration"]).silenced_until)
+      differs(c["silencedUntil"], cw.silence("j", for: c["duration"]).silenced_until)
     end
   end
 

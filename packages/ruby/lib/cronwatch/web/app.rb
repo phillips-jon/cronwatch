@@ -10,11 +10,16 @@ module Cronwatch
   # (routes/index.ts) with the same URLs, JSON, auth, CSRF rules and headers,
   # so @cronwatch/mcp works against a Ruby app as it does against a Node one.
   #
+  # Made by Client#routes, the one way to mount it:
+  #
   #   # config/routes.rb
-  #   mount Cronwatch::Web.new => "/cronwatch"
+  #   mount Cronwatch.client.routes => "/cronwatch"
   #
   #   # config.ru, standalone
-  #   run Cronwatch::Web.new(CW)
+  #   run CW.routes
+  #
+  # Cronwatch::Web.new(client, **options) makes the same app and is
+  # deprecated: it still works through 1.x and goes in 2.0.
   #
   # token:     required to reach anything. Send it as `Authorization: Bearer <token>`,
   #            or open the dashboard once with `?token=<token>` and a cookie is set.
@@ -75,6 +80,22 @@ module Cronwatch
     API_VERSION = 1
     DECIMAL = /\A[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\z/
     RADIX = { "x" => 16, "o" => 8, "b" => 2 }.freeze
+
+    # Deprecated: use client.routes(**options). Still works through 1.x; a
+    # Web made without a client serves Cronwatch.client, read on each request.
+    def self.new(client = nil, **options)
+      Deprecation.warn("Cronwatch::Web.new(client, ...)", "client.routes(...)")
+      build(client, **options)
+    end
+
+    # The app Client#routes returns, without the warning.
+    #
+    # @api private
+    def self.build(client = nil, **options)
+      app = allocate
+      app.send(:initialize, client, **options)
+      app
+    end
 
     def initialize(client = nil, token: UNSET, base_path: nil, origin: nil)
       @client = client
@@ -189,7 +210,7 @@ module Cronwatch
 
       # No token outside development: fail closed.
       if !@token && !@opted_out
-        return wants_html ? html(HTML.message_page("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token: to Cronwatch::Web.new), or pass token: nil to serve them open behind your own auth.", base), 503) : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503)
+        return wants_html ? html(HTML.message_page("CronWatch routes are locked", "Set CRONWATCH_TOKEN (or pass token: to routes), or pass token: nil to serve them open behind your own auth.", base), 503) : api({ ok: false, error: "CRONWATCH_TOKEN is not set" }, 503)
       end
 
       if method != "GET" && method != "HEAD" && cross_site?(request)

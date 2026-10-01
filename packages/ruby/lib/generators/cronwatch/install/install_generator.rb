@@ -207,7 +207,7 @@ module Cronwatch
 
           4. Mount the dashboard in config/routes.rb:
 
-               mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
+               mount Cronwatch.client.routes => "/cronwatch"
 
              Outside development it needs CRONWATCH_TOKEN set to sign in. In
              development, without one, the server prints a sign-in link on

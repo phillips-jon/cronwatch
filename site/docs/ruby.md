@@ -75,7 +75,7 @@ Option names are snake_case (`max_duration`, `failures_before_alert`); condition
 A long-running process checks in a background thread:
 
 ```ruby
-CW.start            # every minute; CW.start("5m") to change it
+CW.start_checking   # every minute; CW.start_checking("5m") to change it
 at_exit { CW.stop }
 ```
 
@@ -122,23 +122,21 @@ end
 
 ```ruby
 # config.ru
-require "cronwatch/web"
 require_relative "lib/jobs"
 
 map "/cronwatch" do
-  run Cronwatch::Web.new(CW)
+  run CW.routes
 end
 ```
 
-Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules.
+`client.routes(**options)` is the one way to build it, as `cw.routes()` is in every language; it needs the `rack` gem. Sinatra, Hanami and Roda mount it the same way. It serves the same pages and JSON API as the TypeScript routes, with the same token rules.
 
 The board shows its counts by health, a timeline of the last day with a lane per job (a tick each time it was due, a mark for each run as long as it took, a dashed box for a missed slot) and the table of every job, and for each job its last seven days, runs and definition, all drawn on the server with no script. The environment is the first of `CRONWATCH_ENV`, `APP_ENV`, then `Rails.env` (when Rails is loaded), `RAILS_ENV` or `RACK_ENV` that holds more than spaces, trimmed and lowercased; `development`, `dev`, `local`, `test` and `testing` count as development and `production` and `prod` as production, as in every language (see [development](/docs/dashboard/#development)). Where the SDK reads `NODE_ENV` third, the gem reads the app's own.
 
 It reads forms through Rack, so it works behind `Rack::MethodOverride` and with a request body that can be read only once. It is installable as a web app like the TypeScript dashboard, with its manifest, icons and service worker under the mount point (from `SCRIPT_NAME` or `base_path:`); see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
 
-`Cronwatch::Web.new(client = nil, token:, base_path:, origin:)`:
+`client.routes(token:, base_path:, origin:)` returns a `Cronwatch::Web`, a Rack app serving that client:
 
-- `client`: the client to serve. Leave it out and each request uses `Cronwatch.client`.
 - `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. Without a token, while the environment (above) is development, the app makes a token of its own and prints a sign-in link to standard output on its first request (see below); anywhere else it answers 503. Puma, Unicorn, Thin and rackup set `RACK_ENV` to `development` when nothing names an environment, production included, so under one of them `RACK_ENV=development` alone does not count: `CRONWATCH_ENV`, `APP_ENV`, `Rails.env` or `RAILS_ENV` must say development (or `RACK_ENV` say `test`, `dev` or `local`). `nil` opts out and serves it open, for a mount behind your own auth.
 - `base_path`: where it is mounted. It defaults to `SCRIPT_NAME`, which `map` and Rails' `mount` set, so it is only needed when something strips the prefix without setting it.
 - `origin`: the public origin the dashboard is served from, such as `"https://app.example.com"`. Leave it out and each request's own origin is used, as Rack reads it (see below). Set it to pin the origin: it then replaces the request's for the cross-site check on writes, the sign-in cookie's `Secure` flag, the `Referer` the redirect back after a form follows, and the development sign-in line. It is read as the TypeScript routes read it (with `new URL`): whitespace around it is dropped, the host is lowercased, a host that is not ASCII becomes punycode (through the `simpleidn` gem, or Addressable when the app has it; without either, write it as `xn--...`), and it is reduced to scheme, host and port. Anything that is not an absolute `http` or `https` URL, or has a port outside 1 to 65535, raises `ArgumentError` when the app is made, and an empty string counts as unset.
@@ -280,7 +278,7 @@ CW = Cronwatch.new(
   store: Cronwatch::Stores::ActiveRecord.new,
   sources: [Cronwatch::Sources::PgCron.new(PG.connect(ENV.fetch("DATABASE_URL")), prefix: "db:")],
 )
-CW.start
+CW.start_checking
 ```
 
 The first argument is an ActiveRecord class, connection pool or connection (queried with `exec_query`, a connection checked out for each query), a `PG::Connection` from the pg gem (`exec_params`), or anything with `query(sql, params)` that returns rows as hashes with string keys. The options:
@@ -376,6 +374,8 @@ A triage of your own is any callable that takes the context (`alert`, `recent_ru
 
 `client.job(name, **options)` takes `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `expect` (a string, a Regexp or a callable; a Regexp that takes longer than one second to match counts as not matching, see [expect rules](/docs/conditions/#expect-rules)), `failures_before_alert`, `description` and `tags`, with the defaults and rules in the [API reference](/docs/api/). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`. Bad options raise `ArgumentError` when the job is declared. It returns a handle whose `run(trigger: "run") { |job| ... }` runs the block, and whose `start` and `resume` handle a run that spans calls (see [Runs that span calls](#runs-that-span-calls)).
 
+`timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. Set `timeout` well above `max_duration`: `max_duration: "10m", timeout: "1h"`.
+
 The block's `job` has `name`, `run_id`, `started_at`, `log(*parts)`, `metric(name, value)`, `metrics(hash)`, `signal`, and `aborted?`, true once the job's `timeout` has passed. Nothing is interrupted; a loop that can stop early checks it, or calls `job.signal.check!` to raise.
 
 The client:
@@ -383,17 +383,30 @@ The client:
 | Method | |
 |---|---|
 | `job(name, **options)` | declare a job and get its handle |
-| `run(name, **options) { \|job\| ... }` | run without keeping a handle. Without a block, `run(id)` is `get_run(id)` |
+| `run(name, **options) { \|job\| ... }` | run without keeping a handle, declaring the job on first use |
 | `check` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune. Returns a result with `checked_at`, `jobs`, `alerts` and `pruned`. Calls at the same time share one check. A job that cannot be evaluated is reported to `on_error` (as `"checking <job>"`) and listed as `failing`; the rest are checked as usual |
-| `start(every = "1m")`, `stop` | check in a background thread; the first check comes after a second, and the interval is at least 5 seconds. A second `start` does nothing, and one with another interval is reported to `on_error`. With `deliver: :check`, `start` warns once that these checks send nothing |
+| `start_checking(every = "1m")`, `stop` | check in a background thread; the first check comes after a second, and the interval is at least 5 seconds. A second `start_checking` does nothing, and one with another interval is reported to `on_error`. With `deliver: :check`, it warns once that these checks send nothing. (A job's `start` opens a run; this starts the checks.) |
 | `jobs`, `jobs_with_runs(limit = 20)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit = 50)`, `get_run(id)` | newest first; `limit` is 1 to 500 |
-| `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; `silence(name, "2h")` works too, and any other keyword raises. State keeps updating underneath. The end is a whole millisecond, held at 2^53 - 1 however long the silence. Each returns the job's stored state, `version` included |
+| `silence(name, for: "2h")`, `unsilence(name)` | stop alerts for a while; any other keyword raises. State keeps updating underneath. The end is a whole millisecond, held at 2^53 - 1 however long the silence. Each returns the job's stored state, `version` included |
 | `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resume_run(name, run_id)` | `job(name).resume(run_id)` for a job declared in this process; raises `ArgumentError` for one that is not |
 | `record_run(run, evaluate: true)` | record a run that happened elsewhere, for a source; see [pg_cron](#pg-cron). Returns the alerts it sent |
 | `defined_jobs` | the definitions declared in this process |
+| `routes(**options)` | the dashboard and JSON API as a Rack app; see [the dashboard](#the-dashboard-in-any-rack-app) |
 | `close` | stop the interval, wait for a check already under way, then close the store |
+
+### Deprecated
+
+These still work through every 1.x release, and go in 2.0. Each writes a warning in Ruby's deprecation category, which shows under `ruby -w`, `-W:deprecated` or `Warning[:deprecated] = true` and names the line that called it.
+
+| Deprecated | Use instead |
+|---|---|
+| `Cronwatch::Web.new(client, **options)` | `client.routes(**options)` (`Cronwatch.client.routes` in Rails). `Web.new` without a client still serves `Cronwatch.client`, read on each request |
+| `client.start(every)` | `client.start_checking(every)`, the same checks under a name that is not a job's `start` |
+| `client.run(id)` without a block | `client.get_run(id)` |
+| `client.silence(name, "2h")` | `client.silence(name, for: "2h")`, as the API and the MCP server spell it |
+| the trigger `active_job` | not an API: runs recorded before 1.0 keep it, and runs from 1.0 on are `active-job` |
 
 ## Runs that span calls
 

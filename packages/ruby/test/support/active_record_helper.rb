@@ -256,7 +256,7 @@ module ActiveRecordStoreTests
                      "VALUES ('far1', 'far', 'ok', #{started_at}, #{started_at}, 0, '{}', 'run')")
       end
       cw.check
-      web = Rack::MockRequest.new(Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch"))
+      web = Rack::MockRequest.new(cw.routes(token: "tok", base_path: "/cronwatch"))
       ["/cronwatch/", "/cronwatch/jobs/far", "/cronwatch/api/jobs/far"].each do |path|
         assert_equal 200, web.get(path, "HTTP_AUTHORIZATION" => "Bearer tok").status, "#{started_at} #{path}"
       end

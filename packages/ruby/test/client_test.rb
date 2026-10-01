@@ -112,10 +112,10 @@ class ClientTest < Minitest::Test
     assert_match(/not a cron expression/, assert_raises(ArgumentError) { cw.job("x", schedule: "nope") }.message)
     assert_match(/grace/, assert_raises(ArgumentError) { cw.job("x", grace: "soon") }.message)
     assert_match(/unknown option :sechdule/, assert_raises(ArgumentError) { cw.job("x", sechdule: "@daily") }.message)
-    # Without a block, run looks a run up by id.
+    # Without a block, run looks a run up by id, as get_run does: deprecated.
     run = cw.runs("adhoc").first
-    assert_equal run.id, cw.run(run.id).id
     assert_equal run.id, cw.get_run(run.id).id
+    assert_equal run.id, assert_deprecated(/run\(id\) without a block is deprecated and goes in 2\.0; use get_run\(id\)/) { cw.run(run.id) }.id
   end
 
   def test_check_finds_a_missed_run_once_and_a_later_run_recovers
@@ -182,7 +182,7 @@ class ClientTest < Minitest::Test
     cw.check
     clock.now = T0 + (70 * MIN) + 1
     cw.check
-    cw.silence("sync", "1h")
+    cw.silence("sync", for: "1h")
     cw.job("sync")
     clock.advance(MIN)
     assert_equal [], cw.check.alerts
@@ -256,7 +256,7 @@ class ClientTest < Minitest::Test
     cw.unsilence("flaky")
     assert_raises(RuntimeError) { job.run { raise "y" } }
     assert_equal [:failed], alerts.types
-    cw.silence("flaky", 60_000)
+    cw.silence("flaky", for: 60_000)
     assert_equal T0 + MIN, cw.store.get_state("flaky").silenced_until
   end
 
@@ -655,12 +655,12 @@ class ClientTest < Minitest::Test
     checks = 0
     cw.define_singleton_method(:check) { checks += 1 }
     cw.instance_variable_set(:@first_tick_s, 0.05)
-    cw.start
+    cw.start_checking
     cw.stop
     sleep 0.15
     assert_equal 0, checks
-    cw.start
-    cw.start # a second start does nothing
+    cw.start_checking
+    cw.start_checking # a second start does nothing
     wait_for { checks >= 1 }
     cw.stop
     sleep 0.1
@@ -672,7 +672,7 @@ class ClientTest < Minitest::Test
     cw, = make(on_error: ->(e, where) { errors << [where, e.message] })
     cw.define_singleton_method(:check) { raise "boom" }
     cw.instance_variable_set(:@first_tick_s, 0.01)
-    cw.start
+    cw.start_checking
     wait_for { errors.any? }
     cw.close
     assert_equal [%w[check boom]], errors
@@ -701,7 +701,7 @@ class ClientTest < Minitest::Test
     source = RaisingSource.new(LoadError.new("cannot load such file -- pg"))
     cw, = make(sources: [source], on_error: ->(e, where) { errors.push([where, e.class]) })
     cw.instance_variable_set(:@first_tick_s, 0.01)
-    cw.start("5s")
+    cw.start_checking("5s")
     source.wait_for_call
     assert_equal ["check", LoadError], errors.pop
     thread = cw.instance_variable_get(:@ticker).instance_variable_get(:@thread)
@@ -715,13 +715,13 @@ class ClientTest < Minitest::Test
     source = RaisingSource.new(RuntimeError.new("tick"))
     cw, = make(sources: [source], on_error: ->(*) {})
     cw.instance_variable_set(:@first_tick_s, 0.01)
-    cw.start("5s")
+    cw.start_checking("5s")
     source.wait_for_call
     ticker = cw.instance_variable_get(:@ticker)
     thread = ticker.instance_variable_get(:@thread)
     thread.kill
     thread.join
-    cw.start("5s")
+    cw.start_checking("5s")
     refute_same ticker, cw.instance_variable_get(:@ticker)
     source.wait_for_call # the new thread's first check
   ensure

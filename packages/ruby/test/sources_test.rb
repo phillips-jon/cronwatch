@@ -23,14 +23,14 @@ class SourcesTest < Minitest::Test
     client.job("db-job", expect: "done")
     clock.advance(1000)
     assert_equal [], client.record_run(outside("r1", :ok, T0, finished_at: T0 + 500, output: "done password=hunter2"))
-    stored = client.run("r1")
+    stored = client.get_run("r1")
     assert_equal [:ok, "done password=[redacted]"], [stored.status, stored.output]
 
     alerts = client.record_run(outside("r2", :ok, T0 + 600, finished_at: T0 + 700, output: "nope\0"))
     assert_equal [:failed], alerts.map(&:type), "expect applies to an outside run"
-    assert_equal [:failed, 'Output did not contain "done"', "nope"], [client.run("r2").status, client.run("r2").error, client.run("r2").output]
+    assert_equal [:failed, 'Output did not contain "done"', "nope"], [client.get_run("r2").status, client.get_run("r2").error, client.get_run("r2").output]
     assert_equal [], client.record_run(outside("r2", :ok, T0 + 600, finished_at: T0 + 700, output: "done")), "a stored finished run is left alone"
-    assert_equal :failed, client.run("r2").status
+    assert_equal :failed, client.get_run("r2").status
     assert_equal [:failed], capture.types
   end
 
@@ -43,7 +43,7 @@ class SourcesTest < Minitest::Test
     alerts = client.record_run({ id: "r1", job: "db-job", status: "failed", started_at: T0, finished_at: T0 + 2000,
                                  duration_ms: 2000, error: "boom", output: nil, metrics: {}, trigger: "outside" })
     assert_equal [:failed], alerts.map(&:type)
-    assert_equal [:failed, 2000], [client.run("r1").status, client.run("r1").duration_ms]
+    assert_equal [:failed, 2000], [client.get_run("r1").status, client.get_run("r1").duration_ms]
     assert_equal [], client.record_run(outside("r1", :ok, T0, finished_at: T0 + 1)), "a finished run is not reopened"
     assert_equal [:failed], capture.types
   end
@@ -55,7 +55,7 @@ class SourcesTest < Minitest::Test
     assert_equal [], client.record_run(outside("h2", :running, T0 - 3000), evaluate: false)
     assert_equal [], client.record_run(outside("h2", :failed, T0 - 3000, finished_at: T0 - 1000, error: "old"), evaluate: false)
     assert_equal %w[h2 h1], client.runs("db-job").map(&:id)
-    assert_equal :failed, client.run("h2").status
+    assert_equal :failed, client.get_run("h2").status
     assert_empty capture.types
     assert_equal 0, client.store.get_state("db-job")&.consecutive_failures.to_i
   end

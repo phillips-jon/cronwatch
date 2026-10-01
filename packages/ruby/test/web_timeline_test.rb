@@ -13,7 +13,7 @@ class WebTimelineTest < Minitest::Test
   def seeded
     clock = Clock.new(T0 - (30 * HOUR))
     cw = Cronwatch.new(now: clock.to_proc, alerts: [Capture.new], cron_secret: nil)
-    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch")
+    web = cw.routes(token: "tok", base_path: "/cronwatch")
     day = Time.utc(2026, 1, 5).to_i * 1000
 
     hourly = cw.job("hourly", schedule: "0 * * * *", timezone: "UTC")
@@ -113,7 +113,7 @@ class WebTimelineTest < Minitest::Test
                        "finishedAt" => T0 - (9 * MIN), "durationMs" => MIN, "error" => "x", "output" => nil,
                        "metrics" => {}, "trigger" => "run",
                      ))
-    web = Cronwatch::Web.new(cw, token: nil, base_path: "/cronwatch")
+    web = cw.routes(token: nil, base_path: "/cronwatch")
     ["/cronwatch/", "/cronwatch/jobs/#{Cronwatch::Web::HTML.encode_uri_component(name)}"].each do |path|
       html = send_request(web, "GET", path).body
       refute_match(/<svg onload/, html, path)
@@ -125,7 +125,7 @@ class WebTimelineTest < Minitest::Test
   def test_the_board_draws_at_most_thirty_lanes_and_says_so
     cw, = make
     33.times { |i| cw.run(format("job-%02d", i)) { nil } }
-    web = Cronwatch::Web.new(cw, token: nil, base_path: "/cronwatch")
+    web = cw.routes(token: nil, base_path: "/cronwatch")
     html = send_request(web, "GET", "/cronwatch/").body
     assert_equal 30, count(html, /<li class="lane">/)
     assert_match(/Showing the first 30 of 33 jobs here/, html)
@@ -134,7 +134,7 @@ class WebTimelineTest < Minitest::Test
 
   def test_an_empty_store_shows_no_timeline
     cw = Cronwatch.new(alerts: [Capture.new], cron_secret: nil)
-    web = Cronwatch::Web.new(cw, token: nil, base_path: "/cronwatch")
+    web = cw.routes(token: nil, base_path: "/cronwatch")
     html = send_request(web, "GET", "/cronwatch/").body
     assert_match(/No jobs yet\./, html)
     refute_match(/class="timeline/, html)
@@ -143,7 +143,7 @@ class WebTimelineTest < Minitest::Test
   def test_a_job_due_too_often_to_draw_shows_its_cadence_as_a_line
     cw, = make
     cw.job("minutely", schedule: "* * * * *").run { nil }
-    web = Cronwatch::Web.new(cw, token: nil, base_path: "/cronwatch")
+    web = cw.routes(token: nil, base_path: "/cronwatch")
     html = send_request(web, "GET", "/cronwatch/").body
     assert_match %r{<line class="cadence"[^>]*><title>minutely: due \* \* \* \* \*, too often to mark each time</title>}, html
     refute_match(/class="tick[^"]*" x1="[\d.]+" y1="6"/, html, "no ticks in the lane")

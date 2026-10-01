@@ -84,7 +84,7 @@ class ActiveRecordStoreForeignRowsTest < Minitest::Test
     assert_equal({ "deep-def" => :failing, "good" => :late, "null-def" => :failing, "text-def" => :failing }, by_name)
     assert_equal ["checking deep-def", "checking null-def", "checking text-def"], errors.map(&:first).sort
     assert_equal 4, cw.jobs.length
-    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch")
+    web = cw.routes(token: "tok", base_path: "/cronwatch")
     assert_equal 200, send_request(web, "GET", "/cronwatch/api/jobs", BEARER).status
     assert_equal 200, send_request(web, "GET", "/cronwatch/", BEARER).status
   end
@@ -102,7 +102,7 @@ class ActiveRecordStoreForeignRowsTest < Minitest::Test
     end
     assert_equal({}, store.get_run("r1").metrics)
     assert_equal({}, store.get_run("r2").metrics)
-    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch")
+    web = cw.routes(token: "tok", base_path: "/cronwatch")
     page = send_request(web, "GET", "/cronwatch/jobs/good", BEARER)
     assert_equal 200, page.status
     assert_includes page.body, %(<span class="metrics"><span><span class="k">cost</span> 1.2500</span><span><span class="k">n</span> 3</span></span>)

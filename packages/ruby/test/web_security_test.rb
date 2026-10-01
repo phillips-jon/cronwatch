@@ -11,7 +11,7 @@ class WebSecurityTest < Minitest::Test
   def app(on_error: nil)
     options = on_error ? { on_error: on_error } : {}
     cw, clock, = make(**options)
-    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch")
+    web = cw.routes(token: "tok", base_path: "/cronwatch")
     [cw, clock, ->(method, path, headers = {}, body = nil) { send_request(web, method, path, headers, body) }]
   end
 
@@ -205,7 +205,7 @@ class WebSecurityTest < Minitest::Test
   def test_without_a_token_in_development_nothing_a_request_says_about_itself_lets_it_in
     with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
       cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
-      web = Cronwatch::Web.new(cw, base_path: "/cronwatch")
+      web = cw.routes(base_path: "/cronwatch")
       before = $stdout
       $stdout = StringIO.new
       begin

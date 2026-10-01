@@ -131,7 +131,7 @@ module Cronwatch
       @registry = Mutex.new
       @ready = false
       @last_prune_at = 0
-      # Seconds before start()'s first check, and how long a channel or triage may take. Tests shorten them.
+      # Seconds before start_checking's first check, and how long a channel or triage may take. Tests shorten them.
       @first_tick_s = 1.0
       @channel_timeout_ms = CHANNEL_TIMEOUT_MS
       @triage_timeout_ms = TRIAGE_TIMEOUT_MS
@@ -161,13 +161,16 @@ module Cronwatch
       JobHandle.new(self, definition)
     end
 
-    # With a block: run a job by name without keeping a handle, declaring it
-    # on first use (or again, when options are given). Without a block: the
-    # run with this id, as get_run.
+    # Run a job by name without keeping a handle, declaring it on first use
+    # (or again, when options are given).
+    #
+    # Without a block it reads the run with this id, as get_run does: that
+    # form is deprecated (use get_run), still works through 1.x and goes in 2.0.
     def run(name_or_id, **options, &block)
       unless block
         raise ArgumentError, "run(#{name_or_id.inspect}, ...) needs a block; without one, run(id) reads a run" if options.any?
 
+        Deprecation.warn("run(id) without a block", "get_run(id)")
         return get_run(name_or_id)
       end
 
@@ -396,7 +399,7 @@ module Cronwatch
     end
 
     # Look for missed and stuck runs across every job, send alerts, retry
-    # alerts no channel accepted, and prune old runs. Call it from start(), a
+    # alerts no channel accepted, and prune old runs. Call it from start_checking, a
     # scheduled job (Cronwatch::CheckJob), or by hand. Concurrent calls share
     # one check.
     def check
@@ -464,12 +467,15 @@ module Cronwatch
 
     # Stop alerts for a job for a while. State keeps updating underneath. The
     # end is a whole millisecond, held at 2**53 - 1 (see Evaluate.silence_end).
-    #   silence("nightly-report", for: "2h")   # or silence("nightly-report", "2h")
+    #   silence("nightly-report", for: "2h")
+    # The duration as a second argument, silence("nightly-report", "2h"), is
+    # deprecated: it still works through 1.x and goes in 2.0.
     def silence(name, duration = nil, **options)
       unknown = options.keys - SILENCE_OPTIONS
       raise ArgumentError, "silence takes for:, not #{unknown.map(&:inspect).join(", ")}" if unknown.any?
       raise ArgumentError, "silence takes a duration or for:, not both" if !duration.nil? && options.key?(:for)
 
+      Deprecation.warn("silence(name, duration)", "silence(name, for: duration)") unless duration.nil?
       duration = options[:for] if duration.nil?
       ms = Duration.parse(duration, "silence duration")
       patch_state(name) { |state| state.silenced_until = Evaluate.silence_end(now, ms) }
@@ -497,8 +503,9 @@ module Cronwatch
     # processes. Default every minute; the first check comes after a second.
     # Calling it again while it runs does nothing, and a different interval
     # is reported to on_error and ignored: stop first to change it. A forked
-    # child (Puma, Unicorn, Sidekiq) has no thread, so call start there.
-    def start(every = "1m")
+    # child (Puma, Unicorn, Sidekiq) has no thread, so call start_checking
+    # there. (A job's start opens a run; this starts the checks.)
+    def start_checking(every = "1m")
       after_fork_check
       ms = [5_000, Duration.parse(every, "check interval")].max
       @ticker_lock.synchronize do
@@ -506,8 +513,8 @@ module Cronwatch
         @ticker = nil if @ticker && !@ticker.alive?
         if @ticker
           unless @ticker_ms == ms
-            report(ArgumentError.new("start(#{every.inspect}) ignored: already checking every #{Duration.format(@ticker_ms)}; " \
-                                     "call stop first to change it"), "start")
+            report(ArgumentError.new("start_checking(#{every.inspect}) ignored: already checking every #{Duration.format(@ticker_ms)}; " \
+                                     "call stop first to change it"), "start_checking")
           end
           return nil
         end
@@ -515,7 +522,7 @@ module Cronwatch
         @ticker_ms = ms
         if @defer_delivery && !@warned_deferred_start
           @warned_deferred_start = true
-          warn '[cronwatch] start() was called with deliver: "check", so these checks send no alerts. ' \
+          warn '[cronwatch] start_checking was called with deliver: "check", so these checks send no alerts. ' \
                'Another process must run checks with deliver: "now" (the default) to send them.'
         end
         @ticker = Ticker.new(ms / 1000.0, @first_tick_s) do
@@ -530,6 +537,26 @@ module Cronwatch
       nil
     end
 
+    # start_checking, under its former name. Deprecated, since a job's start
+    # opens a run: it still works through 1.x and goes in 2.0.
+    def start(every = "1m")
+      Deprecation.warn("client.start(every)", "client.start_checking(every)")
+      start_checking(every)
+    end
+
+    # The dashboard and JSON API for this client, as a Rack app to mount:
+    #
+    #   mount Cronwatch.client.routes => "/cronwatch"   # config/routes.rb
+    #   run CW.routes                                    # config.ru
+    #
+    # Options: token:, base_path: and origin: (see Cronwatch::Web). Needs the
+    # rack gem, which every Rails app has.
+    def routes(**options)
+      require_relative "web"
+      Web.build(self, **options)
+    end
+
+    # Stop the checks start_checking began.
     def stop
       stop_ticker
       nil

@@ -8,7 +8,7 @@ class WebRoutesTest < Minitest::Test
 
   def app(token: "tok")
     cw, clock, = make
-    [cw, clock, Cronwatch::Web.new(cw, token: token, base_path: "/cronwatch")]
+    [cw, clock, cw.routes(token: token, base_path: "/cronwatch")]
   end
 
   def test_everything_needs_the_token
@@ -22,7 +22,7 @@ class WebRoutesTest < Minitest::Test
   def test_the_check_endpoint_also_accepts_the_cron_secret_nothing_else_does
     clock = Clock.new
     cw = Cronwatch.new(now: clock.to_proc, alerts: [Capture.new], cron_secret: "cron-s3cret")
-    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch")
+    web = cw.routes(token: "tok", base_path: "/cronwatch")
     with_cron = { "authorization" => "Bearer cron-s3cret" }
     assert_equal 200, send_request(web, "GET", "/cronwatch/api/check", with_cron).status
     assert_equal 401, send_request(web, "GET", "/cronwatch/api/jobs", with_cron).status
@@ -134,9 +134,9 @@ class WebRoutesTest < Minitest::Test
   def unconfigured(token: Cronwatch::Web::UNSET, host: "app.test")
     cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
     web = if token.equal?(Cronwatch::Web::UNSET)
-            Cronwatch::Web.new(cw, base_path: "/cronwatch")
+            cw.routes(base_path: "/cronwatch")
           else
-            Cronwatch::Web.new(cw, token: token, base_path: "/cronwatch")
+            cw.routes(token: token, base_path: "/cronwatch")
           end
     ->(path) { send_request(web, "GET", "http://#{host}#{path}") }
   end
@@ -159,7 +159,7 @@ class WebRoutesTest < Minitest::Test
           assert_equal 503, get.call("/cronwatch/api/jobs").status, "RACK_ENV=#{env}"
           page = get.call("/cronwatch")
           assert_equal 503, page.status, "RACK_ENV=#{env}"
-          assert_includes page.body, "Set CRONWATCH_TOKEN (or pass token: to Cronwatch::Web.new), or pass token: nil to serve them open behind your own auth."
+          assert_includes page.body, "Set CRONWATCH_TOKEN (or pass token: to routes), or pass token: nil to serve them open behind your own auth."
         end
         assert_empty lines, "no token is made outside development"
       end
@@ -206,7 +206,7 @@ class WebRoutesTest < Minitest::Test
       %w[RAILS_ENV RACK_ENV].each do |var|
         with_env("RAILS_ENV" => nil, "RACK_ENV" => nil, var => env, "CRONWATCH_TOKEN" => nil) do
           cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
-          web = Cronwatch::Web.new(cw, base_path: "/cronwatch/")
+          web = cw.routes(base_path: "/cronwatch/")
           lines, = printed do
             # Every request is refused without the token, whatever it claims about where it came from.
             [
@@ -236,12 +236,12 @@ class WebRoutesTest < Minitest::Test
           assert_equal 200, send_request(web, "GET", "http://localhost:3000/cronwatch/", { "cookie" => cookie }).status
           assert_equal 200, send_request(web, "GET", "http://localhost:3000/cronwatch/api/jobs", { "authorization" => "Bearer #{token}" }).status
 
-          other = Cronwatch::Web.new(Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil), base_path: "/")
+          other = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil).routes(base_path: "/")
           second, = printed { send_request(other, "GET", "https://dev.example:8443/api/jobs") }
           assert_match %r{Sign in: /\?token=[A-Za-z0-9_-]{43} on this server \(the first request's host is not local, so the link leaves it out\)\z}, second[0], "no host that is not local, and a root mount"
           refute_equal token, second[0][/token=([A-Za-z0-9_-]{43})/, 1], "each app makes its own"
 
-          mounted = Cronwatch::Web.new(Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil))
+          mounted = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil).routes
           third, = printed { send_request(mounted, "GET", "http://localhost:3000/admin/cronwatch/api/jobs", script_name: "/admin/cronwatch") }
           assert_match %r{Sign in: http://localhost:3000/admin/cronwatch/\?token=[A-Za-z0-9_-]{43}\z}, third[0], "the mount point, from SCRIPT_NAME"
         end
@@ -262,7 +262,7 @@ class WebRoutesTest < Minitest::Test
   def test_the_development_token_lets_a_cron_secret_run_the_check
     with_env("RAILS_ENV" => nil, "RACK_ENV" => "development", "CRONWATCH_TOKEN" => nil) do
       cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: "cronsecret")
-      web = Cronwatch::Web.new(cw, base_path: "/cronwatch")
+      web = cw.routes(base_path: "/cronwatch")
       printed do
         assert_equal 200, send_request(web, "GET", "/cronwatch/api/check", { "authorization" => "Bearer cronsecret" }).status
         assert_equal 401, send_request(web, "GET", "/cronwatch/api/jobs", { "authorization" => "Bearer cronsecret" }).status
@@ -278,20 +278,20 @@ class WebRoutesTest < Minitest::Test
     end
     with_env("RAILS_ENV" => nil, "RACK_ENV" => "production", "CRONWATCH_TOKEN" => "envtok") do
       cw = Cronwatch.new(store: Cronwatch::Stores::Memory.new, alerts: [Capture.new], cron_secret: nil)
-      web = Cronwatch::Web.new(cw, token: "", base_path: "/cronwatch")
+      web = cw.routes(token: "", base_path: "/cronwatch")
       assert_equal 401, send_request(web, "GET", "/cronwatch/api/jobs").status
       assert_equal 200, send_request(web, "GET", "/cronwatch/api/jobs", { "authorization" => "Bearer envtok" }).status
-      assert_equal 200, send_request(Cronwatch::Web.new(cw, base_path: "/cronwatch"), "GET", "/cronwatch/api/jobs", { "authorization" => "Bearer envtok" }).status,
+      assert_equal 200, send_request(cw.routes(base_path: "/cronwatch"), "GET", "/cronwatch/api/jobs", { "authorization" => "Bearer envtok" }).status,
                    "the token defaults to CRONWATCH_TOKEN"
     end
   end
 
-  # Ruby only: mounted in Rails (`mount Cronwatch::Web.new => "/cronwatch"`) the
+  # Ruby only: mounted in Rails (`mount Cronwatch.client.routes => "/cronwatch"`) the
   # mount point arrives as SCRIPT_NAME, and links, cookies and redirects use it.
   def test_mounted_under_a_script_name_links_and_redirects_use_the_mount_point
     cw, = make
     cw.run("m") { nil }
-    web = Cronwatch::Web.new(cw, token: "tok")
+    web = cw.routes(token: "tok")
     signed_in = send_request(web, "GET", "/admin/cronwatch/jobs/m?token=tok&x=a+b", script_name: "/admin/cronwatch")
     assert_equal 303, signed_in.status
     assert_equal "/admin/cronwatch/jobs/m?x=a+b", signed_in.headers["location"]
@@ -309,14 +309,21 @@ class WebRoutesTest < Minitest::Test
     assert_equal 200, send_request(web, "GET", "/admin/cronwatch/api/jobs", BEARER, script_name: "/admin/cronwatch").status
   end
 
-  # Ruby only: with no client given, the app uses Cronwatch.client at request time.
-  def test_without_a_client_it_serves_cronwatch_client
+  # Ruby only: Cronwatch::Web.new, deprecated for client.routes, still
+  # works, and with no client given uses Cronwatch.client at request time.
+  def test_web_new_is_deprecated_and_without_a_client_serves_cronwatch_client
     previous = Cronwatch.instance_variable_get(:@client)
     cw, = make
     Cronwatch.client = cw
     cw.run("configured") { nil }
-    web = Cronwatch::Web.new(token: "tok")
+    web = assert_deprecated(/Cronwatch::Web\.new\(client, \.\.\.\) is deprecated and goes in 2\.0; use client\.routes/) do
+      Cronwatch::Web.new(token: "tok")
+    end
     assert_equal ["configured"], send_request(web, "GET", "/api/jobs", BEARER).json["jobs"].map { |j| j["name"] }
+    given = assert_deprecated(/Web\.new/) { Cronwatch::Web.new(cw, token: "tok") }
+    assert_instance_of Cronwatch::Web, given
+    assert_same cw, given.client
+    assert_instance_of Cronwatch::Web, cw.routes
   ensure
     Cronwatch.client = previous
   end
@@ -388,7 +395,7 @@ class WebRoutesTest < Minitest::Test
   def test_responses_pass_rack_lint
     cw, = make
     cw.run("l") { nil }
-    web = Rack::Lint.new(Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch"))
+    web = Rack::Lint.new(cw.routes(token: "tok", base_path: "/cronwatch"))
     [
       ["GET", "/cronwatch/", BEARER], ["GET", "/cronwatch/jobs/l", BEARER], ["GET", "/cronwatch/api/jobs", BEARER],
       ["GET", "/cronwatch/?token=tok"], ["POST", "/cronwatch/check", BEARER], ["GET", "/cronwatch/api/check", COOKIE],

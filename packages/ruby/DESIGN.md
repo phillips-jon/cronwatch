@@ -93,11 +93,13 @@ NIGHTLY.run do |job|
 end
 
 CW.check          # finds missed and stuck runs, prunes, returns a CheckResult
-CW.start          # a background thread that checks every minute (plain Ruby processes)
+CW.start_checking # a background thread that checks every minute (plain Ruby processes)
 CW.silence("nightly-report", for: "2h")
 ```
 
-`run(name) { ... }` declares and runs; `run(id)` without a block reads a run, and refuses options. `silence` takes a duration or `for:`, nothing else. A second `start` while one runs does nothing, and one with a different interval is reported to `on_error` and ignored (call `stop` first). `execute` and `report` are public for the integrations and marked `@api private`.
+`run(name) { ... }` declares and runs. `silence` takes `for:`, nothing else. `routes(**options)` builds the dashboard (`Web.build`, see below). A second `start_checking` while one runs does nothing, and one with a different interval is reported to `on_error` and ignored (call `stop` first). `execute` and `report` are public for the integrations and marked `@api private`.
+
+Deprecated for 1.x (plan D11, D19, D21, D22), each still working and warning through `Deprecation.warn` (`Kernel.warn` with `category: :deprecated` and `uplevel: 2`, so it names the caller's line and shows where Ruby's own deprecations do), and each going in 2.0: `Web.new(client, **options)` (`Client#routes` builds through `Web.build`, which does not warn), `Client#start(every)` (`start_checking`), `run(id)` without a block (`get_run`), and `silence(name, duration)` with the duration as a second argument (`for:`). The ActiveJob trigger is `Scheduler::ACTIVE_JOB_TRIGGER`, `active-job` (plan D17); nothing reads a trigger back, so runs stored as `active_job` need nothing.
 
 In Rails:
 
@@ -119,7 +121,7 @@ class NightlyReportJob < ApplicationJob
 end
 
 # config/recurring.yml (Solid Queue) or sidekiq-cron: run Cronwatch::CheckJob every 5 minutes, once, not per process.
-# config/routes.rb: mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
+# config/routes.rb: mount Cronwatch.client.routes => "/cronwatch"
 ```
 
 The job name defaults to the class name without `Job`, dasherized (`NightlyReportJob` is `nightly-report`). A job raising still raises after the run is recorded, so ActiveJob retries and error reporters see it as before.

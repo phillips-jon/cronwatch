@@ -259,7 +259,7 @@ class RailsGeneratorTest < Minitest::Test
 
     ["bin/rails db:migrate", "config/recurring.yml", "class: Cronwatch::CheckJob", "schedule: every 5 minutes",
      "config/schedule.yml", 'cron: "*/5 * * * *"', 'class: "Cronwatch::CheckJob"', "bin/rails cronwatch:check",
-     'mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"'].each { |text| assert_includes out, text }
+     'mount Cronwatch.client.routes => "/cronwatch"'].each { |text| assert_includes out, text }
 
     out, = generate
     assert_equal 1, migrations.length, "running it again adds no second migration"

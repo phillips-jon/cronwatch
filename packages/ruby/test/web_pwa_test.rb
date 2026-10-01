@@ -13,7 +13,7 @@ class WebPWATest < Minitest::Test
 
   def app(token: "tok", base_path: "/cronwatch")
     cw, = make
-    [cw, Cronwatch::Web.new(cw, token: token, base_path: base_path)]
+    [cw, cw.routes(token: token, base_path: base_path)]
   end
 
   def test_the_manifest_describes_the_app_at_its_base_path_without_the_token
@@ -52,7 +52,7 @@ class WebPWATest < Minitest::Test
     end
     # Mounted with Rails' `mount`, the base comes from SCRIPT_NAME.
     cw, = make
-    web = Cronwatch::Web.new(cw, token: "tok")
+    web = cw.routes(token: "tok")
     res = send_request(web, "GET", "/admin/cron/manifest.webmanifest", script_name: "/admin/cron")
     assert_equal "/admin/cron/", res.json["start_url"]
     assert_equal "/admin/cron/icons/icon-192.png", res.json["icons"][2]["src"]

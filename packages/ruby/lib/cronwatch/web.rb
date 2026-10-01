@@ -3,8 +3,7 @@
 # The dashboard and JSON API, as a Rack app. Needs the rack gem; the Rails
 # integration loads this file itself.
 #
-#   require "cronwatch/web"
-#   run Cronwatch::Web.new(CW)
+#   run CW.routes # Client#routes requires this file itself
 begin
   require "rack"
 rescue LoadError => e

@@ -196,7 +196,7 @@ class ClientHardeningTest < Minitest::Test
                  jobs.map { |j| [j.name, j.health, j.next_expected_at.nil?] }
     assert_equal ["reading bad", "reading odd"], errors
     assert_equal :failing, cw.job_summary("bad").health
-    cw.silence("bad", "1h")
+    cw.silence("bad", for: "1h")
     assert_equal :silenced, cw.job_summary("bad").health
   end
 
@@ -218,15 +218,15 @@ class ClientHardeningTest < Minitest::Test
     before = $stderr
     $stderr = StringIO.new
     cw, = make(deliver: :check)
-    cw.start
+    cw.start_checking
     cw.stop
-    cw.start
+    cw.start_checking
     cw.stop
     lines = $stderr.string.lines.map(&:chomp)
-    assert_equal ['[cronwatch] start() was called with deliver: "check", so these checks send no alerts. ' \
+    assert_equal ['[cronwatch] start_checking was called with deliver: "check", so these checks send no alerts. ' \
                   'Another process must run checks with deliver: "now" (the default) to send them.'], lines
     delivering, = make
-    delivering.start
+    delivering.start_checking
     delivering.stop
     assert_equal 1, $stderr.string.lines.length, "a delivering client says nothing"
   ensure
@@ -308,7 +308,7 @@ class ClientHardeningTest < Minitest::Test
     runner.run("s") { nil }
     threads = [
       Thread.new { assert_raises(RuntimeError) { runner.run("s") { raise "x" } } },
-      Thread.new { admin.silence("s", "1h") },
+      Thread.new { admin.silence("s", for: "1h") },
     ]
     threads.each(&:join)
     state = store.get_state("s")
@@ -475,7 +475,7 @@ class ClientHardeningTest < Minitest::Test
   def test_the_silence_endpoints_return_the_state_with_its_version
     cw, = make
     cw.run("v") { nil }
-    silenced = cw.silence("v", "1h")
+    silenced = cw.silence("v", for: "1h")
     assert_equal 1, silenced.version
     assert_equal 2, cw.unsilence("v").version
     assert_equal 2, cw.store.get_state("v").version

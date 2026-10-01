@@ -69,7 +69,7 @@ CronWatch is installed. Next:
 
 4. Mount the dashboard in config/routes.rb:
 
-     mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
+     mount Cronwatch.client.routes => "/cronwatch"
 
    Outside development it needs CRONWATCH_TOKEN set to sign in. In
    development, without one, the server prints a sign-in link on
@@ -302,7 +302,7 @@ Every perform of a watched class counts as a run, whoever enqueued it, as with `
 
 ## Run the check
 
-**Run exactly one checker.** Schedule `Cronwatch::CheckJob` once, as one recurring entry, not per process or per machine, and do not also call `Cronwatch.client.start` or hit `/cronwatch/api/check` from elsewhere. Two checks against one database at the same moment can each open the same condition and send the same alert twice.
+**Run exactly one checker.** Schedule `Cronwatch::CheckJob` once, as one recurring entry, not per process or per machine, and do not also call `Cronwatch.client.start_checking` or hit `/cronwatch/api/check` from elsewhere. Two checks against one database at the same moment can each open the same condition and send the same alert twice.
 
 Failures are caught as they happen. A run that never started, or never finished, can only be noticed by looking. `Cronwatch::CheckJob` (or `Cronwatch::Sidekiq::CheckWorker`, for Sidekiq without ActiveJob) looks: it loads `app/jobs` (and `app/workers` and `app/sidekiq`, when they exist) when the app does not eager load, declares every monitored job, and calls `Cronwatch.client.check`, which finds missed and stuck runs, sends their alerts, retries alerts no channel accepted and prunes old runs. It returns the check's result and is queued on `default`. Schedule it every five minutes beside your other recurring jobs; these are the entries the generator prints.
 
@@ -340,13 +340,12 @@ If the scheduler itself stops, the check stops with it, and nothing inside the a
 ```ruby
 # config/routes.rb
 Rails.application.routes.draw do
-  mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
+  mount Cronwatch.client.routes => "/cronwatch"
 end
 ```
 
-`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. The board counts jobs by health, draws the last 24 hours as a lane per job (when each was due, every run as long as it took, any slot it missed) above a table of every job, and each job's page draws its last seven days above its runs and definition; [Dashboard and API](/docs/dashboard/#pages) describes what the marks mean. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch::Web.new(client = nil, token:, base_path:, origin:)` takes:
+`Cronwatch::Web` is a Rack app serving the same dashboard and JSON API as the TypeScript routes, at the same paths, with the same token rules. The board counts jobs by health, draws the last 24 hours as a lane per job (when each was due, every run as long as it took, any slot it missed) above a table of every job, and each job's page draws its last seven days above its runs and definition; [Dashboard and API](/docs/dashboard/#pages) describes what the marks mean. `gem "cronwatch"` loads it in a Rails app, so the route needs no `require`. `Cronwatch.client.routes(token:, base_path:, origin:)` builds it for the client the initializer configured (`Cronwatch::Web.new(Cronwatch.client)` did the same before 1.0, and still works, deprecated; see [Ruby](/docs/ruby/#deprecated)), and takes:
 
-- `client`: the client to serve. Leave it out and each request uses `Cronwatch.client` at that moment.
 - `token`: leave it out to read `CRONWATCH_TOKEN`. An empty string, passed or in the variable, counts as unset. `nil` opts out of the token entirely and serves the app to anyone who reaches it, for a mount that sits behind your own sign in.
 - `base_path`: where it is mounted, so links resolve. It defaults to the mount point Rack reports (`SCRIPT_NAME`), which is right under Rails' `mount` and Rack's `map`.
 - `origin`: the public origin, such as `"https://app.example.com"`, to use in place of each request's own (see below). It is read as the TypeScript routes read it: whitespace around it is dropped, the host is lowercased and a host that is not ASCII becomes punycode (through the `simpleidn` gem, or Addressable when the app has it; without either, write it as `xn--...`). An empty string counts as unset; anything that is not an absolute `http` or `https` URL, or has a port outside 1 to 65535, raises `ArgumentError` when the routes load.
@@ -369,7 +368,7 @@ To put it behind the app's own sign in instead, mount it inside that check and p
 
 ```ruby
 authenticate :user, ->(user) { user.admin? } do
-  mount Cronwatch::Web.new(Cronwatch.client, token: nil) => "/cronwatch"
+  mount Cronwatch.client.routes(token: nil) => "/cronwatch"
 end
 ```
 
@@ -380,7 +379,7 @@ The dashboard installs as an app on a desktop, an Android phone or an iPhone ([I
 A request with any method other than `GET` and `HEAD` carrying an `Origin` that is not the request's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is refused with 403, so another site cannot silence or forget a job with a signed-in cookie. The request's own origin reads the host and scheme Rack reports, which already follow `X-Forwarded-Host` and `X-Forwarded-Proto` as the rest of Rails does, so there is no `trustProxy` option as in the TypeScript routes. Behind a proxy, make sure those (or `Host`) carry the public host and scheme, or the dashboard's own forms will look foreign. Behind more than one proxy, set `origin:`: where `X-Forwarded-Host` or `X-Forwarded-Proto` lists several values, Rack takes the last, the hop nearest the app, rather than the public one. The host is compared lowercased, as browsers send it. To pin it instead, pass `origin:`:
 
 ```ruby
-mount Cronwatch::Web.new(Cronwatch.client, origin: ENV["APP_ORIGIN"]) => "/cronwatch"
+mount Cronwatch.client.routes(origin: ENV["APP_ORIGIN"]) => "/cronwatch"
 ```
 
 With `origin:` set, a write must carry that `Origin`, the sign-in cookie is `Secure` when it is `https`, a form redirects back only to a `Referer` on it, and the development sign-in line uses it, whatever the request's headers say. Without it, that line names the request's host only when it is loopback.

@@ -146,13 +146,13 @@ class PgCronTest < Minitest::Test
     starting.status = "running"
     starting.start_time = Time.at(Rational(T0 - 3000, 1000)).utc
     cw.check
-    assert_equal :running, cw.run("pgcron:db:26").status
+    assert_equal :running, cw.get_run("pgcron:db:26").status
     starting.status = "failed"
     starting.end_time = Time.at(Rational(T0 - 1000, 1000)).utc
     starting.return_message = "ERROR:  boom"
     clock.advance(1000)
     cw.check
-    finished = cw.run("pgcron:db:26")
+    finished = cw.get_run("pgcron:db:26")
     assert_equal [:failed, 2000], [finished.status, finished.duration_ms]
     assert_equal %i[failed failed], capture.types, "a run that was running and then failed is judged when it finishes"
 
@@ -343,24 +343,24 @@ class PgCronTest < Minitest::Test
     clock.advance(1000)
     cw.check
     cw.check
-    cut = cw.run("pgcron:#{restarted.runid}")
+    cut = cw.get_run("pgcron:#{restarted.runid}")
     assert_equal [:failed, "server restarted"], [cut.status, cut.error]
     assert_equal T0 - 60_000, cut.started_at, "placed at the job's newest run before it"
-    assert_equal :failed, cw.run("pgcron:#{failure.runid}")&.status, "the other job's failure is not starved"
+    assert_equal :failed, cw.get_run("pgcron:#{failure.runid}")&.status, "the other job's failure is not starved"
     assert(capture.alerts.any? { |a| a.type == :failed && a.job == "other" })
-    assert_nil cw.run("pgcron:#{queued.runid}"), "a queued run is held"
+    assert_nil cw.get_run("pgcron:#{queued.runid}"), "a queued run is held"
 
     # Held only so long: then it is copied as running from when it was first seen, and a late start updates nothing but its end.
     clock.advance(11 * MIN)
     cw.check
-    waiting = cw.run("pgcron:#{queued.runid}")
+    waiting = cw.get_run("pgcron:#{queued.runid}")
     assert_equal [:running, T0 + 1000], [waiting.status, waiting.started_at]
     queued.status = "succeeded"
     queued.start_time = at(clock.now - 2000)
     queued.end_time = at(clock.now - 1000)
     clock.advance(1000)
     cw.check
-    assert_equal :ok, cw.run("pgcron:#{queued.runid}").status
+    assert_equal :ok, cw.get_run("pgcron:#{queued.runid}").status
     assert_equal [], errors.grep_v(/cron\.|row level/)
   end
 
@@ -431,13 +431,13 @@ class PgCronTest < Minitest::Test
     assert_nil old.definition.schedule, "the old name has no schedule"
     assert_match(/renamed to rollup-v2/, old.definition.description)
     assert_equal "*/5 * * * *", summary.find { |j| j.name == "rollup-v2" }.definition.schedule
-    assert_equal "rollup-v2", cw.run("pgcron:#{running.runid}").job
+    assert_equal "rollup-v2", cw.get_run("pgcron:#{running.runid}").job
     running.status = "succeeded"
     running.end_time = at(T0)
     clock.advance(HOUR)
     cron.add(1, "succeeded", clock.now - 2000, clock.now - 1000, "1 row")
     cw.check
-    assert_equal :ok, cw.run("pgcron:#{running.runid}").status
+    assert_equal :ok, cw.get_run("pgcron:#{running.runid}").status
     refute(capture.alerts.any? { |a| a.job == "rollup" }, "the old name is never missed")
 
     # Renamed again while no process watched: the next process retires the name the store still schedules.
@@ -467,17 +467,17 @@ class PgCronTest < Minitest::Test
                        sources: [PgCron.new(cron, options: { timeout: "30m" })])
     long = cron.add(1, "running", T0, nil)
     cw.check
-    assert_equal :running, cw.run("pgcron:#{long.runid}").status
+    assert_equal :running, cw.get_run("pgcron:#{long.runid}").status
     clock.advance(45 * MIN)
     cw.check
-    assert_equal :timeout, cw.run("pgcron:#{long.runid}").status
+    assert_equal :timeout, cw.get_run("pgcron:#{long.runid}").status
     assert_equal [:stuck], capture.types
     clock.advance(10 * MIN)
     long.status = "succeeded"
     long.end_time = at(clock.now - 60_000)
     long.return_message = "VACUUM"
     cw.check
-    done = cw.run("pgcron:#{long.runid}")
+    done = cw.get_run("pgcron:#{long.runid}")
     assert_equal [:ok, "VACUUM"], [done.status, done.output]
     assert_equal %i[stuck recovered], capture.types
     assert_equal :healthy, cw.job_summary("vacuum").health
@@ -561,10 +561,10 @@ class PgCronTest < Minitest::Test
       end
       assert running, "saw the sleeping job running"
       cw.check
-      assert_equal :running, cw.run("pgcron:#{running}")&.status
+      assert_equal :running, cw.get_run("pgcron:#{running}")&.status
       sleep 3.5
       cw.check
-      slept = cw.run("pgcron:#{running}")
+      slept = cw.get_run("pgcron:#{running}")
       assert_equal :ok, slept.status
       assert_operator slept.duration_ms, :>=, 2900
 
@@ -651,8 +651,8 @@ class PgCronTest < Minitest::Test
                        "FROM generate_series(1, 520) g", [ids[names[:busy]]])
       disk = insert.call(ids[names[:quiet]], "failed", "now(), now()", "ERROR: disk full")
       3.times { cw.check }
-      assert_equal "server restarted", cw.run("pgcron:#{cut["runid"]}")&.error
-      assert_equal :failed, cw.run("pgcron:#{disk["runid"]}")&.status, "the quiet job's failure is read"
+      assert_equal "server restarted", cw.get_run("pgcron:#{cut["runid"]}")&.error
+      assert_equal :failed, cw.get_run("pgcron:#{disk["runid"]}")&.status, "the quiet job's failure is read"
       assert(capture.alerts.any? { |a| a.type == :failed && a.job == names[:quiet] })
 
       # Renamed in pg_cron: the old name keeps its runs and loses its schedule.

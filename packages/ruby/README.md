@@ -47,7 +47,7 @@ NIGHTLY.run do |job|
   job.metric(:cost, 1.2)             # watched against budgets and baselines
 end
 
-CW.start # checks for missed and stuck runs every minute, in a background thread
+CW.start_checking # checks for missed and stuck runs every minute, in a background thread
 ```
 
 `run` returns what the block returns and raises what it raises, after the run is recorded. A script run from crontab exits when it is done, so instead of `start`, add a second crontab line that declares the jobs and calls `CW.check` every five minutes.
@@ -164,7 +164,7 @@ Or from a crontab: `bin/rails cronwatch:check`.
 ```ruby
 # config/routes.rb
 Rails.application.routes.draw do
-  mount Cronwatch::Web.new(Cronwatch.client) => "/cronwatch"
+  mount Cronwatch.client.routes => "/cronwatch"
 end
 ```
 
@@ -176,9 +176,14 @@ In any other Rack app:
 
 ```ruby
 # config.ru
-require "cronwatch/web"
-map("/cronwatch") { run Cronwatch::Web.new(CW) }
+map("/cronwatch") { run CW.routes }
 ```
+
+`client.routes(**options)` (`token:`, `base_path:`, `origin:`) is the one way to build the dashboard, as `routes()` is in every language.
+
+### Deprecated
+
+These still work through every 1.x release and go in 2.0, each with a warning in Ruby's deprecation category (shown under `ruby -w` or `-W:deprecated`): `Cronwatch::Web.new(client, **options)` (use `client.routes(**options)`), `client.start(every)` (use `client.start_checking(every)`), `client.run(id)` without a block (use `client.get_run(id)`) and `client.silence(name, "2h")` (use `client.silence(name, for: "2h")`). The ActiveJob trigger is `active-job` from 1.0; runs recorded before keep `active_job`.
 
 ## Stores
 

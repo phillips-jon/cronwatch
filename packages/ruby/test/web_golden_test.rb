@@ -81,7 +81,7 @@ class WebGoldenTest < Minitest::Test
     golden = JSON.parse(File.read(GOLDEN))
     assert_equal T0, golden["t0"]
     cw = seed
-    web = Cronwatch::Web.new(cw, token: "tok", base_path: "/cronwatch")
+    web = cw.routes(token: "tok", base_path: "/cronwatch")
     ids = {}
     golden["captures"].each do |capture|
       label = "#{capture["method"]} #{capture["path"]}"

@@ -69,6 +69,20 @@ module TestHelpers
     end
   end
 
+  # Runs the block with Ruby's deprecation warnings on, asserts one matching
+  # `pattern` was written, and returns what the block returned.
+  def assert_deprecated(pattern)
+    before = Warning[:deprecated]
+    Warning[:deprecated] = true
+    result = nil
+    _, err = capture_io { result = yield }
+    assert_match pattern, err
+    assert_match(/\A\S+_test\.rb:\d+: warning: \[cronwatch\]/, err, "the warning points at the caller")
+    result
+  ensure
+    Warning[:deprecated] = before
+  end
+
   def make(**options)
     clock = Clock.new
     capture = Capture.new
