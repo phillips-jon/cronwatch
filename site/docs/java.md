@@ -47,7 +47,7 @@ Cronwatch cw = Cronwatch.builder()
     .alert(Slack.webhook(System.getenv("SLACK_WEBHOOK_URL")))
     .retention("30d")
     .build();
-cw.start();                                          // check every minute, in a long-running service
+cw.startChecking();                                  // check every minute, in a long-running service
 ```
 
 Every option has the SDK's default, and `build()` checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to standard error. `close()` stops the check, waits up to five seconds for a check and sends in flight, and closes the store; a servlet container or a Spring context calls it when the app stops, so no thread of the client's holds the app's class loader.
@@ -102,7 +102,7 @@ When the JVM begins to stop (`System.exit`, a `SIGTERM`), a shutdown hook record
 
 ## Run the check
 
-A job that never starts cannot report itself, so something has to look. `cw.start()` checks every minute, the first a second after it is called, for a long-running service; `start("5m")` or `start(Duration)` sets the interval (five seconds at least), and `stop()` ends it. Where another process checks, call `check()` there:
+A job that never starts cannot report itself, so something has to look. `cw.startChecking()` checks every minute, the first a second after it is called, for a long-running service; `startChecking("5m")` or `startChecking(Duration)` sets the interval (five seconds at least), and `stop()` ends it. (`start()`, its name before 1.0, still works, deprecated; a job's `start` opens a run.) Where another process checks, call `check()` there:
 
 ```java
 CheckResult result = cw.check();   // checkedAt, jobs, alerts, pruned
@@ -317,7 +317,7 @@ Cronwatch cw = Cronwatch.builder()
         .options(JobOptions.builder().grace("5m"))
         .build()))
     .build();
-cw.start();
+cw.startChecking();
 ```
 
 It reads through a data source on the database pg_cron runs in (its `cron.database_name`), each query on a connection of its own in autocommit. Its options: `jobs`, `jobIds` and `pick` to choose jobs; `prefix`, `jobName`, and `options` (job options for every job, or a function answering them per job; the schedule and zone always come from pg_cron); and `timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
@@ -383,6 +383,8 @@ The builder's options:
 | `clock` | the system clock | epoch milliseconds; for tests |
 
 A job's options, on `JobOptions.builder()`: `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the JVM's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `maxDuration`, `budget` (a metric and its ceiling, or a map of them), `expect`, `expectMatch`, `expectThat`, `failuresBeforeAlert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
+
+`timeout` and `maxDuration` both measure a run's length. `timeout` gives up on a run still going: once a running run is older than it, the next check marks it `timeout` (a failure) and the job is stuck. `maxDuration` flags a run that finished successfully but slowly: it stays ok and the job is slow. Set `timeout` well above `maxDuration`: `.maxDuration("10m").timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
 | Method | |
 |---|---|

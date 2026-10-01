@@ -32,7 +32,7 @@ For Quartz and JobRunr, every attempt is a run of its own. An attempt that fails
 
 ### The check
 
-Each integration's check runs a sync first: the scheduler's jobs are declared again, and the jobs of this app's that the store holds with a schedule the scheduler no longer has are declared again without it. Run it once a minute. `cw.start()` checks too, but without the sync, so a job taken out of the scheduler by a deploy keeps its schedule and is reported missed; prefer the integration's check.
+Each integration's check runs a sync first: the scheduler's jobs are declared again, and the jobs of this app's that the store holds with a schedule the scheduler no longer has are declared again without it. Run it once a minute. `cw.startChecking()` checks too, but without the sync, so a job taken out of the scheduler by a deploy keeps its schedule and is reported missed; prefer the integration's check.
 
 ## Spring Boot
 

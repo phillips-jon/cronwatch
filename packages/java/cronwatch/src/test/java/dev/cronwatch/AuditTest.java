@@ -110,7 +110,7 @@ class AuditTest {
               b.timings.firstCheckMs = 20;
             });
     try (Cronwatch cw = m.cw()) {
-      cw.start(Duration.ofDays(100_000));
+      cw.startChecking(Duration.ofDays(100_000));
       Support.await("the first check", () -> source.syncs.get() == 1);
     }
   }
@@ -127,7 +127,7 @@ class AuditTest {
               b.timings.minIntervalMs = 100;
             });
     try (Cronwatch cw = m.cw()) {
-      cw.start(Duration.ofMillis(100));
+      cw.startChecking(Duration.ofMillis(100));
       source.entered.await();
       // The first check waits on the source through several ticks, which share it.
       TimeUnit.MILLISECONDS.sleep(600);

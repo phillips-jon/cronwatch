@@ -186,7 +186,7 @@ class CorrectnessTest {
     Made m = Support.make(b -> b.source(counter));
     try (Cronwatch cw = m.cw()) {
       // The interval's first check comes a second after start; stop() comes first.
-      cw.start();
+      cw.startChecking();
       cw.stop();
       Thread.sleep(1_300);
       assertEquals(0, checks.get());

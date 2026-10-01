@@ -55,7 +55,7 @@ import org.jspecify.annotations.Nullable;
  * });
  *
  * cw.check();                                // missed and stuck runs, retries, pruning
- * cw.start(Duration.ofMinutes(1));           // a check every minute, for a long-running service
+ * cw.startChecking(Duration.ofMinutes(1));   // a check every minute, for a long-running service
  * }</pre>
  *
  * <p>One per app, kept where the app keeps its {@code DataSource} and closed at shutdown ({@link
@@ -686,24 +686,24 @@ public final class Cronwatch implements AutoCloseable {
 
   /**
    * Checks every minute, for a long-running service: the first check a second from now. Not for a
-   * program a crontab runs once, which calls {@link #check} instead. A second {@code start} does
-   * nothing.
+   * program a crontab runs once, which calls {@link #check} instead. A second call, under this name
+   * or {@code start}, does nothing.
    */
-  public void start() {
+  public void startChecking() {
     checks.start(60_000);
   }
 
-  /** {@link #start()} on an interval: five seconds at least, at most 2^31 - 1 ms. */
-  public void start(Duration every) {
+  /** {@link #startChecking()} on an interval: five seconds at least, at most 2^31 - 1 ms. */
+  public void startChecking(Duration every) {
     checks.start(JobOptions.millis(every, "check interval"));
   }
 
   /**
-   * {@link #start()} on an interval given as the SDK's text ({@code "1m"}).
+   * {@link #startChecking()} on an interval given as the SDK's text ({@code "1m"}).
    *
    * @throws CronwatchException for text that is not a duration
    */
-  public void start(String every) {
+  public void startChecking(String every) {
     try {
       checks.start(Durations.parse(every, "check interval"));
     } catch (IllegalArgumentException e) {
@@ -712,7 +712,39 @@ public final class Cronwatch implements AutoCloseable {
     }
   }
 
-  /** Stops the interval {@link #start} began. A check in flight finishes. */
+  /**
+   * {@link #startChecking()}: a job's {@code start} opens a run, so the client's is named for what
+   * it starts.
+   *
+   * @deprecated use {@link #startChecking()}, which does the same; removed in 2.0
+   */
+  @Deprecated(since = "1.0", forRemoval = true)
+  public void start() {
+    startChecking();
+  }
+
+  /**
+   * {@link #startChecking(Duration)}.
+   *
+   * @deprecated use {@link #startChecking(Duration)}, which does the same; removed in 2.0
+   */
+  @Deprecated(since = "1.0", forRemoval = true)
+  public void start(Duration every) {
+    startChecking(every);
+  }
+
+  /**
+   * {@link #startChecking(String)}.
+   *
+   * @throws CronwatchException for text that is not a duration
+   * @deprecated use {@link #startChecking(String)}, which does the same; removed in 2.0
+   */
+  @Deprecated(since = "1.0", forRemoval = true)
+  public void start(String every) {
+    startChecking(every);
+  }
+
+  /** Stops the interval {@link #startChecking} began. A check in flight finishes. */
   public void stop() {
     checks.stop();
   }

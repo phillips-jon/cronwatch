@@ -697,9 +697,9 @@ class HardeningTest {
     try (Cronwatch deferred =
             Cronwatch.builder().deliver(Deliver.AT_CHECK).noShutdownHook().build();
         Cronwatch delivering = Cronwatch.builder().noShutdownHook().build()) {
-      deferred.start();
+      deferred.startChecking();
       deferred.stop();
-      deferred.start();
+      deferred.startChecking();
       deferred.stop();
       assertEquals(1, warnings.size(), warnings.toString());
       String warning = warnings.get(0);
@@ -708,7 +708,7 @@ class HardeningTest {
               && warning.contains("send no alerts")
               && warning.contains("Another process"),
           warning);
-      delivering.start();
+      delivering.startChecking();
       delivering.stop();
       assertEquals(1, warnings.size(), "a delivering client says nothing");
     } finally {
@@ -730,6 +730,7 @@ class HardeningTest {
   }
 
   @Test
+  @SuppressWarnings("removal") // start(), the deprecated alias, does what startChecking() does
   void startAgainAfterStopChecksAndALongIntervalDoesNotCheckEveryMillisecond() throws Exception {
     AtomicInteger checks = new AtomicInteger();
     Source counter =
@@ -752,8 +753,11 @@ class HardeningTest {
               b.timings.firstCheckMs = 50;
             });
     try (Cronwatch cw = m.cw()) {
-      cw.start("30d");
+      cw.startChecking("30d");
       Support.await("the first check", () -> checks.get() == 1);
+      // A second call, under either name, is ignored.
+      cw.startChecking("30d");
+      cw.start("30d");
       TimeUnit.MILLISECONDS.sleep(300);
       assertEquals(1, checks.get(), "no more soon after");
       cw.stop();

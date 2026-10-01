@@ -35,7 +35,7 @@ import org.jspecify.annotations.Nullable;
  *     .store(SqlStore.postgres(dataSource))
  *     .source(PgCron.source(dataSource, PgCronOptions.builder().prefix("db:").build()))
  *     .build();
- * cw.start();
+ * cw.startChecking();
  * }</pre>
  *
  * <p>A job that is renamed, unscheduled or no longer picked keeps its old name's runs and history,

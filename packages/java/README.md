@@ -152,7 +152,7 @@ Cronwatch cw = Cronwatch.builder()
         .options(JobOptions.builder().grace("5m"))
         .build()))
     .build();
-cw.start();
+cw.startChecking();
 ```
 
 The pg_cron source watches the jobs that run inside Postgres, where nothing can wrap them: each check reads `cron.job`, declares each job with its schedule, and copies new rows of `cron.job_run_details` in as runs, so a missed, failed, stuck or slow pg_cron job is alerted like any other. It needs a data source on the database pg_cron runs in (its `cron.database_name`). Jobs are named from their jobname (`prefix` in front); a paused job loses its schedule, and one renamed or dropped keeps its history without one.

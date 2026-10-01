@@ -145,7 +145,7 @@
       <div><dt>Go</dt><dd><code>cw.Start</code> in a long-running process, or the River or Asynq check job.</dd></div>
       <div><dt>Rust</dt><dd><code>cw.start()</code> in a long-running process, the tokio-cron-scheduler check job, or the apalis check worker.</dd></div>
       <div><dt>Elixir</dt><dd><code>check_every</code> on the instance in your supervision tree, <code>Cronwatch.Oban.CheckWorker</code> in Oban’s crontab, a Quantum job running <code>Cronwatch.Quantum.check</code>, or <code>Cronwatch.Release.check</code> from crontab.</dd></div>
-      <div><dt>Java</dt><dd>The Spring Boot starter checks on its own, once per cluster under ShedLock or Quartz. Elsewhere, <code>cw.start()</code> in a long-running process, the Quartz or JobRunr check job, or <code>CronwatchCli</code> from crontab.</dd></div>
+      <div><dt>Java</dt><dd>The Spring Boot starter checks on its own, once per cluster under ShedLock or Quartz. Elsewhere, <code>cw.startChecking()</code> in a long-running process, the Quartz or JobRunr check job, or <code>CronwatchCli</code> from crontab.</dd></div>
       <div><dt>.NET</dt><dd><code>AddCronwatch</code> checks on its own, as a hosted service. With Hangfire or Quartz.NET, their check job runs it once per cluster; from crontab, <code>cronwatch check</code> through your app’s own host.</dd></div>
     </dl>
     <details class="peek">

@@ -86,8 +86,9 @@ public final class JobOptions {
   }
 
   /**
-   * How long a run may go on before it is treated as stuck and marked timeout, as the SDK's text.
-   * Default 1h. {@link JobContext#cancelled()} turns true when it passes.
+   * How long a run may go on before it is treated as stuck and marked timeout (a failure), as the
+   * SDK's text. Default 1h. {@link JobContext#cancelled()} turns true when it passes. Not {@link
+   * #maxDuration}, which flags a run that finished successfully but slowly: set this well above it.
    */
   public JobOptions timeout(String duration) {
     return put("timeout", duration);

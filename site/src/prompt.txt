@@ -653,8 +653,8 @@ Java (Java 21 or newer)
 4. Run the check every few minutes so missed and stuck runs are noticed:
    in Spring Boot the starter does it (cronwatch.check-every, a minute by
    default, once per cluster under ShedLock or a clustered Quartz); the
-   Quartz or JobRunr check job above; cw.start() once in any other
-   long-running process; or, for a program a crontab runs, a second crontab
+   Quartz or JobRunr check job above; cw.startChecking() once in any
+   other long-running process; or, for a program a crontab runs, a second crontab
    line running a main of the app's own that calls
    CronwatchCli.main(MyApp::cronwatch, args) with "check", where
    MyApp.cronwatch() builds the same client and declares the same jobs.
