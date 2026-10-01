@@ -153,7 +153,7 @@ public sealed class NightlyReport(ReportBuilder reports) : ICronwatchJob
 }
 ```
 
-Each fire is a run with the trigger `hosting` (runs recorded before 1.0 carry `schedule`), its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
+`AddCronwatch` and `AddCronwatchJob` are in the namespace `Microsoft.Extensions.DependencyInjection`, as Microsoft's own registration methods are, so they need no `using`; `ICronwatchJob` is in `Cronwatch.Hosting`. Each fire is a run with the trigger `hosting` (runs recorded before 1.0 carry `schedule`), its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
 
 ```csharp
 var app = builder.Build();
@@ -201,7 +201,7 @@ public sealed class SendDigest(CronwatchClient cw) : IInvocable
 
 ### The dashboard and a job's handler on ASP.NET Core
 
-`Cronwatch.Hosting` holds the client in the app's container (`AddCronwatch`, a singleton disposed when the host stops, errors and warnings through the app's `ILogger`, a check every minute as a hosted service once the host has started, and `Retention`, `Token`, `CheckEvery` and `Environment` read from the `Cronwatch` section of the configuration). `Cronwatch.AspNetCore` serves the dashboard and its JSON API (the SDK's `cw.routes()`, the pages and answers byte for byte, so `@cronwatch/mcp` works against it) and a job's handler for a platform cron that calls a URL:
+`Cronwatch.Hosting` holds the client in the app's container (`AddCronwatch`, a singleton disposed when the host stops, errors and warnings through the app's `ILogger`, a check every minute as a hosted service once the host has started, and `Retention`, `Token`, `CheckEvery` and `Environment` read from the `Cronwatch` section of the configuration). `Cronwatch.AspNetCore` serves the dashboard and its JSON API (the SDK's `cw.routes()`, the pages and answers byte for byte, so `@cronwatch/mcp` works against it) and a job's handler for a platform cron that calls a URL. `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` are in the namespace `Microsoft.AspNetCore.Builder`, as `MapHealthChecks` is, so they need no `using`:
 
 ```csharp
 WebApplicationBuilder builder = WebApplication.CreateBuilder();
@@ -240,11 +240,12 @@ An `ActivitySource` and a `Meter`, both named `Cronwatch`: an activity around ea
 
 ## Deprecated
 
-These names still work through every 1.x release, marked `[Obsolete]`, and go in 2.0:
+These names still work through every 1.x release, marked `[Obsolete]`, and go in 2.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
 
 - `cw.Start(every)`: use `cw.StartChecking(every)`, since a job's `StartAsync` opens a run.
 - `Cronwatch.Web.WebRequest` and `WebResponse`: use `CronwatchRequest` and `CronwatchResponse`, since `System.Net` has types of those names. Each converts to and from its replacement, so code written against them still compiles, except a handler lambda that names the request's type.
 - `Cronwatch.Web.WebAdapters`: use `Adapters`, the Java port's name.
+- `Cronwatch.Hosting.CronwatchServiceCollectionExtensions` and `Cronwatch.AspNetCore.CronwatchAspNetCore`, the former classes of the extension methods, which are in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder` now: `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods.
 - `IConditionalRunStore`, `IStateCasStore` and `IRunDeletingStore`: use `IUpdateRunIfStore`, `ICompareAndSetStateStore` and `IDeleteRunIfStore`, named after their methods. Each former interface extends its replacement, so a store of your own that implements it is still used.
 
 ## Testing this package

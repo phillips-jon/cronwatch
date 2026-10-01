@@ -4,8 +4,6 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Cronwatch;
-using Cronwatch.AspNetCore;
-using Cronwatch.Hosting;
 using Cronwatch.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

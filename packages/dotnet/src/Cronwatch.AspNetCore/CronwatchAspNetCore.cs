@@ -4,23 +4,24 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Cronwatch;
 using Cronwatch.Web;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Cronwatch.AspNetCore;
+namespace Microsoft.AspNetCore.Builder;
 
 /// <summary>
 /// The dashboard and a job's handler on ASP.NET Core: <see cref="MapCronwatch(IEndpointRouteBuilder, string, RoutesOptions?)"/>
 /// on endpoint routing, <see cref="UseCronwatch(IApplicationBuilder, string, RoutesOptions?)"/> as
 /// middleware, and <see cref="MapCronwatchHandler(IEndpointRouteBuilder, string, Job, Func{JobContext, HttpContext, CancellationToken, Task}, HandlerOptions?)"/>
 /// for a platform cron. The client is the app's <see cref="CronwatchClient"/> singleton
-/// (<c>AddCronwatch</c>).
+/// (<c>AddCronwatch</c>). They are in Microsoft's namespace, as <c>MapHealthChecks</c> is, so they
+/// need no <c>using</c>.
 /// </summary>
-public static class CronwatchAspNetCore
+public static class CronwatchAspNetCoreExtensions
 {
     private const string Rest = "cronwatchRest";
 

@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Cronwatch;
+namespace Cronwatch.Hosting;
 
 /// <summary>
 /// A job run on its schedule inside the host by <c>AddCronwatchJob</c>: its class is resolved

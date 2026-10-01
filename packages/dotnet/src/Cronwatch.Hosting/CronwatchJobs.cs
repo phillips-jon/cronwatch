@@ -13,7 +13,7 @@ public static class CronwatchJobServiceCollectionExtensions
     /// <summary>
     /// Runs <typeparamref name="TJob"/> at the fire times of <paramref name="options"/>'s schedule
     /// (a cron, or <c>every 5m</c>), each fire a recorded run of the job <paramref name="name"/>
-    /// with the trigger <c>schedule</c>, so the schedule it runs on and the one CronWatch watches
+    /// with the trigger <c>hosting</c>, so the schedule it runs on and the one CronWatch watches
     /// are one definition. A fire that comes while the job's previous run is still going is
     /// skipped, and written to the log once per run it waited on. It is a scheduler for one
     /// process: every replica of a service runs its hosted jobs, so a job that must run once

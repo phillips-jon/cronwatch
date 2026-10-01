@@ -735,7 +735,7 @@ Java (Java 21 or newer)
      and wrap each iteration's work in await nightly.RunAsync(async (job, ct)
      => { ...; job.Log("Report written"); }, stoppingToken). A new job that
      only needs a cron inside the host can be a class implementing
-     ICronwatchJob, registered with services.AddCronwatchJob<T>(name,
+     ICronwatchJob (using Cronwatch.Hosting), registered with services.AddCronwatchJob<T>(name,
      options), which runs it on that schedule.
    - Anything else, or a program a crontab runs: the same RunAsync. What the
      function throws fails the run and is thrown again; in a crontab

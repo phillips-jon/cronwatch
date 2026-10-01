@@ -20,6 +20,8 @@ dotnet add package Cronwatch
 | your ADO.NET driver: `Microsoft.Data.Sqlite`, `Npgsql` or `MySqlConnector` | `SqlStore` over your `DbDataSource`, and the pg_cron source; none is a dependency of CronWatch |
 | `Cronwatch.Hosting` | the client in the Generic Host's container (`AddCronwatch`), the check as a hosted service, errors through `ILogger`, hosted jobs on a cron (`AddCronwatchJob`), and `cronwatch check` from the app's own command line |
 | `Cronwatch.AspNetCore` | the dashboard and a job's handler on ASP.NET Core (`MapCronwatch`, `UseCronwatch`, `MapCronwatchHandler`); it brings `Cronwatch.Hosting` |
+
+`AddCronwatch` and `AddCronwatchJob` are in the namespace `Microsoft.Extensions.DependencyInjection`, `RunCronwatchCommandAsync` in `Microsoft.Extensions.Hosting`, and `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` in `Microsoft.AspNetCore.Builder`, as Microsoft's own `AddHealthChecks` and `MapHealthChecks` are, so they need no `using`. `ICronwatchJob` and `CronwatchHostOptions` are in `Cronwatch.Hosting`.
 | `Cronwatch.Hangfire` | Hangfire 1.8; see [.NET schedulers](/docs/dotnet-schedulers/#hangfire) |
 | `Cronwatch.Quartz` | Quartz.NET 4; see [.NET schedulers](/docs/dotnet-schedulers/#quartz-net) |
 
@@ -469,13 +471,14 @@ A 1.x release keeps what it does not know in the stored data: a field of a job's
 
 ## Deprecated
 
-These names still work through every 1.x release, marked `[Obsolete]` so the compiler points at the replacement, and go in 2.0.
+These names still work through every 1.x release, marked `[Obsolete]` so the compiler points at the replacement, and go in 2.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
 
 | Deprecated | Use |
 |---|---|
 | `cw.Start(every)` | `cw.StartChecking(every)`, since a job's `StartAsync` opens a run |
 | `Cronwatch.Web.WebRequest`, `WebResponse` | `CronwatchRequest`, `CronwatchResponse`, since `System.Net` has types of those names; each converts to and from its replacement, so `WebResponse answer = await routes.HandleAsync(new WebRequest(...))` still compiles, and a handler's function may still return a `WebResponse`. A handler function whose lambda names the request's type must say `CronwatchRequest` |
 | `Cronwatch.Web.WebAdapters` | `Adapters`, the Java port's name |
+| `Cronwatch.Hosting.CronwatchServiceCollectionExtensions`, `Cronwatch.AspNetCore.CronwatchAspNetCore` | the extension methods' classes in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder`; `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods |
 | `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it is still used |
 
 ## Kept in step

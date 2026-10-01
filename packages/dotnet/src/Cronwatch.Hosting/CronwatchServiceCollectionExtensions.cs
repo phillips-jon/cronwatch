@@ -1,15 +1,19 @@
 using System;
 using System.Collections.Generic;
+using Cronwatch;
+using Cronwatch.Hosting;
 using Cronwatch.Web;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Cronwatch.Hosting;
+namespace Microsoft.Extensions.DependencyInjection;
 
-/// <summary>CronWatch in a Generic Host or ASP.NET Core app's container.</summary>
+/// <summary>
+/// CronWatch in a Generic Host or ASP.NET Core app's container: <c>AddCronwatch</c>, in
+/// Microsoft's namespace as its own registration methods are, so it needs no <c>using</c>.
+/// </summary>
 public static class CronwatchServiceCollectionExtensions
 {
     /// <summary>The configuration section read: <c>Cronwatch:Retention</c>, <c>Cronwatch:Token</c>, <c>Cronwatch:CheckEvery</c>, <c>Cronwatch:Environment</c>.</summary>

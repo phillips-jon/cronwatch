@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Cronwatch.Hosting;
 using Cronwatch.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
