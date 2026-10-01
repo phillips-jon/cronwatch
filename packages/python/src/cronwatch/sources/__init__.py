@@ -6,3 +6,5 @@ reports problems (``host.on_error(error, where)``). sync returns the alerts
 recording sent.
 
 ``cronwatch.sources.pgcron.PgCron`` reads pg_cron's jobs and runs."""
+
+__all__: list[str] = []

@@ -29,33 +29,37 @@ packages/python/
     py.typed
     _js.py           JavaScript's numbers, JSON.stringify, trim, \s, UTF-16 lengths, Date.UTC and toISOString
     _env.py          the environment
+    _deprecated.py   the old names 1.0 made internal: module shims and module __getattr__ aliases, each warning
     _zone.py         zoneinfo zones (case-insensitive, as Intl), croner's wall-clock arithmetic (fromTZ)
     _cron.py         croner: CronPattern (the reading of an expression, its checks and messages) and CronDate (the walk)
     types.py         Run, JobState, StoredJob, JobDefinition, Alert, AlertDraft, JobSummary, CheckResult, the StrEnums
-    duration.py      "15m", "1h30m", timedelta: parse and format
-    stats.py         percentiles
-    output.py        the output cap, error messages, secret redaction
-    schedule.py      parse_schedule, next_fire, expectation, run_covers (schedule.ts)
-    evaluate.py      the alert rules, pure functions (evaluate.ts)
-    format.py        alert titles and messages
-    serialize.py     stored definitions, expect rules
-    job.py           JobContext (log, metric, signal), RunRecorder, AbortSignal, current()
-    run_handle.py    RunHandle: a run started by job.start() or found by job.resume(), finished later
+    _duration.py     "15m", "1h30m", timedelta: parse and format
+    _stats.py        percentiles
+    _output.py       the output cap, error messages, secret redaction
+    _schedule.py     parse_schedule, next_fire, expectation, run_covers (schedule.ts)
+    _evaluate.py     the alert rules, pure functions (evaluate.ts)
+    _format.py       alert titles and messages
+    _serialize.py    stored definitions, expect rules
+    _job.py          JobContext (log, metric, signal), RunRecorder, AbortSignal, current()
+    _run_handle.py   RunHandle: a run started by job.start() or found by job.resume(), finished later
+    duration.py stats.py output.py schedule.py evaluate.py format.py serialize.py job.py run_handle.py client.py handler.py
+                     the underscored modules' old names: deprecated shims, until 2.0
     alerts/
       __init__.py    the channel protocol, ChannelContext, Console, Custom, and every channel's class
       _http.py       the POSTs, on urllib.request: no redirect followed, one ten second deadline (Response, UrllibHTTP)
       _shared.py     alerts/shared.ts: the POST with redacted errors, alert ids, run summaries, JavaScript's cuts and encodings
-      email.py       subject, text and HTML for every email channel (alerts/email.ts)
-      sigv4.py       AWS Signature Version 4 on hashlib and hmac (alerts/sigv4.ts)
+      _email.py      subject, text and HTML for every email channel (alerts/email.ts)
+      _sigv4.py      AWS Signature Version 4 on hashlib and hmac (alerts/sigv4.ts)
+      email.py sigv4.py   their old names: deprecated shims, until 2.0
       slack.py discord.py webhook.py resend.py postmark.py sendgrid.py mailgun.py ses.py twilio.py
       sentry.py honeybadger.py datadog.py rollbar.py bugsnag.py newrelic.py
     sources/
       pgcron.py      PgCron, the pg_cron reader (sources/pgcron.ts), and its psycopg adapter
     triage/
       anthropic.py   Anthropic, Claude through the anthropic package (triage/anthropic.ts)
-    client.py        Cronwatch and JobHandle: job, run (plain and async), check, start/stop, silence, forget, jobs, runs, record_run, routes
+    _client.py       Cronwatch and JobHandle: job, run (plain and async), check, start_checking/stop, silence, forget, jobs, runs, record_run, routes
     aio.py           AsyncCronwatch, AsyncJobHandle, AsyncRunHandle: the client's methods as coroutines, the store in a worker thread
-    handler.py       job.handler(): the SDK's fetch-style job handler, and its Django, Flask, Starlette, WSGI and ASGI adapters
+    _handler.py      job.handler(): the SDK's fetch-style job handler, and its Django, Flask, Starlette, WSGI and ASGI adapters
     _response.py     which returned values are HTTP responses, and their status (a run failed by one of 400 or more)
     celery.py        Celery: the signal handlers, @cronwatch_task, install(), beat's schedules, the check task
     apscheduler.py   APScheduler 3: the listener, watch(), triggers as schedules
@@ -100,7 +104,26 @@ packages/python/
     celery_app.py         the Celery app that prefork worker runs
     test_apscheduler.py   cronwatch.apscheduler on background and asyncio schedulers, and events in every order
     test_scheduler_check.py   the schedule check against schedulers that agree, skip a run or run at other times
+    test_env.py           the environment, the SDK's env.test.ts table
+    test_deprecated.py    every name 1.0 made internal or renamed still answers, warning
 ```
+
+## Public and internal
+
+Public means documented in the README or on the site; everything else is internal, and the code says which. Every module has `__all__`, listing its public names. The modules that only implement the client are underscored (`_client`, `_evaluate`, `_format`, `_serialize`, `_schedule`, `_duration`, `_output`, `_stats`, `_job`, `_run_handle`, `_handler`, `alerts._email`, `alerts._sigv4`); what of them is public is re-exported from `cronwatch` (`Cronwatch`, `JobHandle`, `RunHandle`, `JobContext`, `parse_duration`, `parse_schedule`, `redact_secrets` and the rest of its `__all__`). In the public modules (`types`, `alerts` and each channel's module, `stores`, `sources.pgcron`, `triage.anthropic`, `web`, `aio`, `celery`, `apscheduler`, `django`), helpers and constants are underscored.
+
+Everything 0.x published keeps working through 1.x, deprecated, and goes in 2.0: each old module name (`cronwatch.evaluate`, `cronwatch.client`, ...) is a shim whose names warn with a `DeprecationWarning` when used (`_deprecated.module`), and each old helper name answers through its module's `__getattr__`, warning the same way (`_deprecated.names`). `cronwatch.client` is both the old module and the function `client()`: the package imports the shim before it defines the function, so a later `import cronwatch.client` cannot replace the function. `tests/test_deprecated.py` holds every old name to its new one.
+
+The deprecated public API, also listed on the site's Python page:
+
+| Deprecated | Use |
+|---|---|
+| `cw.start(every)`, `AsyncCronwatch.start(every)` | `start_checking(every)`: a job's `start()` opens a run |
+| `cronwatch.web.Web(client, ...)` | `cw.routes(...)` (`cronwatch.client().routes(...)` for the process's client) |
+| `cronwatch.triage.anthropic.AnthropicTriage` | `cronwatch.triage.anthropic.Anthropic`, as every port names it |
+| `Slack(url)`, `Discord(url)` | `Slack(webhook_url=url)`, `Discord(webhook_url=url)` |
+| `cronwatch.alerts.webhook.hmac_sha256_hex(secret, body)` | `signature(secret, body)`, as every port names it |
+| the modules and helpers above | what `cronwatch` and the public modules document |
 
 ## The Python API
 
@@ -147,7 +170,7 @@ The plan was a second copy of the orchestration on async stores. It was not take
 
 `job.start(trigger=None, id=None)`, `job.resume(run_id)` and `cw.resume_run(name, run_id)` are the SDK's `start()`, `resume()` and `resumeRun()`, and return a `RunHandle`: `id`, `job`, `started_at`, `active`, `log`, `metric`, `metrics`, `flush()`, `finish(outcome=None, *, result=, error=)` and `fail(error)`. An outcome is None or `{"status": "ok"}` (ok), `{"error": e}` or `error=e` (failed, written like an error `run()` caught), or a string, `{"result": x}` or `result=x`, treated like `run()`'s return value, including the SDK's rule that an HTTP response of 400 or more fails the run (see Handler).
 
-The client's side follows `client.ts`: a start with an id checks it (the SDK's messages, including the reserved `pgcron:` prefix) and holds a per-process lock keyed by the job and the id while it reads the store and inserts, so two starts with one id at once record one run, and another job's start with that id fails as it would one call later. `finish()` reads the stored run again, joins the stored output with the handle's (redacted, then capped, by `output.redact_and_cap`) and merges metrics (the handle's win), then judges it with the same code as `run()`. `flush()` redacts the lines it appends and writes only over a row still running and of this job (`update_run_if`); when it cannot, the handle keeps the lines for `finish()`, and it keeps the first 16 KB of what it flushed so `expect` at finish sees an early line. The store never raises out of `start`, `resume`, `flush` or `finish`: failures go to `on_error` as `recording <job>`, `starting <job>`, `resuming <job>`, `flushing <job>` or `finishing <job>`. A store that fails during `finish()` records nothing and leaves the handle active, lines kept, so it can be called again. A finish that records nothing (`... was already finished by this handle`, `... was already finished as ok`, `... was not found`, `... belongs to job "<other>"`) is reported, never raised, and returns None.
+The client's side follows `client.ts`: a start with an id checks it (the SDK's messages, including the reserved `pgcron:` prefix) and holds a per-process lock keyed by the job and the id while it reads the store and inserts, so two starts with one id at once record one run, and another job's start with that id fails as it would one call later. `finish()` reads the stored run again, joins the stored output with the handle's (redacted, then capped, by `_output.redact_and_cap`) and merges metrics (the handle's win), then judges it with the same code as `run()`. `flush()` redacts the lines it appends and writes only over a row still running and of this job (`update_run_if`); when it cannot, the handle keeps the lines for `finish()`, and it keeps the first 16 KB of what it flushed so `expect` at finish sees an early line. The store never raises out of `start`, `resume`, `flush` or `finish`: failures go to `on_error` as `recording <job>`, `starting <job>`, `resuming <job>`, `flushing <job>` or `finishing <job>`. A store that fails during `finish()` records nothing and leaves the handle active, lines kept, so it can be called again. A finish that records nothing (`... was already finished by this handle`, `... was already finished as ok`, `... was not found`, `... belongs to job "<other>"`) is reported, never raised, and returns None.
 
 A run is judged once, however many processes finish it: the finish is written only over a stored row still `running`, else over one still `timeout` (a check already counted it as stuck: a late failure is written but not judged, a late success is judged and recovers), through the store's `update_run_if`, one conditional `UPDATE`. Only the process whose write lands evaluates. The stuck check marks a run timed out the same way, so a finish that landed meanwhile wins. `insert_run` raises for an id already stored, the memory store included.
 
@@ -157,9 +180,9 @@ The client is synchronous; each run's work happens in the caller's thread. Every
 
 ## Delivery
 
-`deliver="now"` (the default) sends each alert from the process that produced it. `deliver="check"` sends nothing: the alert is queued in the job's state (`undelivered`, at most 20, the oldest dropped first and reported) for the next check in a process that delivers now, which triages and sends it, as the SDK's `deliver: "check"` does. An alert no channel accepted is queued the same way and retried once per check, oldest first; one that no longer describes the job (`evaluate.stale_alert`) is dropped; one check spends at most 20 seconds of wall clock retrying across all jobs. Triage is tried once per alert: `Alert.triage` None with `triage_tried` True is JSON `null`, never tried again.
+`deliver="now"` (the default) sends each alert from the process that produced it. `deliver="check"` sends nothing: the alert is queued in the job's state (`undelivered`, at most 20, the oldest dropped first and reported) for the next check in a process that delivers now, which triages and sends it, as the SDK's `deliver: "check"` does. An alert no channel accepted is queued the same way and retried once per check, oldest first; one that no longer describes the job (`_evaluate.stale_alert`) is dropped; one check spends at most 20 seconds of wall clock retrying across all jobs. Triage is tried once per alert: `Alert.triage` None with `triage_tried` True is JSON `null`, never tried again.
 
-The outbox is the SDK's: every alert an evaluation composes is written with the state that opens its condition, in the same compare-and-set write, into `JobState.sending` (entries of `SendingAlert(until, alert)`, `until` five minutes on, `SEND_LEASE_MS`) when this process sends it, or into `undelivered` under `deliver="check"`. The sender takes it out when it records how the send went (`evaluate.record_sent`); a check moves an entry whose lease ran out to `undelivered` (`evaluate.release_sending`), where the retry sends it, so an alert whose process died mid-send is sent by a later check, once, or twice if a channel took it just before the process died. The pure steps (`alert_key`, `queue_undelivered`, `hold_alerts`, `release_sending`, `record_sent`) are in `evaluate.py` and replay `health.json`'s `delivery` cases. `sending` is read leniently: an entry that is not an object, or has no numeric `until`, or no alert, never makes the state unreadable, and is dropped when a check releases it.
+The outbox is the SDK's: every alert an evaluation composes is written with the state that opens its condition, in the same compare-and-set write, into `JobState.sending` (entries of `SendingAlert(until, alert)`, `until` five minutes on, `SEND_LEASE_MS`) when this process sends it, or into `undelivered` under `deliver="check"`. The sender takes it out when it records how the send went (`_evaluate.record_sent`); a check moves an entry whose lease ran out to `undelivered` (`_evaluate.release_sending`), where the retry sends it, so an alert whose process died mid-send is sent by a later check, once, or twice if a channel took it just before the process died. The pure steps (`alert_key`, `queue_undelivered`, `hold_alerts`, `release_sending`, `record_sent`) are in `_evaluate.py` and replay `health.json`'s `delivery` cases. `sending` is read leniently: an entry that is not an object, or has no numeric `until`, or no alert, never makes the state unreadable, and is dropped when a check releases it.
 
 `close()` stops the interval, waits for a check already under way (not one the calling thread is running, as a source's `sync` could), then closes the store.
 

@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from cronwatch import AbortError, AbortSignal, Alert, Run, TriageContext, _js
-from cronwatch.triage.anthropic import REQUEST_TIMEOUT_MS, Anthropic, AnthropicTriage
+from cronwatch.triage.anthropic import _REQUEST_TIMEOUT_MS, Anthropic, AnthropicTriage
 
 from helpers import MIN, make
 
@@ -89,7 +89,7 @@ def test_requests_match_what_the_sdk_sends() -> None:
         expected, actual = _js.dumps(c["params"]), _js.dumps(body(params))
         if expected != actual:
             failures.append(f"#{i} {c['context']} {c['options']}\n  expected {expected[:600]}\n  got      {actual[:600]}")
-        assert c["requestOptions"]["timeout"] == params["timeout"] * 1000 == REQUEST_TIMEOUT_MS
+        assert c["requestOptions"]["timeout"] == params["timeout"] * 1000 == _REQUEST_TIMEOUT_MS
         assert client.options == [{"max_retries": c["requestOptions"]["maxRetries"]}]
     assert not failures, "\n".join(failures)
 

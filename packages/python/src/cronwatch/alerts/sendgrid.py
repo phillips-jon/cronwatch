@@ -11,7 +11,9 @@ from .. import _js
 from ..types import Alert
 from ._http import HTTP
 from ._shared import http_or_default, post, required
-from .email import compose, parse_address, recipients
+from ._email import compose, parse_address, recipients
+
+__all__ = ["Sendgrid"]
 
 
 class Sendgrid:

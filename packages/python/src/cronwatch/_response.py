@@ -13,6 +13,8 @@ import http.client
 import sys
 from typing import Any
 
+__all__ = ["LAMBDA_KEYS", "is_lambda_result", "response_status"]
+
 _PLAIN = (str, bytes, bytearray, int, float, bool, list, tuple, dict, set, type(None))
 #: The keys of a Lambda proxy result (API Gateway REST and HTTP APIs, function URLs).
 LAMBDA_KEYS = frozenset({"statusCode", "headers", "multiValueHeaders", "body", "isBase64Encoded", "cookies"})

@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from cronwatch.duration import parse_duration
+from cronwatch._duration import parse_duration
 
 TOO_LONG = "is too long for a duration (more than 64 characters)"
 

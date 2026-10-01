@@ -811,7 +811,7 @@ BEARER = "Authorization: Bearer opaqueTOKENvalue1234567890"
 
 
 def test_a_secret_split_by_the_16_kb_cut_is_redacted_whole_redaction_comes_before_the_cap() -> None:
-    from cronwatch.output import OUTPUT_CAP
+    from cronwatch._output import OUTPUT_CAP
 
     cw, _, _ = make()
 
@@ -851,7 +851,7 @@ def test_a_secret_split_by_the_16_kb_cut_is_redacted_whole_redaction_comes_befor
 def test_text_past_the_redaction_window_never_keeps_what_came_right_after_its_cut() -> None:
     import re
 
-    from cronwatch.output import OUTPUT_CAP, REDACT_EDGE, redact_and_cap, redact_secrets
+    from cronwatch._output import OUTPUT_CAP, REDACT_EDGE, redact_and_cap, redact_secrets
 
     # The window starts part way into a key's body, whose header is before it:
     # the body's rest cannot be told from text, so it is never kept.

@@ -731,10 +731,10 @@ def test_the_development_sign_in_line_uses_the_public_origin_when_set_or_loopbac
 
 
 def test_only_an_origin_that_reads_as_one_is_loopback() -> None:
-    from cronwatch.web import is_loopback_origin
+    from cronwatch.web import _is_loopback_origin
 
     for yes in ("http://localhost", "http://localhost:3000", "http://app.localhost", "https://127.0.0.1", "http://127.8.9.10:1", "http://[::1]:3000"):
-        assert is_loopback_origin(yes), yes
+        assert _is_loopback_origin(yes), yes
     for no in (
         "http://localhost.example",
         "http://128.0.0.1",
@@ -748,7 +748,7 @@ def test_only_an_origin_that_reads_as_one_is_loopback() -> None:
         "http://evil.example#.localhost",
         "http://localhost:1@evil.example:80",
     ):
-        assert not is_loopback_origin(no), no
+        assert not _is_loopback_origin(no), no
 
 
 # ------------------------------------------------------------ routes-pwa.test.ts
@@ -1099,7 +1099,7 @@ def test_the_asgi_app_completes_the_lifespan() -> None:
 def test_a_web_without_a_client_uses_the_process_client(monkeypatch: pytest.MonkeyPatch) -> None:
     import cronwatch
 
-    monkeypatch.setattr(cronwatch, "_client", None)
+    monkeypatch.setattr(cronwatch, "_configured", None)
     cw = cronwatch.configure(alerts=[], cron_secret=None)
     try:
         cw.run("proc", lambda ctx: None)
@@ -1116,12 +1116,12 @@ def test_a_web_without_a_client_uses_the_process_client(monkeypatch: pytest.Monk
 
 def test_an_asgi_body_over_the_limit_is_refused_before_anything_reads_it_whole() -> None:
     """An ASGI server hands the body over before the routes can ask for a
-    token, so a body past MAX_BODY is answered 413 and the rest never read."""
-    from cronwatch.web import MAX_BODY
+    token, so a body past _MAX_BODY is answered 413 and the rest never read."""
+    from cronwatch.web import _MAX_BODY
 
     _, _, web = app()
     chunk = b"x" * (64 * 1024)
-    chunks = MAX_BODY // len(chunk) + 50
+    chunks = _MAX_BODY // len(chunk) + 50
     received = [0]
     sent: list[dict[str, Any]] = []
 
@@ -1145,18 +1145,18 @@ def test_an_asgi_body_over_the_limit_is_refused_before_anything_reads_it_whole()
     asyncio.run(web.asgi(scope, receive, emit))
     assert sent[0]["status"] == 413
     assert json.loads(sent[1]["body"]) == {"ok": False, "error": "Request body too large"}
-    assert received[0] == MAX_BODY // len(chunk) + 1, "reading stops once the limit is passed"
+    assert received[0] == _MAX_BODY // len(chunk) + 1, "reading stops once the limit is passed"
 
 
 def test_a_wsgi_body_over_the_limit_is_413_and_never_silences_the_job() -> None:
-    from cronwatch.web import MAX_BODY
+    from cronwatch.web import _MAX_BODY
 
     cw, _, web = app()
     cw.run("big", lambda ctx: None)
-    res = send(web, "POST", "/cronwatch/api/jobs/big/silence", {**JSON_BODY, "content-length": str(MAX_BODY + 1)}, b'{"for":"2h"}')
+    res = send(web, "POST", "/cronwatch/api/jobs/big/silence", {**JSON_BODY, "content-length": str(_MAX_BODY + 1)}, b'{"for":"2h"}')
     assert res.status == 413
     assert cw.job_summary("big").silenced_until is None
-    form = send(web, "POST", "/cronwatch/jobs/big/silence", {**BEARER, **FORM, "content-length": str(MAX_BODY + 1)}, b"for=2h")
+    form = send(web, "POST", "/cronwatch/jobs/big/silence", {**BEARER, **FORM, "content-length": str(_MAX_BODY + 1)}, b"for=2h")
     assert form.status == 413
     assert cw.job_summary("big").silenced_until is None
 

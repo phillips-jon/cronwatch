@@ -94,19 +94,20 @@ import cronwatch
 
 from . import _zone
 from ._convert import check_options, every_text, field_text, local_zone_name, zone_name
+from ._deprecated import names as _deprecated_names
 from ._scheduler_check import NeverFires, ScheduleError, check_fires
-from .client import Cronwatch, JobHandle, _Execution
-from .schedule import parse_schedule
+from ._client import Cronwatch, JobHandle, _Execution
+from ._schedule import parse_schedule
 
 __all__ = ["CHECK_TASK", "CeleryWatch", "ScheduleError", "check", "cronwatch_task", "install", "watch_for"]
 
 #: The check task's name, for beat_schedule.
 CHECK_TASK = "cronwatch.celery.check"
-TRIGGER = "celery"
+_TRIGGER = "celery"
 #: Tasks never watched: Celery's own, and the check.
-SKIPPED_TASKS = frozenset({"celery.backend_cleanup", CHECK_TASK})
+_SKIPPED_TASKS = frozenset({"celery.backend_cleanup", CHECK_TASK})
 #: Seconds a reading of the beat schedule (and django-celery-beat's table) is used before it is read again.
-REFRESH_S = 60.0
+_REFRESH_S = 60.0
 #: The attribute a request carries its run in, between the signals.
 _RUN = "_cronwatch_run"
 _OPTIONS = "__cronwatch__"
@@ -149,7 +150,7 @@ def _task_options(task: Any) -> dict[str, Any] | None:
 
 
 @dataclass(frozen=True)
-class BeatEntry:
+class _BeatEntry:
     """One entry of beat's schedule, from beat_schedule or django-celery-beat."""
 
     key: str
@@ -159,13 +160,13 @@ class BeatEntry:
     description: str | None = None
 
 
-def _conf_entries(app: Any) -> list[BeatEntry]:
+def _conf_entries(app: Any) -> list[_BeatEntry]:
     found = []
     for key, entry in dict(app.conf.beat_schedule or {}).items():
         if not isinstance(entry, Mapping):
             continue
         found.append(
-            BeatEntry(
+            _BeatEntry(
                 key=str(key),
                 label=f"beat_schedule entry {cronwatch._js.dumps(str(key))}",
                 task=entry.get("task"),
@@ -175,7 +176,7 @@ def _conf_entries(app: Any) -> list[BeatEntry]:
     return found
 
 
-def _database_entries() -> list[BeatEntry]:
+def _database_entries() -> list[_BeatEntry]:
     """django-celery-beat's enabled recurring tasks."""
     from django_celery_beat.models import PeriodicTask
 
@@ -184,7 +185,7 @@ def _database_entries() -> list[BeatEntry]:
         if task.clocked_id is not None:
             continue  # runs once, at a time
         found.append(
-            BeatEntry(
+            _BeatEntry(
                 key=task.name,
                 label=f"django-celery-beat task {cronwatch._js.dumps(task.name)}",
                 task=task.task,
@@ -221,7 +222,7 @@ def _crontab_zone(sched: Any, app: Any) -> str:
     return name
 
 
-def cron_text(sched: Any) -> str:
+def _cron_text(sched: Any) -> str:
     """The five fields croner reads for a Celery crontab. Celery fires on a day
     that matches the day of the month, the month and the day of the week
     together, which croner reads with "+" before the day of the week when both
@@ -289,7 +290,7 @@ _converted: dict[tuple[str, str, str], dict[str, Any]] = {}
 _converted_lock = threading.Lock()
 
 
-def convert(entry: BeatEntry, app: Any = None) -> dict[str, Any] | None:
+def _convert(entry: _BeatEntry, app: Any = None) -> dict[str, Any] | None:
     """{"schedule", "timezone"} for a beat entry, or None for one that runs
     once (django-celery-beat's clocked). Raises ScheduleError, its message
     naming the entry."""
@@ -304,7 +305,7 @@ def convert(entry: BeatEntry, app: Any = None) -> dict[str, Any] | None:
             zone = _crontab_zone(sched, app)
         except ScheduleError as error:
             raise ScheduleError(f"{where}: {sched!r} {error}") from None
-        text = cron_text(sched)
+        text = _cron_text(sched)
         key = (type(sched).__qualname__, text, zone)
         with _converted_lock:
             hit = _converted.get(key)
@@ -380,7 +381,7 @@ class CeleryWatch:
         if callable(given):
             made: Cronwatch = given()
             return made
-        return default_client()
+        return _default_client()
 
     def _report(self, error: BaseException, where: str) -> None:
         key = f"{where}\n{error}"
@@ -392,7 +393,7 @@ class CeleryWatch:
 
     # ------------------------------------------------------------ reading
 
-    def beat_entries(self, report: Callable[[BaseException, str], None] | None = None) -> list[BeatEntry]:
+    def beat_entries(self, report: Callable[[BaseException, str], None] | None = None) -> list[_BeatEntry]:
         """Beat's entries, beat_schedule's and django-celery-beat's (which win by name)."""
         if not self.beat:
             return []
@@ -424,15 +425,15 @@ class CeleryWatch:
         return found
 
     def _read(self, report: Callable[[BaseException, str], None]) -> dict[str, _Declaration]:
-        by_task: dict[str, list[BeatEntry]] = {}
+        by_task: dict[str, list[_BeatEntry]] = {}
         for entry in self.beat_entries(report):
-            if entry.task is None or entry.key in self.exclude or entry.task in self.exclude or entry.task in SKIPPED_TASKS:
+            if entry.task is None or entry.key in self.exclude or entry.task in self.exclude or entry.task in _SKIPPED_TASKS:
                 continue
             by_task.setdefault(entry.task, []).append(entry)
         own = {**self._decorated(report), **self.tasks}
         declarations: dict[str, _Declaration] = {}
         for task in sorted(set(by_task) | set(own)):
-            if task in SKIPPED_TASKS or task in self.exclude:
+            if task in _SKIPPED_TASKS or task in self.exclude:
                 continue
             given = dict(own.get(task, {}))
             name = str(given.pop("name", None) or task)
@@ -442,7 +443,7 @@ class CeleryWatch:
             if "schedule" not in given:
                 if len(entries) == 1:
                     try:
-                        found = convert(entries[0], self.app)
+                        found = _convert(entries[0], self.app)
                         if found:
                             options.update(found)
                     except ScheduleError as error:
@@ -465,7 +466,7 @@ class CeleryWatch:
     def declarations(self, refresh: bool = False, report: Callable[[BaseException, str], None] | None = None) -> dict[str, _Declaration]:
         """The watched tasks by name, read again once REFRESH_S has passed."""
         with self._lock:
-            stale = self._declarations is None or refresh or time.monotonic() - self._read_at > REFRESH_S
+            stale = self._declarations is None or refresh or time.monotonic() - self._read_at > _REFRESH_S
             if not stale:
                 assert self._declarations is not None
                 return self._declarations
@@ -526,7 +527,7 @@ class CeleryWatch:
         if handle is None:
             return
         client = handle._client
-        execution = _Execution(client, handle.definition, TRIGGER, _run_id(task_id))
+        execution = _Execution(client, handle.definition, _TRIGGER, _run_id(task_id))
         execution.begin()
         setattr(task.request, _RUN, execution)
 
@@ -556,7 +557,7 @@ def _run_id(task_id: str | None) -> str | None:
     return f"{task_id}:{uuid.uuid4().hex[:12]}"
 
 
-def default_client() -> Cronwatch:
+def _default_client() -> Cronwatch:
     """The Django integration's client in a Django project that uses it, else cronwatch.client()."""
     django = sys.modules.get("cronwatch.django")
     if django is not None:
@@ -588,7 +589,7 @@ def install(
     """Watches the app's tasks (see the module's docstring). Call it once, where
     the app is made; calling it again for the app replaces what it set up.
 
-    client:             a Cronwatch, or a function returning one. Default: see default_client().
+    client:             a Cronwatch, or a function returning one. Default: the Django integration's client in a Django project that uses it, else cronwatch.client().
     beat:               read beat's schedule. Default True.
     django_celery_beat: read django-celery-beat's PeriodicTask table too. Default: when it is installed.
     tasks:              {task name: options} for tasks to watch without the decorator.
@@ -657,7 +658,7 @@ def _end(task: Any, result: Any, error: BaseException | None, threw: bool) -> No
 def _on_prerun(sender: Any = None, task_id: str | None = None, task: Any = None, **_: Any) -> None:
     task = task if task is not None else sender
     watch = _watch_of(task)
-    if watch is None or task.name in SKIPPED_TASKS:
+    if watch is None or task.name in _SKIPPED_TASKS:
         return
     try:
         watch._begin(task, task_id)
@@ -682,7 +683,7 @@ def _on_failure(sender: Any = None, task_id: str | None = None, exception: BaseE
     # No run here: the main process of a worker whose child ran the task and was lost.
     if isinstance(exception, (WorkerLostError, TimeLimitExceeded, Terminated)):
         watch = _watch_of(sender)
-        if watch is not None and sender.name not in SKIPPED_TASKS:
+        if watch is not None and sender.name not in _SKIPPED_TASKS:
             try:
                 watch._fail_elsewhere(sender.name, task_id, error)
             except Exception as problem:
@@ -700,7 +701,7 @@ def _on_retry(sender: Any = None, request: Any = None, reason: Any = None, **_: 
         return
     # The main process cancelled the task (its connection to the broker was lost).
     watch = _watch_of(sender)
-    if watch is not None and request is not None and sender.name not in SKIPPED_TASKS:
+    if watch is not None and request is not None and sender.name not in _SKIPPED_TASKS:
         try:
             watch._fail_elsewhere(sender.name, getattr(request, "id", None), error)
         except Exception as problem:
@@ -712,7 +713,7 @@ def _on_revoked(sender: Any = None, request: Any = None, terminated: bool = Fals
     if not terminated or sender is None or request is None:
         return
     watch = _watch_of(sender)
-    if watch is None or sender.name in SKIPPED_TASKS:
+    if watch is None or sender.name in _SKIPPED_TASKS:
         return
     try:
         watch._fail_elsewhere(sender.name, getattr(request, "id", None), Terminated(f"revoked and terminated (signal {signum})"))
@@ -758,8 +759,13 @@ def check(self: Any) -> str:
     watch = watch_for(self._get_app())
     if watch is not None:
         watch.declare(strict=False)
-    client = watch.client if watch is not None else default_client()
+    client = watch.client if watch is not None else _default_client()
     result = client.check()
     jobs = len(result.jobs)
     alerts = len(result.alerts)
     return f"cronwatch: checked {jobs} job{'' if jobs == 1 else 's'}, sent {alerts} alert{'' if alerts == 1 else 's'}"
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"TRIGGER": "_TRIGGER", "SKIPPED_TASKS": "_SKIPPED_TASKS", "REFRESH_S": "_REFRESH_S", "BeatEntry": "_BeatEntry", "cron_text": "_cron_text", "convert": "_convert", "default_client": "_default_client"})

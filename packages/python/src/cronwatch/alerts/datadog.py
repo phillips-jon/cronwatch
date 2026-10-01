@@ -10,11 +10,14 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 from .. import _js
+from .._deprecated import names as _deprecated_names
 from ..types import Alert
 from ._http import HTTP
 from ._shared import cut, http_or_default, link_for, plain_text, post, present, required, sha256_hex
 
-ALERT_TYPE = {
+__all__ = ["Datadog"]
+
+_ALERT_TYPE = {
     "missed": "error",
     "failed": "error",
     "stuck": "error",
@@ -65,8 +68,8 @@ class Datadog:
         event: dict[str, Any] = {
             "title": cut(alert.title, 500),
             "text": cut(plain_text(alert, link), 4000),
-            "alert_type": ALERT_TYPE[str(alert.type)],
-            "aggregation_key": aggregation_key(alert),
+            "alert_type": _ALERT_TYPE[str(alert.type)],
+            "aggregation_key": _aggregation_key(alert),
             "date_happened": math.floor(alert.at / 1000),
             "priority": "normal",
             "tags": ["cronwatch", f"job:{alert.job}", f"alert:{alert.type}", *self._tags],
@@ -77,7 +80,12 @@ class Datadog:
         post(self._http, "Datadog", self._url, headers, _js.dumps(event), [self._api_key])
 
 
-def aggregation_key(alert: Alert) -> str:
+def _aggregation_key(alert: Alert) -> str:
     """"cronwatch:<job>:<type>", or a hash of it when that passes Datadog's 100 characters."""
     key = f"cronwatch:{alert.job}:{alert.type}"
     return key if _js.length16(key) <= 100 else f"cronwatch:{sha256_hex(key)[:40]}"
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"ALERT_TYPE": "_ALERT_TYPE", "aggregation_key": "_aggregation_key"})

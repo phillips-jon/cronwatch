@@ -10,11 +10,14 @@ from collections.abc import Callable
 from typing import Any
 
 from .. import _js
-from ..types import Alert, details_to_json
+from .._deprecated import names as _deprecated_names
+from ..types import Alert, _details_to_json
 from ._http import HTTP
 from ._shared import cut, http_or_default, link_for, post, present, required, run_summary
 
-CLASS = {
+__all__ = ["Honeybadger"]
+
+_CLASS = {
     "missed": "CronWatch::Missed",
     "failed": "CronWatch::Failed",
     "stuck": "CronWatch::Stuck",
@@ -63,13 +66,13 @@ class Honeybadger:
         details: dict[str, Any] = {"job": alert.job, "type": str(alert.type)}
         if present(alert.triage):
             details["triage"] = alert.triage
-        details["details"] = details_to_json(alert.details)
+        details["details"] = _details_to_json(alert.details)
         details["run"] = run_summary(alert)
         request["context"] = details
         notice = {
             "notifier": {"name": "cronwatch", "url": "https://cronwatch.dev"},
             "error": {
-                "class": CLASS[str(alert.type)],
+                "class": _CLASS[str(alert.type)],
                 "message": cut(f"{alert.title}\n{alert.message}", 8000),
                 # No code ran here; one frame naming the job keeps the notice well formed.
                 "backtrace": [{"number": "0", "file": f"cronwatch/{alert.job}", "method": str(alert.type)}],
@@ -81,3 +84,8 @@ class Honeybadger:
         }
         headers = {"content-type": "application/json", "accept": "application/json", "x-api-key": self._api_key}
         post(self._http, "Honeybadger", self._url, headers, _js.dumps(notice), [self._api_key])
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"CLASS": "_CLASS"})

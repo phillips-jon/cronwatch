@@ -207,6 +207,10 @@ lambda_handler = cron.aws_lambda                                       # AWS Lam
 
 It answers `{"ok", "job", "run", "status", "durationMs"}` with 200 or 500, 401 without the secret, and 503 when no secret is set outside development (`secret=None` lets anyone run it). A function that returns a response is answered with it, and, as for any run, a response of 400 or more fails the run. An `async def` makes an async handler. On Lambda, `cron.aws_lambda(event, context)` reads the bearer from a REST API's, an HTTP API's or a function URL's event, hands `fn` the event, and answers with the proxy result (`{"statusCode", "headers", "body", "isBase64Encoded"}`); a function may return a proxy result of its own. A function invoked directly (EventBridge Scheduler) gets an event with no headers, and IAM already decides who may invoke it, so give that handler `secret=None`.
 
+### Deprecated
+
+`cw.start(every)` (now `start_checking`), `cronwatch.web.Web(client)` (now `cw.routes()`), `AnthropicTriage` (now `Anthropic`), `Slack(url)` and `Discord(url)` with the URL positional (now `webhook_url=`), and `hmac_sha256_hex` (now `signature`) still work through 1.x, each with a `DeprecationWarning`, and go in 2.0. So do the modules and helpers 1.0 made internal under their old names (`cronwatch.evaluate`, `cronwatch.types.camel`, ...): public means what this README and the [docs](https://cronwatch.dev/docs/python/#deprecated) document, and each module's `__all__` lists it.
+
 ## Testing
 
 From this directory, with [uv](https://docs.astral.sh/uv/):

@@ -13,6 +13,8 @@ from urllib.parse import unquote_to_bytes
 
 from .. import _js
 
+__all__ = ["ABSOLUTE", "DEFAULT_PORTS", "InvalidOrigin", "NOT_HTTP", "bare", "parse", "read"]
+
 ABSOLUTE = 'routes: origin must be an absolute URL such as "https://app.example.com", got {}'
 NOT_HTTP = "routes: origin must be http or https, got {}"
 DEFAULT_PORTS = {"http": 80, "https": 443}

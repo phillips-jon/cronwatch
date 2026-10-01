@@ -20,10 +20,10 @@ from typing import Any
 import pytest
 
 from cronwatch import AlertDraft, Cronwatch, JobDefinition, Run, _js, alerts
-from cronwatch.alerts import _shared, email, sigv4, twilio
+from cronwatch.alerts import _email, _shared, _sigv4, twilio
 from cronwatch.alerts import _http
 from cronwatch.alerts._http import RequestTimeout, UrllibHTTP
-from cronwatch.format import compose_alert
+from cronwatch._format import compose_alert
 
 from helpers import MIN, T0, Clock, make
 
@@ -91,7 +91,7 @@ SIGV4_CASES = [
 @pytest.mark.parametrize(("name", "method", "url", "headers", "token", "authorization"), SIGV4_CASES)
 def test_sigv4_matches_the_aws_test_suite(name: str, method: str, url: str, headers: dict[str, str], token: str | None, authorization: str) -> None:
     now = _js.date_utc(2015, 7, 30, 12, 36)
-    signed = sigv4.sign(method=method, url=url, headers=headers, body="", region="us-east-1", service="service", now=now,
+    signed = _sigv4.sign(method=method, url=url, headers=headers, body="", region="us-east-1", service="service", now=now,
                         access_key_id="AKIDEXAMPLE", secret_access_key="wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY", session_token=token)  # fmt: skip
     assert signed["authorization"] == f"AWS4-HMAC-SHA256 {SCOPE}, {authorization}"
     assert signed["x-amz-date"] == "20150830T123600Z"
@@ -103,34 +103,34 @@ def test_sigv4_matches_the_aws_test_suite(name: str, method: str, url: str, head
 # ---------------------------------------------------------------- SMS
 
 def test_sms_bodies_fit_their_segments_and_keep_the_link_whole() -> None:
-    gsm = twilio.sms_body(failed("x" * 2000), "https://app.example/j")
+    gsm = twilio._sms_body(failed("x" * 2000), "https://app.example/j")
     assert len(gsm) <= 459
     assert gsm.endswith("...\nhttps://app.example/j")
-    ucs = twilio.sms_body(failed("\U0001f600" * 500), None)
+    ucs = twilio._sms_body(failed("\U0001f600" * 500), None)
     assert _js.length16(ucs) <= 201
     ucs.encode("utf-8")  # whole characters only
-    assert twilio.sms_body(failed("one\ntwo"), None) == "nightly failed\none\ntwo"
-    assert twilio.sms_body(failed("one", triage="db down"), None) == "nightly failed\none\nTriage: db down"
+    assert twilio._sms_body(failed("one\ntwo"), None) == "nightly failed\none\ntwo"
+    assert twilio._sms_body(failed("one", triage="db down"), None) == "nightly failed\none\nTriage: db down"
     # The extension table counts two: 80 braces are 160 septets, one segment; 81 are not.
-    assert twilio.fits("{" * 80, 1)
-    assert not twilio.fits("{" * 81, 1)
-    assert twilio.fits("é" * 160, 1)
-    assert not twilio.fits("ê" * 71, 1), "a character outside GSM-7 makes the message UCS-2"
+    assert twilio._fits("{" * 80, 1)
+    assert not twilio._fits("{" * 81, 1)
+    assert twilio._fits("é" * 160, 1)
+    assert not twilio._fits("ê" * 71, 1), "a character outside GSM-7 makes the message UCS-2"
 
 
 def test_sms_bodies_stay_inside_twilios_1600_characters_and_pack_segments_as_phones_do() -> None:
     long = failed("x" * 3000, title="j failed")
-    assert len(twilio.sms_body(long, None, 12)) <= 1530, "segments capped at 10"
-    assert len(twilio.sms_body(long, None, float("nan"))) <= 459, "not a number: the default 3"
-    assert len(twilio.sms_body(long, None, "5")) <= 459, "not a number: the default 3"
-    assert len(twilio.sms_body(long, None, True)) <= 459, "not a number: the default 3"
-    assert twilio.sms_segments("a" * 160) == 1
-    assert twilio.sms_segments("a" * 161) == 2
-    assert twilio.sms_segments("a" * 152 + "{" + "a" * 152) == 3, "an escape pair never straddles a segment"
-    assert twilio.sms_segments(twilio.sms_body(failed(("a" * 152 + "{") * 3, title="t"), None, 3)) <= 3
-    assert twilio.sms_segments("\U0001f600" * 35) == 1
-    assert twilio.sms_segments("a" * 66 + "\U0001f600" + "a" * 66) == 3, "a surrogate pair never straddles a segment"
-    huge = twilio.sms_body(failed("m"), "https://example.com/" + "p" * 2000, 10)
+    assert len(twilio._sms_body(long, None, 12)) <= 1530, "segments capped at 10"
+    assert len(twilio._sms_body(long, None, float("nan"))) <= 459, "not a number: the default 3"
+    assert len(twilio._sms_body(long, None, "5")) <= 459, "not a number: the default 3"
+    assert len(twilio._sms_body(long, None, True)) <= 459, "not a number: the default 3"
+    assert twilio._sms_segments("a" * 160) == 1
+    assert twilio._sms_segments("a" * 161) == 2
+    assert twilio._sms_segments("a" * 152 + "{" + "a" * 152) == 3, "an escape pair never straddles a segment"
+    assert twilio._sms_segments(twilio._sms_body(failed(("a" * 152 + "{") * 3, title="t"), None, 3)) <= 3
+    assert twilio._sms_segments("\U0001f600" * 35) == 1
+    assert twilio._sms_segments("a" * 66 + "\U0001f600" + "a" * 66) == 3, "a surrogate pair never straddles a segment"
+    huge = twilio._sms_body(failed("m"), "https://example.com/" + "p" * 2000, 10)
     assert _js.length16(huge) <= 1600
 
 
@@ -186,18 +186,18 @@ def test_twilio_without_a_context_warns_for_each_refusal(capsys: pytest.CaptureF
 # ---------------------------------------------------------------- email
 
 def test_email_content_and_addresses() -> None:
-    mail = email.compose(failed('a <b>\n"q"'), from_="a@b.c", to=["x@y.z"], subject_prefix="[p]\n", link=lambda _a: "javascript:alert(1)")
+    mail = _email.compose(failed('a <b>\n"q"'), from_="a@b.c", to=["x@y.z"], subject_prefix="[p]\n", link=lambda _a: "javascript:alert(1)")
     assert mail.subject == "[p]  nightly failed", "one line"
     assert "javascript:" not in mail.html
     assert "a &lt;b&gt;\n&quot;q&quot;" in mail.html
-    assert email.parse_address('"Ops Team" <ops@example.com>') == {"email": "ops@example.com", "name": "Ops Team"}
-    assert email.parse_address(" ops@example.com ") == {"email": "ops@example.com"}
-    assert email.parse_address("<ops@example.com>") == {"email": "ops@example.com"}
-    assert email.compose(failed(), from_="a@b.c", to=["x@y.z"], link=lambda _a: "HTTPS://app.example/j").text.endswith("Open: HTTPS://app.example/j")
+    assert _email.parse_address('"Ops Team" <ops@example.com>') == {"email": "ops@example.com", "name": "Ops Team"}
+    assert _email.parse_address(" ops@example.com ") == {"email": "ops@example.com"}
+    assert _email.parse_address("<ops@example.com>") == {"email": "ops@example.com"}
+    assert _email.compose(failed(), from_="a@b.c", to=["x@y.z"], link=lambda _a: "HTTPS://app.example/j").text.endswith("Open: HTTPS://app.example/j")
 
 
 def test_text_cut_for_a_subject_never_leaves_half_a_surrogate_pair() -> None:
-    assert email.compose(failed(title="a" * 249 + "\U0001f600"), from_="a@b.c", to=["d@e.f"]).subject == "a" * 249
+    assert _email.compose(failed(title="a" * 249 + "\U0001f600"), from_="a@b.c", to=["d@e.f"]).subject == "a" * 249
 
 
 @pytest.mark.parametrize(
@@ -230,11 +230,11 @@ def test_channels_refuse_what_they_cannot_send_with(make_channel: Callable[[], A
 
 
 def test_sentry_reads_a_dsn() -> None:
-    from cronwatch.alerts.sentry import parse_dsn
+    from cronwatch.alerts.sentry import _parse_dsn
 
-    dsn = parse_dsn("https://pub@o1.ingest.sentry.io/42")
+    dsn = _parse_dsn("https://pub@o1.ingest.sentry.io/42")
     assert [dsn.endpoint, dsn.public_key] == ["https://o1.ingest.sentry.io/api/42/envelope/", "pub"]
-    dsn = parse_dsn("https://p%40b@sentry.example.com:9000/prefix/7")
+    dsn = _parse_dsn("https://p%40b@sentry.example.com:9000/prefix/7")
     assert [dsn.endpoint, dsn.public_key] == ["https://sentry.example.com:9000/prefix/api/7/envelope/", "p@b"]
 
 

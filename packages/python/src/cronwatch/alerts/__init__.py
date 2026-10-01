@@ -21,6 +21,7 @@ import sys
 from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
+from .._deprecated import names as _deprecated_names
 from ..types import Alert, AlertType
 
 
@@ -62,13 +63,13 @@ class Custom:
         self._send = send
 
     def send(self, alert: Alert, context: ChannelContext | None = None) -> None:
-        if context is not None and takes_context(self._send):
+        if context is not None and _takes_context(self._send):
             self._send(alert, context)
         else:
             self._send(alert)
 
 
-def takes_context(fn: Callable[..., Any]) -> bool:
+def _takes_context(fn: Callable[..., Any]) -> bool:
     """Whether a function accepts a second positional argument (the context)."""
     try:
         parameters = inspect.signature(fn).parameters.values()
@@ -83,21 +84,21 @@ def takes_context(fn: Callable[..., Any]) -> bool:
     return positional >= 2
 
 
-def channel_name(channel: Any) -> str:
+def _channel_name(channel: Any) -> str:
     name = getattr(channel, "name", None)
     if isinstance(name, str) and name:
         return name
     return getattr(channel, "__name__", None) or type(channel).__name__
 
 
-def send_to(channel: Any, alert: Alert, context: ChannelContext) -> None:
+def _send_to(channel: Any, alert: Alert, context: ChannelContext) -> None:
     """channel.send(alert, context), or channel(alert, context) for a plain
     function; either with the alert alone when it takes only that."""
     send = getattr(channel, "send", None)
     target = send if callable(send) else channel
     if not callable(target):
-        raise TypeError(f"alert channel {channel_name(channel)} has no send(alert, context)")
-    if takes_context(target):
+        raise TypeError(f"alert channel {_channel_name(channel)} has no send(alert, context)")
+    if _takes_context(target):
         target(alert, context)
     else:
         target(alert)
@@ -145,3 +146,8 @@ __all__ = [
     "UrllibHTTP",
     "Webhook",
 ]
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"takes_context": "_takes_context", "channel_name": "_channel_name", "send_to": "_send_to"})

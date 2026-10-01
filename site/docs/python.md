@@ -457,6 +457,20 @@ Each process alerts on the jobs it runs, and any side's check sees every job in 
 
 The cron reader matches croner and the SDK, including the two schedules that never make sense (a one-time date is refused, a date no month has never fires): see [Schedule syntax](/docs/schedules/#schedule-syntax).
 
+## Deprecated
+
+These names still work through every 1.x release, each with a `DeprecationWarning`, and go in 2.0:
+
+| Deprecated | Use |
+|---|---|
+| `cw.start(every)`, `AsyncCronwatch.start(every)` | `cw.start_checking(every)`: a job's `start()` opens a run, so the client's is named for what it starts |
+| `cronwatch.web.Web(client, ...)` | `cw.routes(...)`, or `cronwatch.client().routes(...)` for the process's client |
+| `AnthropicTriage` from `cronwatch.triage.anthropic` | `Anthropic`, the name every port uses |
+| `Slack(url)` and `Discord(url)`, the URL given positionally | `Slack(webhook_url=url)`, `Discord(webhook_url=url)` |
+| `hmac_sha256_hex(secret, body)` from `cronwatch.alerts.webhook` | `signature(secret, body)`, the name every port uses |
+
+Public means what this page and the README document; everything else is internal. The modules that only implement the client are underscored from 1.0 (`cronwatch._evaluate`, `cronwatch._client`, `cronwatch._schedule` and so on), and so are the helpers and constants of the public modules (`cronwatch.types.camel`, `cronwatch.alerts.twilio.sms_segments`, the pg_cron source's SQL). Under their old names (`cronwatch.evaluate`, `cronwatch.alerts.twilio.sms_segments`) they still work, warning when used, and go in 2.0. Each module's `__all__` lists what it promises.
+
 ## Kept in step
 
 The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, each channel's requests, stats and health) into `conformance/` in the repository, and the Python package's tests replay every one, as the other ports' do. The dashboard is checked the same way: `tests/test_web_golden.py` replays the SDK routes' answers to a fixed seed (`packages/ruby/test/web/golden.json`) and compares every page and header byte for byte. A change of behaviour lands in TypeScript first, the cases are regenerated, and the port is fixed until they pass. Where they disagree, the port is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).

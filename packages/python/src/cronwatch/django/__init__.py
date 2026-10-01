@@ -47,9 +47,11 @@ import cronwatch
 from cronwatch import _env
 from cronwatch.web import Web
 
+from .._deprecated import names as _deprecated_names
+
 __all__ = ["DjangoWeb", "client", "reset", "routes"]
 
-CLIENT_OPTIONS = {
+_CLIENT_OPTIONS = {
     "STORE": "store",
     "ALERTS": "alerts",
     "TRIAGE": "triage",
@@ -61,8 +63,8 @@ CLIENT_OPTIONS = {
     "DELIVER": "deliver",
     "ON_ERROR": "on_error",
 }
-WEB_OPTIONS = {"TOKEN": "token", "BASE_PATH": "base_path", "ORIGIN": "origin", "TRUST_PROXY": "trust_proxy"}
-KEYS = ("CLIENT", *CLIENT_OPTIONS, *WEB_OPTIONS)
+_WEB_OPTIONS = {"TOKEN": "token", "BASE_PATH": "base_path", "ORIGIN": "origin", "TRUST_PROXY": "trust_proxy"}
+_KEYS = ("CLIENT", *_CLIENT_OPTIONS, *_WEB_OPTIONS)
 
 _lock = threading.Lock()
 _client: Any = None
@@ -89,9 +91,9 @@ def _settings() -> dict[str, Any]:
         return {}
     if not isinstance(value, dict):
         raise ImproperlyConfigured("CRONWATCH must be a dict")
-    unknown = [key for key in value if key not in KEYS]
+    unknown = [key for key in value if key not in _KEYS]
     if unknown:
-        raise ImproperlyConfigured(f"CRONWATCH has {', '.join(map(repr, unknown))}; it takes {', '.join(KEYS)}")
+        raise ImproperlyConfigured(f"CRONWATCH has {', '.join(map(repr, unknown))}; it takes {', '.join(_KEYS)}")
     return dict(value)
 
 
@@ -109,7 +111,7 @@ def _load(value: Any, *, makes: str | None = None) -> Any:
 
 def _client_options(config: dict[str, Any]) -> dict[str, Any]:
     options: dict[str, Any] = {}
-    for key, name in CLIENT_OPTIONS.items():
+    for key, name in _CLIENT_OPTIONS.items():
         if key not in config:
             continue
         value = config[key]
@@ -140,7 +142,7 @@ def client() -> cronwatch.Cronwatch:
     if config.get("CLIENT") is not None:
         found: cronwatch.Cronwatch = _load(config["CLIENT"])
         return found
-    if not any(key in config for key in CLIENT_OPTIONS):
+    if not any(key in config for key in _CLIENT_OPTIONS):
         return cronwatch.client()
     with _lock:
         if _client is None:
@@ -164,7 +166,7 @@ def routes() -> Web:
     with _lock:
         if _routes is None:
             config = _settings()
-            options = {name: config[key] for key, name in WEB_OPTIONS.items() if key in config}
+            options = {name: config[key] for key, name in _WEB_OPTIONS.items() if key in config}
             _routes = DjangoWeb(**options)
         made: Web = _routes
     return made
@@ -179,3 +181,8 @@ def reset() -> None:
         previous, _client, _routes = _client, None, None
     if previous is not None:
         previous.stop()
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"CLIENT_OPTIONS": "_CLIENT_OPTIONS", "WEB_OPTIONS": "_WEB_OPTIONS", "KEYS": "_KEYS"})

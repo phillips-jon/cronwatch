@@ -61,7 +61,8 @@ from typing import Any
 from urllib.parse import quote, quote_plus, unquote_to_bytes, urlsplit
 
 from .. import _env, _js
-from ..duration import parse_duration
+from .._deprecated import names as _deprecated_names
+from .._duration import parse_duration
 from . import _html, _origin, _pwa
 from . import _timeline as timeline
 
@@ -74,40 +75,40 @@ class _Unset:
 
 
 #: Tells "token not given" (read CRONWATCH_TOKEN) from "token=None" (open on purpose).
-UNSET: Any = _Unset()
+_UNSET: Any = _Unset()
 
-COOKIE = "cronwatch_token"
+_COOKIE = "cronwatch_token"
 #: What GET <base>/api says is serving it: the package, as PyPI names it, and the language.
 _LIBRARY = "cronwatch-sdk"
 _LANGUAGE = "python"
 #: The dashboard JSON API's version, which GET <base>/api answers. It goes up
 #: only for a change that is not additive, and such a change waits for a major release.
-API_VERSION = 1
-DEFAULT_RUNS = 20
-MAX_RUNS = 500
+_API_VERSION = 1
+_DEFAULT_RUNS = 20
+_MAX_RUNS = 500
 #: Runs per job the board reads in one go: the table's sparkline, and most jobs' lanes.
-BOARD_PAGE_RUNS = 20
-COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+_BOARD_PAGE_RUNS = 20
+_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 #: The most of a request body read into memory. The routes' forms and JSON are
 #: a few bytes, and an ASGI server hands the body over before the routes can
 #: ask for a token, so without a limit anyone could make the process hold any size.
-MAX_BODY = 1024 * 1024
+_MAX_BODY = 1024 * 1024
 
 # 'self' only for what the app shell needs: app.js (which registers the
 # service worker and nothing else), the manifest, the worker and the icons.
 # No inline script, and the pages work without any.
-CSP = (
+_CSP = (
     "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; "
     "manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
 )
 #: For the SVG icons, should one be opened on its own.
-ASSET_CSP = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
+_ASSET_CSP = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
 # same-origin rather than no-referrer: under no-referrer browsers send
 # `Origin: null` on form posts, which the CSRF check would refuse, and the
 # forms redirect back to the page named by the same-origin Referer.
-SECURITY_HEADERS = {"x-content-type-options": "nosniff", "referrer-policy": "same-origin", "x-robots-tag": "noindex"}
+_SECURITY_HEADERS = {"x-content-type-options": "nosniff", "referrer-policy": "same-origin", "x-robots-tag": "noindex"}
 
-LOCKED = (
+_LOCKED = (
     "Set CRONWATCH_TOKEN (or pass token= to cw.routes(), or TOKEN in Django's CRONWATCH setting), "
     "or pass token=None to serve them open behind your own auth."
 )
@@ -125,7 +126,7 @@ class BodyTooLarge(Exception):
     """A request body over MAX_BODY bytes: answered 413, never read into memory."""
 
     def __init__(self) -> None:
-        super().__init__(f"the request body is larger than {MAX_BODY} bytes")
+        super().__init__(f"the request body is larger than {_MAX_BODY} bytes")
 
 
 @dataclass
@@ -160,7 +161,7 @@ class Request:
 
     def params(self) -> list[tuple[str, str]]:
         """The query's pairs, as URLSearchParams reads them."""
-        return parse_query(self.query)
+        return _parse_query(self.query)
 
     def param(self, name: str) -> str | None:
         """URLSearchParams#get: the first value, or None."""
@@ -194,25 +195,25 @@ class Request:
             length = environ.get("CONTENT_LENGTH")
             if length:
                 size = int(length)
-                if size > MAX_BODY:
+                if size > _MAX_BODY:
                     raise BodyTooLarge()
                 # read(-1) would read everything.
                 data: bytes = stream.read(size) if size > 0 else b""
                 return data
             if environ.get("wsgi.input_terminated"):
-                data = stream.read(MAX_BODY + 1)
-                if len(data) > MAX_BODY:
+                data = stream.read(_MAX_BODY + 1)
+                if len(data) > _MAX_BODY:
                     raise BodyTooLarge()
                 return data
             return b""
 
         return cls(
             method=environ.get("REQUEST_METHOD", "GET"),
-            path=request_path(decoded, raw),
+            path=_request_path(decoded, raw),
             query=_raw_text(query),
             headers=headers,
             body=body,
-            origin=url_origin(scheme, host),
+            origin=_url_origin(scheme, host),
             mount=mount,
         )
 
@@ -240,11 +241,11 @@ class Request:
         candidates = [] if raw_text is None else [raw_text, quote(mount, safe=_PATH_SAFE) + raw_text] if mount else [raw_text]
         return cls(
             method=scope.get("method", "GET"),
-            path=request_path(path.encode("utf-8", "surrogateescape"), *candidates),
+            path=_request_path(path.encode("utf-8", "surrogateescape"), *candidates),
             query=_raw_text(scope.get("query_string", b"").decode("latin-1")),
             headers=headers,
             body=body,
-            origin=url_origin(scheme, host),
+            origin=_url_origin(scheme, host),
             mount=mount,
         )
 
@@ -277,7 +278,7 @@ def _raw_text(text: str) -> str:
     return quote(text.encode("latin-1", "replace"), safe="".join(chr(c) for c in range(0x21, 0x7F)))
 
 
-def url_origin(scheme: str, host: str) -> str:
+def _url_origin(scheme: str, host: str) -> str:
     """The origin of scheme://host, as URL#origin writes it (lowercased, no default port)."""
     try:
         read = _origin.bare(f"{scheme}://{host}")
@@ -286,7 +287,7 @@ def url_origin(scheme: str, host: str) -> str:
     return read or f"{scheme.lower()}://{host.lower()}"
 
 
-def request_path(decoded: bytes, *raw: str | None) -> str:
+def _request_path(decoded: bytes, *raw: str | None) -> str:
     """The path as the browser sent it. A server hands over the path already
     decoded; the raw request target, when the server passes it (gunicorn's
     RAW_URI, uWSGI's REQUEST_URI, ASGI's raw_path), is used when it decodes to
@@ -304,7 +305,7 @@ def request_path(decoded: bytes, *raw: str | None) -> str:
     return path or "/"
 
 
-def parse_query(text: str) -> list[tuple[str, str]]:
+def _parse_query(text: str) -> list[tuple[str, str]]:
     """application/x-www-form-urlencoded parsing as URLSearchParams does it:
     "+" is a space, a bad escape is kept as written, bytes that are not UTF-8 become U+FFFD."""
     text = text[1:] if text.startswith("?") else text
@@ -329,7 +330,7 @@ def _form_encode(text: str) -> str:
     return quote_plus(_js.well_formed(text), safe="*").replace("~", "%7E")
 
 
-def safe_decode(value: str) -> str | None:
+def _safe_decode(value: str) -> str | None:
     """decodeURIComponent, or None where it would throw: a bad escape, or bytes that are not UTF-8."""
     if _BAD_ESCAPE.search(value):
         return None
@@ -339,24 +340,24 @@ def safe_decode(value: str) -> str | None:
         return None
 
 
-def constant_time_equal(a: str, b: str) -> bool:
+def _constant_time_equal(a: str, b: str) -> bool:
     """Compares two secrets without stopping at the first differing character (UTF-16 units, as the SDK compares)."""
     return hmac.compare_digest(a.encode("utf-16-le", "surrogatepass"), b.encode("utf-16-le", "surrogatepass"))
 
 
-def cookie_value(token: str) -> str:
+def _cookie_value(token: str) -> str:
     """The cookie holds a digest of the token, so a leaked cookie does not
     reveal the bearer token itself: the SHA-256 of "cronwatch-cookie:<token>", as hex."""
     return hashlib.sha256(f"cronwatch-cookie:{token}".encode("utf-8", "surrogatepass")).hexdigest()
 
 
-def development_token() -> str:
+def _development_token() -> str:
     """A token for one routes instance in development, when none is configured:
     32 random bytes, base64url (43 characters)."""
     return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
 
 
-def development_sign_in_line(origin: str | None, base: str, token: str) -> str:
+def _development_sign_in_line(origin: str | None, base: str, token: str) -> str:
     """The line a development token is announced with, printed once to stdout
     on the routes' first request. `origin` is the `origin` option when set,
     otherwise the first request's public origin when its host is loopback,
@@ -373,7 +374,7 @@ def development_sign_in_line(origin: str | None, base: str, token: str) -> str:
 _LOOPBACK_V4 = re.compile(r"127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})")
 
 
-def is_loopback_origin(origin: str) -> bool:
+def _is_loopback_origin(origin: str) -> bool:
     """Whether an origin's host is loopback: "localhost", a name ending in
     ".localhost", an IPv4 address in 127.0.0.0/8, or the IPv6 address ::1.
     Only an origin that reads as one counts: a Host header is anyone's to
@@ -470,28 +471,28 @@ def _silence_duration(value: str | None) -> Any:
 def _runs_limit(value: str | None) -> int:
     n = math.nan if value is None or _js.trim(value) == "" else _js_number(value)
     if not _js.is_finite(n):
-        return DEFAULT_RUNS
-    return min(MAX_RUNS, max(1, math.trunc(n)))
+        return _DEFAULT_RUNS
+    return min(_MAX_RUNS, max(1, math.trunc(n)))
 
 
 def _api(body: Any, status: int = 200, headers: Mapping[str, str] | None = None) -> Response:
     return Response(
         status,
-        {"content-type": "application/json; charset=utf-8", "cache-control": "no-store", **SECURITY_HEADERS, **(headers or {})},
+        {"content-type": "application/json; charset=utf-8", "cache-control": "no-store", **_SECURITY_HEADERS, **(headers or {})},
         _js.dumps(body).encode("utf-8", "surrogatepass"),
     )
 
 
 def _redirect(location: str, headers: Mapping[str, str] | None = None) -> Response:
-    return Response(303, {"location": location, "cache-control": "no-store", **SECURITY_HEADERS, **(headers or {})})
+    return Response(303, {"location": location, "cache-control": "no-store", **_SECURITY_HEADERS, **(headers or {})})
 
 
 def _shell(asset: _pwa.Asset, base: str) -> Response:
     """An app shell file. The worker may be scoped to the base (it is served
     from there anyway); the SVGs get a CSP of their own."""
-    headers = {"content-type": asset.type, "cache-control": asset.cache, **SECURITY_HEADERS}
+    headers = {"content-type": asset.type, "cache-control": asset.cache, **_SECURITY_HEADERS}
     if asset.type == "image/svg+xml":
-        headers["content-security-policy"] = ASSET_CSP
+        headers["content-security-policy"] = _ASSET_CSP
     if asset.worker:
         headers["service-worker-allowed"] = f"{base}/"
     return Response(200, headers, asset.body)
@@ -503,9 +504,9 @@ def _html_response(body: str, status: int = 200, cache: str = "no-store") -> Res
         {
             "content-type": "text/html; charset=utf-8",
             "cache-control": cache,
-            "content-security-policy": CSP,
+            "content-security-policy": _CSP,
             "x-frame-options": "DENY",
-            **SECURITY_HEADERS,
+            **_SECURITY_HEADERS,
         },
         _js.well_formed(body).encode("utf-8"),
     )
@@ -524,7 +525,7 @@ class Web:
         self,
         client: Any = None,
         *,
-        token: str | None = UNSET,
+        token: str | None = _UNSET,
         base_path: str | None = None,
         origin: str | None = None,
         trust_proxy: bool = False,
@@ -544,14 +545,14 @@ class Web:
         self,
         client: Any = None,
         *,
-        token: str | None = UNSET,
+        token: str | None = _UNSET,
         base_path: str | None = None,
         origin: str | None = None,
         trust_proxy: bool = False,
     ) -> None:
         self._client = client
         self._opted_out = token is None
-        given = None if token is UNSET or token is None else str(token)
+        given = None if token is _UNSET or token is None else str(token)
         configured = None if self._opted_out else (given or os.environ.get("CRONWATCH_TOKEN") or None)
         self._base_path = None if base_path is None else re.sub(r"/+\Z", "", str(base_path))
         self._origin = _origin.parse(origin)
@@ -561,8 +562,8 @@ class Web:
         # alike), so development gets a token too: made here, and shown only
         # in the server log.
         self._generated = configured is None and not self._opted_out and _env.is_development()
-        self._token: str | None = development_token() if self._generated else configured
-        self._cookie = cookie_value(self._token) if self._token else None
+        self._token: str | None = _development_token() if self._generated else configured
+        self._cookie = _cookie_value(self._token) if self._token else None
         self._announced = False
         self._announce_lock = threading.Lock()
 
@@ -604,12 +605,12 @@ class Web:
             if kind == "websocket":
                 await send({"type": "websocket.close", "code": 1000})
             return
-        body = await read_asgi_body(receive)
+        body = await _read_asgi_body(receive)
         if body is None:
             return
         head = str(scope.get("method", "")).upper() == "HEAD"
         if isinstance(body, BodyTooLarge):
-            response = too_large()
+            response = _too_large()
         else:
             response = await asyncio.to_thread(self.handle, Request.from_asgi(scope, body))
         headers = [(k.encode("latin-1"), v.encode("latin-1")) for k, v in response.wsgi_headers()]
@@ -627,7 +628,7 @@ class Web:
             wants_html = not path.startswith("/api")
             return self._serve(request, path, wants_html, base)
         except BodyTooLarge:
-            return too_large()
+            return _too_large()
         except Exception as error:
             try:
                 self.client.on_error(error, "routes")
@@ -664,8 +665,8 @@ class Web:
             if self._announced:
                 return
             self._announced = True
-        shown = self._origin if self._origin is not None else (origin if is_loopback_origin(origin) else None)
-        print(development_sign_in_line(shown, base, self._token or ""), file=sys.stdout, flush=True)
+        shown = self._origin if self._origin is not None else (origin if _is_loopback_origin(origin) else None)
+        print(_development_sign_in_line(shown, base, self._token or ""), file=sys.stdout, flush=True)
 
     def _serve(self, request: Request, path: str, wants_html: bool, base: str) -> Response:
         method = request.method.upper()
@@ -687,7 +688,7 @@ class Web:
         # No token outside development: fail closed.
         if not self._token and not self._opted_out:
             if wants_html:
-                return _html_response(_html.message_page("CronWatch routes are locked", LOCKED, base), 503)
+                return _html_response(_html.message_page("CronWatch routes are locked", _LOCKED, base), 503)
             return _api({"ok": False, "error": "CRONWATCH_TOKEN is not set"}, 503)
 
         if method not in ("GET", "HEAD") and self._cross_site(request, public_origin):
@@ -701,15 +702,15 @@ class Web:
         if self._token:
             # ?token= is only the sign-in that moves the token into a cookie.
             query = request.param("token") if wants_html and method == "GET" else None
-            sent = self._read_cookie(request, COOKIE)
+            sent = self._read_cookie(request, _COOKIE)
             secret = getattr(cw, "cron_secret", None)
-            cron_secret_ok = path == "/api/check" and bearer is not None and secret is not None and constant_time_equal(bearer, secret)
+            cron_secret_ok = path == "/api/check" and bearer is not None and secret is not None and _constant_time_equal(bearer, secret)
             if bearer is not None:
-                token_ok = constant_time_equal(bearer, self._token)
+                token_ok = _constant_time_equal(bearer, self._token)
             elif query is not None:
-                token_ok = constant_time_equal(query, self._token)
+                token_ok = _constant_time_equal(query, self._token)
             else:
-                token_ok = sent is not None and self._cookie is not None and constant_time_equal(sent, self._cookie)
+                token_ok = sent is not None and self._cookie is not None and _constant_time_equal(sent, self._cookie)
             if not cron_secret_ok and not token_ok:
                 if self._generated:
                     if wants_html:
@@ -728,14 +729,14 @@ class Web:
                 rest = [(k, v) for k, v in request.params() if k != "token"]
                 search = "?" + "&".join(f"{_form_encode(k)}={_form_encode(v)}" for k, v in rest) if rest else ""
                 secure = "; Secure" if public_origin.startswith("https:") else ""
-                cookie = f"{COOKIE}={self._cookie}; Path={base or '/'}; HttpOnly; SameSite=Lax; Max-Age={COOKIE_MAX_AGE}{secure}"
+                cookie = f"{_COOKIE}={self._cookie}; Path={base or '/'}; HttpOnly; SameSite=Lax; Max-Age={_COOKIE_MAX_AGE}{secure}"
                 return _redirect(request.path + search, {"set-cookie": cookie})
 
         def redirect_back() -> Response:
             referer = request.header("referer") or ""
             return _redirect(referer if referer.startswith(public_origin + "/") else f"{base}/")
 
-        decoded = [safe_decode(part) for part in path.split("/") if part]
+        decoded = [_safe_decode(part) for part in path.split("/") if part]
         if any(part is None for part in decoded):
             if wants_html:
                 return _html_response(_html.message_page("Bad request", "The path is not valid.", base), 400)
@@ -744,7 +745,7 @@ class Web:
 
         # HTML
         if method == "GET" and path == "/":
-            entries = cw.jobs_with_runs(BOARD_PAGE_RUNS)
+            entries = cw.jobs_with_runs(_BOARD_PAGE_RUNS)
             now = cw.now()
             runs_by_job = {entry.job.name: entry.runs for entry in entries}
             lanes = self._board_lanes(cw, entries, now)
@@ -791,7 +792,7 @@ class Web:
         if method == "GET" and rest == []:
             from .. import __version__
 
-            return _api({"ok": True, "library": _LIBRARY, "language": _LANGUAGE, "version": __version__, "api": API_VERSION})
+            return _api({"ok": True, "library": _LIBRARY, "language": _LANGUAGE, "version": __version__, "api": _API_VERSION})
         if method == "GET" and rest == ["jobs"]:
             return _api({"ok": True, "jobs": cw.jobs()})
         if len(rest) == 2 and rest[0] == "jobs":
@@ -843,7 +844,7 @@ class Web:
         lanes = []
         for entry in entries[: timeline.BOARD_LANES]:
             runs = entry.runs
-            short = len(runs) >= BOARD_PAGE_RUNS and runs[-1].started_at > start
+            short = len(runs) >= _BOARD_PAGE_RUNS and runs[-1].started_at > start
             if not short:
                 lanes.append(timeline.LaneInput(entry.job, runs, True))
                 continue
@@ -860,7 +861,7 @@ class Web:
             key, *rest = _js.trim(part).split("=")
             # A malformed escape counts as no cookie.
             if key == name:
-                return safe_decode("=".join(rest))
+                return _safe_decode("=".join(rest))
         return None
 
     @staticmethod
@@ -895,7 +896,7 @@ class Web:
                 if "multipart/form-data" in kind:
                     return _multipart(kind, data)
                 out: dict[str, str] = {}
-                for key, value in parse_query(data.decode("latin-1")):
+                for key, value in _parse_query(data.decode("latin-1")):
                     out[key] = value
                 return out
         except BodyTooLarge:
@@ -905,12 +906,12 @@ class Web:
         return {}
 
 
-def too_large() -> Response:
+def _too_large() -> Response:
     """The answer to a body over MAX_BODY bytes."""
     return _api({"ok": False, "error": "Request body too large"}, 413)
 
 
-async def read_asgi_body(receive: Callable[..., Any]) -> bytes | BodyTooLarge | None:
+async def _read_asgi_body(receive: Callable[..., Any]) -> bytes | BodyTooLarge | None:
     """An ASGI request's body; BodyTooLarge once it passes MAX_BODY bytes (the
     rest is not read); None when the client went away."""
     chunks: list[bytes] = []
@@ -921,7 +922,7 @@ async def read_asgi_body(receive: Callable[..., Any]) -> bytes | BodyTooLarge | 
             return None
         chunk = message.get("body", b"")
         size += len(chunk)
-        if size > MAX_BODY:
+        if size > _MAX_BODY:
             return BodyTooLarge()
         chunks.append(chunk)
         if not message.get("more_body", False):
@@ -962,3 +963,8 @@ def _multipart(kind: str, data: bytes) -> dict[str, str]:
             payload = part.get_payload(decode=True)
             out[str(name)] = payload.decode("utf-8", "replace") if isinstance(payload, bytes) else ""
     return out
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"UNSET": "_UNSET", "COOKIE": "_COOKIE", "DEFAULT_RUNS": "_DEFAULT_RUNS", "MAX_RUNS": "_MAX_RUNS", "BOARD_PAGE_RUNS": "_BOARD_PAGE_RUNS", "COOKIE_MAX_AGE": "_COOKIE_MAX_AGE", "MAX_BODY": "_MAX_BODY", "CSP": "_CSP", "ASSET_CSP": "_ASSET_CSP", "SECURITY_HEADERS": "_SECURITY_HEADERS", "LOCKED": "_LOCKED", "url_origin": "_url_origin", "request_path": "_request_path", "parse_query": "_parse_query", "safe_decode": "_safe_decode", "constant_time_equal": "_constant_time_equal", "cookie_value": "_cookie_value", "development_token": "_development_token", "development_sign_in_line": "_development_sign_in_line", "is_loopback_origin": "_is_loopback_origin", "too_large": "_too_large", "read_asgi_body": "_read_asgi_body"})

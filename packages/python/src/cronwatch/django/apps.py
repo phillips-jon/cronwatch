@@ -8,8 +8,12 @@ from django.apps import AppConfig
 from django.core.signals import setting_changed
 from django.utils.module_loading import autodiscover_modules
 
+from .._deprecated import names as _deprecated_names
+
+__all__ = ["CronwatchConfig"]
+
 #: The module imported from every installed app at startup, when the app has one.
-JOBS_MODULE = "cronwatch_jobs"
+_JOBS_MODULE = "cronwatch_jobs"
 
 
 def _settings_changed(setting: str, **kwargs: Any) -> None:
@@ -31,4 +35,9 @@ class CronwatchConfig(AppConfig):
         # Each installed app's cronwatch_jobs module, when it has one, so the
         # jobs declared there are known from startup: cronwatch_check reports
         # one that has never run, as the gem's Railtie declares them at boot.
-        autodiscover_modules(JOBS_MODULE)
+        autodiscover_modules(_JOBS_MODULE)
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"JOBS_MODULE": "_JOBS_MODULE"})

@@ -6,8 +6,11 @@ from __future__ import annotations
 from django.http import HttpRequest, HttpResponse, RawPostDataException
 from django.views.decorators.csrf import csrf_exempt
 
-from ..web import Request, Response, request_path, url_origin
+from .._deprecated import names as _deprecated_names
+from ..web import Request, Response, _request_path, _url_origin
 from . import routes
+
+__all__ = ["dashboard"]
 
 
 @csrf_exempt
@@ -15,10 +18,10 @@ def dashboard(request: HttpRequest, path: str = "") -> HttpResponse:
     """Every URL under the dashboard's prefix. Exempt from Django's CSRF
     middleware, since the forms carry no Django token: the routes refuse a
     cross-site write themselves (Origin and Sec-Fetch-Site, as the SDK does)."""
-    return to_django(routes().handle(from_django(request, path)))
+    return _to_django(routes().handle(_from_django(request, path)))
 
 
-def from_django(request: HttpRequest, path: str = "") -> Request:
+def _from_django(request: HttpRequest, path: str = "") -> Request:
     """A Django request as the routes read it. `path` is what the URL pattern
     matched after the prefix, so the prefix is the mount point."""
     full = request.path
@@ -36,20 +39,25 @@ def from_django(request: HttpRequest, path: str = "") -> Request:
         body, form = b"", request.POST
     return Request(
         method=request.method or "GET",
-        path=request_path(full.encode("utf-8", "surrogateescape"), *raw),
+        path=_request_path(full.encode("utf-8", "surrogateescape"), *raw),
         query=meta.get("QUERY_STRING", ""),
         headers={name.lower(): value for name, value in request.headers.items()},
         body=body,
-        origin=url_origin(request.scheme or "http", request.get_host()),
+        origin=_url_origin(request.scheme or "http", request.get_host()),
         mount=mount.rstrip("/"),
         form=form,
     )
 
 
-def to_django(response: Response) -> HttpResponse:
+def _to_django(response: Response) -> HttpResponse:
     out = HttpResponse(response.body, status=response.status)
     if "content-type" not in response.headers:
         del out["Content-Type"]
     for name, value in response.headers.items():
         out[name] = value
     return out
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"from_django": "_from_django", "to_django": "_to_django"})

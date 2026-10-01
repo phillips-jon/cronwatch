@@ -7,12 +7,15 @@ from collections.abc import Callable
 from typing import Any
 
 from .. import _js
+from .._deprecated import names as _deprecated_names
 from ..types import Alert
 from ._http import HTTP
 from ._shared import alert_id, http_or_default, post, required
-from .email import compose, recipients
+from ._email import compose, recipients
 
-ENDPOINT = "https://api.resend.com/emails"
+__all__ = ["Resend"]
+
+_ENDPOINT = "https://api.resend.com/emails"
 
 
 class Resend:
@@ -50,4 +53,9 @@ class Resend:
             "idempotency-key": f"cronwatch-{alert_id(alert)}",
         }
         body = {"from": email.from_, "to": email.to, "subject": email.subject, "text": email.text, "html": email.html}
-        post(self._http, "Resend", ENDPOINT, headers, _js.dumps(body), [self._api_key])
+        post(self._http, "Resend", _ENDPOINT, headers, _js.dumps(body), [self._api_key])
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"ENDPOINT": "_ENDPOINT"})

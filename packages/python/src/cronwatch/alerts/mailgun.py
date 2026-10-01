@@ -10,7 +10,9 @@ from typing import Any
 from ..types import Alert
 from ._http import HTTP
 from ._shared import basic_auth, encode_uri_component, form, http_or_default, post, present, required
-from .email import compose, recipients
+from ._email import compose, recipients
+
+__all__ = ["Mailgun"]
 
 
 class Mailgun:

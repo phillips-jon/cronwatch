@@ -98,39 +98,39 @@ def job_named(result: Any, name: str) -> Any:
 
 
 def test_schedules_and_names() -> None:
-    assert pgcron.schedule("30 seconds") == "every 30s"
-    assert pgcron.schedule("1 second") == "every 1s"
-    assert pgcron.schedule("0 0 $ * *") == "0 0 L * *"
-    assert pgcron.schedule(" */5  * * * * ") == "*/5 * * * *"
-    assert pgcron.schedule("@reboot") is None
-    assert pgcron.job_name(pgcron.Job(jobid=7, jobname="nightly vacuum")) == "nightly-vacuum"
-    assert pgcron.job_name(pgcron.Job(jobid=7, jobname=None)) == "pg_cron:7"
-    assert pgcron.job_name(pgcron.Job(jobid=7, jobname="  ")) == "pg_cron:7"
+    assert pgcron._schedule("30 seconds") == "every 30s"
+    assert pgcron._schedule("1 second") == "every 1s"
+    assert pgcron._schedule("0 0 $ * *") == "0 0 L * *"
+    assert pgcron._schedule(" */5  * * * * ") == "*/5 * * * *"
+    assert pgcron._schedule("@reboot") is None
+    assert pgcron._job_name(pgcron.Job(jobid=7, jobname="nightly vacuum")) == "nightly-vacuum"
+    assert pgcron._job_name(pgcron.Job(jobid=7, jobname=None)) == "pg_cron:7"
+    assert pgcron._job_name(pgcron.Job(jobid=7, jobname="  ")) == "pg_cron:7"
 
 
 def test_pg_cron_ignores_fields_past_the_fifth_and_so_does_the_reader() -> None:
-    assert pgcron.schedule("0 5 * * * *") == "0 5 * * *"
-    assert pgcron.schedule("* * * * * *") == "* * * * *"
-    assert pgcron.schedule("0 0 $ * * extra") == "0 0 L * *"
-    assert pgcron.schedule("@hourly") == "@hourly"
+    assert pgcron._schedule("0 5 * * * *") == "0 5 * * *"
+    assert pgcron._schedule("* * * * * *") == "* * * * *"
+    assert pgcron._schedule("0 0 $ * * extra") == "0 0 L * *"
+    assert pgcron._schedule("@hourly") == "@hourly"
 
 
 def test_rows_become_runs() -> None:
     row = {"runid": "9", "jobid": "1", "status": "failed", "return_message": "  ERROR:  boom\n", "start_time": at(T0), "end_time": "2026-01-05 09:30:02.5+00"}
-    run = pgcron.run(row, "vacuum", "pgcron:")
+    run = pgcron._run(row, "vacuum", "pgcron:")
     assert [run.id, run.status, run.started_at, run.finished_at, run.duration_ms, run.error, run.output, run.trigger] == [
         "pgcron:9", "failed", T0, T0 + 2500, 2500, "ERROR:  boom", None, "pg_cron",
     ]  # fmt: skip
-    assert pgcron.run({**row, "return_message": " "}, "vacuum", "pgcron:").error == "pg_cron reported the run as failed"
-    going = pgcron.run({**row, "status": "running", "end_time": None}, "vacuum", "pgcron:")
+    assert pgcron._run({**row, "return_message": " "}, "vacuum", "pgcron:").error == "pg_cron reported the run as failed"
+    going = pgcron._run({**row, "status": "running", "end_time": None}, "vacuum", "pgcron:")
     assert [going.status, going.finished_at, going.duration_ms, going.error] == ["running", None, None, None]
-    assert pgcron.run({**row, "status": "starting", "start_time": None, "end_time": None}, "vacuum", "pgcron:") is None, "not started yet"
+    assert pgcron._run({**row, "status": "starting", "start_time": None, "end_time": None}, "vacuum", "pgcron:") is None, "not started yet"
     # A run a server restart cut off: failed, no start_time; it starts at its end_time, else at the fallback.
-    cut = pgcron.run({**row, "start_time": None, "return_message": "server restarted"}, "vacuum", "pgcron:", T0 - HOUR)
+    cut = pgcron._run({**row, "start_time": None, "return_message": "server restarted"}, "vacuum", "pgcron:", T0 - HOUR)
     assert [cut.status, cut.started_at, cut.finished_at, cut.duration_ms, cut.error] == ["failed", T0 + 2500, T0 + 2500, 0, "server restarted"]
-    timeless = pgcron.run({**row, "start_time": None, "end_time": None}, "vacuum", "pgcron:", T0 - HOUR)
+    timeless = pgcron._run({**row, "start_time": None, "end_time": None}, "vacuum", "pgcron:", T0 - HOUR)
     assert [timeless.started_at, timeless.finished_at, timeless.duration_ms] == [T0 - HOUR, T0 - HOUR, 0]
-    naive = pgcron.run({**row, "start_time": dt.datetime(2026, 1, 5, 9, 30)}, "vacuum", "pgcron:")
+    naive = pgcron._run({**row, "start_time": dt.datetime(2026, 1, 5, 9, 30)}, "vacuum", "pgcron:")
     assert naive.started_at == T0, "a timestamp without a zone is UTC"
 
 
@@ -273,7 +273,7 @@ def test_adapters() -> None:
     with pytest.raises(TypeError):
         PgCron(object())
     queryable = FakeCron()
-    assert pgcron.adapter(queryable) is queryable
+    assert pgcron._adapter(queryable) is queryable
 
 
 def test_a_run_cut_off_by_a_restart_is_recorded_and_one_held_run_never_stops_the_others() -> None:

@@ -247,7 +247,7 @@ def test_a_silence_ends_on_a_whole_millisecond_never_past_2_to_the_53_minus_1() 
     web = cw.routes(token=None, base_path="/cronwatch")
     res = send(web, "POST", "/cronwatch/api/jobs/long/silence", {"content-type": "application/json"}, '{"for":"99999999999999999999w"}')
     assert res.status == 200
-    assert res.json()["state"]["silencedUntil"] == top
+    assert res.json()["job"]["silencedUntil"] == top
     assert cw.store.get_state("long").silenced_until == top
 
 
@@ -345,7 +345,7 @@ def test_run_and_monitor_are_typed_for_a_type_checker() -> None:
     rather than become Any (mypy and pyright read these overloads)."""
     import typing
 
-    from cronwatch.client import JobHandle
+    from cronwatch._client import JobHandle
 
     assert len(typing.get_overloads(JobHandle.monitor)) == 2
     assert len(typing.get_overloads(JobHandle.run)) == 3

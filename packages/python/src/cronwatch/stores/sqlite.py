@@ -14,13 +14,16 @@ import time
 from collections.abc import Callable, Sequence
 from typing import Any, TypeVar
 
+from .._deprecated import names as _deprecated_names
 from ..types import JobDefinition, JobState, Run, RunStatus, StoredJob
 from . import _sql
 
-T = TypeVar("T")
+__all__ = ["SqliteStore"]
+
+_T = TypeVar("T")
 
 #: How long opening SQLite keeps retrying a busy database before it gives up.
-BUSY_RETRY_MS = 2_000
+_BUSY_RETRY_MS = 2_000
 
 
 def _busy(error: BaseException) -> bool:
@@ -30,7 +33,7 @@ def _busy(error: BaseException) -> bool:
     return isinstance(error, sqlite3.OperationalError) and ("database is locked" in str(error) or "database table is locked" in str(error))
 
 
-def retry_busy(fn: Callable[[], T], budget_ms: int = BUSY_RETRY_MS, sleep: Callable[[float], None] = time.sleep) -> T:
+def _retry_busy(fn: Callable[[], _T], budget_ms: int = _BUSY_RETRY_MS, sleep: Callable[[float], None] = time.sleep) -> _T:
     """Runs `fn`, retrying while SQLite answers SQLITE_BUSY (or SQLITE_LOCKED),
     with a short growing pause, for up to `budget_ms` in all."""
     waited = 0
@@ -98,7 +101,7 @@ class SqliteStore:
         # pragma has gone through; a failed open is tried afresh next time.
         opened = sqlite3.connect(file, timeout=0, isolation_level=None, check_same_thread=False)
         try:
-            retry_busy(lambda: opened.execute("PRAGMA journal_mode = WAL").fetchall())
+            _retry_busy(lambda: opened.execute("PRAGMA journal_mode = WAL").fetchall())
             opened.execute("PRAGMA busy_timeout = 5000")
             opened.execute("PRAGMA synchronous = NORMAL")
         except BaseException:
@@ -199,3 +202,8 @@ class SqliteStore:
             if self._db is not None and self._own:
                 self._db.close()
                 self._db = None
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"BUSY_RETRY_MS": "_BUSY_RETRY_MS", "retry_busy": "_retry_busy", "T": "_T"})

@@ -14,6 +14,8 @@ from collections.abc import Callable
 
 from . import _js
 
+__all__ = ["environment", "is_development", "is_production", "set_fallback"]
+
 _VARIABLES = ("CRONWATCH_ENV", "APP_ENV", "ENVIRONMENT")
 _ALIASES = {"prod": "production", "dev": "development", "local": "development", "test": "development", "testing": "development"}
 _fallback: Callable[[], str | None] | None = None

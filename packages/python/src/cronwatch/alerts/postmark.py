@@ -7,12 +7,15 @@ from collections.abc import Callable
 from typing import Any
 
 from .. import _js
+from .._deprecated import names as _deprecated_names
 from ..types import Alert
 from ._http import HTTP
 from ._shared import http_or_default, post, required
-from .email import compose, recipients
+from ._email import compose, recipients
 
-ENDPOINT = "https://api.postmarkapp.com/email"
+__all__ = ["Postmark"]
+
+_ENDPOINT = "https://api.postmarkapp.com/email"
 
 
 class Postmark:
@@ -54,4 +57,9 @@ class Postmark:
             "MessageStream": "outbound" if self._message_stream is None else self._message_stream,
             "Tag": "cronwatch",
         }
-        post(self._http, "Postmark", ENDPOINT, headers, _js.dumps(body), [self._server_token])
+        post(self._http, "Postmark", _ENDPOINT, headers, _js.dumps(body), [self._server_token])
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"ENDPOINT": "_ENDPOINT"})

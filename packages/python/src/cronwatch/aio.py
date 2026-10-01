@@ -39,10 +39,10 @@ import warnings
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from .client import Cronwatch, JobHandle, _settle, is_async_callable
-from .duration import Duration
-from .job import JobContext
-from .run_handle import UNSET, RunHandle
+from ._client import Cronwatch, JobHandle, _settle, is_async_callable
+from ._duration import Duration
+from ._job import JobContext
+from ._run_handle import UNSET, RunHandle
 from .types import Alert, CheckResult, JobDefinition, JobState, JobSummary, JobWithRuns, Run
 
 __all__ = ["AsyncCronwatch", "AsyncJobHandle", "AsyncRunHandle"]
@@ -123,7 +123,7 @@ class AsyncJobHandle:
         return self.sync.monitor(fn, trigger=trigger)
 
     def handler(self, fn: Callable[..., Any], *, secret: str | None = UNSET) -> Any:
-        """The SDK's fetch-style job handler; see cronwatch.handler."""
+        """The SDK's fetch-style job handler (see the docs' job.handler())."""
         if secret is UNSET:
             return self.sync.handler(fn)
         return self.sync.handler(fn, secret=secret)
