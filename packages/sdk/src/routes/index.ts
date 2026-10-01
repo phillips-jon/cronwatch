@@ -14,9 +14,11 @@ export interface RoutesOptions {
    * or open the dashboard once with `?token=<token>` and a cookie is set.
    * Defaults to process.env.CRONWATCH_TOKEN (on Cloudflare Workers, which
    * have no process, pass env.CRONWATCH_TOKEN); an empty string counts as unset.
-   * With no token while NODE_ENV is "development" or "test", the routes make
-   * a random one and print a sign-in link to the server log on their first
-   * request; with no token otherwise they answer 503. Pass `null` to opt out
+   * With no token in development (the first of CRONWATCH_ENV, APP_ENV and
+   * NODE_ENV that is set names "development", "dev", "local", "test" or
+   * "testing"), the routes make a random one and print a sign-in link to the
+   * server log on their first request; with no token otherwise they answer
+   * 503. Pass `null` to opt out
    * and serve them open everywhere, for example behind your own auth.
    *
    * The check endpoint (/api/check) also accepts the client's cronSecret, so

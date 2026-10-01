@@ -127,7 +127,7 @@ const routes = cw.routes({ basePath: "/cronwatch", trustProxy: true });
 
 See [behind a proxy](/docs/dashboard/#behind-a-proxy).
 
-A handler requires `Authorization: Bearer <CRON_SECRET>`. With no `CRON_SECRET` set (an empty value counts as unset) it answers 503 and runs nothing, unless `NODE_ENV` is `development` or `test`. For an endpoint that is protected some other way, say so explicitly with `secret: null`:
+A handler requires `Authorization: Bearer <CRON_SECRET>`. With no `CRON_SECRET` set (an empty value counts as unset) it answers 503 and runs nothing, unless the app is [in development](/docs/dashboard/#development) (`CRONWATCH_ENV`, `APP_ENV` or `NODE_ENV`, read in that order). For an endpoint that is protected some other way, say so explicitly with `secret: null`:
 
 ```ts
 const runReindex = reindex.handler(async (job) => { /* ... */ }, { secret: null });
@@ -136,7 +136,7 @@ app.post("/internal/reindex", (c) => runReindex(c.req.raw));
 
 Without a secret the response never includes the job's error text, only its status.
 
-The routes want `CRONWATCH_TOKEN` in the same way. Without it, while `NODE_ENV` is `development` or `test`, they make a token and print a sign-in link to the process's log on their first request (`[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...`); open it once. With `NODE_ENV` anything else they answer 503 until a token is set. See [access](/docs/dashboard/#access).
+The routes want `CRONWATCH_TOKEN` in the same way. Without it, [in development](/docs/dashboard/#development), they make a token and print a sign-in link to the process's log on their first request (`[cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...`); open it once. Outside development they answer 503 until a token is set. See [access](/docs/dashboard/#access).
 
 ### Bun
 

@@ -43,7 +43,7 @@ export const digest = cw.job("daily-digest", { schedule: "0 6 * * *", grace: "10
 }
 ```
 
-**The job route.** `handler()` checks the bearer secret itself, so the route needs nothing else. Set `CRON_SECRET` in the project's environment variables: Vercel sends it with every cron request, and without it the handler refuses to run (503) in production. An empty value counts as unset. Under `next dev` (`NODE_ENV` is `development`) it runs without one.
+**The job route.** `handler()` checks the bearer secret itself, so the route needs nothing else. Set `CRON_SECRET` in the project's environment variables: Vercel sends it with every cron request, and without it the handler refuses to run (503) in production. An empty value counts as unset. Under `next dev` (`NODE_ENV` is `development`) it runs without one, unless `CRONWATCH_ENV` or `APP_ENV` names another environment (see [development](/docs/dashboard/#development)).
 
 ```ts
 // app/api/cron/daily-digest/route.ts

@@ -87,7 +87,7 @@ export const GET = nightlyReport.handler(async (job, request) => {
 
 The handler checks `Authorization: Bearer <CRON_SECRET>` (from `process.env.CRON_SECRET`) before running, answers 200 with the run id on success and 500 with the first line of the error on failure, and records the run either way. Return a `Response` yourself if you need to; a 4xx or 5xx counts as a failure.
 
-Set `CRON_SECRET`. Without one (an empty value counts as unset) the handler fails closed: it answers 503 and runs nothing, except when `NODE_ENV` is `development` or `test`. To accept unauthenticated requests on purpose, pass `{ secret: null }` as the handler's second argument, or `cronSecret: null` to `cronwatch()`; those responses leave out the error text.
+Set `CRON_SECRET`. Without one (an empty value counts as unset) the handler fails closed: it answers 503 and runs nothing, except [in development](/docs/dashboard/#development) (`NODE_ENV` of `development` or `test`, unless `CRONWATCH_ENV` or `APP_ENV` says otherwise). To accept unauthenticated requests on purpose, pass `{ secret: null }` as the handler's second argument, or `cronSecret: null` to `cronwatch()`; those responses leave out the error text.
 
 For anything else, wrap a function:
 
@@ -110,7 +110,7 @@ import { cw } from "@/lib/cronwatch";
 export const { GET, POST, DELETE } = cw.routes();
 ```
 
-Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without one, while `NODE_ENV` is `development` or `test`, the routes make a token of their own and print a sign-in link to the server log on the first request. The link names the host only when that request came to a loopback host (`localhost`, a `.localhost` name, `127.0.0.0/8` or `::1`) or you set `origin`; otherwise it gives the path alone, for you to open on your own host. With `NODE_ENV` anything else, they answer 503 (unless you pass `token: null` to serve them open).
+Set `CRONWATCH_TOKEN` to a long random string. Open `/cronwatch?token=<it>` once and the browser keeps a cookie. Without one, [in development](/docs/dashboard/#development), the routes make a token of their own and print a sign-in link to the server log on the first request. The link names the host only when that request came to a loopback host (`localhost`, a `.localhost` name, `127.0.0.0/8` or `::1`) or you set `origin`; otherwise it gives the path alone, for you to open on your own host. Outside development, they answer 503 (unless you pass `token: null` to serve them open).
 
 ## Run the check
 

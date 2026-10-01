@@ -1,5 +1,5 @@
 import { formatDuration, parseDuration } from "./duration.js";
-import { isDevelopment, readEnv } from "./env.js";
+import { isDevelopment, isProduction, readEnv } from "./env.js";
 import {
   applySilence,
   BASELINE_WINDOW,
@@ -60,8 +60,10 @@ export interface HandlerOptions {
    * Callers must send `Authorization: Bearer <secret>`. Defaults to the
    * client's cronSecret, which defaults to process.env.CRON_SECRET (what
    * Vercel sends its cron requests with). An empty string counts as unset.
-   * With no secret at all the handler answers 503 unless NODE_ENV is
-   * "development" or "test". Pass null to allow anyone.
+   * With no secret at all the handler answers 503 unless the app is in
+   * development (the first of CRONWATCH_ENV, APP_ENV and NODE_ENV that is
+   * set names "development", "dev", "local", "test" or "testing"). Pass
+   * null to allow anyone.
    */
   secret?: string | null;
 }
@@ -461,7 +463,7 @@ export class CronWatch {
     if (!this.ready) {
       this.ready = (async () => {
         if (this.store.init) await this.store.init();
-        if (this.usingDefaultStore && readEnv("NODE_ENV") === "production") {
+        if (this.usingDefaultStore && isProduction()) {
           console.warn("[cronwatch] using the in-memory store: runs and state are lost on restart. Pass a store from @cronwatch/sdk/sqlite or @cronwatch/sdk/postgres.");
         }
       })().catch((error: unknown) => {

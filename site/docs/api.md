@@ -108,7 +108,7 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 
 | Option | Default | |
 |---|---|---|
-| `token` | `CRONWATCH_TOKEN` | the bearer the routes require, and what the sign-in cookie holds a digest of. Empty counts as unset. With none, while `NODE_ENV` is `development` or `test`, the routes make a random token and print a sign-in link to the server log on their first request; otherwise they answer 503. `null` opts out and serves them open |
+| `token` | `CRONWATCH_TOKEN` | the bearer the routes require, and what the sign-in cookie holds a digest of. Empty counts as unset. With none, [in development](/docs/dashboard/#development), the routes make a random token and print a sign-in link to the server log on their first request; otherwise they answer 503. `null` opts out and serves them open |
 | `basePath` | `"/cronwatch"` | where the routes are mounted: it routes requests, builds links and scopes the cookie |
 | `origin` | the request URL's | the public origin, such as `"https://app.example.com"`, used for the cross-site check, the sign-in redirect and cookie, and the development sign-in line. Must be an `http` or `https` URL, or the call throws |
 | `trustProxy` | `false` | take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host` instead, when present (see [behind a proxy](/docs/dashboard/#behind-a-proxy)). With neither this nor `origin`, forwarded headers are ignored |

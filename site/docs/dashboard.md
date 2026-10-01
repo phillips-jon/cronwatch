@@ -23,7 +23,7 @@ Every request needs the token, as `Authorization: Bearer <token>` or as the cook
 
 To sign in to the dashboard, open any page once with `?token=<token>`, or paste the token into the form on the sign-in page (it sends the same `?token=`). The response moves it into an HttpOnly cookie that lasts thirty days (holding a digest of the token, not the token) and redirects to the same URL without it. `?token=` is read only there, on a `GET` of a page; the JSON API and every `POST` or `DELETE` ignore it, so use the bearer header or the cookie.
 
-With no token configured while `NODE_ENV` is `development` or `test`, the routes make one: 32 random bytes, new each time the routes are created (so each dev server restart or reload signs you out). On the first request they print a sign-in link to the server log, once:
+With no token configured [in development](#development), the routes make one: 32 random bytes, new each time the routes are created (so each dev server restart or reload signs you out). On the first request they print a sign-in link to the server log, once:
 
 ```text
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: http://localhost:3000/cronwatch/?token=...
@@ -35,7 +35,13 @@ The link is built from `origin` when it is set, and otherwise from the origin of
 [cronwatch] CRONWATCH_TOKEN is not set, so this development server made a token for the dashboard. Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)
 ```
 
-Open it and the cookie is set as with any token. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a fetch handler cannot tell a caller on this machine from one elsewhere (Next.js keeps an `X-Forwarded-For` the client sent, `next dev` listens on every interface, and tunnels rewrite `Host`), so the log, which only you can read, is the proof. With no token and `NODE_ENV` anything else, or unset, the routes answer 503.
+Open it and the cookie is set as with any token. Until then every request answers 401, and the page says the link is in the server log. Nothing about the request itself lets it in: a fetch handler cannot tell a caller on this machine from one elsewhere (Next.js keeps an `X-Forwarded-For` the client sent, `next dev` listens on every interface, and tunnels rewrite `Host`), so the log, which only you can read, is the proof. With no token outside development, the routes answer 503.
+
+### Development
+
+Whether the app is in development decides two things: the routes make a token of their own when none is set (above), and a job's `handler()` runs without a `CRON_SECRET`. Every CronWatch library reads it the same way. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `NODE_ENV` that is set to more than spaces, trimmed and lowercased; `development`, `dev`, `local`, `test` and `testing` are development, and `production` and `prod` are production (which only makes the default in-memory store warn that it forgets on restart). With none of them set the app is not in development, which is the safe reading. The other languages read `CRONWATCH_ENV` and `APP_ENV` first too, then their own convention in place of `NODE_ENV`.
+
+So `CRONWATCH_ENV=production` keeps a `next dev` server, or a test run, from making a token or running handlers without a secret, and `CRONWATCH_ENV=development` turns development on where `NODE_ENV` cannot be changed. An `APP_ENV` set for another tool counts too: `APP_ENV=local` with `NODE_ENV=production` is development.
 
 Pass `token: null` to serve them open everywhere, for example when the mount already sits behind your own auth:
 
