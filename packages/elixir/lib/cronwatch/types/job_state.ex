@@ -11,9 +11,10 @@ defmodule Cronwatch.JobState do
   the process that wrote them sends them, each a map of `until` (when that
   process's lease runs out, epoch milliseconds) and `alert` (nil for an entry
   that holds none), and `value` (the entry as stored, written back as it is
-  when it holds no alert); it is `nil` when it holds nothing, and the key is
-  then left out. `version` goes up by
-  one on every write (see `c:Cronwatch.Store.compare_and_set_state/3`), `nil`
+  when it holds no alert, and otherwise with its `until` and `alert` set, so
+  the keys a newer writer added are kept); it is `nil` when it holds
+  nothing, and the key is then left out. `version` goes up by one on every
+  write (see `c:Cronwatch.Store.compare_and_set_state/3`), `nil`
   for a state written before versions, which counts as 0. `extra` keeps the
   keys after the known ones, in stored order (`version` and any a newer
   writer added), so a state is written back as the SDK's spread writes it.
@@ -143,8 +144,11 @@ defmodule Cronwatch.JobState do
     if s.version != nil and not wrote, do: Object.put(o, "version", s.version), else: o
   end
 
-  defp sending_value(%{alert: %Alert{} = alert, until: until}),
-    do: %Object{pairs: [{"until", until}, {"alert", Alert.to_value(alert)}]}
+  # An entry read from the store keeps the keys a newer release added.
+  defp sending_value(%{alert: %Alert{} = alert, until: until} = entry) do
+    base = if match?(%Object{}, entry[:value]), do: entry.value, else: %Object{}
+    base |> Object.put("until", until) |> Object.put("alert", Alert.to_value(alert))
+  end
 
   defp sending_value(%{value: value}), do: value
 
