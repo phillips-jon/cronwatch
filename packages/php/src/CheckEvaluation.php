@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Cronwatch;
 
-/** What a check decides for one job, with when it is next expected and when the run it waits for was due. */
+/**
+ * What a check decides for one job, with when it is next expected and when the run it waits for was due.
+ *
+ * @internal
+ */
 final class CheckEvaluation extends Evaluation
 {
     /** @param list<AlertDraft> $alerts */

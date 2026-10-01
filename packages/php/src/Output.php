@@ -19,7 +19,11 @@ final class Output
 
     public const REDACTED = '[redacted]';
 
-    /** Removes every U+0000. */
+    /**
+     * Removes every U+0000.
+     *
+     * @internal
+     */
     public static function stripNul(string $text): string
     {
         return str_contains($text, "\0") ? str_replace("\0", '', $text) : $text;
@@ -30,6 +34,8 @@ final class Output
      * dropping each \u0000 escape (a NUL can appear in JSON no other way).
      * Escapes are read left to right in pairs, so an escaped backslash
      * followed by "u0000" is left as it is.
+     *
+     * @internal
      */
     public static function stripJsonNul(string $json): string
     {
@@ -43,6 +49,8 @@ final class Output
      * NUL characters are removed first, since Postgres refuses them in TEXT
      * and JSONB and the whole run row would be lost. The cap then applies to
      * what is left.
+     *
+     * @internal
      */
     public static function capOutput(string $text): string
     {
@@ -73,6 +81,8 @@ final class Output
      * go before and after `redact`.
      *
      * @param \Closure(string): string $redact
+     *
+     * @internal
      */
     public static function redactAndCap(string $text, \Closure $redact): string
     {
@@ -85,13 +95,21 @@ final class Output
         return self::TRIMMED . Js::tail16($redacted, min(self::OUTPUT_CAP, Js::length16($redacted) - self::REDACT_EDGE));
     }
 
-    /** "Name: message" and the first five stack frames, capped like output. */
+    /**
+     * "Name: message" and the first five stack frames, capped like output.
+     *
+     * @internal
+     */
     public static function errorMessage(mixed $error): string
     {
         return self::capOutput(self::describeError($error));
     }
 
-    /** An error as text, before the cap: a Throwable as "Name: message" and its frames, a string as it is, anything else as JSON. */
+    /**
+     * An error as text, before the cap: a Throwable as "Name: message" and its frames, a string as it is, anything else as JSON.
+     *
+     * @internal
+     */
     public static function describeError(mixed $error): string
     {
         if ($error instanceof \Throwable) {
@@ -112,6 +130,8 @@ final class Output
      * JavaScript stack reads.
      *
      * @param list<string> $frames
+     *
+     * @internal
      */
     public static function describe(string $name, string $message, array $frames): string
     {
@@ -119,7 +139,11 @@ final class Output
         return "{$name}: {$message}" . ($lines === [] ? '' : "\n" . implode("\n", $lines));
     }
 
-    /** The class's own name, without its namespace, as a JavaScript error's name has none. */
+    /**
+     * The class's own name, without its namespace, as a JavaScript error's name has none.
+     *
+     * @internal
+     */
     public static function errorName(\Throwable $error): string
     {
         $class = get_class($error);
@@ -132,6 +156,8 @@ final class Output
      * was thrown, then each caller, "function (file:line)".
      *
      * @return list<string>
+     *
+     * @internal
      */
     public static function frames(\Throwable $error): array
     {

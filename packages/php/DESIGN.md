@@ -27,6 +27,7 @@ packages/php/
     Cronwatch.php         the client: job, run, check, silence, forget, jobs, runs, recordRun, resumeRun, VERSION
     Js.php                JavaScript's numbers, JSON.stringify, trim, \s, UTF-16 lengths, UTF-8 scrubbing, Date.UTC, toISOString
     Env.php               the environment
+    FromEnv.php           FromEnv::Read, the default of cronSecret and the dashboard's token: read the environment
     Duration.php          "15m", "1h30m", DateInterval: parse and format
     Stats.php             percentiles
     Output.php            the output cap, error messages, secret redaction
@@ -91,6 +92,7 @@ packages/php/
     ChannelsTest.php          alerts.test.ts, channels-hardening.test.ts and sigv4.test.ts, and NativeHttp (curl and
                               streams) against a local server (tests/servers/router.php under `php -S`)
     CliTest.php               vendor/bin/cronwatch
+    EnvTest.php               development and production read as every port reads them
     WebGoldenTest.php         packages/ruby/test/web/golden.json: every page, header and JSON body of the SDK's routes,
                               through handle(), the superglobals and PSR-7
     WebTest.php               the SDK's routes tests (routes*.test.ts), and the superglobals, a path-info mount, the

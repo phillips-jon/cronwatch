@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Cronwatch;
 
-/** Alert titles and messages, character for character as format.ts writes them. */
+/**
+ * Alert titles and messages, character for character as format.ts writes them.
+ *
+ * @internal
+ */
 final class Format
 {
     private static function when(int|float|null $at, int|float $now): string

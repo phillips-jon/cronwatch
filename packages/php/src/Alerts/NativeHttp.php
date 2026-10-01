@@ -17,6 +17,8 @@ namespace Cronwatch\Alerts;
  * webhook URL's path, an API key in a header or a body is a credential, and
  * an exception's trace (which an error tracker shows) would otherwise hold
  * them.
+ *
+ * @internal
  */
 final class NativeHttp implements Http
 {

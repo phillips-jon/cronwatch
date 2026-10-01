@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Cronwatch;
 
-/** Percentiles and medians, as stats.ts computes them. */
+/**
+ * Percentiles and medians, as stats.ts computes them.
+ *
+ * @internal
+ */
 final class Stats
 {
     /** @param list<int|float> $values */

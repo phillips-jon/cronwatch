@@ -42,23 +42,51 @@ final class Cronwatch
 {
     public const VERSION = '0.10.0';
 
+    /** @internal */
     public const NAME_PATTERN = '/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/D';
+    /** @internal */
     public const TRIAGE_TIMEOUT_MS = 25_000;
+    /** @internal */
     public const PRUNE_INTERVAL_MS = 60 * 60_000;
-    /** Undelivered alerts kept per job for retry; the oldest go first. */
+    /**
+     * Undelivered alerts kept per job for retry; the oldest go first.
+     *
+     * @internal
+     */
     public const MAX_UNDELIVERED = Evaluate::MAX_UNDELIVERED;
-    /** Wall-clock time one check spends retrying undelivered alerts, across every job. */
+    /**
+     * Wall-clock time one check spends retrying undelivered alerts, across every job.
+     *
+     * @internal
+     */
     public const RETRY_BUDGET_MS = 20_000;
-    /** Reads and writes of one job's state before an update gives up on a store that keeps changing under it. */
+    /**
+     * Reads and writes of one job's state before an update gives up on a store that keeps changing under it.
+     *
+     * @internal
+     */
     public const STATE_ATTEMPTS = 10;
-    /** Runs read for a baseline, and the most read when failures crowd out the successes. */
+    /**
+     * Runs read for a baseline, and the most read when failures crowd out the successes.
+     *
+     * @internal
+     */
     public const HISTORY_PAGE = Evaluate::BASELINE_WINDOW + 5;
+    /** @internal */
     public const HISTORY_MAX = 200;
     /** The longest run id, in UTF-16 code units: what start(), resume() and recordRun() take, and every store holds. */
     private const MAX_RUN_ID = 200;
-    /** Run ids that start with this belong to the pg_cron source. */
+    /**
+     * Run ids that start with this belong to the pg_cron source.
+     *
+     * @internal
+     */
     public const RESERVED_RUN_ID_PREFIX = 'pgcron:';
-    /** The options `defaults` may set. */
+    /**
+     * The options `defaults` may set.
+     *
+     * @internal
+     */
     public const DEFAULT_OPTIONS = ['grace', 'timeout', 'timezone', 'failuresBeforeAlert'];
 
     public readonly Store $store;

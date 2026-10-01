@@ -7,6 +7,8 @@ namespace Cronwatch;
 /**
  * Durations: "15m", "1h30m", "90s", "2d", a number of milliseconds, or a
  * DateInterval. Parsed and formatted as the SDK's duration.ts does.
+ *
+ * @internal
  */
 final class Duration
 {

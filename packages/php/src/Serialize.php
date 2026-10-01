@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Cronwatch;
 
-/** Stored definitions and expect rules (serialize.ts). */
+/**
+ * Stored definitions and expect rules (serialize.ts).
+ *
+ * @internal
+ */
 final class Serialize
 {
     private const DURATIONS = ['grace', 'timeout', 'maxDuration'];

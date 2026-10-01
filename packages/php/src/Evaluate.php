@@ -9,6 +9,8 @@ namespace Cronwatch;
  * current state and returns the new state plus the alerts that should go
  * out. Nothing here touches a store or a network, which is what makes it
  * testable.
+ *
+ * @internal
  */
 final class Evaluate
 {

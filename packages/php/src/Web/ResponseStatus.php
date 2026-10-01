@@ -21,6 +21,8 @@ namespace Cronwatch\Web;
  * The reason is the one the response carries (a PSR-7 reason phrase,
  * HttpFoundation's status text), else "", as a fetch Response made without
  * a statusText has none.
+ *
+ * @internal
  */
 final class ResponseStatus
 {
