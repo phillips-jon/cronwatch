@@ -191,6 +191,30 @@ internal static class Js
         return s.Substring(start, end - start);
     }
 
+    /// <summary>
+    /// Whether a token or secret counts as unset: null, empty, or only what
+    /// <c>String.prototype.trim</c> removes (not .NET's <c>Trim</c>, which takes U+0085 and leaves
+    /// U+FEFF). A value that is not blank is used as given, untrimmed.
+    /// </summary>
+    public static bool IsBlank(string? s)
+    {
+        if (s == null)
+        {
+            return true;
+        }
+        foreach (char c in s)
+        {
+            if (!IsSpace(c))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>A token or secret as given, or null when it is blank (<see cref="IsBlank"/>).</summary>
+    public static string? Secret(string? s) => IsBlank(s) ? null : s;
+
     /// <summary><c>String.prototype.trimEnd</c>.</summary>
     public static string TrimEnd(string s)
     {

@@ -38,6 +38,11 @@ public sealed class WebRequest
         Method = request.Method;
         _target = request.Target;
         _request = request;
+        // The getters read as the request's, so code written against this name sees what it sees.
+        _headers = request.Headers;
+        DeclaredLength = request.DeclaredLength;
+        IsTls = request.IsTls;
+        Mount = request.Mount;
     }
 
     /// <summary>The method, as sent.</summary>

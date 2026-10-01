@@ -146,6 +146,13 @@ internal static class Evaluate
         return s.ToState();
     }
 
+    /// <summary>
+    /// <see cref="NormalizeState(JobState?, string)"/> of any stored JSON value: one that is not an
+    /// object reads as no state.
+    /// </summary>
+    public static JobState NormalizeStateValue(object? value, string job) =>
+        value is JsObject o ? NormalizeState(JobState.FromValue(o), job) : EmptyState(job);
+
     private static MutableState CloneState(JobState s) => MutableState.Of(NormalizeState(s, s.Job));
 
     // ---- delivery
@@ -772,6 +779,12 @@ internal static class Evaluate
     /// </summary>
     public static bool StaleAlert(Alert alert, JobState state)
     {
+        // One read from a foreign or damaged row in a shape that cannot be judged (a recovery that
+        // says nothing of what it recovers from, an alert with no time) goes.
+        if (alert.Damaged)
+        {
+            return true;
+        }
         if (alert.Type == AlertType.Recovered)
         {
             if (alert.Details is not AlertDetails.Recovered r)

@@ -44,9 +44,10 @@ public sealed class Handler
             _secret = "";
             _optedOut = true;
         }
-        else if (!string.IsNullOrEmpty(own?.Value))
+        else if (Js.Secret(own?.Value) is { } given)
         {
-            _secret = own.Value;
+            // A blank secret falls back to the client's.
+            _secret = given;
         }
         else
         {

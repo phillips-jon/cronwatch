@@ -122,7 +122,9 @@ internal static class SqlText
 
     /// <summary>
     /// The version inside a state's JSON, as <c>stateVersion()</c> reads it: a whole number from 0
-    /// to 2^53 - 1, else 0. Each CASE tests the JSON type before any cast.
+    /// to 2^53 - 1, else 0. Each CASE tests the JSON type before any cast, and on SQLite and MySQL,
+    /// whose columns hold any text, that the text is JSON at all: a state row that is not counts as
+    /// 0, so the next write replaces it rather than fail on it.
     /// </summary>
     public static string Version(SqlDialect dialect, string column)
     {
@@ -131,7 +133,7 @@ internal static class SqlText
             // MySQL's JSON_EXTRACT answers JSON and MariaDB's text; plus 0, both are a number, and
             // the CASE tests the JSON type before any arithmetic.
             string mv = "JSON_EXTRACT(" + column + ", '$.version')";
-            return "CASE WHEN JSON_TYPE(" + mv + ") NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN " + mv
+            return "CASE WHEN NOT JSON_VALID(" + column + ") THEN 0 WHEN JSON_TYPE(" + mv + ") NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN " + mv
                 + " + 0 = FLOOR(" + mv + " + 0) AND " + mv + " + 0 BETWEEN 0 AND 9007199254740991 THEN CAST(" + mv
                 + " + 0 AS SIGNED) ELSE 0 END";
         }
@@ -142,7 +144,7 @@ internal static class SqlText
                 + " BETWEEN 0 AND 9007199254740991 THEN " + pv + "::bigint ELSE 0 END";
         }
         string v = "json_extract(" + column + ", '$.version')";
-        return "CASE WHEN json_type(" + column + ", '$.version') NOT IN ('integer', 'real') THEN 0 WHEN " + v + " = CAST(" + v
+        return "CASE WHEN NOT json_valid(" + column + ") THEN 0 WHEN json_type(" + column + ", '$.version') NOT IN ('integer', 'real') THEN 0 WHEN " + v + " = CAST(" + v
             + " AS INTEGER) AND " + v + " BETWEEN 0 AND 9007199254740991 THEN CAST(" + v + " AS INTEGER) ELSE 0 END";
     }
 

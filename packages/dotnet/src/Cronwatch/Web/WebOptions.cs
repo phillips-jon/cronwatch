@@ -21,7 +21,7 @@ public sealed class DashboardToken
 
     internal string? Value { get; }
 
-    /// <summary>A token. <c>""</c> counts as unset.</summary>
+    /// <summary>A token. <c>""</c>, or one of only whitespace, counts as unset.</summary>
     public static implicit operator DashboardToken(string token) => new(token ?? throw new ArgumentNullException(nameof(token)));
 
     /// <summary>Says whether a token is set, never its value.</summary>
@@ -39,7 +39,7 @@ public sealed class RoutesOptions
     /// <summary>
     /// The token the dashboard asks for. Send it as <c>Authorization: Bearer &lt;token&gt;</c>, or
     /// open the dashboard once with <c>?token=&lt;token&gt;</c> and a cookie is set. Unset, it is
-    /// <c>CRONWATCH_TOKEN</c>; <c>""</c> counts as unset. With no token in development the routes
+    /// <c>CRONWATCH_TOKEN</c>; <c>""</c>, or one of only whitespace, given here or in the variable, counts as unset. With no token in development the routes
     /// make a random one and print a sign-in link to standard output on their first request; with
     /// no token otherwise they answer 503. <c>/api/check</c> also takes the client's cron secret as
     /// a bearer, so a platform cron can run checks without the token.
@@ -96,7 +96,7 @@ public sealed class HandlerSecret
 
     internal string? Value { get; }
 
-    /// <summary>A secret. <c>""</c> counts as unset.</summary>
+    /// <summary>A secret. <c>""</c>, or one of only whitespace, counts as unset.</summary>
     public static implicit operator HandlerSecret(string secret) => new(secret ?? throw new ArgumentNullException(nameof(secret)));
 
     /// <summary>Says whether a secret is set, never its value.</summary>
@@ -113,7 +113,7 @@ public sealed class HandlerOptions
 {
     /// <summary>
     /// The secret the handler's requests must carry, in place of the client's cron secret
-    /// (<c>CRON_SECRET</c> by default). <c>""</c> counts as unset.
+    /// (<c>CRON_SECRET</c> by default). <c>""</c>, or one of only whitespace, counts as unset.
     /// </summary>
     public HandlerSecret? Secret { internal get; init; }
 

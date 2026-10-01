@@ -187,6 +187,44 @@ public class PgCronTests
         await k.DisposeAsync();
     }
 
+    // The second review: a job renamed while its run was open kept the run under its old name,
+    // and once that name was forgotten from the dashboard every check reported the run's job as
+    // not declared and read the run again, until the process restarted.
+    [Fact]
+    public async Task A_renamed_jobs_old_name_forgotten_while_its_run_is_open_lets_the_run_go_with_no_error()
+    {
+        var clock = Clock();
+        var cron = new FakeCron();
+        FakeCron.Job job = cron.AddJob(1, "a", "0 3 * * *");
+        FakeCron.Detail running = cron.Add(1, "running", T0 - 5000, null);
+        string id = "pgcron:" + running.RunId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var k = Kit(cron.Source(), clock: clock);
+        await k.Cw.CheckAsync();
+        Assert.Equal("a", (await GetRun(k, id)).Job);
+        job.JobName = "b";
+        clock.Advance(Min);
+        await k.Cw.CheckAsync();
+        Assert.Contains("renamed to b", (await k.Cw.JobSummaryAsync("a"))!.Definition.Description, StringComparison.Ordinal);
+        await k.Cw.ForgetAsync("a");
+        running.Status = "succeeded";
+        running.End = T0;
+        for (int i = 0; i < 3; i++)
+        {
+            clock.Advance(Min);
+            cron.Opened.Clear();
+            await k.Cw.CheckAsync();
+        }
+        // Read once more by the first of these checks, which lets it go; not by the last.
+        var opened = cron.Opened.ToList();
+        Assert.Empty(Others(k));
+        Assert.Null(await k.Cw.JobSummaryAsync("a"));
+        Assert.Null(await k.Cw.GetRunAsync(id));
+        Assert.NotEmpty(opened);
+        Assert.All(opened, ids => Assert.DoesNotContain(running.RunId, ids));
+        Assert.Equal(["b"], k.Cw.DefinedJobs.Select(d => d.Name));
+        await k.DisposeAsync();
+    }
+
     [Fact]
     public async Task A_pick_job_name_or_options_function_that_fails_fails_only_its_job_reported_once()
     {

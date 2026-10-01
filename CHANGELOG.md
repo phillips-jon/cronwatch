@@ -52,10 +52,10 @@ Java:
 .NET:
 
 - `ICronwatchJob` moved from the `Cronwatch` namespace to `Cronwatch.Hosting`, with no alias: add `using Cronwatch.Hosting;` to a job class.
-- The extension methods moved to Microsoft's namespaces: `AddCronwatch` and `AddCronwatchJob` to `Microsoft.Extensions.DependencyInjection`, `RunCronwatchCommandAsync` to `Microsoft.Extensions.Hosting`, and `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` to `Microsoft.AspNetCore.Builder`. `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods, deprecated.
+- The extension methods moved to Microsoft's namespaces: `AddCronwatch` and `AddCronwatchJob` to `Microsoft.Extensions.DependencyInjection`, `RunCronwatchCommandAsync` to `Microsoft.Extensions.Hosting`, and `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` to `Microsoft.AspNetCore.Builder`. `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods, deprecated. The new class for `AddCronwatch` is `CronwatchHostingServiceCollectionExtensions`, so the former class's name is not ambiguous where both namespaces are imported.
+- A `Cronwatch:Token` of only whitespace counts as unset, as `CRONWATCH_TOKEN` does.
 - `TwilioOptions.Segments` is an `int?`, not a `double?`.
 - A handler function whose lambda names its request's type must say `CronwatchRequest`.
-- A store that implemented `IConditionalRunStore.UpdateRunIfAsync`, `IStateCasStore.CompareAndSetStateAsync` or `IRunDeletingStore.DeleteRunIfAsync` explicitly names the new interface instead, since the method now belongs to it.
 
 Go and Elixir have no breaking changes beyond those every language shares.
 
@@ -66,6 +66,7 @@ Go and Elixir have no breaking changes beyond those every language shares.
 - Ruby: `client.routes(**options)`, the dashboard as a Rack app.
 - Rust: constructors and builder methods for every data and options type.
 - Java: a static `of` on each record that may grow.
+- .NET: `Duration.ToMilliseconds(name)`, a duration read as the client reads one, to check a value before it is used.
 - Drupal: Ultimate Cron's jobs are recorded, each on its own rules read as Ultimate Cron reads them (`drupal:<module>` for a module's `hook_cron`, `drupal:job:<id>` for any other, triggers `ultimate-cron` and `ultimate-cron-manual`), and every cron run is still `drupal:cron`. Before, the module left a site running Ultimate Cron alone.
 - The [Stability](https://cronwatch.dev/docs/stability/), [Environment variables](https://cronwatch.dev/docs/environment/) and [Deprecations](https://cronwatch.dev/docs/deprecations/) pages.
 - CI checks each package's public API: a committed report of it for TypeScript, Python and Elixir (`api.txt`), apidiff for the Go modules and cargo-semver-checks for the Rust crates, beside .NET's `PublicAPI.Unshipped.txt`.
@@ -98,6 +99,10 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - One malformed job, run or state row (a hand edit, another writer, a damaged database) affects only its own job, in every language: it no longer stops every check or makes the whole dashboard answer 500. A definition that does not parse or is not an object reads as `{ name }`, and that job is reported and shown as failing; tags that are not a list of strings are left out; unparseable metrics read as `{}`; a time that is not a number reads as 0 (a start) or empty (a finish or duration); a state that does not parse reads as none and is replaced by the next write; and a queued alert that is not an object, a recovery that does not say what it recovers from, and an alert without a numeric time are dropped instead of blocking the job's alerts.
 - An `Authorization` header that is not a bearer, such as a proxy's Basic auth, no longer locks the dashboard: the cookie and `?token=` sign in as if no header came.
 - pg_cron: forgetting the old name of a renamed job while a run of it is open lets the run go, where every check after reported `job is not declared`.
+- .NET: a `CheckEvery` that is not a duration (`"1 minute"`) stops the host from starting, where it was only logged and the app ran on with no checks at all.
+- .NET: `DisposeAsync` waits for a check under way to end before it disposes the store, as the SDK's `close()` does, where after five seconds the check went on writing to a disposed store.
+- .NET: a process that stops just as a run's row is written records the run failed every time; the run was sometimes listed for the process-exit hook only after its row was written, and stayed running.
+- .NET: a store that implemented a former store interface's method explicitly (`IStateCasStore.CompareAndSetStateAsync`) compiles again, and the deprecated `WebRequest` made from a `CronwatchRequest` reads its `IsTls`, `Mount` and `DeclaredLength`.
 
 ## 0.10.0 and earlier
 

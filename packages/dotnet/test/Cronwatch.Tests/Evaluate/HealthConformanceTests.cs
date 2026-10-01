@@ -91,8 +91,8 @@ public class HealthConformanceTests
         foreach (var c in Fixtures.Objects(f, "normalizeState"))
         {
             cases++;
-            var input = c.Get("state") == null ? null : State(c.Get("state"));
-            fails.Same("normalizeState " + i++, Evaluate.NormalizeState(input, "j").ToValue(), c.Get("normalized"));
+            // Any stored JSON value: one that is not an object reads as no state.
+            fails.Same("normalizeState " + i++, Evaluate.NormalizeStateValue(c.Get("state"), "j").ToValue(), c.Get("normalized"));
         }
         i = 0;
         foreach (var c in Fixtures.Objects(f, "muteOpens"))
@@ -177,7 +177,7 @@ public class HealthConformanceTests
             fails.Same("silenceEnd " + i++, Evaluate.SilenceEnd(Fixtures.Integer(c, "now"), ms), c.Get("silencedUntil"));
         }
         cases += Delivery(Fixtures.Object(f, "delivery"), fails);
-        Assert.Equal(214, cases);
+        Assert.Equal(227, cases);
         fails.Check("health");
     }
 

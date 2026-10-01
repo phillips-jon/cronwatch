@@ -116,6 +116,16 @@ public sealed class Definition : IEquatable<Definition>
     /// <summary>A definition over fields the caller gives up.</summary>
     internal static Definition Own(JsObject fields) => new(fields);
 
+    /// <summary>
+    /// What a SQL store reads for a stored definition that is not a JSON object (text that does not
+    /// parse, <c>null</c>, a string, a number, a list): <c>{ name }</c>, marked so that the client
+    /// reports the job and shows it as failing, without evaluating it.
+    /// </summary>
+    internal static Definition UnreadableFor(string name) => new(new JsObject().Set("name", name)) { Unreadable = true };
+
+    /// <summary>Whether this stands for a stored definition that was not a JSON object.</summary>
+    internal bool Unreadable { get; private init; }
+
     /// <summary>A definition read from JSON.</summary>
     /// <exception cref="JsonParseException">When it is not an object.</exception>
     public static Definition FromJson(string text) => new(Json.ParseObject(text));

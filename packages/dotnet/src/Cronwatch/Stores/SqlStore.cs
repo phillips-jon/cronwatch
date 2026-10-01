@@ -411,8 +411,11 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
         : null;
 
     /// <summary>
-    /// A column as a whole number, null for NULL: text is read as a number, and a fraction is cut
-    /// to its whole part, held at the ends of the range.
+    /// A time or a count of milliseconds as a column holds it, or null for NULL and for anything
+    /// that is not a finite number. A number is kept (a fraction cut to its whole part, held at the
+    /// ends of the range); text that is not blank is read as JavaScript's <c>Number()</c> reads it
+    /// (Postgres's <c>BIGINT</c> as text is that number; <c>"x"</c> and <c>"1e400"</c> are not
+    /// finite); anything else (a blob) is not a number.
     /// </summary>
     private static long? IntegerOf(Dictionary<string, object> row, string name)
     {
@@ -420,6 +423,7 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
         {
             return null;
         }
+        double n;
         switch (v)
         {
             case long l:
@@ -429,75 +433,93 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
             case short s:
                 return s;
             case double d:
-                return Js.ToLong(d);
+                n = d;
+                break;
             case float f:
-                return Js.ToLong(f);
+                n = f;
+                break;
             case decimal m:
-                return Js.ToLong((double)m);
-            case bool b:
-                return b ? 1 : 0;
-            default:
-                string t = Js.Trim(Convert.ToString(v, CultureInfo.InvariantCulture) ?? "");
+                n = (double)m;
+                break;
+            case string text:
+                string t = Js.Trim(text);
+                if (t.Length == 0)
+                {
+                    return null;
+                }
                 if (long.TryParse(t, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long parsed))
                 {
                     return parsed;
                 }
-                return double.TryParse(t, NumberStyles.Float, CultureInfo.InvariantCulture, out double dd) ? Js.ToLong(dd) : 0;
+                n = Evaluate.StringToNumber(t);
+                break;
+            default:
+                return null;
+        }
+        return double.IsFinite(n) ? Js.ToLong(n) : null;
+    }
+
+    /// <summary>
+    /// A column's JSON, or null when its text does not parse: a foreign, hand-edited or damaged row
+    /// must affect only its own job, never every read.
+    /// </summary>
+    private static object? JsonOf(Dictionary<string, object> row, string name)
+    {
+        string? text = TextOf(row, name);
+        if (text == null)
+        {
+            return null;
+        }
+        try
+        {
+            return Json.Parse(text);
+        }
+        catch (JsonParseException)
+        {
+            return null;
         }
     }
 
     private static string TextOr(Dictionary<string, object> row, string name) => TextOf(row, name) ?? "";
 
+    /// <summary>
+    /// A job's row, read leniently: a definition that is not a JSON object (text that does not
+    /// parse, another JSON value) is read as <c>{ name }</c> and marked, so the client reports that
+    /// job and shows it as failing while the others carry on; a time that is not a finite number
+    /// reads as 0.
+    /// </summary>
     private static StoredJob JobOf(Dictionary<string, object> row)
     {
         string name = TextOr(row, "name");
-        object? value;
-        try
-        {
-            value = Json.Parse(TextOr(row, "definition"));
-        }
-        catch (JsonParseException e)
-        {
-            throw new InvalidOperationException("job " + name + ": " + e.Message, e);
-        }
-        // JSON of another shape (another writer's, or a hand edit) is a definition with nothing in
-        // it, as the SDK reads it: one such row must not fail every read of the jobs.
-        var definition = Definition.Own(value as JsObject ?? new JsObject());
+        var definition = JsonOf(row, "definition") is JsObject fields ? Definition.Own(fields) : Definition.UnreadableFor(name);
         return new StoredJob(name, definition, IntegerOf(row, "created_at") ?? 0, IntegerOf(row, "updated_at") ?? 0);
     }
 
+    /// <summary>
+    /// A run's row, read leniently: a start that is not a finite number reads as 0, a finish or a
+    /// duration as null; an error or output that is not text as null; metrics that do not parse to
+    /// an object as none (and of one, only the numbers); a trigger that is not text as <c>run</c>.
+    /// </summary>
     private static Run RunOf(Dictionary<string, object> row)
     {
-        string id = TextOr(row, "id");
-        Metrics metrics = Metrics.Empty;
-        string? metricsText = TextOf(row, "metrics");
-        if (metricsText != null)
-        {
-            try
-            {
-                // Metrics another writer stored that are not all numbers keep the ones that are,
-                // so one such row cannot fail the reads it is part of.
-                metrics = Metrics.Lenient(Json.Parse(metricsText));
-            }
-            catch (JsonParseException e)
-            {
-                throw new InvalidOperationException("run " + id + ": " + e.Message, e);
-            }
-        }
         return new Run
         {
-            Id = id,
+            Id = TextOr(row, "id"),
             Job = TextOr(row, "job"),
             Status = new RunStatus(TextOr(row, "status")),
             StartedAt = IntegerOf(row, "started_at") ?? 0,
             FinishedAt = IntegerOf(row, "finished_at"),
             DurationMs = IntegerOf(row, "duration_ms"),
-            Error = TextOf(row, "error"),
-            Output = TextOf(row, "output"),
-            Metrics = metrics,
-            Trigger = TextOr(row, "trigger"),
+            Error = StringOf(row, "error"),
+            Output = StringOf(row, "output"),
+            Metrics = JsonOf(row, "metrics") is JsObject metrics ? Metrics.Lenient(metrics) : Metrics.Empty,
+            Trigger = StringOf(row, "trigger") ?? "run",
         };
     }
+
+    /// <summary>A column that holds text, or null for NULL and anything else (a number, a blob).</summary>
+    private static string? StringOf(Dictionary<string, object> row, string name) =>
+        row.TryGetValue(name, out object? v) ? v as string : null;
 
     private async Task<IReadOnlyList<Run>> RunsAsync(string text, IReadOnlyList<Param> ps, CancellationToken ct)
     {
@@ -741,11 +763,15 @@ public sealed class SqlStore : IStore, IUpdateRunIfStore, ICompareAndSetStateSto
     public Task<IReadOnlyList<Run>> RunningRunsAsync(CancellationToken cancellationToken = default) =>
         RunsAsync(_sql.RunningRuns, [], cancellationToken);
 
-    /// <summary>The job's state. A state that is not JSON, or not an object, fails the read.</summary>
+    /// <summary>
+    /// The job's state. A state that is not JSON, or not an object (a foreign, hand-edited or
+    /// damaged row), reads as none, which the client takes as a fresh state: the next write, whose
+    /// version check counts such a row as 0, replaces it.
+    /// </summary>
     public async Task<JobState?> GetStateAsync(string job, CancellationToken cancellationToken = default)
     {
         var rows = await QueryAsync(_sql.GetState, [Text(job)], cancellationToken).ConfigureAwait(false);
-        return rows.Count == 0 ? null : JobState.FromJson(TextOr(rows[0], "state"));
+        return rows.Count == 0 || JsonOf(rows[0], "state") is not JsObject state ? null : JobState.FromValue(state);
     }
 
     /// <inheritdoc/>

@@ -60,11 +60,91 @@ public class DeprecatedTests
         Assert.True(typeof(IUpdateRunIfStore).IsAssignableFrom(typeof(IConditionalRunStore)));
         Assert.True(typeof(ICompareAndSetStateStore).IsAssignableFrom(typeof(IStateCasStore)));
         Assert.True(typeof(IDeleteRunIfStore).IsAssignableFrom(typeof(IRunDeletingStore)));
-        Assert.Empty(typeof(IConditionalRunStore).GetMethods());
         // The stores the library ships answer to both names.
         IStore memory = new MemoryStore();
         Assert.True(memory is IConditionalRunStore and IStateCasStore and IRunDeletingStore);
         Assert.True(typeof(IStateCasStore).IsAssignableFrom(typeof(SqlStore)));
+    }
+
+    /// <summary>
+    /// A store written before 1.0 that implemented the former interfaces explicitly, as C# often
+    /// does an optional interface: it still compiles, and each method is what the client calls.
+    /// </summary>
+    private sealed class ExplicitlyFormer(IStore inner) : IStore, IConditionalRunStore, IStateCasStore, IRunDeletingStore
+    {
+        public readonly Support.Wrapped Inner = new(inner);
+        public int Updates;
+        public int Sets;
+        public int Deletes;
+
+        Task<bool> IConditionalRunStore.UpdateRunIfAsync(Run run, IReadOnlyList<RunStatus> from, System.Threading.CancellationToken cancellationToken)
+        {
+            System.Threading.Interlocked.Increment(ref Updates);
+            return Inner.UpdateRunIfAsync(run, from, cancellationToken);
+        }
+
+        Task<bool> IStateCasStore.CompareAndSetStateAsync(JobState state, long expected, System.Threading.CancellationToken cancellationToken)
+        {
+            System.Threading.Interlocked.Increment(ref Sets);
+            return Inner.CompareAndSetStateAsync(state, expected, cancellationToken);
+        }
+
+        Task<bool> IRunDeletingStore.DeleteRunIfAsync(string id, string job, RunStatus status, System.Threading.CancellationToken cancellationToken)
+        {
+            System.Threading.Interlocked.Increment(ref Deletes);
+            return Inner.DeleteRunIfAsync(id, job, status, cancellationToken);
+        }
+
+        public Task InitAsync(System.Threading.CancellationToken cancellationToken = default) => Inner.InitAsync(cancellationToken);
+        public Task UpsertJobAsync(Definition definition, long now, System.Threading.CancellationToken cancellationToken = default) => Inner.UpsertJobAsync(definition, now, cancellationToken);
+        public Task<IReadOnlyList<StoredJob>> ListJobsAsync(System.Threading.CancellationToken cancellationToken = default) => Inner.ListJobsAsync(cancellationToken);
+        public Task<StoredJob?> GetJobAsync(string name, System.Threading.CancellationToken cancellationToken = default) => Inner.GetJobAsync(name, cancellationToken);
+        public Task DeleteJobAsync(string name, System.Threading.CancellationToken cancellationToken = default) => Inner.DeleteJobAsync(name, cancellationToken);
+        public Task InsertRunAsync(Run run, System.Threading.CancellationToken cancellationToken = default) => Inner.InsertRunAsync(run, cancellationToken);
+        public Task UpdateRunAsync(Run run, System.Threading.CancellationToken cancellationToken = default) => Inner.UpdateRunAsync(run, cancellationToken);
+        public Task<Run?> GetRunAsync(string id, System.Threading.CancellationToken cancellationToken = default) => Inner.GetRunAsync(id, cancellationToken);
+        public Task<IReadOnlyList<Run>> ListRunsAsync(string job, int limit, System.Threading.CancellationToken cancellationToken = default) => Inner.ListRunsAsync(job, limit, cancellationToken);
+        public Task<Run?> LastRunAsync(string job, System.Threading.CancellationToken cancellationToken = default) => Inner.LastRunAsync(job, cancellationToken);
+        public Task<IReadOnlyList<Run>> RunningRunsAsync(System.Threading.CancellationToken cancellationToken = default) => Inner.RunningRunsAsync(cancellationToken);
+        public Task<JobState?> GetStateAsync(string job, System.Threading.CancellationToken cancellationToken = default) => Inner.GetStateAsync(job, cancellationToken);
+        public Task SetStateAsync(JobState state, System.Threading.CancellationToken cancellationToken = default) => Inner.SetStateAsync(state, cancellationToken);
+        public Task<long> PruneAsync(long before, System.Threading.CancellationToken cancellationToken = default) => Inner.PruneAsync(before, cancellationToken);
+    }
+
+    [Fact]
+    public async Task A_store_that_implemented_the_former_interfaces_explicitly_compiles_and_is_used()
+    {
+        var store = new ExplicitlyFormer(new MemoryStore());
+        await using var m = Support.Make(store: store);
+        Job job = m.Cw.Job("j");
+        await job.RunAsync((_, _) => Task.CompletedTask);
+        await m.Cw.SilenceAsync("j", "1h");
+        Assert.True(store.Updates > 0);
+        Assert.True(store.Sets > 0);
+        // Taken through the new names, the calls reach the explicit implementations.
+        Assert.False(await ((IDeleteRunIfStore)store).DeleteRunIfAsync("none", "j", RunStatus.Running));
+        Assert.Equal(1, store.Deletes);
+    }
+
+    [Fact]
+    public void A_WebRequest_made_from_a_CronwatchRequest_reads_as_it()
+    {
+        var request = new CronwatchRequest("POST", "/cronwatch/api/check")
+        {
+            Headers = [new("host", "app.test")],
+            IsTls = true,
+            Mount = "/cronwatch",
+            DeclaredLength = 5,
+        };
+        WebRequest former = request;
+        Assert.True(former.IsTls);
+        Assert.Equal("/cronwatch", former.Mount);
+        Assert.Equal(5L, former.DeclaredLength);
+        Assert.Equal("app.test", former.Header("host"));
+        Assert.Same(request, (CronwatchRequest)former);
+        WebRequest made = WebRequest.FromCronwatchRequest(request);
+        Assert.True(made.IsTls);
+        Assert.Equal("/cronwatch", made.Mount);
     }
 
     [Fact]

@@ -77,7 +77,7 @@ public static partial class Golden
     public const long T0 = 1_767_605_400_000L;
 
     /// <summary>How many captures golden.json holds.</summary>
-    public const int CaptureCount = 66;
+    public const int CaptureCount = 82;
 
     /// <summary>The captures whose request target is not a valid percent-encoding.</summary>
     public static readonly IReadOnlySet<string> MalformedTargets = new HashSet<string>(StringComparer.Ordinal) { "/cronwatch/jobs/%zz", "/cronwatch/api/jobs/%zz" };

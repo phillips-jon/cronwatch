@@ -12,7 +12,7 @@ namespace Cronwatch;
 /// The CronWatch client: the SDK's <c>cronwatch({...})</c>. Declare jobs with <see cref="Job"/>,
 /// run them with <see cref="Job.RunAsync(Func{JobContext, CancellationToken, Task}, CancellationToken)"/>,
 /// and check for missed and stuck runs with <see cref="CheckAsync"/> (or every minute with
-/// <see cref="Start"/>). Safe to use from any number of threads and tasks at once; keep one per
+/// <see cref="StartChecking"/>). Safe to use from any number of threads and tasks at once; keep one per
 /// process, as a data source is kept, and dispose it at shutdown.
 /// </summary>
 [DebuggerDisplay("{ToString(),nq}")]
@@ -59,13 +59,14 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         _sources = new List<ISource>(options.Sources ?? []);
         if (options.CronSecret is { } secret)
         {
-            _cronSecret = string.IsNullOrEmpty(secret.Value) ? null : secret.Value;
+            // A blank secret given here means none, with no fallback to the variable.
+            _cronSecret = Js.Secret(secret.Value);
             _secretOptOut = secret.Value == null;
         }
         else
         {
-            string? fromEnv = Env.Read("CRON_SECRET");
-            _cronSecret = string.IsNullOrEmpty(fromEnv) ? null : fromEnv;
+            // A CRON_SECRET of only whitespace counts as unset, so a handler answers 503.
+            _cronSecret = Js.Secret(Env.Read("CRON_SECRET"));
         }
         _defaults = defaults;
         _redactOff = ReferenceEquals(options.Redact, Redaction.None);
@@ -568,9 +569,10 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     }
 
     /// <summary>
-    /// Stops the interval, records the runs still open in this process as the process-exit hook
-    /// does, waits up to five seconds for sends and recordings in flight, cancels what is left,
-    /// and disposes the store when it is disposable.
+    /// Stops the interval, waits for a check under way to end (bounded by its own channel, triage
+    /// and retry timeouts, as the SDK's <c>close()</c> awaits it), records the runs still open in
+    /// this process as the process-exit hook does, waits up to five seconds for the other sends and
+    /// recordings in flight, cancels what is left, and disposes the store when it is disposable.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -579,6 +581,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
             return;
         }
         StopInterval();
+        await AwaitCheckAsync().ConfigureAwait(false);
         await RecordOpenRunsAsync().ConfigureAwait(false);
         var pending = new List<Task>(_inFlight.Keys);
         try

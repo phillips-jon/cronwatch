@@ -79,13 +79,10 @@ public sealed class Routes
         {
             configured = "";
         }
-        else if (!string.IsNullOrEmpty(options.Token?.Value))
-        {
-            configured = options.Token.Value;
-        }
         else
         {
-            configured = Env.Read("CRONWATCH_TOKEN") ?? "";
+            // A token of only whitespace, given or read, counts as unset, so the routes stay locked.
+            configured = Js.Secret(options.Token?.Value) ?? Js.Secret(Env.Read("CRONWATCH_TOKEN")) ?? "";
         }
         // A handler cannot tell a local caller from a remote one (proxies, tunnels and a server
         // listening on every interface all look alike), so development gets a token too: made
@@ -279,27 +276,47 @@ public sealed class Routes
         return true;
     }
 
-    /// <summary>The <c>Authorization</c> header without its <c>Bearer </c> (in any case, with any spaces after it), or null.</summary>
-    private static string? Bearer(CronwatchRequest req)
+    /// <summary>
+    /// The token an <c>Authorization</c> header carries: what follows the scheme when the scheme is
+    /// <c>Bearer</c> (in any case) and whitespace follows it, else null. Any other scheme (a proxy's
+    /// Basic auth, say) is no bearer at all, so the cookie and <c>?token=</c> are read as if no
+    /// header came.
+    /// </summary>
+    internal static string? Bearer(CronwatchRequest req)
     {
         string? text = req.Header("authorization");
-        if (text == null)
+        if (text == null || !IsBearerPrefix(text))
         {
             return null;
         }
-        if (IsBearerPrefix(text))
+        int i = 6;
+        while (i < text.Length && Js.IsSpace(text[i]))
         {
-            int i = 6;
-            while (i < text.Length && Js.IsSpace(text[i]))
+            i++;
+        }
+        return i > 6 ? text[i..] : null;
+    }
+
+    /// <summary>
+    /// Where a sign-in through the form goes next: the page it was posted from (the Referer) when
+    /// that is on the public origin and its query has no <c>token</c> parameter, else the dashboard.
+    /// </summary>
+    internal static string SignInReturn(string? referer, string publicOrigin, string basePath)
+    {
+        if (referer == null || !referer.StartsWith(publicOrigin + "/", StringComparison.Ordinal)
+            || !Uri.TryCreate(referer, UriKind.Absolute, out Uri? url))
+        {
+            return basePath + "/";
+        }
+        string query = url.Query.StartsWith('?') ? url.Query[1..] : url.Query;
+        foreach (var p in Requests.ParseQuery(query))
+        {
+            if (p.Key == "token")
             {
-                i++;
-            }
-            if (i > 6)
-            {
-                return text[i..];
+                return basePath + "/";
             }
         }
-        return text;
+        return referer;
     }
 
     /// <summary>Absent means one hour; a number or numeric string is milliseconds.</summary>
@@ -566,6 +583,19 @@ public sealed class Routes
                 : Api(ErrorBody("Cross-site request refused"), 403);
         }
 
+        // The sign-in form posts the token here, in the body, so it stays out of the URL and every
+        // access log. Cross-site posts were refused above.
+        if (_token.Length > 0 && method == "POST" && path == "/signin")
+        {
+            byte[]? data = await ReadLimitedAsync(req, ct).ConfigureAwait(false);
+            string? sent = data == null ? null : Requests.BodyField(said.ContentType, data, "token");
+            if (sent == null || !WebText.ConstantTimeEquals(sent, _token))
+            {
+                return SignInPage(basePath);
+            }
+            return Redirect(SignInReturn(req.Header("referer"), said.PublicOrigin, basePath), SignInCookie(said, basePath));
+        }
+
         if (_token.Length > 0)
         {
             // ?token= is only the sign-in that moves the token into a cookie.
@@ -591,24 +621,19 @@ public sealed class Routes
             }
             if (!cronSecretOk && !tokenOk)
             {
-                if (_generated)
+                if (wantsHtml)
                 {
-                    return wantsHtml
-                        ? Message(
-                            "Sign in",
-                            "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.",
-                            basePath,
-                            401,
-                            true)
-                        : Api(ErrorBody("Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log"), 401);
+                    return SignInPage(basePath);
                 }
-                return wantsHtml
-                    ? Message("Sign in", "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.", basePath, 401, true)
+                return _generated
+                    ? Api(ErrorBody("Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log"), 401)
                     : Api(ErrorBody("Unauthorized"), 401);
             }
             if (queryToken != null)
             {
-                // Move the token from the URL into a cookie so it is not in history or logs.
+                // Move the token from the URL into a cookie, so it is not left in the browser's
+                // history. The request line that carried it may still be in an access log, which
+                // is why the sign-in form posts instead.
                 var rest = new List<string>();
                 foreach (var p in said.Query)
                 {
@@ -618,11 +643,7 @@ public sealed class Routes
                     }
                 }
                 string search = rest.Count == 0 ? "" : "?" + string.Join('&', rest);
-                string secure = said.PublicOrigin.StartsWith("https:", StringComparison.Ordinal) ? "; Secure" : "";
-                string cookiePath = basePath.Length == 0 ? "/" : basePath;
-                return Redirect(
-                    pathname + search,
-                    TokenCookie + "=" + _cookie + "; Path=" + cookiePath + "; HttpOnly; SameSite=Lax; Max-Age=" + CookieMaxAge.ToString(CultureInfo.InvariantCulture) + secure);
+                return Redirect(pathname + search, SignInCookie(said, basePath));
             }
         }
 
@@ -725,6 +746,25 @@ public sealed class Routes
         }
         return Message("Not found", path, basePath, 404);
     }
+
+    /// <summary>The cookie a sign-in sets, by <c>?token=</c> or by the form.</summary>
+    private string SignInCookie(Said said, string basePath)
+    {
+        string secure = said.PublicOrigin.StartsWith("https:", StringComparison.Ordinal) ? "; Secure" : "";
+        string cookiePath = basePath.Length == 0 ? "/" : basePath;
+        return TokenCookie + "=" + _cookie + "; Path=" + cookiePath + "; HttpOnly; SameSite=Lax; Max-Age=" + CookieMaxAge.ToString(CultureInfo.InvariantCulture) + secure;
+    }
+
+    /// <summary>The 401 sign-in page, with the form that posts the token.</summary>
+    private CronwatchResponse SignInPage(string basePath) =>
+        _generated
+            ? Message(
+                "Sign in",
+                "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once, or enter the token from it below, and this browser stays signed in.",
+                basePath,
+                401,
+                true)
+            : Message("Sign in", "Enter your CRONWATCH_TOKEN and this browser stays signed in.", basePath, 401, true);
 
     private static CronwatchResponse RedirectBack(Said said, string basePath) =>
         said.Referer.StartsWith(said.PublicOrigin + "/", StringComparison.Ordinal) ? Redirect(said.Referer) : Redirect(basePath + "/");

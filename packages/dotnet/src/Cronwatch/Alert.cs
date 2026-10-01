@@ -45,12 +45,29 @@ public sealed record Alert
     /// <summary>Keys of the stored alert's run this release does not know, as JSON.</summary>
     internal string? RunUnknown { get; init; }
 
+    /// <summary>
+    /// The stored alert as it was read, written back as it was (the SDK keeps a queued alert as
+    /// plain JSON), until the client changes it.
+    /// </summary>
+    internal JsObject? Read { get; init; }
+
+    /// <summary>
+    /// Read from a foreign or damaged row in a shape that cannot be judged: a recovery whose
+    /// <c>details.after</c> is not a list of strings, or any other alert whose <c>at</c> is not a
+    /// number. A retry drops it as stale.
+    /// </summary>
+    internal bool Damaged { get; init; }
+
     /// <summary>A copy with triage's answer (null for none), marked tried.</summary>
-    public Alert WithTriage(string? diagnosis) => this with { Triage = diagnosis, TriageTried = true };
+    public Alert WithTriage(string? diagnosis) => this with { Triage = diagnosis, TriageTried = true, Read = null };
 
     /// <summary>The alert as the SDK's JSON object, keys in its order.</summary>
     public JsObject ToValue()
     {
+        if (Read != null)
+        {
+            return Read.Copy();
+        }
         var o = new JsObject()
             .Set("type", Type.Value)
             .Set("run", Run == null ? null : Values.WithUnknown(Run.ToValue(), RunUnknown))
@@ -99,12 +116,11 @@ public sealed record Alert
             run = Run.FromValue(copy);
             runUnknown = Values.Unknown(ro, RunKeys);
         }
-        else if (r != null)
-        {
-            run = Run.FromValue(r);
-        }
         var details = o.Get("details") as JsObject ?? new JsObject();
         var definition = o.Get("definition") as JsObject ?? new JsObject();
+        bool damaged = type == AlertType.Recovered
+            ? o.Get("details") is not JsObject || details.Get("after") is not List<object?> after || !after.TrueForAll(c => c is string)
+            : !JsonText.TryNumber(o.Get("at"), out _);
         return new Alert
         {
             Type = type,
@@ -119,6 +135,8 @@ public sealed record Alert
             At = Values.Integer(o, "at"),
             Unknown = Values.Unknown(o, Keys),
             RunUnknown = runUnknown,
+            Read = o.Copy(),
+            Damaged = damaged,
         };
     }
 }

@@ -38,15 +38,15 @@ Cronwatch.Hosting.CronwatchServiceCollectionExtensions
 Cronwatch.Hosting.ICronwatchJob
 Cronwatch.Hosting.ICronwatchJob.RunAsync(Cronwatch.JobContext! job, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 Microsoft.Extensions.DependencyInjection.CronwatchJobServiceCollectionExtensions
-Microsoft.Extensions.DependencyInjection.CronwatchServiceCollectionExtensions
+Microsoft.Extensions.DependencyInjection.CronwatchHostingServiceCollectionExtensions
 Microsoft.Extensions.Hosting.CronwatchHostExtensions
 const Cronwatch.Hosting.CronwatchServiceCollectionExtensions.ConfigurationSection = "Cronwatch" -> string!
-const Microsoft.Extensions.DependencyInjection.CronwatchServiceCollectionExtensions.ConfigurationSection = "Cronwatch" -> string!
+const Microsoft.Extensions.DependencyInjection.CronwatchHostingServiceCollectionExtensions.ConfigurationSection = "Cronwatch" -> string!
 override Cronwatch.Hosting.CronwatchHostOptions.ToString() -> string!
 static Cronwatch.Hosting.CronwatchServiceCollectionExtensions.AddCronwatch(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Cronwatch.Hosting.CronwatchHostOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Cronwatch.Hosting.CronwatchServiceCollectionExtensions.AddCronwatch(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<System.IServiceProvider!, Cronwatch.Hosting.CronwatchHostOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.CronwatchJobServiceCollectionExtensions.AddCronwatchJob<TJob>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, Cronwatch.JobOptions! options) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.Extensions.DependencyInjection.CronwatchServiceCollectionExtensions.AddCronwatch(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Cronwatch.Hosting.CronwatchHostOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static Microsoft.Extensions.DependencyInjection.CronwatchServiceCollectionExtensions.AddCronwatch(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<System.IServiceProvider!, Cronwatch.Hosting.CronwatchHostOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.CronwatchHostingServiceCollectionExtensions.AddCronwatch(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Cronwatch.Hosting.CronwatchHostOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.CronwatchHostingServiceCollectionExtensions.AddCronwatch(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<System.IServiceProvider!, Cronwatch.Hosting.CronwatchHostOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.Hosting.CronwatchHostExtensions.RunCronwatchCommandAsync(this Microsoft.Extensions.Hosting.IHost! host, string![]! args, System.IO.TextWriter! stdout, System.IO.TextWriter! stderr, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
 static Microsoft.Extensions.Hosting.CronwatchHostExtensions.RunCronwatchCommandAsync(this Microsoft.Extensions.Hosting.IHost! host, string![]! args, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!

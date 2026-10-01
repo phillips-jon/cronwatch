@@ -101,7 +101,7 @@ public sealed class CronwatchHangfire : IDisposable
     /// Adds the recurring job <see cref="CheckJobId"/> every minute, unless it is there already: a
     /// sync (the recurring jobs declared again, the declarations written, and jobs gone from Hangfire
     /// declared again without their schedule, within 30 seconds) and a CronWatch check, once per
-    /// minute across every server sharing the storage, in place of <c>cw.Start()</c> on each.
+    /// minute across every server sharing the storage, in place of <c>cw.StartChecking()</c> on each.
     /// </summary>
     public static void ScheduleCheck(IRecurringJobManager manager, string cron = "* * * * *")
     {
