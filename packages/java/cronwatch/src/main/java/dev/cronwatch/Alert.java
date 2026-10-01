@@ -65,16 +65,32 @@ public record Alert(
 
   /** This alert with triage tried and its diagnosis, or null when it gave nothing. */
   public Alert withTriage(@Nullable String diagnosis) {
-    return new Alert(type, run, details, job, definition, title, message, diagnosis, true, at);
+    Alert triaged =
+        new Alert(type, run, details, job, definition, title, message, diagnosis, true, at);
+    JsObject raw = Kept.get(this);
+    if (raw != null) {
+      Kept.put(triaged, raw);
+    }
+    return triaged;
   }
 
-  /** The alert as the SDK writes it. */
+  /**
+   * The alert as the SDK writes it. One read from JSON (a queued alert) keeps the fields this
+   * release does not know, at the top and in its details, and an alert of a type it does not know
+   * keeps its details as they were stored, as the SDK carries a queued alert unchanged.
+   */
   public JsObject toValue() {
+    JsObject raw = Kept.get(this);
+    Object storedDetails = raw == null ? null : raw.get("details");
+    Object detailsValue =
+        storedDetails != null && !Kept.KNOWN_TYPES.contains(type.value())
+            ? Js.copyJson(storedDetails)
+            : Kept.withUnknown(details.toValue(), storedDetails instanceof JsObject d ? d : null);
     JsObject o =
         new JsObject()
             .set("type", type.value())
             .set("run", run == null ? null : run.toValue())
-            .set("details", details.toValue())
+            .set("details", detailsValue)
             .set("job", job)
             .set("definition", definition.toObject())
             .set("title", title)
@@ -83,7 +99,7 @@ public record Alert(
     if (triageTried || triage != null) {
       o.set("triage", triage);
     }
-    return o;
+    return Kept.withUnknown(o, raw);
   }
 
   /** The SDK's JSON. */
@@ -123,16 +139,19 @@ public record Alert(
     }
     JsObject details = o.get("details") instanceof JsObject d ? d : new JsObject();
     JsObject definition = o.get("definition") instanceof JsObject d ? d : new JsObject();
-    return new Alert(
-        type,
-        run,
-        AlertDetails.fromValue(type, details),
-        Values.string(o, "job"),
-        Definition.of(definition),
-        Values.string(o, "title"),
-        Values.string(o, "message"),
-        Values.nullableString(o, "triage"),
-        o.has("triage"),
-        Values.integer(o, "at"));
+    Alert alert =
+        new Alert(
+            type,
+            run,
+            AlertDetails.fromValue(type, details),
+            Values.string(o, "job"),
+            Definition.of(definition),
+            Values.string(o, "title"),
+            Values.string(o, "message"),
+            Values.nullableString(o, "triage"),
+            o.has("triage"),
+            Values.integer(o, "at"));
+    Kept.put(alert, o);
+    return alert;
   }
 }

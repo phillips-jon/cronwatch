@@ -465,6 +465,82 @@ class BridgeTest {
     }
   }
 
+  // The cross-port check: a job forgotten (the dashboard's forget) while its entry was still in
+  // the scheduler was left undeclared, written back by its next run and then taken by unschedule
+  // for an entry gone, so it lost its schedule until the process restarted.
+  @Test
+  void aJobForgottenWhileItsEntryRunsKeepsItsSchedule() throws Exception {
+    MemoryStore store = new MemoryStore();
+    List<String> errors = new CopyOnWriteArrayList<>();
+    try (Cronwatch cw = client(store, errors)) {
+      Watch w = new Watch(cw, "quartz", "billing", "Quartz");
+      List<Entry> entries = List.of(entry("nightly", "x", "0 2 * * *"));
+      w.declare(entries);
+      assertTrue(w.settle(Duration.ofSeconds(10)));
+      String declared = stored(store, "nightly");
+
+      // Declared again by the next declare.
+      cw.forget("nightly");
+      w.declare(entries);
+      assertTrue(w.settle(Duration.ofSeconds(10)));
+      Job job = w.job("nightly");
+      assertNotNull(job);
+      job.run(ctx -> {});
+      assertTrue(w.unschedule().isEmpty());
+      w.declare(entries);
+      assertTrue(w.settle(Duration.ofSeconds(10)));
+      cw.check();
+      assertEquals(declared, stored(store, "nightly"), "declare puts it back");
+
+      // Declared again by unschedule, when no declare came between.
+      cw.forget("nightly");
+      Job held = w.job("nightly");
+      assertNotNull(held);
+      held.run(ctx -> {});
+      assertTrue(w.unschedule().isEmpty(), "not taken for an entry gone");
+      assertEquals(declared, stored(store, "nightly"), "unschedule puts it back");
+      w.declare(entries);
+      assertTrue(w.settle(Duration.ofSeconds(10)));
+      cw.check();
+      assertEquals(declared, stored(store, "nightly"), "and it stays");
+      assertTrue(errors.isEmpty(), errors.toString());
+    }
+  }
+
+  // The cross-port check: a fallback kept after the client forgot its job was run without the
+  // client declaring it, so this worker's unschedule took away the schedule another process stored.
+  @Test
+  void aForgottenFallbackIsMadeAgainFromTheStore() throws Exception {
+    MemoryStore store = new MemoryStore();
+    try (Cronwatch scheduler = client(store);
+        Cronwatch worker = client(store)) {
+      Watch ws = new Watch(scheduler, "river", "billing", "River");
+      ws.declare(List.of(entry("report", "x", "0 3 * * *")));
+      assertTrue(ws.settle(Duration.ofSeconds(10)));
+      String declared = stored(store, "report");
+
+      Watch w = new Watch(worker, "river", "billing", "River");
+      w.declare(List.of(entry("other", "y", "0 4 * * *")));
+      assertTrue(w.settle(Duration.ofSeconds(10)));
+      Job first = w.fallback("report", JobOptions.builder());
+      assertNotNull(first);
+      worker.forget("report");
+      Job again = w.fallback("report", JobOptions.builder());
+      assertNotNull(again);
+      assertTrue(again != first, "made again");
+      assertTrue(worker.definedJobs().stream().anyMatch(d -> d.name().equals("report")));
+      again.run(ctx -> {});
+      assertTrue(w.unschedule().isEmpty(), "not taken for an entry gone");
+      assertFalse(stored(store, "report").contains("no longer scheduled"));
+      // The scheduling process puts its schedule back, and the worker leaves it.
+      ws.unschedule();
+      assertEquals(declared, stored(store, "report"));
+      assertSame(again, w.fallback("report", JobOptions.builder()));
+      assertTrue(w.unschedule().isEmpty());
+      assertEquals(declared, stored(store, "report"), "the scheduler's schedule is kept");
+    }
+  }
+
   // The .NET audit: a job that fired before its scheduler's entry was read ran on the handle its
   // fallback made, which wrote its declaration over the entry's and took the schedule away.
   @Test

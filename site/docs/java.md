@@ -50,7 +50,7 @@ Cronwatch cw = Cronwatch.builder()
 cw.startChecking();                                  // check every minute, in a long-running service
 ```
 
-Every option has the SDK's default, and `build()` checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to standard error. `close()` stops the check, waits up to five seconds for a check and sends in flight, and closes the store; a servlet container or a Spring context calls it when the app stops, so no thread of the client's holds the app's class loader.
+Every option has the SDK's default, and `build()` checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to standard error. `close()` stops the check, waits for a check under way to end (each channel, triage and retry has its own time limit), waits up to five seconds for other sends in flight, and closes the store; a servlet container or a Spring context calls it when the app stops, so no thread of the client's holds the app's class loader.
 
 The client's own work (recording a run, sending alerts, checking) runs on virtual threads of its own, so an interrupt of your thread never cuts a write in half. Everything on `Cronwatch`, `Job` and a run's context is safe to use from any thread.
 

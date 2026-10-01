@@ -19,6 +19,7 @@ import dev.cronwatch.store.SqlStore;
 import dev.cronwatch.store.Store;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -467,6 +468,55 @@ class StartFinishTest {
         () ->
             closing.getState() == Thread.State.WAITING
                 || closing.getState() == Thread.State.TIMED_WAITING);
+    assertEquals(List.of(), order, "the store is not closed while the check is under way");
+    gate.countDown();
+    closing.join();
+    check.join();
+    assertEquals(List.of("send", "close"), order);
+  }
+
+  @Test
+  void closeWaitsForTheCheckPastItsWaitForOtherWork() throws Exception {
+    CountDownLatch sending = new CountDownLatch(1);
+    CountDownLatch gate = new CountDownLatch(1);
+    List<String> order = new CopyOnWriteArrayList<>();
+    MemoryStore inner = new MemoryStore();
+    Store store =
+        (Store)
+            java.lang.reflect.Proxy.newProxyInstance(
+                Store.class.getClassLoader(),
+                new Class<?>[] {Store.class},
+                (proxy, method, args) -> {
+                  if (method.getName().equals("close")) {
+                    order.add("close");
+                  }
+                  try {
+                    return method.invoke(inner, args);
+                  } catch (java.lang.reflect.InvocationTargetException e) {
+                    throw e.getCause();
+                  }
+                });
+    Clock clock = new Clock();
+    Cronwatch.Builder builder =
+        Support.builder(clock, new Capture(), new Errors())
+            .alerts(List.of(held(sending, gate, order, "send")))
+            .store(store);
+    // The cross-port check: close gave up on the check after its five seconds, interrupted it and
+    // closed the store under it. The check is waited for to its end, as the SDK's close awaits it.
+    builder.timings.closeWaitMs = 20;
+    Cronwatch cw = builder.build();
+    cw.job("callback", JobOptions.builder().timeout("30m")).start();
+    clock.advance(31 * MIN);
+    Thread check = Support.background(cw::check);
+    sending.await();
+    Thread closing = Thread.ofVirtual().start(cw::close);
+    Support.await(
+        "close to wait for the check",
+        () ->
+            closing.getState() == Thread.State.WAITING
+                || closing.getState() == Thread.State.TIMED_WAITING);
+    closing.join(Duration.ofMillis(500));
+    assertTrue(closing.isAlive(), "close is still waiting for the check");
     assertEquals(List.of(), order, "the store is not closed while the check is under way");
     gate.countDown();
     closing.join();

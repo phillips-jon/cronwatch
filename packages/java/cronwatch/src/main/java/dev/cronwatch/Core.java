@@ -86,6 +86,10 @@ final class Core {
 
   final Store store;
   final boolean defaultStore;
+
+  /** The builder's environment (the Spring starter's profile), read after the variables. */
+  final @Nullable String environmentFallback;
+
   final List<Channel> channels;
   final @Nullable Triage triage;
 
@@ -136,6 +140,10 @@ final class Core {
 
   final AtomicReference<@Nullable CompletableFuture<CheckResult>> checking =
       new AtomicReference<>();
+
+  /** The thread the check in flight runs on, so a close from inside it does not wait for itself. */
+  volatile @Nullable Thread checkThread;
+
   final AtomicLong lastPruneAt = new AtomicLong(0);
 
   /** Runs whose function is running in this process, by id, for the shutdown hook. */
@@ -157,7 +165,9 @@ final class Core {
       boolean deferDelivery,
       ErrorHandler onError,
       LongSupplier clock,
-      Timings timings) {
+      Timings timings,
+      @Nullable String environmentFallback) {
+    this.environmentFallback = environmentFallback;
     this.store = store;
     this.defaultStore = defaultStore;
     this.channels = List.copyOf(channels);
@@ -303,7 +313,7 @@ final class Core {
             return null;
           });
       ready = true;
-      if (defaultStore && Env.environment().equals("production")) {
+      if (defaultStore && Env.environment(environmentFallback).equals("production")) {
         Env.LOGGER.log(
             System.Logger.Level.WARNING,
             "[cronwatch] using the in-memory store: runs and state are lost on restart. Pass a"

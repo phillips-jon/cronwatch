@@ -60,6 +60,7 @@ final class Checks {
       // again once answered starts a check of its own rather than joining this finished one.
       core.spawn(
           () -> {
+            core.checkThread = Thread.currentThread();
             try {
               CheckResult result = runCheck();
               core.checking.compareAndSet(mine, null);
@@ -67,6 +68,8 @@ final class Checks {
             } catch (Throwable t) {
               core.checking.compareAndSet(mine, null);
               mine.completeExceptionally(t);
+            } finally {
+              core.checkThread = null;
             }
           },
           "check");

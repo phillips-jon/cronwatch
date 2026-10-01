@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -77,12 +78,16 @@ public final class Watch {
     /** The definition's JSON, to tell a changed declaration. */
     String key;
 
+    /** What it was declared with, to declare it again once forgotten. */
+    JobOptions options;
+
     /** The entry is still in the scheduler. */
     boolean current;
 
-    Declared(Job job, String key, boolean current) {
+    Declared(Job job, String key, JobOptions options, boolean current) {
       this.job = job;
       this.key = key;
+      this.options = options;
       this.current = current;
     }
   }
@@ -145,10 +150,23 @@ public final class Watch {
     lock.lock();
     try {
       Declared d = jobs.get(name);
-      return d != null ? d.job : fallback.get(name);
+      if (d != null) {
+        return d.job;
+      }
+      // Not a fallback forgotten since (the dashboard's forget): that is made again.
+      Job f = fallback.get(name);
+      if (f != null && !clientDeclares(name)) {
+        fallback.remove(name);
+        return null;
+      }
+      return f;
     } finally {
       lock.unlock();
     }
+  }
+
+  private boolean clientDeclares(String name) {
+    return Access.client().declares(cw, name);
   }
 
   /** Whether {@code name} was declared from a scheduler entry by this watch. */
@@ -289,7 +307,9 @@ public final class Watch {
     lock.lock();
     try {
       Declared d = jobs.get(name);
-      if (d != null && d.key.equals(key)) {
+      // Unchanged, and still declared: a job forgotten since (the dashboard's forget) is declared
+      // again, or its next run would write it back and unschedule take it for an entry gone.
+      if (d != null && d.key.equals(key) && clientDeclares(name)) {
         d.current = d.current || current;
         return;
       }
@@ -308,10 +328,11 @@ public final class Watch {
       fallback.remove(name);
       Declared d = jobs.get(name);
       if (d == null) {
-        jobs.put(name, new Declared(job, key, current));
+        jobs.put(name, new Declared(job, key, options.copy(), current));
       } else {
         d.job = job;
         d.key = key;
+        d.options = options.copy();
         d.current = d.current || current;
       }
     } finally {
@@ -547,6 +568,7 @@ public final class Watch {
       return List.of();
     }
     List<String> failed = new ArrayList<>();
+    redeclareForgotten();
     Set<String> defined = defined();
     for (String name : mine) {
       if (!defined.contains(name)) {
@@ -609,6 +631,59 @@ public final class Watch {
       throw new CronwatchException(CronwatchException.Kind.OTHER, String.join("\n", failed));
     }
     return names;
+  }
+
+  /**
+   * Declares again every job whose entry the scheduler still has and that was forgotten since (the
+   * dashboard's forget), so it keeps its schedule rather than being taken for an entry gone.
+   */
+  private void redeclareForgotten() {
+    declaring.lock();
+    try {
+      Map<String, Declared> forgotten = new TreeMap<>();
+      lock.lock();
+      try {
+        for (Map.Entry<String, Declared> e : jobs.entrySet()) {
+          if (e.getValue().current && !clientDeclares(e.getKey())) {
+            forgotten.put(e.getKey(), e.getValue());
+          }
+        }
+      } finally {
+        lock.unlock();
+      }
+      for (Map.Entry<String, Declared> e : forgotten.entrySet()) {
+        String name = e.getKey();
+        String key;
+        JobOptions options;
+        lock.lock();
+        try {
+          key = e.getValue().key;
+          options = e.getValue().options.copy();
+        } finally {
+          lock.unlock();
+        }
+        Job job;
+        try {
+          job = cw.job(name, options);
+        } catch (CronwatchException ex) {
+          reportOnce(
+              Objects.requireNonNullElse(ex.getMessage(), "invalid"),
+              "declaring " + SchedulerBridge.quote(name));
+          continue;
+        }
+        lock.lock();
+        try {
+          Declared d = jobs.get(name);
+          if (d != null && d.key.equals(key)) {
+            d.job = job;
+          }
+        } finally {
+          lock.unlock();
+        }
+      }
+    } finally {
+      declaring.unlock();
+    }
   }
 
   @Override

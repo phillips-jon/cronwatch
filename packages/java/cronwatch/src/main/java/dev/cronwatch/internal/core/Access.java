@@ -44,6 +44,9 @@ public final class Access {
     /** The environment as the client reads it, the builder's fallback included. */
     String environment(Cronwatch cw);
 
+    /** Whether the client declares {@code name} now (not forgotten since it was declared). */
+    boolean declares(Cronwatch cw, String name);
+
     /** Whether the client was built with {@code noCronSecret()}. */
     boolean secretOptOut(Cronwatch cw);
 
