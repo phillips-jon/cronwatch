@@ -13,6 +13,7 @@ use Cronwatch\Laravel\ClientFactory;
 use Cronwatch\Laravel\DatabaseStore;
 use Cronwatch\Laravel\LogChannel;
 use Cronwatch\Laravel\MailChannel;
+use Cronwatch\Laravel\Settings;
 use Cronwatch\Store\MemoryStore;
 use Cronwatch\Store\Migrated;
 use Cronwatch\Store\MysqlStore;
@@ -92,7 +93,7 @@ final class ProviderTest extends TestCase
 
     protected function noCreate($app): void
     {
-        $app['config']->set('cronwatch.store.create_tables', false);
+        $app['config']->set('cronwatch.create_tables', false);
     }
 
     #[DefineEnvironment('noCreate')]
@@ -105,11 +106,70 @@ final class ProviderTest extends TestCase
         $this->assertCount(1, $cw->runs('after-migrate'));
     }
 
+    /** A config/cronwatch.php published before 1.0, with the keys 1.0 renamed. */
+    protected function keysBefore10($app): void
+    {
+        $app['config']->set('cronwatch.store', ['driver' => 'database', 'prefix' => 'old_', 'create_tables' => false, 'migrations' => true]);
+        $app['config']->set('cronwatch.schedule', ['watch' => true, 'exclude' => [], 'check' => true, 'check_cron' => '*/7 * * * *']);
+    }
+
+    #[DefineEnvironment('keysBefore10')]
+    public function testTheKeysRenamedIn10AreStillReadWithADeprecationNotice(): void
+    {
+        Settings::forgetReported();
+        $notices = [];
+        set_error_handler(function (int $level, string $message) use (&$notices): bool {
+            $notices[] = [$level, $message];
+            return true;
+        }, E_USER_DEPRECATED);
+        try {
+            $cw = $this->app->make(Cronwatch::class);
+            $config = $this->app->make('config');
+            $read = [Settings::scheduleCheck($config), Settings::checkFrequency($config)];
+            Settings::tablePrefix($config);
+        } finally {
+            restore_error_handler();
+        }
+        $this->assertInstanceOf(Migrated::class, $cw->store);
+        $this->assertSame([true, '*/7 * * * *'], $read);
+        $this->assertTrue(collect($this->app->make(\Illuminate\Console\Scheduling\Schedule::class)->events())
+            ->contains(fn ($e) => str_contains((string) $e->command, 'cronwatch:check') && $e->expression === '*/7 * * * *'));
+        $this->artisan('migrate')->assertExitCode(0);
+        $pdo = new \PDO("sqlite:{$this->dir}/app.db");
+        $this->assertSame(['old_jobs', 'old_runs', 'old_state'], $pdo->query("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'old_%' ORDER BY name")->fetchAll(\PDO::FETCH_COLUMN));
+        // Once per key per process, naming the new key.
+        $this->assertSame([
+            [E_USER_DEPRECATED, 'The cronwatch.store.prefix setting is deprecated and is read until 2.0; rename it to cronwatch.table_prefix in config/cronwatch.php.'],
+            [E_USER_DEPRECATED, 'The cronwatch.store.create_tables setting is deprecated and is read until 2.0; rename it to cronwatch.create_tables in config/cronwatch.php.'],
+            [E_USER_DEPRECATED, 'The cronwatch.schedule.check setting is deprecated and is read until 2.0; rename it to cronwatch.check.schedule in config/cronwatch.php.'],
+            [E_USER_DEPRECATED, 'The cronwatch.schedule.check_cron setting is deprecated and is read until 2.0; rename it to cronwatch.check.frequency in config/cronwatch.php.'],
+        ], $notices);
+    }
+
+    public function testTheKeysOf10AloneGiveNoNotice(): void
+    {
+        Settings::forgetReported();
+        $notices = 0;
+        set_error_handler(function () use (&$notices): bool {
+            $notices++;
+            return true;
+        }, E_USER_DEPRECATED);
+        try {
+            $this->app['config']->set('cronwatch.table_prefix', 'new_');
+            $config = $this->app->make('config');
+            $read = [Settings::tablePrefix($config), Settings::createTables($config), Settings::scheduleCheck($config), Settings::checkFrequency($config)];
+        } finally {
+            restore_error_handler();
+        }
+        $this->assertSame(['new_', true, true, '*/5 * * * *'], $read);
+        $this->assertSame(0, $notices);
+    }
+
     public function testASqliteFileOfItsOwn(): void
     {
         $this->app['config']->set('cronwatch.store.driver', 'sqlite');
         $this->app['config']->set('cronwatch.store.path', "{$this->dir}/own.db");
-        $this->app['config']->set('cronwatch.store.prefix', 'cw_');
+        $this->app['config']->set('cronwatch.table_prefix', 'cw_');
         $cw = $this->app->make(Cronwatch::class);
         $this->assertInstanceOf(SqliteStore::class, $cw->store);
         $this->assertSame("{$this->dir}/own.db", $cw->store->path);
@@ -166,7 +226,8 @@ final class ProviderTest extends TestCase
             'driver' => $driver, 'host' => $parts['host'], 'port' => $parts['port'] ?? null, 'database' => ltrim($parts['path'], '/'),
             'username' => rawurldecode($parts['user'] ?? ''), 'password' => rawurldecode($parts['pass'] ?? ''), 'charset' => $driver === 'pgsql' ? 'utf8' : 'utf8mb4', 'prefix' => '',
         ]);
-        $this->app['config']->set('cronwatch.store', ['driver' => 'database', 'connection' => 'server', 'prefix' => $prefix]);
+        $this->app['config']->set('cronwatch.store', ['driver' => 'database', 'connection' => 'server']);
+        $this->app['config']->set('cronwatch.table_prefix', $prefix);
         $this->app->forgetInstance(Cronwatch::class);
         $cw = $this->app->make(Cronwatch::class);
         $this->assertInstanceOf($class, $cw->store);

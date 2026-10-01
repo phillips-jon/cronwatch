@@ -26,15 +26,17 @@ return [
         'driver' => env('CRONWATCH_STORE', 'database'),
         'connection' => env('CRONWATCH_DB_CONNECTION'),
         'path' => env('CRONWATCH_SQLITE_PATH'),
-        'prefix' => env('CRONWATCH_TABLE_PREFIX', 'cronwatch_'),
         // `php artisan migrate` makes the tables (the migration is loaded from
         // the package; publish it with --tag=cronwatch-migrations to keep a copy).
         'migrations' => env('CRONWATCH_MIGRATIONS', true),
-        // Whether each process may run CREATE TABLE IF NOT EXISTS itself. Turn it
-        // off when the migration made the tables and the app's database user may
-        // not create tables.
-        'create_tables' => env('CRONWATCH_CREATE_TABLES', true),
     ],
+
+    // The tables' names start with this. (Before 1.0: store.prefix, still read.)
+    'table_prefix' => env('CRONWATCH_TABLE_PREFIX', 'cronwatch_'),
+    // Whether each process may run CREATE TABLE IF NOT EXISTS itself. Turn it
+    // off when the migration made the tables and the app's database user may
+    // not create tables. (Before 1.0: store.create_tables, still read.)
+    'create_tables' => env('CRONWATCH_CREATE_TABLES', true),
 
     // Where alerts go. With none set, alerts are written to the log.
     'alerts' => [
@@ -81,15 +83,23 @@ return [
         'watch' => env('CRONWATCH_WATCH_SCHEDULE', true),
         // Job names left out.
         'exclude' => [],
-        // Schedule `cronwatch:check` in the app's own scheduler.
-        'check' => env('CRONWATCH_SCHEDULE_CHECK', true),
-        'check_cron' => env('CRONWATCH_CHECK_CRON', '*/5 * * * *'),
         // A command that sends its output nowhere (Laravel's default) records
         // none. On, its output goes to a temporary file of CronWatch's own for
         // the run instead, and the run keeps the last 256 KB. The file holds
         // all of it until the run ends, so a command that writes a lot needs
         // the disk space.
         'capture_output' => env('CRONWATCH_CAPTURE_OUTPUT', false),
+    ],
+
+    // The check: declares the schedule, finds missed and stuck runs and
+    // sends their alerts. (Before 1.0: schedule.check and
+    // schedule.check_cron, still read.)
+    'check' => [
+        // Schedule `cronwatch:check` in the app's own scheduler; false for a
+        // crontab line of your own instead.
+        'schedule' => env('CRONWATCH_SCHEDULE_CHECK', true),
+        // How often, as a cron expression.
+        'frequency' => env('CRONWATCH_CHECK_CRON', '*/5 * * * *'),
     ],
 
     // Queued jobs marked #[Cronwatch\Watch] or implementing

@@ -263,7 +263,7 @@ final class Plugin
     {
         $jobs = self::cronJobs();
         $name = Jobs::add($jobs, $event['hook'], $event['args'], $event['recurrence'], $event['interval']);
-        return self::declare(self::client(), $name, $jobs[$name])->start(trigger: 'wp-cron');
+        return self::declare(self::client(), $name, $jobs[$name])->start(trigger: Jobs::TAG);
     }
 
     /** One check: prepare(), then the library's check. */

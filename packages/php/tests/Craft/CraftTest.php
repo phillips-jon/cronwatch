@@ -521,7 +521,7 @@ final class CraftTest extends TestCase
         $this->assertStringEndsWith("hello\n", self::must(['cwt/task/hello']));
         $run = self::last('craft:cwt:task:hello');
         $this->assertSame('ok', $run['status']);
-        $this->assertSame('command', $run['trigger']);
+        $this->assertSame('craft-command', $run['trigger']);
         $this->assertSame('hello from cwt', $run['output']);
         $definition = self::definition('craft:cwt:task:hello');
         $this->assertSame('0 3 * * *', $definition['schedule']);
@@ -585,7 +585,7 @@ final class CraftTest extends TestCase
         $name = 'cwt.jobs.Flaky';
         $runs = self::runs($name);
         $this->assertSame(['failed', 'failed', 'ok'], array_column($runs, 'status'), 'each attempt is a run');
-        $this->assertSame(['queue'], array_values(array_unique(array_column($runs, 'trigger'))));
+        $this->assertSame(['craft-queue'], array_values(array_unique(array_column($runs, 'trigger'))));
         $this->assertStringStartsWith('RuntimeException: job a failed attempt 1', (string) $runs[0]['error']);
         $this->assertSame('job a attempt 3', $runs[2]['output']);
         // The integration's tags, and this install's under craft-config (from CRAFT_APP_ID).
@@ -722,6 +722,16 @@ final class CraftTest extends TestCase
             $this->assertStringStartsWith('application/json', $headers['content-type']);
             $this->assertStringContainsString('"name":"craft:cwt:task:hello"', $body);
             [$status] = self::http('GET', '/cronwatch/api/jobs', null, ['Authorization' => 'Bearer wrong']);
+            $this->assertSame(401, $status);
+
+            // GET /api names the library: the dashboard answers it, not the site's 404 page.
+            foreach (['/cronwatch/api', '/cronwatch/api/'] as $path) {
+                [$status, $headers, $body] = self::http('GET', $path, null, ['Authorization' => "Bearer {$token}"]);
+                $this->assertStringStartsWith('application/json', $headers['content-type'], "{$path}: {$body}");
+                $this->assertContains($status, [200, 404], $body);
+                $this->assertSame($status === 200 ? ['ok' => true, 'library' => 'cronwatch/cronwatch', 'language' => 'php', 'version' => \Cronwatch\Cronwatch::VERSION, 'api' => 1] : ['ok' => false, 'error' => 'Not found'], json_decode($body, true));
+            }
+            [$status] = self::http('GET', '/cronwatch/api');
             $this->assertSame(401, $status);
 
             // A check is prepared (the jobs declared, the jobs table read) only for a caller with the token:

@@ -55,6 +55,11 @@ register_deactivation_hook( __FILE__, array( \Cronwatch\WordPress\Plugin::class,
  * Adds a line to the output of the WP-Cron event running now, as the job's
  * log. Does nothing outside a watched event.
  *
+ * The documented form is the action, do_action( 'cronwatch_log', ...$parts ),
+ * which does nothing when the plugin is not active where a call to this
+ * function would be a fatal error. This function is kept, and keeps working,
+ * for code written against it.
+ *
  * @param mixed ...$parts Joined with spaces; anything not a string is written as JSON.
  */
 function cronwatch_log( mixed ...$parts ): void {

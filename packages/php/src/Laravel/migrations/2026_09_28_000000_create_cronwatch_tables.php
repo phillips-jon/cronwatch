@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Cronwatch\Laravel\ClientFactory;
 use Cronwatch\Store\MysqlStore;
 use Cronwatch\Store\PostgresStore;
-use Cronwatch\Store\Sql;
 use Cronwatch\Store\SqliteStore;
 use Illuminate\Database\Migrations\Migration;
 
@@ -30,7 +29,7 @@ return new class extends Migration
             return;
         }
         $config = (array) config('cronwatch.store', []);
-        $prefix = Sql::tablePrefix(is_string($config['prefix'] ?? null) ? $config['prefix'] : Sql::DEFAULT_PREFIX);
+        $prefix = $store->prefix;
         $connection = ($config['driver'] ?? 'database') === 'database'
             ? app('db')->connection(is_string($config['connection'] ?? null) && $config['connection'] !== '' ? $config['connection'] : null)
             : null;

@@ -119,7 +119,7 @@ final class ScheduleTest extends TestCase
         $this->artisan('schedule:run')->assertExitCode(0);
 
         $run = fn (string $name) => $cw->runs($name)[0] ?? null;
-        $this->assertSame(['ok', 'pruned 3 tokens', ['pruned' => 3], 'schedule'], [$run('prune')->status, $run('prune')->output, $run('prune')->metrics, $run('prune')->trigger]);
+        $this->assertSame(['ok', 'pruned 3 tokens', ['pruned' => 3], 'laravel-scheduler'], [$run('prune')->status, $run('prune')->output, $run('prune')->metrics, $run('prune')->trigger]);
         $this->assertSame(['ok', 'returned text'], [$run('returns')->status, $run('returns')->output]);
         $this->assertSame('failed', $run('throws')->status);
         $this->assertStringStartsWith("RuntimeException: database is down\n    at ", $run('throws')->error);
@@ -252,6 +252,21 @@ final class ScheduleTest extends TestCase
         $this->assertFileDoesNotExist($file);
     }
 
+    public function testABackgroundRunStartedBefore10UnderTheOldTriggerIsStillFinished(): void
+    {
+        $cw = $this->client();
+        $event = $this->schedule()->exec('backup')->daily()->runInBackground()->cronwatch(['name' => 'backup']);
+        [$handle] = $this->app->make(ScheduledTasks::class)->handleFor($event);
+        // A run 0.x started, with the trigger it wrote then; the upgrade happens while it runs.
+        $handle->start(trigger: 'schedule');
+        file_put_contents(storage_path('framework/schedule-cronwatch-' . sha1($event->mutexName()) . '.log'), 'backed up');
+        $this->artisan('schedule:finish', ['id' => $event->mutexName(), 'code' => 0])->assertExitCode(0);
+        $run = $cw->runs('backup')[0];
+        $this->assertSame(['ok', 'schedule', 'backed up'], [$run->status, $run->trigger, $run->output]);
+
+        $this->assertSame([], $this->errors);
+    }
+
     public function testABackgroundTaskThatRanPastItsTimeoutIsStillFinished(): void
     {
         $cw = $this->client();
@@ -300,9 +315,9 @@ final class ScheduleTest extends TestCase
         $this->artisan('schedule:run')->assertExitCode(0);
         $runs = $cw->runs('nightly-report');
         $this->assertCount(1, $runs);
-        $this->assertSame(['queue', 'ok', 'Report written'], [$runs[0]->trigger, $runs[0]->status, $runs[0]->output]);
+        $this->assertSame(['laravel-queue', 'ok', 'Report written'], [$runs[0]->trigger, $runs[0]->status, $runs[0]->output]);
         $plain = $cw->runs('Cronwatch.Tests.Laravel.Fixtures.PlainQueuedJob');
-        $this->assertSame([['schedule', 'ok']], array_map(fn ($r) => [$r->trigger, $r->status], $plain), 'the dispatch is the run of a job the queue does not watch');
+        $this->assertSame([['laravel-scheduler', 'ok']], array_map(fn ($r) => [$r->trigger, $r->status], $plain), 'the dispatch is the run of a job the queue does not watch');
     }
 
     public function testTheCheckDeclaresEveryTaskReportsOneThatNeverRanAndUnschedulesOnesTakenOut(): void
@@ -371,12 +386,12 @@ final class ScheduleTest extends TestCase
 
     protected function checkOff($app): void
     {
-        $app['config']->set('cronwatch.schedule.check', false);
+        $app['config']->set('cronwatch.check.schedule', false);
     }
 
     protected function checkEveryTen($app): void
     {
-        $app['config']->set('cronwatch.schedule.check_cron', '*/10 * * * *');
+        $app['config']->set('cronwatch.check.frequency', '*/10 * * * *');
     }
 
     protected function turnedOff($app): void

@@ -165,7 +165,7 @@ final class SchedulerTest extends TestCase
         $this->consume('scheduler_default', 2);
         $report = $cw->runs('nightly-report');
         $this->assertNotEmpty($report);
-        $this->assertSame(['ok', 'scheduler', 'Report written', ['pages' => 12]], [$report[0]->status, $report[0]->trigger, $report[0]->output, $report[0]->metrics]);
+        $this->assertSame(['ok', 'symfony-scheduler', 'Report written', ['pages' => 12]], [$report[0]->status, $report[0]->trigger, $report[0]->output, $report[0]->metrics]);
         $failing = $cw->runs('Cronwatch.Tests.Symfony.Fixtures.Failing');
         $this->assertNotEmpty($failing);
         $this->assertSame('failed', $failing[0]->status);
@@ -184,7 +184,7 @@ final class SchedulerTest extends TestCase
         $this->consume('async', 3);
         $runs = array_reverse($cw->runs('Cronwatch.Tests.Symfony.Fixtures.AsyncReport'));
         $this->assertSame(['failed', 'failed', 'ok'], array_map(fn ($r) => $r->status, $runs));
-        $this->assertSame(['messenger', 'messenger', 'messenger'], array_map(fn ($r) => $r->trigger, $runs));
+        $this->assertSame(['symfony-messenger', 'symfony-messenger', 'symfony-messenger'], array_map(fn ($r) => $r->trigger, $runs));
         $this->assertStringStartsWith('RuntimeException: attempt 1 failed', $runs[0]->error);
         $this->assertSame('attempt 3 worked', $runs[2]->output);
         $this->assertSame(['failed', 'recovered'], $this->capture->types());
@@ -202,7 +202,7 @@ final class SchedulerTest extends TestCase
         $tester = new CommandTester($application->find('messenger:consume'));
         $tester->execute(['receivers' => ['scheduler_default', 'async'], '--limit' => '2', '--time-limit' => '5', '--sleep' => '0.05', '--no-reset' => null]);
         $runs = $cw->runs('queued-report');
-        $this->assertSame([['ok', 'messenger', 'sent on and handled']], array_map(fn ($r) => [$r->status, $r->trigger, $r->output], $runs));
+        $this->assertSame([['ok', 'symfony-messenger', 'sent on and handled']], array_map(fn ($r) => [$r->status, $r->trigger, $r->output], $runs));
         $this->assertSame('every 1s', $cw->store->getJob('queued-report')->definition->get('schedule'));
     }
 

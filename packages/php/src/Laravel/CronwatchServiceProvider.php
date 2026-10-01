@@ -92,9 +92,9 @@ final class CronwatchServiceProvider extends ServiceProvider
                 }
             });
         }
-        if ($config->get('cronwatch.schedule.check', true)) {
+        if (Settings::scheduleCheck($config)) {
             $this->callAfterResolving(Schedule::class, function (Schedule $schedule) use ($config): void {
-                $schedule->command(ScheduledTasks::CHECK_COMMAND)->cron((string) $config->get('cronwatch.schedule.check_cron', '*/5 * * * *'));
+                $schedule->command(ScheduledTasks::CHECK_COMMAND)->cron(Settings::checkFrequency($config));
             });
         }
         if ($config->get('cronwatch.queue.watch', true)) {

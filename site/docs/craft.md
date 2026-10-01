@@ -42,7 +42,7 @@ The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, 
 
 ### Commands
 
-A listed command's run is recorded as `craft <route>` runs it, with the trigger `"command"`: ok, failed with `Exited with code N` for a non-zero exit, or failed with the exception that ended it. A listed command that another runs, and whose exception that one catches, is failed when the caller finishes. Its job is `craft:<route>` with slashes as colons (`craft:resave:entries`) unless `name` says otherwise, and its schedule is what you give, so a command the crontab stopped running is reported missed.
+A listed command's run is recorded as `craft <route>` runs it, with the trigger `"craft-command"` (`"command"` on runs recorded before 1.0; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)): ok, failed with `Exited with code N` for a non-zero exit, or failed with the exception that ended it. A listed command that another runs, and whose exception that one catches, is failed when the caller finishes. Its job is `craft:<route>` with slashes as colons (`craft:resave:entries`) unless `name` says otherwise (the `craft:` prefix keeps it apart from the app's own jobs), and its schedule is what you give, so a command the crontab stopped running is reported missed.
 
 A command of your own can carry its options in code instead, with the `WatchCommand` behavior (`actions` limits it to some of the controller's actions):
 
@@ -73,7 +73,7 @@ public function actionSend(): int
 
 ### Queue jobs
 
-A listed class, or one marked with the attribute, is recorded wherever the queue runs it (`craft queue/run`, `queue/listen`, or the runner a Control Panel request starts), with the trigger `"queue"`:
+A listed class, or one marked with the attribute, is recorded wherever the queue runs it (`craft queue/run`, `queue/listen`, or the runner a Control Panel request starts), with the trigger `"craft-queue"` (`"queue"` on runs recorded before 1.0):
 
 ```php
 use Cronwatch\Watch;

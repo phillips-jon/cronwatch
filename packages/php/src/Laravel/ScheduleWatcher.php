@@ -38,7 +38,9 @@ use Illuminate\Contracts\Container\Container;
  */
 final class ScheduleWatcher
 {
-    public const TRIGGER = 'schedule';
+    public const TRIGGER = 'laravel-scheduler';
+    /** The trigger runs recorded before 1.0 carry; read back through 1.x so a run open across the upgrade is still finished. */
+    private const OLD_TRIGGER = 'schedule';
     /** How much of an output file's end a run reads. */
     private const OUTPUT_READ = 256 * 1024;
     /** The name a foreground run's own output file starts with, in the system's temporary directory. */
@@ -181,7 +183,7 @@ final class ScheduleWatcher
         $running = null;
         $timedOut = null;
         foreach ($runs as $run) {
-            if ($run->trigger !== self::TRIGGER) {
+            if ($run->trigger !== self::TRIGGER && $run->trigger !== self::OLD_TRIGGER) {
                 continue;
             }
             if ($run->status === RunStatus::RUNNING) {

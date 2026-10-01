@@ -39,7 +39,7 @@ php artisan vendor:publish --tag=cronwatch-migrations   # optional: the migratio
 
 Every task in the app's schedule (`routes/console.php`, or `withSchedule()` in `bootstrap/app.php`) is a job, and every run `schedule:run` makes of it is recorded, through the scheduler's own events:
 
-- A run starts when Laravel starts the task, with the trigger `"schedule"`.
+- A run starts when Laravel starts the task, with the trigger `"laravel-scheduler"` (runs recorded before 1.0 carry `"schedule"`, and a background task started then is still finished; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)).
 - A command that exits non-zero fails with `Exited with code N`; a callback that throws fails with the exception, and one that returns `false` with `Returned false`. A callback's return value is treated as `run()`'s: a string is the output, and an HTTP response of 400 or more fails the run.
 - A command's output is what it wrote: its own file (`->sendOutputTo()`, or `->appendOutputTo()` read from where the file stood when the run started), or, for a task that sends its output nowhere (Laravel's default), nothing. Set `CRONWATCH_CAPTURE_OUTPUT=true` to record that output too: it goes to a temporary file of CronWatch's own for the run, which holds all of it until the run ends. At most the last 256 KB is read. A failed command's output is kept with its error.
 - A task Laravel skips (a filter said no, the schedule is paused, `->withoutOverlapping()` found the last run still going) records nothing.
@@ -110,7 +110,7 @@ final class SendNightlyReport implements ShouldQueue
 
 `implements Cronwatch\Laravel\ShouldBeWatched` does the same, with the options from a static `cronwatch()` method returning the options array when the class has one. `#[Watch(enabled: false)]` leaves a subclass out. The job is named after its class, backslashes as dots (`App.Jobs.SendNightlyReport`), unless `name` says otherwise.
 
-Every attempt is a run of its own, recorded in the worker that ran it with the trigger `"queue"`, so the rules of every other port's queues hold: failing attempts open one failed alert, the attempt that succeeds closes it with a recovery, and `failuresBeforeAlert` rides through retries. A job that hits its timeout is failed before the worker kills itself. A job released back onto the queue without an exception (a `RateLimited` or `WithoutOverlapping` middleware, or `$this->release()`) did not run, so its attempt is taken back: nothing is recorded or alerted, and the job's count of failures in a row is left as it was. So is one a middleware skips without releasing it (`->dontRelease()` on those middleware, or `Skip`), which Laravel deletes unrun. A queued listener, mailable or notification is watched by its own class. The sync queue records the same way.
+Every attempt is a run of its own, recorded in the worker that ran it with the trigger `"laravel-queue"` (`"queue"` on runs recorded before 1.0), so the rules of every other port's queues hold: failing attempts open one failed alert, the attempt that succeeds closes it with a recovery, and `failuresBeforeAlert` rides through retries. A job that hits its timeout is failed before the worker kills itself. A job released back onto the queue without an exception (a `RateLimited` or `WithoutOverlapping` middleware, or `$this->release()`) did not run, so its attempt is taken back: nothing is recorded or alerted, and the job's count of failures in a row is left as it was. So is one a middleware skips without releasing it (`->dontRelease()` on those middleware, or `Skip`), which Laravel deletes unrun. A queued listener, mailable or notification is watched by its own class. The sync queue records the same way.
 
 A watched class that the scheduler dispatches (`Schedule::job(new SendNightlyReport)->dailyAt('02:00')`) is one job: the scheduler declares the schedule under the queued job's name and options, and the worker records the runs, so a job that is dispatched but never handled is still reported missed.
 
@@ -202,6 +202,37 @@ claude mcp add cronwatch -e CRONWATCH_URL=https://app.example.com/cronwatch -e C
 ```
 
 Laravel's CSRF middleware is taken off the dashboard's routes, since its forms carry no Laravel token and the routes refuse a cross-site write themselves; the origin they compare with is the request's as Laravel sees it, so the app's trusted proxies apply. `CRONWATCH_DASHBOARD=false` leaves the routes out.
+
+## Settings
+
+Every key of `config/cronwatch.php` (publish it with `php artisan vendor:publish --tag=cronwatch-config`), the variable it reads, and the [Symfony bundle](/docs/symfony/)'s key for the same setting, which keeps the same spelling wherever the two mean the same thing:
+
+| `config/cronwatch.php` | Variable | Symfony `cronwatch.yaml` |
+|---|---|---|
+| `enabled` | `CRONWATCH_ENABLED` | |
+| `app_id` | `CRONWATCH_APP_ID` | `app_id` |
+| `store.driver`, `store.connection`, `store.path` | `CRONWATCH_STORE`, `CRONWATCH_DB_CONNECTION`, `CRONWATCH_SQLITE_PATH` | `store` (a URL), `store_service` |
+| `store.migrations` | `CRONWATCH_MIGRATIONS` | |
+| `table_prefix` | `CRONWATCH_TABLE_PREFIX` | `table_prefix` |
+| `create_tables` | `CRONWATCH_CREATE_TABLES` | `create_tables` |
+| `alerts.mail.to`, `.from`, `.mailer`, `.subject_prefix` | `CRONWATCH_MAIL_TO`, `CRONWATCH_MAIL_FROM`, `CRONWATCH_MAILER`, `CRONWATCH_MAIL_SUBJECT_PREFIX` | `alerts.mailer.to`, `.from`, `.subject_prefix` |
+| `alerts.slack`, `alerts.discord` | `CRONWATCH_SLACK_WEBHOOK_URL`, `CRONWATCH_DISCORD_WEBHOOK_URL` | `alerts.slack`, `alerts.discord` |
+| `alerts.webhook.url`, `.secret` | `CRONWATCH_WEBHOOK_URL`, `CRONWATCH_WEBHOOK_SECRET` | `alerts.webhook.url`, `.secret` |
+| `alerts.log` (a log channel's name) | `CRONWATCH_LOG_CHANNEL` | `alerts.log` (true or false: the logger has no channels to name) |
+| `alerts.channels` (class names) | | `alerts.services` (service ids) |
+| `triage.enabled`, `.model`, `.context` | `CRONWATCH_TRIAGE`, `CRONWATCH_TRIAGE_MODEL`, `CRONWATCH_TRIAGE_CONTEXT` | `triage.enabled`, `.model`, `.context` |
+| `cron_secret` | `CRON_SECRET` | `cron_secret` |
+| `retention`, `defaults`, `deliver` | `CRONWATCH_RETENTION`, `CRONWATCH_DELIVER` | `retention`, `defaults`, `deliver` |
+| `schedule.watch`, `schedule.exclude` | `CRONWATCH_WATCH_SCHEDULE` | `scheduler.watch`, `scheduler.exclude` (and `scheduler.jobs`) |
+| `schedule.capture_output` | `CRONWATCH_CAPTURE_OUTPUT` | |
+| `check.schedule` | `CRONWATCH_SCHEDULE_CHECK` | `check.schedule` (a schedule's name, or false) |
+| `check.frequency` (a cron expression) | `CRONWATCH_CHECK_CRON` | `check.frequency` (a period, or a cron expression) |
+| `queue.watch` | `CRONWATCH_WATCH_QUEUE` | `messenger.watch` |
+| `dashboard.enabled`, `.path`, `.domain` | `CRONWATCH_DASHBOARD`, `CRONWATCH_PATH`, `CRONWATCH_DOMAIN` | the routes' import and prefix |
+| `dashboard.middleware` | | `dashboard.role` |
+| `dashboard.token` | `CRONWATCH_TOKEN` | `dashboard.token` |
+
+Releases before 1.0 spelled four of these differently: `store.prefix` (now `table_prefix`), `store.create_tables` (now `create_tables`), `schedule.check` (now `check.schedule`) and `schedule.check_cron` (now `check.frequency`). The variables did not change, so a config file that was never published needs nothing. A published one that still has an old key keeps working through 1.x: the old key is read in place of the new one, with a deprecation notice (Laravel writes those to its `deprecations` log channel when one is set) naming the key to rename it to. The old keys go in 2.0.
 
 ## Tests
 

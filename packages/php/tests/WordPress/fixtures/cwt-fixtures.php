@@ -19,7 +19,9 @@ add_filter('pre_http_request', function ($pre, $args, $url) {
 
 add_action('cwt_ok', function (...$args): void {
     echo "did ok\n";
-    cronwatch_log('logged', $args);
+    // The documented form, and the function the plugin keeps working.
+    do_action('cronwatch_log', 'logged', $args);
+    cronwatch_log('and by the function');
 });
 add_action('cwt_single', function (...$args): void {
     echo 'single ' . implode(',', $args) . "\n";

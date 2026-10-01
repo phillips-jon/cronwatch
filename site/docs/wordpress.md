@@ -30,12 +30,12 @@ Every WP-Cron event becomes a job, with nothing to configure. A run starts just 
 - An event that is no longer scheduled (its plugin was deactivated, say) keeps its history and is never reported missed.
 - An uncaught exception, a fatal error or `exit()` in a callback fails the run, with the message and its file and line.
 
-Jobs are tagged `wp-cron`. A hook fired by hand (`do_action()`) outside WP-Cron is not a run.
+Jobs are tagged `wp-cron`, and their runs have the trigger `"wp-cron"`. The `wp:` prefix keeps a hook's job apart from the app's own jobs; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names). A hook fired by hand (`do_action()`) outside WP-Cron is not a run.
 
-Your own code can add lines to the output of the event running now:
+Your own code can add lines to the output of the event running now with the `cronwatch_log` action, which does nothing while the plugin is inactive, so the code needs no check for it:
 
 ```php
-cronwatch_log( 'Sent', $count, 'emails' );   // or do_action( 'cronwatch_log', 'Sent', $count, 'emails' )
+do_action( 'cronwatch_log', 'Sent', $count, 'emails' );
 ```
 
 ## A quiet site needs a real cron

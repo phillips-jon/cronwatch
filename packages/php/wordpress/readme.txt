@@ -27,7 +27,7 @@ It needs no change to your code or your other plugins. Every scheduled event bec
 * Single events (`wp_schedule_single_event`, such as a scheduled post's publishing) are one job per hook, with no schedule: they are one-offs, so a failure is reported but there is no cadence to miss. If WP-Cron stops running altogether, the recurring events WordPress itself schedules (update checks, twice daily and hourly) are reported missed, which is how you find out.
 * An event that is no longer scheduled (its plugin was deactivated, say) keeps its history and is never reported missed.
 
-What a run prints is kept as its output. Your own code can add lines with `cronwatch_log( 'sent 40 emails' );`.
+What a run prints is kept as its output. Your own code can add lines with `do_action( 'cronwatch_log', 'sent 40 emails' );`.
 
 Alerts go by email (through `wp_mail()`, the way the site sends its other mail), to Slack, or to any URL as a signed JSON webhook: set them under CronWatch, Settings, where you can also send a test alert and see each event's health.
 
@@ -68,7 +68,7 @@ CronWatch finds missed runs with a check every five minutes, which it schedules 
 * `cronwatch_job_options` (filter): a job's options (`grace`, `timeout`, `maxDuration`, `failuresBeforeAlert`, `description`, `tags`), given the options, the hook, its arguments and its recurrence. Options CronWatch refuses are written to the error log, and the job keeps its own.
 * `cronwatch_client_args` (filter): the arguments the library's client is made with (its store, alert channels, default grace and error handler).
 * `cronwatch_reject_unsafe_urls` (filter): whether an alert URL may not reach a private address or an unusual port (WordPress's `reject_unsafe_urls`). True on a multisite network, where a site's administrators may not be the network's, and false otherwise; given the URL's origin.
-* `cronwatch_log( ...$parts )`, or `do_action( 'cronwatch_log', ...$parts )`: a line for the output of the event running now.
+* `cronwatch_log` (action): `do_action( 'cronwatch_log', ...$parts )` adds a line for the output of the event running now, the parts joined with spaces and anything not a string written as JSON. With the plugin inactive it does nothing, so the code needs no check for it.
 
 The plugin carries only the alert channels its settings offer. Developers who need other channels or AI triage of alerts can install [the cronwatch/cronwatch Composer package](https://packagist.org/packages/cronwatch/cronwatch), which has them, and add them with these filters.
 
@@ -129,6 +129,10 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 4. The foot of the settings page: the "Send a test alert" button and the watched events with their health, last run and next due time.
 
 == Changelog ==
+
+= Unreleased =
+
+* The `cronwatch_log` action is the documented way to add a line to a run's output; the `cronwatch_log()` function still works.
 
 = 0.10.0 =
 

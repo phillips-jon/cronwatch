@@ -24,10 +24,10 @@ Then, under Configuration, System, CronWatch, say where alerts go and send a tes
 
 Drupal runs every module's `hook_cron` from its cron service, whatever starts it: Automated Cron after a page, `drush cron`, or a system cron requesting `/cron/<key>`. The module records:
 
-- **`drupal:cron`**: the whole cron run, with the trigger `"cron"`. Its output lists the modules that ran and those that failed. A run that finds cron already locked by another records nothing.
+- **`drupal:cron`**: the whole cron run, with the trigger `"drupal-cron"` (`"cron"` on runs recorded before 1.0; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)). Its output lists the modules that ran and those that failed. A run that finds cron already locked by another records nothing.
 - **`drupal:<module>`**: each module's `hook_cron` in it, with what it logged and the exception it threw. Drupal carries on past a module's exception, so that module's run fails and the others and the cron run do not; an `\Error` fails both the module's run and the cron run, which Drupal lets it end. A module with more than one `hook_cron` (Drupal 11.1 and newer, `#[Hook('cron')]` on several methods) is one run, failed if any of them threw.
 
-Only `drupal:cron` has a schedule, since every `hook_cron` runs on every cron run: giving each module the site's schedule would turn a cron that stopped into one missed alert per module. The schedule is the one under the settings (what your crontab does: `*/15 * * * *`, or `every 1h`), else Automated Cron's interval (`every 3h` by default, since Automated Cron runs cron after the first request once the interval has passed), else none; the settings page says which. The module jobs report failures, slow runs and stuck runs. All are tagged `drupal-cron`. A module uninstalled keeps its history and is never reported missed.
+Only `drupal:cron` has a schedule, since every `hook_cron` runs on every cron run: giving each module the site's schedule would turn a cron that stopped into one missed alert per module. The schedule is the one under the settings (what your crontab does: `*/15 * * * *`, or `every 1h`), else Automated Cron's interval (`every 3h` by default, since Automated Cron runs cron after the first request once the interval has passed), else none; the settings page says which. The module jobs report failures, slow runs and stuck runs. All are tagged `drupal-cron`. The `drupal:` prefix keeps a module's job apart from the app's own jobs of the same name. A module uninstalled keeps its history and is never reported missed.
 
 A module's code can log to its run and record numbers:
 
@@ -74,7 +74,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 final class SyncWorker extends QueueWorkerBase { /* ... */ }
 ```
 
-Every item the worker processes is then a run of `drupal:queue:<worker>`, with the trigger `"queue"`, in cron, Drush or anywhere else. What the worker throws, a failure or a `RequeueException`, `DelayedRequeueException` or `SuspendQueueException` asking for the item back, is recorded as a failed attempt and thrown on, so Drupal releases, delays or keeps the item as it would. Failing attempts open one alert and the attempt that succeeds closes it with a recovery. Workers are tagged `drupal-queue`; one no longer watched keeps its history without a schedule.
+Every item the worker processes is then a run of `drupal:queue:<worker>`, with the trigger `"drupal-queue"` (`"queue"` on runs recorded before 1.0), in cron, Drush or anywhere else. What the worker throws, a failure or a `RequeueException`, `DelayedRequeueException` or `SuspendQueueException` asking for the item back, is recorded as a failed attempt and thrown on, so Drupal releases, delays or keeps the item as it would. Failing attempts open one alert and the attempt that succeeds closes it with a recovery. Workers are tagged `drupal-queue`; one no longer watched keeps its history without a schedule.
 
 ## The check
 

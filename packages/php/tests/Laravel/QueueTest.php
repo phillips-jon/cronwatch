@@ -53,7 +53,7 @@ final class QueueTest extends TestCase
         $name = 'Cronwatch.Tests.Laravel.Fixtures.FlakyJob';
         $runs = array_reverse($cw->runs($name));
         $this->assertSame(['failed', 'failed', 'ok'], array_map(fn ($r) => $r->status, $runs));
-        $this->assertSame(['queue', 'queue', 'queue'], array_map(fn ($r) => $r->trigger, $runs));
+        $this->assertSame(['laravel-queue', 'laravel-queue', 'laravel-queue'], array_map(fn ($r) => $r->trigger, $runs));
         $this->assertStringStartsWith('RuntimeException: attempt 1 failed', $runs[0]->error);
         $this->assertStringStartsWith('RuntimeException: attempt 2 failed', $runs[1]->error);
         $this->assertSame('attempt 3 worked', $runs[2]->output);

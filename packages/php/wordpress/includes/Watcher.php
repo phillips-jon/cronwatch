@@ -169,7 +169,7 @@ final class Watcher
         }
     }
 
-    /** cronwatch_log(): a line for the run in progress. */
+    /** The cronwatch_log action (and cronwatch_log()): a line for the run in progress. */
     public function log(mixed ...$parts): void
     {
         for ($i = count($this->open) - 1; $i >= 0; $i--) {

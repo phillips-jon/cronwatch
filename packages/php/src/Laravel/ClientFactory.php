@@ -65,11 +65,14 @@ final class ClientFactory
     /**
      * The store config/cronwatch.php names. `ignoreCreateTables` gives the
      * store itself, for the migration, even when create_tables is off.
+     * The table prefix and create_tables are read through Settings, which
+     * still takes their pre-1.0 keys under `store`.
      */
     public function store(bool $ignoreCreateTables = false): Store
     {
         $config = $this->config()['store'] ?? [];
-        $prefix = is_string($config['prefix'] ?? null) ? $config['prefix'] : 'cronwatch_';
+        $settings = $this->app->make('config');
+        $prefix = Settings::tablePrefix($settings);
         $driver = is_string($config['driver'] ?? null) ? $config['driver'] : 'database';
         $store = match ($driver) {
             'database' => DatabaseStore::make($this->app->make('db'), is_string($config['connection'] ?? null) && $config['connection'] !== '' ? $config['connection'] : null, $prefix),
@@ -77,7 +80,7 @@ final class ClientFactory
             'memory' => new MemoryStore(),
             default => throw new \InvalidArgumentException("cronwatch.store.driver must be database, sqlite or memory, not {$driver}"),
         };
-        if (!$ignoreCreateTables && ($config['create_tables'] ?? true) === false && !$store instanceof MemoryStore) {
+        if (!$ignoreCreateTables && !Settings::createTables($settings) && !$store instanceof MemoryStore) {
             return new Migrated($store);
         }
         return $store;

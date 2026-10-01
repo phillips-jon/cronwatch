@@ -1,5 +1,13 @@
 # Release Notes for CronWatch
 
+## Unreleased
+
+### Changed
+- Runs are recorded with the triggers `craft-queue` and `craft-command`, the integration's name as every other integration spells it; runs recorded before keep `queue` and `command`.
+
+### Fixed
+- `GET /cronwatch/api`, with no path after it, reaches the JSON API instead of the site's 404 page, so the API's own answer at its root (the library and its version, from 1.0) is served.
+
 ## 0.10.0 - 2026-09-30
 
 ### Added

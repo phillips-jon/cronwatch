@@ -42,8 +42,8 @@ use yii\queue\ExecEvent;
  */
 final class Recorder
 {
-    public const TRIGGER_QUEUE = 'queue';
-    public const TRIGGER_COMMAND = 'command';
+    public const TRIGGER_QUEUE = 'craft-queue';
+    public const TRIGGER_COMMAND = 'craft-command';
     public const TAG_QUEUE = 'craft-queue';
     public const TAG_COMMAND = 'craft-command';
     /** Jobs declared from the settings, which the check declares again without a schedule once they are taken out. */
