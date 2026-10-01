@@ -143,6 +143,34 @@ defmodule Cronwatch.Conformance.ChannelsTest do
     assert count == 90 + 18 + 6 + 8
   end
 
+  test "conformance/channels.json: the webhook's payload, \"schema\":1 first, and its signature" do
+    f = Conformance.fixture("channels")
+    {alerts, _} = alerts(f)
+    rec = Rec.start()
+    cases = list(f, "webhookPayloads")
+
+    failures =
+      Enum.flat_map(cases, fn c ->
+        {module, state} = build("webhook", Object.new([{"url", "https://hooks.example.com/x"}, {"secret", field(c, "secret")}]), Rec.spec(rec))
+        Rec.answer_with(rec, 200, "")
+        :ok = module.send(state, Map.fetch!(alerts, field(c, "alert")), ctx())
+        [got] = Rec.taken(rec)
+        {_, signature} = List.keyfind(got.headers, "x-cronwatch-signature", 0)
+
+        cond do
+          got.body != field(c, "body") -> ["#{field(c, "alert")}: body #{got.body}\n  want #{field(c, "body")}"]
+          signature != field(c, "signature") -> ["#{field(c, "alert")}: signature #{signature}, want #{field(c, "signature")}"]
+          true -> []
+        end
+      end)
+
+    assert failures == [], "channels.json webhookPayloads: #{length(failures)} cases differ:\n" <> Enum.join(failures, "\n")
+    assert length(cases) == 15
+
+    assert Webhook.signature("key", "The quick brown fox jumps over the lazy dog") ==
+             "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+  end
+
   test "Discord's description is held to 4096 as a whole, the message cut and the triage whole" do
     {_, first} = alerts(Conformance.fixture("channels"))
 

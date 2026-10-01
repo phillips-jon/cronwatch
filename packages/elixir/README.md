@@ -100,6 +100,8 @@ triage: {Cronwatch.Triage.Anthropic, context: "A Phoenix app with a Postgres dat
 
 Requests go through a small HTTP/1.1 client of the package's own, over OTP's `:gen_tcp` and `:ssl`, with one ten second deadline, redirects refused, at most 1 MiB of any answer read as it arrives, TLS always verified, and only a URL's origin in any error; no credential is printed by `inspect`. `transport:` on a channel or the instance takes a `Cronwatch.Transport` of your own (over Req or Finch, say). `Cronwatch.Triage.Anthropic` reads `ANTHROPIC_API_KEY` unless given `api_key:`.
 
+The webhook posts the alert with `"schema": 1` as its first field, the payload every CronWatch library sends ([its JSON Schema](https://cronwatch.dev/schemas/webhook/1.json)); read its fields, not `title` and `message`, whose wording is not promised. With a `secret:` it is signed, and `Cronwatch.Alerts.Webhook.signature(secret, raw_body)` gives a receiver the hex to compare with `Plug.Crypto.secure_compare/2`.
+
 ### pg_cron
 
 `{Cronwatch.Sources.PgCron, repo: MyApp.Repo}` in the instance's `sources:` records the runs of pg_cron jobs inside a Postgres database, as the SDK's source does; `jobs:`, `job_ids:` or `pick:` choose which.
