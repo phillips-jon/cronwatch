@@ -12,7 +12,7 @@
 //	s, _ := gocron.NewScheduler(cwgocron.Watch(cw, cwgocron.Options{}))
 //	s.NewJob(gocron.CronJob("0 2 * * *", false), gocron.NewTask(jobs.NightlyReport))
 //	s.Start()
-//	cw.Start(time.Minute) // checks for missed and stuck runs
+//	cw.StartChecking(time.Minute) // checks for missed and stuck runs
 //
 // Watch adds gocron's BeforeJobRuns, AfterJobRuns, AfterJobRunsWithError
 // and AfterJobRunsWithPanic listeners to every job (WithGlobalJobOptions):

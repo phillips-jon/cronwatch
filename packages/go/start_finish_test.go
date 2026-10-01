@@ -305,7 +305,7 @@ func TestCloseWaitsForACheckUnderWayBeforeItClosesTheStore(t *testing.T) {
 				if by == "a caller" {
 					wg.Go(func() { _, _ = k.cw.Check(bg) })
 				} else {
-					k.cw.Start(time.Minute)
+					k.cw.StartChecking(time.Minute)
 					time.Sleep(2 * time.Second)
 				}
 				<-entered

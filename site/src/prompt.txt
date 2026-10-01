@@ -411,10 +411,10 @@ Go (Go 1.25 or newer)
      Lambda. It needs Authorization: Bearer $CRON_SECRET.
 
 4. Run the check every few minutes so missed and stuck runs are noticed:
-   cw.Start(time.Minute) once in a long-running process (robfig/cron and
-   gocron apps included), the River or Asynq check job above, or a second
-   crontab line running a command that declares the same jobs and calls
-   cw.Check(ctx).
+   cw.StartChecking(time.Minute) once in a long-running process (robfig/cron
+   and gocron apps included), the River or Asynq check job above, or a
+   second crontab line running a command that declares the same jobs and
+   calls cw.Check(ctx).
 
 5. Mount the dashboard: routes, err := cw.Routes() (or cw.MustRoutes() at
    package level), then mux.Handle("/cronwatch/", routes). Outside

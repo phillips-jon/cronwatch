@@ -6,7 +6,7 @@
 //	c := cron.New(robfigcron.Watch(cw, robfigcron.Options{}))
 //	c.AddFunc("0 2 * * *", jobs.NightlyReport) // the job "jobs.NightlyReport"
 //	c.Start()
-//	cw.Start(time.Minute) // checks for missed and stuck runs
+//	cw.StartChecking(time.Minute) // checks for missed and stuck runs
 //
 // Watch installs a JobWrapper that records each run (a panic is a failed
 // run, and carries on to the wrappers outside it, such as cron.Recover)

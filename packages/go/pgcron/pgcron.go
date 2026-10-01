@@ -6,7 +6,7 @@
 //
 //	source := pgcron.New(db, pgcron.Options{Prefix: "db:"}) // the app's *sql.DB, any Postgres driver
 //	cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(source))
-//	cw.Start(time.Minute)
+//	cw.StartChecking(time.Minute)
 //
 // A job that is renamed, unscheduled or no longer picked keeps its old
 // name's runs and history, and that name is declared again without a

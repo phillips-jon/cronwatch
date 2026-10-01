@@ -152,7 +152,7 @@ cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(pgcro
 if err != nil {
 	log.Fatal(err)
 }
-cw.Start(time.Minute)
+cw.StartChecking(time.Minute)
 ```
 
 ## Dashboard
@@ -183,7 +183,7 @@ The answer is `{"ok","job","run","status","durationMs"}`, 200 or 500 (a panic in
 
 ## Checks
 
-Missed and stuck runs are found by a check. A long-running service (a server, a worker, a process running a scheduler) calls `cw.Start(time.Minute)`, a goroutine that checks every minute until `cw.Stop` or `cw.Close`; one process is enough, and more are harmless. A program run from a crontab checks from a second crontab line, on a store both reach ([`examples/crontab`](examples/crontab/main.go) is one):
+Missed and stuck runs are found by a check. A long-running service (a server, a worker, a process running a scheduler) calls `cw.StartChecking(time.Minute)`, a goroutine that checks every minute until `cw.Stop` or `cw.Close`; one process is enough, and more are harmless. A program run from a crontab checks from a second crontab line, on a store both reach ([`examples/crontab`](examples/crontab/main.go) is one):
 
 ```
 # m  h  dom mon dow  command

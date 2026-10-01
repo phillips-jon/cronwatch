@@ -478,9 +478,9 @@ func TestStartWithDeliverAtCheckSaysOnceAnotherProcessMustSend(t *testing.T) {
 	cronwatch.Stderr = &buf
 	defer func() { cronwatch.Stderr = saved }()
 	cw := cronwatch.MustNew(cronwatch.WithDeliver(cronwatch.DeliverAtCheck), cronwatch.WithoutCronSecret())
-	cw.Start(time.Hour)
+	cw.StartChecking(time.Hour)
 	cw.Stop()
-	cw.Start(time.Hour)
+	cw.StartChecking(time.Hour)
 	cw.Stop()
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 	eq(t, "warnings", len(lines), 1)

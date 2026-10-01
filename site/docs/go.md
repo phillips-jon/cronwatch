@@ -118,10 +118,10 @@ The context the function gets is the caller's with the job's `Timeout` added (an
 A job that never starts cannot report itself, so something has to look. A long-running process (a server, a worker, a process running a scheduler) checks in a goroutine:
 
 ```go
-cw.Start(time.Minute) // until cw.Stop() or cw.Close()
+cw.StartChecking(time.Minute) // until cw.Stop() or cw.Close()
 ```
 
-The first check runs a second after `Start`, then one every interval (a minute when 0, five seconds at least). A second `Start` does nothing, and `Stop` lets a check in flight finish. One process checking is enough; running `Start` in every replica is harmless, since a check judges each run once. A serverless function does not run between requests, so call `cw.Check` from a cron there instead, or point one at the dashboard's `/api/check`.
+The first check runs a second after `StartChecking`, then one every interval (a minute when 0, five seconds at least). A second call does nothing, and `Stop` lets a check in flight finish. One process checking is enough; running `StartChecking` in every replica is harmless, since a check judges each run once. A serverless function does not run between requests, so call `cw.Check` from a cron there instead, or point one at the dashboard's `/api/check`.
 
 A program run from a crontab exits when it is done, so nothing inside it notices the run that never happened. Add a second crontab line that checks, on a store both reach. Both commands declare the job, so the check knows its schedule before its first run:
 
@@ -328,7 +328,7 @@ cw, err := cronwatch.New(cronwatch.WithStore(store), cronwatch.WithSources(sourc
 if err != nil {
 	log.Fatal(err)
 }
-cw.Start(time.Minute)
+cw.StartChecking(time.Minute)
 ```
 
 It reads through anything with `QueryContext`: a `*sql.DB`, `*sql.Conn` or `*sql.Tx`, opened with whatever Postgres driver the app uses (pgx's `stdlib` and `lib/pq` are both tested). Settings are read from `pg_settings`, so a setting the role may not read never aborts your transaction, and the source never commits or rolls back. `pgcron.Options` has `Jobs`, `JobIDs` and `Pick` to choose jobs, `Prefix`, `JobName`, `Options` and `OptionsFor` (job options for every job, or per job; the schedule and zone always come from pg_cron) and `Timezone` (by default the server's `cron.timezone`, else UTC). The rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
@@ -408,7 +408,7 @@ The client:
 | `Job(name, options...)`, `MustJob` | declare a job and get its handle |
 | `Run(ctx, name, fn, options...)` | run without keeping a handle |
 | `Check(ctx)` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `Start(every)`, `Stop()` | check in a goroutine; the interval is at least five seconds |
+| `StartChecking(every)`, `Stop()` | check in a goroutine; the interval is at least five seconds. `Start(every)`, its name before 1.0, still works and is deprecated: a job's `Start` opens a run |
 | `Jobs(ctx)`, `JobsWithRuns(ctx, limit)`, `JobSummary(ctx, name)` | summaries, without alerting |
 | `Runs(ctx, name, limit)`, `GetRun(ctx, id)` | newest first; `limit` is 1 to 500 |
 | `Silence(ctx, name, d)`, `Unsilence(ctx, name)` | stop alerts for a while; state keeps updating underneath. The end is a whole millisecond, held at 2^53 - 1 |

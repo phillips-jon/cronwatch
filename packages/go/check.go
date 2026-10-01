@@ -376,12 +376,13 @@ func (c *Client) Forget(ctx context.Context, name string) error {
 	return c.store.DeleteJob(ctx, name)
 }
 
-// Start checks on an interval in a goroutine, for long-running servers:
-// the first check a second from now, then every `every` (a minute when 0,
-// five seconds at least). Not for serverless functions, where nothing runs
-// between requests: call Check from a cron there instead. A second Start
-// does nothing.
-func (c *Client) Start(every time.Duration) {
+// StartChecking checks on an interval in a goroutine, for long-running
+// servers: the first check a second from now, then every `every` (a minute
+// when 0, five seconds at least). Not for serverless functions, where
+// nothing runs between requests: call Check from a cron there instead. A
+// second call does nothing. (A job's Start opens a run; this starts the
+// checks.)
+func (c *Client) StartChecking(every time.Duration) {
 	c.timerMu.Lock()
 	defer c.timerMu.Unlock()
 	if c.stop != nil {
@@ -394,7 +395,7 @@ func (c *Client) Start(every time.Duration) {
 	c.warnMu.Lock()
 	if c.deferDelivery && !c.warnedDeferredStart {
 		c.warnedDeferredStart = true
-		fmt.Fprintln(Stderr, `[cronwatch] Start() was called with DeliverAtCheck, so these checks send no alerts. Another process must run checks with DeliverNow (the default) to send them.`)
+		fmt.Fprintln(Stderr, `[cronwatch] StartChecking() was called with DeliverAtCheck, so these checks send no alerts. Another process must run checks with DeliverNow (the default) to send them.`)
 	}
 	c.warnMu.Unlock()
 	stop, ticking := make(chan struct{}), make(chan struct{})
@@ -430,7 +431,13 @@ func (c *Client) Start(every time.Duration) {
 	}()
 }
 
-// Stop stops the interval Start began. A check in flight finishes; Close
+// Start is StartChecking, under its former name.
+//
+// Deprecated: Use StartChecking, since a job's Start opens a run. Start
+// still works through 1.x and goes in 2.0.
+func (c *Client) Start(every time.Duration) { c.StartChecking(every) }
+
+// Stop stops the interval StartChecking began. A check in flight finishes; Close
 // waits for it.
 func (c *Client) Stop() { c.stopTicking() }
 

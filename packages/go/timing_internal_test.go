@@ -212,13 +212,13 @@ func TestStopAlsoCancelsTheFirstCheckStartSchedules(t *testing.T) {
 	shorten(t, &firstCheckDelay, 30*time.Millisecond)
 	store := &countingStore{MemoryStore: NewMemoryStore()}
 	cw := MustNew(WithStore(store), WithoutCronSecret())
-	cw.Start(time.Hour)
+	cw.StartChecking(time.Hour)
 	cw.Stop()
 	time.Sleep(100 * time.Millisecond)
 	if n := store.checks.Load(); n != 0 {
 		t.Fatalf("%d checks after stop", n)
 	}
-	cw.Start(time.Hour)
+	cw.StartChecking(time.Hour)
 	deadline := time.Now().Add(5 * time.Second)
 	for store.checks.Load() == 0 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
@@ -227,10 +227,38 @@ func TestStopAlsoCancelsTheFirstCheckStartSchedules(t *testing.T) {
 	if n := store.checks.Load(); n != 1 {
 		t.Errorf("%d checks, want the first one", n)
 	}
-	// A second Start while one runs does nothing.
-	cw.Start(time.Hour)
-	cw.Start(time.Minute)
+	// A second StartChecking while one runs does nothing.
+	cw.StartChecking(time.Hour)
+	cw.StartChecking(time.Minute)
 	cw.Stop()
+}
+
+// Start, deprecated, is StartChecking under its former name: one interval
+// whichever name begins it, and Stop ends it.
+func TestStartIsStartChecking(t *testing.T) {
+	shorten(t, &firstCheckDelay, time.Hour)
+	cw := MustNew(WithoutCronSecret())
+	cw.Start(time.Hour)
+	cw.timerMu.Lock()
+	first := cw.stop
+	cw.timerMu.Unlock()
+	if first == nil {
+		t.Fatal("Start began no interval")
+	}
+	cw.StartChecking(time.Minute)
+	cw.timerMu.Lock()
+	same := cw.stop == first
+	cw.timerMu.Unlock()
+	if !same {
+		t.Error("StartChecking after Start began a second interval")
+	}
+	cw.Stop()
+	cw.timerMu.Lock()
+	stopped := cw.stop == nil
+	cw.timerMu.Unlock()
+	if !stopped {
+		t.Error("Stop did not end the interval Start began")
+	}
 }
 
 func TestStartChecksOnItsInterval(t *testing.T) {
@@ -238,7 +266,7 @@ func TestStartChecksOnItsInterval(t *testing.T) {
 	store := &countingStore{MemoryStore: NewMemoryStore()}
 	cw := MustNew(WithStore(store), WithoutCronSecret())
 	// Five seconds is the shortest interval, so the first check is the one seen here.
-	cw.Start(time.Millisecond)
+	cw.StartChecking(time.Millisecond)
 	deadline := time.Now().Add(5 * time.Second)
 	for store.checks.Load() == 0 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)

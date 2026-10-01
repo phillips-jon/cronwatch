@@ -36,7 +36,7 @@ For the queues, every attempt is a run of its own. An attempt that fails (an err
 
 ### The check
 
-robfig/cron and gocron run in the same process as the rest of the app, so that process checks: `cw.Start(time.Minute)` beside `c.Start()`. River and Asynq have a check job of their own, scheduled like any other and never a job itself, which also declares again without their schedules the jobs this app's scheduler no longer runs.
+robfig/cron and gocron run in the same process as the rest of the app, so that process checks: `cw.StartChecking(time.Minute)` beside `c.Start()`. River and Asynq have a check job of their own, scheduled like any other and never a job itself, which also declares again without their schedules the jobs this app's scheduler no longer runs.
 
 ## robfig/cron
 
@@ -53,7 +53,7 @@ c := cron.New(robfigcron.Watch(cw, robfigcron.Options{
 c.AddFunc("0 2 * * *", jobs.NightlyReport) // the job "jobs.NightlyReport"
 c.AddJob("*/15 * * * *", robfigcron.Named("sync-invoices", syncJob, cronwatch.Grace("5m")))
 c.Start()
-cw.Start(time.Minute) // checks for missed and stuck runs
+cw.StartChecking(time.Minute) // checks for missed and stuck runs
 ```
 
 `Watch` is a `cron.Option`. It sets the cron's chain to your wrappers (`Options.Chain`) with CronWatch's innermost, and its logger to one around yours (`Options.Logger`, else robfig/cron's default), which is how entries added or removed later are followed: robfig/cron logs `start`, `added` and `removed`, and each starts a sync. A `cron.WithChain` or `cron.WithLogger` given to `cron.New` after `Watch` replaces CronWatch's, so give yours to the options instead. A wrapper outside CronWatch's that skips a run (`cron.SkipIfStillRunning`) records nothing, and one that recovers panics (`cron.Recover`) sees the panic after the run is recorded as failed; without one, the panic ends the program, as it would without CronWatch.
@@ -91,7 +91,7 @@ s.NewJob(gocron.CronJob("0 2 * * *", false), gocron.NewTask(jobs.NightlyReport))
 s.NewJob(gocron.DurationJob(15*time.Minute), gocron.NewTask(syncInvoices),
 	gocron.WithName("sync-invoices"))
 s.Start()
-cw.Start(time.Minute) // checks for missed and stuck runs
+cw.StartChecking(time.Minute) // checks for missed and stuck runs
 ```
 
 The package is also called `gocron`, so import it under a name of its own. `Watch` is a `gocron.SchedulerOption` that adds gocron's event listeners to every job (`BeforeJobRuns`, `AfterJobRuns`, `AfterJobRunsWithError` and `AfterJobRunsWithPanic`): a run starts when gocron is about to run the job and ends with its outcome, an error failing it. A job added or updated later is declared at once, and one removed is unscheduled at the next sync (the next run of a job not declared yet, or the watcher's `Sync`).
