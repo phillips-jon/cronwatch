@@ -152,9 +152,13 @@ public final class Sql {
   static String version(Dialect dialect, String column) {
     if (dialect == Dialect.MYSQL) {
       // MySQL's JSON_EXTRACT answers JSON and MariaDB's text; plus 0, both are a number, and the
-      // CASE tests the JSON type before any arithmetic.
+      // CASE tests the JSON type before any arithmetic. The column is text, which may hold text
+      // that is not JSON at all (a damaged row's): that counts as 0, tested before JSON_EXTRACT,
+      // which fails on it.
       String v = "JSON_EXTRACT(" + column + ", '$.version')";
-      return "CASE WHEN JSON_TYPE("
+      return "CASE WHEN NOT JSON_VALID("
+          + column
+          + ") THEN 0 WHEN JSON_TYPE("
           + v
           + ") NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN "
           + v

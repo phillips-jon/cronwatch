@@ -26,7 +26,7 @@ defmodule Cronwatch.Store.SQLDialectTest do
 
     assert q.cas_from_zero ==
              "UPDATE cw_state SET state = ? WHERE job = ? AND " <>
-               "CASE WHEN JSON_TYPE(JSON_EXTRACT(state, '$.version')) NOT IN " <>
+               "CASE WHEN NOT JSON_VALID(state) THEN 0 WHEN JSON_TYPE(JSON_EXTRACT(state, '$.version')) NOT IN " <>
                "('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 " <>
                "WHEN JSON_EXTRACT(state, '$.version') + 0 = FLOOR(JSON_EXTRACT(state, '$.version') + 0) " <>
                "AND JSON_EXTRACT(state, '$.version') + 0 BETWEEN 0 AND 9007199254740991 " <>
@@ -191,6 +191,15 @@ defmodule Cronwatch.Store.MySQLDialectTests do
   and Rust ports have them), used once per server.
   """
 
+  import ExUnit.Assertions
+
+  alias Cronwatch.JS
+  alias Cronwatch.Store.Ecto, as: EctoStore
+  alias Cronwatch.Test.Client
+  alias Cronwatch.Test.Clock
+  alias Cronwatch.Test.Servers
+  alias Cronwatch.Test.Stores
+
   defmacro __using__(opts) do
     kind = Keyword.fetch!(opts, :kind)
 
@@ -200,6 +209,7 @@ defmodule Cronwatch.Store.MySQLDialectTests do
       alias Cronwatch.JobState
       alias Cronwatch.JS
       alias Cronwatch.Store.Ecto, as: EctoStore
+      alias Cronwatch.Store.MySQLDialectTests
       alias Cronwatch.StoreCase
       alias Cronwatch.Test.Servers
 
@@ -330,7 +340,50 @@ defmodule Cronwatch.Store.MySQLDialectTests do
         assert {:ok, %{trigger: trigger}} = EctoStore.get_run(h, "r")
         assert trigger == String.duplicate("é", 255)
       end
+
+      # State rows a damaged or hand-edited row could hold in the LONGTEXT
+      # column (see damaged_state_row_is_replaced/1).
+      test "a damaged state row is replaced" do
+        MySQLDialectTests.damaged_state_row_is_replaced(@kind)
+      end
     end
+  end
+
+  # State rows a damaged or hand-edited row could hold in the LONGTEXT
+  # column: text that is not JSON, JSON that is not an object, and objects
+  # whose version is not a number. A check, a silence and a second check
+  # answer with no error, and the silence replaces each row (it counts as
+  # version 0, as on SQLite).
+  @doc false
+  def damaged_state_row_is_replaced(kind) do
+    {EctoStore, h} = store = Servers.store(kind)
+    p = h.prefix
+    :ok = EctoStore.init(h)
+
+    damaged =
+      ["{", "not json", "5", ~s("x"), "[]", "null"] ++
+        [~s({"version":"x"}), ~s({"version":true}), ~s({"version":{"a":1}}), ~s({"version":[1]})]
+
+    damaged
+    |> Enum.with_index()
+    |> Enum.each(fn {text, i} ->
+      :ok = EctoStore.upsert_job(h, JS.parse!(~s({"name":"dmg#{i}"})), 1)
+      Servers.sql(h.repo, h.dynamic_repo, "INSERT INTO #{p}state (job, state) VALUES (?, ?)", ["dmg#{i}", text])
+    end)
+
+    %{cw: cw, clock: c, errors: errors} = Client.make(store: Stores.option(store))
+    assert {:ok, _} = Cronwatch.check(instance: cw)
+
+    damaged
+    |> Enum.with_index()
+    |> Enum.each(fn {text, i} ->
+      assert {:ok, _} = Cronwatch.silence("dmg#{i}", "1h", instance: cw), "silencing over #{text}"
+      {:ok, st} = EctoStore.get_state(h, "dmg#{i}")
+      assert st.silenced_until == Clock.now(c) + 3_600_000, "over #{text}"
+    end)
+
+    assert {:ok, _} = Cronwatch.check(instance: cw)
+    assert Agent.get(errors, & &1) == []
   end
 end
 

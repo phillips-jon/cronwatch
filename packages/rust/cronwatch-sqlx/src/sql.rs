@@ -266,11 +266,13 @@ impl Statements {
         // The version inside a state's JSON text, as cronwatch's state_version
         // reads it: a whole number from 0 to 2^53 - 1, else 0. JSON_TYPE is
         // tested before any arithmetic; MySQL's JSON_EXTRACT answers JSON and
-        // MariaDB's text, and `+ 0` makes either a number.
+        // MariaDB's text, and `+ 0` makes either a number. The column is
+        // text, which may hold text that is not JSON at all (a damaged row's):
+        // that counts as 0, tested before JSON_EXTRACT, which fails on it.
         let version = |column: &str| {
             let v = format!("JSON_EXTRACT({column}, '$.version')");
             format!(
-                "CASE WHEN JSON_TYPE({v}) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN {v} + 0 = FLOOR({v} + 0) AND {v} + 0 BETWEEN 0 AND 9007199254740991 THEN CAST({v} + 0 AS SIGNED) ELSE 0 END"
+                "CASE WHEN NOT JSON_VALID({column}) THEN 0 WHEN JSON_TYPE({v}) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN {v} + 0 = FLOOR({v} + 0) AND {v} + 0 BETWEEN 0 AND 9007199254740991 THEN CAST({v} + 0 AS SIGNED) ELSE 0 END"
             )
         };
         let s = |text: String| -> Arc<str> { Arc::from(text) };
@@ -397,7 +399,7 @@ mod tests {
         assert!(q.insert_run.contains("metrics, `trigger`)"));
         assert_eq!(
             &*q.cas_from_zero,
-            "UPDATE cw_state SET state = ? WHERE job = ? AND CASE WHEN JSON_TYPE(JSON_EXTRACT(state, '$.version')) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN JSON_EXTRACT(state, '$.version') + 0 = FLOOR(JSON_EXTRACT(state, '$.version') + 0) AND JSON_EXTRACT(state, '$.version') + 0 BETWEEN 0 AND 9007199254740991 THEN CAST(JSON_EXTRACT(state, '$.version') + 0 AS SIGNED) ELSE 0 END = 0"
+            "UPDATE cw_state SET state = ? WHERE job = ? AND CASE WHEN NOT JSON_VALID(state) THEN 0 WHEN JSON_TYPE(JSON_EXTRACT(state, '$.version')) NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN JSON_EXTRACT(state, '$.version') + 0 = FLOOR(JSON_EXTRACT(state, '$.version') + 0) AND JSON_EXTRACT(state, '$.version') + 0 BETWEEN 0 AND 9007199254740991 THEN CAST(JSON_EXTRACT(state, '$.version') + 0 AS SIGNED) ELSE 0 END = 0"
         );
         assert!(q.update_run_if(1).ends_with("status IN (?)"));
     }

@@ -130,10 +130,13 @@ func newStatements(d Dialect, p string) statements {
 		// The version inside a state's JSON text, as the SDK's stateVersion()
 		// reads it: a whole number from 0 to 2^53 - 1, else 0. MySQL's
 		// JSON_EXTRACT answers JSON and MariaDB's text; plus 0, both are a
-		// number, and the CASE tests the JSON type before any arithmetic.
+		// number, and the CASE tests the JSON type before any arithmetic. The
+		// column is text, which may hold text that is not JSON at all (a
+		// damaged row's): that counts as 0, tested before JSON_EXTRACT, which
+		// fails on it.
 		version := func(column string) string {
 			v := "JSON_EXTRACT(" + column + ", '$.version')"
-			return "CASE WHEN JSON_TYPE(" + v + ") NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN " +
+			return "CASE WHEN NOT JSON_VALID(" + column + ") THEN 0 WHEN JSON_TYPE(" + v + ") NOT IN ('INTEGER', 'UNSIGNED INTEGER', 'DOUBLE', 'DECIMAL') THEN 0 WHEN " +
 				v + " + 0 = FLOOR(" + v + " + 0) AND " + v + " + 0 BETWEEN 0 AND 9007199254740991 THEN CAST(" + v + " + 0 AS SIGNED) ELSE 0 END"
 		}
 		return statements{

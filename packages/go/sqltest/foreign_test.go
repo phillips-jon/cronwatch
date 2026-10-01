@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	cronwatch "cronwatch.dev/go"
 	"cronwatch.dev/go/sqlstore"
@@ -164,5 +165,51 @@ func TestServerCronOverForeignRow(t *testing.T) {
 				cronOverForeignRow(t, b.open(t), b.dialect, prefix("farcron"), startedAt)
 			})
 		}
+	})
+}
+
+// damagedStates are state rows a damaged or hand-edited MySQL or MariaDB
+// row could hold in its LONGTEXT column: text that is not JSON, JSON that
+// is not an object, and objects whose version is not a number.
+var damagedStates = []string{`{`, `not json`, `5`, `"x"`, `[]`, `null`, `{"version":"x"}`, `{"version":true}`, `{"version":{"a":1}}`, `{"version":[1]}`}
+
+// TestMySQLDamagedStateRowIsReplaced: a check, a silence and a second check
+// over jobs whose state rows are damaged answer with no error, and the
+// silence replaces each row (it counts as version 0, as on SQLite).
+func TestMySQLDamagedStateRowIsReplaced(t *testing.T) {
+	mysqlServers(t, func(t *testing.T, b backend) {
+		db := b.open(t)
+		p := prefix("dmg")
+		store := newStore(t, db, sqlstore.MySQL, p)
+		must(t, store.Init(ctx))
+		for i, text := range damagedStates {
+			name := "dmg" + strconv.Itoa(i)
+			var def cronwatch.Definition
+			must(t, def.UnmarshalJSON([]byte(`{"name":"`+name+`"}`)))
+			must(t, store.UpsertJob(ctx, def, 1))
+			_, err := db.ExecContext(ctx, "INSERT INTO "+p+"state (job, state) VALUES (?, ?)", name, text)
+			must(t, err)
+		}
+		proc := process(t, store, storetest.NewClock(storetest.T0).Now)
+		_, err := proc.Client.Check(ctx)
+		must(t, err)
+		for i, text := range damagedStates {
+			name := "dmg" + strconv.Itoa(i)
+			if _, err := proc.Client.Silence(ctx, name, time.Hour); err != nil {
+				t.Errorf("silencing over %s: %v", text, err)
+				continue
+			}
+			st, err := store.GetState(ctx, name)
+			must(t, err)
+			if st == nil || st.SilencedUntil == nil || *st.SilencedUntil != storetest.T0+3600000 {
+				t.Errorf("the state after silencing over %s: %+v", text, st)
+			}
+		}
+		_, err = proc.Client.Check(ctx)
+		must(t, err)
+		if errs := proc.Errors.List(); len(errs) > 0 {
+			t.Fatalf("errors: %v", errs)
+		}
+		must(t, proc.Client.Close())
 	})
 }

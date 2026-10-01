@@ -1,10 +1,12 @@
 package dev.cronwatch.store;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.cronwatch.Cronwatch;
 import dev.cronwatch.Definition;
 import dev.cronwatch.JobState;
 import dev.cronwatch.Metrics;
@@ -15,6 +17,7 @@ import dev.cronwatch.json.Json;
 import dev.cronwatch.storetest.TestRuns;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -200,6 +203,57 @@ abstract class MysqlDialectTests extends ServerStoreTests {
     Run read = store.getRun("r");
     assertNotNull(read);
     assertEquals("é".repeat(254) + "😀", read.trigger());
+  }
+
+  /**
+   * State rows a damaged or hand-edited row could hold in the {@code LONGTEXT} column: text that is
+   * not JSON, JSON that is not an object, and objects whose version is not a number. A check, a
+   * silence and a second check answer with no error, and the silence replaces each row (it counts
+   * as version 0, as on SQLite).
+   */
+  @Test
+  void aDamagedStateRowIsReplaced() throws Exception {
+    List<String> damaged =
+        List.of(
+            "{",
+            "not json",
+            "5",
+            "\"x\"",
+            "[]",
+            "null",
+            "{\"version\":\"x\"}",
+            "{\"version\":true}",
+            "{\"version\":{\"a\":1}}",
+            "{\"version\":[1]}");
+    String p = prefix();
+    SqlStore store = Servers.store(kind(), p);
+    store.init();
+    for (int i = 0; i < damaged.size(); i++) {
+      store.upsertJob(Definition.fromJson("{\"name\":\"dmg" + i + "\"}"), 1);
+      exec(
+          "INSERT INTO "
+              + p
+              + "state (job, state) VALUES ('dmg"
+              + i
+              + "', '"
+              + damaged.get(i)
+              + "')");
+    }
+    List<String> errors = new ArrayList<>();
+    try (Cronwatch cw = client(store, new AtomicLong(T0), new ArrayList<>(), errors)) {
+      cw.check();
+      for (int i = 0; i < damaged.size(); i++) {
+        String name = "dmg" + i;
+        String over = "silencing over " + damaged.get(i);
+        JobState silenced = assertDoesNotThrow(() -> cw.silence(name, "1h"), over);
+        assertEquals(Long.valueOf(T0 + 3_600_000), silenced.silencedUntil(), over);
+        JobState stored = store.getState(name);
+        assertNotNull(stored, over);
+        assertEquals(Long.valueOf(T0 + 3_600_000), stored.silencedUntil(), over);
+      }
+      cw.check();
+    }
+    assertEquals(List.of(), errors);
   }
 
   @Test
