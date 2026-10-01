@@ -14,7 +14,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, ClassVar
 
 
 class RunStatus(StrEnum):
@@ -427,11 +427,18 @@ class JobState:
     #: when empty: the key is never written as an empty list.
     sending: list[Any] | None = None
     version: int | None = None
+    #: Keys a newer release wrote that this one does not know, as their JSON,
+    #: written back unchanged so a shared store never loses them.
+    extra: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
+
+    #: The keys this release reads, camelCase as stored.
+    KEYS: ClassVar[tuple[str, ...]] = ("job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending", "version")
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | JobState) -> JobState:
         if isinstance(data, JobState):
             return data
+        known = set(cls.KEYS) | {snake(k) for k in cls.KEYS}
         pending = _get(data, "pendingRecovery")
         undelivered = _get(data, "undelivered")
         sending = _get(data, "sending")
@@ -445,13 +452,15 @@ class JobState:
             undelivered=None if undelivered is None else [Alert.from_dict(a) for a in undelivered],
             sending=[SendingAlert.from_json(e) for e in sending] if isinstance(sending, list) and sending else None,
             version=_get(data, "version"),
+            extra={k: v for k, v in data.items() if k not in known},
         )
 
     def to_dict(self) -> dict[str, Any]:
         """pendingRecovery, undelivered, sending and version are left out when
         unset, as in state written before they existed (sending also when
-        empty). The version comes last, where the
-        SDK's spread of a normalized state puts it."""
+        empty). The version comes after the known keys, where the SDK's
+        spread of a normalized state puts it, and the keys this release does
+        not know come after it, as they were read."""
         out: dict[str, Any] = {
             "job": self.job,
             "open": {str(k): v for k, v in (self.open or {}).items()},
@@ -467,6 +476,8 @@ class JobState:
             out["sending"] = [_sending_to_json(e) for e in self.sending]
         if self.version is not None:
             out["version"] = self.version
+        for key, value in self.extra.items():
+            out.setdefault(key, value)
         return out
 
     def copy(self) -> JobState:
@@ -480,6 +491,7 @@ class JobState:
             undelivered=None if self.undelivered is None else list(self.undelivered),
             sending=None if self.sending is None else list(self.sending),
             version=self.version,
+            extra=dict(self.extra),
         )
 
 

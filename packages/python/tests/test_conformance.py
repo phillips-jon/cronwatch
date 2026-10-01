@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from cronwatch import _js, alerts, duration, evaluate, output, schedule, serialize
+from cronwatch import Cronwatch, _js, alerts, duration, evaluate, output, schedule, serialize
 from cronwatch.alerts import discord, twilio, webhook
 from cronwatch.alerts._shared import error_body
 from cronwatch.alerts.email import compose as compose_email
@@ -978,6 +978,106 @@ def test_pg_cron_rows_as_runs() -> None:
     each_case(PGCRON["runs"], check)
 
 
+# ---------------------------------------------------------------- client
+
+CLIENT = fixture("client.json")
+
+
+def test_client_run_ids() -> None:
+    """start, resume and record_run hold run ids to 1 to 200 UTF-16 units, each with its own error."""
+
+    def check(c: dict[str, Any]) -> str | None:
+        cw = Cronwatch(store=MemoryStore(), alerts=[], cron_secret=None, now=lambda: T0)
+        job = cw.job("j")
+        method = c["method"]
+
+        def call() -> None:
+            if method == "start":
+                job.start(id=c["id"]).finish()
+            elif method == "resume":
+                job.resume(c["id"])
+            else:
+                cw.record_run({"id": c["id"], "job": "j", "status": "ok", "startedAt": T0 - 1000, "finishedAt": T0, "durationMs": 1000, "error": None, "output": None, "metrics": {}, "trigger": "run"})
+
+        try:
+            if "error" in c:
+                # The port's own spelling of the method, as its NUL message already has it.
+                return raises(c["error"].replace("recordRun:", "record_run:"), call)
+            call()
+            return None
+        finally:
+            cw.close()
+
+    each_case(CLIENT["runIds"], check)
+
+
+def canonical(value: Any) -> str:
+    """JSON with sorted keys: the fixture compares objects as values, not by key order."""
+    return json.dumps(json.loads(as_json(value)), sort_keys=True)
+
+
+@pytest.mark.parametrize("kind", STORES)
+def test_client_unknown_fields(kind: str, tmp_path: Path) -> None:
+    """What a newer release wrote (a state or definition key, a run status, a
+    trigger, an open condition) survives a check, a silence, an unsilence, a
+    summary and a run, over each store."""
+    unknown = CLIENT["unknownFields"]
+    seed = unknown["seed"]
+    store = make_store(kind, tmp_path)
+    store.upsert_job(JobDefinition.from_dict(seed["definition"]), seed["createdAt"])
+    for run in seed["runs"]:
+        store.insert_run(Run.from_dict(run))
+    store.set_state(JobState.from_dict(seed["state"]))
+    clock = {"now": 0}
+    sent: list[Alert] = []
+    errors: list[str] = []
+    cw = Cronwatch(
+        store=store,
+        now=lambda: clock["now"],
+        cron_secret=None,
+        alerts=[alerts.Custom("capture", sent.append)],
+        on_error=lambda error, where: errors.append(f"{where}: {error}"),
+    )
+    try:
+        for step in unknown["steps"]:
+            clock["now"] = step["at"] if "at" in step else clock["now"]
+            op = step["op"]
+            if op == "check":
+                cw.check()
+            elif op == "silence":
+                cw.silence("keep", step["for"])
+            elif op == "unsilence":
+                cw.unsilence("keep")
+            elif op == "summary":
+                summary = cw.job_summary("keep")
+                assert summary is not None
+                got = summary.to_dict()
+                # `open` follows the stored state's key order, which Postgres's JSONB does not keep: compared as a set.
+                assert canonical({**got, "open": sorted(got["open"])}) == canonical({**step["summary"], "open": sorted(step["summary"]["open"])}), op
+            elif op == "declareAndRun":
+                clock["now"] = step["startedAt"]
+                handle = cw.job("keep", **{snake(k): v for k, v in step["declared"].items()}).start(id=step["id"])
+                clock["now"] = step["finishedAt"]
+                handle.finish(step["output"])
+            else:
+                raise AssertionError(f"unknown step {op}")
+            got_job = store.get_job("keep")
+            got_state = store.get_state("keep")
+            assert got_job is not None and got_state is not None
+            snapshot = {
+                "job": got_job.to_dict(),
+                "state": got_state.to_dict(),
+                "runs": [r.to_dict() for r in store.list_runs("keep", 10)],
+                "alerts": [a.to_dict() for a in sent],
+                "errors": list(errors),
+            }
+            sent.clear()
+            errors.clear()
+            assert canonical(snapshot) == canonical(step["expect"]), op
+    finally:
+        cw.close()
+
+
 # ---------------------------------------------------------------- every fixture
 
 # triage.json is replayed by test_triage.py, which needs the anthropic package's shapes.
@@ -985,5 +1085,5 @@ ELSEWHERE = {"triage.json"}
 
 
 def test_every_fixture_is_replayed() -> None:
-    replayed = {"duration.json", "schedule.json", "evaluate.json", "format.json", "health.json", "output.json", "store.json", "channels.json", "pgcron.json"}
+    replayed = {"client.json", "duration.json", "schedule.json", "evaluate.json", "format.json", "health.json", "output.json", "store.json", "channels.json", "pgcron.json"}
     assert {p.name for p in DIR.glob("*.json")} == replayed | ELSEWHERE

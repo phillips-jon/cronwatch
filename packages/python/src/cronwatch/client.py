@@ -675,6 +675,10 @@ class Cronwatch:
             declared = self._definitions.get(given.job)
         if declared is None:
             raise ValueError(f'record_run: job "{given.job}" is not declared; call job() first')
+        # The longest id start() takes; MySQL's column would hold 255, but every store holds 200.
+        if not isinstance(given.id, str) or given.id == "" or _js.length16(given.id) > 200:
+            got = f"{_js.length16(given.id)} characters" if isinstance(given.id, str) else type(given.id).__name__
+            raise ValueError(f'record_run: run ids must be 1 to 200 characters (got {got}; job "{given.job}")')
         if "\x00" in given.id:
             raise ValueError(f'record_run: run ids cannot contain a NUL character (job "{given.job}")')
         # Refused as metric() refuses them: a store keeps NaN and Infinity as null.

@@ -441,13 +441,15 @@ The client:
 | `silence(name, "2h")`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
 | `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resume_run(name, run_id)` | `job(name).resume(run_id)` for a job declared in this process |
-| `record_run(run, evaluate=True)` | record a run that happened elsewhere, for a source; returns the alerts it sent. Every metric must be a finite number, as with `metric()`; one that is not raises `ValueError` and nothing is recorded |
+| `record_run(run, evaluate=True)` | record a run that happened elsewhere, for a source; returns the alerts it sent. Its id is 1 to 200 characters with no NUL, as `start()` takes, and every metric must be a finite number, as with `metric()`; anything else raises `ValueError` and nothing is recorded |
 | `defined_jobs()` | the definitions declared in this process |
 | `close()` | stop the thread, wait for a check already under way, then close the store |
 
 ## Sharing a database with the other languages
 
 The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the PHP, Go, Rust, Elixir, Java and .NET stores: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+
+A 1.x release keeps what it does not know: a key a newer release added to a job's state or definition, a condition, a run status or a trigger is read, carried through every write and written back as it was, so any 1.x of any language can share a store with any other. Releases before 1.0 do not promise this: upgrade every process to 1.0 together.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store.
 
