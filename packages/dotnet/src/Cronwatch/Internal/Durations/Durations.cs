@@ -35,7 +35,7 @@ internal static class Durations
         {
             return Parse(s, label);
         }
-        if (Json.TryNumber(value, out double n))
+        if (JsonText.TryNumber(value, out double n))
         {
             return Parse(n, label);
         }
@@ -73,7 +73,7 @@ internal static class Durations
                     return b.ToString();
                 }
             default:
-                return Json.TryNumber(v, out double n) ? Js.FormatNumber(n) : Convert.ToString(v, CultureInfo.InvariantCulture) ?? "";
+                return JsonText.TryNumber(v, out double n) ? Js.FormatNumber(n) : Convert.ToString(v, CultureInfo.InvariantCulture) ?? "";
         }
     }
 

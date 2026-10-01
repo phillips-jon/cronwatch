@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Cronwatch.Internal;
 
 namespace Cronwatch;
 
@@ -112,7 +113,7 @@ public sealed class JobOptions
         {
             _order.Add(key);
         }
-        _values[key] = Json.Copy(value);
+        _values[key] = JsonText.Copy(value);
         return this;
     }
 
@@ -166,7 +167,7 @@ public sealed class JobOptions
             }
             else
             {
-                Put(key, Json.Copy(v));
+                Put(key, JsonText.Copy(v));
             }
         }
         if (other._expect != null)
@@ -188,7 +189,7 @@ public sealed class JobOptions
         foreach (string key in _order)
         {
             object? v = _values[key];
-            o.Set(key, v is BudgetMap b ? b.ToJs() : Json.Copy(v));
+            o.Set(key, v is BudgetMap b ? b.ToJs() : JsonText.Copy(v));
         }
         return o;
     }

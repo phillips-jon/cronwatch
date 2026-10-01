@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Cronwatch.Internal;
 using Xunit;
 using static Cronwatch.Tests.Support;
 
@@ -63,7 +64,7 @@ public class ClientConformanceTests
                 {
                     got.Set("error", e.Message);
                 }
-                failures.Same("runIds " + method + " " + Json.Quote(id), got, c);
+                failures.Same("runIds " + method + " " + JsonText.Quote(id), got, c);
             }
             Assert.Empty(m.Errors.Entries);
         }

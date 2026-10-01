@@ -133,7 +133,7 @@ public sealed record JobState
                 }
                 continue;
             }
-            o.Set(e.Key, Json.Copy(e.Value));
+            o.Set(e.Key, JsonText.Copy(e.Value));
         }
         if (Version != null && !wroteVersion)
         {
@@ -155,14 +155,14 @@ public sealed record JobState
     {
         if (v is not JsObject o)
         {
-            throw new JsonParseException("a job state must be an object, not " + Json.Kind(v));
+            throw new JsonParseException("a job state must be an object, not " + JsonText.Kind(v));
         }
         var open = new List<KeyValuePair<Condition, long>>();
         if (o.Get("open") is JsObject opened)
         {
             foreach (var e in opened)
             {
-                open.Add(new(new Condition(e.Key), Json.TryNumber(e.Value, out double n) ? Js.ToLong(n) : 0L));
+                open.Add(new(new Condition(e.Key), JsonText.TryNumber(e.Value, out double n) ? Js.ToLong(n) : 0L));
             }
         }
         List<Condition>? pending = null;
@@ -214,7 +214,7 @@ public sealed record JobState
             {
                 // A version that is not a whole number (1.5, "x") reads as none; one out of range
                 // is kept, so the state writes back as it was read. Either counts as 0.
-                version = Json.TryNumber(e.Value, out double n) && Js.IsInteger(n) ? Js.ToLong(n) : null;
+                version = JsonText.TryNumber(e.Value, out double n) && Js.IsInteger(n) ? Js.ToLong(n) : null;
             }
             extra.Set(e.Key, e.Value);
         }

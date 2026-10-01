@@ -55,7 +55,7 @@ internal static class HangfireCrons
         }
         catch (CronFormatException e)
         {
-            throw new ScheduleException("cronwatch: " + label + " is " + Json.Quote(cron) + ", which Hangfire cannot read: " + e.Message);
+            throw new ScheduleException("cronwatch: " + label + " is " + Json.Stringify(cron) + ", which Hangfire cannot read: " + e.Message);
         }
         string expr;
         bool daily;

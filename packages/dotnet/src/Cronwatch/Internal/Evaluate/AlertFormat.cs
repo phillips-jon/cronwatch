@@ -239,7 +239,7 @@ internal static class AlertFormat
             case JsObject:
                 return "[object Object]";
             default:
-                return Json.TryNumber(v, out double n) ? Js.FormatNumber(n) : v.ToString() ?? "";
+                return JsonText.TryNumber(v, out double n) ? Js.FormatNumber(n) : v.ToString() ?? "";
         }
     }
 

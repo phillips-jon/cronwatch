@@ -31,7 +31,7 @@ public class HealthConformanceTests
         {
             foreach (var n in list)
             {
-                if (Json.TryNumber(n, out double d))
+                if (JsonText.TryNumber(n, out double d))
                 {
                     output.Add(d);
                 }

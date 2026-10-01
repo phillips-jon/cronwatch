@@ -75,7 +75,7 @@ public sealed record Run
     {
         if (v is not JsObject o)
         {
-            throw new JsonParseException("a run must be an object, not " + Json.Kind(v));
+            throw new JsonParseException("a run must be an object, not " + JsonText.Kind(v));
         }
         return new Run
         {
@@ -156,7 +156,7 @@ public sealed class Definition : IEquatable<Definition>
     }
 
     /// <summary>A field's value (a copy), or null.</summary>
-    public object? Get(string key) => Json.Copy(_fields.Get(key));
+    public object? Get(string key) => JsonText.Copy(_fields.Get(key));
 
     /// <summary>Whether the field is there.</summary>
     public bool Has(string key) => _fields.Has(key);

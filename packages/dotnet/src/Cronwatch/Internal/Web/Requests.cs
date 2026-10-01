@@ -310,7 +310,7 @@ internal static class Requests
             }
             catch (JsonParseException)
             {
-                // Not JSON, or nested past Json.MaxDepth: the SDK's readBody reads it as none.
+                // Not JSON, or nested past JsonText.MaxDepth: the SDK's readBody reads it as none.
                 return null;
             }
             return JsonField(value, name);

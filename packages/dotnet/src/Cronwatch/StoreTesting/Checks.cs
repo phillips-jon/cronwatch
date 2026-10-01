@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Cronwatch.Internal;
 
 namespace Cronwatch.StoreTesting;
 
@@ -105,7 +106,7 @@ internal static class Checks
         {
             var pairs = o.ToList();
             pairs.Sort((a, b) => string.CompareOrdinal(a.Key, b.Key));
-            return "{" + string.Join(",", pairs.Select(e => Json.Quote(e.Key) + ":" + Write(e.Value))) + "}";
+            return "{" + string.Join(",", pairs.Select(e => JsonText.Quote(e.Key) + ":" + Write(e.Value))) + "}";
         }
         if (v is List<object?> list)
         {

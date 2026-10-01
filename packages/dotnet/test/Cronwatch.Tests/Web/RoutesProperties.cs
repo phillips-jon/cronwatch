@@ -115,7 +115,7 @@ public class RoutesProperties
             }
             catch (Exception e) when (e is not Xunit.Sdk.XunitException)
             {
-                throw new InvalidOperationException("the property failed for seed " + seed.ToString(CultureInfo.InvariantCulture) + " on " + Json.Quote(text), e);
+                throw new InvalidOperationException("the property failed for seed " + seed.ToString(CultureInfo.InvariantCulture) + " on " + JsonText.Quote(text), e);
             }
         }
     }

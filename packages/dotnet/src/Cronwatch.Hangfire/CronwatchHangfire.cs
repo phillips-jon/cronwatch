@@ -139,7 +139,7 @@ public sealed class CronwatchHangfire : IDisposable
 
     // ---- reading the recurring jobs
 
-    private static string Label(string id) => "Hangfire recurring job " + Json.Quote(id);
+    private static string Label(string id) => "Hangfire recurring job " + Json.Stringify(id);
 
     private JobOptions OptionsFor(string name) =>
         _options.Jobs.TryGetValue(name, out JobOptions? given) ? given : new JobOptions();
@@ -183,7 +183,7 @@ public sealed class CronwatchHangfire : IDisposable
         (string? iana, TimeZoneInfo? info) = HangfireCrons.Zone(dto.TimeZoneId);
         if (iana == null || info == null)
         {
-            problem = "cronwatch: " + label + " runs in the time zone " + Json.Quote(dto.TimeZoneId ?? "")
+            problem = "cronwatch: " + label + " runs in the time zone " + Json.Stringify(dto.TimeZoneId ?? "")
                 + ", which this system does not know, so it is watched without a schedule";
         }
         else if (string.IsNullOrWhiteSpace(dto.Cron))
@@ -303,7 +303,7 @@ public sealed class CronwatchHangfire : IDisposable
         if (!SchedulerBridge.ValidName(name))
         {
             Watch.ReportOnce(
-                "cronwatch: the Hangfire job " + Json.Quote(name) + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
+                "cronwatch: the Hangfire job " + Json.Stringify(name) + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
                 "hangfire");
             return null;
         }

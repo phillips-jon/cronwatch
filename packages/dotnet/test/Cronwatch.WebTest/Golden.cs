@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Cronwatch.Internal;
 using Cronwatch.Web;
 
 namespace Cronwatch.WebTest;
@@ -128,7 +129,7 @@ public static partial class Golden
     {
         const string Placeholders = """{"ok":true,"library":"<library>","language":"<language>","version":"<version>",""";
         return body.StartsWith(Placeholders, StringComparison.Ordinal)
-            ? """{"ok":true,"library":"Cronwatch","language":"dotnet","version":""" + Json.Quote(CronwatchClient.Version) + "," + body[Placeholders.Length..]
+            ? """{"ok":true,"library":"Cronwatch","language":"dotnet","version":""" + JsonText.Quote(CronwatchClient.Version) + "," + body[Placeholders.Length..]
             : body;
     }
 

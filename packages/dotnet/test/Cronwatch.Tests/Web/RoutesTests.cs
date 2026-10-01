@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Cronwatch.Internal;
 using Cronwatch.Web;
 using Xunit;
 using static Cronwatch.Tests.Support;
@@ -274,7 +275,7 @@ public class RoutesTests
     public async Task Get_api_names_the_library_its_language_and_versions()
     {
         await using var w = new WebKit();
-        string want = "{\"ok\":true,\"library\":\"Cronwatch\",\"language\":\"dotnet\",\"version\":" + Json.Quote(CronwatchClient.Version) + ",\"api\":1}";
+        string want = "{\"ok\":true,\"library\":\"Cronwatch\",\"language\":\"dotnet\",\"version\":" + JsonText.Quote(CronwatchClient.Version) + ",\"api\":1}";
         foreach (string path in new[] { "/cronwatch/api", "/cronwatch/api/" })
         {
             CronwatchResponse r = await w.Get(path, Auth);

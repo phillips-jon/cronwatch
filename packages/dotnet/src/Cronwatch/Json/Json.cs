@@ -46,12 +46,12 @@ public sealed class JsonParseException : Exception
 /// </remarks>
 public static class Json
 {
-    /// <summary>
-    /// How deep arrays and objects may nest. The reader and writer recurse, so text nested
-    /// thousands deep (a request body, a stored row) would overflow a thread's stack; nothing
-    /// CronWatch or an app stores comes near this.
-    /// </summary>
-    public const int MaxDepth = 256;
+    /// <summary>How deep arrays and objects may nest (internal now).</summary>
+    [Obsolete(Internal)]
+    public const int MaxDepth = JsonText.MaxDepth;
+
+    /// <summary>The message on the helpers 1.0 made internal.</summary>
+    private const string Internal = "An internal helper, not part of the 1.x promise: only Parse, ParseObject and Stringify are. It still works through 1.x and goes in 2.0.";
 
     /// <summary>
     /// <c>JSON.stringify</c> of a value: <c>null</c>, a <see cref="bool"/>, a number, a
@@ -68,7 +68,7 @@ public static class Json
 
     private static void Write(StringBuilder b, object? v, int depth)
     {
-        if (depth > MaxDepth)
+        if (depth > JsonText.MaxDepth)
         {
             throw new ArgumentException("JSON nested too deeply");
         }
@@ -166,11 +166,16 @@ public static class Json
         }
     }
 
-    /// <summary>A deep copy of a JSON value: nested objects and lists are copied, the rest is immutable.</summary>
-    public static object? Copy(object? value) => JsObject.CopyValue(value);
+    /// <summary>A deep copy of a JSON value (internal now).</summary>
+    [Obsolete(Internal)]
+    public static object? Copy(object? value) => JsonText.Copy(value);
+
+    /// <summary><c>JSON.stringify</c> of a string (internal now; <see cref="Stringify"/> writes one the same).</summary>
+    [Obsolete(Internal)]
+    public static string Quote(string s) => JsonText.Quote(s);
 
     /// <summary><c>JSON.stringify</c> of a string.</summary>
-    public static string Quote(string s)
+    internal static string QuoteString(string s)
     {
         var b = new StringBuilder(s.Length + 2);
         QuoteInto(b, s);
@@ -235,7 +240,7 @@ public static class Json
     /// <c>JSON.parse</c>: numbers as <see cref="double"/>, objects as <see cref="JsObject"/> in
     /// JavaScript's key order (a key given twice keeps its first place and its last value), arrays
     /// as <c>List&lt;object?&gt;</c>. A lone surrogate escape (<c>\ud800</c>) is kept, as JavaScript
-    /// keeps it. Arrays and objects nested more than <see cref="MaxDepth"/> deep are refused.
+    /// keeps it. Arrays and objects nested more than 256 deep are refused.
     /// </summary>
     /// <exception cref="JsonParseException">When the text is not JSON.</exception>
     public static object? Parse(string text)
@@ -260,11 +265,15 @@ public static class Json
         {
             return o;
         }
-        throw new JsonParseException("expected a JSON object, not " + Kind(v));
+        throw new JsonParseException("expected a JSON object, not " + KindOf(v));
     }
 
+    /// <summary>A value's type as JavaScript's <c>typeof</c> names it (internal now).</summary>
+    [Obsolete(Internal)]
+    public static string Kind(object? v) => JsonText.Kind(v);
+
     /// <summary>A value's type as JavaScript's <c>typeof</c> names it, for messages.</summary>
-    public static string Kind(object? v) => v switch
+    internal static string KindOf(object? v) => v switch
     {
         null => "null",
         bool => "boolean",
@@ -273,8 +282,12 @@ public static class Json
         _ => "object",
     };
 
+    /// <summary>Whether a value is a JSON number, and which (internal now).</summary>
+    [Obsolete(Internal)]
+    public static bool TryNumber(object? v, out double n) => JsonText.TryNumber(v, out n);
+
     /// <summary>Whether a value is a JSON number, and which.</summary>
-    public static bool TryNumber(object? v, out double n)
+    internal static bool TryNumberOf(object? v, out double n)
     {
         switch (v)
         {
@@ -334,7 +347,7 @@ public static class Json
 
         public object? Value(int depth)
         {
-            if (depth >= MaxDepth)
+            if (depth >= JsonText.MaxDepth)
             {
                 throw new JsonParseException("JSON nested too deeply");
             }

@@ -98,6 +98,18 @@ public class DeprecatedTests
     }
 
     [Fact]
+    public void The_json_helpers_made_internal_still_answer()
+    {
+        Assert.Equal("\"a\\\"b\"", Json.Quote("a\"b"));
+        Assert.Equal(Json.Stringify("a\"b"), Json.Quote("a\"b"));
+        Assert.Equal("number", Json.Kind(1.5));
+        Assert.True(Json.TryNumber(2L, out double n) && n == 2);
+        var o = new JsObject().Set("a", new List<object?> { 1.0 });
+        Assert.Equal(o.ToJson(), Json.Stringify(Json.Copy(o)));
+        Assert.Equal(256, Json.MaxDepth);
+    }
+
+    [Fact]
     public void WebAdapters_is_Adapters()
     {
         Assert.Equal(Adapters.Target("/cafÃ©"), WebAdapters.Target("/cafÃ©"));

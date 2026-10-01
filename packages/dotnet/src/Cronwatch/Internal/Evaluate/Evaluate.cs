@@ -86,7 +86,7 @@ internal static class Evaluate
     /// </summary>
     public static long StateVersion(object? version)
     {
-        if (Json.TryNumber(version, out double d) && Js.IsInteger(d) && d >= 0 && d <= MaxDurationMs)
+        if (JsonText.TryNumber(version, out double d) && Js.IsInteger(d) && d >= 0 && d <= MaxDurationMs)
         {
             return (long)d;
         }
@@ -99,7 +99,7 @@ internal static class Evaluate
     /// and 0 when it is negative or not a whole number (1.5, "3", Infinity).
     /// </summary>
     public static long FailureCount(object? count) =>
-        Json.TryNumber(count, out double d) && Js.IsInteger(d) && d > 0 ? (d >= MaxDurationMs ? MaxDurationMs : (long)d) : 0;
+        JsonText.TryNumber(count, out double d) && Js.IsInteger(d) && d > 0 ? (d >= MaxDurationMs ? MaxDurationMs : (long)d) : 0;
 
     /// <summary>A count of failures in a row held from 0 to 2^53 - 1.</summary>
     public static long FailureCount(long count) => Math.Clamp(count, 0, MaxDurationMs);
@@ -435,7 +435,7 @@ internal static class Evaluate
                 string text = Js.Trim(s);
                 return text.Length == 0 ? 0 : StringToNumber(text);
             default:
-                return Json.TryNumber(v, out double n) ? n : double.NaN;
+                return JsonText.TryNumber(v, out double n) ? n : double.NaN;
         }
     }
 
@@ -623,7 +623,7 @@ internal static class Evaluate
         null => false,
         bool b => b,
         string s => s.Length != 0,
-        _ => !Json.TryNumber(v, out double n) || (n != 0 && !double.IsNaN(n)),
+        _ => !JsonText.TryNumber(v, out double n) || (n != 0 && !double.IsNaN(n)),
     };
 
     /// <summary>

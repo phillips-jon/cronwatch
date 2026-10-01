@@ -40,7 +40,7 @@ public static class StoreReplay
     private static JsObject Field(JsObject o, string key) =>
         o.Get(key) as JsObject ?? throw new StoreContractException("the fixture has no object " + key);
 
-    private static long Number(JsObject o, string key) => Json.TryNumber(o.Get(key), out double n) ? Js.ToLong(n) : -1;
+    private static long Number(JsObject o, string key) => JsonText.TryNumber(o.Get(key), out double n) ? Js.ToLong(n) : -1;
 
     private static List<RunStatus> Statuses(object? v)
     {

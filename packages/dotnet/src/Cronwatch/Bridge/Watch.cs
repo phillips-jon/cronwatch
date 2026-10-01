@@ -205,7 +205,7 @@ public sealed class Watch
                     schedule = "";
                     zone = "";
                     ReportOnce(
-                        "cronwatch: " + Json.Quote(name) + " is run by " + list.Count + " " + _scheduler
+                        "cronwatch: " + JsonText.Quote(name) + " is run by " + list.Count + " " + _scheduler
                         + " entries on different schedules (" + string.Join("; ", times)
                         + "), so it is watched without a schedule; give each a name of its own",
                         "declaring " + first.Label);
@@ -238,7 +238,7 @@ public sealed class Watch
             }
             foreach (var e in gone)
             {
-                DeclareOne(e.Key, Json.Quote(e.Key), SchedulerBridge.Unscheduled(e.Value), false);
+                DeclareOne(e.Key, JsonText.Quote(e.Key), SchedulerBridge.Unscheduled(e.Value), false);
             }
         }
     }
@@ -409,7 +409,7 @@ public sealed class Watch
         catch (TimeoutException)
         {
             throw new CronwatchException(
-                "writing the declaration of " + Json.Quote(name) + " took longer than " + Js.FormatLong((long)SaveLimit.TotalSeconds) + " seconds; gave up");
+                "writing the declaration of " + JsonText.Quote(name) + " took longer than " + Js.FormatLong((long)SaveLimit.TotalSeconds) + " seconds; gave up");
         }
     }
 

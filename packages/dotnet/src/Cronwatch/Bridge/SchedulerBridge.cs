@@ -236,7 +236,7 @@ public static class SchedulerBridge
                 {
                     options.SetField(key, text);
                 }
-                else if (Json.TryNumber(value, out double ms))
+                else if (JsonText.TryNumber(value, out double ms))
                 {
                     options.SetField(key, ms);
                 }
@@ -246,7 +246,7 @@ public static class SchedulerBridge
                 {
                     foreach (var e in budget)
                     {
-                        if (Json.TryNumber(e.Value, out double ceiling))
+                        if (JsonText.TryNumber(e.Value, out double ceiling))
                         {
                             options.Budget[e.Key] = ceiling;
                         }
@@ -254,7 +254,7 @@ public static class SchedulerBridge
                 }
                 break;
             case "failuresBeforeAlert":
-                if (Json.TryNumber(value, out double n) && n >= 0 && n <= int.MaxValue && n == Math.Floor(n))
+                if (JsonText.TryNumber(value, out double n) && n >= 0 && n <= int.MaxValue && n == Math.Floor(n))
                 {
                     options.SetField(key, (int)n);
                 }

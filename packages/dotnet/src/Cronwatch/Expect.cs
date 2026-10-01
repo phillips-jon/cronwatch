@@ -69,7 +69,7 @@ public abstract class Expect
         {
             if (e.Key != "expect")
             {
-                output.Set(e.Key, Json.Copy(e.Value));
+                output.Set(e.Key, JsonText.Copy(e.Value));
             }
         }
         if (rule != null)
@@ -92,7 +92,7 @@ public abstract class Expect
         {
             try
             {
-                if (Json.Parse(description[Prefix.Length..]) is string text && string.Equals(Prefix + Json.Quote(text), description, StringComparison.Ordinal))
+                if (Json.Parse(description[Prefix.Length..]) is string text && string.Equals(Prefix + JsonText.Quote(text), description, StringComparison.Ordinal))
                 {
                     return new ContainsRule(text);
                 }
@@ -116,9 +116,9 @@ public abstract class Expect
     private sealed class ContainsRule(string text) : Expect
     {
         internal override string? Check(string output) =>
-            output.Contains(text, StringComparison.Ordinal) ? null : "Output did not contain " + Json.Quote(text);
+            output.Contains(text, StringComparison.Ordinal) ? null : "Output did not contain " + JsonText.Quote(text);
 
-        internal override string Describe() => "contains " + Json.Quote(text);
+        internal override string Describe() => "contains " + JsonText.Quote(text);
     }
 
     private sealed class MatchRule(JsRegex pattern) : Expect
