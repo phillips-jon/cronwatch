@@ -105,14 +105,19 @@ public sealed class SlackChannel : IChannel
     /// <summary>Breaks up <c>```</c> so text inside a code block cannot close it.</summary>
     internal static string CodeBlockSafe(string text) => text.Replace("```", "`\u200b`\u200b`", StringComparison.Ordinal);
 
+    /// <summary>The channel for an incoming webhook URL, with no link: the common case.</summary>
+    /// <exception cref="CronwatchException">For an empty URL.</exception>
+    public static SlackChannel Webhook(string webhookUrl) => new(new SlackOptions { WebhookUrl = webhookUrl });
+
     /// <summary>Names the channel.</summary>
     public override string ToString() => "SlackChannel";
 }
 
-/// <summary>Slack channels for the common case.</summary>
+/// <summary><see cref="SlackChannel.Webhook"/>'s former home.</summary>
+[Obsolete("Use SlackChannel.Webhook(url), on the channel type as every channel's constructor is. This class still works through 1.x and goes in 2.0.")]
 public static class Slack
 {
-    /// <summary>The channel for an incoming webhook URL, with no link.</summary>
+    /// <summary>The channel for an incoming webhook URL, with no link (<see cref="SlackChannel.Webhook"/>).</summary>
     /// <exception cref="CronwatchException">For an empty URL.</exception>
-    public static SlackChannel Webhook(string webhookUrl) => new(new SlackOptions { WebhookUrl = webhookUrl });
+    public static SlackChannel Webhook(string webhookUrl) => SlackChannel.Webhook(webhookUrl);
 }

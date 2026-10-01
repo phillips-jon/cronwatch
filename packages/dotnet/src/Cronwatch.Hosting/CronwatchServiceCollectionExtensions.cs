@@ -91,6 +91,7 @@ public static class CronwatchServiceCollectionExtensions
                 Store = o.Store,
                 Alerts = alerts,
                 Triage = o.Triage,
+                Transport = o.Transport,
                 Sources = o.Sources,
                 CronSecret = o.CronSecret,
                 Retention = retention,
@@ -108,6 +109,7 @@ public static class CronwatchServiceCollectionExtensions
             {
                 Store = o.Store,
                 Triage = o.Triage,
+                Transport = o.Transport,
                 Sources = o.Sources,
                 CronSecret = o.CronSecret,
                 Retention = retention,

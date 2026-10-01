@@ -65,7 +65,7 @@ public sealed class CronwatchOptions
 
     /// <summary>
     /// Where alerts go. Default: the console. Add channels with a collection initializer
-    /// (<c>Alerts = { Slack.Webhook(url) }</c>); an empty list set explicitly sends nowhere.
+    /// (<c>Alerts = { SlackChannel.Webhook(url) }</c>); an empty list set explicitly sends nowhere.
     /// </summary>
     public IList<IChannel> Alerts
     {

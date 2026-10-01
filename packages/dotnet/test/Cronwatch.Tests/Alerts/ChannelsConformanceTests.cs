@@ -120,7 +120,7 @@ public class ChannelsConformanceTests
                 MessagingServiceSid = S(o, "messagingServiceSid"),
                 To = Strings(o.Get("to")),
                 Recovered = recovered is true,
-                Segments = o.Get("segments") is double d ? d : null,
+                Segments = o.Get("segments") is double d ? (int)d : null,
                 Link = link,
                 Transport = transport,
             }),

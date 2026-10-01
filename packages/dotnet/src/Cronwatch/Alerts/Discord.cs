@@ -128,14 +128,19 @@ public sealed class DiscordChannel : IChannel
         return b.ToString();
     }
 
+    /// <summary>The channel for a webhook URL, with no link: the common case.</summary>
+    /// <exception cref="CronwatchException">For an empty URL.</exception>
+    public static DiscordChannel Webhook(string webhookUrl) => new(new DiscordOptions { WebhookUrl = webhookUrl });
+
     /// <summary>Names the channel.</summary>
     public override string ToString() => "DiscordChannel";
 }
 
-/// <summary>Discord channels for the common case.</summary>
+/// <summary><see cref="DiscordChannel.Webhook"/>'s former home.</summary>
+[Obsolete("Use DiscordChannel.Webhook(url), on the channel type as every channel's constructor is. This class still works through 1.x and goes in 2.0.")]
 public static class Discord
 {
-    /// <summary>The channel for a webhook URL, with no link.</summary>
+    /// <summary>The channel for a webhook URL, with no link (<see cref="DiscordChannel.Webhook"/>).</summary>
     /// <exception cref="CronwatchException">For an empty URL.</exception>
-    public static DiscordChannel Webhook(string webhookUrl) => new(new DiscordOptions { WebhookUrl = webhookUrl });
+    public static DiscordChannel Webhook(string webhookUrl) => DiscordChannel.Webhook(webhookUrl);
 }

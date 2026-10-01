@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using Cronwatch.Alerts;
 using Cronwatch.Web;
 using Xunit;
 
@@ -86,6 +87,14 @@ public class DeprecatedTests
             System.Threading.Interlocked.Increment(ref Calls);
             return CompareAndSetStateAsync(state, expected, cancellationToken);
         }
+    }
+
+    [Fact]
+    public void Slack_and_Discord_Webhook_are_the_channel_types_shortcuts()
+    {
+        Assert.Equal(SlackChannel.Webhook("https://hooks.slack.example/T/B/x").Name, Cronwatch.Alerts.Slack.Webhook("https://hooks.slack.example/T/B/x").Name);
+        Assert.IsType<DiscordChannel>(Cronwatch.Alerts.Discord.Webhook("https://discord.example/api/webhooks/1/x"));
+        Assert.Throws<CronwatchException>(() => Cronwatch.Alerts.Slack.Webhook(""));
     }
 
     [Fact]

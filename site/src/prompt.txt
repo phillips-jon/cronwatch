@@ -693,7 +693,7 @@ Java (Java 21 or newer)
    builder.Services.AddCronwatch(o =>
    {
        o.Store = SqlStore.Postgres(dataSource);   // or SqlStore.Sqlite, SqlStore.MySql
-       o.Alerts.Add(Slack.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
+       o.Alerts.Add(SlackChannel.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
    });
 
    It is a singleton that checks every minute as a hosted service and logs
@@ -703,7 +703,7 @@ Java (Java 21 or newer)
    await using var cw = new CronwatchClient(new CronwatchOptions
    {
        Store = SqlStore.Sqlite(SqliteFactory.Instance.CreateDataSource("Data Source=cronwatch.db")),
-       Alerts = { Slack.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
+       Alerts = { SlackChannel.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
    });
 
    Other channels in Cronwatch.Alerts, each made from its options

@@ -53,7 +53,7 @@ public class ChannelTests
     private static IChannel Refused(string which) => which switch
     {
         "slack" => new SlackChannel(new SlackOptions()),
-        "discord" => Discord.Webhook(""),
+        "discord" => DiscordChannel.Webhook(""),
         "webhook" => new WebhookChannel(new WebhookOptions { Secret = Secret }),
         "resend" => new ResendChannel(new ResendOptions { ApiKey = "  \n", From = "a@example.com", To = { "b@example.com" } }),
         "resend-from" => new ResendChannel(new ResendOptions { ApiKey = Secret, To = { "b@example.com" } }),
@@ -121,8 +121,8 @@ public class ChannelTests
             Assert.DoesNotContain("+15551110000", text, StringComparison.Ordinal);
             Assert.Contains("set", text, StringComparison.Ordinal);
         }
-        Assert.Equal("SlackChannel", Slack.Webhook("https://hooks.example/" + Secret).ToString());
-        Assert.Equal("DiscordChannel", Discord.Webhook("https://hooks.example/" + Secret).ToString());
+        Assert.Equal("SlackChannel", SlackChannel.Webhook("https://hooks.example/" + Secret).ToString());
+        Assert.Equal("DiscordChannel", DiscordChannel.Webhook("https://hooks.example/" + Secret).ToString());
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class ChannelTests
     public async Task A_channel_without_a_transport_posts_through_the_clients()
     {
         var rec = new Recorder();
-        var channel = Slack.Webhook("https://hooks.slack.example/T/B/" + Secret);
+        var channel = SlackChannel.Webhook("https://hooks.slack.example/T/B/" + Secret);
         await channel.SendAsync(ChannelsConformanceTests.Sample(), new ChannelContext(_ => { }, rec), CancellationToken.None);
         Assert.Equal("https://hooks.slack.example/T/B/" + Secret, Assert.Single(rec.Taken()).Url);
     }

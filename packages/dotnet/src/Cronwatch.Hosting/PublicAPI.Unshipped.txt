@@ -30,6 +30,8 @@ Cronwatch.Hosting.CronwatchHostOptions.Sources.get -> System.Collections.Generic
 Cronwatch.Hosting.CronwatchHostOptions.Store.get -> Cronwatch.IStore?
 Cronwatch.Hosting.CronwatchHostOptions.Store.set -> void
 Cronwatch.Hosting.CronwatchHostOptions.Token.set -> void
+Cronwatch.Hosting.CronwatchHostOptions.Transport.get -> Cronwatch.Alerts.ITransport?
+Cronwatch.Hosting.CronwatchHostOptions.Transport.set -> void
 Cronwatch.Hosting.CronwatchHostOptions.Triage.get -> Cronwatch.ITriage?
 Cronwatch.Hosting.CronwatchHostOptions.Triage.set -> void
 Cronwatch.Hosting.CronwatchServiceCollectionExtensions

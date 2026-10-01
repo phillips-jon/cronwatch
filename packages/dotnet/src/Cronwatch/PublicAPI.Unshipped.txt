@@ -345,7 +345,7 @@ Cronwatch.Alerts.TwilioOptions.MessagingServiceSid.get -> string?
 Cronwatch.Alerts.TwilioOptions.MessagingServiceSid.init -> void
 Cronwatch.Alerts.TwilioOptions.Recovered.get -> bool
 Cronwatch.Alerts.TwilioOptions.Recovered.init -> void
-Cronwatch.Alerts.TwilioOptions.Segments.get -> double?
+Cronwatch.Alerts.TwilioOptions.Segments.get -> int?
 Cronwatch.Alerts.TwilioOptions.Segments.init -> void
 Cronwatch.Alerts.TwilioOptions.To.get -> System.Collections.Generic.IList<string!>!
 Cronwatch.Alerts.TwilioOptions.To.init -> void
@@ -1276,7 +1276,9 @@ static Cronwatch.AlertType.implicit operator Cronwatch.AlertType(string! value) 
 static Cronwatch.AlertType.operator !=(Cronwatch.AlertType left, Cronwatch.AlertType right) -> bool
 static Cronwatch.AlertType.operator ==(Cronwatch.AlertType left, Cronwatch.AlertType right) -> bool
 static Cronwatch.Alerts.Discord.Webhook(string! webhookUrl) -> Cronwatch.Alerts.DiscordChannel!
+static Cronwatch.Alerts.DiscordChannel.Webhook(string! webhookUrl) -> Cronwatch.Alerts.DiscordChannel!
 static Cronwatch.Alerts.Slack.Webhook(string! webhookUrl) -> Cronwatch.Alerts.SlackChannel!
+static Cronwatch.Alerts.SlackChannel.Webhook(string! webhookUrl) -> Cronwatch.Alerts.SlackChannel!
 static Cronwatch.Alerts.WebhookChannel.Signature(string! secret, string! body) -> string!
 static Cronwatch.Bridge.ScheduleException.NeverFires(string! why) -> Cronwatch.Bridge.ScheduleException!
 static Cronwatch.Bridge.SchedulerBridge.AppName(string? fallback = null) -> string!

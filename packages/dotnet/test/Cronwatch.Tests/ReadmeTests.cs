@@ -177,7 +177,7 @@ public class ReadmeTests
             Store = SqlStore.Postgres(pg), // SqlStore.MySql(dataSource) for MySQL and MariaDB
             Alerts =
             {
-                Slack.Webhook(slackWebhookUrl),
+                SlackChannel.Webhook(slackWebhookUrl),
                 new ResendChannel(new ResendOptions { ApiKey = resendApiKey, From = "cron@example.com", To = { "ops@example.com" } }),
             },
             Triage = new AnthropicTriage(), // reads ANTHROPIC_API_KEY when it runs

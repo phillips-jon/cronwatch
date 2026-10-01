@@ -96,7 +96,7 @@ A run is judged once, however many processes finish it. A run id holding a NUL i
 
 ### Alerts, triage and pg_cron
 
-The SDK's fifteen channels are in `Cronwatch.Alerts`: Slack, Discord, a signed webhook, Resend, Postmark, SendGrid, Mailgun, SES, Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic, each made from its options (`new ResendChannel(new ResendOptions { ... })`), with `Slack.Webhook(url)` and `Discord.Webhook(url)` for the common case. `AnthropicTriage` adds a short diagnosis from Claude to each alert but recoveries, and `PgCronSource` watches the jobs Postgres's pg_cron runs:
+The SDK's fifteen channels are in `Cronwatch.Alerts`: Slack, Discord, a signed webhook, Resend, Postmark, SendGrid, Mailgun, SES, Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic, each made from its options (`new ResendChannel(new ResendOptions { ... })`), with `SlackChannel.Webhook(url)` and `DiscordChannel.Webhook(url)` for the common case. `AnthropicTriage` adds a short diagnosis from Claude to each alert but recoveries, and `PgCronSource` watches the jobs Postgres's pg_cron runs:
 
 ```csharp
 var pg = NpgsqlDataSource.Create(connectionString);
@@ -106,7 +106,7 @@ await using var cw = new CronwatchClient(new CronwatchOptions
     Store = SqlStore.Postgres(pg), // SqlStore.MySql(dataSource) for MySQL and MariaDB
     Alerts =
     {
-        Slack.Webhook(slackWebhookUrl),
+        SlackChannel.Webhook(slackWebhookUrl),
         new ResendChannel(new ResendOptions { ApiKey = resendApiKey, From = "cron@example.com", To = { "ops@example.com" } }),
     },
     Triage = new AnthropicTriage(), // reads ANTHROPIC_API_KEY when it runs
@@ -246,6 +246,7 @@ These names still work through every 1.x release, marked `[Obsolete]`, and go in
 - `Cronwatch.Web.WebRequest` and `WebResponse`: use `CronwatchRequest` and `CronwatchResponse`, since `System.Net` has types of those names. Each converts to and from its replacement, so code written against them still compiles, except a handler lambda that names the request's type.
 - `Cronwatch.Web.WebAdapters`: use `Adapters`, the Java port's name.
 - `Cronwatch.Hosting.CronwatchServiceCollectionExtensions` and `Cronwatch.AspNetCore.CronwatchAspNetCore`, the former classes of the extension methods, which are in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder` now: `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods.
+- `Slack.Webhook(url)` and `Discord.Webhook(url)`: use `SlackChannel.Webhook(url)` and `DiscordChannel.Webhook(url)`, on the channel types.
 - `IConditionalRunStore`, `IStateCasStore` and `IRunDeletingStore`: use `IUpdateRunIfStore`, `ICompareAndSetStateStore` and `IDeleteRunIfStore`, named after their methods. Each former interface extends its replacement, so a store of your own that implements it is still used.
 
 ## Testing this package

@@ -35,7 +35,7 @@ var pg = NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("app"
 builder.Services.AddCronwatch(o =>
 {
     o.Store = SqlStore.Postgres(pg);                         // default: a MemoryStore
-    o.Alerts.Add(Slack.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
+    o.Alerts.Add(SlackChannel.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
     o.Retention = "30d";
 });
 ```
@@ -48,7 +48,7 @@ Anywhere else, make one and dispose it when the app stops:
 await using var cw = new CronwatchClient(new CronwatchOptions
 {
     Store = SqlStore.Postgres(pg),
-    Alerts = { Slack.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
+    Alerts = { SlackChannel.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
     Retention = "30d",
 });
 cw.StartChecking();                                          // check every minute, in a long-running service
@@ -271,8 +271,8 @@ await using var cw = new CronwatchClient(new CronwatchOptions
 {
     Alerts =
     {
-        Slack.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!),
-        Discord.Webhook(Environment.GetEnvironmentVariable("DISCORD_WEBHOOK_URL")!),
+        SlackChannel.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!),
+        DiscordChannel.Webhook(Environment.GetEnvironmentVariable("DISCORD_WEBHOOK_URL")!),
         new WebhookChannel(new WebhookOptions
         {
             Url = "https://hooks.example.com/cronwatch",
@@ -316,7 +316,7 @@ new BugsnagChannel(new BugsnagOptions { ApiKey = Env("BUGSNAG_API_KEY") });
 new NewRelicChannel(new NewRelicOptions { AccountId = "1234567", ApiKey = Env("NEW_RELIC_LICENSE_KEY") });
 ```
 
-The options are the SDK's in PascalCase: `SubjectPrefix` and `Link` among the email options; `MessageStream` (Postmark); `Region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `SessionToken` and `ConfigurationSetName` (SES); `ApiKeySid`, `ApiKeySecret`, `MessagingServiceSid` and `Segments` (Twilio, 1 to 10, default 3); `Environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `Release` (Sentry); `Headers` (the webhook, extra request headers in the order sent); `Endpoint` (Honeybadger, Bugsnag); `Host` (Datadog); `ReleaseStage` (Bugsnag); `EventType` (New Relic); and `Recovered` and `Link` wherever the SDK has them, with the SDK's defaults. No options class's `ToString()` prints a credential, and neither does a logger that walks its public properties.
+The options are the SDK's in PascalCase: `SubjectPrefix` and `Link` among the email options; `MessageStream` (Postmark); `Region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `SessionToken` and `ConfigurationSetName` (SES); `ApiKeySid`, `ApiKeySecret`, `MessagingServiceSid` and `Segments` (Twilio, an `int?`, 1 to 10, default 3); `Environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `Release` (Sentry); `Headers` (the webhook, extra request headers in the order sent); `Endpoint` (Honeybadger, Bugsnag); `Host` (Datadog); `ReleaseStage` (Bugsnag); `EventType` (New Relic); and `Recovered` and `Link` wherever the SDK has them, with the SDK's defaults. No options class's `ToString()` prints a credential, and neither does a logger that walks its public properties.
 
 Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for the whole request, reads at most 1 MiB of the answer, follows no redirect (so credentials never reach another address), uses no proxy, and always verifies TLS. A refused request names only the URL's origin, never its path, with the channel's keys cut out. The requests go through the client's `ITransport`, by default an `HttpClientTransport` over one `HttpClient` the client makes on its first send and disposes with itself; `Transport` on the client's options, or on one channel's or triage's, takes one of your own, for `IHttpClientFactory`, a proxy or your own trust store. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
@@ -371,7 +371,7 @@ A function given to `Redact` replaces the default; one that throws falls back to
 ```csharp
 await using var cw = new CronwatchClient(new CronwatchOptions
 {
-    Alerts = { Slack.Webhook(slackWebhookUrl) },
+    Alerts = { SlackChannel.Webhook(slackWebhookUrl) },
     Triage = new AnthropicTriage(new AnthropicTriageOptions
     {
         Context = "An ASP.NET Core service on Kubernetes with a Postgres database.",
@@ -479,6 +479,7 @@ These names still work through every 1.x release, marked `[Obsolete]` so the com
 | `Cronwatch.Web.WebRequest`, `WebResponse` | `CronwatchRequest`, `CronwatchResponse`, since `System.Net` has types of those names; each converts to and from its replacement, so `WebResponse answer = await routes.HandleAsync(new WebRequest(...))` still compiles, and a handler's function may still return a `WebResponse`. A handler function whose lambda names the request's type must say `CronwatchRequest` |
 | `Cronwatch.Web.WebAdapters` | `Adapters`, the Java port's name |
 | `Cronwatch.Hosting.CronwatchServiceCollectionExtensions`, `Cronwatch.AspNetCore.CronwatchAspNetCore` | the extension methods' classes in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder`; `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods |
+| `Slack.Webhook(url)`, `Discord.Webhook(url)` | `SlackChannel.Webhook(url)`, `DiscordChannel.Webhook(url)`, on the channel types |
 | `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it is still used |
 
 ## Kept in step
