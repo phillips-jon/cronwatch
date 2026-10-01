@@ -14,14 +14,17 @@ use std::sync::Arc;
 
 use common::server::{mysqls, postgres, servers};
 use common::{definition, repo, state};
-use cronwatch::storetest::{self, Clock, Process, Shared, T0};
+use cronwatch::storetest::{
+    self,
+    kit::{Clock, Process, Shared, T0},
+};
 use cronwatch::{JobOptions, Metrics, Run, RunStatus, StartOptions, Store};
 use cronwatch_sqlx::Dialect;
 
 const MIN: i64 = 60_000;
 
 fn run(id: &str, job: &str, status: RunStatus, started_at: i64) -> Run {
-    storetest::new_run_plain(id, job, status, started_at)
+    storetest::kit::new_run_plain(id, job, status, started_at)
 }
 
 #[tokio::test]
@@ -36,7 +39,7 @@ async fn each_server_passes_the_contract() {
 async fn each_server_replays_store_json() {
     let fixture = std::fs::read_to_string(repo().join("conformance/store.json")).expect("conformance/store.json");
     for s in servers() {
-        let cases = storetest::replay_fixture(&fixture, || s.store("replay")).await;
+        let cases = storetest::kit::replay_fixture(&fixture, || s.store("replay")).await;
         assert!(cases >= 20, "{}: {cases} cases", s.name);
         s.cleanup().await;
     }
@@ -58,7 +61,7 @@ async fn each_server_counts_a_foreign_states_version_as_the_sdk_does() {
         let p = store.table_prefix().to_string();
         let cast = if s.dialect == Dialect::Postgres { "::jsonb" } else { "" };
         let db = Arc::new(s.db());
-        let cases = storetest::replay_foreign_versions(&fixture, &store, |text| {
+        let cases = storetest::kit::replay_foreign_versions(&fixture, &store, |text| {
             let (db, p) = (db.clone(), p.clone());
             async move { db.exec(&format!("INSERT INTO {p}state (job, state) VALUES ('v', '{text}'{cast})")).await }
         })
@@ -74,7 +77,7 @@ async fn a_check_over_a_run_that_started_at_the_lowest_bigint_on_each_server() {
         let store = s.store("far");
         let p = store.table_prefix().to_string();
         let db = Arc::new(s.db());
-        storetest::check_over_foreign_rows(store, &p, |sql| {
+        storetest::kit::check_over_foreign_rows(store, &p, |sql| {
             let db = db.clone();
             async move { db.exec(&sql).await }
         })
@@ -86,11 +89,11 @@ async fn a_check_over_a_run_that_started_at_the_lowest_bigint_on_each_server() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_check_and_the_dashboard_over_a_cron_job_whose_last_run_started_far_off_on_each_server() {
     for s in servers() {
-        for (i, started_at) in storetest::FAR_STARTS.into_iter().enumerate() {
+        for (i, started_at) in storetest::kit::FAR_STARTS.into_iter().enumerate() {
             let store = s.store(&format!("farcron{i}"));
             let p = store.table_prefix().to_string();
             let db = Arc::new(s.db());
-            storetest::cron_over_foreign_row(store, &p, started_at, |sql| {
+            storetest::kit::cron_over_foreign_row(store, &p, started_at, |sql| {
                 let db = db.clone();
                 async move { db.exec(&sql).await }
             })
@@ -104,7 +107,7 @@ async fn a_check_and_the_dashboard_over_a_cron_job_whose_last_run_started_far_of
 async fn a_run_is_finished_once_across_stores_on_each_server() {
     for s in servers() {
         let server = s.clone();
-        storetest::finish_once(move || {
+        storetest::kit::finish_once(move || {
             let p = server.prefix("once");
             let on = server.clone();
             Shared { open: Box::new(move || Arc::new(on.store_on(&p)) as Arc<dyn Store>), done: Box::new(|| {}) }
@@ -389,7 +392,7 @@ async fn nul_characters_are_still_recorded_on_postgres() {
     assert_eq!((second.status.clone(), second.trigger.as_str()), (RunStatus::Ok, "cron"));
     assert_eq!(second.metrics.iter().collect::<Vec<_>>(), [("rows", 2.0)]);
     let stored = store.get_job("nul2").await.unwrap().unwrap();
-    storetest::same_json(
+    storetest::kit::same_json(
         "nul2",
         &stored.definition.to_json(),
         r#"{"name":"nul2","description":"ab","tags":["t"],"budget":{"c":5}}"#,

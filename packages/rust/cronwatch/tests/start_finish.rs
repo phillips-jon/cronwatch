@@ -1,5 +1,5 @@
 //! start-finish.test.ts, and the tests of finish-once.test.ts after its
-//! backend loops (those are `storetest::finish_once`), as the Go port has
+//! backend loops (those are `storetest::kit::finish_once`), as the Go port has
 //! them.
 
 mod common;

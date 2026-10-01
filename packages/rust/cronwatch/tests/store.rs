@@ -17,17 +17,27 @@ async fn the_memory_store_passes_the_contract() {
 
 #[tokio::test]
 async fn the_memory_store_replays_store_json() {
-    let cases = storetest::replay_fixture(&fixture(), MemoryStore::new).await;
+    let cases = storetest::kit::replay_fixture(&fixture(), MemoryStore::new).await;
     assert!(cases >= 20, "{cases} cases");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_run_is_finished_once_across_processes() {
-    storetest::finish_once(|| {
+    storetest::kit::finish_once(|| {
         // Every "process" shares the one memory store, as processes share a
         // database.
         let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
-        storetest::Shared { open: Box::new(move || store.clone()), done: Box::new(|| {}) }
+        storetest::kit::Shared { open: Box::new(move || store.clone()), done: Box::new(|| {}) }
     })
     .await;
+}
+
+/// The names this module had before 1.0 still work, deprecated, until 1.0.
+#[tokio::test]
+#[allow(deprecated)]
+async fn the_deprecated_helpers_still_work() {
+    let cases = storetest::replay_fixture(&fixture(), MemoryStore::new).await;
+    assert!(cases >= 20, "{cases} cases");
+    assert_eq!(storetest::T0, storetest::kit::T0);
+    storetest::same_json("keys in any order", r#"{"a":1,"b":2}"#, r#"{"b":2,"a":1}"#);
 }

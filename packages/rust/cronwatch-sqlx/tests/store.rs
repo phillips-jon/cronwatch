@@ -10,7 +10,10 @@ mod common;
 use std::sync::Arc;
 
 use common::{TempDir, memory_pool, pool, repo, store};
-use cronwatch::storetest::{self, Clock, Process, Shared, T0};
+use cronwatch::storetest::{
+    self,
+    kit::{Clock, Process, Shared, T0},
+};
 use cronwatch::{AlertType, JobOptions, Store};
 use cronwatch_sqlx::SqlStore;
 
@@ -28,7 +31,7 @@ async fn the_sqlite_store_passes_the_contract_on_a_file_with_a_prefix() {
 #[tokio::test]
 async fn the_sqlite_store_replays_store_json() {
     let fixture = std::fs::read_to_string(repo().join("conformance/store.json")).expect("conformance/store.json");
-    let cases = storetest::replay_fixture(&fixture, || SqlStore::sqlite(memory_pool())).await;
+    let cases = storetest::kit::replay_fixture(&fixture, || SqlStore::sqlite(memory_pool())).await;
     assert!(cases >= 20, "{cases} cases");
 }
 
@@ -45,7 +48,7 @@ async fn the_sqlite_store_counts_a_foreign_states_version_as_the_sdk_does() {
     let file = dir.file("foreign-version.db");
     let fixture = std::fs::read_to_string(repo().join("conformance/store.json")).expect("conformance/store.json");
     let p = pool(&file);
-    let cases = storetest::replay_foreign_versions(&fixture, &store(&file, "cronwatch_"), |text| {
+    let cases = storetest::kit::replay_foreign_versions(&fixture, &store(&file, "cronwatch_"), |text| {
         let p = p.clone();
         async move {
             sqlx::query("INSERT INTO cronwatch_state (job, state) VALUES ('v', ?)")
@@ -64,7 +67,7 @@ async fn a_check_over_a_run_that_started_at_the_lowest_bigint_on_sqlite() {
     let dir = TempDir::new();
     let file = dir.file("far.db");
     let p = pool(&file);
-    storetest::check_over_foreign_rows(store(&file, "cronwatch_"), "cronwatch_", |sql| {
+    storetest::kit::check_over_foreign_rows(store(&file, "cronwatch_"), "cronwatch_", |sql| {
         let p = p.clone();
         async move {
             sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&p).await.unwrap();
@@ -75,9 +78,9 @@ async fn a_check_over_a_run_that_started_at_the_lowest_bigint_on_sqlite() {
 
 #[tokio::test]
 async fn a_check_and_the_dashboard_over_a_cron_job_whose_last_run_started_far_off_on_sqlite() {
-    for started_at in storetest::FAR_STARTS {
+    for started_at in storetest::kit::FAR_STARTS {
         let p = memory_pool();
-        storetest::cron_over_foreign_row(SqlStore::sqlite(p.clone()), "cronwatch_", started_at, |sql| {
+        storetest::kit::cron_over_foreign_row(SqlStore::sqlite(p.clone()), "cronwatch_", started_at, |sql| {
             let p = p.clone();
             async move {
                 sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).execute(&p).await.unwrap();
@@ -91,7 +94,7 @@ async fn a_check_and_the_dashboard_over_a_cron_job_whose_last_run_started_far_of
 async fn a_run_is_finished_once_across_stores_on_one_file() {
     let dir = Arc::new(TempDir::new());
     let mut n = 0;
-    storetest::finish_once(move || {
+    storetest::kit::finish_once(move || {
         n += 1;
         let file = dir.file(&format!("finish-{n}.db"));
         Shared { open: Box::new(move || Arc::new(store(&file, "cronwatch_")) as Arc<dyn Store>), done: Box::new(|| {}) }

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use common::{TempDir, pool, repo, store};
 use cronwatch::js::{self, Object, Value};
-use cronwatch::storetest::{Clock, Process};
+use cronwatch::storetest::kit::{Clock, Process};
 use cronwatch::{Definition, JobOptions, JobState, Run, Store, StoredJob};
 use cronwatch_sqlx::SqlStore;
 use sqlx::Row;

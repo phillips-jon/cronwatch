@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use cronwatch::storetest::{Capture, Errors};
+use cronwatch::storetest::kit::{Capture, Errors};
 use cronwatch::{AlertType, Channel, Client, JobOptions, JobSummary, RunStatus};
 use cronwatch_sqlx::{PgCron, PgCronJob, PgCronOptions, SqlStore};
 use sqlx::{AssertSqlSafe, PgPool};

@@ -6,7 +6,7 @@
 use std::sync::{Arc, Mutex};
 
 use cronwatch::js::{self, Value};
-use cronwatch::storetest::{Capture, Clock, Errors, T0};
+use cronwatch::storetest::kit::{Capture, Clock, Errors, T0};
 use cronwatch::{AlertType, CheckResult, Client, JobOptions, JobSummary, MemoryStore, Run, RunStatus, Store};
 
 use super::*;
