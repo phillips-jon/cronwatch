@@ -252,7 +252,8 @@ module Cronwatch
       return hash if hash.is_a?(Alert)
 
       run = Naming.fetch(hash, "run")
-      details = Naming.from_json_value(Naming.fetch(hash, "details") || {})
+      written = Naming.fetch(hash, "details") || {}
+      details = Naming.from_json_value(written)
       details[:after] = details[:after].map(&:to_sym) if details[:after].is_a?(Array)
       details[:reason] = details[:reason].to_sym if details[:reason].is_a?(String)
       alert = new(
@@ -266,19 +267,55 @@ module Cronwatch
         at: Naming.fetch(hash, "at"),
       )
       alert.triage_result = Naming.fetch(hash, "triage") if Naming.present?(hash, "triage")
+      alert.keep_as_written(hash, written, details)
       alert
+    end
+
+    # What a stored alert held that its members do not say again: the
+    # fields this version does not know (a newer release may add one), and
+    # its details as written, since snake_case and back would turn a key
+    # spelled `a_b` into `aB`. to_h writes both back, the details only while
+    # they are unchanged.
+    #
+    # @api private
+    def keep_as_written(hash, written, details)
+      extra = hash.each_with_object({}) { |(k, v), out| out[k.to_s] = v unless Alert::KNOWN.include?(k.to_s) }
+      @extra = extra.empty? ? nil : extra
+      @written_details = [Marshal.load(Marshal.dump(details)), Alert.string_keys(written)] if written.is_a?(Hash)
+    end
+
+    # @api private
+    def self.string_keys(value)
+      case value
+      when Hash then value.to_h { |k, v| [k.to_s, string_keys(v)] }
+      when Array then value.map { |v| string_keys(v) }
+      else value
+      end
     end
 
     def to_h
       out = {
-        "type" => type.to_s, "run" => run&.to_h, "details" => Naming.to_json_value(details), "job" => job,
+        "type" => type.to_s, "run" => run&.to_h, "details" => details_json, "job" => job,
         "definition" => definition.respond_to?(:to_h) ? definition.to_h : definition,
         "title" => title, "message" => message, "at" => at,
       }
       out["triage"] = triage if triage_tried?
+      @extra&.each { |key, value| out[key] = value unless out.key?(key) || Alert::KNOWN.include?(key) }
       out
     end
+
+    private
+
+    def details_json
+      return @written_details[1] if @written_details && @written_details[0] == details
+
+      Naming.to_json_value(details)
+    end
   end
+
+  # The fields this version reads from a stored alert; the rest are kept as they came.
+  # @api private
+  Alert::KNOWN = %w[type run details job definition title message at triage].freeze
 
   # `version` goes up by one on every write, so a store can refuse a write
   # made from a stale read (see Stores::Memory#compare_and_set_state). Absent

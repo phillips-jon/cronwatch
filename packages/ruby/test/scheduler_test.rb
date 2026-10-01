@@ -323,6 +323,25 @@ class SchedulerTest < Minitest::Test
     assert_equal "nightly", handle.name
   end
 
+  # The bridges' rule: a job forgotten while its scheduler still runs it is
+  # declared again, with its schedule, at the next declare before a check.
+  def test_a_job_forgotten_in_this_process_is_declared_again_before_the_next_check
+    client, = make
+    Cronwatch.client = client
+    declaration = Cronwatch::Monitored::Declaration.new("nightly", { schedule: "0 3 * * *" }, where: "NightlyJob")
+    declaration.registration
+    client.forget("nightly")
+    assert_empty client.defined_jobs
+    declaration.registration
+    assert_equal [["nightly", "0 3 * * *"]], client.defined_jobs.map { |d| [d.name, d.schedule] }
+    client.check
+    assert_equal ["nightly"], client.jobs.map(&:name)
+    _, handle = declaration.registration
+    assert_same client.defined_jobs.first, handle.definition, "declared once, then the handle is kept"
+  ensure
+    Cronwatch.client = nil
+  end
+
   def test_default_sources_follow_what_is_loaded
     expected = defined?(::Sidekiq::Cron::Job) ? [SC] : []
     assert_equal expected, Cronwatch::Scheduler.sources.map(&:class), "Solid Queue is not loaded in this process"

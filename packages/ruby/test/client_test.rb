@@ -605,6 +605,13 @@ class ClientTest < Minitest::Test
     assert_equal 'metric "cost" must be a finite number', error.message
     assert_raises(ArgumentError) { cw.run("m") { |j| j.metric(:cost, "1") } }
     assert_equal :failed, cw.runs("m").first.status
+    # Past a double's range, as JavaScript holds it: Infinity.
+    error = assert_raises(ArgumentError) { cw.run("big") { |j| j.metric(:cost, 10**400) } }
+    assert_equal 'metric "cost" must be a finite number', error.message
+    assert_equal :failed, cw.runs("big").first.status
+    assert_includes cw.runs("big").first.error, 'metric "cost" must be a finite number'
+    cw.run("max") { |j| j.metric(:cost, 2**1000) }
+    assert_equal :ok, cw.runs("max").first.status
   end
 
   def test_log_writes_values_as_the_sdk_does
@@ -881,7 +888,8 @@ class ClientTest < Minitest::Test
     cw.job("imported")
     base = { id: "m1", job: "imported", status: "ok", started_at: 1, finished_at: 2, duration_ms: 1, error: nil, output: nil,
              trigger: "source" }
-    [Float::NAN, Float::INFINITY, nil, "3"].each do |value|
+    # 10**400 is Infinity in JavaScript, past a double's range.
+    [Float::NAN, Float::INFINITY, nil, "3", 10**400, -(10**400)].each do |value|
       error = assert_raises(ArgumentError) { cw.record_run(base.merge(metrics: { rows: value })) }
       assert_equal 'record_run: metric "rows" must be a finite number (job "imported", run "m1")', error.message
     end

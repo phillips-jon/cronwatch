@@ -210,4 +210,37 @@ class OutboxTest < Minitest::Test
     cw.check
     assert_nil store.get_state("j").sending, "every malformed entry counts as run out, and none carries an alert to send"
   end
+  # Webhook schema 1 lets a release add a field to its alerts. A queued alert
+  # keeps one this version does not know, and its details keys as written,
+  # through every state write, and the retry sends it, as the SDK does.
+  def test_a_queued_alert_keeps_the_fields_a_newer_release_wrote_through_every_write_and_in_its_retry
+    store = Cronwatch::Stores::Memory.new
+    alert = { "type" => "failed", "run" => nil, "details" => { "consecutiveFailures" => 1, "a_b" => { "c_d" => 2 } },
+              "job" => "j", "definition" => { "name" => "j" }, "title" => "j failed", "message" => "m", "at" => T0,
+              "futureAlertField" => { "x" => [1] } }
+    raw = { "job" => "j", "open" => { "failed" => T0 }, "consecutiveFailures" => 1, "silencedUntil" => nil,
+            "lastAlertAt" => T0, "undelivered" => [alert],
+            "sending" => [{ "until" => 1, "alert" => alert.merge("type" => "missed"), "futureEntryKey" => true }] }
+    round = Cronwatch::JobState.from_h(raw).to_h
+    assert_equal({ "x" => [1] }, round["undelivered"][0]["futureAlertField"])
+    assert_equal({ "consecutiveFailures" => 1, "a_b" => { "c_d" => 2 } }, round["undelivered"][0]["details"])
+    assert_equal({ "x" => [1] }, round["sending"][0]["alert"]["futureAlertField"])
+    assert_equal true, round["sending"][0]["futureEntryKey"]
+
+    store.set_state(Cronwatch::JobState.from_h(raw.merge("sending" => nil)))
+    sent = Capture.new
+    clock = Clock.new
+    cw = Cronwatch.new(store: store, alerts: [sent], cron_secret: nil, now: clock.to_proc)
+    cw.job("j")
+    cw.silence("j", for: "1m")
+    written = store.get_state("j").to_h["undelivered"][0]
+    assert_equal({ "x" => [1] }, written["futureAlertField"], "kept through the silence's write")
+    assert_equal({ "consecutiveFailures" => 1, "a_b" => { "c_d" => 2 } }, written["details"])
+    clock.advance(2 * MIN)
+    cw.check
+    assert_equal [:failed], sent.types
+    body = JSON.parse(sent.alerts[0].to_json)
+    assert_equal({ "x" => [1] }, body["futureAlertField"], "the retry sends it")
+    assert_equal({ "consecutiveFailures" => 1, "a_b" => { "c_d" => 2 } }, body["details"])
+  end
 end

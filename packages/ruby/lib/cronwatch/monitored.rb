@@ -53,7 +53,10 @@ module Cronwatch
         client = Cronwatch.client
         @lock.synchronize do
           current = @registration
-          return current if current && current[0].equal?(client)
+          # Kept while the client still holds the job: one forgotten since
+          # (the dashboard's forget) is declared again, with its schedule,
+          # as the other ports' bridges declare it again before a check.
+          return current if current && current[0].equal?(client) && client.defined_jobs.any? { |d| d.name == @name }
 
           handle = client.job(@name, **resolve_locked)
           @registration = [client, handle].freeze

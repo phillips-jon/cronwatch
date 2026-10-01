@@ -19,7 +19,13 @@ class AlertsTest < Minitest::Test
     end
 
     def post(url, body, headers)
-      @calls << { url: url, body: body, json: JSON.parse(body), headers: headers }
+      # Ruby's parser refuses a lone surrogate, which JSON.stringify writes.
+      json = begin
+        JSON.parse(body)
+      rescue JSON::ParserError
+        nil
+      end
+      @calls << { url: url, body: body, json: json, headers: headers }
       Cronwatch::HTTP::Response.new(status: @status, body: @body)
     end
   end
@@ -63,6 +69,21 @@ class AlertsTest < Minitest::Test
     assert description.start_with?("```\nError: long\n")
     assert_equal 2, description.scan("```").length, "only the block's own fences"
     assert_operator Cronwatch::JS.length16(embed["title"]) + 4096, :<=, 6000
+  end
+
+  # String#slice keeps the high half of a pair it cuts, and JSON.stringify
+  # writes it as \ud83d, so the gem sends that too.
+  def test_discord_keeps_the_lone_high_surrogate_where_its_caps_cut_a_pair_as_the_sdk_does
+    http = FakeHTTP.new
+    channel = Cronwatch::Alerts::Discord.new(webhook_url: "https://discord.example/w", http: http)
+    channel.call(alert.tap { |a| a.message = "#{"a" * 3799}\u{1F600}" })
+    assert_includes http.calls[0][:body], "\"description\":\"```\\n#{"a" * 3799}\\ud83d\\n```\""
+    channel.call(alert(triage: "#{"b" * 999}\u{1F600}x").tap { |a| a.message = "m" })
+    assert_includes http.calls[1][:body], "\"description\":\"```\\nm\\n```\\n**Triage:** #{"b" * 999}\\ud83d\""
+    # A message long enough to be cut again for the triage's room loses the lone half there, as the SDK's cut does.
+    channel.call(alert(triage: "t" * 1000).tap { |a| a.message = "#{"a" * 3799}\u{1F600}" })
+    description = http.calls[2][:json]["embeds"][0]["description"]
+    assert_equal "```\n#{"a" * (4096 - 8 - 1013)}\n```\n**Triage:** #{"t" * 1000}", description
   end
 
   def test_discord_adds_the_link_and_reports_a_refusal

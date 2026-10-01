@@ -46,10 +46,28 @@ module Cronwatch
       # cap, and escaping can grow both, so the whole is held to
       # DESCRIPTION_MAX (in UTF-16 units) by cutting the message's block,
       # never the triage: Discord refuses a longer one on every retry.
+      #
+      # Where a cap cuts a surrogate pair the high half is kept, as the SDK's
+      # slice keeps it, and written as JSON.stringify writes it (see
+      # JS.lone_surrogate). The cut of the block to the room left leaves out
+      # a pair or a lone half, as the SDK's cut does.
       def self.embed_description(alert)
-        triage = alert.triage && !alert.triage.empty? ? "\n**Triage:** #{escape_markdown(JS.head16(alert.triage, 1000))}" : ""
-        room = DESCRIPTION_MAX - "```\n".length - "\n```".length - JS.length16(triage)
-        "```\n#{JS.head16(code_block_safe(JS.head16(alert.message, 3800)), room)}\n```#{triage}"
+        triage = ""
+        triage_units = 0
+        if alert.triage && !alert.triage.empty?
+          head, lone = JS.slice16(alert.triage, 1000)
+          triage = "\n**Triage:** #{escape_markdown(head)}"
+          triage_units = JS.length16(triage)
+          if lone
+            triage += JS.lone_surrogate(lone)
+            triage_units += 1
+          end
+        end
+        room = DESCRIPTION_MAX - "```\n".length - "\n```".length - triage_units
+        head, lone = JS.slice16(alert.message, 3800)
+        block = code_block_safe(head)
+        block = lone && JS.length16(block) + 1 <= room ? block + JS.lone_surrogate(lone) : JS.head16(block, room)
+        "```\n" + block + "\n```" + triage
       end
 
       # Breaks up ``` so text inside a code block cannot close it.

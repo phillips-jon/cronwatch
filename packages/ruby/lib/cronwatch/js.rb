@@ -42,8 +42,10 @@ module Cronwatch
       value - floor >= 0.5 ? floor + 1 : floor
     end
 
+    # Number.isFinite of the number as JavaScript would hold it: an Integer
+    # past a double's range is Infinity there, so it is not finite here.
     def finite?(value)
-      value.is_a?(Integer) || (value.is_a?(Numeric) && value.real? && value.to_f.finite?)
+      value.is_a?(Numeric) && value.real? && value.to_f.finite?
     end
 
     # Number.isInteger.
@@ -161,10 +163,42 @@ module Cronwatch
     end
 
     def quote(text)
+      if text.encoding == Encoding::UTF_8 && !text.valid_encoding? && text.b.match?(LONE)
+        # A lone surrogate (see lone_surrogate), written as JSON.stringify writes one.
+        parts = text.b.split(LONE_SPLIT).each_with_index.map do |part, i|
+          next quote(part.force_encoding(Encoding::UTF_8))[1...-1] if i.even?
+
+          bytes = part.bytes
+          format("\\u%04x", ((bytes[0] & 0x0F) << 12) | ((bytes[1] & 0x3F) << 6) | (bytes[2] & 0x3F))
+        end
+        return "\"#{parts.join}\""
+      end
       text = text.encode(Encoding::UTF_8, invalid: :replace, undef: :replace) unless text.encoding == Encoding::UTF_8 && text.valid_encoding?
       text = text.scrub unless text.valid_encoding?
       escaped = text.gsub(/["\\\u0000-\u001f]/) { |c| ESCAPES[c] || format("\\u%04x", c.ord) }
       "\"#{escaped}\""
+    end
+
+    # A surrogate code unit on its own, in the bytes UTF-8 would give it.
+    # They make the string invalid UTF-8, which Ruby's own methods refuse, so
+    # one is only ever the last thing added to text about to be written:
+    # quote writes it as \udXXX, as JSON.stringify does.
+    LONE = /\xED[\xA0-\xBF][\x80-\xBF]/n
+    LONE_SPLIT = /(\xED[\xA0-\xBF][\x80-\xBF])/n
+
+    def lone_surrogate(unit)
+      [0xED, 0x80 | ((unit >> 6) & 0x3F), 0x80 | (unit & 0x3F)].pack("C*").force_encoding(Encoding::UTF_8)
+    end
+
+    # String.prototype.slice(0, units) as JavaScript gives it: the first
+    # `units` UTF-16 code units, and the high surrogate of a pair the cut
+    # splits. Returns the head Ruby can hold (head16) and that surrogate's
+    # code unit, or nil when the cut splits no pair.
+    def slice16(text, units)
+      head = head16(text, units)
+      return [head, nil] if text.ascii_only? || head.length == text.length || length16(head) == units
+
+      [head, 0xD800 + ((text[head.length].ord - 0x10000) >> 10)]
     end
 
     # Property order: array-index keys ascending, then the rest as inserted.
