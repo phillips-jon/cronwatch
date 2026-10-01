@@ -103,6 +103,19 @@ def test_install_declares_every_task_beat_schedules_before_it_runs() -> None:
     assert sorted(alerts.types()) == ["missed", "missed"]
 
 
+def test_a_task_forgotten_while_beat_schedules_it_is_declared_again_at_the_next_declare() -> None:
+    app = new_app()
+    app.conf.beat_schedule = {"nightly-report": {"task": "reports.nightly", "schedule": crontab(hour=2, minute=0)}}
+    cw, _, _ = make()
+    watch = install(app, client=cw)
+    watch.declare()
+    cw.forget("reports.nightly")
+    assert cw.defined_jobs() == []
+    assert [h.name for h in watch.declare()] == ["reports.nightly"]
+    assert [d.schedule for d in cw.defined_jobs()] == ["0 2 * * *"]
+    assert [j.name for j in cw.jobs()] == ["reports.nightly"], "back on the board before it next runs"
+
+
 def test_a_schedule_that_cannot_be_read_is_reported_once_and_the_task_is_still_watched() -> None:
     app = new_app()
     app.conf.beat_schedule = {
