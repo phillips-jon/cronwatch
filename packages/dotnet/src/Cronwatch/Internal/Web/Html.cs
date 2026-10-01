@@ -386,6 +386,12 @@ internal static class Html
             var metrics = new StringBuilder();
             foreach (var m in run.Metrics)
             {
+                // A stored number that reads as Infinity (1e400 in a foreign row) is left out, as
+                // the SDK's Number.isFinite leaves it out.
+                if (!double.IsFinite(m.Value))
+                {
+                    continue;
+                }
                 metrics.Append("<span><span class=\"k\">").Append(H(m.Key)).Append("</span> ").Append(H(MetricText(m.Value))).Append("</span>");
             }
             string tookCell = run.DurationMs is long took ? H(Durations.Format(took)) : "<span class=\"muted\">running</span>";
