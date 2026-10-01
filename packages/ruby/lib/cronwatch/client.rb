@@ -81,7 +81,9 @@ module Cronwatch
     # alerts:      where alerts go: objects with #call(alert) and #name. Defaults to the console.
     # triage:      a callable taking a TriageContext and returning a short diagnosis, added to every alert but recoveries.
     # cron_secret: a second bearer Cronwatch::Web accepts for /api/check, for an outside cron. Defaults to
-    #              ENV["CRON_SECRET"]; an empty string counts as unset. Pass nil for none.
+    #              ENV["CRON_SECRET"]; an empty string or one of only whitespace, given here or in the
+    #              variable, counts as unset. Pass nil for none. Anything but a String or nil (false, a
+    #              number, a Symbol) raises TypeError.
     # retention:   how long finished runs are kept. Default "30d".
     # defaults:    grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
     # redact:      applied to every run's output and error before it is stored, shown or sent to an alert
@@ -106,8 +108,11 @@ module Cronwatch
         raise ArgumentError, "a source must respond to sync(host)" unless source.respond_to?(:sync)
       end
       @triage = triage
-      secret = cron_secret.equal?(UNSET) ? ENV.fetch("CRON_SECRET", nil) : cron_secret
-      @cron_secret = secret.nil? || secret.to_s.empty? ? nil : secret.to_s
+      # A blank secret, given or read, counts as unset; one given that is not a String raises.
+      @cron_secret =
+        if cron_secret.equal?(UNSET) then Environment.secret("CRON_SECRET")
+        else Environment.secret_option(cron_secret, "cron_secret")
+        end
       @retention_ms = Duration.parse(retention || "30d", "retention")
       @defaults = (defaults || {}).transform_keys(&:to_sym)
       unknown = @defaults.keys - DEFAULT_OPTIONS

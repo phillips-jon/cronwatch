@@ -566,13 +566,14 @@ module Cronwatch
         layout("#{job.name}: CronWatch", body, base, refresh: 60)
       end
 
-      # A page with one message. With `sign_in`, a form under it takes the
-      # token and sends it as ?token=, which the app moves into the cookie:
+      # A page with one message. With `sign_in`, a form under it posts the
+      # token to <base>/signin in the body, keeping it out of the URL and
+      # access logs, and the app sets the cookie:
       # the way in where there is no address bar to open a link with, such as
       # an app on an iPhone's home screen, which keeps its cookies apart from
       # Safari's.
       def message_page(title, message, base, sign_in: false)
-        form = sign_in ? %(<form class="signin" method="get" action="#{h(base)}/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>) : ""
+        form = sign_in ? %(<form class="signin" method="post" action="#{h(base)}/signin"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>) : ""
         layout(title, %(<header class="top">#{brand(base)}</header><main class="message"><h1>#{h(title)}</h1><p>#{h(message)}</p>#{form}</main>), base)
       end
     end

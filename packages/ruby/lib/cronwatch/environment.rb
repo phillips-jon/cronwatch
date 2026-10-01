@@ -49,7 +49,38 @@ module Cronwatch
     end
 
     def present?(value)
-      !value.nil? && !JS.trim(value).empty?
+      !value.nil? && !blank?(value)
+    end
+
+    # Whether a String is empty or only whitespace, as JavaScript's
+    # String.prototype.trim sees it (JS::WHITESPACE). Bytes that are not
+    # UTF-8 are not whitespace.
+    def blank?(value)
+      JS.trim(value.dup.force_encoding(Encoding::UTF_8).scrub).empty?
+    end
+
+    # A secret from the environment (CRONWATCH_TOKEN, CRON_SECRET): nil when
+    # the variable is unset, empty or only whitespace, so a blank value counts
+    # as not set and the routes fail closed. Any other value is used as it
+    # is, untrimmed.
+    def secret(variable)
+      value = ENV.fetch(variable, nil)
+      present?(value) ? value : nil
+    end
+
+    # A token or secret passed in code: a String, or nil. A String that is
+    # empty or only whitespace counts as not given (nil here; the caller
+    # tells that from nil the opt-out). Anything else (false, a number, a
+    # Symbol) raises TypeError naming the option, so it never becomes a
+    # password.
+    def secret_option(value, what)
+      return nil if value.nil?
+      unless value.is_a?(String)
+        kind = [true, false].include?(value) ? value.to_s : value.class.name
+        raise TypeError, "#{what} must be a String, or nil to opt out, not #{kind}"
+      end
+
+      blank?(value) ? nil : value
     end
 
     # The framework's own name for the environment, as it sets it: Rails.env

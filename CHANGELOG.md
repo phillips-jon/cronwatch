@@ -29,6 +29,7 @@ Ruby:
 - The environment is read from `CRONWATCH_ENV` and `APP_ENV` before `Rails.env`, `RAILS_ENV` and `RACK_ENV`.
 - The constants the docs do not name are private (`private_constant`), so referring to one raises `NameError`.
 - A one-time date is refused; a date no month has, which Fugit refused, never fires.
+- `token:` on `routes` and `cron_secret:` on the client take a String or `nil` only, and raise `TypeError` for anything else: `false`, a number or a Symbol was turned into a password (`token: false` signed in with `Bearer false`).
 
 Python:
 

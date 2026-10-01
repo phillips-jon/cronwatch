@@ -174,10 +174,59 @@ class WebPWATest < Minitest::Test
     _, web = app(base_path: "/ops/cron")
     page = send_request(web, "GET", "/ops/cron/jobs/x")
     assert_equal 401, page.status
-    assert_match(%r{<form class="signin" method="get" action="/ops/cron/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password"[^>]*required><button class="primary" type="submit">Sign in</button></form>}, page.body)
-    res = send_request(web, "GET", "/ops/cron/?token=tok")
+    # It posts the token in the body, so the token never sits in a URL or an access log.
+    assert_match(%r{<form class="signin" method="post" action="/ops/cron/signin"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password"[^>]*required><button class="primary" type="submit">Sign in</button></form>}, page.body)
+    assert_includes page.body, "Enter your CRONWATCH_TOKEN and this browser stays signed in."
+    post = lambda do |body, headers = {}|
+      send_request(web, "POST", "/ops/cron/signin", { "content-type" => "application/x-www-form-urlencoded" }.merge(headers), body)
+    end
+    # Back to the page it was posted from, with the cookie.
+    res = post.call("token=tok", "origin" => "http://app.test", "referer" => "http://app.test/ops/cron/jobs/x?view=all")
     assert_equal 303, res.status
-    assert_equal "/ops/cron/", res.headers["location"]
+    assert_equal "http://app.test/ops/cron/jobs/x?view=all", res.headers["location"]
+    assert_match(%r{\Acronwatch_token=[0-9a-f]{64}; Path=/ops/cron; HttpOnly; SameSite=Lax; Max-Age=2592000\z}, res.headers["set-cookie"])
+    assert_equal "no-store", res.headers["cache-control"]
+    # To the dashboard when the page came from elsewhere, had none, or carried a ?token=.
+    [nil, "https://evil.example/ops/cron/jobs/x", "http://app.test/ops/cron/?token=wrong", "http://app.test/ops/cron/?a=1&token=",
+     "http://app.test/ops/cron/?%74oken=x", "http://app.test/ops/cron/?to\tken=x"].each do |referer|
+      r = post.call("token=tok", referer.nil? ? {} : { "referer" => referer })
+      assert_equal 303, r.status, referer.inspect
+      assert_equal "/ops/cron/", r.headers["location"], referer.inspect
+    end
+    # A token only in the fragment is no query parameter.
+    assert_equal "http://app.test/ops/cron/jobs/x#token=1", post.call("token=tok", "referer" => "http://app.test/ops/cron/jobs/x#token=1").headers["location"]
+    # A JSON body signs in too, its values read as strings.
+    assert_equal 303, post.call('{"token":"tok"}', "content-type" => "application/json").status
+    # A wrong or missing token is the sign-in page again, with no cookie.
+    ["token=wrong", "", "other=tok"].each do |body|
+      r = post.call(body)
+      assert_equal 401, r.status, body
+      assert_nil r.headers["set-cookie"], body
+      assert_match(/class="signin"/, r.body)
+    end
+    # A cross-site post is refused before the token is looked at.
+    cross = post.call("token=tok", "origin" => "https://evil.example")
+    assert_equal 403, cross.status
+    assert_nil cross.headers["set-cookie"]
+    # The ?token= link still signs in, for the development sign-in line.
+    link = send_request(web, "GET", "/ops/cron/?token=tok")
+    assert_equal 303, link.status
+    assert_equal "/ops/cron/", link.headers["location"]
+    # Other pages do not carry the form.
     refute_match(/class="signin"/, send_request(web, "GET", "/ops/cron/offline").body)
+    # GET /signin is not special: the sign-in page without credentials, 404 with them.
+    assert_equal 401, send_request(web, "GET", "/ops/cron/signin").status
+    assert_equal 404, send_request(web, "GET", "/ops/cron/signin", BEARER).status
+    # With the routes open there is nothing to sign in to.
+    _, open = app(token: nil, base_path: "/ops/cron")
+    none = send_request(open, "POST", "/ops/cron/signin", { "content-type" => "application/x-www-form-urlencoded" }, "token=tok")
+    assert_equal 404, none.status
+  end
+
+  def test_the_sign_in_cookie_is_secure_on_an_https_origin
+    _, web = app
+    res = send_request(web, "POST", "https://app.test/cronwatch/signin", { "content-type" => "application/x-www-form-urlencoded" }, "token=tok")
+    assert_equal 303, res.status
+    assert_match(/; Secure\z/, res.headers["set-cookie"])
   end
 end

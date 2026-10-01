@@ -225,7 +225,7 @@ class WebRoutesTest < Minitest::Test
 
           page = send_request(web, "GET", "http://localhost:3000/cronwatch/")
           assert_equal 401, page.status
-          assert_includes page.body, "The sign-in link is in the server log: open it once and this browser stays signed in."
+          assert_includes page.body, "The sign-in link is in the server log: open it once, or enter the token from it below, and this browser stays signed in."
           api = send_request(web, "GET", "http://localhost:3000/cronwatch/api/jobs")
           assert_equal({ "ok" => false, "error" => "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, api.json)
 

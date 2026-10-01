@@ -232,4 +232,101 @@ class WebSecurityTest < Minitest::Test
       end
     end
   end
+
+  PRODUCTION = { "CRONWATCH_ENV" => nil, "APP_ENV" => nil, "RAILS_ENV" => nil, "RACK_ENV" => "production" }.freeze
+
+  def test_a_cronwatch_token_or_token_of_only_whitespace_counts_as_unset_so_the_routes_stay_locked
+    ["", " ", "  ", "\t", " \n  \u{feff} ", " ", " "].each do |blank|
+      with_env(PRODUCTION.merge("CRONWATCH_TOKEN" => blank)) do
+        [Cronwatch.new(alerts: [Capture.new], cron_secret: nil).routes(base_path: "/cronwatch"),
+         Cronwatch.new(alerts: [Capture.new], cron_secret: nil).routes(token: blank, base_path: "/cronwatch"),].each do |web|
+          label = blank.inspect
+          encoded = URI.encode_www_form_component(blank)
+          assert_equal 503, send_request(web, "GET", "/cronwatch/api/jobs").status, label
+          sign_in = send_request(web, "GET", "/cronwatch/?token=#{encoded}")
+          assert_equal 503, sign_in.status, label
+          assert_nil sign_in.headers["set-cookie"], label
+          assert_equal 503, send_request(web, "GET", "/cronwatch/api/jobs", { "authorization" => "Bearer  " }).status, label
+          assert_equal 503, send_request(web, "POST", "/cronwatch/signin", FORM, "token=#{encoded}").status, label
+        end
+      end
+    end
+    # A blank token given in code falls back to the variable, as an empty one always has.
+    with_env(PRODUCTION.merge("CRONWATCH_TOKEN" => "from-env")) do
+      web = Cronwatch.new(alerts: [Capture.new], cron_secret: nil).routes(token: "  ", base_path: "/cronwatch")
+      assert_equal 200, send_request(web, "GET", "/cronwatch/api/jobs", { "authorization" => "Bearer from-env" }).status
+    end
+    # Anything else is used as it is, spaces and all.
+    with_env(PRODUCTION.merge("CRONWATCH_TOKEN" => " padded ")) do
+      web = Cronwatch.new(alerts: [Capture.new], cron_secret: nil).routes(base_path: "/cronwatch")
+      assert_equal 303, send_request(web, "GET", "/cronwatch/?token=%20padded%20").status
+      assert_equal 401, send_request(web, "GET", "/cronwatch/?token=padded").status
+    end
+  end
+
+  def test_a_token_given_in_code_that_is_not_a_string_or_nil_raises_so_it_never_becomes_a_password
+    cw = Cronwatch.new(alerts: [Capture.new], cron_secret: nil)
+    [[false, "false"], [true, "true"], [0, "Integer"], [5, "Integer"], [1.5, "Float"], [:tok, "Symbol"], [{}, "Hash"],
+     [["tok"], "Array"],].each do |token, kind|
+      error = assert_raises(TypeError, token.inspect) { cw.routes(token: token) }
+      assert_equal "routes: token must be a String, or nil to opt out, not #{kind}", error.message
+      error = assert_raises(TypeError, token.inspect) { Cronwatch::Web.build(cw, token: token) }
+      assert_equal "routes: token must be a String, or nil to opt out, not #{kind}", error.message
+    end
+  end
+
+  def test_an_authorization_header_that_is_not_a_bearer_leaves_the_cookie_and_token_query_to_sign_in
+    cw, _, send = app
+    cw.run("x") { nil }
+    basic = { "authorization" => "Basic dXNlcjpwYXNz" }
+    assert_equal 200, send.call("GET", "/cronwatch/api/jobs", basic.merge(COOKIE)).status
+    assert_equal 200, send.call("GET", "/cronwatch/", basic.merge(COOKIE)).status
+    assert_equal 401, send.call("GET", "/cronwatch/api/jobs", basic).status
+    link = send.call("GET", "/cronwatch/jobs/x?token=tok", basic)
+    assert_equal 303, link.status
+    refute_nil link.headers["set-cookie"]
+    # Not a bearer, so GET /api/check does not run on its strength.
+    assert_equal 405, send.call("GET", "/cronwatch/api/check", basic.merge(COOKIE)).status
+    # A bearer is matched whatever the scheme's case, and with any whitespace after it.
+    ["Bearer tok", "bearer tok", "BEARER\ttok", "Bearer   tok"].each do |authorization|
+      assert_equal 200, send.call("GET", "/cronwatch/api/jobs", { "authorization" => authorization }).status, authorization
+    end
+    # A wrong bearer still wins over a good cookie; "Bearer" with nothing after it, or run on, is no bearer.
+    assert_equal 401, send.call("GET", "/cronwatch/api/jobs", { "authorization" => "Bearer wrong" }.merge(COOKIE)).status
+    assert_equal 200, send.call("GET", "/cronwatch/api/jobs", { "authorization" => "Bearer" }.merge(COOKIE)).status
+    assert_equal 200, send.call("GET", "/cronwatch/api/jobs", { "authorization" => "Bearertok" }.merge(COOKIE)).status
+  end
+
+  # The SDK's handler half of this test has no Ruby counterpart (the gem has
+  # no handler); the client's secret and /api/check are the same.
+  def test_a_cron_secret_of_only_whitespace_counts_as_unset_and_api_check_takes_only_the_token
+    ["", " ", "\t\n", " \u{feff}", " ", " "].each do |blank|
+      with_env(PRODUCTION.merge("CRON_SECRET" => blank)) do
+        assert_nil Cronwatch.new(alerts: [Capture.new]).cron_secret, blank.inspect
+      end
+      # Given in code it means no secret, with no fallback to the variable.
+      with_env(PRODUCTION.merge("CRON_SECRET" => "from-env")) do
+        assert_nil Cronwatch.new(alerts: [Capture.new], cron_secret: blank).cron_secret, blank.inspect
+      end
+    end
+    with_env(PRODUCTION.merge("CRON_SECRET" => "  ")) do
+      web = Cronwatch.new(alerts: [Capture.new]).routes(token: "tok", base_path: "/cronwatch")
+      assert_equal 401, send_request(web, "POST", "/cronwatch/api/check", { "authorization" => "Bearer   " }).status
+    end
+    # Anything else is used as it is.
+    with_env(PRODUCTION.merge("CRON_SECRET" => " s3cret ")) do
+      assert_equal " s3cret ", Cronwatch.new(alerts: [Capture.new]).cron_secret
+    end
+  end
+
+  def test_a_cron_secret_that_is_not_a_string_or_nil_raises_so_false_or_a_number_never_becomes_a_password
+    [[false, "false"], [true, "true"], [0, "Integer"], [5, "Integer"], [:s, "Symbol"], [{}, "Hash"], [["s"], "Array"]].each do |value, kind|
+      error = assert_raises(TypeError, value.inspect) { Cronwatch.new(alerts: [Capture.new], cron_secret: value) }
+      assert_equal "cron_secret must be a String, or nil to opt out, not #{kind}", error.message
+    end
+    # Cronwatch.configure hands the option to the client the same way.
+    configuration = Cronwatch::Configuration.new
+    configuration.cron_secret = false
+    assert_raises(TypeError) { Cronwatch::Client.new(**configuration.to_options) }
+  end
 end

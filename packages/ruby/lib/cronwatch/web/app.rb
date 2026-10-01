@@ -22,8 +22,11 @@ module Cronwatch
   # deprecated: it still works through 1.x and goes in 2.0.
   #
   # token:     required to reach anything. Send it as `Authorization: Bearer <token>`,
-  #            or open the dashboard once with `?token=<token>` and a cookie is set.
-  #            Defaults to ENV["CRONWATCH_TOKEN"]; an empty string counts as unset.
+  #            or open the dashboard once with `?token=<token>` (or sign in with the
+  #            form, which posts it to <base>/signin) and a cookie is set.
+  #            Defaults to ENV["CRONWATCH_TOKEN"]; an empty string or one of only
+  #            whitespace, given here or in the variable, counts as unset, and
+  #            anything but a String or nil (false, a number, a Symbol) raises TypeError.
   #            With no token while Cronwatch::Environment is development or
   #            test (Environment.stated_development?: under Puma, Unicorn,
   #            Thin or rackup, which set RACK_ENV=development by default,
@@ -71,7 +74,10 @@ module Cronwatch
     SECURITY_HEADERS = {
       "x-content-type-options" => "nosniff", "referrer-policy" => "same-origin", "x-robots-tag" => "noindex",
     }.freeze
-    BEARER = Regexp.new("\\ABearer[#{JS::WHITESPACE}]+", Regexp::IGNORECASE)
+    # A bearer is what follows the scheme when the scheme is Bearer (any case)
+    # and whitespace follows it. Any other Authorization header (a proxy's
+    # Basic auth) is no bearer at all.
+    BEARER = Regexp.new("\\ABearer[#{JS::WHITESPACE}]+(.*)\\z", Regexp::IGNORECASE | Regexp::MULTILINE)
     # What GET <base>/api names, so a client such as @cronwatch/mcp can tell
     # what it is talking to. API_VERSION goes up only with a change that is
     # not additive, in a major release.
@@ -103,8 +109,9 @@ module Cronwatch
       @client = client
       @origin = Web.configured_origin(origin)
       @opted_out = token.nil?
-      given = token.equal?(UNSET) ? nil : token
-      @token = @opted_out ? nil : [given, ENV.fetch("CRONWATCH_TOKEN", nil)].map(&:to_s).find { |t| !t.empty? }
+      # A blank token, given or read, counts as unset; one given that is not a String raises.
+      given = token.equal?(UNSET) ? nil : Environment.secret_option(token, "routes: token")
+      @token = @opted_out ? nil : given || Environment.secret("CRONWATCH_TOKEN")
       @base_path = base_path&.to_s&.sub(%r{/+\z}, "")
       # A Rack app cannot reliably tell a local caller from a remote one
       # (proxies, tunnels and a server bound to every interface all look
@@ -220,7 +227,18 @@ module Cronwatch
       end
 
       authorization = request.header("authorization")
-      bearer = authorization&.sub(BEARER, "")
+      bearer = authorization && BEARER.match(authorization)&.[](1)
+
+      # The sign-in form posts the token here, in the body, so it stays out of
+      # the URL and every access log. Cross-site posts were refused above.
+      if @token && method == "POST" && path == "/signin"
+        sent = read_body(request)["token"]
+        return sign_in_page(base) if sent.nil? || !HTTP.constant_time_equal?(sent, @token)
+
+        return redirect(sign_in_return(request.header("referer"), public_origin(request), base),
+                        "set-cookie" => sign_in_cookie(request, base))
+      end
+
       if @token
         # ?token= is only the sign-in that moves the token into a cookie.
         query = wants_html && method == "GET" ? request.query("token") : nil
@@ -233,16 +251,18 @@ module Cronwatch
           else !cookie.nil? && HTTP.constant_time_equal?(cookie, cookie_value(@token))
           end
         unless cron_secret_ok || token_ok
+          return sign_in_page(base) if wants_html
           if @generated
-            return wants_html ? html(HTML.message_page("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base, sign_in: true), 401) : api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401)
+            return api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401)
           end
-          return wants_html ? html(HTML.message_page("Sign in", "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.", base, sign_in: true), 401) : api({ ok: false, error: "Unauthorized" }, 401)
+
+          return api({ ok: false, error: "Unauthorized" }, 401)
         end
         unless query.nil?
-          # Move the token from the URL into a cookie so it is not in history or logs.
-          secure = public_origin(request).start_with?("https:") ? "; Secure" : ""
-          return redirect(request.pathname + request.search_without("token"),
-                          "set-cookie" => "#{COOKIE}=#{cookie_value(@token)}; Path=#{base.empty? ? "/" : base}; HttpOnly; SameSite=Lax; Max-Age=#{COOKIE_MAX_AGE}#{secure}")
+          # Move the token from the URL into a cookie, so it is not left in the
+          # browser's history. The request line that carried it may still be in
+          # an access log, which is why the sign-in form posts instead.
+          return redirect(request.pathname + request.search_without("token"), "set-cookie" => sign_in_cookie(request, base))
         end
       end
 
@@ -384,6 +404,37 @@ module Cronwatch
       shown = @origin || (Web.loopback_origin?(request.origin) ? request.origin : nil)
       $stdout.puts(Web.development_sign_in_line(shown, base, @token))
       $stdout.flush
+    end
+
+    # The 401 sign-in page, with the form that posts the token to <base>/signin.
+    def sign_in_page(base)
+      message =
+        if @generated
+          "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server " \
+            "log: open it once, or enter the token from it below, and this browser stays signed in."
+        else
+          "Enter your CRONWATCH_TOKEN and this browser stays signed in."
+        end
+      html(HTML.message_page("Sign in", message, base, sign_in: true), 401)
+    end
+
+    # The cookie a sign-in sets, by ?token= or by the form.
+    def sign_in_cookie(request, base)
+      secure = public_origin(request).start_with?("https:") ? "; Secure" : ""
+      "#{COOKIE}=#{cookie_value(@token)}; Path=#{base.empty? ? "/" : base}; HttpOnly; SameSite=Lax; Max-Age=#{COOKIE_MAX_AGE}#{secure}"
+    end
+
+    # Where a sign-in through the form goes next: the page it was posted from
+    # (the Referer) when that is on the public origin and its query has no
+    # `token` parameter, else the dashboard. A Referer that starts with the
+    # origin and "/" always parses as a URL; its query is read as
+    # URLSearchParams reads it, after the tabs and newlines a URL parser drops.
+    def sign_in_return(referer, origin, base)
+      return "#{base}/" if referer.nil? || !referer.start_with?("#{origin}/")
+
+      url = referer.delete("\t\n\r").split("#", 2).first.to_s
+      query = url.include?("?") ? url.split("?", 2).last : ""
+      Request.parse_query(query).any? { |key, _| key == "token" } ? "#{base}/" : referer
     end
 
     # The cookie holds a digest of the token, so a leaked cookie does not reveal the bearer token itself.
