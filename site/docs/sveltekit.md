@@ -88,7 +88,7 @@ import type { ServerInit } from "@sveltejs/kit";
 import { cw } from "$lib/server/cronwatch";
 
 export const init: ServerInit = () => {
-  cw.start("1m");
+  cw.startChecking("1m");
 };
 ```
 

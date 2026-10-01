@@ -72,7 +72,7 @@ A function run that is cancelled, or whose last step never reports back, leaves 
 
 ## The check
 
-In a long-running server, `cw.start()` does it. On serverless, a cron on your platform can call `/cronwatch/api/check`, or Inngest can run it:
+In a long-running server, `cw.startChecking()` does it. On serverless, a cron on your platform can call `/cronwatch/api/check`, or Inngest can run it:
 
 ```ts
 // src/inngest/cronwatch-check.ts

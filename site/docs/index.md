@@ -119,7 +119,7 @@ Failures are caught as they happen. A run that never started, or never finished,
 In a long-running server, once at startup:
 
 ```ts
-cw.start();          // every minute; cw.start("5m") to change it
+cw.startChecking();  // every minute; cw.startChecking("5m") to change it
 ```
 
 On a serverless platform, add a cron that hits the check endpoint with either the dashboard token or the cron secret as a bearer:

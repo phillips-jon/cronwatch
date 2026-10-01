@@ -1295,15 +1295,16 @@ export class Cronwatch {
   /**
    * Check on an interval, for long-running servers. Default every minute.
    * Not for serverless functions or Cloudflare Workers, where nothing runs
-   * between requests: call check() from a cron there instead.
+   * between requests: call check() from a cron there instead. (A job's
+   * start() opens a run; this starts the checks.)
    */
-  start(every: Duration = "1m"): void {
+  startChecking(every: Duration = "1m"): void {
     if (this.timer) return;
     // At most setInterval's longest delay: a longer one would check every millisecond.
     const ms = Math.min(TIMER_MAX_MS, Math.max(5_000, parseDuration(every, "check interval")));
     if (this.deferDelivery && !this.warnedDeferredStart) {
       this.warnedDeferredStart = true;
-      console.warn('[cronwatch] start() was called with deliver: "check", so these checks send no alerts. Another process must run checks with deliver: "now" (the default) to send them.');
+      console.warn('[cronwatch] startChecking() was called with deliver: "check", so these checks send no alerts. Another process must run checks with deliver: "now" (the default) to send them.');
     }
     const tick = () => this.check().catch((e) => this.onError(e, "check"));
     this.timer = setInterval(tick, ms);
@@ -1315,6 +1316,16 @@ export class Cronwatch {
     if (typeof this.firstTick === "object" && "unref" in this.firstTick) this.firstTick.unref();
   }
 
+  /**
+   * startChecking(), under its former name.
+   * @deprecated Renamed `startChecking`, since a job's `start()` opens a run.
+   * This name still works through 1.x and goes in 2.0.
+   */
+  start(every: Duration = "1m"): void {
+    this.startChecking(every);
+  }
+
+  /** Stop the checks startChecking() began. */
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     if (this.firstTick) clearTimeout(this.firstTick);

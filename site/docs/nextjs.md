@@ -89,7 +89,7 @@ With `next start` or the standalone server, the process is long-lived, so start 
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { cw } = await import("./lib/cronwatch");
-    cw.start();
+    cw.startChecking();
   }
 }
 ```

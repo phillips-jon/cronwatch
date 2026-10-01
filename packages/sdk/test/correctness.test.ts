@@ -113,11 +113,11 @@ test("a late success after a stuck mark closes stuck and recovers", async () => 
   assert.deepEqual(alerts.types(), ["stuck", "recovered"]);
 });
 
-test("stop() cancels the first check start() scheduled", async () => {
+test("stop() cancels the first check startChecking() scheduled", async () => {
   const cw = cronwatch({ alerts: [capture()], cronSecret: null });
   let checks = 0;
   cw.check = async () => { checks++; return { checkedAt: 0, jobs: [], alerts: [], pruned: 0 }; };
-  cw.start();
+  cw.startChecking();
   cw.stop();
   await new Promise((r) => setTimeout(r, 1_300));
   assert.equal(checks, 0);

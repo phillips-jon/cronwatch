@@ -13,7 +13,7 @@ CronWatch runs inside your app. If the whole app is down, nothing inside it can 
 
 ## Someone has to call the check
 
-Missed and stuck runs are only found by `cw.check()`. In a long-running process `cw.start()` does it; on serverless a platform cron has to. If neither is set up, failures are still caught but misses never are. The docs for [Next.js](/docs/nextjs/) and [servers and scripts](/docs/node/) show both.
+Missed and stuck runs are only found by `cw.check()`. In a long-running process `cw.startChecking()` does it; on serverless a platform cron has to. If neither is set up, failures are still caught but misses never are. The docs for [Next.js](/docs/nextjs/) and [servers and scripts](/docs/node/) show both.
 
 ## Several instances
 

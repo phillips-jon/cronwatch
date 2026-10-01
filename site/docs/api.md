@@ -25,19 +25,21 @@ group: Reference
 
 ## cw.job(name, options)
 
-Names are 1 to 120 characters, starting with a letter or digit, of letters, digits, `.`, `_`, `:` and `-`. Declaring the same name twice replaces the options. Options are checked when the job is declared: an unknown timezone, a schedule that does not parse or an interval under one second, a `grace`, `timeout` or `maxDuration` that is not a duration, a zero `timeout` or `maxDuration`, a `failuresBeforeAlert` that is not a whole number of 1 or more, or a budget that is not a finite number of 0 or more all throw, rather than quietly turning a check off. A duration string longer than 64 characters throws too, wherever one is read (these options, the interval in `every`, `retention`, `start()` and `silence()`); no real duration comes near it.
+Names are 1 to 120 characters, starting with a letter or digit, of letters, digits, `.`, `_`, `:` and `-`. Declaring the same name twice replaces the options. Options are checked when the job is declared: an unknown timezone, a schedule that does not parse or an interval under one second, a `grace`, `timeout` or `maxDuration` that is not a duration, a zero `timeout` or `maxDuration`, a `failuresBeforeAlert` that is not a whole number of 1 or more, or a budget that is not a finite number of 0 or more all throw, rather than quietly turning a check off. A duration string longer than 64 characters throws too, wherever one is read (these options, the interval in `every`, `retention`, `startChecking()` and `silence()`); no real duration comes near it.
 
 | Option | Default | |
 |---|---|---|
 | `schedule` | none | cron expression, nickname, or `every <duration>` |
 | `timezone` | process timezone | IANA name the cron is read in |
 | `grace` | `"10m"` | how late a start may be before the run is missed |
-| `timeout` | `"1h"` | a run still going after this is stuck |
-| `maxDuration` | baseline | a successful run longer than this is slow |
+| `timeout` | `"1h"` | a run still going after this is stuck: marked `timeout`, counted as a failure, and alerted as stuck. The job's signal aborts then |
+| `maxDuration` | baseline | a run that succeeded but took longer than this is slow: it stays `ok` and is alerted as slow. Without it, slow is more than twice the p95 of recent successful runs (and over 10 seconds) |
 | `budget` | baseline | `{ metric: ceiling }`, each ceiling a finite number, 0 or more |
 | `expect` | | string, RegExp or `(output) => boolean` the output must satisfy. A RegExp, like a function, runs without a time limit: see [expect rules](/docs/conditions/#expect-rules) |
 | `failuresBeforeAlert` | `1` | alert on the Nth consecutive failure; a whole number, 1 or more |
 | `description`, `tags` | | shown on the dashboard |
+
+`timeout` and `maxDuration` both measure a run's length, and are easy to mix up. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `maxDuration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So `timeout` should be well above `maxDuration`: `{ maxDuration: "10m", timeout: "1h" }` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
 Returns a handle:
 
@@ -89,7 +91,7 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 |---|---|
 | `run(name, options?, fn)` | run without keeping a handle; declares the job on first use |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune. Returns `{ checkedAt, jobs, alerts, pruned }`. Concurrent calls share one check. A job that cannot be evaluated is reported to `onError` and listed as `failing`; the rest are checked as usual |
-| `start(every = "1m")`, `stop()` | check on an interval, starting about a second after `start()`. The interval is held between 5 seconds and about 24.8 days (the longest delay a timer keeps), so a shorter one checks every 5 seconds and a longer one about every 24.8 days. With `deliver: "check"`, `start()` warns once on the console that these checks send nothing and another process must |
+| `startChecking(every = "1m")`, `stop()` | check on an interval, starting about a second after `startChecking()`. The interval is held between 5 seconds and about 24.8 days (the longest delay a timer keeps), so a shorter one checks every 5 seconds and a longer one about every 24.8 days. With `deliver: "check"`, it warns once on the console that these checks send nothing and another process must. (A job's `start()` opens a run; this starts the checks.) |
 | `routes(options?)` | the [dashboard and API](/docs/dashboard/) handlers; see [below](#routes) |
 | `jobs()` | every job's summary, without alerting |
 | `jobsWithRuns(limit = 20)` | every job's summary with its newest `limit` runs, read together: `{ job, runs }[]` |
@@ -152,6 +154,7 @@ These names still work, and do exactly what their replacements do, through every
 |---|---|
 | `CronWatch`, `CronWatchOptions` | `Cronwatch`, `CronwatchOptions`: the spelling every port uses |
 | `createRoutes(cw, options)` | `cw.routes(options)` |
+| `cw.start(every)` | `cw.startChecking(every)`: a job's `start()` opens a run, so the client's is named for what it starts |
 | `hmacSha256Hex(secret, body)` from `/webhook` | `signature(secret, body)`, the name every port uses |
 
 These were exported by accident, are internal to their entry points, and are no longer exported from 1.0: `MAX_SEGMENTS`, `MAX_BODY`, `smsSegments` and `smsBody` from `/twilio`; `parseDsn` from `/sentry`; `DESCRIPTION_MAX`, `embedDescription`, `codeBlockSafe` and `escapeMarkdown` from `/discord`; `PG_CRON_HOLD_MS`, `pgCronSchedule`, `pgCronJobName` and `pgCronRun` from `/pg-cron`.

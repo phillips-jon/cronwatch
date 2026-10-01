@@ -107,7 +107,7 @@ import { cw } from "@/lib/cronwatch";
 export const { GET, POST, DELETE } = cw.routes();
 \`\`\`
 
-Missed runs are found by \`cw.check()\`. Either call \`cw.start()\` once in a long-running server (instrumentation.ts in Next.js), or point a cron at \`GET /cronwatch/api/check\` every few minutes with the bearer token.
+Missed runs are found by \`cw.check()\`. Either call \`cw.startChecking()\` once in a long-running server (instrumentation.ts in Next.js), or point a cron at \`GET /cronwatch/api/check\` every few minutes with the bearer token.
 
 For a plain function outside HTTP: \`await nightlyReport.run(async (job) => { ... })\`. The function's exception is recorded as a failure and rethrown.
 

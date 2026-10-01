@@ -132,7 +132,7 @@ export default {
 
 **The check.** Its own trigger, every five minutes here, calls `cw.check()` directly: no HTTP round trip, no secret. It marks missed and stuck runs, sends and retries alerts, and prunes old runs. A job declared in `monitor()` is written to the store on every invocation, so a job that has never run is still found missed.
 
-**No start().** `cw.start()` checks on an interval, which needs a process that stays up. A Worker does nothing between invocations, and timers do not outlive the invocation that set them, so use the check trigger instead.
+**No startChecking().** `cw.startChecking()` checks on an interval, which needs a process that stays up. A Worker does nothing between invocations, and timers do not outlive the invocation that set them, so use the check trigger instead.
 
 **The dashboard.** `cw.routes()` is a fetch handler, so it mounts in `fetch` under `/cronwatch` (change `basePath` to mount it elsewhere). Open `/cronwatch/?token=<CRONWATCH_TOKEN>` once and a cookie keeps the browser signed in. The MCP server reads the same routes.
 

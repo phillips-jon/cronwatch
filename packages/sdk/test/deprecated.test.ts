@@ -49,6 +49,22 @@ test("the helpers the channel and source entry points leaked are still there, de
   assert.deepEqual(Object.keys(webhook).sort(), ["hmacSha256Hex", "signature", "webhook"]);
 });
 
+test("cw.start(every) is cw.startChecking(every)", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
+  const cw = cronwatch({ alerts: [], cronSecret: null });
+  let checks = 0;
+  cw.check = async () => { checks++; return { checkedAt: 0, jobs: [], alerts: [], pruned: 0 }; };
+  cw.start("1m");
+  t.mock.timers.tick(1_000);
+  assert.equal(checks, 1, "the first check, a second in");
+  cw.startChecking("1m");
+  t.mock.timers.tick(60_000);
+  assert.equal(checks, 2, "one interval: a second start is ignored, whichever name it uses");
+  cw.stop();
+  t.mock.timers.tick(120_000);
+  assert.equal(checks, 2);
+});
+
 test("createRoutes(cw, options) is cw.routes(options)", async () => {
   const cw = cronwatch({ alerts: [] });
   cw.job("a");

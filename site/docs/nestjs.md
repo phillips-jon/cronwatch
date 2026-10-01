@@ -40,7 +40,7 @@ export class CronwatchModule implements OnApplicationBootstrap, OnApplicationShu
   constructor(private readonly cw: Cronwatch) {}
 
   onApplicationBootstrap() {
-    this.cw.start("1m");
+    this.cw.startChecking("1m");
   }
 
   async onApplicationShutdown() {

@@ -47,6 +47,8 @@ A cron read in a timezone with daylight saving follows that zone's clock. When c
 
 ## Timeouts and stuck runs
 
+`timeout` is not `maxDuration`: `timeout` gives up on a run that is still going, while `maxDuration` flags a run that finished, successfully, but slowly (see [slow](/docs/conditions/#slow)). Set `timeout` comfortably above both the job's usual length and its `maxDuration`.
+
 Every run is recorded as `running` when it starts. Normally it is updated to `ok` or `failed` within the same call. If the process dies first, the row stays `running`. Each check marks any run older than the job's `timeout` (default `1h`) as `timeout`, counts it as a failure, and opens a **stuck** condition. The next run's start closes it, and the next successful run sends the recovery. If the timed-out run does finish later, a success closes stuck and recovers, and a failure is not counted a second time.
 
 Inside the process, `job.signal` is an `AbortSignal` that fires when the timeout elapses, so work that can stop early may honour it; nothing is killed for you. In Ruby, `job.aborted?` turns true and `job.signal.check!` raises once the timeout has passed.

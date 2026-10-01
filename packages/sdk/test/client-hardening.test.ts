@@ -280,16 +280,16 @@ test("handler fails closed without a secret outside development", async () => {
   }
 });
 
-test("stop() also cancels the first check start() schedules", (t) => {
+test("stop() also cancels the first check startChecking() schedules", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
   const { cw } = make();
   let checks = 0;
   cw.check = async () => { checks++; return { checkedAt: 0, jobs: [], alerts: [], pruned: 0 }; };
-  cw.start();
+  cw.startChecking();
   cw.stop();
   t.mock.timers.tick(120_000);
   assert.equal(checks, 0);
-  cw.start();
+  cw.startChecking();
   t.mock.timers.tick(1_000);
   assert.equal(checks, 1);
   cw.stop();
@@ -443,13 +443,13 @@ test('start() with deliver: "check" says once that another process must send', (
   try {
     const cw = cronwatch({ deliver: "check", cronSecret: null });
     cw.check = async () => ({ checkedAt: 0, jobs: [], alerts: [], pruned: 0 });
-    cw.start();
+    cw.startChecking();
     cw.stop();
-    cw.start();
+    cw.startChecking();
     cw.stop();
     assert.equal(warnings.length, 1);
     assert.match(warnings[0]!, /deliver: "check".*send no alerts.*Another process/);
-    cronwatch({ cronSecret: null }).start();
+    cronwatch({ cronSecret: null }).startChecking();
     assert.equal(warnings.length, 1, "a delivering client says nothing");
   } finally {
     console.warn = warn;
@@ -467,12 +467,12 @@ test("a timeout longer than setTimeout can hold does not abort the job at once",
   assert.equal(aborted, false, "Node fires a timer past 2^31 - 1 ms after 1 ms");
 });
 
-test("start() with an interval longer than setInterval can hold does not check every millisecond", (t) => {
+test("startChecking() with an interval longer than setInterval can hold does not check every millisecond", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] });
   const cw = cronwatch({ cronSecret: null });
   let checks = 0;
   cw.check = async () => { checks++; return { checkedAt: 0, jobs: [], alerts: [], pruned: 0 }; };
-  cw.start("30d");
+  cw.startChecking("30d");
   t.mock.timers.tick(1_000);
   assert.equal(checks, 1, "the first check, a second in");
   t.mock.timers.tick(60_000);

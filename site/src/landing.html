@@ -136,7 +136,7 @@
     <p class="small">Every condition sends one message when it opens. When a successful run leaves nothing open, one recovered message names everything that was. A job that fails all night pages you once, and the fix announces itself.</p>
     <p class="small">The check runs every few minutes, from wherever suits the app:</p>
     <dl class="stacks">
-      <div><dt>A server</dt><dd><code>cw.start()</code> in a long-running process.</dd></div>
+      <div><dt>A server</dt><dd><code>cw.startChecking()</code> in a long-running process.</dd></div>
       <div><dt>Vercel</dt><dd>A cron hitting <code>/cronwatch/api/check</code>.</dd></div>
       <div><dt>Workers</dt><dd>A Cron Trigger of its own.</dd></div>
       <div><dt>Ruby</dt><dd>In Rails, <code>Cronwatch::CheckJob</code> scheduled beside your other recurring jobs; with Sidekiq jobs outside ActiveJob, <code>Cronwatch::Sidekiq::CheckWorker</code>.</dd></div>

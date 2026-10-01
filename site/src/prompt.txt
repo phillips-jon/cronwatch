@@ -98,10 +98,11 @@ TypeScript and Node
    from "@cronwatch/sdk/node".
 
 5. Make missed and stuck runs detectable. A job that never fires cannot report
-   itself, so something has to look. In a long-running server call cw.start()
-   once at boot. On serverless, mount the routes and point a cron at the check
-   endpoint every few minutes. On Workers, give the check a Cron Trigger of
-   its own that calls cw.check() in scheduled(); never cw.start() there.
+   itself, so something has to look. In a long-running server call
+   cw.startChecking() once at boot. On serverless, mount the routes and point
+   a cron at the check endpoint every few minutes. On Workers, give the check
+   a Cron Trigger of its own that calls cw.check() in scheduled(); never
+   cw.startChecking() there.
 
    // app/cronwatch/[[...path]]/route.ts in Next.js; elsewhere mount it at
    // /cronwatch or pass basePath to cw.routes()

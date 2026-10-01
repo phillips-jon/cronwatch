@@ -68,7 +68,7 @@ for (let i = 96; i >= 1; i--) {
 }
 // sync-crm stops: its last run was 35m30s ago, so with a 5m grace its
 // deadline passed 30s before the check below, which is when a server calling
-// cw.start() would have said so.
+// cw.startChecking() would have said so.
 for (let i = 44; i >= 1; i--) {
   await at(now - (i - 1) * 30 * MIN - 35 * MIN - 30_000, "sync-crm", 8_000, (j) => { j.metric("contacts", 120 + i); });
 }

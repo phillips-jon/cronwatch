@@ -8,16 +8,16 @@ order: 3
 
 ## A long-running server
 
-Any process that stays up can run the checker itself. Call `cw.start()` once at boot and `cw.stop()` on shutdown.
+Any process that stays up can run the checker itself. Call `cw.startChecking()` once at boot and `cw.stop()` on shutdown.
 
 ```ts
 import { cw } from "./cronwatch.js";
 
-cw.start("1m");
+cw.startChecking("1m");
 process.on("SIGTERM", () => { cw.stop(); });
 ```
 
-The first check runs about a second after `start()`, then one every interval. The interval is held between 5 seconds and about 24.8 days (the longest delay a timer keeps), and it is unref'd, so it never keeps a process alive on its own.
+The first check runs about a second after `startChecking()`, then one every interval. The interval is held between 5 seconds and about 24.8 days (the longest delay a timer keeps), and it is unref'd, so it never keeps a process alive on its own.
 
 ## node-cron
 
@@ -150,7 +150,7 @@ import { postgres } from "@cronwatch/sdk/postgres";
 const cw = cronwatch({ store: postgres({ connectionString: process.env.DATABASE_URL }) });
 const routes = cw.routes({ basePath: "/cronwatch" });
 
-cw.start();
+cw.startChecking();
 Bun.serve({ port: 3000, fetch: (request) => routes.handler(request) });
 ```
 
@@ -168,7 +168,7 @@ const pool = new pg.Pool({ connectionString: Deno.env.get("DATABASE_URL") });
 const cw = cronwatch({ store: postgres({ pool }) });
 const routes = cw.routes({ basePath: "/cronwatch" });
 
-cw.start();
+cw.startChecking();
 Deno.serve({ port: 3000 }, (request) => routes.handler(request));
 ```
 

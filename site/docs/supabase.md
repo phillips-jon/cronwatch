@@ -34,7 +34,7 @@ export const cw = cronwatch({
   sources: [pgCron(pool)],
 });
 
-cw.start();                               // or call cw.check() from wherever your checks run
+cw.startChecking();                       // or call cw.check() from wherever your checks run
 ```
 
 Jobs you wrap in code and pg_cron jobs live side by side in the same store, dashboard and alerts.
@@ -81,7 +81,7 @@ Run ids starting with `pgcron:` belong to the reader: `job.start({ id })` and `j
 
 Nothing is read until something calls `cw.check()`. Any of these does:
 
-- **A server that is up anyway.** `cw.start()` checks every minute.
+- **A server that is up anyway.** `cw.startChecking()` checks every minute.
 - **A cron outside the database.** Mount the routes and have Vercel cron, GitHub Actions or any scheduler call `/cronwatch/api/check` with the bearer secret (see [Dashboard and API](/docs/dashboard/)).
 - **A Supabase Edge Function.** Edge Functions run on Deno, which can import npm packages. The function builds the client, runs one check and returns its result:
 

@@ -25,7 +25,7 @@ export const nightlyReport = cw.job("nightly-report", {
   schedule: "0 2 * * *",     // cron, "@hourly", or "every 15m"
   timezone: "UTC",
   grace: "15m",              // how late a start may be before it is missed
-  timeout: "30m",            // a run still going after this is stuck
+  timeout: "30m",            // a run still going after this is stuck (maxDuration: a finished run longer than it is slow)
   expect: "Report written",  // output must contain this, or the run failed
   budget: { cost: 2 },       // cost above 2 is over budget
 });

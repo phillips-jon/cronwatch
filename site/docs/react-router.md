@@ -100,7 +100,7 @@ A job endpoint is `app/routes/api.cron.daily-digest.ts` with a loader like the o
 
 On a serverless host, add a cron for `/cronwatch/api/check`, sent with `CRON_SECRET` as the bearer; the check endpoint accepts the cron secret as well as the dashboard token.
 
-On a long-running server (`react-router-serve`, or your own Express server), call `cw.start()` once when the server starts. In a custom server, that is the file that calls `listen()`; import the client there. With `react-router-serve` there is no such file, so a cron hitting the check endpoint is the simpler route there too.
+On a long-running server (`react-router-serve`, or your own Express server), call `cw.startChecking()` once when the server starts. In a custom server, that is the file that calls `listen()`; import the client there. With `react-router-serve` there is no such file, so a cron hitting the check endpoint is the simpler route there too.
 
 ## Limits that matter
 
