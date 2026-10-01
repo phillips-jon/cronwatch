@@ -49,7 +49,7 @@ public final class Golden {
   private static final long DAY = 24 * HOUR;
 
   /** How many captures golden.json holds. */
-  public static final int CAPTURES = 63;
+  public static final int CAPTURES = 66;
 
   /** One capture: the request sent and the SDK's answer. */
   public record Capture(
@@ -106,10 +106,20 @@ public final class Golden {
               o.get("body") instanceof String s ? s : null,
               ((Number) o.get("status")).intValue(),
               pairs(o.get("responseHeaders")),
-              (String) o.get("responseBody")));
+              ours((String) o.get("responseBody"))));
     }
     assertEquals(CAPTURES, out.size(), "golden.json's captures");
     return out;
+  }
+
+  /**
+   * A captured body with the fixture's placeholders for what {@code GET <base>/api} names filled in
+   * with this port's: its library, its language and its version.
+   */
+  static String ours(String body) {
+    return body.replace("<library>", "dev.cronwatch:cronwatch")
+        .replace("<language>", "java")
+        .replace("<version>", Cronwatch.VERSION);
   }
 
   /** A body's function that may throw anything, as the seed's runs do. */

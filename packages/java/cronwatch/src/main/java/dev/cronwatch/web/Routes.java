@@ -3,7 +3,6 @@ package dev.cronwatch.web;
 import dev.cronwatch.CheckResult;
 import dev.cronwatch.Cronwatch;
 import dev.cronwatch.CronwatchException;
-import dev.cronwatch.JobState;
 import dev.cronwatch.JobSummary;
 import dev.cronwatch.JobWithRuns;
 import dev.cronwatch.Run;
@@ -53,6 +52,15 @@ public final class Routes implements Endpoint {
   public static final String DEFAULT_BASE_PATH = "/cronwatch";
 
   private static final String TOKEN_COOKIE = "cronwatch_token";
+
+  /** The package {@code GET <base>/api} names: each port answers with its own. */
+  private static final String LIBRARY = "dev.cronwatch:cronwatch";
+
+  /**
+   * The JSON API's version, which {@code GET <base>/api} answers. It goes up only for a change that
+   * is not additive, in a major release.
+   */
+  private static final int API_VERSION = 1;
 
   /** Runs a JSON job read lists by default, and at most. */
   private static final int DEFAULT_RUNS = 20;
@@ -778,9 +786,26 @@ public final class Routes implements Endpoint {
     return lanes;
   }
 
+  /** A silence's or an unsilence's answer: the job's summary after it, as GET answers it. */
+  private Response summaryAnswer(String name) {
+    JobSummary job = cw.jobSummary(name);
+    return api(new JsObject().set("ok", true).set("job", job == null ? null : job.toValue()), 200);
+  }
+
   private Response serveApi(Request req, String method, List<String> rest, Said said) {
     int n = rest.size();
     String first = n > 0 ? rest.get(0) : "";
+    // What is serving the API, so a client such as @cronwatch/mcp can tell.
+    if (method.equals("GET") && n == 0) {
+      return api(
+          new JsObject()
+              .set("ok", true)
+              .set("library", LIBRARY)
+              .set("language", "java")
+              .set("version", Cronwatch.VERSION)
+              .set("api", API_VERSION),
+          200);
+    }
     if (method.equals("GET") && n == 1 && first.equals("jobs")) {
       List<Object> list = new ArrayList<>();
       for (JobSummary j : cw.jobs()) {
@@ -830,12 +855,12 @@ public final class Routes implements Endpoint {
         } catch (IllegalArgumentException e) {
           return api(errorBody(Objects.requireNonNullElse(e.getMessage(), "")), 400);
         }
-        JobState state = Access.client().silence(cw, name, ms);
-        return api(new JsObject().set("ok", true).set("state", state.toValue()), 200);
+        Access.client().silence(cw, name, ms);
+        return summaryAnswer(name);
       }
       if (action.equals("unsilence")) {
-        JobState state = cw.unsilence(name);
-        return api(new JsObject().set("ok", true).set("state", state.toValue()), 200);
+        cw.unsilence(name);
+        return summaryAnswer(name);
       }
     }
     if (n == 1 && first.equals("check")) {
