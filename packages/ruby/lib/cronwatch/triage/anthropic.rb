@@ -37,6 +37,8 @@ module Cronwatch
 
       # JavaScript's /<\/?job_data/gi, spelled out: Ruby's /i folds more than ASCII.
       TAG = %r{</?[Jj][Oo][Bb]_[Dd][Aa][Tt][Aa]}
+      private_constant :DEFAULT_EFFORT, :DEFAULT_MAX_TOKENS, :DEFAULT_MODEL, :FALLBACK_BETA, :REQUEST_TIMEOUT_MS,
+                       :SYSTEM, :TAG
 
       attr_reader :model, :effort, :max_tokens, :fallbacks, :context
 

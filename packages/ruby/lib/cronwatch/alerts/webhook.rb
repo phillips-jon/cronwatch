@@ -28,6 +28,7 @@ module Cronwatch
       # The version of the body's shape, its first key. It goes up only in a
       # major release; fields are added within one.
       SCHEMA = 1
+      private_constant :SCHEMA
 
       # The HMAC-SHA256 of `body` with `secret`, as lowercase hex, without the
       # `sha256=` the header puts before it. A receiver compares it with the

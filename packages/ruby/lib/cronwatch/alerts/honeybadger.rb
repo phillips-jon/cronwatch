@@ -11,6 +11,7 @@ module Cronwatch
         missed: "CronWatch::Missed", failed: "CronWatch::Failed", stuck: "CronWatch::Stuck", slow: "CronWatch::Slow",
         over_budget: "CronWatch::OverBudget", recovered: "CronWatch::Recovered",
       }.freeze
+      private_constant :CLASS
 
       attr_reader :name
 

@@ -31,6 +31,7 @@ module Cronwatch
       MAX_SEGMENTS = 10
       # Twilio refuses a Body longer than this.
       MAX_BODY = 1600
+      private_constant :GSM, :GSM_EXTENDED, :MAX_BODY, :MAX_SEGMENTS
 
       attr_reader :name
 

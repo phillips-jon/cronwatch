@@ -12,6 +12,7 @@ module Cronwatch
       # The longest embed description Discord takes. The title (under 256)
       # and it stay well inside the embed's 6000.
       DESCRIPTION_MAX = 4096
+      private_constant :COLOR, :DESCRIPTION_MAX
 
       attr_reader :name
 

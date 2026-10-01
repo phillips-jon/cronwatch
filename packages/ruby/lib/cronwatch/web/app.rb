@@ -80,6 +80,8 @@ module Cronwatch
     API_VERSION = 1
     DECIMAL = /\A[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?\z/
     RADIX = { "x" => 16, "o" => 8, "b" => 2 }.freeze
+    private_constant :API_VERSION, :ASSET_CSP, :BEARER, :BOARD_PAGE_RUNS, :COOKIE, :COOKIE_MAX_AGE, :CSP, :DECIMAL,
+                     :DEFAULT_RUNS, :LANGUAGE, :LIBRARY, :MAX_RUNS, :RADIX, :SECURITY_HEADERS
 
     # Deprecated: use client.routes(**options). Still works through 1.x; a
     # Web made without a client serves Cronwatch.client, read on each request.

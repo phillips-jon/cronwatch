@@ -9,6 +9,7 @@ module Cronwatch
     #                                 from: "CronWatch <alerts@example.com>", to: "ops@example.com")
     class Resend
       ENDPOINT = "https://api.resend.com/emails"
+      private_constant :ENDPOINT
 
       attr_reader :name
 

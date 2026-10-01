@@ -45,6 +45,9 @@ module Cronwatch
     # The longest run id, in UTF-16 code units (JavaScript's string length):
     # what start, resume and record_run take, and every store holds.
     MAX_RUN_ID = 200
+    private_constant :CHANNEL_TIMEOUT_MS, :DEFAULT_OPTIONS, :FORK_LOCK, :HISTORY_MAX, :HISTORY_PAGE, :MAX_RUN_ID,
+                     :PRUNE_INTERVAL_MS, :RESERVED_RUN_ID_PREFIX, :RETRY_BUDGET_MS, :SILENCE_OPTIONS, :STATE_ATTEMPTS,
+                     :TRIAGE_TIMEOUT_MS
 
     # What execute returns: the recorded run, and the block's own outcome.
     ExecuteResult = Struct.new(:run, :result, :error, :threw, keyword_init: true)

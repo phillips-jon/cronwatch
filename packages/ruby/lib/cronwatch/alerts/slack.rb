@@ -11,6 +11,7 @@ module Cronwatch
         missed: ":hourglass_flowing_sand:", failed: ":x:", stuck: ":no_entry:", slow: ":turtle:",
         over_budget: ":moneybag:", recovered: ":white_check_mark:",
       }.freeze
+      private_constant :EMOJI
 
       attr_reader :name
 

@@ -80,6 +80,7 @@ module Cronwatch
 
     # What from_h makes a stored definition that is not a JSON object from.
     UNREADABLE = {}.freeze
+    private_constant :BY_JSON, :FIELDS, :UNREADABLE
 
     def initialize(fields = {})
       @fields = {}

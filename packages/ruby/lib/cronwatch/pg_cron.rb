@@ -86,6 +86,8 @@ module Cronwatch
       # The options of a definition that are declared again, without its schedule, for a name no longer in use.
       UNSCHEDULED = %i[description tags grace timeout max_duration budget failures_before_alert].freeze
       DESCRIBED = /\Apg_cron job (\d+) in /
+      private_constant :BACKFILL, :COLUMNS, :DESCRIBED, :JOBS_SQL, :MAX_PAGES, :NEWEST_SQL, :PAGE, :REBOOT, :RUNS_SQL,
+                       :SCHEDULE_ONLY, :SECONDS, :SETTING_SQL, :UNSCHEDULED, :UTC
 
       attr_reader :name
 

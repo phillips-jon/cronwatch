@@ -8,6 +8,7 @@ module Cronwatch
     # `recovered: false`.
     class Rollbar
       ENDPOINT = "https://api.rollbar.com/api/1/item/"
+      private_constant :ENDPOINT
 
       attr_reader :name
 

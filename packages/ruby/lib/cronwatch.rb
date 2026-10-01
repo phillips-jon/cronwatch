@@ -50,6 +50,7 @@ module Cronwatch
   # The options Cronwatch.configure sets. Anything left unset takes the client's default.
   class Configuration
     OPTIONS = %i[store alerts triage cron_secret retention defaults redact deliver now on_error sources].freeze
+    private_constant :OPTIONS
 
     attr_accessor(*OPTIONS)
 

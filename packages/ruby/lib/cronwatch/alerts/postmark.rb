@@ -7,6 +7,7 @@ module Cronwatch
     # defaults to "outbound", the transactional stream.
     class Postmark
       ENDPOINT = "https://api.postmarkapp.com/email"
+      private_constant :ENDPOINT
 
       attr_reader :name
 

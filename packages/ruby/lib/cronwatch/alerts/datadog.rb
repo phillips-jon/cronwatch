@@ -11,6 +11,7 @@ module Cronwatch
       ALERT_TYPE = {
         missed: "error", failed: "error", stuck: "error", slow: "warning", over_budget: "warning", recovered: "success",
       }.freeze
+      private_constant :ALERT_TYPE
 
       attr_reader :name
 
