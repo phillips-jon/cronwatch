@@ -162,7 +162,7 @@ application = cw.routes()
 
 - `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. `None` opts out and serves the routes open, for a mount behind your own auth.
 
-  Without a token, in development, the routes make a token of their own and print a sign-in link to standard output on the first request. Anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that is set (where the SDK reads `NODE_ENV` third), and `development`, `dev` and `test` count as development.
+  Without a token, in development, the routes make a token of their own and print a sign-in link to standard output on the first request. Anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that holds more than spaces (where the SDK reads `NODE_ENV` third), trimmed and lowercased; `development`, `dev`, `local`, `test` and `testing` count as development, and `production` and `prod` as production, as in every CronWatch library.
 
   The link names the host only when `origin` is set or the request's host is loopback: `localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`. Only a host that is one of those counts, so a Host header such as `localhost:1@evil.example` does not. Otherwise the link leaves the host out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`.
 - `base_path`: where it is mounted. It defaults to the mount point the server reports (`SCRIPT_NAME`, or ASGI's `root_path`), so the mounts above need nothing more.

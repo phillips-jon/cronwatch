@@ -1,7 +1,9 @@
-"""The environment, read in one place (the SDK reads NODE_ENV). Python has no
-single convention, so the first of CRONWATCH_ENV, APP_ENV and ENVIRONMENT
-that is set is used; failing those, a framework integration may name one
-(cronwatch.django reads DEBUG: development when it is on, production when off).
+"""The environment, read in one place, as every CronWatch library reads it:
+the first of CRONWATCH_ENV, APP_ENV and ENVIRONMENT that holds more than
+spaces, trimmed and lowercased, with "prod" read as "production" and "dev",
+"local", "test" and "testing" as "development". Failing those, a framework
+integration may name one (cronwatch.django reads DEBUG: development when it
+is on, production when off). None when nothing names one, which is neither.
 It decides whether the in-memory store warns that it forgets on restart, and
 whether the web routes make a development token when none is configured."""
 
@@ -10,7 +12,10 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 
+from . import _js
+
 _VARIABLES = ("CRONWATCH_ENV", "APP_ENV", "ENVIRONMENT")
+_ALIASES = {"prod": "production", "dev": "development", "local": "development", "test": "development", "testing": "development"}
 _fallback: Callable[[], str | None] | None = None
 
 
@@ -20,24 +25,29 @@ def set_fallback(read: Callable[[], str | None] | None) -> None:
     _fallback = read
 
 
+def _name(value: str | None) -> str | None:
+    """A value trimmed as JavaScript trims and lowercased, its alias resolved; None for one of only spaces."""
+    name = _js.trim(value).lower() if isinstance(value, str) else ""
+    return _ALIASES.get(name, name) or None
+
+
 def environment() -> str | None:
-    for name in _VARIABLES:
-        value = os.environ.get(name)
-        if value:
-            return value.strip().lower()
+    for variable in _VARIABLES:
+        name = _name(os.environ.get(variable))
+        if name is not None:
+            return name
     read = _fallback
     if read is not None:
         try:
-            value = read()
+            return _name(read())
         except Exception:
             return None
-        return value.strip().lower() if value else None
     return None
 
 
 def is_production() -> bool:
-    return environment() in ("production", "prod")
+    return environment() == "production"
 
 
 def is_development() -> bool:
-    return environment() in ("development", "dev", "test")
+    return environment() == "development"
