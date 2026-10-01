@@ -26,6 +26,7 @@ interface CheckResult
   pruned: number
 type Condition = 'missed' | 'failed' | 'stuck' | 'slow' | 'over_budget'
 type CronWatch = Cronwatch (deprecated)
+const CronWatch: typeof Cronwatch (deprecated)
 type CronWatchOptions = CronwatchOptions (deprecated)
 class Cronwatch
   constructor(options?: CronwatchOptions)

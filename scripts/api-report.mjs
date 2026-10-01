@@ -78,21 +78,30 @@ function report(pkg) {
         for (const s of statics.getConstructSignatures()) lines.push(`  constructor${checker.signatureToString(s, undefined, FLAGS).replace(/:[^:]*$/, "")}`);
         for (const prop of checker.getPropertiesOfType(statics)) if (prop.name !== "prototype") lines.push(...member(prop, decl, "static "));
         for (const prop of checker.getPropertiesOfType(checker.getDeclaredTypeOfSymbol(symbol))) lines.push(...member(prop, decl));
-      } else if (symbol.flags & ts.SymbolFlags.Function) {
-        for (const s of checker.getTypeOfSymbolAtLocation(symbol, decl).getCallSignatures()) lines.push(`function ${name}${checker.signatureToString(s, undefined, FLAGS)}${dep}`);
-      } else if (symbol.flags & ts.SymbolFlags.Interface) {
-        lines.push(`interface ${name}${typeParams(decl)}${dep}`);
+        continue;
+      }
+      // A symbol may be both a value and a type (a const and a type alias of
+      // one name, say): each half gets its own line, so removing either is
+      // a change to the report.
+      const before = lines.length;
+      const declOf = (is) => symbol.declarations?.find(is) ?? decl;
+      if (symbol.flags & ts.SymbolFlags.Function) {
+        for (const s of checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration ?? decl).getCallSignatures()) lines.push(`function ${name}${checker.signatureToString(s, undefined, FLAGS)}${dep}`);
+      }
+      if (symbol.flags & ts.SymbolFlags.Interface) {
+        lines.push(`interface ${name}${typeParams(declOf(ts.isInterfaceDeclaration))}${dep}`);
         const declared = checker.getDeclaredTypeOfSymbol(symbol);
         for (const s of declared.getCallSignatures()) lines.push(`  ${checker.signatureToString(s, undefined, FLAGS)}`);
-        for (const prop of checker.getPropertiesOfType(declared)) lines.push(...member(prop, decl));
-      } else if (symbol.flags & ts.SymbolFlags.TypeAlias) {
-        lines.push(`type ${name}${typeParams(decl)} = ${type(checker.getDeclaredTypeOfSymbol(symbol), ts.TypeFormatFlags.InTypeAlias)}${dep}`);
-      } else if (symbol.flags & ts.SymbolFlags.Variable) {
-        // A literal widened (VERSION is a string, not this release's number).
-        lines.push(`const ${name}: ${type(checker.getBaseTypeOfLiteralType(checker.getTypeOfSymbolAtLocation(symbol, decl)))}${dep}`);
-      } else {
-        lines.push(`${ts.SymbolFlags[symbol.flags] ?? "export"} ${name}${dep}`);
+        for (const prop of checker.getPropertiesOfType(declared)) lines.push(...member(prop, declOf(ts.isInterfaceDeclaration)));
       }
+      if (symbol.flags & ts.SymbolFlags.TypeAlias) {
+        lines.push(`type ${name}${typeParams(declOf(ts.isTypeAliasDeclaration))} = ${type(checker.getDeclaredTypeOfSymbol(symbol), ts.TypeFormatFlags.InTypeAlias)}${dep}`);
+      }
+      if (symbol.flags & ts.SymbolFlags.Variable) {
+        // A literal widened (VERSION is a string, not this release's number).
+        lines.push(`const ${name}: ${type(checker.getBaseTypeOfLiteralType(checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration ?? decl)))}${dep}`);
+      }
+      if (lines.length === before) lines.push(`${ts.SymbolFlags[symbol.flags] ?? "export"} ${name}${dep}`);
     }
     out.push(lines.join("\n"));
   }
