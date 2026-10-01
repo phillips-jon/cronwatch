@@ -149,7 +149,22 @@ func TestRoutesCheckAcceptsTheCronSecretAndNothingElseDoes(t *testing.T) {
 	with := hdr{"authorization": "Bearer " + secret}
 	status(t, "check", w.get("/cronwatch/api/check", with), 200)
 	status(t, "jobs", w.get("/cronwatch/api/jobs", with), 401)
+	status(t, "about", w.get("/cronwatch/api", with), 401)
 	status(t, "only as a bearer", w.get("/cronwatch/api/check?token="+secret, nil), 401)
+}
+
+func TestRoutesAPINamesTheLibrary(t *testing.T) {
+	w := newWeb(t, nil)
+	want := `{"ok":true,"library":"cronwatch.dev/go","language":"go","version":"` + cronwatch.Version + `","api":1}`
+	for _, path := range []string{"/cronwatch/api", "/cronwatch/api/"} {
+		res := w.get(path, auth)
+		status(t, path, res, 200)
+		eq(t, path, res.Body.String(), want)
+	}
+	status(t, "no token", w.get("/cronwatch/api", nil), 401)
+	res := w.send("POST", "/cronwatch/api", auth, "")
+	status(t, "only GET", res, 404)
+	eq(t, "the API's not found", res.Body.String(), `{"ok":false,"error":"Not found"}`)
 }
 
 func TestRoutesSignInSetsACookieAndRedirectsToACleanURL(t *testing.T) {
@@ -267,13 +282,17 @@ func TestRoutesAPIWrites(t *testing.T) {
 	result := decode(t, post("/cronwatch/api/check", ""))
 	eq(t, "ok", result["ok"].(bool), true)
 	eq(t, "jobs", len(result["jobs"].([]any)), 1)
+	// Silence and unsilence answer the job's summary, as GET /api/jobs/:name has it.
 	silenced := decode(t, post("/cronwatch/api/jobs/s/silence", `{"for":"2h"}`))
-	eq(t, "until", silenced["state"].(map[string]any)["silencedUntil"].(float64), float64(T0+2*HOUR))
+	eq(t, "until", silenced["job"].(map[string]any)["silencedUntil"].(float64), float64(T0+2*HOUR))
+	eq(t, "summary health", silenced["job"].(map[string]any)["health"].(string), "silenced")
+	eq(t, "no state", silenced["state"], any(nil))
 	eq(t, "health", summary(t, w.cw, "s").Health, cronwatch.HealthSilenced)
 	endless := decode(t, post("/cronwatch/api/jobs/s/silence", `{"for":"99999999999999999999w"}`))
-	eq(t, "held at 2^53 - 1", endless["state"].(map[string]any)["silencedUntil"].(float64), float64(9007199254740991))
+	eq(t, "held at 2^53 - 1", endless["job"].(map[string]any)["silencedUntil"].(float64), float64(9007199254740991))
 	un := decode(t, post("/cronwatch/api/jobs/s/unsilence", ""))
-	eq(t, "unsilenced", un["state"].(map[string]any)["silencedUntil"], any(nil))
+	eq(t, "unsilenced", un["job"].(map[string]any)["silencedUntil"], any(nil))
+	eq(t, "unsilenced health", un["job"].(map[string]any)["health"].(string), "healthy")
 	// A silence an older SDK wrote past int64 still reads as a silence.
 	var far cronwatch.JobState
 	check(t, far.UnmarshalJSON([]byte(`{"job":"s","open":{},"consecutiveFailures":0,"silencedUntil":6.048e+28,"lastAlertAt":null}`)))
@@ -406,7 +425,7 @@ func TestRoutesSilenceDurations(t *testing.T) {
 		t.Error("a bad duration silenced the job")
 	}
 	until := func(body string) int64 {
-		return int64(decode(t, silence(body))["state"].(map[string]any)["silencedUntil"].(float64)) - T0
+		return int64(decode(t, silence(body))["job"].(map[string]any)["silencedUntil"].(float64)) - T0
 	}
 	eq(t, "a number", until(`{"for":7200000}`), 7_200_000)
 	eq(t, "a numeric string", until(`{"for":"60000"}`), 60_000)
@@ -414,7 +433,7 @@ func TestRoutesSilenceDurations(t *testing.T) {
 	eq(t, "absent", until(`{}`), HOUR)
 	eq(t, "a byte order mark", until("\ufeff"+`{"for":"2h"}`), 2*HOUR)
 	status(t, "query", w.send("POST", "/cronwatch/api/jobs/s/silence?for=forever", auth, ""), 400)
-	eq(t, "the query when the body has none", int64(decode(t, w.send("POST", "/cronwatch/api/jobs/s/silence?for=3h", auth, ""))["state"].(map[string]any)["silencedUntil"].(float64))-T0, 3*HOUR)
+	eq(t, "the query when the body has none", int64(decode(t, w.send("POST", "/cronwatch/api/jobs/s/silence?for=3h", auth, ""))["job"].(map[string]any)["silencedUntil"].(float64))-T0, 3*HOUR)
 }
 
 // ctxStore fails ListJobs with its context's error, as a network store does.
@@ -953,7 +972,7 @@ func TestHugeDurationsNeitherHangNorWrap(t *testing.T) {
 		t.Fatal("the dashboard never answered")
 	}
 	silenced := decode(t, w.send("POST", "/cronwatch/api/jobs/rare/silence", join(auth, hdr{"content-type": "application/json"}), `{"for":"99999999999999999999999"}`))
-	until := silenced["state"].(map[string]any)["silencedUntil"].(float64)
+	until := silenced["job"].(map[string]any)["silencedUntil"].(float64)
 	if until <= float64(w.c.Now()) {
 		t.Fatalf("a long silence ended at once: %v", until)
 	}

@@ -804,6 +804,29 @@ func (rt *Routes) serve(r *http.Request, pathname, path, rawQuery, base string, 
 	return page(messagePage("Not found", path, base, false), http.StatusNotFound), nil
 }
 
+// What GET <base>/api says is serving it: the module, as its path names it,
+// and the language. apiVersion is the dashboard JSON API's version; it goes
+// up only for a change that is not additive (a field removed or retyped, a
+// path moved), and such a change waits for a major release.
+const (
+	apiLibrary  = "cronwatch.dev/go"
+	apiLanguage = "go"
+	apiVersion  = 1
+)
+
+// summaryAnswer is the job's summary after a silence or an unsilence, as
+// GET <base>/api/jobs/:name has it.
+func summaryAnswer(ctx context.Context, cw *Client, name string) (answer, error) {
+	job, err := cw.JobSummary(ctx, name)
+	if err != nil {
+		return answer{}, err
+	}
+	if job == nil {
+		return apiAnswer(js.NewObject("ok", false, "error", "No such job"), http.StatusNotFound), nil
+	}
+	return apiAnswer(js.NewObject("ok", true, "job", *job), http.StatusOK), nil
+}
+
 func (rt *Routes) serveAPI(r *http.Request, method string, rest []string, query []formPair, hasBearer bool) (answer, error) {
 	ctx := r.Context()
 	cw := rt.c
@@ -813,6 +836,9 @@ func (rt *Routes) serveAPI(r *http.Request, method string, rest []string, query 
 		return job != nil, err
 	}
 	switch {
+	case method == http.MethodGet && len(rest) == 0:
+		// What is serving the API, so a client such as @cronwatch/mcp can tell.
+		return apiAnswer(js.NewObject("ok", true, "library", apiLibrary, "language", apiLanguage, "version", Version, "api", apiVersion), http.StatusOK), nil
 	case method == http.MethodGet && len(rest) == 1 && rest[0] == "jobs":
 		jobs, err := cw.Jobs(ctx)
 		if err != nil {
@@ -870,17 +896,15 @@ func (rt *Routes) serveAPI(r *http.Request, method string, rest []string, query 
 			if err != nil {
 				return apiAnswer(js.NewObject("ok", false, "error", err.Error()), http.StatusBadRequest), nil
 			}
-			state, err := cw.silenceFor(ctx, name, ms)
-			if err != nil {
+			if _, err := cw.silenceFor(ctx, name, ms); err != nil {
 				return answer{}, err
 			}
-			return apiAnswer(js.NewObject("ok", true, "state", state), http.StatusOK), nil
+			return summaryAnswer(ctx, cw, name)
 		case "unsilence":
-			state, err := cw.Unsilence(ctx, name)
-			if err != nil {
+			if _, err := cw.Unsilence(ctx, name); err != nil {
 				return answer{}, err
 			}
-			return apiAnswer(js.NewObject("ok", true, "state", state), http.StatusOK), nil
+			return summaryAnswer(ctx, cw, name)
 		}
 	case len(rest) == 1 && rest[0] == "check":
 		// A page cannot send an Authorization header cross-site, so a GET
