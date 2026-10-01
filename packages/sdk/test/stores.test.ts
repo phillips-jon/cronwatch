@@ -12,6 +12,8 @@ import { memory } from "../src/stores/memory.js";
 import { postgres } from "../src/stores/postgres.js";
 import { sqlite } from "../src/stores/sqlite.js";
 import type { Alert, JobState, Store } from "../src/types.js";
+import { normalizeState } from "../src/evaluate.js";
+import { readStoredJob } from "../src/serialize.js";
 import { conformance, run } from "./store-conformance.js";
 
 const PG = process.env.CRONWATCH_TEST_PG;
@@ -297,4 +299,81 @@ await test("postgres: many instances can init at once", { skip: NO_PG }, async (
     await Promise.all(stores.map((s) => s.close!()));
     await drop(prefix);
   }
+});
+
+// Rows a foreign, hand-edited or damaged writer could leave (store.json
+// foreignRows): each is read leniently, and one affects only its own job.
+interface ForeignRows {
+  rows: { table: "jobs" | "runs" | "state"; row: Record<string, unknown>; read: unknown; readable?: boolean }[];
+  check: {
+    now: number; extraJobs: Record<string, unknown>[]; extraRuns: Record<string, unknown>[]; reported: string[];
+    alerts: { type: string; job: string; at: number }[]; health: Record<string, string>;
+    silence: { job: string; for: string; reported: string[]; state: JobState };
+    states: Record<string, unknown>; read: { reported: string[]; pages: { path: string; status: number }[] };
+  };
+}
+const foreignRows = (JSON.parse(readFileSync(storeFixture, "utf8")) as { foreignRows: ForeignRows }).foreignRows;
+
+function insertRow(db: Database.Database, table: string, row: Record<string, unknown>) {
+  const keys = Object.keys(row);
+  db.prepare(`INSERT INTO cronwatch_${table} (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`).run(...keys.map((k) => row[k]));
+}
+
+await test("sqlite: each foreign row reads leniently (store.json foreignRows.rows)", async () => {
+  for (const c of foreignRows.rows) {
+    const db = new Database(":memory:");
+    const store = sqlite({ database: db });
+    await store.init!();
+    insertRow(db, c.table, c.row);
+    const label = `${c.table} ${JSON.stringify(c.row)}`;
+    if (c.table === "jobs") {
+      const { job, readable } = readStoredJob((await store.getJob(c.row.name as string))!);
+      assert.deepEqual(job, c.read, label);
+      assert.equal(readable, c.readable, label);
+      assert.deepEqual((await store.listJobs()).map((j) => readStoredJob(j).job), [c.read], label);
+    } else if (c.table === "runs") {
+      assert.deepEqual(await store.getRun(c.row.id as string), c.read, label);
+      assert.deepEqual(await store.listRuns(c.row.job as string, 10), [c.read], label);
+    } else {
+      assert.deepEqual(normalizeState(await store.getState(c.row.job as string), c.row.job as string), c.read, label);
+    }
+    db.close();
+  }
+});
+
+await test("sqlite: a check, a silence and every page over foreign rows (store.json foreignRows.check)", async () => {
+  const c = foreignRows.check;
+  const db = new Database(":memory:");
+  const store = sqlite({ database: db });
+  await store.init!();
+  const jobs = [...foreignRows.rows.filter((r) => r.table === "jobs").map((r) => r.row), ...c.extraJobs];
+  for (const row of jobs) insertRow(db, "jobs", row);
+  for (const row of [...foreignRows.rows.filter((r) => r.table === "runs").map((r) => r.row), ...c.extraRuns]) insertRow(db, "runs", row);
+  for (const row of foreignRows.rows.filter((r) => r.table === "state").map((r) => r.row)) insertRow(db, "state", row);
+  const names = jobs.map((j) => j.name as string);
+  const errors: string[] = [];
+  const reported = () => [...new Set(errors.splice(0).map((where) => names.find((n) => where.endsWith(` ${n}`)) ?? where))].sort();
+  const sent: Alert[] = [];
+  const cw = cronwatch({
+    store, now: () => c.now, cronSecret: null,
+    alerts: [custom("capture", (alert) => void sent.push(alert))],
+    onError: (_e, where) => void errors.push(where),
+  });
+  const result = await cw.check();
+  assert.deepEqual(reported(), c.reported);
+  assert.deepEqual(sent.splice(0).map((a) => ({ type: a.type, job: a.job, at: a.at })), c.alerts);
+  assert.deepEqual(Object.fromEntries(result.jobs.map((j) => [j.name, j.health])), c.health);
+  await cw.silence(c.silence.job, c.silence.for);
+  assert.deepEqual(reported(), c.silence.reported);
+  assert.deepEqual(await store.getState(c.silence.job), c.silence.state);
+  for (const [job, state] of Object.entries(c.states)) assert.deepEqual(await store.getState(job), state, job);
+  const routes = cw.routes({ token: "tok" });
+  for (const page of c.read.pages) {
+    const res = await routes.handler(new Request(`http://app.test${page.path}`, { headers: { authorization: "Bearer tok" } }));
+    await res.text();
+    assert.equal(res.status, page.status, page.path);
+  }
+  assert.deepEqual(reported(), c.read.reported);
+  await cw.close();
+  db.close();
 });

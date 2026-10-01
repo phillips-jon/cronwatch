@@ -89,21 +89,41 @@ export function emptyState(job: string): JobState {
   return { job, open: {}, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null, pendingRecovery: [], undelivered: [] };
 }
 
+/** A JSON object: not null, not an array. */
+export function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 /**
  * A stored state with every field present, or a fresh one. State written by
  * an older version lacks the newer fields. `sending` is the exception: it is
  * there only while it holds an alert (see holdAlerts).
+ *
+ * Read leniently, since a foreign, hand-edited or damaged row must affect
+ * only its own job, and the next write puts it right: a state that is not
+ * an object reads as none; `open` keeps only its entries whose value is a
+ * number (anything but an object reads as {}); `silencedUntil` and
+ * `lastAlertAt` that are not numbers read as null; `pendingRecovery` keeps
+ * only its strings, and `undelivered` only its entries that are objects (a
+ * list of neither shape reads as []). Unknown fields are kept as written.
  */
 export function normalizeState(state: JobState | null, job: string): JobState {
-  if (!state) return emptyState(job);
+  if (!isObject(state)) return emptyState(job);
   const { sending, ...rest } = state;
+  const open = isObject(state.open)
+    ? Object.fromEntries(Object.entries(state.open).filter(([, at]) => typeof at === "number"))
+    : {};
+  const number = (value: unknown) => (typeof value === "number" ? value : null);
+  const list = (value: unknown) => (Array.isArray(value) ? value : []);
   return {
     ...emptyState(job),
     ...rest,
-    open: { ...state.open },
+    open,
     consecutiveFailures: failureCount(state),
-    pendingRecovery: [...(state.pendingRecovery ?? [])],
-    undelivered: [...(state.undelivered ?? [])],
+    silencedUntil: number(state.silencedUntil),
+    lastAlertAt: number(state.lastAlertAt),
+    pendingRecovery: list(state.pendingRecovery).filter((c): c is Condition => typeof c === "string"),
+    undelivered: list(state.undelivered).filter((alert): alert is Alert => isObject(alert)),
     ...(Array.isArray(sending) && sending.length > 0 ? { sending: [...sending] } : {}),
   };
 }
@@ -442,11 +462,19 @@ export function applySilence(previous: JobState, evaluation: Evaluation, now: nu
  * is dropped rather than sent late. An alert for a condition is stale once
  * that condition has closed, or has closed and opened again (it opened at a
  * time other than the alert's). A recovery is stale when any condition it
- * names is open again; while they all stay closed it is kept.
+ * names is open again; while they all stay closed it is kept. From a
+ * foreign or damaged row: an alert whose `at` is not a number, and a
+ * recovery whose `details.after` is not a list of strings, are stale.
  */
 export function staleAlert(alert: AlertDraft & { at: number }, state: JobState): boolean {
-  if (alert.type === "recovered") return alert.details.after.some((condition) => state.open[condition] !== undefined);
-  return state.open[alert.type] !== alert.at;
+  if (alert.type === "recovered") {
+    // One whose details say nothing of what it recovers from (a foreign or damaged row's) cannot be judged, and goes.
+    const after: unknown = isObject(alert.details) ? (alert.details as { after?: unknown }).after : undefined;
+    if (!Array.isArray(after)) return true;
+    return after.some((condition) => typeof condition !== "string" || state.open[condition as Condition] !== undefined);
+  }
+  // One with no time (a foreign or damaged row's) cannot match an open condition.
+  return typeof alert.at !== "number" || state.open[alert.type] !== alert.at;
 }
 
 /** How a job looks at a glance. Silence wins, then stuck, failing and late. */

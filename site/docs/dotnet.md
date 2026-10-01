@@ -431,7 +431,7 @@ A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname
 | `job.RunAsync(fn)`, and with `RunOptions` | run as a recorded run; `RunOptions.Trigger` and `DiscardWhen` |
 | `CronwatchClient.Current`, `Log`, `Metric`, `CancellationToken` | the run in progress, on its `JobContext` |
 | `CheckAsync()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `Start()`, `Start(every)`, `Stop()` | check on an interval |
+| `StartChecking()`, `StartChecking(every)`, `Stop()` | check on an interval |
 | `JobsAsync()`, `JobsWithRunsAsync(limit)`, `JobSummaryAsync(name)` | summaries, without alerting |
 | `RunsAsync(name, limit)`, `GetRunAsync(id)` | newest first; `limit` is held to 1 to 500 |
 | `SilenceAsync(name, duration)`, `UnsilenceAsync(name)` | stop alerts for a while; state keeps updating underneath |

@@ -27,7 +27,7 @@ A program a crontab runs needs no integration: see [a crontab](#a-crontab) below
 
 ### Retries
 
-Every attempt is a run of its own. An attempt that fails is a failed run with its exception, so failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `FailuresBeforeAlert = 3` counts failed attempts in a row. A Hangfire retry and a Quartz.NET refire (`RefireImmediately`) are new runs. An attempt the scheduler gives back without failing it (a Hangfire job stopped by its server's shutdown, which Hangfire puts back in its queue) is taken back, so nothing is judged, no alert is sent and the failures in a row are left as they were. Taking a run back needs a store with `IRunDeletingStore`, which `MemoryStore` and `SqlStore` are.
+Every attempt is a run of its own. An attempt that fails is a failed run with its exception, so failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `FailuresBeforeAlert = 3` counts failed attempts in a row. A Hangfire retry and a Quartz.NET refire (`RefireImmediately`) are new runs. An attempt the scheduler gives back without failing it (a Hangfire job stopped by its server's shutdown, which Hangfire puts back in its queue) is taken back, so nothing is judged, no alert is sent and the failures in a row are left as they were. Taking a run back needs a store with `IDeleteRunIfStore`, which `MemoryStore` and `SqlStore` are.
 
 ### The check
 

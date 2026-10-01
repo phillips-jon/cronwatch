@@ -392,7 +392,7 @@ A job's options, on `JobOptions.builder()`: `schedule` (five or six field cron, 
 | `job.run(fn)`, `job.call(fn)`, and with `RunOptions` | run as a recorded run; `RunOptions.trigger`, `interruptingAtTimeout` and `discardWhen` |
 | `Cronwatch.current()`, `log`, `metric`, `cancelled`, `onCancel`, `wrap` | the run in progress, on its `JobContext` |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `start()`, `start(every)`, `stop()` | check on an interval |
+| `startChecking()`, `startChecking(every)`, `stop()` | check on an interval |
 | `jobs()`, `jobsWithRuns(limit)`, `jobSummary(name)` | summaries, without alerting |
 | `runs(name, limit)`, `getRun(id)` | newest first; `limit` is held to 1 to 500 |
 | `silence(name, duration)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath |

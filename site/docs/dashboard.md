@@ -13,15 +13,15 @@ group: Reference
 export const { GET, POST, DELETE } = cw.routes({ token: process.env.CRONWATCH_TOKEN, basePath: "/cronwatch" });
 ```
 
-`basePath` defaults to `/cronwatch` and must match where the routes are mounted: it routes requests, builds links and scopes the cookie path. `token` defaults to `CRONWATCH_TOKEN`; an empty string counts as unset.
+`basePath` defaults to `/cronwatch` and must match where the routes are mounted: it routes requests, builds links and scopes the cookie path. `token` defaults to `CRONWATCH_TOKEN`; an empty string, or one of only whitespace, counts as unset (given in code or in the variable), and a value that is neither a string nor `null` (`false`, a number) throws.
 
 Every port serves the same pages and API at the same paths, with the same token rules, so everything below holds for them too: see [Rails](/docs/rails/#mount-the-dashboard), [Ruby](/docs/ruby/#the-dashboard-in-any-rack-app), [Django](/docs/django/#mount-the-dashboard), [Python](/docs/python/#the-dashboard), [PHP](/docs/php/#the-dashboard), [Go](/docs/go/#the-dashboard), [Rust](/docs/rust/#the-dashboard), [Elixir](/docs/elixir/#the-dashboard), [Java](/docs/java/#the-dashboard) and [.NET](/docs/dotnet/#the-dashboard) for how each mounts it.
 
 ## Access
 
-Every request needs the token, as `Authorization: Bearer <token>` or as the cookie the dashboard sets. Comparison is constant-time.
+Every request needs the token, as `Authorization: Bearer <token>` or as the cookie the dashboard sets. Comparison is constant-time. Only a `Bearer` header counts (the scheme in any case): any other `Authorization`, such as the `Basic` credentials a proxy's password prompt makes the browser send on every request, is passed over, and the cookie or `?token=` signs in as if no header came.
 
-To sign in to the dashboard, open any page once with `?token=<token>`, or paste the token into the form on the sign-in page (it sends the same `?token=`). The response moves it into an HttpOnly cookie that lasts thirty days (holding a digest of the token, not the token) and redirects to the same URL without it. `?token=` is read only there, on a `GET` of a page; the JSON API and every `POST` or `DELETE` ignore it, so use the bearer header or the cookie.
+To sign in to the dashboard, paste the token into the form on the sign-in page. It posts the token in the request body to `<base>/signin`, so the token never appears in a URL or an access log; the answer sets an HttpOnly cookie that lasts thirty days (holding a digest of the token, not the token) and redirects back to the page the form was on (or to the board, when that page is on another origin or carried a `?token=`). A wrong token shows the sign-in page again, with a 401. Opening any page once with `?token=<token>` signs in too, which is what the development sign-in link does: the response moves the token into the same cookie and redirects to the same URL without it, but the request line that carried it may already be in an access log, so prefer the form for a real token. `?token=` is read only there, on a `GET` of a page; the JSON API and every other `POST` or `DELETE` ignore it, so use the bearer header or the cookie.
 
 With no token configured [in development](#development), the routes make one: 32 random bytes, new each time the routes are created (so each dev server restart or reload signs you out). On the first request they print a sign-in link to the server log, once:
 
@@ -182,6 +182,7 @@ The dashboard's own buttons post HTML forms to paths outside `/api`. They take t
 
 | Method and path | Does | Then |
 |---|---|---|
+| `POST /signin` | form field `token`, the sign-in form's (needs no cookie or bearer; served only while the routes have a token) | sets the cookie and redirects back to the page it came from (a `Referer` on this origin without a `token` parameter), or to the board; a wrong token is the 401 sign-in page |
 | `POST /check` | run the check now | redirects back to the page it came from (a `Referer` on this origin), or to the board |
 | `POST /jobs/:name/silence` | form field `for`, read as above (one hour when left out) | redirects back; a bad `for` is a 400 page saying why |
 | `POST /jobs/:name/unsilence` | resume alerts | redirects back |

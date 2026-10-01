@@ -65,9 +65,13 @@ cronwatch({ store: d1(env.DB, { prefix: "monitoring_", createTables: false }) })
 
 Make it inside the handler, where `env` is; [Cloudflare Workers](/docs/cloudflare/) has the whole Worker. The tables are created on first use with `CREATE TABLE IF NOT EXISTS`, once per isolate, or by the migration on that page when `createTables` is `false`. Forgetting a job is one `batch`, which D1 runs as a transaction. `prefix` follows the same rules as for Postgres above, and a prefix starting with `_cf_` is refused because D1 keeps its own tables under it. Pass the binding itself rather than a `withSession()` session, so a read always sees the last write.
 
+## Damaged rows
+
+A row another writer left (a hand edit, a script, a damaged database) affects only its own job, never the check or the dashboard. The SQL stores and the client read every row leniently: a job's definition that does not parse, or is not a JSON object, reads as `{ name }`, and that job is reported to `onError` and shown as failing until it is declared again; `tags` that are not a list of strings are left out; run metrics that do not parse to an object read as `{}`; a start time that is not a number reads as 0 and a finish or duration as empty; a state that does not parse reads as none, and the next write replaces it; and a queued alert that is not an object, or cannot be judged, is dropped. Every CronWatch library reads rows the same way.
+
 ## Retention
 
-Finished runs older than `retention` (default `30d`) are deleted by `check()`, at most once an hour. Pruning happens only there: recording runs never deletes anything, so an app that never checks (no `cw.start()`, no cron hitting the check endpoint, no `cw.check()` of its own) keeps every run until something does. Running rows are never pruned, and neither is each job's newest run, so a job that runs less often than the retention is not mistaken for one that never ran.
+Finished runs older than `retention` (default `30d`) are deleted by `check()`, at most once an hour. Pruning happens only there: recording runs never deletes anything, so an app that never checks (no `cw.startChecking()`, no cron hitting the check endpoint, no `cw.check()` of its own) keeps every run until something does. Running rows are never pruned, and neither is each job's newest run, so a job that runs less often than the retention is not mistaken for one that never ran.
 
 ```ts
 cronwatch({ retention: "90d" });

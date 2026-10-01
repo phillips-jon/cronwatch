@@ -269,15 +269,44 @@ test("the sign-in cookie is scoped to the base, so the installed app shares it",
 });
 
 test("the sign-in page takes the token in a form, for an installed app with no address bar", async () => {
-  const { get } = app({ basePath: "/ops/cron" });
+  const { get, routes } = app({ basePath: "/ops/cron" });
   const page = await get("/ops/cron/jobs/x");
   assert.equal(page.status, 401);
   const html = await page.text();
-  assert.match(html, /<form class="signin" method="get" action="\/ops\/cron\/"><label for="token">Token<\/label><input id="token" name="token" type="password" autocomplete="current-password"[^>]*required><button class="primary" type="submit">Sign in<\/button><\/form>/);
-  // What the form sends is the ?token= sign-in.
-  const res = await get("/ops/cron/?token=tok");
+  // It posts the token in the body, so the token never sits in a URL or an access log.
+  assert.match(html, /<form class="signin" method="post" action="\/ops\/cron\/signin"><label for="token">Token<\/label><input id="token" name="token" type="password" autocomplete="current-password"[^>]*required><button class="primary" type="submit">Sign in<\/button><\/form>/);
+  const post = (body: string, headers: Record<string, string> = {}) =>
+    routes.handler(new Request("http://app.test/ops/cron/signin", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", ...headers }, body }));
+  // Back to the page it was posted from, with the cookie.
+  const res = await post("token=tok", { origin: "http://app.test", referer: "http://app.test/ops/cron/jobs/x?view=all" });
   assert.equal(res.status, 303);
-  assert.equal(res.headers.get("location"), "/ops/cron/");
-  // Other pages do not carry it.
+  assert.equal(res.headers.get("location"), "http://app.test/ops/cron/jobs/x?view=all");
+  assert.match(res.headers.get("set-cookie")!, /^cronwatch_token=[0-9a-f]{64}; Path=\/ops\/cron; HttpOnly; SameSite=Lax; Max-Age=2592000$/);
+  // To the dashboard when the page came from elsewhere, had none, or carried a ?token=.
+  for (const referer of [undefined, "https://evil.example/ops/cron/jobs/x", "http://app.test/ops/cron/?token=wrong", "http://app.test/ops/cron/?a=1&token="]) {
+    const r = await post("token=tok", referer === undefined ? {} : { referer });
+    assert.equal(r.status, 303, String(referer));
+    assert.equal(r.headers.get("location"), "/ops/cron/", String(referer));
+  }
+  // A wrong or missing token is the sign-in page again, with no cookie.
+  for (const body of ["token=wrong", "", "other=tok"]) {
+    const r = await post(body);
+    assert.equal(r.status, 401, body);
+    assert.equal(r.headers.get("set-cookie"), null, body);
+    assert.match(await r.text(), /class="signin"/);
+  }
+  // A cross-site post is refused before the token is looked at.
+  const cross = await post("token=tok", { origin: "https://evil.example" });
+  assert.equal(cross.status, 403);
+  assert.equal(cross.headers.get("set-cookie"), null);
+  // The ?token= link still signs in, for the development sign-in line.
+  const link = await get("/ops/cron/?token=tok");
+  assert.equal(link.status, 303);
+  assert.equal(link.headers.get("location"), "/ops/cron/");
+  // Other pages do not carry the form.
   assert.doesNotMatch(await (await get("/ops/cron/offline")).text(), /class="signin"/);
+  // With the routes open there is nothing to sign in to.
+  const open = app({ token: null, basePath: "/ops/cron" });
+  const none = await open.routes.handler(new Request("http://app.test/ops/cron/signin", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "token=tok" }));
+  assert.equal(none.status, 404);
 });

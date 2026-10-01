@@ -165,7 +165,7 @@ const keyOf = (definition: JobOptions) =>
  * runs and history, and that name is declared again without a schedule, so
  * it is never reported missed. Its description says why.
  *
- *   cronwatch({ store: postgres({ pool }), sources: [pgCron(pool)] }).start();
+ *   cronwatch({ store: postgres({ pool }), sources: [pgCron(pool)] }).startChecking();
  */
 export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
   const prefix = options.prefix ?? "";
@@ -353,9 +353,11 @@ export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
         try {
           const visible = new Set(all.map((j) => j.jobid));
           for (const stored of await host.store.listJobs()) {
-            const def = stored.definition;
-            if (!stored.name.startsWith(prefix) || inUse.has(stored.name) || !def.schedule || !(def.tags ?? []).includes("pg_cron")) continue;
-            const match = /^pg_cron job (\d+) in /.exec(def.description ?? "");
+            const def = stored.definition as StoredJobDefinition | null;
+            // A foreign or damaged definition (not an object, tags not a list) is not one of ours.
+            if (typeof def !== "object" || def === null || !Array.isArray(def.tags)) continue;
+            if (!stored.name.startsWith(prefix) || inUse.has(stored.name) || !def.schedule || !def.tags.includes("pg_cron")) continue;
+            const match = /^pg_cron job (\d+) in /.exec(typeof def.description === "string" ? def.description : "");
             if (!match) continue;
             const jobid = Number(match[1]);
             const current = names.get(jobid);
@@ -370,13 +372,19 @@ export function pgCron(db: Queryable, options: PgCronOptions = {}): Source {
       if (!recording || names.size === 0) return [];
 
       const alerts: Alert[] = [];
+      // The names declared now, after the retires above. A run copied under
+      // a retired name that was then forgotten (the dashboard's forget) has
+      // no job to go to: it is let go, never recorded and never read again.
+      const declaredNow = host.definedJobs ? new Set(host.definedJobs().map((d) => d.name)) : null;
       /** Copies one row. A row that cannot be recorded is reported and skipped; it never stops the others. */
       const record = async (row: DetailRow, evaluate: boolean): Promise<void> => {
         const runid = Number(row.runid);
         const jobid = Number(row.jobid);
         const name = pending.get(runid) ?? names.get(jobid);
-        if (!name) {
+        if (!name || (declaredNow !== null && !inUse.has(name) && !declaredNow.has(name))) {
+          pending.delete(runid);
           held.delete(runid);
+          if (name) retired.delete(name);
           return;
         }
         let run: Run | null;

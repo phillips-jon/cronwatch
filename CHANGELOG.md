@@ -16,6 +16,8 @@ Every language:
 - A blank `CRONWATCH_ENV` or `APP_ENV` (only spaces) counts as unset, and every language reads the environment the same way: `CRONWATCH_ENV`, then `APP_ENV`, then its own variable, trimmed and lowercased, with `prod` as production and `dev`, `local`, `test` and `testing` as development. This decides whether the dashboard makes a token of its own and whether a handler with no secret runs. See [Environment variables](https://cronwatch.dev/docs/environment/).
 - Integrations record runs with their names spelled the one way: `active-job` (was `active_job`), `laravel-scheduler` and `laravel-queue` (were `schedule` and `queue`), `symfony-scheduler` and `symfony-messenger` (were `scheduler` and `messenger`), `drupal-cron` and `drupal-queue` (were `cron` and `queue`), `craft-queue` and `craft-command` (were `queue` and `command`), `spring-scheduled` (was `scheduled`) and .NET's `hosting` (was `schedule`). Runs recorded before keep their trigger; a filter on it should look for both spellings until they age out.
 - A one-time date in place of a cron expression is refused when the job is declared, with the same message in every language, and a date no month has (`0 0 30 2 *`) is accepted and never fires.
+- A dashboard token or cron secret of only whitespace, in `CRONWATCH_TOKEN`, `CRON_SECRET` or given in code, counts as unset, as the Environment variables page says: outside development the dashboard stays locked (503) and a handler answers 503 and reports why, where the blank value was taken as the token. A token or secret given in code that is neither a string nor null (`false`, a number) is refused with an error instead of becoming a password; PHP's deprecated `false` for "off" still works.
+- The dashboard's sign-in form posts the token to `<base>/signin` in the request body, so it no longer lands in access logs as `?token=`. Opening a page with `?token=` still signs in, for the development sign-in link.
 
 TypeScript:
 
@@ -93,6 +95,9 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - Every language holds run ids to 200 characters on every path; `recordRun` let a longer one through, which the MySQL column could not hold.
 - TypeScript: a schedule on a date no month has no longer runs out of stack.
 - Craft CMS: `GET /cronwatch/api`, with no path after it, reaches the JSON API instead of the site's 404 page.
+- One malformed job, run or state row (a hand edit, another writer, a damaged database) affects only its own job, in every language: it no longer stops every check or makes the whole dashboard answer 500. A definition that does not parse or is not an object reads as `{ name }`, and that job is reported and shown as failing; tags that are not a list of strings are left out; unparseable metrics read as `{}`; a time that is not a number reads as 0 (a start) or empty (a finish or duration); a state that does not parse reads as none and is replaced by the next write; and a queued alert that is not an object, a recovery that does not say what it recovers from, and an alert without a numeric time are dropped instead of blocking the job's alerts.
+- An `Authorization` header that is not a bearer, such as a proxy's Basic auth, no longer locks the dashboard: the cookie and `?token=` sign in as if no header came.
+- pg_cron: forgetting the old name of a renamed job while a run of it is open lets the run go, where every check after reported `job is not declared`.
 
 ## 0.10.0 and earlier
 

@@ -69,7 +69,8 @@ export function statements(dialect: Dialect, p: string) {
   const byName = pg ? `name COLLATE "C"` : "name";
   // The version inside a state's JSON, as stateVersion() reads it: a whole
   // number from 0 to 2^53 - 1, else 0 (none, or a foreign row's 1.5 or "x",
-  // which must neither fail the statement nor refuse every write for good).
+  // which must neither fail the statement nor refuse every write for good;
+  // on SQLite, also text that is not JSON).
   // Each CASE tests the JSON type before any cast.
   const version = (column: string) => {
     if (pg) {
@@ -77,7 +78,8 @@ export function statements(dialect: Dialect, p: string) {
       return `CASE WHEN jsonb_typeof(${column}->'version') <> 'number' THEN 0 WHEN ${v} % 1 = 0 AND ${v} BETWEEN 0 AND 9007199254740991 THEN ${v}::bigint ELSE 0 END`;
     }
     const v = `json_extract(${column}, '$.version')`;
-    return `CASE WHEN json_type(${column}, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN ${v} = CAST(${v} AS INTEGER) AND ${v} BETWEEN 0 AND 9007199254740991 THEN CAST(${v} AS INTEGER) ELSE 0 END`;
+    // Text that is not JSON at all (SQLite holds any) counts as 0 too, before json_type could fail on it.
+    return `CASE WHEN NOT json_valid(${column}) THEN 0 WHEN json_type(${column}, '$.version') NOT IN ('integer', 'real') THEN 0 WHEN ${v} = CAST(${v} AS INTEGER) AND ${v} BETWEEN 0 AND 9007199254740991 THEN CAST(${v} AS INTEGER) ELSE 0 END`;
   };
   const sql = {
     upsertJob: `INSERT INTO ${p}jobs (name, definition, created_at, updated_at) VALUES (?, ?, ?, ?)
@@ -161,20 +163,55 @@ export interface RunRow {
 }
 export interface StateRow { state: Json<JobState> }
 
-const json = <T>(v: Json<T>): T => (typeof v === "string" ? (JSON.parse(v) as T) : v);
-const num = (v: Int | null): number | null => (v === null ? null : Number(v));
+/**
+ * Rows are read leniently: a foreign, hand-edited or damaged row (SQLite
+ * keeps whatever type it is given, in any column) must affect only its own
+ * job, never every read. JSON text that does not parse reads as null, which
+ * the client takes as no state, or as an unreadable definition it reports.
+ */
+const json = (v: unknown): unknown => {
+  if (typeof v !== "string") return v;
+  try {
+    return JSON.parse(v) as unknown;
+  } catch {
+    return null;
+  }
+};
+/** A time, or a count of milliseconds, as a column holds it (a string from Postgres's BIGINT): NaN when it is not a number. */
+const number = (v: unknown): number => (typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : Number.NaN);
+/** A time that must be there: one that is not a finite number reads as 0. */
+const time = (v: unknown): number => {
+  const n = number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+/** A time or duration that may be absent: one that is not a finite number reads as null. */
+const maybeTime = (v: unknown): number | null => {
+  const n = number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const textOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
+const isObject = (v: unknown): v is Record<string, number> => typeof v === "object" && v !== null && !Array.isArray(v);
 
+/** A job's row. Its definition is as stored, or null when its text does not parse; the client reads the rest (see readStoredJob). */
 export function rowToJob(r: JobRow): StoredJob {
-  return { name: r.name, definition: json(r.definition), createdAt: Number(r.created_at), updatedAt: Number(r.updated_at) };
+  return { name: r.name, definition: json(r.definition) as StoredJobDefinition, createdAt: time(r.created_at), updatedAt: time(r.updated_at) };
 }
 
+/**
+ * A run's row. A start that is not a finite number reads as 0, a finish or
+ * duration as null; an error or output that is not text as null; metrics
+ * that do not parse to an object as {}; a trigger that is not text as "run".
+ */
 export function rowToRun(r: RunRow): Run {
+  const metrics = json(r.metrics);
   return {
-    id: r.id, job: r.job, status: r.status, startedAt: Number(r.started_at), finishedAt: num(r.finished_at),
-    durationMs: num(r.duration_ms), error: r.error, output: r.output, metrics: r.metrics === null ? {} : json(r.metrics), trigger: r.trigger,
+    id: r.id, job: r.job, status: r.status, startedAt: time(r.started_at), finishedAt: maybeTime(r.finished_at),
+    durationMs: maybeTime(r.duration_ms), error: textOrNull(r.error), output: textOrNull(r.output),
+    metrics: isObject(metrics) ? metrics : {}, trigger: typeof r.trigger === "string" ? r.trigger : "run",
   };
 }
 
+/** A state's row, or null when its text does not parse (normalizeState reads anything else that is not an object as no state). */
 export function rowToState(r: StateRow): JobState {
-  return json(r.state);
+  return json(r.state) as JobState;
 }

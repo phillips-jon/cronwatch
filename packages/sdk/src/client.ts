@@ -1,5 +1,5 @@
 import { formatDuration, parseDuration } from "./duration.js";
-import { isDevelopment, isProduction, readEnv } from "./env.js";
+import { isDevelopment, isProduction, readSecretEnv, secretOption } from "./env.js";
 import {
   applySilence,
   BASELINE_WINDOW,
@@ -31,7 +31,7 @@ import { createRecorder } from "./job.js";
 import type { JobContext } from "./job.js";
 import { capOutput, describeError, OUTPUT_CAP, redactAndCap, redactSecrets } from "./output.js";
 import { parseSchedule } from "./schedule.js";
-import { checkExpectation, toStored } from "./serialize.js";
+import { checkExpectation, readStoredJob, toStored } from "./serialize.js";
 import { buildRoutes } from "./routes/index.js";
 import type { Routes, RoutesOptions } from "./routes/index.js";
 import { memory } from "./stores/memory.js";
@@ -59,7 +59,8 @@ export interface HandlerOptions {
   /**
    * Callers must send `Authorization: Bearer <secret>`. Defaults to the
    * client's cronSecret, which defaults to process.env.CRON_SECRET (what
-   * Vercel sends its cron requests with). An empty string counts as unset.
+   * Vercel sends its cron requests with). An empty string, or one of only
+   * whitespace, counts as unset; any other type (false, a number) throws.
    * With no secret at all the handler answers 503 unless the app is in
    * development (the first of CRONWATCH_ENV, APP_ENV and NODE_ENV that is
    * set names "development", "dev", "local", "test" or "testing"). Pass
@@ -197,8 +198,9 @@ export interface CronwatchOptions {
   /**
    * Shared secret that handler() requests must carry. Defaults to
    * process.env.CRON_SECRET (on Cloudflare Workers, which have no process,
-   * pass env.CRON_SECRET); an empty string counts as unset. Pass null to
-   * let handlers run without one.
+   * pass env.CRON_SECRET); an empty string or one of only whitespace, given
+   * here or in the variable, counts as unset. Pass null to let handlers run
+   * without one. Any other type (false, a number) throws.
    */
   cronSecret?: string | null;
   /** How long finished runs are kept. Default "30d". */
@@ -329,13 +331,17 @@ export class Cronwatch {
   private usingDefaultStore = false;
   private warnedNoSecret = false;
   private warnedDeferredStart = false;
+  /** Stored jobs read with a definition that was not a JSON object (see readJob). */
+  private readonly unreadable = new WeakSet<StoredJob>();
 
   constructor(options: CronwatchOptions = {}) {
     this.store = options.store ?? (this.usingDefaultStore = true, memory());
     this.alerts = options.alerts ?? [consoleChannel()];
     this.triage = options.triage;
     this.sources = options.sources ?? [];
-    const secret = options.cronSecret === undefined ? readEnv("CRON_SECRET") : options.cronSecret;
+    // A blank secret, given or read, counts as unset; one given that is not a string throws.
+    const given = secretOption(options.cronSecret, "cronSecret");
+    const secret = options.cronSecret === undefined ? readSecretEnv("CRON_SECRET") : given;
     this.cronSecret = secret ? secret : null;
     this.secretOptOut = options.cronSecret === null;
     this.retentionMs = parseDuration(options.retention ?? "30d", "retention");
@@ -407,7 +413,8 @@ export class Cronwatch {
         return outcome.result as T;
       },
       handler<T>(fn: HandlerFn<T>, options?: HandlerOptions) {
-        const own = options?.secret;
+        // A blank secret falls back to the client's; one that is not a string throws.
+        const own = secretOption(options?.secret, "handler: secret");
         const secret = own === null ? null : own ? own : self.cronSecret;
         const optedOut = own === null || (!own && self.secretOptOut);
         return async (request: Request): Promise<Response> => {
@@ -516,14 +523,26 @@ export class Cronwatch {
     const jobs = await this.store.listJobs();
     const listed = new Set(jobs.map((job) => job.name));
     const missing = [...this.definitions.values()].filter((definition) => !listed.has(definition.name));
-    if (missing.length === 0) return jobs;
+    if (missing.length === 0) return jobs.map((job) => this.readJob(job));
     for (const definition of missing) {
       // Not one forgotten here meanwhile.
       if (this.definitions.get(definition.name) !== definition) continue;
       this.synced.delete(definition.name);
       await this.sync(definition);
     }
-    return this.store.listJobs();
+    return (await this.store.listJobs()).map((job) => this.readJob(job));
+  }
+
+  /** A stored job read leniently (readStoredJob); one whose definition is unreadable is remembered, so that evaluating it throws. */
+  private readJob(stored: StoredJob): StoredJob {
+    const { job, readable } = readStoredJob(stored);
+    if (!readable) this.unreadable.add(job);
+    return job;
+  }
+
+  /** Throws for a job whose stored definition was not a JSON object: reported, and shown as failing, while the others carry on. */
+  private evaluable(stored: StoredJob): void {
+    if (this.unreadable.has(stored)) throw new Error(`job "${stored.name}": its stored definition is not a JSON object`);
   }
 
   /**
@@ -1130,7 +1149,10 @@ export class Cronwatch {
     for (const listed of await this.store.runningRuns()) {
       try {
         const declared = this.definitions.get(listed.job);
-        const definition = declared ? toStored(declared) : (await this.store.getJob(listed.job))?.definition;
+        const found = declared ? null : await this.store.getJob(listed.job);
+        const stored = found ? this.readJob(found) : null;
+        if (stored) this.evaluable(stored);
+        const definition = declared ? toStored(declared) : stored?.definition;
         if (!definition || !isStuck(definition, listed, now)) continue;
         // Read again just before the write: lines and metrics flushed since the
         // list was read (while earlier stuck runs were sent, say) are kept.
@@ -1155,6 +1177,7 @@ export class Cronwatch {
     const retries = { spentMs: 0 };
     for (const stored of await this.storedJobs()) {
       try {
+        this.evaluable(stored);
         const recent = await this.store.listRuns(stored.name, BASELINE_WINDOW);
         let nextExpectedAt: number | null = null;
         const { state, result: held } = await this.updateState(stored.name, (previous) => {
@@ -1194,6 +1217,7 @@ export class Cronwatch {
     let recent: Run[] = [];
     try {
       recent = await this.store.listRuns(stored.name, Math.max(runs, BASELINE_WINDOW));
+      this.evaluable(stored);
       const state = await this.readState(stored.name);
       const { nextExpectedAt } = onCheck(stored.definition, stored, recent[0] ?? null, state, now);
       return { job: summarize(stored, recent, state, nextExpectedAt, now), runs: recent.slice(0, runs) };
@@ -1232,7 +1256,7 @@ export class Cronwatch {
     if (definition) await this.sync(definition, true);
     const stored = await this.store.getJob(name);
     if (!stored) return null;
-    return (await this.snapshot(stored, this.now(), 0)).job;
+    return (await this.snapshot(this.readJob(stored), this.now(), 0)).job;
   }
 
   /** A job's runs, newest first. `limit` is a whole number from 1 to 500. */

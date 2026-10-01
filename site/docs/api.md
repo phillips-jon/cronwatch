@@ -15,7 +15,7 @@ group: Reference
 | `sources` | `[]` | where runs this process does not wrap come from, such as [`pgCron(pool)`](/docs/supabase/). Each source is synced at the start of every `check()`; one that throws is reported to `onError` and the check carries on |
 | `alerts` | console | an array of [channels](/docs/alerts/) |
 | `triage` | | a [triage function](/docs/triage/) |
-| `cronSecret` | `process.env.CRON_SECRET` | what `handler()` requires as a bearer. Empty counts as unset, and with none set handlers answer 503 outside development. `null` lets handlers run without one |
+| `cronSecret` | `process.env.CRON_SECRET` | what `handler()` requires as a bearer. Empty or only whitespace counts as unset (given here or in the variable), and a value that is neither a string nor `null` throws; with none set handlers answer 503 outside development. `null` lets handlers run without one |
 | `retention` | `"30d"` | how long finished runs are kept |
 | `defaults` | | `grace`, `timeout`, `timezone`, `failuresBeforeAlert` applied to every job |
 | `redact` | secret patterns | `(text) => string` applied to output and errors before they are stored or sent; `false` keeps them as logged. One that throws or returns something other than a string is reported to `onError` (as `"redact"`) and the default patterns are used for that text |
@@ -46,7 +46,7 @@ Returns a handle:
 | Method | |
 |---|---|
 | `run(fn, { trigger? })` | runs `fn(job)`, records the run, returns its result, rethrows its error |
-| `handler(fn, { secret? })` | a `(request) => Promise<Response>` that checks the bearer secret, runs `fn(job, request)` and answers with JSON, or with the `Response` `fn` returned. `secret` defaults to the client's `cronSecret`; `null` accepts anyone, and then the JSON leaves out the error text |
+| `handler(fn, { secret? })` | a `(request) => Promise<Response>` that checks the bearer secret, runs `fn(job, request)` and answers with JSON, or with the `Response` `fn` returned. `secret` defaults to the client's `cronSecret` (also when empty or only whitespace; neither a string nor `null`, it throws); `null` accepts anyone, and then the JSON leaves out the error text |
 | `start({ trigger?, id? })` | records a running run now and returns a [run handle](#the-run-handle) to finish it later, perhaps in another process. `trigger` defaults to `"start"`. `id` (1 to 200 characters) is your own stable id, such as an Inngest run id: a start with an id already recorded returns a handle on that run instead of recording another. A store that fails is reported to `onError`, never thrown, and the run is written when it finishes |
 | `resume(runId)` | a run handle on a run started elsewhere, read from the store. One that already finished, or is not in the store, gives a handle whose `finish()` records nothing and reports why to `onError`. Throws only for a run of another job, or for an id that is empty, longer than 200 characters or starts with `pgcron:` (the same rules as `start({ id })`) |
 
@@ -110,12 +110,12 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 
 | Option | Default | |
 |---|---|---|
-| `token` | `CRONWATCH_TOKEN` | the bearer the routes require, and what the sign-in cookie holds a digest of. Empty counts as unset. With none, [in development](/docs/dashboard/#development), the routes make a random token and print a sign-in link to the server log on their first request; otherwise they answer 503. `null` opts out and serves them open |
+| `token` | `CRONWATCH_TOKEN` | the bearer the routes require, and what the sign-in cookie holds a digest of. Empty or only whitespace counts as unset, here or in the variable; a value that is neither a string nor `null` throws. With none, [in development](/docs/dashboard/#development), the routes make a random token and print a sign-in link to the server log on their first request; otherwise they answer 503. `null` opts out and serves them open |
 | `basePath` | `"/cronwatch"` | where the routes are mounted: it routes requests, builds links and scopes the cookie |
 | `origin` | the request URL's | the public origin, such as `"https://app.example.com"`, used for the cross-site check, the sign-in redirect and cookie, and the development sign-in line. Must be an `http` or `https` URL, or the call throws |
 | `trustProxy` | `false` | take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host` instead, when present (see [behind a proxy](/docs/dashboard/#behind-a-proxy)). With neither this nor `origin`, forwarded headers are ignored |
 
-The development sign-in line names the host only when `origin` is set or the first request's host is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`); for any other host it prints the path alone, since a client controls the `Host` header. Cross-site writes are refused, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400.
+The development sign-in line names the host only when `origin` is set or the first request's host is loopback (`localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`); for any other host it prints the path alone, since a client controls the `Host` header. Cross-site writes are refused, only a `Bearer` `Authorization` header is read as the token (any other scheme leaves the cookie and `?token=` to sign in), the sign-in form posts the token to `<base>/signin`, `?token=` is read only on a page `GET`, and a silence `for` that is not a duration or a number of milliseconds is a 400.
 
 ### recordRun()
 
