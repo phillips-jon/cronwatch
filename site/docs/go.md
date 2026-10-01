@@ -25,7 +25,7 @@ The package is `cronwatch`, so the import reads `cronwatch "cronwatch.dev/go"`, 
 | `cronwatch.dev/go/triage` | Claude triage, over plain HTTP |
 | `cronwatch.dev/go/pgcron` | watching pg_cron's jobs |
 | `cronwatch.dev/go/storetest` | the contract test for a store of your own |
-| `cronwatch.dev/go/bridge` | what the scheduler integrations share, for an integration of your own |
+| `cronwatch.dev/go/bridge` | what the scheduler integrations share, for an integration of your own. It is outside the 1.x promise: it may change in any minor release |
 
 The scheduler integrations are modules of their own (`cronwatch.dev/go/robfigcron`, `/gocron`, `/river`, `/asynq`), so an app pulls only the scheduler it uses; see [Go schedulers](/docs/go-schedulers/).
 

@@ -16,6 +16,16 @@
 // AppTag), so two apps sharing one store never declare each other's jobs
 // without a schedule. That is the PHP port's rule for Laravel and Symfony
 // (Cronwatch\Bridge\Unscheduled).
+//
+// # Outside the 1.x promise
+//
+// This package is for integration authors, and is outside the promise the
+// rest of the module makes for 1.x: it changes whenever one of this
+// project's own integrations needs it to, in a minor release, without a
+// deprecation first. The integrations built on it (robfigcron, gocron,
+// river and asynq) keep their own promises. An integration of your own
+// may build on it at its own risk, pinned to a release; ask on the issue
+// tracker if you need part of it promised.
 package bridge
 
 import (
