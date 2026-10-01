@@ -117,7 +117,7 @@ class RailsIntegrationTest < Minitest::Test
     assert_equal :ok, run.status
     assert_equal "Report written: 42", run.output
     assert_equal({ "rows" => 42 }, run.metrics)
-    assert_equal "active_job", run.trigger
+    assert_equal "active-job", run.trigger
     stored = Cronwatch.client.store.get_job("nightly-report").definition.to_h
     assert_equal({ "schedule" => "0 2 * * *", "grace" => "15m", "expect" => 'contains "Report written"',
                    "budget" => { "rows" => 100 }, "name" => "nightly-report" }.sort.to_h, stored.sort.to_h)

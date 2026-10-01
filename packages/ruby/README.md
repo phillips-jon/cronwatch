@@ -100,7 +100,7 @@ class NightlyReportJob < ApplicationJob
 end
 ```
 
-Every `perform` is recorded as a run with the trigger `"active_job"`. The name defaults to the class name without `Job`, dasherized, with `::` as `:` (`Reports::NightlyJob` is `reports:nightly`); pass `name:` to choose another. Jobs are declared once the app has booted, so a check knows a job that has never run. A job that raises still raises after the run is recorded, so ActiveJob retries and your error reporter see it as before.
+Every `perform` is recorded as a run with the trigger `"active-job"` (runs recorded before 1.0 carry `"active_job"`). The name defaults to the class name without `Job`, dasherized, with `::` as `:` (`Reports::NightlyJob` is `reports:nightly`); pass `name:` to choose another. Jobs are declared once the app has booted, so a check knows a job that has never run. A job that raises still raises after the run is recorded, so ActiveJob retries and your error reporter see it as before.
 
 ### Sidekiq
 

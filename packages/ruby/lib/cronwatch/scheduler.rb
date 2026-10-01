@@ -40,6 +40,11 @@ module Cronwatch
       end
     end
 
+    # The trigger of a run an ActiveJob perform records, through
+    # Cronwatch::ActiveJob or a scheduler's entry. Runs recorded before 1.0
+    # carry "active_job".
+    ACTIVE_JOB_TRIGGER = "active-job"
+
     # How far ahead the daylight saving check looks, and how far either side
     # of each clock change it compares the scheduler's runs with CronWatch's.
     HORIZON_YEARS = 5
@@ -622,7 +627,7 @@ module Cronwatch
         ::ActiveJob::Base.around_perform do |job, block|
           declaration = Cronwatch::Scheduler.declaration_for_active_job(job)
           if declaration
-            Cronwatch::Monitored.record(declaration, "active_job", job) { block.call }
+            Cronwatch::Monitored.record(declaration, ACTIVE_JOB_TRIGGER, job) { block.call }
           else
             block.call
           end

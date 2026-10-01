@@ -7,7 +7,7 @@ require_relative "../scheduler"
 
 module Cronwatch
   # Monitors an ActiveJob class. Each perform is a recorded run with the
-  # trigger "active_job"; `cronwatch` in the job is the run's context, for
+  # trigger "active-job"; `cronwatch` in the job is the run's context, for
   # log and metric. A perform that raises is recorded as failed and then
   # raises as before, so retry_on, discard_on and error reporters see it
   # unchanged.
@@ -34,7 +34,7 @@ module Cronwatch
     extend ActiveSupport::Concern
     include Cronwatch::Monitored
 
-    TRIGGER = "active_job"
+    TRIGGER = Scheduler::ACTIVE_JOB_TRIGGER
 
     included do
       around_perform :cronwatch_perform

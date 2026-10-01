@@ -174,7 +174,7 @@ class NightlyReportJob < ApplicationJob
 end
 ```
 
-Every `perform` is recorded as a run with the trigger `"active_job"`. The job is named after the class, without `Job`, underscored and dasherized, with `::` becoming `:`: `NightlyReportJob` is `nightly-report` and `Reports::NightlyJob` is `reports:nightly`. Pass `name:` to choose another; an anonymous class must. Keep names stable: they are the key everything in the store hangs off.
+Every `perform` is recorded as a run with the trigger `"active-job"` (runs recorded before 1.0 carry `"active_job"`, which nothing changes; see [triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)). The job is named after the class, without `Job`, underscored and dasherized, with `::` becoming `:`: `NightlyReportJob` is `nightly-report` and `Reports::NightlyJob` is `reports:nightly`. Pass `name:` to choose another; an anonymous class must. Keep names stable: they are the key everything in the store hangs off.
 
 `cronwatch` takes `name` and the options a job declared by hand takes: `schedule`, `timezone`, `grace`, `timeout`, `max_duration`, `budget`, `expect`, `failures_before_alert`, `description` and `tags`. A bad option raises `ArgumentError`.
 
@@ -292,7 +292,7 @@ Cronwatch.declare_from_scheduler!(grace: "10m")
 Once the app has booted, every enabled entry in the scheduler's config becomes a job, with the schedule and zone converted as above, so the check reports one that never runs:
 
 - A class that calls `cronwatch` declares itself, as usual; its entry is left to it.
-- Any other class is named as `cronwatch` would name it (`DailyDigestJob` is `daily-digest`) and each of its performs is recorded: ActiveJob classes with the trigger `"active_job"`, Sidekiq jobs through the server middleware with `"sidekiq"`.
+- Any other class is named as `cronwatch` would name it (`DailyDigestJob` is `daily-digest`) and each of its performs is recorded: ActiveJob classes with the trigger `"active-job"` (`"active_job"` before 1.0), Sidekiq jobs through the server middleware with `"sidekiq"`.
 - A Solid Queue `command:` task is named after its key (`clear_solid_queue_finished_jobs`), and each run of Solid Queue's job with that command is recorded.
 - `Cronwatch::CheckJob` and `Cronwatch::Sidekiq::CheckWorker` are left out.
 

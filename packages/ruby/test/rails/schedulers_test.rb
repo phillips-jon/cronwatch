@@ -216,13 +216,13 @@ class SchedulersTest < Minitest::Test
     assert_equal 1, wrapper.jobs.length
     assert_equal "SyncFeedsJob", wrapper.jobs.first["wrapped"]
     wrapper.drain
-    assert_equal [["active_job", :ok]], runs("sync-feeds").map { |r| [r.trigger, r.status] }
+    assert_equal [["active-job", :ok]], runs("sync-feeds").map { |r| [r.trigger, r.status] }
 
     # Also for a class declare_from_scheduler! watches.
     Cronwatch.declare_from_scheduler!
     adapter.enqueue(RefreshScoresJob.new)
     wrapper.drain
-    assert_equal ["active_job"], runs("refresh-scores").map(&:trigger)
+    assert_equal ["active-job"], runs("refresh-scores").map(&:trigger)
   end
 
   def test_declare_from_scheduler_watches_every_entry
@@ -258,7 +258,7 @@ class SchedulersTest < Minitest::Test
     HardWorker.drain
     assert_raises(NightlyBackupJob::Failed) { NightlyBackupJob.perform_now(true) }
     assert_equal [:ok], runs("daily-digest").map(&:status)
-    assert_equal ["active_job"], runs("clear_solid_queue_finished_jobs").map(&:trigger)
+    assert_equal ["active-job"], runs("clear_solid_queue_finished_jobs").map(&:trigger)
     assert_equal ["sidekiq"], runs("hard-worker").map(&:trigger)
     assert_equal [:failed], runs("nightly-backup").map(&:status)
     assert_equal [[:failed, "nightly-backup"]], sent
