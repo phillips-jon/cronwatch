@@ -1,5 +1,7 @@
 package pgcron_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // An app's Pick, JobName or OptionsFor that fails, as the SDK's
 // pgcron.test.ts has it.
 

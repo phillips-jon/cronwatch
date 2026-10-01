@@ -1,5 +1,7 @@
 package pgcron_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // The pg_cron source against the fake tables (fake_test.go), as the SDK's
 // pgcron.test.ts has it, and the replay of conformance/pgcron.json. The
 // tests against a real pg_cron are in the sqltest module, which has a

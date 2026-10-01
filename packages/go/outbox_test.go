@@ -1,5 +1,7 @@
 package cronwatch_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // outbox.test.ts: an alert is written with the state that opens its
 // condition, sent by the process that wrote it, and by a later check only
 // when that process stopped before it recorded how the send went.

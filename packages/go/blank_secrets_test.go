@@ -1,5 +1,7 @@
 package cronwatch_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // A token or cron secret of only whitespace counts as unset, as the SDK's
 // routes-security and client-hardening tests have it; only a Bearer
 // Authorization header is a bearer; the sign-in form posts the token.

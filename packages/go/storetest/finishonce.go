@@ -15,14 +15,23 @@ import (
 )
 
 // T0 is Monday 2026-01-05 09:30:00Z, the SDK tests' clock start.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 const T0 int64 = 1767605400000
 
 const min = 60_000
 
 // Clock is a settable clock for a client.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 type Clock struct{ at atomic.Int64 }
 
 // NewClock is a clock at start.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 func NewClock(start int64) *Clock {
 	c := &Clock{}
 	c.at.Store(start)
@@ -42,6 +51,9 @@ func (c *Clock) Set(t int64) { c.at.Store(t) }
 // List (or Types), which take its lock: a client sends from goroutines of
 // its own, so reading Alerts directly is safe only once every send has
 // returned.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 type Capture struct {
 	mu     sync.Mutex
 	Alerts []cronwatch.Alert
@@ -77,6 +89,9 @@ func (c *Capture) Types() []string {
 }
 
 // Errors keeps what a client reports, as "where: message".
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 type Errors struct {
 	mu   sync.Mutex
 	list []string
@@ -97,6 +112,9 @@ func (e *Errors) List() []string {
 }
 
 // Process is one client over a shared store, as one process would have.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 type Process struct {
 	Client *cronwatch.Client
 	Alerts *Capture
@@ -104,6 +122,9 @@ type Process struct {
 }
 
 // NewProcess is a client over store, with a capture channel and an error list.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 func NewProcess(t *testing.T, store cronwatch.Store, now func() int64) *Process {
 	t.Helper()
 	p := &Process{Alerts: &Capture{}, Errors: &Errors{}}
@@ -118,6 +139,9 @@ func NewProcess(t *testing.T, store cronwatch.Store, now func() int64) *Process 
 
 // Shared opens stores over one database, as several processes would have
 // them: each call to Open is another store on the same data.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 type Shared struct {
 	Open func() cronwatch.Store
 	// Done is called at the end, to close the stores and drop the data.
@@ -138,6 +162,9 @@ func anyMatch(lists [][]string, re *regexp.Regexp) bool {
 // FinishOnce is finish-once.test.ts's tests over several stores sharing one
 // database: however many processes finish a run, it is recorded and judged
 // once. shared makes a fresh database each time it is called.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 func FinishOnce(t *testing.T, shared func(t *testing.T) Shared) {
 	ctx := context.Background()
 	failed := func(id, job string, startedAt int64) cronwatch.Run {

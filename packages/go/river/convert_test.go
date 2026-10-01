@@ -1,5 +1,7 @@
 package river_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 import (
 	"context"
 	"encoding/json"

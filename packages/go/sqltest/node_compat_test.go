@@ -1,5 +1,7 @@
 package sqltest
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // A Node process and a Go process sharing one SQLite file: the SDK's store
 // (from the built packages/sdk/dist) and sqlstore replay the same store
 // calls (testdata/shared_store.json, the Ruby and Python ports' fixture),

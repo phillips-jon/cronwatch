@@ -1,5 +1,7 @@
 package cronwatch_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // Replays packages/ruby/test/web/golden.json, the SDK routes' answers to a
 // fixed seed (written by golden.mjs), against Client.Routes seeded the same
 // way, and compares status, headers and body byte for byte: straight into

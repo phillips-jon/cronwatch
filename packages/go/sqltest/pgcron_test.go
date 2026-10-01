@@ -1,5 +1,7 @@
 package sqltest
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // The pg_cron source against a real pg_cron, as the SDK's pgcron.test.ts
 // runs it, when CRONWATCH_TEST_PGCRON is the URL of a Postgres with pg_cron
 // preloaded (cron.database_name naming that database). Through pgx's stdlib

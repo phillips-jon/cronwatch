@@ -82,7 +82,7 @@ packages/go/
   alerts/          the alert channels, a file each, email.go, sigv4.go and shared.go as in alerts/ (net/http only)
   triage/          Claude triage over plain HTTP (triage/anthropic.ts)
   pgcron/          the pg_cron source over a database/sql handle (sources/pgcron.ts)
-  storetest/       the store contract test (store-conformance.ts), the store.json replay, the finish-once scenarios; exported for stores of your own
+  storetest/       the store contract test (store-conformance.ts), the store.json replay, the finish-once scenarios; Run is exported for stores of your own, and the rest (deprecated, going in 1.0) is the module's own test kit
   sqltest/         a module of its own: the SQL store's tests with real drivers, the SQLite file shared with Node, and the pg_cron source against a real pg_cron
   internal/webserver/  the seeded dashboard @cronwatch/mcp's end-to-end test drives (go run)
   bridge/          what the scheduler integrations share (standard library only): Watch (entries as jobs, collisions, jobs gone unscheduled, tagged by app), CheckFires, AppTag, FieldText, EveryText, Zone, OptionsOf

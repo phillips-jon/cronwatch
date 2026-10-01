@@ -1,5 +1,7 @@
 package cronwatch_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // The SDK's routes tests (routes.test.ts, routes-security.test.ts,
 // routes-origin.test.ts, routes-pwa.test.ts in part), and what only a Go
 // handler has: the base path found from http.StripPrefix and ServeMux

@@ -1,5 +1,7 @@
 package alerts
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // The channels' hardening, as the SDK's channels-hardening.test.ts and the
 // other ports' tests have it, against real HTTP servers where it matters:
 // redirects refused, one deadline, bodies capped, only the origin in an
