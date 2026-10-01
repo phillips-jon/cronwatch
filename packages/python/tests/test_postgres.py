@@ -38,6 +38,33 @@ def test_a_prefix_that_is_not_a_plain_lowercase_identifier_is_refused() -> None:
             PostgresStore("postgres://unused", prefix=bad)
 
 
+BAD_URL = "postgres://app:p%zzword@db.example:5432/app"
+
+
+def test_a_database_url_whose_password_has_a_stray_percent_is_not_quoted_in_the_error() -> None:
+    # libpq's own error quotes the token it could not read: here the password.
+    from cronwatch.stores.postgres import PostgresStore
+
+    errors: list[str] = []
+    cw = Cronwatch(store=PostgresStore(BAD_URL), alerts=[], cron_secret=None, on_error=lambda e, _where: errors.append(str(e)))
+    with pytest.raises(Exception) as raised:
+        cw.check()
+    assert "zzword" not in str(raised.value)
+    assert '"db.example"' in str(raised.value)
+    # A run still runs; the store's error goes to on_error, without the password.
+    assert cw.run("j", lambda ctx: 7) == 7
+    assert errors and all("zzword" not in e for e in errors)
+
+
+def test_pg_cron_with_such_a_url_does_not_quote_it_either() -> None:
+    from cronwatch.sources import pgcron
+
+    with pytest.raises(Exception) as raised:
+        pgcron._adapter(BAD_URL).query("SELECT 1", [])
+    assert "zzword" not in str(raised.value)
+    assert '"db.example"' in str(raised.value)
+
+
 def test_statements_are_the_sdks_with_numbered_placeholders() -> None:
     sql = _sql.statements("postgres", "cronwatch_")
     assert sql["cas_update"] == (

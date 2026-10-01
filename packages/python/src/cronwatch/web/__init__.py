@@ -18,7 +18,8 @@ app, and Web.asgi is the same routes as an ASGI app:
 
 token:       required to reach anything. Send it as `Authorization: Bearer <token>`, or
              open the dashboard once with `?token=<token>` and a cookie is set. Defaults to
-             $CRONWATCH_TOKEN; "" counts as unset. With no token while the environment is
+             $CRONWATCH_TOKEN; "" or only whitespace counts as unset, and anything but a
+             string or None raises TypeError. With no token while the environment is
              development or test (cronwatch._env), the routes make a random one and print a
              sign-in link to stdout on their first request; with no token otherwise they
              answer 503. Pass token=None to opt out and serve them open everywhere, for
@@ -113,7 +114,33 @@ _LOCKED = (
     "or pass token=None to serve them open behind your own auth."
 )
 
-_BEARER = re.compile(f"^Bearer[{_js.WHITESPACE}]+", re.IGNORECASE)
+# An Authorization header that is a bearer: the scheme in any case, then
+# one or more whitespace characters, then the token as is.
+_BEARER = re.compile(f"Bearer[{_js.WHITESPACE}]+(.*)", re.IGNORECASE | re.DOTALL)
+
+
+def _bearer_token(header: str | None) -> str | None:
+    """The token an Authorization header carries: what follows the scheme when
+    the scheme is Bearer (any case) and whitespace follows it, else None. Any
+    other scheme (a proxy's Basic auth, say) is not a bearer at all, so the
+    cookie and ?token= are read as if no header came."""
+    match = None if header is None else _BEARER.fullmatch(header)
+    return None if match is None else match.group(1)
+
+
+def _sign_in_return(referer: str | None, public_origin: str, base: str) -> str:
+    """Where a sign-in through the form goes next: the page it was posted from
+    (the Referer) when that is on the public origin and its query has no
+    `token` parameter, else the dashboard."""
+    if referer is None or not referer.startswith(public_origin + "/"):
+        return f"{base}/"
+    try:
+        query = urlsplit(referer).query
+    except ValueError:
+        return f"{base}/"
+    if any(key == "token" for key, _ in _parse_query(query)):
+        return f"{base}/"
+    return referer
 _BAD_ESCAPE = re.compile(r"%(?![0-9A-Fa-f]{2})")
 _WHOLE = re.compile(r"[0-9]+(?:\.[0-9]+)?\Z")
 _DECIMAL = re.compile(r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z")
@@ -552,8 +579,9 @@ class Web:
     ) -> None:
         self._client = client
         self._opted_out = token is None
-        given = None if token is _UNSET or token is None else str(token)
-        configured = None if self._opted_out else (given or os.environ.get("CRONWATCH_TOKEN") or None)
+        # A blank token, given or read, counts as unset; one given that is not a string raises.
+        given = _env.secret_option(token, "routes: token", _UNSET)
+        configured = None if self._opted_out else (given if isinstance(given, str) else _env.read_secret_env("CRONWATCH_TOKEN"))
         self._base_path = None if base_path is None else re.sub(r"/+\Z", "", str(base_path))
         self._origin = _origin.parse(origin)
         self._trust_proxy = trust_proxy is True
@@ -660,12 +688,17 @@ class Web:
         return built or request.origin
 
     def _announce(self, origin: str, base: str) -> None:
-        """Prints the development sign-in link, once per routes instance."""
+        """Prints the development sign-in link, once per routes instance. The
+        link is worked out before the line counts as shown, so a request
+        whose origin cannot be read never leaves it unprinted."""
+        try:
+            shown = self._origin if self._origin is not None else (origin if _is_loopback_origin(origin) else None)
+        except Exception:  # noqa: BLE001, a host that cannot be read is not local
+            shown = None
         with self._announce_lock:
             if self._announced:
                 return
             self._announced = True
-        shown = self._origin if self._origin is not None else (origin if _is_loopback_origin(origin) else None)
         print(_development_sign_in_line(shown, base, self._token or ""), file=sys.stdout, flush=True)
 
     def _serve(self, request: Request, path: str, wants_html: bool, base: str) -> Response:
@@ -697,8 +730,29 @@ class Web:
             return _api({"ok": False, "error": "Cross-site request refused"}, 403)
 
         cw = self.client
-        authorization = request.header("authorization")
-        bearer = None if authorization is None else _BEARER.sub("", authorization, count=1)
+        bearer = _bearer_token(request.header("authorization"))
+
+        def sign_in_cookie() -> str:
+            secure = "; Secure" if public_origin.startswith("https:") else ""
+            return f"{_COOKIE}={self._cookie}; Path={base or '/'}; HttpOnly; SameSite=Lax; Max-Age={_COOKIE_MAX_AGE}{secure}"
+
+        def sign_in_page() -> Response:
+            message = (
+                "CRONWATCH_TOKEN is not set, so this development server made a token. "
+                "The sign-in link is in the server log: open it once, or enter the token from it below, and this browser stays signed in."
+                if self._generated
+                else "Enter your CRONWATCH_TOKEN and this browser stays signed in."
+            )
+            return _html_response(_html.message_page("Sign in", message, base, sign_in=True), 401)
+
+        # The sign-in form posts the token here, in the body, so it stays out
+        # of the URL and every access log. Cross-site posts were refused above.
+        if self._token and method == "POST" and path == "/signin":
+            given_token = self._read_body(request).get("token")
+            if given_token is None or not _constant_time_equal(given_token, self._token):
+                return sign_in_page()
+            return _redirect(_sign_in_return(request.header("referer"), public_origin, base), {"set-cookie": sign_in_cookie()})
+
         if self._token:
             # ?token= is only the sign-in that moves the token into a cookie.
             query = request.param("token") if wants_html and method == "GET" else None
@@ -712,25 +766,18 @@ class Web:
             else:
                 token_ok = sent is not None and self._cookie is not None and _constant_time_equal(sent, self._cookie)
             if not cron_secret_ok and not token_ok:
-                if self._generated:
-                    if wants_html:
-                        message = (
-                            "CRONWATCH_TOKEN is not set, so this development server made a token. "
-                            "The sign-in link is in the server log: open it once and this browser stays signed in."
-                        )
-                        return _html_response(_html.message_page("Sign in", message, base, sign_in=True), 401)
-                    return _api({"ok": False, "error": "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log"}, 401)
                 if wants_html:
-                    message = "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in."
-                    return _html_response(_html.message_page("Sign in", message, base, sign_in=True), 401)
+                    return sign_in_page()
+                if self._generated:
+                    return _api({"ok": False, "error": "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log"}, 401)
                 return _api({"ok": False, "error": "Unauthorized"}, 401)
             if query is not None:
-                # Move the token from the URL into a cookie so it is not in history or logs.
+                # Move the token from the URL into a cookie, so it is not left in
+                # the browser's history. The request line that carried it may
+                # still be in an access log, which is why the sign-in form posts instead.
                 rest = [(k, v) for k, v in request.params() if k != "token"]
                 search = "?" + "&".join(f"{_form_encode(k)}={_form_encode(v)}" for k, v in rest) if rest else ""
-                secure = "; Secure" if public_origin.startswith("https:") else ""
-                cookie = f"{_COOKIE}={self._cookie}; Path={base or '/'}; HttpOnly; SameSite=Lax; Max-Age={_COOKIE_MAX_AGE}{secure}"
-                return _redirect(request.path + search, {"set-cookie": cookie})
+                return _redirect(request.path + search, {"set-cookie": sign_in_cookie()})
 
         def redirect_back() -> Response:
             referer = request.header("referer") or ""

@@ -5,12 +5,15 @@ Postgres store (a later release) numbers them."""
 
 from __future__ import annotations
 
+import json
+import math
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .. import _js
 from .._output import strip_json_nul, strip_nul
+from .._serialize import unreadable_definition
 from ..types import JobDefinition, JobState, Run, StoredJob
 
 __all__ = [
@@ -105,7 +108,8 @@ def statements(dialect: str, p: str) -> dict[str, str]:
         """The version inside a state's JSON, as state_version() reads it: a
         whole number from 0 to 2^53 - 1, else 0 (none, or a foreign row's 1.5
         or "x", which must neither fail the statement nor refuse every write
-        for good). Each CASE tests the JSON type before any cast."""
+        for good; on SQLite, also text that is not JSON). Each CASE tests the
+        JSON type before any cast."""
         if pg:
             v = f"({column}->>'version')::numeric"
             return (
@@ -113,8 +117,9 @@ def statements(dialect: str, p: str) -> dict[str, str]:
                 f"WHEN {v} % 1 = 0 AND {v} BETWEEN 0 AND 9007199254740991 THEN {v}::bigint ELSE 0 END"
             )
         v = f"json_extract({column}, '$.version')"
+        # Text that is not JSON at all (SQLite holds any) counts as 0 too, before json_type could fail on it.
         return (
-            f"CASE WHEN json_type({column}, '$.version') NOT IN ('integer', 'real') THEN 0 "
+            f"CASE WHEN NOT json_valid({column}) THEN 0 WHEN json_type({column}, '$.version') NOT IN ('integer', 'real') THEN 0 "
             f"WHEN {v} = CAST({v} AS INTEGER) AND {v} BETWEEN 0 AND 9007199254740991 THEN CAST({v} AS INTEGER) ELSE 0 END"
         )
 
@@ -210,43 +215,100 @@ def cas_update_params(state: JobState, expected_version: int) -> list[Any]:
     return [_json_text(state.to_dict()), state.job, expected_version]
 
 
+# Rows are read leniently: a foreign, hand-edited or damaged row (SQLite
+# keeps whatever type it is given, in any column) must affect only its own
+# job, never every read. JSON text that does not parse reads as None, which
+# the client takes as no state, or as an unreadable definition it reports.
+
+
+def _refuse_constant(name: str) -> Any:
+    raise ValueError(f"{name} is not JSON")
+
+
 def _json(value: Any) -> Any:
-    """SQLite hands back JSON as TEXT and Postgres as parsed JSONB."""
-    return _js.loads(value) if isinstance(value, (str, bytes)) else value
-
-
-def _num(value: Any) -> Any:
-    """Postgres returns BIGINT as a number already; text is read as a number."""
-    if value is None or isinstance(value, (int, float)):
+    """SQLite hands back JSON as TEXT and Postgres as parsed JSONB. Text that
+    is not JSON (JSON.parse would throw, so NaN and Infinity too) reads as None."""
+    if not isinstance(value, (str, bytes)):
         return value
-    text = str(value)
-    return int(text) if re.fullmatch(r"-?[0-9]+", text) else float(text)
+    try:
+        return json.loads(value, parse_constant=_refuse_constant)
+    except ValueError:  # JSONDecodeError and UnicodeDecodeError are ValueErrors
+        return None
+
+
+# What Number() reads from text, once trimmed: a decimal, or a 0x, 0o or 0b integer.
+_DECIMAL = re.compile(r"[+-]?(?:[0-9]+\.?[0-9]*|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+_RADIX = re.compile(r"0([xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)")
+
+
+def _read_number(value: Any) -> Any:
+    """A time, or a count of milliseconds, as a column holds it (text from
+    Postgres's BIGINT), read the way JavaScript's Number() reads it: None when
+    it is not a finite number."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value if _js.is_finite(value) else None
+    if not isinstance(value, str):
+        return None
+    text = _js.trim(value)
+    if not text:
+        return None
+    if re.fullmatch(r"-?[0-9]+", text):
+        n: Any = int(text)
+        return n if _js.is_finite(n) else None
+    radix = _RADIX.fullmatch(text)
+    if radix:
+        n = int(text, 0)
+        return n if _js.is_finite(n) else None
+    if not _DECIMAL.fullmatch(text):
+        return None
+    f = float(text)
+    if not math.isfinite(f):
+        return None
+    return int(f) if f.is_integer() and abs(f) <= _js.MAX_SAFE_INTEGER else f
+
+
+def _time(value: Any) -> Any:
+    """A time that must be there: one that is not a finite number reads as 0."""
+    n = _read_number(value)
+    return 0 if n is None else n
 
 
 def row_to_job(row: Any) -> StoredJob:
+    """A job's row. A definition that is not a JSON object (or whose text does
+    not parse) is held as an unreadable one, which the client reports (see
+    read_stored_job); a time that is not a finite number reads as 0."""
+    definition = _json(row["definition"])
     return StoredJob(
         name=row["name"],
-        definition=JobDefinition.from_dict(_json(row["definition"])),
-        created_at=_num(row["created_at"]),
-        updated_at=_num(row["updated_at"]),
+        definition=JobDefinition(definition) if isinstance(definition, Mapping) else unreadable_definition(row["name"]),
+        created_at=_time(row["created_at"]),
+        updated_at=_time(row["updated_at"]),
     )
 
 
 def row_to_run(row: Any) -> Run:
-    metrics = row["metrics"]
+    """A run's row. A start that is not a finite number reads as 0, a finish or
+    duration as None; an error or output that is not text as None; metrics
+    that do not parse to an object as {}; a trigger that is not text as "run"."""
+    metrics = _json(row["metrics"])
+    error, output, trigger = row["error"], row["output"], row["trigger"]
     return Run(
         id=row["id"],
         job=row["job"],
         status=row["status"],
-        started_at=_num(row["started_at"]),
-        finished_at=_num(row["finished_at"]),
-        duration_ms=_num(row["duration_ms"]),
-        error=row["error"],
-        output=row["output"],
-        metrics={} if metrics is None else dict(_json(metrics)),
-        trigger=row["trigger"],
+        started_at=_time(row["started_at"]),
+        finished_at=_read_number(row["finished_at"]),
+        duration_ms=_read_number(row["duration_ms"]),
+        error=error if isinstance(error, str) else None,
+        output=output if isinstance(output, str) else None,
+        metrics=dict(metrics) if isinstance(metrics, Mapping) else {},
+        trigger=trigger if isinstance(trigger, str) else "run",
     )
 
 
-def row_to_state(row: Any) -> JobState:
-    return JobState.from_dict(_json(row["state"]))
+def row_to_state(row: Any) -> JobState | None:
+    """A state's row, or None (no state) when it is not a JSON object."""
+    state = _json(row["state"])
+    return JobState.from_dict(state) if isinstance(state, Mapping) else None

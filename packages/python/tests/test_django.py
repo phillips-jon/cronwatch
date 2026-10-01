@@ -185,6 +185,16 @@ def test_debug_is_the_development_environment(capsys: pytest.CaptureFixture[str]
         assert locked.json() == {"ok": False, "error": "CRONWATCH_TOKEN is not set"}
 
 
+def test_a_token_setting_of_only_whitespace_counts_as_unset_and_falls_back_to_the_variable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CRONWATCH_TOKEN", " \t")
+    with override_settings(DEBUG=False, CRONWATCH={"CLIENT": fixed(), "TOKEN": "  "}):
+        assert Client().get(f"{BASE}/api/jobs", HTTP_AUTHORIZATION="Bearer  ").status_code == 503
+    cwdjango.reset()
+    monkeypatch.setenv("CRONWATCH_TOKEN", "from-env")
+    with override_settings(DEBUG=False, CRONWATCH={"CLIENT": fixed(), "TOKEN": "  "}):
+        assert Client().get(f"{BASE}/api/jobs", HTTP_AUTHORIZATION="Bearer from-env").status_code == 200
+
+
 def test_the_cronwatch_check_command_runs_one_check() -> None:
     cw = fixed()
     with override_settings(CRONWATCH={"CLIENT": cw}):

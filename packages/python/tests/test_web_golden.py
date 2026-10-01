@@ -129,7 +129,7 @@ def through_handle(web: Web, method: str, path: str, headers: dict[str, str], bo
 def test_the_json_api_and_pages_match_the_sdk_routes(deliver: Any) -> None:
     data = golden()
     assert data["t0"] == T0
-    assert len(data["captures"]) == 66
+    assert len(data["captures"]) == 82
     errors: list[str] = []
     cw = seed(errors)
     web = cw.routes(token="tok", base_path="/cronwatch")

@@ -49,7 +49,7 @@ def build():
     cronwatch.current().metric("pages", 14)
 ```
 
-`client=` is a client or a function returning one. In a Django project that uses [`cronwatch.django`](/docs/django/), leave it out and the settings' client is used; otherwise it is `cronwatch.client()`.
+`client=` is a client or a function returning one. In a Django project that uses [`cronwatch.django`](/docs/django/), leave it out and the settings' client is used; otherwise it is `cronwatch.client()`. A `CRONWATCH` setting the client cannot be made from (a `STORE` path with a typo, an unknown key) raises its error in the worker and fails the check task, rather than fall back to a client that keeps runs in worker memory.
 
 ## Tasks beat does not schedule
 

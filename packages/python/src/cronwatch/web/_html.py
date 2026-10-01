@@ -531,12 +531,13 @@ def job_page(job: JobSummary, runs: Sequence[Run], now: int, base: str, complete
 
 
 def message_page(title: str, message: str, base: str, sign_in: bool = False) -> str:
-    """A page with one message. With `sign_in`, a form under it takes the
-    token and sends it as ?token=, which the routes move into the cookie: the
-    way in where there is no address bar to open a link with, such as an app
-    on an iPhone's home screen, which keeps its cookies apart from Safari's."""
+    """A page with one message. With `sign_in`, a form under it posts the
+    token to <base>/signin in the body, keeping it out of the URL and access
+    logs, and the routes set the cookie: the way in where there is no address
+    bar to open a link with, such as an app on an iPhone's home screen, which
+    keeps its cookies apart from Safari's."""
     form = (
-        f'<form class="signin" method="get" action="{h(base)}/"><label for="token">Token</label>'
+        f'<form class="signin" method="post" action="{h(base)}/signin"><label for="token">Token</label>'
         '<input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required>'
         '<button class="primary" type="submit">Sign in</button></form>'
         if sign_in

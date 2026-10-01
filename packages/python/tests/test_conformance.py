@@ -364,7 +364,8 @@ def test_percentile_and_median() -> None:
 
 
 def test_normalize_state() -> None:
-    each_case(HEALTH["normalizeState"], lambda c: differs(c["normalized"], _evaluate.normalize_state(state_from(c["state"]), "j")))
+    # The stored JSON as it came: normalize_state takes any value, not only a state.
+    each_case(HEALTH["normalizeState"], lambda c: differs(c["normalized"], _evaluate.normalize_state(c["state"], "j")))
 
 
 def test_mute_opens() -> None:

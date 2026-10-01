@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import timedelta
 from typing import Any, Union
 
 from . import _js
 from ._duration import parse_duration
-from .types import JobDefinition
+from .types import JobDefinition, StoredJob
 
-__all__ = ["ExpectRule", "check_expectation", "describe_pattern", "to_stored"]
+__all__ = ["ExpectRule", "check_expectation", "describe_pattern", "is_readable", "read_stored_job", "to_stored", "unreadable_definition"]
 
 #: What a successful run's output must satisfy: a string it must contain, a
 #: compiled pattern it must match (re.search), or a function returning True.
@@ -52,6 +52,51 @@ def to_stored(definition: JobDefinition) -> JobDefinition:
         else:
             fields["expect"] = "custom function"
     return JobDefinition(fields)
+
+
+class _UnreadableDefinition(JobDefinition):
+    """The definition of a stored job whose own was not a JSON object: just
+    its name. The client reports such a job and shows it as failing, without
+    evaluating it."""
+
+    __slots__ = ()
+
+
+def unreadable_definition(name: str) -> JobDefinition:
+    """What a store reads for a job row whose definition is not a JSON object
+    (or whose text does not parse)."""
+    return _UnreadableDefinition({"name": name})
+
+
+def read_stored_job(stored: StoredJob) -> tuple[StoredJob, bool]:
+    """A stored job as the client reads it (serialize.ts readStoredJob), so a
+    foreign, hand-edited or damaged row affects only its own job. A
+    definition that is not a JSON object becomes ``{name}`` and ``readable``
+    is False. ``tags`` is kept only when it is a list of strings. Every other
+    field is kept as stored."""
+    definition: Any = stored.definition
+    if isinstance(definition, _UnreadableDefinition):
+        return stored, False
+    if isinstance(definition, JobDefinition):
+        fields = definition.fields
+    elif isinstance(definition, Mapping):
+        fields = JobDefinition(definition).fields
+    else:
+        return StoredJob(stored.name, unreadable_definition(stored.name), stored.created_at, stored.updated_at), False
+    tags = fields.get("tags", _ABSENT)
+    if tags is _ABSENT and isinstance(definition, JobDefinition):
+        return stored, True
+    if tags is not _ABSENT and not (isinstance(tags, list) and all(isinstance(t, str) for t in tags)):
+        del fields["tags"]
+    return StoredJob(stored.name, JobDefinition(fields), stored.created_at, stored.updated_at), True
+
+
+def is_readable(stored: StoredJob) -> bool:
+    """False for a stored job read_stored_job found unreadable."""
+    return not isinstance(stored.definition, _UnreadableDefinition)
+
+
+_ABSENT = object()
 
 
 def check_expectation(expect: ExpectRule | None, output: str | None) -> str | None:

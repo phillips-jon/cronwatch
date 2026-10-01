@@ -665,6 +665,40 @@ def test_without_trust_proxy_a_spoofed_forwarded_host_or_proto_changes_nothing()
     assert "Secure" not in go("GET", "/cronwatch/?token=tok", spoofed).headers["set-cookie"]
 
 
+def test_an_overlong_numeric_host_is_not_an_origin_and_never_a_500() -> None:
+    # Python refuses to read a decimal of more than 4300 digits; the parser
+    # must answer "not an origin" for it, as the URL parser does.
+    digits = "1" * 5000
+    assert _origin.bare(f"https://{digits}") is None
+    assert _origin.bare(f"https://{digits}.example") == f"https://{digits}.example"
+    assert _origin.bare(f"https://a.example:{'0' * 5000}443") == "https://a.example"
+    assert _origin.bare(f"https://a.example:{'0' * 5000}8080") == "https://a.example:8080"
+    assert _origin.bare(f"https://0x{'0' * 5000}7f.1") == "https://127.0.0.1"
+    assert _origin.bare(f"https://a.example:{digits}") is None
+    errors = Errors()
+    cw, _, _ = make(on_error=errors)
+    web = cw.routes(token="tok", base_path="/cronwatch", trust_proxy=True)
+    response = send(web, "GET", "http://app.test/cronwatch/?token=tok", {"x-forwarded-proto": "https", "x-forwarded-host": digits})
+    assert response.status == 303
+    assert "Secure" not in response.headers["set-cookie"], "the forwarded origin is ignored, so the request's own is used"
+    assert errors.items == []
+
+
+def test_in_development_a_first_request_with_an_overlong_numeric_host_still_prints_the_sign_in_line(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CRONWATCH_ENV", "development")
+    monkeypatch.delenv("CRONWATCH_TOKEN", raising=False)
+    errors = Errors()
+    cw, _, _ = make(on_error=errors)
+    web = cw.routes(base_path="/cronwatch", trust_proxy=True)
+    assert send(web, "GET", "http://localhost:3000/cronwatch/api/jobs", {"x-forwarded-host": "1" * 5000}).status == 401
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1
+    assert "Sign in: http://localhost:3000/cronwatch/?token=" in lines[0]
+    assert errors.items == []
+
+
 def test_a_mixed_case_host_matches_the_browsers_lowercase_origin() -> None:
     cw, _, go = behind("http://App.Example.com")
     cw.run("x", lambda ctx: None)
@@ -858,15 +892,44 @@ def test_the_sign_in_page_takes_the_token_in_a_form() -> None:
     _, _, web = app(base_path="/ops/cron")
     page = send(web, "GET", "/ops/cron/jobs/x")
     assert page.status == 401
+    # It posts the token in the body, so the token never sits in a URL or an access log.
     assert re.search(
-        r'<form class="signin" method="get" action="/ops/cron/"><label for="token">Token</label><input id="token" name="token" '
+        r'<form class="signin" method="post" action="/ops/cron/signin"><label for="token">Token</label><input id="token" name="token" '
         r'type="password" autocomplete="current-password"[^>]*required><button class="primary" type="submit">Sign in</button></form>',
         page.text,
     )
-    res = send(web, "GET", "/ops/cron/?token=tok")
-    assert (res.status, res.headers["location"]) == (303, "/ops/cron/")
-    assert "; Path=/ops/cron; HttpOnly; SameSite=Lax" in res.headers["set-cookie"]
+
+    def post(body: str, headers: dict[str, str] | None = None) -> WebResponse:
+        return send(web, "POST", "/ops/cron/signin", {"content-type": "application/x-www-form-urlencoded", **(headers or {})}, body)
+
+    # Back to the page it was posted from, with the cookie.
+    res = post("token=tok", {"origin": "http://app.test", "referer": "http://app.test/ops/cron/jobs/x?view=all"})
+    assert (res.status, res.headers["location"]) == (303, "http://app.test/ops/cron/jobs/x?view=all")
+    assert re.fullmatch(r"cronwatch_token=[0-9a-f]{64}; Path=/ops/cron; HttpOnly; SameSite=Lax; Max-Age=2592000", res.headers["set-cookie"])
+    # To the dashboard when the page came from elsewhere, had none, or carried a ?token=.
+    for referer in [None, "https://evil.example/ops/cron/jobs/x", "http://app.test/ops/cron/?token=wrong", "http://app.test/ops/cron/?a=1&token="]:
+        r = post("token=tok", {} if referer is None else {"referer": referer})
+        assert (r.status, r.headers["location"]) == (303, "/ops/cron/"), referer
+    # A wrong or missing token is the sign-in page again, with no cookie.
+    for body in ["token=wrong", "", "other=tok"]:
+        r = post(body)
+        assert r.status == 401, body
+        assert "set-cookie" not in r.headers, body
+        assert 'class="signin"' in r.text
+    # A cross-site post is refused before the token is looked at.
+    cross = post("token=tok", {"origin": "https://evil.example"})
+    assert cross.status == 403
+    assert "set-cookie" not in cross.headers
+    # The ?token= link still signs in, for the development sign-in line.
+    link = send(web, "GET", "/ops/cron/?token=tok")
+    assert (link.status, link.headers["location"]) == (303, "/ops/cron/")
+    assert "; Path=/ops/cron; HttpOnly; SameSite=Lax" in link.headers["set-cookie"]
+    # Other pages do not carry the form.
     assert 'class="signin"' not in send(web, "GET", "/ops/cron/offline").text
+    # With the routes open there is nothing to sign in to.
+    _, _, open_web = app(token=None, base_path="/ops/cron")
+    none = send(open_web, "POST", "/ops/cron/signin", {"content-type": "application/x-www-form-urlencoded"}, "token=tok")
+    assert none.status == 404
 
 
 # ------------------------------------------------------------ routes-timeline.test.ts

@@ -564,17 +564,18 @@ def _run_id(task_id: str | None) -> str | None:
 
 
 def _default_client() -> Cronwatch:
-    """The Django integration's client in a Django project that uses it, else cronwatch.client()."""
+    """The Django integration's client in a Django project that uses it, else
+    cronwatch.client(). Only Django settings that are not configured fall
+    back: a client the settings fail to make (a STORE path with a typo, an
+    unknown key, a store factory that raises) raises here, naming the
+    setting, rather than be replaced by one that records into worker memory."""
     django = sys.modules.get("cronwatch.django")
     if django is not None:
-        try:
-            from django.conf import settings
+        from django.conf import settings
 
-            if settings.configured:
-                made: Cronwatch = django.client()
-                return made
-        except Exception:
-            pass
+        if settings.configured:
+            made: Cronwatch = django.client()
+            return made
     return cronwatch.client()
 
 

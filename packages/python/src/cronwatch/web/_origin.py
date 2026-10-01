@@ -71,7 +71,17 @@ def _shown(value: object) -> str:
 
 def read(value: str) -> tuple[str, bool]:
     """(origin, whether anything past the host would show in the URL: a path
-    other than "/", credentials, a query or a fragment)."""
+    other than "/", credentials, a query or a fragment). Raises InvalidOrigin
+    for anything that is not one, never another error."""
+    try:
+        return _read(value)
+    except (InvalidOrigin, _NotHttp):
+        raise
+    except ValueError:  # a conversion this parser did not foresee
+        raise InvalidOrigin from None
+
+
+def _read(value: str) -> tuple[str, bool]:
     text = _EDGES.sub("", value).replace("\t", "").replace("\n", "").replace("\r", "")
     match = _SCHEME.match(text)
     if not match:
@@ -116,9 +126,12 @@ def _split_port(authority: str) -> tuple[str, int | None]:
         return host, None
     if not rest.startswith(":") or not _DIGITS.match(rest[1:]):
         raise InvalidOrigin
-    port = int(rest[1:])
-    if port > 65_535:
+    # Leading zeros are allowed; past them, more than five digits is no port
+    # (and Python will not read a decimal of more than 4300 digits at all).
+    digits = rest[1:].lstrip("0") or "0"
+    if len(digits) > 5 or int(digits) > 65_535:
         raise InvalidOrigin
+    port = int(digits)
     return host, port
 
 
@@ -169,10 +182,12 @@ def _ipv4(host: str) -> str | None:
 def _number(part: str) -> int:
     if part == "":
         raise InvalidOrigin
+    # Read without leading zeros, and a decimal of more than ten digits (past
+    # any address, and past the 4300 digits Python will read) as too large.
     if _HEX.match(part):
-        return 0 if len(part) == 2 else int(part[2:], 16)
+        return int(part[2:].lstrip("0") or "0", 16)
     if _OCTAL.match(part):
-        return int(part, 8)
+        return int(part.lstrip("0") or "0", 8)
     if _DIGITS.match(part) and (part == "0" or not part.startswith("0")):
-        return int(part)
+        return int(part) if len(part) <= 10 else 2**40
     raise InvalidOrigin

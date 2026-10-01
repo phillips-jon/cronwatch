@@ -100,6 +100,9 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - An `Authorization` header that is not a bearer, such as a proxy's Basic auth, no longer locks the dashboard: the cookie and `?token=` sign in as if no header came.
 - pg_cron: forgetting the old name of a renamed job while a run of it is open lets the run go, where every check after reported `job is not declared`.
 - Ruby: the channels' HTTP client reads at most 1 MiB of an answer's body, and none of a 2xx answer's, where it read everything that came within the 10 second deadline, so a hostile or broken endpoint could stream gigabytes into the worker.
+- Python: Celery in a Django project no longer falls back to a client in worker memory when the `CRONWATCH` settings fail to make one (a `STORE` path with a typo, an unknown key, a store factory that raises): the error is raised, so the check task fails naming it, where every run was kept in memory and lost and the check reported success. Only Django settings that are not configured fall back to `cronwatch.client()`.
+- Python: a `DATABASE_URL` (or pg_cron connection string) that libpq cannot read, such as a password with a stray `%`, is reported naming only its host, where libpq's error quoted the password to `on_error` and the log on every check and run.
+- Python: a host or forwarded host of more than 4300 digits is not an origin, where Python's limit on reading such a number made the dashboard answer 500 (and, in development, could keep the sign-in line from being printed).
 
 ## 0.10.0 and earlier
 

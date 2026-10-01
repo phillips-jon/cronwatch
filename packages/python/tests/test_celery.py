@@ -299,6 +299,36 @@ def test_the_default_client_is_the_process_client(monkeypatch: pytest.MonkeyPatc
     assert [r.job for r in made.runs("e.default")] == ["e.default"]
 
 
+def test_a_django_client_that_fails_to_load_is_not_replaced_by_one_in_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A typo in settings.CRONWATCH (a STORE path, an unknown key) must be
+    # heard, not quietly swapped for a client that records into worker memory.
+    from types import SimpleNamespace
+
+    def broken() -> Any:
+        raise ImportError("CRONWATCH['STORE']: no module named 'myapp.monitoring'")
+
+    monkeypatch.setitem(sys.modules, "cronwatch.django", SimpleNamespace(client=broken))
+    monkeypatch.setattr("django.conf.settings", SimpleNamespace(configured=True))
+    fallback = cronwatch.configure(alerts=[], cron_secret=None)
+    with pytest.raises(ImportError, match="myapp.monitoring"):
+        cwcelery._default_client()
+    app = new_app()
+    result = app.tasks[CHECK_TASK].apply()
+    assert result.failed()
+    assert "myapp.monitoring" in str(result.result)
+    # A watched task still runs: Celery logs the error its signal handler raised.
+    install(app, tasks={"e.broken": {}})
+
+    @app.task(shared=False, name="e.broken")
+    def work() -> int:
+        return 3
+
+    assert work.apply().get() == 3
+    # Only Django settings that are not configured at all leave the process's client.
+    monkeypatch.setattr("django.conf.settings", SimpleNamespace(configured=False))
+    assert cwcelery._default_client() is fallback
+
+
 # ---------------------------------------------------------------- a real worker, in this process
 
 

@@ -30,6 +30,7 @@ try:
 except ImportError as error:  # pragma: no cover, the message is tested in a subprocess
     raise ImportError(f'cronwatch.stores.postgres needs psycopg 3.2 or newer: pip install "cronwatch-sdk[postgres]" ({error})') from error
 
+from .. import _pg
 from .._deprecated import names as _deprecated_names
 from ..types import JobDefinition, JobState, Run, RunStatus, StoredJob
 from . import _sql
@@ -67,7 +68,7 @@ class PostgresStore:
                 self._connection.close()
             except Exception:  # noqa: BLE001, a broken connection may not close cleanly
                 pass
-        self._connection = psycopg.connect(self._conninfo, autocommit=True, row_factory=dict_row, cursor_factory=psycopg.RawCursor)
+        self._connection = _pg.connect(psycopg, self._conninfo, autocommit=True, row_factory=dict_row, cursor_factory=psycopg.RawCursor)
         return self._connection
 
     @contextmanager

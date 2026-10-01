@@ -24,7 +24,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
 
-from . import _js, _zone
+from . import _env, _js, _zone
 from ._env import is_production
 from ._response import response_status
 from .alerts import ChannelContext, Console, _channel_name, _send_to
@@ -59,7 +59,7 @@ from ._job import AbortSignal, JobContext, RunRecorder, _current
 from ._output import cap_output, describe_error, redact_and_cap, redact_secrets
 from ._run_handle import RunHandle, _Retry
 from ._schedule import parse_schedule
-from ._serialize import check_expectation, to_stored
+from ._serialize import check_expectation, is_readable, read_stored_job, to_stored
 from .stores.memory import MemoryStore
 from .types import (
     Alert,
@@ -557,7 +557,8 @@ class Cronwatch:
     sources:  where runs this process does not wrap come from. Each is synced at the start of every
               check(); one that raises is reported to on_error and the check carries on.
     cron_secret: the secret an outside cron must present to the check endpoint of the web dashboard
-              (routes()). Defaults to $CRON_SECRET; "" counts as unset; None for none.
+              (routes()). Defaults to $CRON_SECRET; "" or only whitespace, given or in the variable, counts as
+              unset; None for none. Anything else (False, a number) raises TypeError.
     retention: how long finished runs are kept. Default "30d".
     defaults: grace, timeout, timezone and failures_before_alert applied to every job unless it sets its own.
     redact:   applied to every run's output and error before it is stored, shown or sent. The default
@@ -594,8 +595,10 @@ class Cronwatch:
         for source in self.sources:
             if not callable(getattr(source, "sync", None)):
                 raise TypeError("a source must have sync(host)")
-        secret = os.environ.get("CRON_SECRET") if cron_secret is _UNSET else cron_secret
-        self.cron_secret: str | None = str(secret) if secret else None
+        # A blank secret, given or read, counts as unset; one given that is not a string raises.
+        given = _env.secret_option(cron_secret, "cron_secret", _UNSET)
+        secret = _env.read_secret_env("CRON_SECRET") if cron_secret is _UNSET else given
+        self.cron_secret: str | None = secret if isinstance(secret, str) else None
         #: cron_secret was passed as None: handlers may run without a secret.
         self._secret_opt_out = cron_secret is None
         self._warned_no_secret = False
@@ -797,7 +800,7 @@ class Cronwatch:
         stored = self.store.get_job(name)
         if stored is None:
             return None
-        return self._snapshot(stored, self.now(), 0).job
+        return self._snapshot(self._read_job(stored), self.now(), 0).job
 
     def runs(self, name: str, limit: int = 50) -> list[Run]:
         """A job's runs, newest first. `limit` is a whole number from 1 to 500."""
@@ -1069,7 +1072,7 @@ class Cronwatch:
         listed = {job.name for job in jobs}
         missing = [definition for definition in self.defined_jobs() if definition.name not in listed]
         if not missing:
-            return jobs
+            return [self._read_job(job) for job in jobs]
         for definition in missing:
             with self._registry:
                 # Not one forgotten here meanwhile.
@@ -1078,7 +1081,20 @@ class Cronwatch:
                 self._synced.discard(definition.name)
             self._sync(definition)
         again: list[StoredJob] = self.store.list_jobs()
-        return again
+        return [self._read_job(job) for job in again]
+
+    @staticmethod
+    def _read_job(stored: StoredJob) -> StoredJob:
+        """A stored job read leniently (see read_stored_job): one whose
+        definition is unreadable keeps only its name, and evaluating it raises."""
+        return read_stored_job(stored)[0]
+
+    @staticmethod
+    def _evaluable(stored: StoredJob) -> None:
+        """Raises for a job whose stored definition was not a JSON object:
+        reported, and shown as failing, while the others carry on."""
+        if not is_readable(stored):
+            raise ValueError(f'job "{stored.name}": its stored definition is not a JSON object')
 
     def _serial(self, job: str, syncing: bool = False) -> threading.RLock:
         """The job's lock: two runs (or a run and a check) in this process never
@@ -1547,7 +1563,10 @@ class Cronwatch:
                 if declared is not None:
                     judged: JobDefinition | None = to_stored(declared)
                 else:
-                    stored_job = self.store.get_job(listed.job)
+                    found = self.store.get_job(listed.job)
+                    stored_job = self._read_job(found) if found is not None else None
+                    if stored_job is not None:
+                        self._evaluable(stored_job)
                     judged = stored_job.definition if stored_job else None
                 if judged is None or not is_stuck(judged, listed, at):
                     continue
@@ -1574,6 +1593,7 @@ class Cronwatch:
         retries = [0.0]
         for stored in self._stored_jobs():
             try:
+                self._evaluable(stored)
                 recent = self.store.list_runs(stored.name, BASELINE_WINDOW)
                 expected: list[int | None] = [None]
 
@@ -1609,6 +1629,7 @@ class Cronwatch:
         recent: list[Run] = []
         try:
             recent = self.store.list_runs(stored.name, max(count, BASELINE_WINDOW))
+            self._evaluable(stored)
             state = self._read_state(stored.name)
             next_expected_at = on_check(stored.definition, stored, recent[0] if recent else None, state, at).next_expected_at
             return JobWithRuns(job=summarize(stored, recent, state, next_expected_at, at), runs=recent[:count])
@@ -1626,7 +1647,10 @@ class Cronwatch:
             state = self._read_state(stored.name)
         except Exception:
             state = empty_state(stored.name)
-        return unevaluable_summary(stored, recent, state, at)
+        try:
+            return unevaluable_summary(stored, recent, state, at)
+        except Exception:  # noqa: BLE001, the fallback must not fail the whole check or page
+            return unevaluable_summary(stored, recent, empty_state(stored.name), at)
 
     def _dispatch(self, name: str, alerts: list[Alert], at: int) -> list[Alert]:
         """Triage and send each alert the outbox holds (see _outbox()). The
