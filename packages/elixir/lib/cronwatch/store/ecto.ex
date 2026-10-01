@@ -195,20 +195,11 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       with {:ok, _} <- query(h, sql, params), do: :ok
     end
 
+    # Each row read by `fun`, which reads any row leniently and never fails.
     defp rows(h, sql, params, fun) do
       with {:ok, %{columns: columns, rows: rows}} <- query(h, sql, params) do
         keys = Enum.map(columns, &String.downcase/1)
-
-        Enum.reduce_while(rows, {:ok, []}, fn row, {:ok, acc} ->
-          case fun.(Enum.zip(keys, row)) do
-            {:ok, v} -> {:cont, {:ok, [v | acc]}}
-            {:error, _} = e -> {:halt, e}
-          end
-        end)
-        |> case do
-          {:ok, list} -> {:ok, Enum.reverse(list)}
-          e -> e
-        end
+        {:ok, Enum.map(rows, &fun.(Enum.zip(keys, &1)))}
       end
     end
 
@@ -260,14 +251,39 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       end
     end
 
-    # A column as a whole number, nil for NULL: text is read as a number, a
-    # fraction is cut to its whole part, and anything past 64 bits is held
-    # at the ends.
-    defp int(row, key) do
-      case List.keyfind(row, key, 0) do
-        {_, nil} ->
+    # Rows are read leniently: a foreign, hand-edited or damaged row (SQLite
+    # keeps whatever type it is given, in any column) must affect only its
+    # own job, never every read. JSON text that does not parse reads as nil,
+    # which the client takes as no state, or as an unreadable definition it
+    # reports.
+    defp json(row, key) do
+      case text(row, key) do
+        nil ->
           nil
 
+        t ->
+          case JS.parse(t) do
+            {:ok, v} -> v
+            {:error, _} -> nil
+          end
+      end
+    end
+
+    # A column that holds text: a string as it is (a blob too, which the
+    # driver hands over as one), anything else nil.
+    defp string(row, key) do
+      case List.keyfind(row, key, 0) do
+        {_, v} when is_binary(v) -> JS.scrub(v)
+        _ -> nil
+      end
+    end
+
+    # A time, or a count of milliseconds, as a whole number, or nil when it
+    # is not a finite number: text is read as JavaScript's Number() reads it
+    # (Postgres's BIGINT can arrive as text), a fraction is cut to its whole
+    # part, and anything past 64 bits is held at the ends.
+    defp time(row, key) do
+      case List.keyfind(row, key, 0) do
         {_, v} when is_integer(v) ->
           v |> max(@min_int) |> min(@max_int)
 
@@ -275,17 +291,15 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
           JS.to_int(v)
 
         {_, v} when is_binary(v) ->
-          t = String.trim(v)
+          t = JS.trim(v)
 
           case Integer.parse(t) do
             {n, ""} ->
               n |> max(@min_int) |> min(@max_int)
 
             _ ->
-              case Float.parse(t) do
-                {f, ""} -> JS.to_int(f)
-                _ -> 0
-              end
+              n = if t == "", do: :nan, else: Cronwatch.Evaluate.js_number(t)
+              if JS.finite?(n), do: JS.to_int(n)
           end
 
         _ ->
@@ -293,74 +307,55 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       end
     end
 
+    # A job's row. Its definition is as stored, or nil when its text does not
+    # parse; the client reads the rest (Cronwatch.Serialize.read_stored_job).
+    # A time that is not a finite number reads as 0.
     defp job_of(row) do
-      name = text(row, "name") || ""
-
-      # JSON of another shape (another writer's, or a hand edit) is a
-      # definition with nothing in it, as the SDK reads it: one such row must
-      # not fail every read of the jobs, and with it every check.
-      case JS.parse(text(row, "definition") || "") do
-        {:ok, v} ->
-          definition = if match?(%Object{}, v), do: v, else: Object.new()
-
-          {:ok,
-           %StoredJob{
-             name: name,
-             definition: definition,
-             created_at: int(row, "created_at") || 0,
-             updated_at: int(row, "updated_at") || 0
-           }}
-
-        {:error, e} ->
-          {:error, %RuntimeError{message: "job #{name}: #{e}"}}
-      end
+      %StoredJob{
+        name: text(row, "name") || "",
+        definition: json(row, "definition"),
+        created_at: time(row, "created_at") || 0,
+        updated_at: time(row, "updated_at") || 0
+      }
     end
 
+    # A run's row. A start that is not a finite number reads as 0, a finish
+    # or duration as nil; an error or output that is not text as nil;
+    # metrics that do not parse to an object as {} (and an object keeps the
+    # values that are numbers); a trigger that is not text as "run".
     defp run_of(row) do
-      id = text(row, "id") || ""
-
-      # Metrics another writer stored that are not all numbers keep the ones
-      # that are, so one such row (a running one especially, which every
-      # check reads) cannot fail the reads it is part of.
       metrics =
-        case text(row, "metrics") do
-          nil ->
-            {:ok, Object.new()}
-
-          t ->
-            case JS.parse(t) do
-              {:ok, v} ->
-                case Metrics.from_value(v) do
-                  {:ok, m} -> {:ok, m}
-                  {:error, _} -> {:ok, Metrics.lenient(v)}
-                end
-
-              {:error, e} ->
-                {:error, %RuntimeError{message: "run #{id}: #{e}"}}
+        case json(row, "metrics") do
+          %Object{} = v ->
+            case Metrics.from_value(v) do
+              {:ok, m} -> m
+              {:error, _} -> Metrics.lenient(v)
             end
+
+          _ ->
+            Object.new()
         end
 
-      with {:ok, metrics} <- metrics do
-        {:ok,
-         %Run{
-           id: id,
-           job: text(row, "job") || "",
-           status: text(row, "status") || "",
-           started_at: int(row, "started_at") || 0,
-           finished_at: int(row, "finished_at"),
-           duration_ms: int(row, "duration_ms"),
-           error: text(row, "error"),
-           output: text(row, "output"),
-           metrics: metrics,
-           trigger: text(row, "trigger") || ""
-         }}
-      end
+      %Run{
+        id: text(row, "id") || "",
+        job: text(row, "job") || "",
+        status: text(row, "status") || "",
+        started_at: time(row, "started_at") || 0,
+        finished_at: time(row, "finished_at"),
+        duration_ms: time(row, "duration_ms"),
+        error: string(row, "error"),
+        output: string(row, "output"),
+        metrics: metrics,
+        trigger: string(row, "trigger") || "run"
+      }
     end
 
+    # A state's row, or nil (no state) when its text does not parse or is
+    # not an object; each field is read leniently (JobState.from_value).
     defp state_of(row) do
-      case JobState.from_json(text(row, "state") || "") do
-        {:ok, s} -> {:ok, s}
-        {:error, e} -> {:error, %RuntimeError{message: "state: #{e}"}}
+      case JobState.from_value(json(row, "state")) do
+        {:ok, s} -> s
+        {:error, _} -> nil
       end
     end
 

@@ -183,6 +183,122 @@ defmodule Cronwatch.Web.EnvTest do
     refute inspect(Cronwatch.Web.init(token: "secret-token")) =~ "secret-token", "the token is never inspected"
   end
 
+  # Blank as JavaScript's trim sees it: U+FEFF and U+00A0 are spaces there,
+  # U+0085 is not.
+  @blanks ["", " ", "  ", "\t", " \n  ﻿ "]
+
+  test "blank, as JavaScript's trim sees it" do
+    for blank <- @blanks ++ [" ", " ", "﻿", "　"] do
+      assert Cronwatch.Env.secret(blank) == nil, inspect(blank)
+    end
+
+    assert Cronwatch.Env.secret("\u0085") == "\u0085"
+    assert Cronwatch.Env.secret(" padded ") == " padded ", "used untrimmed"
+  end
+
+  test "a CRONWATCH_TOKEN or token of only whitespace counts as unset, so the routes stay locked" do
+    %{cw: cw} = make()
+
+    locked = fn opts, what ->
+      assert send(opts, "GET", "http://app.test/cronwatch/api/jobs").status == 503, what
+
+      for blank <- @blanks do
+        page = send(opts, "GET", "http://app.test/cronwatch/?token=" <> URI.encode_www_form(blank), [])
+        assert page.status == 503, what
+        assert header(page, "set-cookie") == nil, what
+      end
+
+      res = send(opts, "GET", "http://app.test/cronwatch/api/jobs", [{"authorization", "Bearer  "}])
+      assert res.status == 503, what
+    end
+
+    for blank <- @blanks do
+      with_env([{"CRONWATCH_ENV", "production"}, {"CRONWATCH_TOKEN", blank}], fn ->
+        assert Cronwatch.Web.token(instance: cw) == nil
+        locked.([instance: cw], "CRONWATCH_TOKEN=#{inspect(blank)}")
+      end)
+
+      with_env([{"CRONWATCH_ENV", "production"}, {"MY_TOKEN", blank}], fn ->
+        locked.([instance: cw, token: {:system, "MY_TOKEN"}], "MY_TOKEN=#{inspect(blank)}")
+      end)
+
+      with_env([{"CRONWATCH_ENV", "production"}], fn ->
+        locked.([instance: cw, token: blank], "token: #{inspect(blank)}")
+      end)
+
+      # A blank token in code falls back to the variable.
+      with_env([{"CRONWATCH_ENV", "production"}, {"CRONWATCH_TOKEN", "from-env"}], fn ->
+        res =
+          send([instance: cw, token: blank], "GET", "http://app.test/cronwatch/api/jobs", [
+            {"authorization", "Bearer from-env"}
+          ])
+
+        assert res.status == 200, inspect(blank)
+      end)
+    end
+
+    System.delete_env("MY_TOKEN")
+
+    # Any other value is used as it is, untrimmed.
+    with_env([{"CRONWATCH_ENV", "production"}, {"CRONWATCH_TOKEN", " padded "}], fn ->
+      assert send([instance: cw], "GET", "http://app.test/cronwatch/?token=%20padded%20").status == 303
+      assert send([instance: cw], "GET", "http://app.test/cronwatch/?token=padded").status == 401
+    end)
+  end
+
+  test "a CRON_SECRET or secret of only whitespace counts as unset" do
+    bearer = fn h, value ->
+      Plug.Test.conn("POST", "/")
+      |> Plug.Conn.put_req_header("authorization", "Bearer " <> value)
+      |> Cronwatch.Handler.call(h)
+    end
+
+    handler = fn cw, opts ->
+      Cronwatch.Handler.init([instance: cw, job: "closed", run: {Cronwatch.Test.Handlers, :count, [self()]}] ++ opts)
+    end
+
+    for blank <- ["", " ", "\t\n", " ﻿"] do
+      # From the variable, and given in code: no secret, so 503 and one report.
+      for {env, opts} <- [{[{"CRON_SECRET", blank}], [cron_secret: nil]}, {[], [cron_secret: blank]}] do
+        with_env([{"CRONWATCH_ENV", "production"} | env], fn ->
+          %{cw: cw, errors: errors} = make(opts)
+          assert Routes.cron_secret(Cronwatch.Config.get(cw)) == nil, inspect({env, opts})
+          h = handler.(cw, [])
+          assert call(h).status == 503
+          assert bearer.(h, blank).status == 503
+          refute_received :ran
+          assert wheres(errors) == ["handler"], "reported once"
+
+          # A blank secret of the handler's own falls back to the instance's.
+          assert call(handler.(cw, secret: blank)).status == 503
+        end)
+      end
+
+      # A blank cron_secret given in code does not fall back to the variable.
+      with_env([{"CRONWATCH_ENV", "production"}, {"CRON_SECRET", "from-env"}], fn ->
+        %{cw: cw} = make(cron_secret: blank)
+        assert bearer.(handler.(cw, []), "from-env").status == 503
+      end)
+
+      # With cron_secret: false and a blank secret of its own, the job runs.
+      with_env([{"CRONWATCH_ENV", "production"}], fn ->
+        %{cw: cw} = make(cron_secret: false)
+        assert call(handler.(cw, secret: blank)).status == 200
+        assert_received :ran
+      end)
+    end
+
+    # /api/check takes no blank cron secret, and the token is not it.
+    with_env([{"CRONWATCH_ENV", "production"}, {"CRON_SECRET", "  "}], fn ->
+      %{cw: cw} = make(cron_secret: nil)
+      opts = [instance: cw, token: "tok"]
+      res = send(opts, "POST", "http://app.test/cronwatch/api/check", [{"authorization", "Bearer   "}])
+      assert res.status == 401
+    end)
+  end
+
+  defp call(h), do: Cronwatch.Handler.call(Plug.Test.conn("GET", "/"), h)
+
   test "the sign-in line shows the host only when configured or loopback" do
     %{cw: cw} = make()
     internal = "http://10.0.0.5:8080"
@@ -252,8 +368,6 @@ defmodule Cronwatch.Web.EnvTest do
     defp handler(cw, opts \\ []) do
       Cronwatch.Handler.init([instance: cw, job: "closed", run: {Cronwatch.Test.Handlers, :count, [self()]}] ++ opts)
     end
-
-    defp call(h), do: Cronwatch.Handler.call(Plug.Test.conn("GET", "/"), h)
 
     test "fails closed outside development, and reports it once" do
       with_env([], fn ->

@@ -170,7 +170,8 @@ defmodule Cronwatch.Store.SQL do
       else
         v = "json_extract(#{column}, '$.version')"
 
-        "CASE WHEN json_type(#{column}, '$.version') NOT IN ('integer', 'real') THEN 0 " <>
+        "CASE WHEN NOT json_valid(#{column}) THEN 0 " <>
+          "WHEN json_type(#{column}, '$.version') NOT IN ('integer', 'real') THEN 0 " <>
           "WHEN #{v} = CAST(#{v} AS INTEGER) AND #{v} BETWEEN 0 AND 9007199254740991 THEN CAST(#{v} AS INTEGER) ELSE 0 END"
       end
     end
@@ -185,7 +186,16 @@ defmodule Cronwatch.Store.SQL do
          "id, job, status, started_at, finished_at, duration_ms, error, output, metrics::text AS metrics, trigger",
          "state::text AS state"}
       else
-        {"*", "*", "state"}
+        # A time SQLite holds as an infinite REAL (text such as "1e400" in
+        # an INTEGER column becomes one) reads as NULL, since the driver
+        # cannot hand it over; it is not a finite number either way.
+        finite = fn c ->
+          "CASE WHEN typeof(#{c}) <> 'real' THEN #{c} WHEN abs(#{c}) > 1.7976931348623157e308 THEN NULL ELSE #{c} END AS #{c}"
+        end
+
+        {"name, definition, #{finite.("created_at")}, #{finite.("updated_at")}",
+         "id, job, status, #{finite.("started_at")}, #{finite.("finished_at")}, #{finite.("duration_ms")}, " <>
+           "error, output, metrics, trigger", "state"}
       end
 
     %{

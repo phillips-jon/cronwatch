@@ -29,7 +29,7 @@ defmodule Cronwatch.Alerts.Discord do
   alias Cronwatch.JS.Object
   alias Cronwatch.JS.Units
 
-  @derive {Inspect, except: [:webhook_url]}
+  @derive {Inspect, except: [:webhook_url, :transport]}
   defstruct [:webhook_url, link: nil, transport: nil]
 
   @type t :: %__MODULE__{webhook_url: String.t(), link: (Alert.t() -> String.t()) | nil, transport: term()}

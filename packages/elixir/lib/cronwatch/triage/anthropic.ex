@@ -66,7 +66,7 @@ defmodule Cronwatch.Triage.Anthropic do
 
   @known [:api_key, :model, :effort, :max_tokens, :fallbacks, :context, :base_url, :transport]
 
-  @derive {Inspect, except: [:api_key]}
+  @derive {Inspect, except: [:api_key, :transport]}
   defstruct api_key: nil,
             model: @default_model,
             effort: @default_effort,

@@ -21,6 +21,7 @@ defmodule Cronwatch.Evaluate do
   alias Cronwatch.Schedule
   alias Cronwatch.Stats
   alias Cronwatch.StoredJob
+  alias Cronwatch.Types.Read
 
   @default_grace_ms 10 * 60_000
   @default_timeout_ms 60 * 60_000
@@ -38,7 +39,12 @@ defmodule Cronwatch.Evaluate do
 
   def empty_state(job), do: %JobState{job: job, pending_recovery: [], undelivered: []}
 
-  @doc "A stored state with every field present, or a fresh one."
+  @doc """
+  A stored state with every field present, or a fresh one. Read leniently,
+  since a foreign, hand-edited or damaged row must affect only its own job:
+  a value that is not an object reads as no state, and each field of the
+  wrong shape as its empty value (see `Cronwatch.JobState.from_value/1`).
+  """
   def normalize_state(nil, job), do: empty_state(job)
 
   def normalize_state(%JobState{} = s, job) do
@@ -51,6 +57,13 @@ defmodule Cronwatch.Evaluate do
         sending: if(s.sending in [nil, []], do: nil, else: s.sending)
     }
   end
+
+  def normalize_state(%Object{} = o, job) do
+    {:ok, s} = JobState.from_value(o)
+    normalize_state(s, job)
+  end
+
+  def normalize_state(_other, job), do: empty_state(job)
 
   ## Delivery: the outbox
 
@@ -596,11 +609,37 @@ defmodule Cronwatch.Evaluate do
   Whether an alert waiting to be retried no longer describes the job, so it
   is dropped rather than sent late.
   """
-  def stale_alert?(%{type: "recovered", details: details}, state) do
-    Enum.any?(Map.get(details, :after, []), &(JobState.open_at(state, &1) != nil))
+  def stale_alert?(%Alert{type: "recovered"} = alert, state) do
+    # One whose details say nothing of what it recovers from (a foreign or
+    # damaged row's) cannot be judged, and goes.
+    case recovered_after(alert) do
+      :none -> true
+      after_list -> Enum.any?(after_list, &(JobState.open_at(state, &1) != nil))
+    end
   end
 
-  def stale_alert?(%{type: type, at: at}, state), do: JobState.open_at(state, type) != at
+  # One with no time (a foreign or damaged row's) cannot match an open
+  # condition.
+  def stale_alert?(%Alert{type: type, at: at} = alert, state),
+    do: not numeric_at?(alert) or JobState.open_at(state, type) != at
+
+  # What a recovery recovers from, as it was read: :none unless its details
+  # are an object whose `after` is a list of strings.
+  defp recovered_after(%Alert{value: %Object{} = o}) do
+    with %Object{} = details <- Object.get(o, "details"),
+         list when is_list(list) <- Object.get(details, "after"),
+         true <- Enum.all?(list, &is_binary/1) do
+      list
+    else
+      _ -> :none
+    end
+  end
+
+  defp recovered_after(%Alert{details: %{after: list}}) when is_list(list), do: list
+  defp recovered_after(_), do: :none
+
+  defp numeric_at?(%Alert{value: %Object{} = o}), do: Read.number?(Object.get(o, "at"))
+  defp numeric_at?(%Alert{at: at}), do: is_number(at)
 
   @doc "How a job looks at a glance. Silence wins, then stuck, failing and late."
   def job_health(def, last_run, state, now) do

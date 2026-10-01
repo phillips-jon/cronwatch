@@ -119,6 +119,10 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - Go: a queued alert's run keeps the fields a newer release added to it (an `attempt`, say) when the state is written back, as the alert's own fields and its details already did.
 - Go: an alert of a type the release does not know leaves out Datadog's `alert_type`, Honeybadger's error class and Discord's embed colour, as the SDK does, where it sent them empty (or a colour of 0).
 - Rust: a scheduler integration's worker that declares a job from the stored definition (one another process schedules) keeps the fields it has no option for, an app's `JobOptions::field` or one a newer release added, where it wrote the definition back without them.
+- Elixir: `false` stays the way to turn a token or secret off, since `nil` means left out; a token, cron secret or handler secret of any other type was already refused, and the error now says so without printing the value.
+- Elixir: a channel's, triage's or the instance's `transport:` options, which can hold a proxy's password, are left out when the struct is inspected (`IO.inspect`, a crash report).
+- Elixir: the webhook body of a queued alert that carries a `schema` key of its own (another writer's) has one `schema` key, first, as the SDK writes it, where it had two and its signature differed.
+- Elixir: `Cronwatch.Release.check/2` and `mix cronwatch.check` send alerts whatever the configuration's `deliver` says, so job nodes given `deliver: :check` have them sent; with `deliver: :check` they queued every alert and printed "sent". Called into a running instance that delivers at check time, the line says the alerts were queued, with a warning on standard error.
 
 ## 0.10.0 and earlier
 

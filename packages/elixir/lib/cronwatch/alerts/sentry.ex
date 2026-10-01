@@ -18,7 +18,7 @@ defmodule Cronwatch.Alerts.Sentry do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
 
-  @derive {Inspect, except: [:public_key]}
+  @derive {Inspect, except: [:public_key, :transport]}
   defstruct [:endpoint, :public_key, :environment, :release, :recovered, :link, :transport]
 
   @impl true

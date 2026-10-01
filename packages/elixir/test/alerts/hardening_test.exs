@@ -25,6 +25,7 @@ defmodule Cronwatch.Alerts.HardeningTest do
   alias Cronwatch.Test.RewriteTransport
   alias Cronwatch.Transport.HTTP
   alias Cronwatch.Transport.Request
+  alias Cronwatch.Triage.Anthropic
 
   defp sample do
     f = Conformance.fixture("channels")
@@ -323,6 +324,23 @@ defmodule Cronwatch.Alerts.HardeningTest do
 
     assert {:error, %Cronwatch.Error{message: "Cronwatch: Nope is not a Cronwatch.Transport"}} =
              Config.new(transport: Nope)
+  end
+
+  test "a transport's options, which may hold a credential, are never inspected" do
+    transport = {Rec, [proxy: "http://user:proxy-pass@proxy.example", passphrase: "tls-pass"]}
+
+    states =
+      EveryChannel.started("https://h.example/x", transport) ++
+        [{Anthropic, elem(Anthropic.init(api_key: "k", transport: transport), 1)}]
+
+    {:ok, config} = Config.new(transport: transport)
+    ctx = %ChannelContext{on_error: fn _ -> :ok end, transport: transport}
+
+    for value <- Enum.map(states, &elem(&1, 1)) ++ [config, ctx] do
+      shown = inspect(value)
+      refute shown =~ "proxy-pass", shown
+      refute shown =~ "tls-pass", shown
+    end
   end
 
   test "a transport given as an option is checked" do

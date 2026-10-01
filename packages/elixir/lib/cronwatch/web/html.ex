@@ -597,7 +597,7 @@ defmodule Cronwatch.Web.HTML do
     form =
       if sign_in,
         do:
-          ~s(<form class="signin" method="get" action="#{h(base)}/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>),
+          ~s(<form class="signin" method="post" action="#{h(base)}/signin"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>),
         else: ""
 
     body =

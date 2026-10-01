@@ -63,8 +63,9 @@ defmodule Cronwatch.Check do
     # Each job on its own: one that cannot be evaluated is reported, shown as
     # failing and does not stop the others.
     {jobs, alerts, _spent} =
-      Enum.reduce(stored_jobs!(c), {[], alerts, 0}, fn stored, {jobs, alerts, spent} ->
+      Enum.reduce(stored_jobs!(c), {[], alerts, 0}, fn {stored, readable}, {jobs, alerts, spent} ->
         try do
+          evaluable!(stored, readable)
           recent = Core.store!(c, :list_runs, [stored.name, Evaluate.baseline_window()])
 
           {state, {{held, dropped}, next}} =
@@ -113,6 +114,7 @@ defmodule Cronwatch.Check do
   # here that the store no longer has was forgotten by another process after
   # this one wrote it: it is written again, as its next run would, so it is
   # checked and shown while any process still declares it.
+  # Each is read leniently, as `{job, readable}` (Serialize.read_stored_job).
   defp stored_jobs!(c) do
     for job <- Runs.jobs(c.name), do: Core.sync!(c, job)
     jobs = Core.store!(c, :list_jobs, [])
@@ -120,7 +122,7 @@ defmodule Cronwatch.Check do
 
     case Enum.reject(Runs.jobs(c.name), &MapSet.member?(listed, &1.name)) do
       [] ->
-        jobs
+        Enum.map(jobs, &Serialize.read_stored_job/1)
 
       missing ->
         # Not one forgotten here meanwhile.
@@ -129,9 +131,16 @@ defmodule Cronwatch.Check do
           Core.sync!(c, job)
         end
 
-        Core.store!(c, :list_jobs, [])
+        Enum.map(Core.store!(c, :list_jobs, []), &Serialize.read_stored_job/1)
     end
   end
+
+  # A job whose stored definition is not a JSON object is not evaluated: it
+  # is reported, and shown as failing, while the others carry on.
+  defp evaluable!(_stored, true), do: :ok
+
+  defp evaluable!(stored, false),
+    do: raise(Error.invalid("job #{Cronwatch.JS.quote(stored.name)}: its stored definition is not a JSON object"))
 
   defp last_prune(c) do
     case :ets.lookup(Runs.table(c.name, :flags), :last_prune) do
@@ -156,8 +165,13 @@ defmodule Cronwatch.Check do
         job.definition
       else
         case Core.store!(c, :get_job, [listed.job]) do
-          nil -> nil
-          stored -> stored.definition
+          nil ->
+            nil
+
+          found ->
+            {stored, readable} = Serialize.read_stored_job(found)
+            evaluable!(stored, readable)
+            stored.definition
         end
       end
 
@@ -211,7 +225,7 @@ defmodule Cronwatch.Check do
   end
 
   # A job's summary and its newest runs, without alerting.
-  defp snapshot(c, stored, now, runs) do
+  defp snapshot(c, {stored, readable}, now, runs) do
     recent =
       try do
         {:ok, Core.store!(c, :list_runs, [stored.name, max(runs, Evaluate.baseline_window())])}
@@ -226,6 +240,7 @@ defmodule Cronwatch.Check do
 
       {:ok, recent} ->
         try do
+          evaluable!(stored, readable)
           state = Core.read_state!(c, stored.name)
           {:ok, {_, next, _}} = ok!(Evaluate.on_check(stored.definition, stored, List.first(recent), state, now))
           {:ok, summary} = ok!(Evaluate.summarize(stored, recent, state, next, now))
@@ -257,7 +272,7 @@ defmodule Cronwatch.Check do
 
     case Core.store!(c, :get_job, [name]) do
       nil -> nil
-      stored -> c |> snapshot(stored, Core.now(c), 0) |> elem(0)
+      stored -> c |> snapshot(Serialize.read_stored_job(stored), Core.now(c), 0) |> elem(0)
     end
   end
 

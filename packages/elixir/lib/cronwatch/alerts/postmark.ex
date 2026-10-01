@@ -19,7 +19,7 @@ defmodule Cronwatch.Alerts.Postmark do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
 
-  @derive {Inspect, except: [:token]}
+  @derive {Inspect, except: [:token, :transport]}
   defstruct [:token, :stream, :email, :transport]
 
   @endpoint "https://api.postmarkapp.com/email"

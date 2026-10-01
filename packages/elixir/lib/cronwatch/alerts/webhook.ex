@@ -37,7 +37,7 @@ defmodule Cronwatch.Alerts.Webhook do
   alias Cronwatch.Alerts.Shared
   alias Cronwatch.JS
 
-  @derive {Inspect, except: [:url, :headers, :secret]}
+  @derive {Inspect, except: [:url, :headers, :secret, :transport]}
   defstruct [:url, headers: [], secret: "", transport: nil]
 
   @type t :: %__MODULE__{url: String.t(), headers: [{String.t(), String.t()}], secret: String.t(), transport: term()}
@@ -80,8 +80,12 @@ defmodule Cronwatch.Alerts.Webhook do
   @doc false
   @spec payload(Alert.t()) :: String.t()
   def payload(%Alert{} = alert) do
-    %JS.Object{pairs: pairs} = Alert.to_value(alert)
-    JS.stringify(%JS.Object{pairs: [{"schema", @schema} | pairs]})
+    # { schema: 1, ...alert }: a queued alert another writer stored with a
+    # schema of its own keeps one key, first, with its value.
+    [{"schema", @schema}]
+    |> JS.Object.new()
+    |> JS.Object.merge(Alert.to_value(alert))
+    |> JS.stringify()
   end
 
   @doc """

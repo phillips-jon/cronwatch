@@ -32,9 +32,9 @@ if Code.ensure_loaded?(Plug.Conn) do
         status it set), and a status of 400 or more fails the run with
         `HTTP <status> <reason>`.
       * `:secret` - the secret requests must carry, in place of the
-        instance's cron secret; `""` counts as unset, `{:system, "VAR"}`
-        reads a variable on each request, and `false` lets anyone run the
-        job.
+        instance's cron secret; `""` or a string of only whitespace counts as
+        unset, `{:system, "VAR"}` reads a variable on each request, and
+        `false` lets anyone run the job.
       * `:instance` - the Cronwatch instance (default `Cronwatch`).
 
     The function runs in the request's process, so a request whose client
@@ -91,7 +91,11 @@ if Code.ensure_loaded?(Plug.Conn) do
         do: raise(ArgumentError, "Cronwatch.Handler needs :run, as {module, function, args}")
 
       unless secret == nil or secret == false or is_binary(secret) or match?({:system, v} when is_binary(v), secret),
-        do: raise(ArgumentError, "Cronwatch.Handler: secret must be a string, {:system, name} or false")
+        do:
+          raise(
+            ArgumentError,
+            "Cronwatch.Handler: secret must be a string or {:system, name}, or false to opt out, not #{Cronwatch.Config.shape(secret)}"
+          )
 
       unless is_atom(instance) and instance not in [nil, true, false],
         do: raise(ArgumentError, "Cronwatch.Handler: instance must be an atom, not #{inspect(instance)}")
@@ -137,10 +141,16 @@ if Code.ensure_loaded?(Plug.Conn) do
     # The options' secret, else the instance's; and whether anyone may run
     # the job without one.
     defp secret(%{secret: false}, _c), do: {nil, true}
-    defp secret(%{secret: s}, _c) when is_binary(s) and s != "", do: {s, false}
+    # A blank secret, given or read, falls back to the instance's.
+    defp secret(%{secret: s} = opts, c) when is_binary(s) do
+      case Env.secret(s) do
+        nil -> secret(%{opts | secret: nil}, c)
+        s -> {s, false}
+      end
+    end
 
     defp secret(%{secret: {:system, var}} = opts, c) do
-      case Env.read(var) do
+      case Env.read_secret(var) do
         nil -> secret(%{opts | secret: nil}, c)
         s -> {s, false}
       end

@@ -52,6 +52,91 @@ defmodule Cronwatch.Web.RoutesTest do
     assert Cronwatch.Web.token(w.opts) == "tok"
   end
 
+  test "a token or secret given in code that is not a string, nil or false is refused" do
+    %{cw: cw} = make()
+
+    for bad <- [true, 5, 1.5, :sym, ~c"tok", %{}, {:system, :not_a_name}] do
+      e = assert_raise ArgumentError, fn -> Cronwatch.Web.init(instance: cw, token: bad) end
+      assert e.message =~ "token must be a string", inspect(bad)
+      assert e.message =~ "false to", inspect(bad)
+      refute e.message =~ "tok\"", "the value is not printed"
+
+      e =
+        assert_raise ArgumentError, fn ->
+          Cronwatch.Handler.init(instance: cw, job: "j", run: {Cronwatch.Test.Handlers, :count, [self()]}, secret: bad)
+        end
+
+      assert e.message =~ "secret must be a string", inspect(bad)
+      assert e.message =~ "false to opt out", inspect(bad)
+
+      assert {:error, %Cronwatch.Error{message: message}} = Cronwatch.Config.new(cron_secret: bad)
+      assert message =~ "cron_secret must be a string, or false to opt out", inspect(bad)
+    end
+
+    # nil (left out), false (the opt-out) and a string are taken.
+    for good <- [nil, false, "s", {:system, "VAR"}] do
+      assert %Cronwatch.Web{} = Cronwatch.Web.init(instance: cw, token: good)
+    end
+
+    for good <- [nil, false, "s"], do: assert({:ok, _} = Cronwatch.Config.new(cron_secret: good))
+  end
+
+  test "an Authorization header that is not a bearer leaves the cookie and ?token= to sign in" do
+    w = web()
+    cookie = {"cookie", token_cookie()}
+    basic = {"authorization", "Basic dXNlcjpwYXNz"}
+    assert get(w, "/cronwatch/api/jobs", [basic, cookie]).status == 200
+    assert get(w, "/cronwatch/api/jobs", [basic]).status == 401
+    assert get(w, "/cronwatch/api/check", [basic, cookie]).status == 405, "a GET check still needs a bearer"
+    assert get(w, "/cronwatch/?token=tok", [basic]).status == 303
+
+    for header <- ["Token tok", "Bearertok", "Bearer", "tok"] do
+      assert get(w, "/cronwatch/api/jobs", [{"authorization", header}, cookie]).status == 200, header
+      assert get(w, "/cronwatch/api/jobs", [{"authorization", header}]).status == 401, header
+    end
+
+    assert get(w, "/cronwatch/api/jobs", [{"authorization", "bearer tok"}]).status == 200
+    assert get(w, "/cronwatch/api/jobs", [{"authorization", "Bearer wrong"}, cookie]).status == 401, "a bearer wins"
+  end
+
+  test "the sign-in form posts the token to <base>/signin" do
+    w = web()
+    res = get(w, "/cronwatch/")
+    assert res.status == 401
+    assert res.body =~ ~s(<form class="signin" method="post" action="/cronwatch/signin">)
+    assert res.body =~ "Enter your CRONWATCH_TOKEN and this browser stays signed in."
+
+    signed =
+      req(w, "POST", "/cronwatch/signin", [@form, {"referer", "http://app.test/cronwatch/jobs/x?a=1"}], "token=tok")
+
+    assert signed.status == 303
+    assert header(signed, "location") == "http://app.test/cronwatch/jobs/x?a=1"
+    assert hd(String.split(header(signed, "set-cookie"), ";")) == token_cookie()
+
+    for referer <- [
+          "http://app.test/cronwatch/?token=",
+          "http://app.test/cronwatch/?a=1&%74oken=x",
+          "http://app.test.evil/cronwatch/",
+          "http://app.test"
+        ] do
+      res = req(w, "POST", "/cronwatch/signin", [@form, {"referer", referer}], "token=tok")
+      assert header(res, "location") == "/cronwatch/", referer
+    end
+
+    assert req(w, "POST", "/cronwatch/signin/", [@form], "token=tok").status == 303, "a trailing slash"
+    wrong = req(w, "POST", "/cronwatch/signin", [@form], "token=tok2")
+    assert {wrong.status, header(wrong, "set-cookie")} == {401, nil}
+    assert req(w, "POST", "/cronwatch/signin", [@json], ~s({"token":"tok"})).status == 303
+
+    # Over https the cookie is Secure.
+    secure = Cronwatch.Test.Web.send(w.opts, "POST", "https://app.test/cronwatch/signin", [@form], "token=tok")
+    assert header(secure, "set-cookie") =~ "; Secure"
+
+    # With the routes open, /signin is any other path.
+    open = %{w | opts: Keyword.put(w.opts, :token, false)}
+    assert req(open, "POST", "/cronwatch/signin", [@form], "token=tok").status == 404
+  end
+
   test "check accepts the cron secret and nothing else does" do
     secret = "cron-" <> "s3cret"
     w = web([], cron_secret: secret)

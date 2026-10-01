@@ -30,6 +30,9 @@ defmodule Cronwatch.ChannelContext do
   instance's `transport:` option, for a channel given none of its own.
   """
 
+  # A transport's options may hold a credential (a proxy's password, say),
+  # so they are never printed.
+  @derive {Inspect, except: [:transport]}
   defstruct [:on_error, transport: nil]
   @type t :: %__MODULE__{on_error: (term() -> any()), transport: Cronwatch.Transport.spec()}
 

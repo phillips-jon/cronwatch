@@ -18,7 +18,7 @@ defmodule Cronwatch.Alerts.Mailgun do
   alias Cronwatch.Alerts.Provider
   alias Cronwatch.Alerts.Shared
 
-  @derive {Inspect, except: [:api_key]}
+  @derive {Inspect, except: [:api_key, :transport]}
   defstruct [:api_key, :url, :email, :transport]
 
   @impl true
