@@ -359,7 +359,7 @@ export function planEdits(rows, readFile, current, next) {
  * (`cronwatch = "X.Y"` in Cargo, `{:cronwatch, "~> X.Y"}` on Hex).
  */
 function strays(current) {
-  const skip = new Set([...VERSIONED.map((row) => row.file), ...MARKDOWN_CHANGELOGS, ROOT_CHANGELOG, "package-lock.json", "scripts/release.mjs"]);
+  const skip = new Set([...VERSIONED.map((row) => row.file), ...MARKDOWN_CHANGELOGS, ROOT_CHANGELOG, "package-lock.json", "scripts/release.mjs", "scripts/release.test.mjs"]);
   const minor = minorOf(current).replace(".", "\\.");
   const found = [];
   for (const args of [["-F", current], ["-E", `cronwatch[a-z-]* = (\\{ version = )?"${minor}"|\\{:cronwatch, \\\\?"~(>|&gt;) ${minor}`]]) {
