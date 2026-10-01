@@ -12,7 +12,12 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-// Converted is a gocron schedule as CronWatch reads it.
+// Converted is a gocron schedule as CronWatch reads it: the one type every
+// integration's Convert returns, robfigcron.Converted.
+//
+// Deprecated: Use robfigcron.Converted, the same type, which river and
+// asynq's Convert return too. Converted still works through 1.x and goes in
+// 2.0.
 type Converted = robfigcron.Converted
 
 // cronParser reads a crontab as gocron does, with or without a seconds
@@ -36,7 +41,7 @@ var cronParser = cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | 
 // or month, other days from the end of the month, a one-time job, is
 // refused, and the job is watched without a schedule. where names the job
 // in the error.
-func Convert(s gocron.JobSchedule, loc *time.Location, where string) (Converted, error) {
+func Convert(s gocron.JobSchedule, loc *time.Location, where string) (robfigcron.Converted, error) {
 	if loc == nil {
 		loc = time.Local
 	}
@@ -48,22 +53,22 @@ func Convert(s gocron.JobSchedule, loc *time.Location, where string) (Converted,
 		}
 		parsed, err := cronParser.Parse(spec)
 		if err != nil {
-			return Converted{}, bridge.Refuse("%s has the crontab %q, which robfig/cron cannot read: %v", where, v.Crontab, err)
+			return robfigcron.Converted{}, bridge.Refuse("%s has the crontab %q, which robfig/cron cannot read: %v", where, v.Crontab, err)
 		}
 		return robfigcron.Convert(parsed, loc, where)
 	case gocron.DurationJobSchedule:
 		if v.Duration < time.Second {
-			return Converted{}, bridge.Refuse("%s runs every %s; CronWatch watches intervals of one second or more", where, v.Duration)
+			return robfigcron.Converted{}, bridge.Refuse("%s runs every %s; CronWatch watches intervals of one second or more", where, v.Duration)
 		}
-		return Converted{Schedule: bridge.EveryText(v.Duration)}, nil
+		return robfigcron.Converted{Schedule: bridge.EveryText(v.Duration)}, nil
 	case gocron.DailyJobSchedule:
 		if v.Interval != 1 {
-			return Converted{}, bridge.Refuse("%s runs every %d days, which a cron cannot say; give the job a schedule of its own", where, v.Interval)
+			return robfigcron.Converted{}, bridge.Refuse("%s runs every %d days, which a cron cannot say; give the job a schedule of its own", where, v.Interval)
 		}
 		return wall(where, loc, v.AtTimes, "*", "*", "*", func(time.Time) bool { return true })
 	case gocron.WeeklyJobSchedule:
 		if v.Interval != 1 {
-			return Converted{}, bridge.Refuse("%s runs every %d weeks, which a cron cannot say; give the job a schedule of its own", where, v.Interval)
+			return robfigcron.Converted{}, bridge.Refuse("%s runs every %d weeks, which a cron cannot say; give the job a schedule of its own", where, v.Interval)
 		}
 		var days []int
 		for _, d := range v.DaysOfWeek {
@@ -73,12 +78,12 @@ func Convert(s gocron.JobSchedule, loc *time.Location, where string) (Converted,
 		return wall(where, loc, v.AtTimes, "*", "*", dow, func(t time.Time) bool { return slices.Contains(v.DaysOfWeek, t.Weekday()) })
 	case gocron.MonthlyJobSchedule:
 		if v.Interval != 1 {
-			return Converted{}, bridge.Refuse("%s runs every %d months, which a cron cannot say; give the job a schedule of its own", where, v.Interval)
+			return robfigcron.Converted{}, bridge.Refuse("%s runs every %d months, which a cron cannot say; give the job a schedule of its own", where, v.Interval)
 		}
 		last := false
 		for _, d := range v.DaysFromEnd {
 			if d != -1 {
-				return Converted{}, bridge.Refuse("%s runs %d days from the end of the month, which CronWatch cannot read; give the job a schedule of its own", where, -d)
+				return robfigcron.Converted{}, bridge.Refuse("%s runs %d days from the end of the month, which CronWatch cannot read; give the job a schedule of its own", where, -d)
 			}
 			last = true
 		}
@@ -93,13 +98,13 @@ func Convert(s gocron.JobSchedule, loc *time.Location, where string) (Converted,
 			return slices.Contains(v.Days, t.Day()) || (last && t.AddDate(0, 0, 1).Day() == 1)
 		})
 	case gocron.DurationRandomJobSchedule:
-		return Converted{}, bridge.Refuse("%s runs at random intervals of %s to %s, so it has no schedule CronWatch can hold it to", where, v.Min, v.Max)
+		return robfigcron.Converted{}, bridge.Refuse("%s runs at random intervals of %s to %s, so it has no schedule CronWatch can hold it to", where, v.Min, v.Max)
 	case gocron.OneTimeJobSchedule:
-		return Converted{}, bridge.Refuse("%s runs once, so it has no schedule", where)
+		return robfigcron.Converted{}, bridge.Refuse("%s runs once, so it has no schedule", where)
 	case nil:
-		return Converted{}, bridge.Refuse("%s has no schedule gocron reports", where)
+		return robfigcron.Converted{}, bridge.Refuse("%s has no schedule gocron reports", where)
 	}
-	return Converted{}, bridge.Refuse("%s has a %T schedule, which CronWatch cannot read", where, s)
+	return robfigcron.Converted{}, bridge.Refuse("%s has a %T schedule, which CronWatch cannot read", where, s)
 }
 
 // hms is a time of day.
@@ -107,13 +112,13 @@ type hms struct{ h, m, s int }
 
 // wall is the cron for a daily, weekly or monthly job's times on the days
 // matches allows, checked against gocron's rule for them.
-func wall(where string, loc *time.Location, at []time.Time, dom, month, dow string, matches func(time.Time) bool) (Converted, error) {
+func wall(where string, loc *time.Location, at []time.Time, dom, month, dow string, matches func(time.Time) bool) (robfigcron.Converted, error) {
 	if len(at) == 0 {
-		return Converted{}, bridge.Refuse("%s has no times of day", where)
+		return robfigcron.Converted{}, bridge.Refuse("%s has no times of day", where)
 	}
 	zone, ok := bridge.Zone(loc)
 	if !ok {
-		return Converted{}, bridge.Refuse("%s runs in %s, which is not an IANA timezone; give the scheduler one, such as UTC or Europe/London", where, loc)
+		return robfigcron.Converted{}, bridge.Refuse("%s runs in %s, which is not an IANA timezone; give the scheduler one, such as UTC or Europe/London", where, loc)
 	}
 	var times []hms
 	var hours, minutes, seconds []int
@@ -125,7 +130,7 @@ func wall(where string, loc *time.Location, at []time.Time, dom, month, dow stri
 	times = slices.Compact(times)
 	hours, minutes, seconds = unique(hours), unique(minutes), unique(seconds)
 	if len(hours)*len(minutes)*len(seconds) != len(times) {
-		return Converted{}, bridge.Refuse("%s runs at times of day a cron cannot say at once (not every combination of their hours, minutes and seconds); give the job a schedule of its own", where)
+		return robfigcron.Converted{}, bridge.Refuse("%s runs at times of day a cron cannot say at once (not every combination of their hours, minutes and seconds); give the job a schedule of its own", where)
 	}
 	text := fmt.Sprintf("%s %s %s %s %s", bridge.FieldText(minutes, 0, 59), bridge.FieldText(hours, 0, 23), dom, month, dow)
 	if s := bridge.FieldText(seconds, 0, 59); s != "0" {
@@ -133,9 +138,9 @@ func wall(where string, loc *time.Location, at []time.Time, dom, month, dow stri
 	}
 	daily := dom == "*" && month == "*" && dow == "*"
 	if err := bridge.CheckFires(wallRuns(loc, times, matches), text, zone, where, "gocron", daily, time.Now().UnixMilli()); err != nil {
-		return Converted{}, err
+		return robfigcron.Converted{}, err
 	}
-	return Converted{Schedule: text, Timezone: zone}, nil
+	return robfigcron.Converted{Schedule: text, Timezone: zone}, nil
 }
 
 func unique(values []int) []int {

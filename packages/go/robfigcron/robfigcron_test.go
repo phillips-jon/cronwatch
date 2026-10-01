@@ -88,6 +88,19 @@ func (c *Cleanup) Run() {
 	}
 }
 
+// Watch, deprecated, is New(cw, options).Option(): the cron's jobs are
+// wrapped and their runs recorded.
+func TestWatchIsTheWatchersOption(t *testing.T) {
+	k := newKit(t, nil)
+	c := cron.New(robfigcron.Watch(k.cw, robfigcron.Options{Logger: quiet}))
+	id, err := c.AddFunc("0 2 * * *", NightlyReport)
+	check(t, err)
+	c.Entry(id).WrappedJob.Run()
+	runs := k.runs(t, "robfigcron_test.NightlyReport")
+	eq(t, "one run", len(runs), 1)
+	eq(t, "recorded by the watcher", runs[0].Trigger, robfigcron.Trigger)
+}
+
 func TestEntriesAreJobsWithTheirSchedules(t *testing.T) {
 	t.Setenv("CRONWATCH_APP_ID", "billing")
 	k := newKit(t, nil)

@@ -9,12 +9,12 @@
 //		cwgocron "cronwatch.dev/go/gocron"
 //	)
 //
-//	s, _ := gocron.NewScheduler(cwgocron.Watch(cw, cwgocron.Options{}))
+//	s, _ := gocron.NewScheduler(cwgocron.New(cw, cwgocron.Options{}).Option())
 //	s.NewJob(gocron.CronJob("0 2 * * *", false), gocron.NewTask(jobs.NightlyReport))
 //	s.Start()
 //	cw.StartChecking(time.Minute) // checks for missed and stuck runs
 //
-// Watch adds gocron's BeforeJobRuns, AfterJobRuns, AfterJobRunsWithError
+// The watcher's Option adds gocron's BeforeJobRuns, AfterJobRuns, AfterJobRunsWithError
 // and AfterJobRunsWithPanic listeners to every job (WithGlobalJobOptions):
 // a run starts when gocron is about to run the job and ends with its
 // outcome, an error failing it. A panic fails the run and then carries on
@@ -128,6 +128,10 @@ func New(cw *cronwatch.Client, options Options) *Watcher {
 }
 
 // Watch is New(cw, options).Option(), for gocron.NewScheduler.
+//
+// Deprecated: Use New(cw, options).Option(), which does the same and keeps
+// the Watcher for its Sync and Wait. Watch still works through 1.x and goes
+// in 2.0.
 func Watch(cw *cronwatch.Client, options Options) gocron.SchedulerOption {
 	return New(cw, options).Option()
 }
@@ -140,7 +144,7 @@ func (w *Watcher) Option() gocron.SchedulerOption {
 	global := gocron.WithGlobalJobOptions(w.jobOption())
 	// A SchedulerOption takes gocron's unexported scheduler, which is a
 	// gocron.Scheduler; the option is made through reflect to keep hold of
-	// it, so Watch is the one line an app adds.
+	// it, so the option is the one line an app adds.
 	t := reflect.TypeOf(global)
 	made := reflect.MakeFunc(t, func(args []reflect.Value) []reflect.Value {
 		s, _ := args[0].Interface().(gocron.Scheduler)
@@ -231,7 +235,7 @@ func (w *Watcher) Sync(ctx context.Context) error {
 	s := w.scheduler
 	w.mu.Unlock()
 	if s == nil {
-		return errors.New("the watcher was not given to gocron.NewScheduler; pass cwgocron.Watch(cw, options) or watcher.Option() to it")
+		return errors.New("the watcher was not given to gocron.NewScheduler; pass watcher.Option() to it")
 	}
 	jobs := s.Jobs()
 	if jobs == nil {
@@ -367,14 +371,21 @@ func (w *Watcher) failed(id uuid.UUID, _ string, err error) {
 	}
 }
 
-// Panic is what a gocron job panicked with, as a run's error: "Panic: <value>".
-type Panic struct{ Value any }
+// PanicError is what a gocron job panicked with, as a run's error:
+// "PanicError: <value>".
+type PanicError struct{ Value any }
 
-func (p Panic) Error() string { return fmt.Sprint(p.Value) }
+func (p PanicError) Error() string { return fmt.Sprint(p.Value) }
+
+// Panic is PanicError, under its name before 1.0.
+//
+// Deprecated: Use PanicError, which follows Go's naming for error types.
+// Panic still works through 1.x and goes in 2.0.
+type Panic = PanicError
 
 func (w *Watcher) panicked(id uuid.UUID, _ string, recovered any) {
 	if handle := w.take(id); handle != nil {
-		handle.Fail(context.Background(), Panic{recovered})
+		handle.Fail(context.Background(), PanicError{recovered})
 	}
 	// gocron recovered it only because CronWatch listens for panics: it
 	// carries on as it would have without CronWatch.

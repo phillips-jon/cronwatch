@@ -9,9 +9,9 @@ import (
 func nightlyReport() {}
 
 // The README's gocron example: one scheduler option.
-func ExampleWatch() {
+func ExampleWatcher_Option() {
 	cw := cronwatch.MustNew()
-	s, err := gocron.NewScheduler(cwgocron.Watch(cw, cwgocron.Options{}))
+	s, err := gocron.NewScheduler(cwgocron.New(cw, cwgocron.Options{}).Option())
 	if err != nil {
 		panic(err)
 	}

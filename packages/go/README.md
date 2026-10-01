@@ -74,7 +74,7 @@ A scheduler you already run is watched with one line, each integration a module 
 **robfig/cron v3** (`go get cronwatch.dev/go/robfigcron`): a `cron.Option`. A job is named after its function (`jobs.NightlyReport`) or type; name a closure, or give options, with `robfigcron.Named`. `watcher.Func` makes a job that gets the run's context and logs.
 
 ```go
-c := cron.New(robfigcron.Watch(cw, robfigcron.Options{Chain: []cron.JobWrapper{cron.Recover(logger)}}))
+c := cron.New(robfigcron.New(cw, robfigcron.Options{Chain: []cron.JobWrapper{cron.Recover(logger)}}).Option())
 c.AddFunc("0 2 * * *", jobs.NightlyReport)
 c.AddJob("*/15 * * * *", robfigcron.Named("sync-invoices", syncJob, cronwatch.Grace("5m")))
 ```
@@ -82,7 +82,7 @@ c.AddJob("*/15 * * * *", robfigcron.Named("sync-invoices", syncJob, cronwatch.Gr
 **gocron v2** (`go get cronwatch.dev/go/gocron`, gocron 2.21 or newer): its event listeners, as a scheduler option. Cron, duration, and daily, weekly and monthly jobs are read as schedules; a job is named by `gocron.WithName`, else its function.
 
 ```go
-s, err := gocron.NewScheduler(cwgocron.Watch(cw, cwgocron.Options{}))
+s, err := gocron.NewScheduler(cwgocron.New(cw, cwgocron.Options{}).Option())
 s.NewJob(gocron.DailyJob(1, gocron.NewAtTimes(gocron.NewAtTime(2, 0, 0))), gocron.NewTask(jobs.NightlyReport))
 ```
 
