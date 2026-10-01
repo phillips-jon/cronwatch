@@ -32,7 +32,7 @@ import type { JobContext } from "./job.js";
 import { capOutput, describeError, OUTPUT_CAP, redactAndCap, redactSecrets } from "./output.js";
 import { parseSchedule } from "./schedule.js";
 import { checkExpectation, toStored } from "./serialize.js";
-import { createRoutes } from "./routes/index.js";
+import { buildRoutes } from "./routes/index.js";
 import type { Routes, RoutesOptions } from "./routes/index.js";
 import { memory } from "./stores/memory.js";
 import type {
@@ -1282,9 +1282,14 @@ export class Cronwatch {
     await this.store.deleteJob(name);
   }
 
-  /** The dashboard and JSON API as fetch-style handlers. See createRoutes(). */
+  /**
+   * The dashboard and JSON API as fetch-style handlers: the one way to mount
+   * them. A Next.js app exports them from app/cronwatch/[[...path]]/route.ts:
+   *
+   *   export const { GET, POST, DELETE } = cw.routes();
+   */
   routes(options?: RoutesOptions): Routes {
-    return createRoutes(this, options);
+    return buildRoutes(this, options);
   }
 
   /**

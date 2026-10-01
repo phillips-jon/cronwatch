@@ -271,12 +271,22 @@ function runsLimit(value: string | null): number {
 }
 
 /**
- * A fetch-style handler serving the dashboard and a small JSON API. Mount it
- * in a Next.js app at app/cronwatch/[[...path]]/route.ts:
+ * The dashboard and its JSON API for a client.
+ * @deprecated Use `cw.routes(options)`, the one way to mount the dashboard
+ * in every port. This name still works through 1.x and goes in 2.0.
+ */
+export function createRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes {
+  return cw.routes(options);
+}
+
+/**
+ * A fetch-style handler serving the dashboard and a small JSON API, which
+ * cw.routes() returns. Mount it in a Next.js app at
+ * app/cronwatch/[[...path]]/route.ts:
  *
  *   export const { GET, POST, DELETE } = cw.routes();
  */
-export function createRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes {
+export function buildRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes {
   const optedOut = options.token === null;
   const configured = optedOut ? null : (options.token || readEnv("CRONWATCH_TOKEN") || null);
   const base = (options.basePath ?? "/cronwatch").replace(/\/+$/, "");

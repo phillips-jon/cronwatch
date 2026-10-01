@@ -37,7 +37,7 @@ const entries = Object.keys(sdkPkg.exports)
   .map((k) => (k === "." ? "@cronwatch/sdk" : `@cronwatch/sdk/${k.slice(2)}`));
 // What each entry must export, so a load that "works" but is empty still fails.
 const expected = {
-  "@cronwatch/sdk": ["cronwatch", "memory", "createRoutes", "formatDuration"],
+  "@cronwatch/sdk": ["cronwatch", "Cronwatch", "memory", "formatDuration"],
   "@cronwatch/sdk/sqlite": ["sqlite"],
   "@cronwatch/sdk/postgres": ["postgres"],
   "@cronwatch/sdk/slack": ["slack"],

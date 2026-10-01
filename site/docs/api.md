@@ -104,7 +104,7 @@ A second `finish()` on a handle, or on a run another process has finished, recor
 
 ### routes()
 
-`cw.routes(options?)` returns `{ handler, GET, POST, DELETE }`, one fetch-style handler under four names, serving the [dashboard and API](/docs/dashboard/).
+`cw.routes(options?)` returns `{ handler, GET, POST, DELETE }`, one fetch-style handler under four names, serving the [dashboard and API](/docs/dashboard/). It is the one way to mount the dashboard, here and in every port.
 
 | Option | Default | |
 |---|---|---|
@@ -128,7 +128,7 @@ The development sign-in line names the host only when `origin` is set or the fir
 
 ## Exports
 
-`@cronwatch/sdk`: `cronwatch`, `Cronwatch` (the client class, and its options type `CronwatchOptions`; the former spellings `CronWatch` and `CronWatchOptions` still work through 1.x, deprecated), `memory`, `custom`, `consoleChannel`, `createRoutes`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails`, `ParsedSchedule`, `JobContext`, `RunHandle`, `StartOptions`, `RunOutcome`, `RecordRunOptions`, `Source` and `SourceHost` (the interface a source is given: `job()`, `recordRun()`, `store`, `now` and `onError`), and `FetchHandler`, `Routes` and `RoutesOptions`.
+`@cronwatch/sdk`: `cronwatch`, `Cronwatch` (the client class, and its options type `CronwatchOptions`; the former spellings `CronWatch` and `CronWatchOptions` still work through 1.x, deprecated), `memory`, `custom`, `consoleChannel`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails`, `ParsedSchedule`, `JobContext`, `RunHandle`, `StartOptions`, `RunOutcome`, `RecordRunOptions`, `Source` and `SourceHost` (the interface a source is given: `job()`, `recordRun()`, `store`, `now` and `onError`), and `FetchHandler`, `Routes` and `RoutesOptions`.
 
 Stores: `@cronwatch/sdk/sqlite` (`sqlite`), `/postgres` (`postgres`) and `/d1` (`d1`). `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies; `/d1` needs nothing.
 
@@ -141,3 +141,12 @@ Triage: `@cronwatch/sdk/anthropic` (`anthropic`) needs `@anthropic-ai/sdk`, whic
 The core, `/d1`, `/pg-cron` and every channel use only `fetch` and Web Crypto, so they run on Node 22 or newer, Cloudflare Workers, Deno and Bun. `/sqlite`, `/postgres` and `/node` need Node.
 
 `@cronwatch/sdk/node`: `toNodeHandler(fetchHandler, { trustProxy?, basePath? })` turns a fetch-style handler (the routes, or a job's `handler()`) into `(req, res, next?)` for `http.createServer`, Express or Connect, NestJS and Firebase `onRequest`; `toKoaMiddleware(fetchHandler, options?)` does the same for Koa; `toRequest(req, options?)` and `writeResponse(res, response)` are the two halves. Node only; see [Express, Koa and plain Node servers](/docs/node/#express-koa-and-plain-node-servers).
+
+## Deprecated
+
+These names still work, and do exactly what their replacements do, through every 1.x release; each is marked `@deprecated`, so an editor strikes it through, and each goes in 2.0.
+
+| Deprecated | Use instead |
+|---|---|
+| `CronWatch`, `CronWatchOptions` | `Cronwatch`, `CronwatchOptions`: the spelling every port uses |
+| `createRoutes(cw, options)` | `cw.routes(options)` |

@@ -77,7 +77,7 @@ An `expect` RegExp runs in your process on the runtime's own engine and, like an
 
 | Import | |
 |---|---|
-| `@cronwatch/sdk` | `cronwatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, types |
+| `@cronwatch/sdk` | `cronwatch`, `Cronwatch`, `memory`, `custom`, `consoleChannel`, types; the dashboard is `cw.routes()` |
 | `@cronwatch/sdk/sqlite` | `sqlite({ path })`, needs `better-sqlite3` (and `@types/better-sqlite3` in TypeScript) |
 | `@cronwatch/sdk/postgres` | `postgres({ connectionString })`, needs `pg` (and `@types/pg` in TypeScript) |
 | `@cronwatch/sdk/d1` | `d1(env.DB)`, the Cloudflare D1 store; needs nothing |
