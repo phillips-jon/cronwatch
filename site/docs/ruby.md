@@ -443,6 +443,8 @@ A date no month has (`0 0 30 2 *`) and a one-time date (`2026-12-01T00:00:00`) a
 
 Both sides write a job's state through `compare_and_set_state` and the same `version` inside its JSON, so a Ruby process and a Node process updating one job at the same moment refuse each other's stale writes rather than lose them.
 
+A 1.x release keeps what it does not know. A field of a job's state or definition that a newer release wrote, a condition it opened, a run status or a trigger it recorded, is read, kept and written back unchanged by every write the gem makes, so any 1.x release of any language can share a store with any other, in either direction. Releases before 1.0 are not covered: upgrade every process that shares a store to 1.0 together.
+
 ## Kept in step
 
 The TypeScript SDK is the source of truth. Its build generates cases (duration parsing, schedules across daylight saving, sequences of runs and checks with the alerts and state they must produce, alert titles and messages, stats and health) into `conformance/` in the repository, and the gem's tests replay every one. The dashboard is compared the same way: the gem's `Cronwatch::Web` must answer a fixed set of requests byte for byte as the SDK's routes do. A change of behaviour lands in TypeScript first, the cases are regenerated, and the gem is fixed until they pass. Where the two disagree, the gem is wrong: [open an issue](https://github.com/phillips-jon/cronwatch/issues).

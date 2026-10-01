@@ -2,6 +2,7 @@
 
 require_relative "../test_helper"
 require_relative "../memory_store_test" # StoreConformance
+require_relative "client_fixture"
 require "cronwatch/active_record"
 require "securerandom"
 require "tmpdir"
@@ -193,6 +194,12 @@ module ActiveRecordStoreTests
       end
     end
     base.include SqlStoreConformance
+  end
+
+  # conformance/client.json unknownFields: what a newer release wrote
+  # survives a check, a silence, an unsilence and a run on this store too.
+  def test_unknown_stored_fields_survive
+    ClientFixture.replay_unknown_fields(make_store) { |op, expected, got| assert_equal expected, got, op }
   end
 
   # A state row as another process wrote it: its JSON text, as it is.

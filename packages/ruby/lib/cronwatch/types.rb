@@ -282,9 +282,19 @@ module Cronwatch
   # a foreign writer left malformed must not make the whole state unreadable:
   # an entry that is not a Hash, or whose alert is not one, is kept as it
   # came. nil when there is none; it is never written empty.
+  #
+  # `extra` holds the fields this version does not know, written by a newer
+  # one, as the JSON they came as (string keys): every write carries them
+  # back unchanged, after the known fields, so a process sharing the store
+  # with a newer release never erases what that release keeps there. nil
+  # when there are none. An open condition this version does not know stays
+  # in `open` the same way, under its own name.
   JobState = Struct.new(:job, :open, :consecutive_failures, :silenced_until, :last_alert_at, :pending_recovery,
-                        :undelivered, :version, :sending, keyword_init: true) do
+                        :undelivered, :version, :sending, :extra, keyword_init: true) do
     include Serializable
+
+    # The fields this version reads, as stored.
+    KNOWN = %w[job open consecutiveFailures silencedUntil lastAlertAt pendingRecovery undelivered version sending].freeze
 
     def self.from_h(hash)
       return hash if hash.is_a?(JobState)
@@ -292,7 +302,9 @@ module Cronwatch
       pending = Naming.fetch(hash, "pendingRecovery")
       undelivered = Naming.fetch(hash, "undelivered")
       sending = Naming.fetch(hash, "sending")
+      extra = hash.each_with_object({}) { |(k, v), out| out[k.to_s] = v unless KNOWN.include?(k.to_s) }
       new(
+        extra: extra.empty? ? nil : extra,
         job: Naming.fetch(hash, "job"),
         open: (Naming.fetch(hash, "open") || {}).each_with_object({}) { |(k, v), out| out[k.to_sym] = v },
         consecutive_failures: Naming.fetch(hash, "consecutiveFailures", 0),
@@ -342,6 +354,7 @@ module Cronwatch
           entry.is_a?(Hash) ? entry.transform_values { |v| v.is_a?(Alert) ? v.to_h : v } : entry
         end
       end
+      extra&.each { |key, value| out[key] = value unless out.key?(key) || KNOWN.include?(key) }
       out
     end
   end

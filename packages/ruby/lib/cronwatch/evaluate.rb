@@ -92,6 +92,8 @@ module Cronwatch
         undelivered: (state.undelivered || []).dup,
         version: state.version,
         sending: sending.is_a?(Array) && !sending.empty? ? sending.dup : nil,
+        # Fields a newer release wrote, carried through every write.
+        extra: state.extra,
       )
     end
 
