@@ -665,6 +665,40 @@ def test_without_trust_proxy_a_spoofed_forwarded_host_or_proto_changes_nothing()
     assert "Secure" not in go("GET", "/cronwatch/?token=tok", spoofed).headers["set-cookie"]
 
 
+def test_an_overlong_numeric_host_is_not_an_origin_and_never_a_500() -> None:
+    # Python refuses to read a decimal of more than 4300 digits; the parser
+    # must answer "not an origin" for it, as the URL parser does.
+    digits = "1" * 5000
+    assert _origin.bare(f"https://{digits}") is None
+    assert _origin.bare(f"https://{digits}.example") == f"https://{digits}.example"
+    assert _origin.bare(f"https://a.example:{'0' * 5000}443") == "https://a.example"
+    assert _origin.bare(f"https://a.example:{'0' * 5000}8080") == "https://a.example:8080"
+    assert _origin.bare(f"https://0x{'0' * 5000}7f.1") == "https://127.0.0.1"
+    assert _origin.bare(f"https://a.example:{digits}") is None
+    errors = Errors()
+    cw, _, _ = make(on_error=errors)
+    web = cw.routes(token="tok", base_path="/cronwatch", trust_proxy=True)
+    response = send(web, "GET", "http://app.test/cronwatch/?token=tok", {"x-forwarded-proto": "https", "x-forwarded-host": digits})
+    assert response.status == 303
+    assert "Secure" not in response.headers["set-cookie"], "the forwarded origin is ignored, so the request's own is used"
+    assert errors.items == []
+
+
+def test_in_development_a_first_request_with_an_overlong_numeric_host_still_prints_the_sign_in_line(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CRONWATCH_ENV", "development")
+    monkeypatch.delenv("CRONWATCH_TOKEN", raising=False)
+    errors = Errors()
+    cw, _, _ = make(on_error=errors)
+    web = cw.routes(base_path="/cronwatch", trust_proxy=True)
+    assert send(web, "GET", "http://localhost:3000/cronwatch/api/jobs", {"x-forwarded-host": "1" * 5000}).status == 401
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1
+    assert "Sign in: http://localhost:3000/cronwatch/?token=" in lines[0]
+    assert errors.items == []
+
+
 def test_a_mixed_case_host_matches_the_browsers_lowercase_origin() -> None:
     cw, _, go = behind("http://App.Example.com")
     cw.run("x", lambda ctx: None)

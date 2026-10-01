@@ -660,12 +660,17 @@ class Web:
         return built or request.origin
 
     def _announce(self, origin: str, base: str) -> None:
-        """Prints the development sign-in link, once per routes instance."""
+        """Prints the development sign-in link, once per routes instance. The
+        link is worked out before the line counts as shown, so a request
+        whose origin cannot be read never leaves it unprinted."""
+        try:
+            shown = self._origin if self._origin is not None else (origin if _is_loopback_origin(origin) else None)
+        except Exception:  # noqa: BLE001, a host that cannot be read is not local
+            shown = None
         with self._announce_lock:
             if self._announced:
                 return
             self._announced = True
-        shown = self._origin if self._origin is not None else (origin if _is_loopback_origin(origin) else None)
         print(_development_sign_in_line(shown, base, self._token or ""), file=sys.stdout, flush=True)
 
     def _serve(self, request: Request, path: str, wants_html: bool, base: str) -> Response:
