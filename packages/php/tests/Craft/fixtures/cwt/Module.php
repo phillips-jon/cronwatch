@@ -23,6 +23,14 @@ final class Module extends \yii\base\Module
         Craft::setAlias('@cwt', __DIR__);
         $this->controllerNamespace = Craft::$app->getRequest()->getIsConsoleRequest() ? 'cwt\\console\\controllers' : 'cwt\\controllers';
         parent::init();
+        // Once the plugins are loaded, so after the plugin's own listener: Cancelled never runs.
+        Craft::$app->onInit(function (): void {
+            Event::on(\yii\queue\Queue::class, \yii\queue\Queue::EVENT_BEFORE_EXEC, function (\yii\queue\ExecEvent $event): void {
+                if ($event->job instanceof jobs\Cancelled) {
+                    $event->handled = true;
+                }
+            });
+        });
         Event::on(Plugin::class, Plugin::EVENT_ALERTS, function (AlertsEvent $event): void {
             $event->channels[] = function (Alert $alert): void {
                 $file = Craft::getAlias('@storage/runtime/cwt-alerts.json');

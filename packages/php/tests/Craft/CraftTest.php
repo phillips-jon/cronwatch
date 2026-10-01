@@ -603,6 +603,22 @@ final class CraftTest extends TestCase
         $this->assertSame('Queue job cwt\jobs\Flaky', self::definition($name)['description']);
     }
 
+    /**
+     * A listener of EVENT_BEFORE_EXEC registered after the plugin's cancels
+     * the job (the fixtures' Module does, for Cancelled): the queue sends no
+     * "after" event, and the attempt is no run at all, not one left running
+     * (stuck) or ended as interrupted when the process exits. In a child
+     * process per job (queue/run's default) and in the worker's own.
+     */
+    public function testAQueueJobAnotherListenerCancelsIsNoRun(): void
+    {
+        foreach ([[], ['--isolate=0']] as $options) {
+            self::must(['cwt/task/push-cancelled']);
+            self::must(['queue/run', ...$options]);
+            $this->assertSame([], self::runs('cwt-cancelled'), 'queue/run ' . implode(' ', $options));
+        }
+    }
+
     public function testAlertLinksNeverTakeTheHostOfAVisitorsRequest(): void
     {
         // A site as Craft makes one: @web not set, so Craft takes it from each
