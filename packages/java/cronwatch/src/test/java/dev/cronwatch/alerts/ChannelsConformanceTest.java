@@ -341,6 +341,30 @@ class ChannelsConformanceTest {
       }
     }
 
+    // The webhook's whole body, "schema": 1 first, and its signature.
+    for (JsObject c : Fixtures.objects(f, "webhookPayloads")) {
+      Channel ch =
+          Webhook.channel(
+              WebhookOptions.builder()
+                  .url("https://hooks.example.com/in")
+                  .secret(s(c, "secret"))
+                  .transport(rec)
+                  .build());
+      rec.answerWith(200, "");
+      ch.send(alerts.get(s(c, "alert")), cx);
+      Request sent = rec.taken().get(0);
+      failures.same("webhook body of " + s(c, "alert"), Recorder.body(sent), c.get("body"));
+      failures.same(
+          "webhook signature of " + s(c, "alert"),
+          sent.header("x-cronwatch-signature"),
+          c.get("signature"));
+      failures.same(
+          "Webhook.signature of " + s(c, "alert"),
+          "sha256=" + Webhook.signature(s(c, "secret"), s(c, "body")),
+          c.get("signature"));
+      count++;
+    }
+
     JsObject partial = Fixtures.object(f, "twilioPartial");
     JsObject po = Fixtures.object(partial, "options");
     List<String> numbers = strings(po.get("to"));
@@ -436,6 +460,7 @@ class ChannelsConformanceTest {
     for (String key : List.of("sends", "providerSends", "failures", "providerFailures")) {
       total += Fixtures.objects(f, key).size();
     }
+    total += Fixtures.objects(f, "webhookPayloads").size();
     total += Fixtures.objects(partial, "cases").size();
     for (String key :
         List.of("errorBodies", "subjects", "smsSegments", "smsBodies", "discordDescriptions")) {
