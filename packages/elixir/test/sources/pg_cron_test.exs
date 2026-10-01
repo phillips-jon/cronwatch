@@ -407,6 +407,46 @@ defmodule Cronwatch.Sources.PgCronTest do
     assert Enum.map(Cronwatch.defined_jobs(instance: k.cw), & &1.name) == ["vacuum"]
   end
 
+  test "a renamed job's old name forgotten while its run is open lets the run go, with no error" do
+    c = Clock.new()
+    cron = FakeCron.new()
+    FakeCron.job(cron, 1, "a", "0 3 * * *")
+    running = FakeCron.add(cron, 1, "running", @t0 - 5000, nil)
+    {:ok, opened} = Agent.start_link(fn -> [] end)
+    fake = FakeCron.query(cron)
+
+    query = fn sql, params ->
+      if sql =~ "unnest" do
+        ids = params |> Enum.at(2) |> String.trim("{") |> String.trim("}") |> String.split(",", trim: true)
+        Agent.update(opened, &(&1 ++ [Enum.map(ids, fn id -> String.to_integer(id) end)]))
+      end
+
+      fake.(sql, params)
+    end
+
+    k = make(sources: [{PgCron, [query: query]}], clock_ref: c)
+    check(k)
+    assert run(k, pid(running)).job == "a"
+    FakeCron.update_job(cron, 1, &%{&1 | jobname: "b"})
+    Clock.advance(c, @min)
+    check(k)
+    assert description(Cronwatch.job_summary!("a", instance: k.cw)) =~ "renamed to b"
+    :ok = Cronwatch.forget("a", instance: k.cw)
+    FakeCron.update(cron, running, &%{&1 | status: "succeeded", end: @t0})
+
+    for _ <- 1..3 do
+      Clock.advance(c, @min)
+      Agent.update(opened, fn _ -> [] end)
+      check(k)
+    end
+
+    assert messages(k.errors) == []
+    assert Cronwatch.job_summary!("a", instance: k.cw) == nil, "the forgotten name is not declared again"
+    assert run(k, pid(running)) == nil, "the run is not recorded"
+    assert Enum.all?(Agent.get(opened, & &1), &(running not in &1)), "and is no longer read"
+    assert Enum.map(Cronwatch.defined_jobs(instance: k.cw), & &1.name) == ["b"]
+  end
+
   test "a job's options apply, and a schedule it cannot read is reported" do
     cron = FakeCron.new()
     FakeCron.job(cron, 1, "odd", "not a schedule")

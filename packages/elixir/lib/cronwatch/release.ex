@@ -16,9 +16,13 @@ defmodule Cronwatch.Release do
   mails the failure. From source, `mix cronwatch.check` does the same.
 
   The instance's `check_every` and `integrations` are left out: the process
-  checks once and ends. Called where the instance is already running (`bin/my_app
-  rpc` into the live app), it checks that instance, leaves it running and
-  never halts, since halting would stop the app.
+  checks once and ends. Its `deliver` is `:now` whatever the configuration
+  says: an app whose job nodes queue their alerts (`deliver: :check`) has
+  this check send them, so it sends them itself. Called where the instance
+  is already running (`bin/my_app rpc` into the live app), it checks that
+  instance, leaves it running and never halts, since halting would stop the
+  app; an instance there that delivers at check time sends nothing, which
+  the line it prints says, with a warning on standard error.
   """
 
   @doc """
@@ -41,7 +45,18 @@ defmodule Cronwatch.Release do
       {:ok, r} ->
         jobs = length(r.jobs)
         alerts = length(r.alerts)
-        IO.puts("cronwatch: checked #{jobs} job#{plural(jobs)}, sent #{alerts} alert#{plural(alerts)}")
+
+        if running and Cronwatch.Config.get(name).deliver == :check do
+          IO.puts(
+            :stderr,
+            "[cronwatch] #{inspect(name)} delivers with deliver: :check, so this check sends no alerts. " <>
+              "Another process must run checks with deliver: :now (the default) to send them."
+          )
+
+          IO.puts("cronwatch: checked #{jobs} job#{plural(jobs)}, queued #{alerts} alert#{plural(alerts)}")
+        else
+          IO.puts("cronwatch: checked #{jobs} job#{plural(jobs)}, sent #{alerts} alert#{plural(alerts)}")
+        end
 
       {:error, e} ->
         IO.puts(:stderr, "cronwatch: the check failed: #{Cronwatch.Config.describe(e)}")
@@ -63,7 +78,13 @@ defmodule Cronwatch.Release do
   end
 
   defp start_and_check(name, config, repos) do
-    config = config |> Keyword.drop([:check_every, :integrations]) |> Keyword.put(:name, name)
+    # This process is the one that sends: deliver: :check here would queue
+    # every alert for a check that never comes.
+    config =
+      config
+      |> Keyword.drop([:check_every, :integrations])
+      |> Keyword.put(:name, name)
+      |> Keyword.put(:deliver, :now)
 
     case Cronwatch.Supervisor.start_link(config) do
       {:ok, sup} ->

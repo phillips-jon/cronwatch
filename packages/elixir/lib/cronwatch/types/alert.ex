@@ -24,6 +24,15 @@ defmodule Cronwatch.Alert do
   in stored order, that a newer release added: a queued alert is written
   back, and sent on retry, with every field it was read with, as the SDK
   keeps it.
+
+  `value` is the object an alert was read from, when that is not what this
+  release would write for it (a foreign or damaged queued alert, missing a
+  field or holding one of the wrong type): while the alert is unchanged it
+  is written back as it was read, as the SDK keeps such an entry, and the
+  retry judges it by what it holds: a recovery whose details do not list
+  what it recovers from, or an alert whose time is not a number, is dropped
+  as stale.
+  It is nil for an alert made here or read as this release writes it.
   """
 
   alias Cronwatch.JS
@@ -44,7 +53,8 @@ defmodule Cronwatch.Alert do
     triage: nil,
     triage_tried: false,
     at: 0,
-    extra: []
+    extra: [],
+    value: nil
   ]
 
   @known ~w(type run details job definition title message at triage)
@@ -60,12 +70,23 @@ defmodule Cronwatch.Alert do
           triage: String.t() | nil,
           triage_tried: boolean(),
           at: integer(),
-          extra: [{String.t(), Object.value()}]
+          extra: [{String.t(), Object.value()}],
+          value: Object.t() | nil
         }
 
   @doc "The alert as the SDK writes it."
   @spec to_value(t()) :: Object.t()
-  def to_value(%__MODULE__{} = a) do
+  def to_value(%__MODULE__{value: %Object{} = value} = a) do
+    # Unchanged since it was read: as it was read.
+    case from_value(value) do
+      {:ok, read} when read == a -> value
+      _ -> written(a)
+    end
+  end
+
+  def to_value(%__MODULE__{} = a), do: written(a)
+
+  defp written(a) do
     pairs = [
       {"type", a.type},
       {"run", if(a.run, do: Run.to_value(a.run))},
@@ -216,36 +237,37 @@ defmodule Cronwatch.Alert do
 
     # A queued alert's run keeps the metrics that are numbers, as a stored
     # run row does, so one another writer stored otherwise cannot fail every
-    # read of the job's state.
+    # read of the job's state; a run that is not one reads as none.
     run =
       case Object.get(o, "run") do
-        nil ->
-          {:ok, nil}
-
         %Object{} = r ->
-          with {:ok, run} <- Run.from_value(Object.put(r, "metrics", Metrics.lenient(Object.get(r, "metrics")))),
-               do: {:ok, Run.with_extra(run, r)}
+          case Run.from_value(Object.put(r, "metrics", Metrics.lenient(Object.get(r, "metrics")))) do
+            {:ok, run} -> Run.with_extra(run, r)
+            {:error, _} -> nil
+          end
 
-        r ->
-          Run.from_value(r)
+        _ ->
+          nil
       end
 
-    with {:ok, run} <- run do
-      {:ok,
-       %__MODULE__{
-         type: type,
-         run: run,
-         details: details_from(type, Read.object(o, "details")),
-         job: Read.str(o, "job"),
-         definition: Read.object(o, "definition"),
-         title: Read.str(o, "title"),
-         message: Read.str(o, "message"),
-         triage_tried: Object.has_key?(o, "triage"),
-         triage: Read.nullable_str(o, "triage"),
-         at: Read.int(o, "at"),
-         extra: Enum.reject(o.pairs, fn {k, _} -> k in @known end)
-       }}
-    end
+    alert = %__MODULE__{
+      type: type,
+      run: run,
+      details: details_from(type, Read.object(o, "details")),
+      job: Read.str(o, "job"),
+      definition: Read.object(o, "definition"),
+      title: Read.str(o, "title"),
+      message: Read.str(o, "message"),
+      triage_tried: Object.has_key?(o, "triage"),
+      triage: Read.nullable_str(o, "triage"),
+      at: Read.int(o, "at"),
+      extra: Enum.reject(o.pairs, fn {k, _} -> k in @known end)
+    }
+
+    # Kept as read only when that is not what this release writes for it.
+    if JS.stringify(written(alert)) == JS.stringify(o),
+      do: {:ok, alert},
+      else: {:ok, %{alert | value: o}}
   end
 
   def from_value(v), do: {:error, "an alert must be an object, not #{Read.kind(v)}"}

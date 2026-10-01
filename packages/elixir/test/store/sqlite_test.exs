@@ -56,15 +56,22 @@ defmodule Cronwatch.Store.SQLiteTest do
 
     assert SQL.statements(:sqlite, "cw_").cas_update ==
              "UPDATE cw_state SET state = ? WHERE job = ? AND " <>
-               "CASE WHEN json_type(state, '$.version') NOT IN ('integer', 'real') THEN 0 " <>
+               "CASE WHEN NOT json_valid(state) THEN 0 WHEN json_type(state, '$.version') NOT IN ('integer', 'real') THEN 0 " <>
                "WHEN json_extract(state, '$.version') = CAST(json_extract(state, '$.version') AS INTEGER) " <>
                "AND json_extract(state, '$.version') BETWEEN 0 AND 9007199254740991 " <>
                "THEN CAST(json_extract(state, '$.version') AS INTEGER) ELSE 0 END = ?"
 
     assert String.ends_with?(SQL.update_run_if(:postgres, "cw_", 2), "WHERE id = $7 AND status IN ($8, $9)")
 
+    # sql.ts's SELECT *, but a time held as an infinite REAL reads as NULL,
+    # which the driver can hand over.
+    finite = fn c ->
+      "CASE WHEN typeof(#{c}) <> 'real' THEN #{c} WHEN abs(#{c}) > 1.7976931348623157e308 THEN NULL ELSE #{c} END AS #{c}"
+    end
+
     assert SQL.statements(:sqlite, "cw_").list_runs ==
-             "SELECT * FROM cw_runs WHERE job = ? ORDER BY started_at DESC, rowid DESC LIMIT ?"
+             "SELECT id, job, status, #{finite.("started_at")}, #{finite.("finished_at")}, #{finite.("duration_ms")}, " <>
+               "error, output, metrics, trigger FROM cw_runs WHERE job = ? ORDER BY started_at DESC, rowid DESC LIMIT ?"
   end
 
   use ForeignRows, store: fn -> Repo.store(file()) end
@@ -116,6 +123,26 @@ defmodule Cronwatch.Store.SQLiteTest do
     assert Repo.sql(pid, "SELECT name FROM sqlite_master WHERE name = 'app_rows'").rows == []
   end
 
+  defp fresh do
+    path = file()
+    pid = Repo.start(path)
+    {:ok, h} = EctoStore.new(repo: Repo, dynamic_repo: pid)
+    {{EctoStore, h}, pid}
+  end
+
+  test "each foreign row reads leniently (store.json foreignRows.rows)" do
+    ForeignRows.replay_rows(fn ->
+      dir = Repo.tmp_dir()
+      pid = Repo.start(Path.join(dir, "row.db"))
+      {:ok, h} = EctoStore.new(repo: Repo, dynamic_repo: pid)
+      {{EctoStore, h}, pid}
+    end)
+  end
+
+  test "a check, a silence and every page over foreign rows (store.json foreignRows.check)" do
+    ForeignRows.replay_check(&fresh/0)
+  end
+
   test "rows of another shape are read as the SDK reads them" do
     path = file()
     pid = Repo.start(path)
@@ -125,7 +152,8 @@ defmodule Cronwatch.Store.SQLiteTest do
 
     # Metrics that are not all numbers keep the ones that are; a time stored
     # as text or real is read as a number; text that is not UTF-8 reads
-    # with U+FFFD; a definition that is not an object is an empty one.
+    # with U+FFFD; a definition that is not an object is read as it is, and
+    # the client reads it as unreadable.
     Repo.sql(
       pid,
       "INSERT INTO cronwatch_runs (id, job, status, started_at, finished_at, duration_ms, error, output, metrics, trigger) " <>
@@ -142,7 +170,9 @@ defmodule Cronwatch.Store.SQLiteTest do
     assert run.finished_at == 1600
     assert run.output == "bad � byte"
     {:ok, [job]} = Store.call(store, :list_jobs, [])
-    assert JS.stringify(job.definition) == "{}"
+    assert JS.stringify(job.definition) == "[1,2]"
+    {read, false} = Cronwatch.Serialize.read_stored_job(job)
+    assert JS.stringify(read.definition) == ~s({"name":"j"})
     {:ok, big} = Store.call(store, :get_run, ["big"])
     assert big.started_at == 9_223_372_036_854_775_807
 

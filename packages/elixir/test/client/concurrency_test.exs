@@ -7,6 +7,7 @@ defmodule Cronwatch.ConcurrencyTest do
 
   alias Cronwatch.JS.Object
   alias Cronwatch.Store
+  alias Cronwatch.Test.Barrier
   alias Cronwatch.Test.Capture
   alias Cronwatch.Test.Clock
   alias Cronwatch.Test.Repo
@@ -16,12 +17,13 @@ defmodule Cronwatch.ConcurrencyTest do
 
   # Two instances, as two processes sharing one store, each failing the job
   # once at the same time.
-  defp race(store_a, store_b) do
+  defp race(store_a, store_b, barrier \\ nil) do
     clock = Clock.new()
     one = make(store: store_a, clock_ref: clock)
     two = make(store: store_b, clock_ref: clock)
     opts = [failures_before_alert: 2]
     Cronwatch.run("shared", fn _ -> nil end, [instance: one.cw] ++ opts)
+    if barrier, do: Barrier.on(barrier)
 
     tasks =
       for {i, msg} <- [{one, "one"}, {two, "two"}] do
@@ -29,6 +31,7 @@ defmodule Cronwatch.ConcurrencyTest do
       end
 
     Task.await_many(tasks, 10_000)
+    if barrier, do: Barrier.off(barrier)
     %{one: one, two: two, types: Capture.types(one.alerts) ++ Capture.types(two.alerts)}
   end
 
@@ -59,11 +62,15 @@ defmodule Cronwatch.ConcurrencyTest do
 
   test "a custom store without compare_and_set_state still works, but cannot keep two processes apart" do
     name = shared_memory()
+    # Both processes read each state before either writes, every time, so
+    # the lost update is certain rather than left to timing.
+    barrier = Barrier.new()
 
     r =
       race(
-        WrapNoCas.spec(inner: Wrap.memory(name), slow_state: 25),
-        WrapNoCas.spec(inner: Wrap.memory(name), slow_state: 25)
+        WrapNoCas.spec(inner: Wrap.memory(name), barrier: barrier),
+        WrapNoCas.spec(inner: Wrap.memory(name), barrier: barrier),
+        barrier
       )
 
     # The documented caveat: the later write wins, so one failure is lost.

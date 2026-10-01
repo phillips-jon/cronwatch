@@ -9,13 +9,18 @@ defmodule Cronwatch.Test.ForeignRows do
 
   import ExUnit.Assertions
 
+  alias Cronwatch.Evaluate
   alias Cronwatch.JobState
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
+  alias Cronwatch.Run
+  alias Cronwatch.Serialize
   alias Cronwatch.Store.Ecto, as: EctoStore
   alias Cronwatch.Test.Capture
   alias Cronwatch.Test.Client
+  alias Cronwatch.Test.Clock
   alias Cronwatch.Test.Conformance
+  alias Cronwatch.Test.Repo
   alias Cronwatch.Test.Servers
   alias Cronwatch.Test.Stores
 
@@ -150,6 +155,148 @@ defmodule Cronwatch.Test.ForeignRows do
     assert hd(String.split(sent.message, "\n")) ==
              "Started before 0001-01-01 00:00:00 UTC and never reported finishing. " <>
                "Marked as timed out after 104249991d 8h."
+  end
+
+  ## store.json foreignRows, on SQLite (its values are as SQLite holds them)
+
+  @doc """
+  `foreignRows.rows`: each row alone in a fresh SQLite store, read
+  leniently: a job as the client reads it (from get and list), a run as the
+  store reads it (from get and list), a state as normalize_state reads it.
+  stores.test.ts has the same test.
+  """
+  def replay_rows(new_store) do
+    rows = foreign_rows() |> Object.get("rows")
+    assert length(rows) >= 28
+
+    for c <- rows do
+      {{EctoStore, h} = store, pid} = new_store.()
+      :ok = EctoStore.init(h)
+      table = Object.get(c, "table")
+      row = Object.get(c, "row")
+      insert(pid, table, row)
+      want = JS.stringify(Object.get(c, "read"))
+      label = "#{table} #{JS.stringify(row)}"
+
+      case table do
+        "jobs" ->
+          name = Object.get(row, "name")
+          {:ok, got} = Cronwatch.Store.call(store, :get_job, [name])
+          {job, readable} = Serialize.read_stored_job(got)
+          assert JS.stringify(stored_value(job)) == want, label
+          assert readable == Object.get(c, "readable"), label
+          {:ok, listed} = Cronwatch.Store.call(store, :list_jobs, [])
+          assert Enum.map(listed, &JS.stringify(stored_value(elem(Serialize.read_stored_job(&1), 0)))) == [want], label
+
+        "runs" ->
+          {:ok, got} = Cronwatch.Store.call(store, :get_run, [Object.get(row, "id")])
+          assert JS.stringify(Run.to_value(got)) == want, label
+          {:ok, listed} = Cronwatch.Store.call(store, :list_runs, [Object.get(row, "job"), 10])
+          assert Enum.map(listed, &JS.stringify(Run.to_value(&1))) == [want], label
+
+        "state" ->
+          job = Object.get(row, "job")
+          {:ok, got} = Cronwatch.Store.call(store, :get_state, [job])
+          assert JS.stringify(JobState.to_value(Evaluate.normalize_state(got, job))) == want, label
+      end
+    end
+  end
+
+  @doc """
+  `foreignRows.check`: every row in one SQLite store beside a healthy job
+  with a failed run, and a client that declares nothing checks at `now`,
+  silences the job whose state does not parse, and reads every page. Only
+  the jobs whose definition is not an object are reported; the rest are
+  checked as usual. stores.test.ts has the same test.
+  """
+  def replay_check(new_store) do
+    f = foreign_rows()
+    c = Object.get(f, "check")
+    rows = Object.get(f, "rows")
+    {{EctoStore, h} = store, pid} = new_store.()
+    :ok = EctoStore.init(h)
+    of = fn table -> for r <- rows, Object.get(r, "table") == table, do: Object.get(r, "row") end
+    jobs = of.("jobs") ++ Object.get(c, "extraJobs")
+    for row <- jobs, do: insert(pid, "jobs", row)
+    for row <- of.("runs") ++ Object.get(c, "extraRuns"), do: insert(pid, "runs", row)
+    for row <- of.("state"), do: insert(pid, "state", row)
+    names = Enum.map(jobs, &Object.get(&1, "name"))
+
+    %{cw: cw, errors: errors, alerts: alerts} =
+      Client.make(store: Stores.option(store), clock_ref: Clock.new(Object.get(c, "now")))
+
+    reported = fn ->
+      wheres = Agent.get_and_update(errors, &{&1, []})
+
+      wheres
+      |> Enum.map(fn {where, _} -> Enum.find(names, where, &String.ends_with?(where, " " <> &1)) end)
+      |> Enum.uniq()
+      |> Enum.sort()
+    end
+
+    result = Cronwatch.check!(instance: cw)
+    assert reported.() == Object.get(c, "reported")
+
+    sent = for a <- Capture.alerts(alerts), do: Object.new([{"type", a.type}, {"job", a.job}, {"at", a.at}])
+    assert JS.stringify(sent) == JS.stringify(Object.get(c, "alerts"))
+
+    health = Object.new(for j <- result.jobs, do: {j.name, j.health})
+    assert JS.stringify(health) == JS.stringify(Object.get(c, "health"))
+
+    silence = Object.get(c, "silence")
+    Cronwatch.silence!(Object.get(silence, "job"), Object.get(silence, "for"), instance: cw)
+    assert reported.() == Object.get(silence, "reported")
+    assert raw_state(pid, Object.get(silence, "job")) == JS.stringify(Object.get(silence, "state"))
+
+    # As stored: a read that changes nothing writes nothing, so some are
+    # still the foreign values.
+    for {job, state} <- Object.to_list(Object.get(c, "states")) do
+      assert raw_state(pid, job) == JS.stringify(state), job
+    end
+
+    opts = Cronwatch.Web.init(instance: cw, token: "tok")
+
+    for page <- c |> Object.get("read") |> Object.get("pages") do
+      path = Object.get(page, "path")
+
+      conn =
+        Plug.Test.conn("GET", path)
+        |> Map.put(:host, "app.test")
+        |> Map.put(:req_headers, [{"host", "app.test"}, {"authorization", "Bearer tok"}])
+        |> Cronwatch.Web.call(opts)
+
+      assert conn.status == Object.get(page, "status"), path
+    end
+
+    assert reported.() == c |> Object.get("read") |> Object.get("reported")
+  end
+
+  defp foreign_rows, do: Conformance.fixture("store") |> Object.get("foreignRows")
+
+  defp insert(pid, table, %Object{} = row) do
+    keys = Object.keys(row)
+    marks = Enum.map_join(keys, ", ", fn _ -> "?" end)
+
+    Repo.sql(
+      pid,
+      "INSERT INTO cronwatch_#{table} (#{Enum.join(keys, ", ")}) VALUES (#{marks})",
+      Enum.map(keys, &Object.get(row, &1))
+    )
+  end
+
+  # The state's row as stored, as the JSON it holds.
+  defp raw_state(pid, job) do
+    %{rows: [[text]]} = Repo.sql(pid, "SELECT state FROM cronwatch_state WHERE job = ?", [job])
+    JS.stringify(JS.parse!(text))
+  end
+
+  defp stored_value(job) do
+    Object.new([
+      {"name", job.name},
+      {"definition", job.definition},
+      {"createdAt", job.created_at},
+      {"updatedAt", job.updated_at}
+    ])
   end
 
   defp param(:postgres), do: "$1::text::jsonb"

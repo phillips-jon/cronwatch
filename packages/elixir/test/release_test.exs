@@ -4,10 +4,15 @@ defmodule Cronwatch.ReleaseTest do
 
   import ExUnit.CaptureIO
 
+  alias Cronwatch.Config
+  alias Cronwatch.Core
   alias Cronwatch.Release
   alias Cronwatch.Store.Ecto, as: EctoStore
+  alias Cronwatch.Test.Capture
+  alias Cronwatch.Test.More
   alias Cronwatch.Test.Repo
   alias Cronwatch.Test.Stores
+  alias Cronwatch.Test.Wrap
   alias Mix.Tasks.Cronwatch.Check, as: CheckTask
 
   setup do
@@ -70,6 +75,35 @@ defmodule Cronwatch.ReleaseTest do
     for fun <- [:list_jobs, :running_runs], do: Stores.hook(hooks, fun, fn _, _ -> {:error, :down} end)
     err = capture_io(:stderr, fn -> assert {:error, _} = Release.check(:release_running) end)
     assert err =~ "cronwatch: the check failed"
+  end
+
+  test "the crontab check sends what job nodes with deliver: :check queued, whatever its own deliver" do
+    name = More.shared_memory()
+    store = Wrap.spec(inner: Wrap.memory(name))
+    start_supervised!({Cronwatch, name: :release_node, store: store, alerts: [], deliver: :check, cron_secret: false})
+    catch_error(Cronwatch.run("nightly", fn _ -> raise "boom" end, instance: :release_node))
+    [queued] = Core.read_state!(Config.get(:release_node), "nightly").undelivered
+    assert queued.type == "failed"
+
+    capture = Capture.new()
+    config = [store: store, alerts: [Capture.channel(capture)], deliver: :check]
+    out = capture_io(fn -> assert {:ok, _} = Release.check(:release_sender, config: config, halt: false) end)
+    assert Capture.types(capture) == ["failed"], "the queued alert was sent"
+    assert out == "cronwatch: checked 1 job, sent 1 alert\n"
+    assert Core.read_state!(Config.get(:release_node), "nightly").undelivered == []
+  end
+
+  test "a running instance that delivers at check time says it queued, and warns" do
+    start_supervised!({Cronwatch, name: :release_deferred, alerts: [], deliver: :check, cron_secret: false})
+    catch_error(Cronwatch.run("nightly", fn _ -> raise "boom" end, instance: :release_deferred))
+
+    err =
+      capture_io(:stderr, fn ->
+        out = capture_io(fn -> assert {:ok, _} = Release.check(:release_deferred) end)
+        assert out == "cronwatch: checked 1 job, queued 0 alerts\n"
+      end)
+
+    assert err =~ "sends no alerts"
   end
 
   test "a store without a repo, or with one that is not a repo, is a failure answered, not raised" do

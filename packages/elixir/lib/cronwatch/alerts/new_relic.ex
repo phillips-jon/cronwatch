@@ -21,7 +21,7 @@ defmodule Cronwatch.Alerts.NewRelic do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
 
-  @derive {Inspect, except: [:api_key]}
+  @derive {Inspect, except: [:api_key, :transport]}
   defstruct [:api_key, :url, :event_type, :link, :transport]
 
   @impl true

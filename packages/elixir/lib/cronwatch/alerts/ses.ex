@@ -27,7 +27,7 @@ defmodule Cronwatch.Alerts.SES do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
 
-  @derive {Inspect, except: [:secret_access_key, :session_token]}
+  @derive {Inspect, except: [:secret_access_key, :session_token, :transport]}
   defstruct [
     :region,
     :access_key_id,

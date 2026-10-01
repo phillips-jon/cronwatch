@@ -139,8 +139,8 @@ defmodule Cronwatch.Conformance.CoreTest do
       |> list("normalizeState")
       |> Enum.with_index()
       |> Enum.reduce(fails, fn {c, i}, acc ->
-        input = if field(c, "state"), do: state(field(c, "state"))
-        got = Evaluate.normalize_state(input, "j")
+        # Any JSON value: one that is not an object reads as no state.
+        got = Evaluate.normalize_state(field(c, "state"), "j")
         same(acc, "normalizeState #{i}", JobState.to_value(got), field(c, "normalized"))
       end)
 

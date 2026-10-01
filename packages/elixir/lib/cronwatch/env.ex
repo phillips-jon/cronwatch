@@ -51,4 +51,16 @@ defmodule Cronwatch.Env do
       value -> value
     end
   end
+
+  @doc """
+  A secret from the environment (`CRONWATCH_TOKEN`, `CRON_SECRET`): nil when
+  the variable is unset, empty or only whitespace (as JavaScript's trim sees
+  it), so a blank value counts as not set and the dashboard and handlers
+  fail closed. Any other value is used as it is, untrimmed.
+  """
+  def read_secret(var), do: var |> System.get_env() |> secret()
+
+  @doc "A secret given as a string: nil when it is nil, empty or only whitespace, else as it is."
+  def secret(value) when is_binary(value), do: if(Cronwatch.JS.trim(value) == "", do: nil, else: value)
+  def secret(_), do: nil
 end

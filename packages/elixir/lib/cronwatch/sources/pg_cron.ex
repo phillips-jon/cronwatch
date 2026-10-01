@@ -839,12 +839,16 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
             []
         end
 
+      # A foreign or damaged definition (not an object, tags not a list) is
+      # not one of ours.
       for job <- stored,
-          definition = job.definition,
+          %Object{} = definition <- [job.definition],
+          tags = Object.get(definition, "tags"),
+          is_list(tags),
           String.starts_with?(job.name, prefix),
           not MapSet.member?(in_use, job.name),
           Object.get(definition, "schedule") not in [nil, ""],
-          "pg_cron" in List.wrap(Object.get(definition, "tags")),
+          "pg_cron" in tags,
           jobid = description_job_id(Object.get(definition, "description")),
           jobid != nil do
         current = names[jobid]
@@ -994,6 +998,21 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       cond do
         name == nil ->
           update_st(&%{&1 | held: Map.delete(&1.held, runid)})
+          []
+
+        # A run copied under a retired name that was then forgotten (the
+        # dashboard's forget) has no job to go to: it is let go, never
+        # recorded and never read again.
+        name not in Map.values(names) and Runs.job(c.name, name) == nil ->
+          update_st(
+            &%{
+              &1
+              | pending: Map.delete(&1.pending, runid),
+                held: Map.delete(&1.held, runid),
+                retired: MapSet.delete(&1.retired, name)
+            }
+          )
+
           []
 
         time(row["start_time"]) == nil and not finished?(text(row["status"])) ->

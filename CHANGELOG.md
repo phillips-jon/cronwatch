@@ -98,6 +98,10 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - One malformed job, run or state row (a hand edit, another writer, a damaged database) affects only its own job, in every language: it no longer stops every check or makes the whole dashboard answer 500. A definition that does not parse or is not an object reads as `{ name }`, and that job is reported and shown as failing; tags that are not a list of strings are left out; unparseable metrics read as `{}`; a time that is not a number reads as 0 (a start) or empty (a finish or duration); a state that does not parse reads as none and is replaced by the next write; and a queued alert that is not an object, a recovery that does not say what it recovers from, and an alert without a numeric time are dropped instead of blocking the job's alerts.
 - An `Authorization` header that is not a bearer, such as a proxy's Basic auth, no longer locks the dashboard: the cookie and `?token=` sign in as if no header came.
 - pg_cron: forgetting the old name of a renamed job while a run of it is open lets the run go, where every check after reported `job is not declared`.
+- Elixir: `false` stays the way to turn a token or secret off, since `nil` means left out; a token, cron secret or handler secret of any other type was already refused, and the error now says so without printing the value.
+- Elixir: a channel's, triage's or the instance's `transport:` options, which can hold a proxy's password, are left out when the struct is inspected (`IO.inspect`, a crash report).
+- Elixir: the webhook body of a queued alert that carries a `schema` key of its own (another writer's) has one `schema` key, first, as the SDK writes it, where it had two and its signature differed.
+- Elixir: `Cronwatch.Release.check/2` and `mix cronwatch.check` send alerts whatever the configuration's `deliver` says, so job nodes given `deliver: :check` have them sent; with `deliver: :check` they queued every alert and printed "sent". Called into a running instance that delivers at check time, the line says the alerts were queued, with a warning on standard error.
 
 ## 0.10.0 and earlier
 

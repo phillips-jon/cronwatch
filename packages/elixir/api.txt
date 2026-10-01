@@ -212,6 +212,11 @@
 # Cronwatch.StoredJob
   type t/0
 # Cronwatch.Telemetry
+# Cronwatch.Test.Barrier
+  function arrive/1
+  function new/0
+  function off/1
+  function on/1
 # Cronwatch.Test.Capture
   function alerts/1
   function channel/1
@@ -279,6 +284,8 @@
   function check_over/1
   function cron_over/2
   function far_starts/0
+  function replay_check/1
+  function replay_rows/1
   function replay_versions/1
   macro __using__/1
 # Cronwatch.Test.HTTP

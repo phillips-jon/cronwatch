@@ -108,4 +108,33 @@ defmodule Cronwatch.Serialize do
   @spec check_expectation(rule() | nil, String.t() | nil) :: String.t() | nil
   def check_expectation(nil, _output), do: nil
   def check_expectation(rule, output), do: check(rule, output || "")
+
+  @doc """
+  A stored job as the client reads it (the SDK's readStoredJob), so a
+  foreign, hand-edited or damaged row affects only its own job: answers
+  `{job, readable}`. A definition that is not a JSON object (a SQL store
+  reads text that does not parse as nil) becomes `{name}` and `readable` is
+  false: the client reports the job and shows it as failing, without
+  evaluating it. `tags` is kept only when it is a list of strings. Every
+  other field is kept as stored.
+  """
+  @spec read_stored_job(Cronwatch.StoredJob.t()) :: {Cronwatch.StoredJob.t(), boolean()}
+  def read_stored_job(%Cronwatch.StoredJob{definition: %Object{} = definition} = stored) do
+    definition =
+      case Object.fetch(definition, "tags") do
+        {:ok, tags} when is_list(tags) ->
+          if Enum.all?(tags, &is_binary/1), do: definition, else: Object.delete(definition, "tags")
+
+        {:ok, _} ->
+          Object.delete(definition, "tags")
+
+        :error ->
+          definition
+      end
+
+    {%{stored | definition: definition}, true}
+  end
+
+  def read_stored_job(%Cronwatch.StoredJob{} = stored),
+    do: {%{stored | definition: Object.new([{"name", stored.name}])}, false}
 end

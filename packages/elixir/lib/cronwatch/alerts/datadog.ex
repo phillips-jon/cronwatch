@@ -20,7 +20,7 @@ defmodule Cronwatch.Alerts.Datadog do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
 
-  @derive {Inspect, except: [:api_key]}
+  @derive {Inspect, except: [:api_key, :transport]}
   defstruct [:api_key, :url, :tags, :host, :link, :transport]
 
   @impl true

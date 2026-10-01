@@ -19,7 +19,7 @@ defmodule Cronwatch.Alerts.Rollbar do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
 
-  @derive {Inspect, except: [:token]}
+  @derive {Inspect, except: [:token, :transport]}
   defstruct [:token, :environment, :recovered, :link, :transport]
 
   @endpoint "https://api.rollbar.com/api/1/item/"

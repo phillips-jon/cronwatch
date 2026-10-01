@@ -8,11 +8,14 @@ defmodule Cronwatch.Test.Wrap do
   as if another process wrote between every read and write) and `init`
   (a function called by `init/1`, answering `:ok` or `{:error, reason}`)
   and `before` (a map of a call's name to a function run before it is
-  passed on).
+  passed on), and `barrier` (a `Cronwatch.Test.Barrier`: while it is on,
+  each `get_state` waits after reading until another has read too, so two
+  processes certainly both get the old state).
   """
   @behaviour Cronwatch.Store
 
   alias Cronwatch.Store.Memory
+  alias Cronwatch.Test.Barrier
 
   def spec(opts), do: {__MODULE__, Map.new(opts)}
 
@@ -61,6 +64,7 @@ defmodule Cronwatch.Test.Wrap do
   def get_state(h, j) do
     result = call(h, :get_state, [j])
     if ms = h[:slow_state], do: Process.sleep(ms)
+    if b = h[:barrier], do: Barrier.arrive(b)
     result
   end
 
@@ -172,4 +176,47 @@ defmodule Cronwatch.Test.More do
   def get(agent), do: Agent.get(agent, & &1)
   def put(agent, v), do: Agent.update(agent, fn _ -> v end)
   def push(agent, v), do: Agent.update(agent, &(&1 ++ [v]))
+end
+
+defmodule Cronwatch.Test.Barrier do
+  @moduledoc """
+  Pairs up callers: while it is on, each `arrive/1` waits until a second
+  caller has arrived for the same pair, so two processes that each read
+  once are certain to have both read before either goes on. Off, it lets
+  everyone through. A caller left waiting for five seconds fails the test
+  rather than hang it.
+  """
+
+  @doc "A barrier, off."
+  def new do
+    {:ok, agent} = Agent.start_link(fn -> %{on: false, arrived: 0} end)
+    agent
+  end
+
+  @doc "Turns it on, from the next arrival."
+  def on(b), do: Agent.update(b, &%{&1 | on: true})
+
+  @doc "Turns it off: every arrival goes straight through."
+  def off(b), do: Agent.update(b, &%{&1 | on: false})
+
+  @doc "Waits for this caller's partner, while the barrier is on."
+  def arrive(b) do
+    ticket =
+      Agent.get_and_update(b, fn
+        %{on: false} = s -> {nil, s}
+        s -> {s.arrived + 1, %{s | arrived: s.arrived + 1}}
+      end)
+
+    if ticket, do: wait(b, div(ticket + 1, 2) * 2, 5_000)
+    :ok
+  end
+
+  defp wait(_b, _until, left) when left <= 0, do: raise("Cronwatch.Test.Barrier: no partner arrived")
+
+  defp wait(b, until, left) do
+    if Agent.get(b, & &1.arrived) < until do
+      Process.sleep(1)
+      wait(b, until, left - 1)
+    end
+  end
 end

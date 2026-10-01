@@ -21,7 +21,7 @@ defmodule Cronwatch.Alerts.Resend do
   alias Cronwatch.JS
   alias Cronwatch.JS.Object
 
-  @derive {Inspect, except: [:api_key]}
+  @derive {Inspect, except: [:api_key, :transport]}
   defstruct [:api_key, :email, :transport]
 
   @endpoint "https://api.resend.com/emails"

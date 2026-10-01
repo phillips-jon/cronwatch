@@ -11,10 +11,11 @@ defmodule Cronwatch.Config do
 
   require Logger
 
-  # The handler's shared secret is never printed (a crash report, an
-  # IO.inspect of the config); the channels' and triage's states print only
-  # what their own Inspect allows.
-  @derive {Inspect, except: [:cron_secret]}
+  # The handler's shared secret and the transport's options (which may hold
+  # a proxy's password) are never printed (a crash report, an IO.inspect of
+  # the config); the channels' and triage's states print only what their own
+  # Inspect allows.
+  @derive {Inspect, except: [:cron_secret, :transport]}
   defstruct name: Cronwatch,
             store: nil,
             default_store: false,
@@ -236,7 +237,7 @@ defmodule Cronwatch.Config do
   defp deliver(other),
     do: {:error, Error.invalid(~s(deliver must be "now" or "check", not #{inspect(other)}))}
 
-  # The SDK's start(every): at least five seconds, and at most setTimeout's
+  # The SDK's startChecking(every): at least five seconds, and at most setTimeout's
   # longest delay.
   @timer_max 2_147_483_647
   defp check_every(nil), do: {:ok, nil}
@@ -248,14 +249,24 @@ defmodule Cronwatch.Config do
   end
 
   # A binary, false for none, or left out to read CRON_SECRET when a handler
-  # needs it; "" counts as unset.
+  # needs it; "" or only whitespace, given or read, counts as unset (with no
+  # fallback to the variable for one given).
   defp cron_secret(opts) do
     case Keyword.fetch(opts, :cron_secret) do
-      :error -> {:ok, :env}
-      {:ok, nil} -> {:ok, :env}
-      {:ok, false} -> {:ok, false}
-      {:ok, s} when is_binary(s) -> {:ok, s}
-      {:ok, other} -> {:error, Error.invalid("Cronwatch: cron_secret must be a string or false, not #{shape(other)}")}
+      :error ->
+        {:ok, :env}
+
+      {:ok, nil} ->
+        {:ok, :env}
+
+      {:ok, false} ->
+        {:ok, false}
+
+      {:ok, s} when is_binary(s) ->
+        {:ok, s}
+
+      {:ok, other} ->
+        {:error, Error.invalid("Cronwatch: cron_secret must be a string, or false to opt out, not #{shape(other)}")}
     end
   end
 
@@ -302,14 +313,16 @@ defmodule Cronwatch.Config do
   # What an option was given as, never its value: a channel given as its
   # webhook URL, or a secret given as a charlist, must not be quoted in the
   # refusal a boot log prints.
-  defp shape(value) when is_binary(value), do: "a string"
-  defp shape(value) when is_list(value), do: "a list"
-  defp shape(value) when is_map(value), do: "a map"
-  defp shape(value) when is_tuple(value), do: "a tuple of #{tuple_size(value)}"
-  defp shape(value) when is_number(value), do: "a number"
-  defp shape(value) when is_function(value), do: "a function of #{elem(:erlang.fun_info(value, :arity), 1)} arguments"
-  defp shape(value) when is_atom(value), do: inspect(value)
-  defp shape(_), do: "a term of another type"
+  @doc false
+  # What kind of value was given, for an error, without the value itself.
+  def shape(value) when is_binary(value), do: "a string"
+  def shape(value) when is_list(value), do: "a list"
+  def shape(value) when is_map(value), do: "a map"
+  def shape(value) when is_tuple(value), do: "a tuple of #{tuple_size(value)}"
+  def shape(value) when is_number(value), do: "a number"
+  def shape(value) when is_function(value), do: "a function of #{elem(:erlang.fun_info(value, :arity), 1)} arguments"
+  def shape(value) when is_atom(value), do: inspect(value)
+  def shape(_), do: "a term of another type"
 
   @doc false
   def describe(%Error{message: m}), do: m

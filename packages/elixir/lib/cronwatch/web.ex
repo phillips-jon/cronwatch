@@ -22,7 +22,9 @@ if Code.ensure_loaded?(Plug.Conn) do
       * `:instance` - the Cronwatch instance to show (default `Cronwatch`).
       * `:token` - the token the dashboard asks for, sent as
         `Authorization: Bearer <token>`, or once as `?token=<token>`, which
-        moves it into a cookie. Left out (or `""`), it is `CRONWATCH_TOKEN`,
+        moves it into a cookie. Left out (or `""`, or a string of only
+        whitespace), it is `CRONWATCH_TOKEN` (counted as unset when it is
+        only whitespace),
         read on each request; `{:system, "VAR"}` reads another variable, also
         on each request, so a release does not bake in its build machine's
         value. `false` serves the dashboard open to anyone, for one behind the
@@ -88,7 +90,11 @@ if Code.ensure_loaded?(Plug.Conn) do
         do: raise(ArgumentError, "Cronwatch.Web: instance must be an atom, not #{inspect(instance)}")
 
       unless token == nil or token == false or is_binary(token) or match?({:system, v} when is_binary(v), token),
-        do: raise(ArgumentError, "Cronwatch.Web: token must be a string, {:system, name} or false")
+        do:
+          raise(
+            ArgumentError,
+            "Cronwatch.Web: token must be a string or {:system, name}, or false to serve it open, not #{Cronwatch.Config.shape(token)}"
+          )
 
       unless base_path == nil or is_binary(base_path),
         do: raise(ArgumentError, "Cronwatch.Web: base_path must be a string, not #{inspect(base_path)}")

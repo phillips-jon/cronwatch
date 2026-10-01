@@ -75,12 +75,13 @@ defmodule Cronwatch.Web.Routes do
   request, so a release does not bake in its build machine's environment.
   """
   def token_state(opts) do
+    # A blank token, given or read, counts as unset (Env.secret/1).
     configured =
       case opts.token do
         false -> :open
-        {:system, var} -> Env.read(var) || Env.read("CRONWATCH_TOKEN")
-        t when is_binary(t) and t != "" -> t
-        _ -> Env.read("CRONWATCH_TOKEN")
+        {:system, var} -> Env.read_secret(var) || Env.read_secret("CRONWATCH_TOKEN")
+        t when is_binary(t) -> Env.secret(t) || Env.read_secret("CRONWATCH_TOKEN")
+        _ -> Env.read_secret("CRONWATCH_TOKEN")
       end
 
     cond do
@@ -111,11 +112,14 @@ defmodule Cronwatch.Web.Routes do
   @doc "The cookie's value for a token: the SHA-256 of `cronwatch-cookie:<token>`, as hex."
   def cookie_value(token), do: :sha256 |> :crypto.hash("cronwatch-cookie:" <> token) |> Base.encode16(case: :lower)
 
-  @doc "The instance's cron secret, or nil: the option, else `CRON_SECRET`, `\"\"` counting as unset."
+  @doc """
+  The instance's cron secret, or nil: the option, else `CRON_SECRET`, a
+  value that is empty or only whitespace counting as unset. A blank option
+  means no secret, with no fallback to the variable.
+  """
   def cron_secret(%Config{cron_secret: false}), do: nil
-  def cron_secret(%Config{cron_secret: :env}), do: Env.read("CRON_SECRET")
-  def cron_secret(%Config{cron_secret: ""}), do: nil
-  def cron_secret(%Config{cron_secret: s}) when is_binary(s), do: s
+  def cron_secret(%Config{cron_secret: :env}), do: Env.read_secret("CRON_SECRET")
+  def cron_secret(%Config{cron_secret: s}) when is_binary(s), do: Env.secret(s)
   def cron_secret(_), do: nil
 
   @doc """
@@ -247,19 +251,18 @@ defmodule Cronwatch.Web.Routes do
     (origin != nil and origin != public_origin) or (site != nil and site not in ["same-origin", "none"])
   end
 
-  # The Authorization header without its "Bearer " (in any case, with any
-  # spaces after it), or nil when there is none.
+  # The token an Authorization header carries: what follows the scheme when
+  # the scheme is Bearer (any case) and whitespace follows it, else nil. Any
+  # other scheme (a proxy's Basic auth, say) is no bearer at all, so the
+  # cookie and ?token= are read as if no header came.
   defp bearer(req) do
     case header_text(req, "authorization") do
-      nil ->
-        nil
-
-      <<b::binary-size(6), rest::binary>> = text when rest != "" ->
+      <<b::binary-size(6), rest::binary>> when rest != "" ->
         trimmed = JS.trim_start(rest)
-        if ascii_downcase(b) == "bearer" and byte_size(trimmed) < byte_size(rest), do: trimmed, else: text
+        if ascii_downcase(b) == "bearer" and byte_size(trimmed) < byte_size(rest), do: trimmed
 
-      text ->
-        text
+      _ ->
+        nil
     end
   end
 
@@ -413,6 +416,11 @@ defmodule Cronwatch.Web.Routes do
           do: page("Cross-site request refused", "Changes can only be made from the dashboard itself.", base, 403),
           else: api(error_body("Cross-site request refused"), 403)
 
+      # The sign-in form posts the token here, in the body, so it stays out
+      # of the URL and every access log. Cross-site posts were refused above.
+      token != nil and method == "POST" and path == "/signin" ->
+        sign_in(req, public_origin, base, {kind, token})
+
       true ->
         said = %{method: method, public_origin: public_origin, query: query, bearer: bearer(req)}
         at = %{pathname: pathname, path: path, base: base, wants_html: wants_html}
@@ -447,52 +455,87 @@ defmodule Cronwatch.Web.Routes do
       end
 
     cond do
+      denied and wants_html ->
+        sign_in_page(kind, base)
+
       denied and kind == :generated ->
-        if wants_html,
-          do:
-            page(
-              "Sign in",
-              "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.",
-              base,
-              401,
-              true
-            ),
-          else:
-            api(
-              error_body(
-                "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log"
-              ),
-              401
-            )
+        api(
+          error_body(
+            "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log"
+          ),
+          401
+        )
 
       denied ->
-        if wants_html,
-          do:
-            page(
-              "Sign in",
-              "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.",
-              base,
-              401,
-              true
-            ),
-          else: api(error_body("Unauthorized"), 401)
+        api(error_body("Unauthorized"), 401)
 
       query_token != nil ->
-        # Move the token from the URL into a cookie so it is not in history or logs.
+        # Move the token from the URL into a cookie, so it is not left in the
+        # browser's history. The request line that carried it may still be in
+        # an access log, which is why the sign-in form posts instead.
         rest =
           for {n, v} <- said.query, n != "token", do: "#{Request.form_encode(n)}=#{Request.form_encode(v)}"
 
         search = if rest == [], do: "", else: "?" <> Enum.join(rest, "&")
-        secure = if String.starts_with?(said.public_origin, "https:"), do: "; Secure", else: ""
-        cookie_path = if base == "", do: "/", else: base
-
-        redirect(pathname <> search, [
-          {"set-cookie",
-           "#{@token_cookie}=#{cookie_value(token)}; Path=#{cookie_path}; HttpOnly; SameSite=Lax; Max-Age=#{@cookie_max_age}#{secure}"}
-        ])
+        redirect(pathname <> search, [sign_in_cookie(token, said.public_origin, base)])
 
       true ->
         route(opts, req, said, path, base, wants_html)
+    end
+  end
+
+  # The 401 page with the sign-in form.
+  defp sign_in_page(:generated, base),
+    do:
+      page(
+        "Sign in",
+        "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once, or enter the token from it below, and this browser stays signed in.",
+        base,
+        401,
+        true
+      )
+
+  defp sign_in_page(_kind, base),
+    do: page("Sign in", "Enter your CRONWATCH_TOKEN and this browser stays signed in.", base, 401, true)
+
+  # The cookie a sign-in sets: a hash of the token, never the token.
+  defp sign_in_cookie(token, public_origin, base) do
+    secure = if String.starts_with?(public_origin, "https:"), do: "; Secure", else: ""
+    cookie_path = if base == "", do: "/", else: base
+
+    {"set-cookie",
+     "#{@token_cookie}=#{cookie_value(token)}; Path=#{cookie_path}; HttpOnly; SameSite=Lax; Max-Age=#{@cookie_max_age}#{secure}"}
+  end
+
+  # POST <base>/signin: the form's token, in the body. A wrong or missing one
+  # is the sign-in page again, with no cookie; the right one sets the cookie
+  # and goes back to the page the form was on.
+  defp sign_in(req, public_origin, base, {kind, token}) do
+    sent = body_field(req, "token")
+
+    if is_binary(sent) and Text.constant_time_eq(sent, token) do
+      back = sign_in_return(Request.header(req, "referer"), public_origin, base)
+      redirect(back, [sign_in_cookie(token, public_origin, base)])
+    else
+      sign_in_page(kind, base)
+    end
+  end
+
+  # Where a sign-in through the form goes next: the page it was posted from
+  # (the Referer) when that is on the public origin and its query has no
+  # `token` parameter, else the dashboard.
+  defp sign_in_return(referer, public_origin, base) do
+    if is_binary(referer) and String.starts_with?(referer, public_origin <> "/") and not token_param?(referer),
+      do: referer,
+      else: "#{base}/"
+  end
+
+  defp token_param?(url) do
+    without_fragment = url |> :binary.split("#") |> hd()
+
+    case :binary.split(without_fragment, "?") do
+      [_, query] -> Enum.any?(Request.parse_form(query), fn {name, _} -> name == "token" end)
+      [_] -> false
     end
   end
 

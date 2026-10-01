@@ -61,7 +61,8 @@ defmodule Cronwatch do
   Options: `name` (default `Cronwatch`), `store` (`{module, opts}`, default
   the memory store), `alerts` (a list of channels, default the console),
   `triage`, `sources`, `cron_secret` (a string, `false` for none, or left
-  out to read `CRON_SECRET` when needed), `retention` (default `"30d"`),
+  out to read `CRON_SECRET` when needed; one of only whitespace, given or
+  read, is none), `retention` (default `"30d"`),
   `defaults` (`grace`, `timeout`, `timezone` and `failures_before_alert` for
   every job), `redact` (a function, or `false`), `deliver` (`:now` or
   `:check`), `on_error` (a function of the error and where), `clock`,

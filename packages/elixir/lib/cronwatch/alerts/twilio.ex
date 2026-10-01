@@ -29,7 +29,7 @@ defmodule Cronwatch.Alerts.Twilio do
   alias Cronwatch.ChannelContext
   alias Cronwatch.JS
 
-  @derive {Inspect, except: [:password, :authorization]}
+  @derive {Inspect, except: [:password, :authorization, :transport]}
   defstruct [
     :url,
     :authorization,

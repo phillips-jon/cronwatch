@@ -70,6 +70,16 @@ defmodule Cronwatch.QueuedAlertTest do
     assert Webhook.payload(read) == ~s({"schema":1,) <> String.slice(a, 1..-1//1)
   end
 
+  test "a queued alert that carries a schema of its own is sent with one schema key, first" do
+    # { schema: 1, ...alert }: the alert's own value, in the first place.
+    a = alert("failed", ~s({"consecutiveFailures":3,"threshold":3}), ~s(,"schema":2))
+    {:ok, read} = Alert.from_json(a)
+    body = Webhook.payload(read)
+    assert String.starts_with?(body, ~s({"schema":2,"type":"failed",))
+    assert length(String.split(body, ~s("schema":))) == 2, "one schema key"
+    refute body =~ ~s("at":5,"schema")
+  end
+
   test "the fields survive the outbox being let go into the retry queue" do
     a = alert("failed", ~s({"consecutiveFailures":3,"threshold":3,"more":1}), ~s(,"futureAlertField":1))
     {:ok, state} = JobState.from_json(state([], [~s({"until":9,"alert":#{a}})]))

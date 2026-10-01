@@ -182,8 +182,10 @@ defmodule Cronwatch.JobState do
   def from_value(%Object{} = o) do
     open =
       case Object.get(o, "open") do
+        # Only the entries whose value is a number: one of another type
+        # (a foreign or damaged row's) is not an open condition.
         %Object{pairs: pairs} ->
-          Enum.map(pairs, fn {k, at} -> {k, if(Read.number?(at), do: JS.to_int(at), else: 0)} end)
+          for {k, at} <- pairs, Read.number?(at), do: {k, JS.to_int(at)}
 
         _ ->
           []
@@ -195,8 +197,9 @@ defmodule Cronwatch.JobState do
         _ -> nil
       end
 
-    # An entry that is not an alert is dropped rather than fail every read of
-    # the state: it could never be delivered.
+    # An entry that is not an object is dropped rather than fail every read
+    # of the state: it could never be delivered. An object of the wrong shape
+    # is kept as read, and the retry drops it as stale (Evaluate.stale_alert?).
     undelivered =
       case Object.get(o, "undelivered") do
         list when is_list(list) ->

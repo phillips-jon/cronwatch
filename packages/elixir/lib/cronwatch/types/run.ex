@@ -110,6 +110,11 @@ defmodule Cronwatch.StoredJob do
   A job as a store knows it: its name, its definition (the SDK's JSON object
   as a `Cronwatch.JS.Object`, fields in the order they were given, `expect`
   described in words), and when it was first and last declared.
+
+  A row another writer left, or a damaged one, can hold a definition that
+  is not an object: the SQL store reads it as it is, and text that is not
+  JSON as nil. The client then shows that job as failing and reports it,
+  without evaluating it.
   """
 
   alias Cronwatch.JS.Object
@@ -117,5 +122,10 @@ defmodule Cronwatch.StoredJob do
   @enforce_keys [:name, :definition]
   defstruct [:name, :definition, created_at: 0, updated_at: 0]
 
-  @type t :: %__MODULE__{name: String.t(), definition: Object.t(), created_at: integer(), updated_at: integer()}
+  @type t :: %__MODULE__{
+          name: String.t(),
+          definition: Object.t() | Object.value(),
+          created_at: integer(),
+          updated_at: integer()
+        }
 end

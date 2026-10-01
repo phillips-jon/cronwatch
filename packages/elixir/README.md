@@ -119,7 +119,7 @@ scope "/" do
 end
 ```
 
-It finds its base path from where the router mounted it. The token is `CRONWATCH_TOKEN`, read on each request (`token: "..."`, `token: {:system, "VAR"}`, or `token: false` to serve it open behind your own auth); send it as `Authorization: Bearer <token>`, or open the page once with `?token=<token>` and a cookie keeps you signed in. In development with no token it makes one and prints a sign-in link; elsewhere with none it answers 503. `origin: "https://app.example.com"` or `trust_proxy: true` tell it the public origin behind a proxy. A request body is read only when a route wants one, at most 1 MiB; behind a Phoenix endpoint the fields its `Plug.Parsers` read are used. `/api/check` also takes the instance's cron secret as a bearer.
+It finds its base path from where the router mounted it. The token is `CRONWATCH_TOKEN`, read on each request (`token: "..."`, `token: {:system, "VAR"}`, or `token: false` to serve it open behind your own auth); send it as `Authorization: Bearer <token>`, or open the page once with `?token=<token>` (or enter it in the sign-in form) and a cookie keeps you signed in. A token or `CRONWATCH_TOKEN` of only whitespace counts as unset. In development with no token it makes one and prints a sign-in link; elsewhere with none it answers 503. `origin: "https://app.example.com"` or `trust_proxy: true` tell it the public origin behind a proxy. A request body is read only when a route wants one, at most 1 MiB; behind a Phoenix endpoint the fields its `Plug.Parsers` read are used. `/api/check` also takes the instance's cron secret as a bearer.
 
 ### A job's handler
 
