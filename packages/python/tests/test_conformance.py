@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from cronwatch import _js, alerts, duration, evaluate, output, schedule, serialize
-from cronwatch.alerts import discord, twilio
+from cronwatch.alerts import discord, twilio, webhook
 from cronwatch.alerts._shared import error_body
 from cronwatch.alerts.email import compose as compose_email
 from cronwatch.format import compose_alert
@@ -811,6 +811,20 @@ def test_channel_payloads() -> None:
         return differs([c["url"], c["headers"], c["body"]], [request["url"], request["headers"], digest(request["body"])])
 
     each_case(CHANNELS["sends"], check)
+
+
+def test_webhook_payloads() -> None:
+    """The webhook's whole body, "schema": 1 first, and its signature, byte for byte."""
+
+    def check(c: dict[str, Any]) -> str | None:
+        http = FakeHTTP()
+        alerts.Webhook("https://hooks.example.com/cw", secret=c["secret"], http=http).send(Alert.from_dict(CHANNEL_ALERTS[c["alert"]]))
+        request = http.requests[-1]
+        mine = webhook.signature(c["secret"], request["body"])
+        return differs([c["body"], c["signature"], c["signature"]], [request["body"], request["headers"]["x-cronwatch-signature"], f"sha256={mine}"])
+
+    assert len(CHANNELS["webhookPayloads"]) == 15
+    each_case(CHANNELS["webhookPayloads"], check)
 
 
 def test_channel_failures() -> None:

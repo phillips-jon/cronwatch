@@ -398,9 +398,23 @@ def test_webhook_signs_the_raw_body_and_sends_the_alert_as_the_sdk_does() -> Non
     assert call["headers"]["user-agent"] == "cronwatch"
     assert call["headers"]["x-team"] == "billing"
     parsed = json.loads(call["body"])
-    assert list(parsed) == ["type", "run", "details", "job", "definition", "title", "message", "at", "triage"]
+    assert list(parsed) == ["schema", "type", "run", "details", "job", "definition", "title", "message", "at", "triage"]
+    assert parsed["schema"] == 1
     assert parsed["details"] == {"consecutiveFailures": 1, "threshold": 1}
-    assert call["body"] == _js.dumps(alert_j("db").to_dict())
+    assert call["body"] == '{"schema":1,' + _js.dumps(alert_j("db").to_dict())[1:]
+
+
+def test_signature_is_the_hmac_sha256_hex_a_receiver_checks() -> None:
+    from cronwatch.alerts.webhook import signature
+
+    assert signature("key", "The quick brown fox jumps over the lazy dog") == "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+
+
+def test_hmac_sha256_hex_is_a_deprecated_alias_of_signature() -> None:
+    from cronwatch.alerts import webhook
+
+    with pytest.warns(DeprecationWarning, match="signature"):
+        assert webhook.hmac_sha256_hex("key", "body") == webhook.signature("key", "body")
 
 
 # ---------------------------------------------------------------- through the client
@@ -497,7 +511,7 @@ def test_the_default_http_posts_to_a_real_server() -> None:
         assert "\r\nContent-type: application/json" in head or "\r\ncontent-type: application/json" in head.lower()
         signature = hmac.new(b"k", body, hashlib.sha256).hexdigest()
         assert f"x-cronwatch-signature: sha256={signature}" in head.lower()
-        assert body.decode() == _js.dumps(alert_j().to_dict())
+        assert body.decode() == _js.dumps({"schema": 1, **alert_j().to_dict()})
     finally:
         server.close()
 
