@@ -145,7 +145,7 @@ A plain `Plug.Router` forwards to it the same way. Its base path is where the ro
 
 Its options:
 
-- `token:` the token. Left out (or `""`), it is `CRONWATCH_TOKEN`, read on each request; `{:system, "VAR"}` reads another variable, also on each request, so a release never bakes in its build machine's value. Send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. Without a token, in development, the dashboard makes one and prints a sign-in link on its first request (naming the host only when `origin` is set or the request's host is loopback); anywhere else it answers 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `MIX_ENV` that is set, and `development`, `dev`, `local`, `test` and `testing` count as development.
+- `token:` the token. Left out (or `""`), it is `CRONWATCH_TOKEN`, read on each request; `{:system, "VAR"}` reads another variable, also on each request, so a release never bakes in its build machine's value. Send it as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps the browser signed in. Without a token, in development, the dashboard makes one and prints a sign-in link on its first request (naming the host only when `origin` is set or the request's host is loopback); anywhere else it answers 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `MIX_ENV` set to more than spaces, trimmed and lowercased, and `development`, `dev`, `local`, `test` and `testing` count as development, as in every CronWatch library (see [Development](/docs/dashboard/#development)).
 - `token: false`: serve it to anyone, for a mount behind your own auth, such as a `pipe_through` that signs in your admins.
 - `origin: "https://app.example.com"`: the public origin, pinned whatever a request says, for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line. Anything but an http or https URL is refused.
 - `trust_proxy: true`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
@@ -170,7 +170,7 @@ A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, an
 
 ## Stores
 
-`Cronwatch.Store.Memory` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each node has its own. When the environment is production (`CRONWATCH_ENV`, `APP_ENV` or `MIX_ENV` set to `production` or `prod`), the instance warns once that it is using it.
+`Cronwatch.Store.Memory` is the default. Nothing survives a restart, so a miss cannot be noticed across one, and each node has its own. When the environment is production (the first of `CRONWATCH_ENV`, `APP_ENV` and `MIX_ENV` that is set reads `production` or `prod`), the instance warns once that it is using it.
 
 `Cronwatch.Store.Ecto` keeps the same three tables as the SDK's SQL stores in your database, through the Ecto repo you already have. The repo's adapter picks the dialect:
 
