@@ -175,10 +175,12 @@ func newStatements(d Dialect, p string) statements {
 	// The version inside a state's JSON, as the SDK's stateVersion() reads
 	// it: a whole number from 0 to 2^53 - 1, else 0 (none, or a foreign
 	// row's 1.5 or "x", which must neither fail the statement nor refuse
-	// every write for good). Each CASE tests the JSON type before any cast.
+	// every write for good; on SQLite, also text that is not JSON, before
+	// json_type could fail on it). Each CASE tests the JSON type before any
+	// cast.
 	version := func(column string) string {
 		v := "json_extract(" + column + ", '$.version')"
-		return "CASE WHEN json_type(" + column + ", '$.version') NOT IN ('integer', 'real') THEN 0 WHEN " +
+		return "CASE WHEN NOT json_valid(" + column + ") THEN 0 WHEN json_type(" + column + ", '$.version') NOT IN ('integer', 'real') THEN 0 WHEN " +
 			v + " = CAST(" + v + " AS INTEGER) AND " + v + " BETWEEN 0 AND 9007199254740991 THEN CAST(" + v + " AS INTEGER) ELSE 0 END"
 	}
 	if pg {

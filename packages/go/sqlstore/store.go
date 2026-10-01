@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -274,87 +274,134 @@ func text(v any) (string, bool) {
 	return string(b), true
 }
 
-// integer is a number column: drivers hand back int64, or text for BIGINT.
-func integer(v any) (int64, bool) {
+// Rows are read leniently, as the SDK's stores/sql.ts reads them: a
+// foreign, hand-edited or damaged row (SQLite keeps whatever type it is
+// given, in any column) must affect only its own job, never every read.
+
+// numeric is a time or a count of milliseconds as a column holds it: a
+// number as it is, text (Postgres's BIGINT, or a foreign row's) as
+// JavaScript's Number() reads it once it is more than whitespace, and NaN
+// for anything else.
+func numeric(v any) float64 {
 	switch t := v.(type) {
 	case int64:
-		return t, true
+		return float64(t)
 	case int32:
-		return int64(t), true
+		return float64(t)
 	case int:
-		return int64(t), true
+		return float64(t)
 	case float64:
-		return int64(t), true
-	case nil:
-		return 0, false
+		return t
+	case string:
+		if js.Trim(t) != "" {
+			return js.Number(t)
+		}
+	case []byte:
+		if s := string(t); js.Trim(s) != "" {
+			return js.Number(s)
+		}
 	}
-	s, _ := text(v)
-	if n, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64); err == nil {
+	return math.NaN()
+}
+
+// finite is a column's number as an int64 (held at its ends), or false
+// when it is not a finite number.
+func finite(v any) (int64, bool) {
+	if n, ok := v.(int64); ok {
 		return n, true
 	}
-	f, _ := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	f := numeric(v)
+	switch {
+	case math.IsNaN(f) || math.IsInf(f, 0):
+		return 0, false
+	case f >= math.MaxInt64:
+		return math.MaxInt64, true
+	case f <= math.MinInt64:
+		return math.MinInt64, true
+	}
 	return int64(f), true
 }
 
-func nullableInt(v any) *int64 {
-	n, ok := integer(v)
+// timeOf is a time that must be there: one that is not a finite number
+// reads as 0.
+func timeOf(v any) int64 {
+	n, _ := finite(v)
+	return n
+}
+
+// maybeTime is a time or duration that may be absent: one that is not a
+// finite number reads as nil.
+func maybeTime(v any) *int64 {
+	n, ok := finite(v)
 	if !ok {
 		return nil
 	}
 	return &n
 }
 
-func nullableText(v any) *string {
+// textOrNil is a text column, or nil when it is not text (NULL, a
+// number). Bytes are text: drivers hand TEXT back that way too.
+func textOrNil(v any) *string {
+	switch t := v.(type) {
+	case string:
+		return &t
+	case []byte:
+		s := string(t)
+		return &s
+	}
+	return nil
+}
+
+// parsed is a JSON column parsed, or nil (JSON null) when it is NULL or
+// its text does not parse.
+func parsed(v any) any {
 	t, ok := text(v)
 	if !ok {
 		return nil
 	}
-	return &t
+	out, err := js.Parse(t)
+	if err != nil {
+		return nil
+	}
+	return out
 }
 
+// job is a job's row. A definition that is not a JSON object (text that
+// does not parse, null, a string, a list) is the zero Definition, which
+// the client reads as a job it cannot evaluate: reported and shown as
+// failing while the others carry on.
 func (r row) job() (cronwatch.StoredJob, error) {
 	name, _ := text(r["name"])
-	def, _ := text(r["definition"])
 	var d cronwatch.Definition
-	if err := json.Unmarshal([]byte(def), &d); err != nil {
-		// JSON of another shape (another writer's, or a hand edit) is a
-		// definition with nothing in it, as the SDK reads it: one such row
-		// must not fail every read of the jobs, and with it every check.
-		if !json.Valid([]byte(def)) {
+	if _, ok := parsed(r["definition"]).(*js.Object); ok {
+		def, _ := text(r["definition"])
+		if err := json.Unmarshal([]byte(def), &d); err != nil {
 			return cronwatch.StoredJob{}, fmt.Errorf("job %s: %w", name, err)
 		}
-		_ = json.Unmarshal([]byte("{}"), &d)
 	}
-	created, _ := integer(r["created_at"])
-	updated, _ := integer(r["updated_at"])
-	return cronwatch.StoredJob{Name: name, Definition: d, CreatedAt: created, UpdatedAt: updated}, nil
+	return cronwatch.StoredJob{Name: name, Definition: d, CreatedAt: timeOf(r["created_at"]), UpdatedAt: timeOf(r["updated_at"])}, nil
 }
 
+// run is a run's row. A start that is not a finite number reads as 0, a
+// finish or duration as nil; an error or output that is not text as nil;
+// metrics that do not parse to an object as none (of those that do, the
+// numbers); a trigger that is not text as "run".
 func (r row) run() (cronwatch.Run, error) {
 	var out cronwatch.Run
 	out.ID, _ = text(r["id"])
 	out.Job, _ = text(r["job"])
 	status, _ := text(r["status"])
 	out.Status = cronwatch.RunStatus(status)
-	out.StartedAt, _ = integer(r["started_at"])
-	out.FinishedAt = nullableInt(r["finished_at"])
-	out.DurationMs = nullableInt(r["duration_ms"])
-	out.Error = nullableText(r["error"])
-	out.Output = nullableText(r["output"])
-	out.Metrics = cronwatch.Metrics{}
-	if m, ok := text(r["metrics"]); ok {
-		if err := json.Unmarshal([]byte(m), &out.Metrics); err != nil {
-			// Metrics another writer stored that are not all numbers keep
-			// the ones that are, so one such row (a running one especially,
-			// which every check reads) cannot fail the reads it is part of.
-			v, perr := js.Parse(m)
-			if perr != nil {
-				return cronwatch.Run{}, fmt.Errorf("run %s: %w", out.ID, err)
-			}
-			out.Metrics = numbersOf(v)
-		}
+	out.StartedAt = timeOf(r["started_at"])
+	out.FinishedAt = maybeTime(r["finished_at"])
+	out.DurationMs = maybeTime(r["duration_ms"])
+	out.Error = textOrNil(r["error"])
+	out.Output = textOrNil(r["output"])
+	out.Metrics = numbersOf(parsed(r["metrics"]))
+	out.Trigger = "run"
+	if t := textOrNil(r["trigger"]); t != nil {
+		out.Trigger = *t
 	}
-	out.Trigger, _ = text(r["trigger"])
 	return out, nil
 }
 
@@ -373,11 +420,18 @@ func numbersOf(v any) cronwatch.Metrics {
 	return out
 }
 
-func (r row) state() (cronwatch.JobState, error) {
+// state is a state's row, or nil (no state) when it is not a JSON object:
+// text that does not parse, a number, a list. The next write replaces it.
+func (r row) state() (*cronwatch.JobState, error) {
+	if _, ok := parsed(r["state"]).(*js.Object); !ok {
+		return nil, nil
+	}
 	t, _ := text(r["state"])
 	var s cronwatch.JobState
-	err := json.Unmarshal([]byte(t), &s)
-	return s, err
+	if err := json.Unmarshal([]byte(t), &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
 }
 
 // Postgres refuses U+0000 in TEXT and JSONB, and a refused write loses the
@@ -631,11 +685,7 @@ func (s *Store) GetState(ctx context.Context, job string) (*cronwatch.JobState, 
 	if err != nil || len(rows) == 0 {
 		return nil, err
 	}
-	st, err := rows[0].state()
-	if err != nil {
-		return nil, err
-	}
-	return &st, nil
+	return rows[0].state()
 }
 
 func (s *Store) SetState(ctx context.Context, st cronwatch.JobState) error {

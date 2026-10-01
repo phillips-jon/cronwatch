@@ -683,8 +683,13 @@ func applySilence(previous JobState, e evaluation, now int64) evaluation {
 // condition is stale once that condition has closed, or has closed and
 // opened again (it opened at a time other than the alert's). A recovery is
 // stale when any condition it names is open again; while they all stay
-// closed it is kept.
+// closed it is kept. From a foreign or damaged row: an alert whose at is
+// not a number, and a recovery whose details.after is not a list of
+// strings, are stale.
 func staleAlert(alert Alert, state JobState) bool {
+	if alert.malformed {
+		return true
+	}
 	if alert.Type == AlertRecovered {
 		d, _ := alert.Details.(RecoveredDetails)
 		for _, c := range d.After {

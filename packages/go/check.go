@@ -108,7 +108,11 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 				if stored == nil {
 					return nil
 				}
-				def = stored.Definition
+				job := readStoredJob(*stored)
+				if err := evaluable(job); err != nil {
+					return err
+				}
+				def = job.Definition
 			}
 			stuck, err := isStuck(def, run, now)
 			if err != nil || !stuck {
@@ -171,6 +175,9 @@ func (c *Client) runCheck(ctx context.Context) (*CheckResult, error) {
 
 // checkJob is one job's part of a check: missed, then retries and sends.
 func (c *Client) checkJob(ctx context.Context, job StoredJob, now int64, spent *time.Duration) (JobSummary, []Alert, error) {
+	if err := evaluable(job); err != nil {
+		return JobSummary{}, nil, err
+	}
 	recent, err := c.store.ListRuns(ctx, job.Name, baselineWindow)
 	if err != nil {
 		return JobSummary{}, nil, err
@@ -218,6 +225,9 @@ func (c *Client) snapshot(ctx context.Context, job StoredJob, now int64, runs in
 			return recent[:runs]
 		}
 		return recent
+	}
+	if err == nil {
+		err = evaluable(job)
 	}
 	if err == nil {
 		var state JobState
@@ -303,7 +313,7 @@ func (c *Client) JobSummary(ctx context.Context, name string) (*JobSummary, erro
 	if err != nil || stored == nil {
 		return nil, err
 	}
-	s := c.snapshot(ctx, *stored, c.now(), 0).Job
+	s := c.snapshot(ctx, readStoredJob(*stored), c.now(), 0).Job
 	return &s, nil
 }
 

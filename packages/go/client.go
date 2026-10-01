@@ -477,10 +477,16 @@ func (c *Client) storedJobs(ctx context.Context) ([]StoredJob, error) {
 			return nil, err
 		}
 	}
-	if !missing {
-		return jobs, nil
+	if missing {
+		if jobs, err = c.store.ListJobs(ctx); err != nil {
+			return nil, err
+		}
 	}
-	return c.store.ListJobs(ctx)
+	// Read leniently: a foreign or damaged row affects only its own job.
+	for i, job := range jobs {
+		jobs[i] = readStoredJob(job)
+	}
+	return jobs, nil
 }
 
 // syncTurn waits for every earlier write of name's declaration to end, so
