@@ -27,7 +27,7 @@ ORDER = [("month", "year", 0), ("day", "month", -1), ("hour", "day", 0), ("minut
 
 _MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
 _DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
-_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}", re.ASCII)
 
 
 class CronError(ValueError):

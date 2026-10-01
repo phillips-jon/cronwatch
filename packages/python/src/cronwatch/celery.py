@@ -487,7 +487,13 @@ class CeleryWatch:
         client = self.client
         with self._lock:
             known = self._handles.get(task)
-            if known is not None and known[0] is client and known[1] == found.options and known[2].name == found.name:
+            if (
+                known is not None
+                and known[0] is client
+                and known[1] == found.options
+                and known[2].name == found.name
+                and client._declares(found.name)
+            ):
                 return known[2]
             try:
                 made = client.job(found.name, **found.options)

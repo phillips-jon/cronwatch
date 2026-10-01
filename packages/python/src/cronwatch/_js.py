@@ -77,12 +77,21 @@ def is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _in_double_range(value: int) -> bool:
+    """An int a JavaScript number can hold: one that does not overflow a double."""
+    try:
+        float(value)
+    except OverflowError:
+        return False
+    return True
+
+
 def is_finite(value: Any) -> bool:
-    """Number.isFinite."""
+    """Number.isFinite. An int past a double's range is no number JavaScript has."""
     if isinstance(value, bool):
         return False
     if isinstance(value, int):
-        return True
+        return _in_double_range(value)
     return isinstance(value, float) and math.isfinite(value)
 
 
@@ -91,7 +100,7 @@ def is_integer(value: Any) -> bool:
     if isinstance(value, bool):
         return False
     if isinstance(value, int):
-        return True
+        return _in_double_range(value)
     return isinstance(value, float) and math.isfinite(value) and value == math.floor(value)
 
 

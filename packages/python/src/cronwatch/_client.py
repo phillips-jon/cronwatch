@@ -665,6 +665,11 @@ class Cronwatch:
         handle = self.job(name, **options) if options or declared is None else JobHandle(self, declared)
         return handle.run(fn)
 
+    def _declares(self, name: str) -> bool:
+        """Whether this process still declares the job: false after forget()."""
+        with self._registry:
+            return name in self._definitions
+
     def defined_jobs(self) -> list[JobDefinition]:
         """The definitions declared in this process."""
         with self._registry:

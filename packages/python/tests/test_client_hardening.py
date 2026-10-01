@@ -869,3 +869,72 @@ def test_text_past_the_redaction_window_never_keeps_what_came_right_after_its_cu
     assert redact_and_cap("password=x", redact_secrets) == "password=[redacted]"
     assert redact_and_cap("a\x00b", lambda t: t + "\x00") == "ab"
     assert redact_and_cap("x" * (OUTPUT_CAP + 5), redact_secrets) == "[earlier output trimmed]\n" + "x" * OUTPUT_CAP
+
+
+def test_a_queued_alert_keeps_the_fields_a_newer_release_wrote_through_every_write_and_its_retry() -> None:
+    from cronwatch.stores import SqliteStore
+    from cronwatch.types import JobState
+
+    down = [True]
+    got: list[Alert] = []
+
+    class FlakyChannel:
+        name = "flaky"
+
+        def send(self, alert: Alert) -> None:
+            if down[0]:
+                raise ConnectionError("down")
+            got.append(alert)
+
+    store = SqliteStore(":memory:")
+    cw, c, _ = make(store=store, alerts=[FlakyChannel()], on_error=lambda e, w: None)
+    with pytest.raises(RuntimeError):
+        cw.run("r", boom())
+    stored = store.get_state("r").to_dict()
+    queued = stored["undelivered"][0]
+    queued["futureAlertField"] = {"kept": True}
+    queued["details"]["a_b"] = 1
+    stored["sending"] = [{"until": T0, "alert": dict(queued), "futureEntryKey": "kept"}]
+    assert JobState.from_dict(stored).to_dict() == stored, "read and written back whole"
+    del stored["sending"]
+    store.set_state(JobState.from_dict(stored))
+
+    c.advance(MIN)
+    cw.check()
+    again = store.get_state("r").to_dict()["undelivered"][0]
+    assert again["futureAlertField"] == {"kept": True}, "a check's write keeps it"
+    assert again["details"]["a_b"] == 1 and "aB" not in again["details"], "details keys as they were written"
+
+    down[0] = False
+    c.advance(MIN)
+    cw.check()
+    assert len(got) == 1
+    body = got[0].to_dict()
+    assert body["futureAlertField"] == {"kept": True}, "the retry sends it"
+    assert body["details"]["a_b"] == 1
+
+
+def test_a_metric_past_a_doubles_range_is_refused_before_anything_is_written() -> None:
+    from cronwatch import _js
+
+    cw, _, _ = make(on_error=lambda e, w: None)
+    cw.job("j")
+    with pytest.raises(ValueError, match=r'^record_run: metric "m" must be a finite number \(job "j", run "a"\)$'):
+        cw.record_run({"id": "a", "job": "j", "status": "ok", "startedAt": T0, "finishedAt": T0, "durationMs": 0, "metrics": {"m": 10**400}})
+    assert cw.store.get_job("j") is None, "refused before the declaration was written"
+    with pytest.raises(ValueError, match='metric "m" must be a finite number'):
+        cw.run("j", lambda ctx: ctx.metric("m", 10**400))
+    [run] = cw.store.list_runs("j", 10)
+    assert run.status == "failed" and run.metrics == {}, "the function raised, so the run failed"
+    assert _js.is_finite(2**1023) and not _js.is_finite(2**1024)
+    assert not _js.is_integer(-(10**400))
+
+
+@pytest.mark.parametrize("text", ["٢٠٢٦-١٢-٠١T00:00", "２０２６-12-01 00:00"])
+def test_a_date_in_digits_other_than_ascii_is_no_one_time_date_as_javascripts_digit_class_reads_it(text: str) -> None:
+    from cronwatch._schedule import parse_schedule
+
+    with pytest.raises(ValueError, match=r"Invalid ISO8601 passed to timezone parser\.$"):
+        parse_schedule(text)
+    with pytest.raises(ValueError, match="a one-time date is not supported"):
+        parse_schedule("2026-12-01T00:00")

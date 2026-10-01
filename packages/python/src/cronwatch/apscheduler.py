@@ -419,7 +419,13 @@ class SchedulerWatch:
     def _declare(self, declaration: _Declaration) -> JobHandle | None:
         client = self.client
         known = self._handles.get(declaration.job_id)
-        if known is not None and known[0] is client and known[1] == declaration.options and known[2].name == declaration.name:
+        if (
+            known is not None
+            and known[0] is client
+            and known[1] == declaration.options
+            and known[2].name == declaration.name
+            and client._declares(declaration.name)
+        ):
             return known[2]
         try:
             made = client.job(declaration.name, **declaration.options)

@@ -109,6 +109,25 @@ def test_every_job_is_declared_with_its_trigger_and_later_changes_follow() -> No
         watched.close()
 
 
+def test_a_job_forgotten_while_the_scheduler_runs_it_is_declared_again_with_its_schedule() -> None:
+    cw, _, _ = make()
+    scheduler = BackgroundScheduler(timezone=UTC)
+    scheduler.add_job(nightly_report, "cron", hour=2, id="nightly")
+    watched = watch(scheduler, client=cw)
+    try:
+        watched.flush()
+        assert [j.name for j in cw.jobs()] == ["nightly"]
+        cw.forget("nightly")
+        assert cw.defined_jobs() == []
+        scheduler.start(paused=True)  # its declare of every job
+        watched.flush()
+        assert [d.to_dict() for d in cw.defined_jobs()] == [{"schedule": "0 2 * * *", "timezone": "UTC", "name": "nightly"}]
+        assert [j.name for j in cw.jobs()] == ["nightly"], "back on the board before it next runs"
+    finally:
+        scheduler.shutdown(wait=False)
+        watched.close()
+
+
 def test_runs_are_recorded_from_a_real_background_scheduler() -> None:
     cw, _, alerts = make()
     scheduler = BackgroundScheduler(timezone=UTC)
