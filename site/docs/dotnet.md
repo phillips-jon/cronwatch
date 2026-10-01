@@ -212,7 +212,7 @@ WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/
 - `TrustProxy = true`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
 - `BasePath`: where it is mounted, when the adapter cannot tell; `MapCronwatch` and `UseCronwatch` say so already.
 
-A request body past 1 MiB is answered 413. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
+A request body past 1 MiB is answered 413. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` names what is serving it, `{"ok":true,"library":"Cronwatch","language":"dotnet","version":"1.0.0","api":1}` with the package's version, and the silence and unsilence endpoints answer the job's summary, `{"ok":true,"job":{...}}`. `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
 
 ## Jobs a URL starts
 

@@ -260,14 +260,29 @@ public class RoutesTests
         Assert.Equal(true, WebKit.Field(result, "ok"));
         Assert.Single((List<object?>)WebKit.Field(result, "jobs")!);
         JsObject silenced = WebKit.JsonOf(await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), "{\"for\":\"2h\"}"));
-        Assert.Equal((double)(T0 + (2 * Hour)), WebKit.Field(silenced, "state", "silencedUntil"));
+        Assert.Equal((double)(T0 + (2 * Hour)), WebKit.Field(silenced, "job", "silencedUntil"));
         Assert.Equal(JobHealth.Silenced, (await w.Summary("s"))!.Health);
         JsObject un = WebKit.JsonOf(await w.Send("POST", "/cronwatch/api/jobs/s/unsilence", Hs(Auth, JsonType)));
-        Assert.Null(WebKit.Field(un, "state", "silencedUntil"));
+        Assert.Null(WebKit.Field(un, "job", "silencedUntil"));
         Status("ghost", await w.Send("POST", "/cronwatch/api/jobs/nope/silence", Hs(Auth, JsonType), "{\"for\":\"1h\"}"), 404);
         Status("delete", await w.Send("DELETE", "/cronwatch/api/jobs/s", Hs(Auth)), 200);
         Assert.Null(await w.Summary("s"));
         Status("delete again", await w.Send("DELETE", "/cronwatch/api/jobs/s", Hs(Auth)), 404);
+    }
+
+    [Fact]
+    public async Task Get_api_names_the_library_its_language_and_versions()
+    {
+        await using var w = new WebKit();
+        string want = "{\"ok\":true,\"library\":\"Cronwatch\",\"language\":\"dotnet\",\"version\":" + Json.Quote(CronwatchClient.Version) + ",\"api\":1}";
+        foreach (string path in new[] { "/cronwatch/api", "/cronwatch/api/" })
+        {
+            WebResponse r = await w.Get(path, Auth);
+            Status(path, r, 200);
+            Assert.Equal(want, r.Text());
+        }
+        Status("no token", await w.Get("/cronwatch/api"), 401);
+        Status("POST", await w.Send("POST", "/cronwatch/api", Hs(Auth, JsonType)), 404);
     }
 
     [Fact]
@@ -425,7 +440,7 @@ public class RoutesTests
     private static async Task<long> Until(WebKit w, string body)
     {
         JsObject r = WebKit.JsonOf(await w.Send("POST", "/cronwatch/api/jobs/s/silence", Hs(Auth, JsonType), body));
-        return (long)(double)WebKit.Field(r, "state", "silencedUntil")! - T0;
+        return (long)(double)WebKit.Field(r, "job", "silencedUntil")! - T0;
     }
 
     [Fact]
@@ -451,7 +466,7 @@ public class RoutesTests
         Contains("65 characters", (string?)WebKit.Field(WebKit.JsonOf(longText), "error"), "silence duration");
         Status("query", await w.Send("POST", "/cronwatch/api/jobs/s/silence?for=forever", Hs(Auth)), 400);
         JsObject query = WebKit.JsonOf(await w.Send("POST", "/cronwatch/api/jobs/s/silence?for=3h", Hs(Auth)));
-        Assert.Equal((double)(T0 + (3 * Hour)), WebKit.Field(query, "state", "silencedUntil"));
+        Assert.Equal((double)(T0 + (3 * Hour)), WebKit.Field(query, "job", "silencedUntil"));
     }
 
     // The Go audit: a body cut short was read as far as it came, so "for=7d" silenced the job for
@@ -791,7 +806,7 @@ public class RoutesTests
             Status(path, await w.Get(path, Auth), 200);
         }
         JsObject silenced = WebKit.JsonOf(await w.Send("POST", "/cronwatch/api/jobs/rare/silence", Hs(Auth, JsonType), "{\"for\":\"99999999999999999999999\"}"));
-        double until = (double)WebKit.Field(silenced, "state", "silencedUntil")!;
+        double until = (double)WebKit.Field(silenced, "job", "silencedUntil")!;
         Assert.True(until > w.M.Clock.Ms(), "a long silence ended at once: " + until);
     }
 

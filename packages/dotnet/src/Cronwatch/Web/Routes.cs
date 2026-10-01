@@ -30,6 +30,17 @@ public sealed class Routes
     private const int BoardPageRuns = 20;
     private const int CookieMaxAge = 60 * 60 * 24 * 30;
 
+    /// <summary>
+    /// What <c>GET &lt;base&gt;/api</c> says is serving it: the package as NuGet names it, and the
+    /// language; each port answers with its own.
+    /// </summary>
+    private const string Library = "Cronwatch";
+
+    private const string Language = "dotnet";
+
+    /// <summary>The API's version: it goes up only with a change that is not additive, in a major release.</summary>
+    private const int ApiVersion = 1;
+
     // 'self' only for what the app shell needs: app.js (which registers the service worker and
     // nothing else), the manifest, the worker and the icons. No inline script, and the pages work
     // without any.
@@ -747,6 +758,11 @@ public sealed class Routes
     {
         int n = rest.Count;
         string first = n > 0 ? rest[0] : "";
+        // What is serving the API, so a client such as @cronwatch/mcp can tell.
+        if (method == "GET" && n == 0)
+        {
+            return Api(new JsObject().Set("ok", true).Set("library", Library).Set("language", Language).Set("version", CronwatchClient.Version).Set("api", ApiVersion), 200);
+        }
         if (method == "GET" && n == 1 && first == "jobs")
         {
             var list = new List<object?>();
@@ -808,13 +824,13 @@ public sealed class Routes
                 {
                     return Api(ErrorBody(e.Message), 400);
                 }
-                JobState state = await _cw.SilenceAsync(name, ms, ct).ConfigureAwait(false);
-                return Api(new JsObject().Set("ok", true).Set("state", state.ToValue()), 200);
+                await _cw.SilenceAsync(name, ms, ct).ConfigureAwait(false);
+                return Api(new JsObject().Set("ok", true).Set("job", (await _cw.JobSummaryAsync(name, ct).ConfigureAwait(false))?.ToValue()), 200);
             }
             if (action == "unsilence")
             {
-                JobState state = await _cw.UnsilenceAsync(name, ct).ConfigureAwait(false);
-                return Api(new JsObject().Set("ok", true).Set("state", state.ToValue()), 200);
+                await _cw.UnsilenceAsync(name, ct).ConfigureAwait(false);
+                return Api(new JsObject().Set("ok", true).Set("job", (await _cw.JobSummaryAsync(name, ct).ConfigureAwait(false))?.ToValue()), 200);
             }
         }
         if (n == 1 && first == "check")
