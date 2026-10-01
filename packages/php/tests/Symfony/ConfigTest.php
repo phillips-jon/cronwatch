@@ -145,6 +145,8 @@ final class ConfigTest extends TestCase
             $this->assertSame('from-the-environment', $cw->cronSecret);
             $this->assertFalse($cw->secretOptOut);
             $this->assertTrue(ClientFactory::client(['store' => 'memory', 'cron_secret' => false], sys_get_temp_dir())->secretOptOut);
+            // A blank one (JavaScript's whitespace, U+00A0 included) is unset, and CRON_SECRET is read.
+            $this->assertSame('from-the-environment', ClientFactory::client(['store' => 'memory', 'cron_secret' => " \u{00A0}\u{FEFF}"], sys_get_temp_dir())->cronSecret);
         } finally {
             putenv($saved === false ? 'CRON_SECRET' : "CRON_SECRET={$saved}");
         }

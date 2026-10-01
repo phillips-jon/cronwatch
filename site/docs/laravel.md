@@ -232,6 +232,8 @@ Every key of `config/cronwatch.php` (publish it with `php artisan vendor:publish
 | `dashboard.middleware` | | `dashboard.role` |
 | `dashboard.token` | `CRONWATCH_TOKEN` | `dashboard.token` |
 
+`dashboard.token` and `cron_secret` are read only as Laravel reads them. A value in the config is used as written, and an empty one, or one of only spaces, means none. When the config's value is null, the variable is read through `env()`, so `CRONWATCH_TOKEN=null` (or `(null)`, `empty`, `true`) in `.env` means no token, never the word. `cron_secret` set to `false` turns the secret off.
+
 Releases before 1.0 spelled four of these differently: `store.prefix` (now `table_prefix`), `store.create_tables` (now `create_tables`), `schedule.check` (now `check.schedule`) and `schedule.check_cron` (now `check.frequency`). The variables did not change, so a config file that was never published needs nothing. A published one that still has an old key keeps working through 1.x: the old key is read in place of the new one, with a deprecation notice (Laravel writes those to its `deprecations` log channel when one is set) naming the key to rename it to. The old keys go in 2.0.
 
 ## Tests

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Cronwatch\Laravel;
 
+use Cronwatch\Env;
+use Cronwatch\Js;
 use Illuminate\Contracts\Config\Repository;
+use Illuminate\Support\Env as LaravelEnv;
 
 /**
  * The settings whose keys 1.0 renamed to match the Symfony bundle's:
@@ -51,6 +54,37 @@ final class Settings
     {
         $frequency = self::get($config, 'check.frequency', '*/5 * * * *');
         return is_string($frequency) && trim($frequency) !== '' ? trim($frequency) : '*/5 * * * *';
+    }
+
+    /**
+     * A token or secret from the config (`dashboard.token`, `cron_secret`),
+     * or null when there is none. A string that is not blank (JavaScript's
+     * whitespace) is the value, used as written. Any other value the config
+     * gives (an empty or blank string, true, false) means none, with no
+     * fallback. Only a config value of null (the key unset, or `env()` of a
+     * variable that is unset) reads the variable, and then as Laravel's own
+     * `env()` reads it, so `X=null`, `X=(null)`, `X=empty`, `X=true` and
+     * `X=false` in .env are not a password (the raw environment holds them
+     * as written). A cached config (`config:cache`) with
+     * no value still reads a variable the process is given at run time.
+     */
+    public static function secret(Repository $config, string $key, string $variable): ?string
+    {
+        $value = $config->get("cronwatch.{$key}");
+        if ($value === null && class_exists(LaravelEnv::class)) {
+            $value = LaravelEnv::get($variable);
+        }
+        return is_string($value) && Js::trim($value) !== '' ? $value : null;
+    }
+
+    /**
+     * Whether the raw environment holds a value for a variable that
+     * secret() did not take (`CRONWATCH_TOKEN=null`, read by Laravel as
+     * null): the library's own read of the variable must not be asked then.
+     */
+    public static function rawOnly(string $variable): bool
+    {
+        return Js::trim((string) Env::read($variable)) !== '';
     }
 
     private static function get(Repository $config, string $key, mixed $default): mixed

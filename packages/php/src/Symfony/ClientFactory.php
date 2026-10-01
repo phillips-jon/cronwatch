@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Cronwatch\Symfony;
 
 use Cronwatch\FromEnv;
+use Cronwatch\Js;
 use Cronwatch\Alerts\AlertChannel;
 use Cronwatch\Alerts\Discord;
 use Cronwatch\Alerts\Slack;
@@ -115,6 +116,7 @@ final class ClientFactory
 
     private static function text(mixed $value): ?string
     {
-        return is_string($value) && trim($value) !== '' ? $value : null;
+        // Blank is JavaScript's whitespace, as for every token and secret.
+        return is_string($value) && Js::trim($value) !== '' ? $value : null;
     }
 }

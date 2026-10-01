@@ -323,6 +323,38 @@ final class ProviderTest extends TestCase
         $this->assertInstanceOf(MemoryStore::class, $this->app->make(ClientFactory::class)->store());
     }
 
+    public function testACronSecretLaravelReadsAsNullOrBlankIsNoSecretAndTheRawWordIsNeverRead(): void
+    {
+        $saved = [getenv('CRON_SECRET'), $_SERVER['CRON_SECRET'] ?? null, $_ENV['CRON_SECRET'] ?? null];
+        try {
+            foreach (['null', '(null)', 'Null', 'empty', '(empty)', 'true', '(true)'] as $word) {
+                putenv("CRON_SECRET={$word}");
+                $_SERVER['CRON_SECRET'] = $_ENV['CRON_SECRET'] = $word;
+                // What env('CRON_SECRET') in config/cronwatch.php gives: null, "" or true.
+                $this->app['config']->set('cronwatch.cron_secret', \Illuminate\Support\Env::get('CRON_SECRET'));
+                $cw = $this->app->make(ClientFactory::class)->client();
+                $this->assertNull($cw->cronSecret, "CRON_SECRET={$word} is no secret");
+                $this->assertFalse($cw->secretOptOut, "CRON_SECRET={$word} does not turn handlers open");
+            }
+            // A value the config gives (blank here) is never replaced by the environment's.
+            putenv('CRON_SECRET=from-the-environment');
+            $_SERVER['CRON_SECRET'] = $_ENV['CRON_SECRET'] = 'from-the-environment';
+            $this->app['config']->set('cronwatch.cron_secret', " \u{00A0}");
+            $this->assertNull($this->app->make(ClientFactory::class)->client()->cronSecret);
+            $this->app['config']->set('cronwatch.cron_secret', ' padded ');
+            $this->assertSame(' padded ', $this->app->make(ClientFactory::class)->client()->cronSecret);
+        } finally {
+            putenv($saved[0] === false ? 'CRON_SECRET' : "CRON_SECRET={$saved[0]}");
+            unset($_SERVER['CRON_SECRET'], $_ENV['CRON_SECRET']);
+            if ($saved[1] !== null) {
+                $_SERVER['CRON_SECRET'] = $saved[1];
+            }
+            if ($saved[2] !== null) {
+                $_ENV['CRON_SECRET'] = $saved[2];
+            }
+        }
+    }
+
     public function testAnUnsetCronSecretIsReadFromTheEnvironmentAndFalseTurnsItOff(): void
     {
         $saved = getenv('CRON_SECRET');

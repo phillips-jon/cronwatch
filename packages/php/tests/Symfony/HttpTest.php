@@ -116,6 +116,18 @@ final class HttpTest extends TestCase
         });
     }
 
+    public function testABlankTokenInTheConfigReadsCronwatchToken(): void
+    {
+        self::withoutSecrets(function (): void {
+            putenv('CRONWATCH_TOKEN=from-the-environment');
+            $browser = static::createClient(['cronwatch' => ['store' => 'memory', 'dashboard' => ['token' => "\u{00A0}\u{3000}"]]]);
+            $browser->disableReboot();
+            $this->seeded();
+            $browser->request('GET', '/cronwatch/api/jobs', server: ['HTTP_AUTHORIZATION' => 'Bearer from-the-environment']);
+            $this->assertSame(200, $browser->getResponse()->getStatusCode());
+        });
+    }
+
     /** Runs $body with CRONWATCH_TOKEN and CRON_SECRET unset everywhere PHP reads them. */
     private static function withoutSecrets(callable $body): void
     {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Cronwatch\Laravel;
 
-use Cronwatch\FromEnv;
 use Cronwatch\Alert;
 use Cronwatch\Alerts\AlertChannel;
 use Cronwatch\Alerts\Discord;
@@ -40,7 +39,8 @@ final class ClientFactory
     public function client(): Cronwatch
     {
         $config = $this->config();
-        $secret = $config['cron_secret'] ?? null;
+        $settings = $this->app->make('config');
+        $secret = $settings->get('cronwatch.cron_secret') === false ? false : Settings::secret($settings, 'cron_secret', 'CRON_SECRET');
         $triage = $config['triage'] ?? [];
         return new Cronwatch(
             store: $this->store(),
@@ -49,8 +49,10 @@ final class ClientFactory
                 model: is_string($triage['model'] ?? null) && $triage['model'] !== '' ? $triage['model'] : null,
                 context: is_string($triage['context'] ?? null) && $triage['context'] !== '' ? $triage['context'] : null,
             ) : null,
-            // false in the config turns the secret off; unset reads CRON_SECRET.
-            cronSecret: $secret === false ? null : (is_string($secret) && $secret !== '' ? $secret : FromEnv::Read),
+            // false in the config turns the secret off; null reads CRON_SECRET as
+            // env() does (Settings::secret()). With none, "" is no secret, and the
+            // library does not read the raw variable again.
+            cronSecret: $secret === false ? null : ($secret ?? ''),
             retention: $config['retention'] ?? '30d',
             defaults: is_array($config['defaults'] ?? null) ? $config['defaults'] : [],
             deliver: is_string($config['deliver'] ?? null) ? $config['deliver'] : 'now',
