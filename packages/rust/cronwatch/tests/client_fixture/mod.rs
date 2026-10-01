@@ -40,7 +40,7 @@ fn int(o: &Object, key: &str) -> i64 {
     field(o, key).as_f64().unwrap_or_else(|| panic!("{key} is not a number")) as i64
 }
 
-fn objects<'a>(v: &'a Value) -> Vec<&'a Object> {
+fn objects(v: &Value) -> Vec<&Object> {
     v.as_array().expect("a list").iter().map(|x| x.as_object().expect("an object")).collect()
 }
 
