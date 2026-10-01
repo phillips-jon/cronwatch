@@ -38,6 +38,19 @@ export function addMarkdownChangelog(text, next, date, file = "CHANGELOG.md") {
   return { text: text.slice(0, at) + entry + text.slice(at), change: `+ ${heading} (a placeholder entry: write the plugin's notes)`, written: false };
 }
 
+/**
+ * The project's own CHANGELOG.md at the root: "## Unreleased" becomes
+ * "## X.Y.Z - YYYY-MM-DD", as in the plugins' changelogs. It is where a
+ * release's notes are written, so a release without them is refused rather
+ * than given a placeholder.
+ */
+export function addRootChangelog(text, next, date, file = "CHANGELOG.md") {
+  if (new RegExp(`^## ${escape(next)}(?: |$)`, "m").test(text)) return { text, change: `## ${next} is already there`, written: true };
+  if (!/^## Unreleased[ \t]*$/m.test(text)) throw new Error(`${file}: no "## Unreleased" section; write the release's notes there first`);
+  const heading = `## ${next} - ${date}`;
+  return { text: text.replace(/^## Unreleased[ \t]*$/m, heading), change: `## Unreleased -> ${heading}`, written: true };
+}
+
 /** Today as YYYY-MM-DD in the local time zone, the date a release is cut. */
 export function today(now = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");

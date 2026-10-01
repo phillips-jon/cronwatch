@@ -2,11 +2,19 @@
 
 ## Unreleased
 
+### Added
+- From the library: `GET /cronwatch/api` answers what is serving it: the library, its language and version, and the API's version (`api: 1`).
+
 ### Changed
 - Runs are recorded with the triggers `craft-queue` and `craft-command`, the integration's name as every other integration spells it; runs recorded before keep `queue` and `command`.
+- From the library: the JSON API's silence and unsilence answer the job's summary, `{ ok: true, job }`, instead of its stored state.
+- From the library: the webhook's body starts with `"schema": 1`, the payload's version; its JSON Schema is at https://cronwatch.dev/schemas/webhook/1.json.
+- From the library: a blank `CRONWATCH_ENV` or `APP_ENV` counts as unset.
+- From the library: a run id longer than 200 characters is refused, on every path.
 
 ### Fixed
 - `GET /cronwatch/api`, with no path after it, reaches the JSON API instead of the site's 404 page, so the API's own answer at its root (the library and its version, from 1.0) is served.
+- From the library: a job's stored state keeps the fields a newer release wrote, so sites and apps on different 1.x releases can share one database.
 
 ## 0.10.0 - 2026-09-30
 

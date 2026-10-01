@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { addMarkdownChangelog, addReadmeChangelog, today } from "./changelogs.mjs";
+import { addMarkdownChangelog, addReadmeChangelog, addRootChangelog, today } from "./changelogs.mjs";
 
 const MARKDOWN = "# Release Notes for CronWatch\n\n## Unreleased\n\n### Fixed\n- A thing.\n\n## 1.2.3 - 2026-09-30\n\n### Changed\n- Updated to the library's 1.2.3.\n";
 
@@ -40,6 +40,16 @@ test("the WordPress readme's = Unreleased = becomes = X.Y.Z =, and a placeholder
   const { text, written } = addReadmeChangelog(released, "1.3.0");
   assert.equal(text, released.replace("= 1.2.3 =", "= 1.3.0 =\n\n* Carries version 1.3.0 of the CronWatch library.\n\n= 1.2.3 ="));
   assert.equal(written, false);
+});
+
+test("the root CHANGELOG.md's Unreleased section becomes the release's, and a release without one is refused", () => {
+  const root = "# Changelog\n\n## Unreleased\n\n### Fixed\n\n- A thing.\n\n## 0.10.0 and earlier\n\nSee the GitHub releases.\n";
+  const { text, change, written } = addRootChangelog(root, "1.0.0", "2026-10-01");
+  assert.equal(text, root.replace("## Unreleased", "## 1.0.0 - 2026-10-01"));
+  assert.equal(change, "## Unreleased -> ## 1.0.0 - 2026-10-01");
+  assert.equal(written, true);
+  assert.equal(addRootChangelog(text, "1.0.0", "2026-10-02").text, text);
+  assert.throws(() => addRootChangelog(text, "1.0.1", "2026-10-02"), /CHANGELOG\.md: no "## Unreleased" section/);
 });
 
 test("today is the local date", () => {
@@ -105,6 +115,16 @@ test("a prerelease is cut, then its release, and the changelog still checks", ()
   const readme = addReadmeChangelog("== Changelog ==\n\n= 1.2.3 =\n\n* Carries version 1.2.3 of the CronWatch library.\n", "1.3.0-beta.1");
   assert.match(readme.text, /^= 1\.3\.0-beta\.1 =$/m);
   assert.equal(addReadmeChangelog(readme.text, "1.3.0").written, false);
+});
+
+test("CHANGELOG.md has dated releases, newest first, under at most one Unreleased, then the earlier releases' line", () => {
+  const text = readFileSync(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  const [current, earlier] = text.split(/^## 0\.10\.0 and earlier$/m);
+  assert.ok(earlier !== undefined, 'the "## 0.10.0 and earlier" line is there, last');
+  assert.doesNotMatch(earlier, /^## /m);
+  const headings = [...current.matchAll(/^## (.*)$/gm)].map((m) => m[1]);
+  assert.ok(headings.filter((h) => h === "Unreleased").length <= 1);
+  if (headings.some((h) => h !== "Unreleased")) checkChangelog(current);
 });
 
 for (const file of ["packages/php/craft/CHANGELOG.md", "packages/php/drupal/CHANGELOG.md"]) {

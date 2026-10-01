@@ -1,0 +1,98 @@
+# Changelog
+
+Every notable change to CronWatch, newest first. All the packages, in every language, share one version, so each release is one section here, with a line per language where it matters. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and from 1.0 the versions follow [Semantic Versioning](https://semver.org) as the [Stability](https://cronwatch.dev/docs/stability/) page describes. The WordPress plugin, the Drupal module and the Craft CMS plugin keep their own changelogs too, for their stores.
+
+## Unreleased
+
+The preparation for 1.0: names settled across the languages, internals marked as internal, and the stored data, the JSON API and the webhook made ready to grow without breaking. Names that changed keep working under their old spelling, deprecated (see [Deprecations](https://cronwatch.dev/docs/deprecations/)); the breaking changes for 0.x users are listed first.
+
+### Breaking changes for 0.x users
+
+Every language:
+
+- Processes sharing a store should all move to this release together: 1.x releases keep each other's stored data, 0.x releases do not.
+- The dashboard API's silence and unsilence answer the job's summary, `{ ok: true, job }`, where they answered its stored state, `{ ok: true, state }`. `@cronwatch/mcp` reads either.
+- `recordRun` refuses a run id longer than 200 characters, as the normal path already did.
+- A blank `CRONWATCH_ENV` or `APP_ENV` (only spaces) counts as unset, and every language reads the environment the same way: `CRONWATCH_ENV`, then `APP_ENV`, then its own variable, trimmed and lowercased, with `prod` as production and `dev`, `local`, `test` and `testing` as development. This decides whether the dashboard makes a token of its own and whether a handler with no secret runs. See [Environment variables](https://cronwatch.dev/docs/environment/).
+- Integrations record runs with their names spelled the one way: `active-job` (was `active_job`), `laravel-scheduler` and `laravel-queue` (were `schedule` and `queue`), `symfony-scheduler` and `symfony-messenger` (were `scheduler` and `messenger`), `drupal-cron` and `drupal-queue` (were `cron` and `queue`), `craft-queue` and `craft-command` (were `queue` and `command`), `spring-scheduled` (was `scheduled`) and .NET's `hosting` (was `schedule`). Runs recorded before keep their trigger; a filter on it should look for both spellings until they age out.
+- A one-time date in place of a cron expression is refused when the job is declared, with the same message in every language, and a date no month has (`0 0 30 2 *`) is accepted and never fires.
+
+TypeScript:
+
+- The environment is read from `CRONWATCH_ENV` and `APP_ENV` before `NODE_ENV`, which was the only one read. An app with `APP_ENV=development` set for another reason now counts as development.
+- A one-time date, which croner accepted, is refused; a date no month has, which reported its job as unevaluable, never fires.
+
+Ruby:
+
+- The environment is read from `CRONWATCH_ENV` and `APP_ENV` before `Rails.env`, `RAILS_ENV` and `RACK_ENV`.
+- The constants the docs do not name are private (`private_constant`), so referring to one raises `NameError`.
+- A one-time date is refused; a date no month has, which Fugit refused, never fires.
+
+Python:
+
+- Every module declares `__all__`, so `from cronwatch.x import *` brings only the public names. The modules that only implement the client moved to underscored names (`cronwatch._evaluate` and the rest); the old names still work, with a `DeprecationWarning`.
+- `local` and `testing` count as development.
+
+PHP:
+
+- `null` turns the cron secret, the dashboard's token and a handler's secret off, as in every other language. In 0.x `null` read `CRON_SECRET` or `CRONWATCH_TOKEN`, and `false` turned them off. Leaving the argument out still reads the environment, as does the new default, `Cronwatch\FromEnv::Read`; `false` still works, deprecated. Code that passed `null` on purpose to mean "read the environment" now turns the secret off. Laravel's and Symfony's settings are unchanged: an unset token or cron secret there is still read from the environment.
+
+Rust:
+
+- The data types (`Run`, `StoredJob`, `Alert`, `JobState`, `JobSummary` and the rest), `AlertDetails`'s variants and every options struct are `#[non_exhaustive]`, so a later release can add a field without a major. Build them with their constructors (`Run::new`, `StoredJob::new`, `Alert::new`, `AlertDetails::failure` and the others) and options with `new()` and a builder method per field (`SlackOptions::new().webhook_url(url)`), not struct literals.
+- `js::parse` returns a `JsonError`; `ParseError` is a deprecated alias of it.
+
+Java:
+
+- These were public without being meant for apps, and are internal: `Json.quote`, `Json.kind`, `Json.copy` and `Json.MAX_DEPTH`; `PgCron.schedule`, `PgCron.jobName`, `PgCron.run`, `PgCron.HOLD_MS` and `PgCronRow`; `Twilio.MAX_SEGMENTS`; and in `dev.cronwatch.storetest` everything but `StoreContract.run`.
+- A record that may grow (`Run`, `StoredJob`, `JobState`, `Alert`, `JobSummary`, `CheckResult`) is built with its static `of`; its canonical constructor is no longer promised.
+
+.NET:
+
+- `ICronwatchJob` moved from the `Cronwatch` namespace to `Cronwatch.Hosting`, with no alias: add `using Cronwatch.Hosting;` to a job class.
+- The extension methods moved to Microsoft's namespaces: `AddCronwatch` and `AddCronwatchJob` to `Microsoft.Extensions.DependencyInjection`, `RunCronwatchCommandAsync` to `Microsoft.Extensions.Hosting`, and `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` to `Microsoft.AspNetCore.Builder`. `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods, deprecated.
+- `TwilioOptions.Segments` is an `int?`, not a `double?`.
+- A handler function whose lambda names its request's type must say `CronwatchRequest`.
+- A store that implemented `IConditionalRunStore.UpdateRunIfAsync`, `IStateCasStore.CompareAndSetStateAsync` or `IRunDeletingStore.DeleteRunIfAsync` explicitly names the new interface instead, since the method now belongs to it.
+
+Go and Elixir have no breaking changes beyond those every language shares.
+
+### Added
+
+- `GET /api` on every dashboard says what is answering: `{ ok: true, library, language, version, api: 1 }`. The API only grows within `api: 1`.
+- The webhook's body starts with `"schema": 1`, and its JSON Schema is published at [cronwatch.dev/schemas/webhook/1.json](https://cronwatch.dev/schemas/webhook/1.json). A receiver can check the `X-CronWatch-Signature` header with `signature(secret, body)`, new in TypeScript (`@cronwatch/sdk/webhook`), Ruby (`Cronwatch::Alerts::Webhook.signature`), Python (`cronwatch.alerts.webhook.signature`) and PHP (`Webhook::signature`), as Go, Rust, Elixir, Java and .NET already had.
+- Ruby: `client.routes(**options)`, the dashboard as a Rack app.
+- Rust: constructors and builder methods for every data and options type.
+- Java: a static `of` on each record that may grow.
+- The [Stability](https://cronwatch.dev/docs/stability/), [Environment variables](https://cronwatch.dev/docs/environment/) and [Deprecations](https://cronwatch.dev/docs/deprecations/) pages.
+- CI checks each package's public API: a committed report of it for TypeScript, Python and Elixir (`api.txt`), apidiff for the Go modules and cargo-semver-checks for the Rust crates, beside .NET's `PublicAPI.Unshipped.txt`.
+
+### Changed
+
+- The client's check loop is started with `startChecking(every)` (`start_checking` in Ruby, Python, Rust and Elixir, `StartChecking` in Go and .NET), since a job's `start()` opens a run. The client's `start(every)` still works, deprecated.
+- `routes()` on the client is the one way to mount the dashboard. TypeScript's `createRoutes`, Ruby's and Python's `Web.new(client)` and `Web(client)`, and Java's `Routes.of` still work, deprecated.
+- TypeScript: the client class is `Cronwatch`, with options `CronwatchOptions`, as every other language spells it; `CronWatch` and `CronWatchOptions` are deprecated aliases.
+- Python: the triage class is `Anthropic` (was `AnthropicTriage`), and `Slack` and `Discord` take `webhook_url` by keyword.
+- Ruby: `silence` takes the duration as `for:`, as the API and the MCP server do; `run(id)` without a block is `get_run(id)`.
+- PHP: `$job->monitor($fn)` is the decorator (was `wrap`). Laravel's settings keys `store.prefix`, `store.create_tables`, `schedule.check` and `schedule.check_cron` are `table_prefix`, `create_tables`, `check.schedule` and `check.frequency`, as Symfony spells them; the old keys are still read, with a deprecation notice.
+- Go: `PanicError` is gocron's panic type (was `Panic`), and `robfigcron.Converted` the one converted type. The `Watch` shortcuts are deprecated in favour of `New(cw, o).Option()`.
+- Rust: axum and reqwest, both below 1.0, are leaving the core crate's API: `Routes::into_router()` and `ReqwestTransport::with_client` are deprecated and go in 1.0. Mount the tower service with `Router::new().nest_service(...)` instead.
+- Java: `SqlStore` is in `dev.cronwatch.store`, beside `MemoryStore`, and the bridge is `SchedulerBridge`, as in .NET; the old names are deprecated.
+- .NET: `CronwatchRequest` and `CronwatchResponse` (were `WebRequest` and `WebResponse`, whose names `System.Net` also has), `Adapters` (was `WebAdapters`), `SlackChannel.Webhook` and `DiscordChannel.Webhook` (were `Slack.Webhook` and `Discord.Webhook`), and the optional store interfaces named after their methods: `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`.
+- Public means documented. Each language marks the rest as internal in its own way (`@api private` in Ruby, underscored modules in Python, `@internal` in PHP, hidden from HexDocs in Elixir, internal or deprecated elsewhere). The scheduler bridges are for integration authors and outside the 1.x promise, and each store test kit promises only the entry point that runs the whole contract.
+- `cronwatch-apalis` stays outside the 1.x promise while apalis 1.0 is a release candidate.
+
+### Deprecated
+
+Every deprecated name, with its replacement and the release it goes in, is on the [Deprecations](https://cronwatch.dev/docs/deprecations/) page. In short: the client's `start(every)` in every language; the dashboard's other constructors; TypeScript's `CronWatch`, `CronWatchOptions` and `hmacSha256Hex`; Python's `AnthropicTriage`, positional webhook URLs, `hmac_sha256_hex` and its implementation modules' old names; PHP's `false` for "off", `wrap` and `hmacSha256Hex`; Laravel's four old keys; .NET's former type and interface names and its `Json` helpers; Java's `jdbc.SqlStore` and `Bridge`; Elixir's `StoreCase` helpers. The helpers exported by accident in TypeScript, Go and Rust are deprecated now and go in 1.0.
+
+### Fixed
+
+- Ruby, Python and PHP keep the fields of a job's stored state and definition that they do not know, as the other languages did. A 0.x process in those languages erased what a newer release had written there (the queue of alerts being sent, for one) on its next write.
+- Every language holds run ids to 200 characters on every path; `recordRun` let a longer one through, which the MySQL column could not hold.
+- TypeScript: a schedule on a date no month has no longer runs out of stack.
+- Craft CMS: `GET /cronwatch/api`, with no path after it, reaches the JSON API instead of the site's 404 page.
+
+## 0.10.0 and earlier
+
+Releases up to 0.10.0 (2026-09-30) are described in their [GitHub releases](https://github.com/phillips-jon/cronwatch/releases), and the plugins' in their own changelogs.

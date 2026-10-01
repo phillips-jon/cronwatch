@@ -22,7 +22,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { addMarkdownChangelog, addReadmeChangelog, today } from "./changelogs.mjs";
+import { addMarkdownChangelog, addReadmeChangelog, addRootChangelog, today } from "./changelogs.mjs";
 
 /** Every place the release version lives. Each pattern captures (before)(version)(after). */
 const VERSIONED = [
@@ -86,9 +86,13 @@ const VERSIONED = [
  * and the Craft plugin's and Drupal module's CHANGELOG.md, whose
  * "## Unreleased" becomes "## X.Y.Z - <today>". A file with no notes written
  * ahead gets a placeholder section, with a reminder to write better notes.
+ * The project's CHANGELOG.md is turned the same way, but holds the
+ * release's notes, so the release refuses to run without its Unreleased
+ * section.
  */
 const README_CHANGELOG = "packages/php/wordpress/readme.txt";
 const MARKDOWN_CHANGELOGS = ["packages/php/craft/CHANGELOG.md", "packages/php/drupal/CHANGELOG.md"];
+const ROOT_CHANGELOG = "CHANGELOG.md";
 
 /** How each package ships, printed after the release commit, in order. Given the semver and the RubyGems version. */
 const PUBLISH = [
@@ -285,7 +289,7 @@ function planEdits(current, next) {
 
 /** Tracked files, outside the table and the regenerated ones, that still mention the old version. */
 function strays(current) {
-  const skip = new Set([...VERSIONED.map((row) => row.file), ...MARKDOWN_CHANGELOGS, "package-lock.json", "scripts/release.mjs"]);
+  const skip = new Set([...VERSIONED.map((row) => row.file), ...MARKDOWN_CHANGELOGS, ROOT_CHANGELOG, "package-lock.json", "scripts/release.mjs"]);
   let out = "";
   try {
     out = git("grep", "-n", "-F", current, "--", ".", ":!conformance/", ":!package-lock.json");
@@ -366,6 +370,11 @@ const edits = planEdits(current, next);
   for (const file of MARKDOWN_CHANGELOGS) {
     if (!edits.has(file)) { const text = read(file); edits.set(file, { before: text, after: text, lines: [] }); }
     changes.push([file, edits.get(file), (text) => addMarkdownChangelog(text, next, date, file), '"## Unreleased"']);
+  }
+  {
+    const text = read(ROOT_CHANGELOG);
+    edits.set(ROOT_CHANGELOG, { before: text, after: text, lines: [] });
+    changes.push([ROOT_CHANGELOG, edits.get(ROOT_CHANGELOG), (text) => addRootChangelog(text, next, date, ROOT_CHANGELOG), '"## Unreleased"']);
   }
   for (const [file, edit, add, heading] of changes) {
     let result;

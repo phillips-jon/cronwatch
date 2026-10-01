@@ -133,6 +133,11 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 = Unreleased =
 
 * The `cronwatch_log` action is the documented way to add a line to a run's output; the `cronwatch_log()` function still works.
+* The JSON API's root answers what is serving it: the library, its language and version, and the API's version.
+* The JSON API's silence and unsilence answer the job's summary instead of its stored state.
+* The webhook's body starts with `"schema": 1`, the payload's version; its JSON Schema is at https://cronwatch.dev/schemas/webhook/1.json.
+* A job's stored state keeps the fields a newer release wrote, so sites and apps on different 1.x releases can share one database.
+* A blank `CRONWATCH_ENV` or `APP_ENV` counts as unset.
 
 = 0.10.0 =
 
