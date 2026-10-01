@@ -79,6 +79,12 @@ public final class Cronwatch implements AutoCloseable {
   /** Run ids that start with this belong to the pg_cron source. */
   public static final String RESERVED_RUN_ID_PREFIX = "pgcron:";
 
+  /**
+   * The longest run id, in UTF-16 code units: what {@code start}, {@code resume} and {@code
+   * recordRun} take, and every store holds.
+   */
+  static final int MAX_RUN_ID = 200;
+
   final Core core;
   final Delivery delivery;
   final Runs runs;
@@ -356,13 +362,15 @@ public final class Cronwatch implements AutoCloseable {
 
   /** The SDK's refusal of a run id no store could hold, or one reserved for the pg_cron source. */
   static void checkRunId(String job, String id, String method) {
-    if (id.isEmpty() || id.length() > 200) {
+    if (id.isEmpty() || id.length() > MAX_RUN_ID) {
       throw CronwatchException.invalid(
           "job "
               + Json.quote(job)
               + ": "
               + method
-              + "() needs a run id of 1 to 200 characters (got "
+              + "() needs a run id of 1 to "
+              + MAX_RUN_ID
+              + " characters (got "
               + id.length()
               + " characters)");
     }
@@ -537,8 +545,9 @@ public final class Cronwatch implements AutoCloseable {
    * number throws before anything is written, as {@link JobContext#metric} does. Returns the alerts
    * it sent.
    *
-   * @throws CronwatchException when the job is not declared, for a metric that is not a finite
-   *     number, or when the store fails
+   * @throws CronwatchException when the job is not declared, for a run id that is not 1 to 200
+   *     characters or holds a NUL, for a metric that is not a finite number, or when the store
+   *     fails
    */
   public List<Alert> recordRun(Run run) {
     return recordRun(run, true);

@@ -737,6 +737,17 @@ final class Runs {
               + dev.cronwatch.json.Json.quote(input.job())
               + " is not declared; call job first");
     }
+    // The longest id start() takes; MySQL's column would hold 255, but every store holds 200.
+    if (input.id().isEmpty() || input.id().length() > Cronwatch.MAX_RUN_ID) {
+      throw CronwatchException.invalid(
+          "recordRun: run ids must be 1 to "
+              + Cronwatch.MAX_RUN_ID
+              + " characters (got "
+              + input.id().length()
+              + " characters; job "
+              + dev.cronwatch.json.Json.quote(input.job())
+              + ")");
+    }
     if (input.id().indexOf('\0') >= 0) {
       throw CronwatchException.invalid(
           "recordRun: run ids cannot contain a NUL character (job "

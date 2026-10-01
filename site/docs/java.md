@@ -390,7 +390,7 @@ A job's options, on `JobOptions.builder()`: `schedule` (five or six field cron, 
 | `forget(name)` | remove a job and its runs |
 | `job.start(options)`, `job.resume(id)`, `resumeRun(name, id)` | runs that span calls |
 | `job.open(options)` | a run seen from outside the function, for a scheduler integration: an `ObservedRun` to close or take back |
-| `recordRun(run)` | record a run that happened elsewhere, for a source; answers the alerts it sent |
+| `recordRun(run)` | record a run that happened elsewhere, for a source (its id 1 to 200 characters, as `start` takes); answers the alerts it sent |
 | `syncJob(name)` | write a declaration to the store now, unless it already holds it |
 | `definedJobs()` | the jobs declared in this process |
 | `routes()`, `job.handler(fn)` | the dashboard and a job's handler |
