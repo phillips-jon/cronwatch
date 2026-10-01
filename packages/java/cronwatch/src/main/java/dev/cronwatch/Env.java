@@ -1,6 +1,8 @@
 package dev.cronwatch;
 
+import dev.cronwatch.internal.js.Js;
 import java.util.Locale;
+import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,8 +33,16 @@ final class Env {
    * Spring starter's, from the app's active profiles.
    */
   static String environment(@Nullable String fallback) {
+    return environment(System::getenv, fallback);
+  }
+
+  /**
+   * {@link #environment(String)} over {@code getenv}: the first of {@code CRONWATCH_ENV}, {@code
+   * APP_ENV} and {@code fallback} whose value, trimmed as JavaScript trims, is not empty.
+   */
+  static String environment(UnaryOperator<@Nullable String> getenv, @Nullable String fallback) {
     for (String name : VARIABLES) {
-      String value = System.getenv(name);
+      String value = getenv.apply(name);
       if (value == null) {
         continue;
       }
@@ -45,7 +55,7 @@ final class Env {
   }
 
   private static String normalize(String value) {
-    String v = value.strip().toLowerCase(Locale.ROOT);
+    String v = Js.trim(value).toLowerCase(Locale.ROOT);
     return switch (v) {
       case "prod" -> "production";
       case "dev", "local", "test", "testing" -> "development";
