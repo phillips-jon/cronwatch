@@ -1517,10 +1517,11 @@ async function storeCases() {
 
 /**
  * What the client itself does, through its public API, over a memory store
- * on a fixed clock: the run ids it takes (runIds).
+ * on a fixed clock: the run ids it takes (runIds), and what it keeps of
+ * stored data it does not know (unknownFields).
  */
 async function clientCases() {
-  return { runIds: await runIdCases() };
+  return { runIds: await runIdCases(), unknownFields: await unknownFieldCases() };
 }
 
 /**
@@ -1553,6 +1554,77 @@ async function runIdCases() {
     await cw.close();
   }
   return out;
+}
+
+/**
+ * A newer release may write what this one does not know: a top-level key in
+ * a job's definition or its state (the JSON columns, which are where stored
+ * data grows; a run's columns are fixed), a run status, a trigger, a
+ * condition in `open`. A process that reads such data, changes it and
+ * writes it back keeps them as they were, and a run with a status it does
+ * not know is left alone. An unknown open condition is shown in the
+ * summary and holds back the recovered message until the release that
+ * knows it closes it. The seed is what another process wrote; then a
+ * process that does not declare the job checks, silences and unsilences it,
+ * reads its summary, and finally declares it and finishes a run. After each
+ * step: the stored job, state and runs, the alerts sent and anything
+ * reported to onError. The stored definition is the declaring process's own
+ * once it declares the job (the last step): a declaration replaces the
+ * definition, as it always does.
+ */
+async function unknownFieldCases() {
+  let now = T0;
+  const sent = [];
+  const errors = [];
+  const store = sdk.memory();
+  const definition = { name: "keep", timeout: "5m", tags: ["a"], futureOption: { mode: "x", list: [1, "two", null] } };
+  const state = {
+    job: "keep", open: { future_condition: T0 - 2 * HOUR }, consecutiveFailures: 0, silencedUntil: null, lastAlertAt: null,
+    pendingRecovery: [], undelivered: [], version: 3, futureField: { kept: true, list: [1, "two"] },
+  };
+  const runRow = (id, status, startedAt, extra = {}) => ({
+    id, job: "keep", status, startedAt, finishedAt: null, durationMs: null, error: null, output: null, metrics: {}, trigger: "run", ...extra,
+  });
+  const runs = [
+    runRow("k0", "queued", T0 - 2 * HOUR),
+    runRow("k1", "running", T0 - HOUR, { trigger: "future-scheduler" }),
+  ];
+  await store.upsertJob(clone(definition), T0 - DAY);
+  for (const run of runs) await store.insertRun(clone(run));
+  await store.setState(clone(state));
+
+  const cw = sdk.cronwatch({
+    store, now: () => now, cronSecret: null,
+    alerts: [sdk.custom("capture", (alert) => { sent.push(clone(alert)); })],
+    onError: (error, where) => errors.push(`${where}: ${error.message}`),
+  });
+  const snapshot = async () => ({
+    job: clone(await store.getJob("keep")),
+    state: clone(await store.getState("keep")),
+    runs: clone(await store.listRuns("keep", 10)),
+    alerts: sent.splice(0),
+    errors: errors.splice(0),
+  });
+  const steps = [];
+  now = T0;
+  await cw.check();
+  steps.push({ op: "check", at: now, expect: await snapshot() });
+  now = T0 + MIN;
+  await cw.silence("keep", "1h");
+  steps.push({ op: "silence", at: now, for: "1h", expect: await snapshot() });
+  now = T0 + 2 * MIN;
+  await cw.unsilence("keep");
+  steps.push({ op: "unsilence", at: now, expect: await snapshot() });
+  const summary = clone(await cw.jobSummary("keep"));
+  steps.push({ op: "summary", at: now, summary, expect: await snapshot() });
+  now = T0 + 3 * MIN;
+  const declared = { timeout: "5m", tags: ["a"] };
+  const handle = await cw.job("keep", declared).start({ id: "k2" });
+  now = T0 + 3 * MIN + 1500;
+  await handle.finish("done");
+  steps.push({ op: "declareAndRun", declared, id: "k2", startedAt: T0 + 3 * MIN, finishedAt: now, output: "done", expect: await snapshot() });
+  await cw.close();
+  return { seed: { definition, createdAt: T0 - DAY, state, runs }, steps };
 }
 
 // ---------------------------------------------------------------- channels
