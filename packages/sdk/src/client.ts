@@ -1,5 +1,5 @@
 import { formatDuration, parseDuration } from "./duration.js";
-import { isDevelopment, isProduction, readEnv } from "./env.js";
+import { isDevelopment, isProduction, readSecretEnv, secretOption } from "./env.js";
 import {
   applySilence,
   BASELINE_WINDOW,
@@ -59,7 +59,8 @@ export interface HandlerOptions {
   /**
    * Callers must send `Authorization: Bearer <secret>`. Defaults to the
    * client's cronSecret, which defaults to process.env.CRON_SECRET (what
-   * Vercel sends its cron requests with). An empty string counts as unset.
+   * Vercel sends its cron requests with). An empty string, or one of only
+   * whitespace, counts as unset; any other type (false, a number) throws.
    * With no secret at all the handler answers 503 unless the app is in
    * development (the first of CRONWATCH_ENV, APP_ENV and NODE_ENV that is
    * set names "development", "dev", "local", "test" or "testing"). Pass
@@ -197,8 +198,9 @@ export interface CronwatchOptions {
   /**
    * Shared secret that handler() requests must carry. Defaults to
    * process.env.CRON_SECRET (on Cloudflare Workers, which have no process,
-   * pass env.CRON_SECRET); an empty string counts as unset. Pass null to
-   * let handlers run without one.
+   * pass env.CRON_SECRET); an empty string or one of only whitespace, given
+   * here or in the variable, counts as unset. Pass null to let handlers run
+   * without one. Any other type (false, a number) throws.
    */
   cronSecret?: string | null;
   /** How long finished runs are kept. Default "30d". */
@@ -337,7 +339,9 @@ export class Cronwatch {
     this.alerts = options.alerts ?? [consoleChannel()];
     this.triage = options.triage;
     this.sources = options.sources ?? [];
-    const secret = options.cronSecret === undefined ? readEnv("CRON_SECRET") : options.cronSecret;
+    // A blank secret, given or read, counts as unset; one given that is not a string throws.
+    const given = secretOption(options.cronSecret, "cronSecret");
+    const secret = options.cronSecret === undefined ? readSecretEnv("CRON_SECRET") : given;
     this.cronSecret = secret ? secret : null;
     this.secretOptOut = options.cronSecret === null;
     this.retentionMs = parseDuration(options.retention ?? "30d", "retention");
@@ -409,7 +413,8 @@ export class Cronwatch {
         return outcome.result as T;
       },
       handler<T>(fn: HandlerFn<T>, options?: HandlerOptions) {
-        const own = options?.secret;
+        // A blank secret falls back to the client's; one that is not a string throws.
+        const own = secretOption(options?.secret, "handler: secret");
         const secret = own === null ? null : own ? own : self.cronSecret;
         const optedOut = own === null || (!own && self.secretOptOut);
         return async (request: Request): Promise<Response> => {

@@ -1,5 +1,5 @@
 import type { Cronwatch } from "../client.js";
-import { isDevelopment, readEnv } from "../env.js";
+import { isDevelopment, readSecretEnv, secretOption } from "../env.js";
 import { constantTimeEqual, json } from "../http.js";
 import { parseDuration } from "../duration.js";
 import type { Duration, JobSummary, Run } from "../types.js";
@@ -13,7 +13,9 @@ export interface RoutesOptions {
    * Required to reach anything. Send it as `Authorization: Bearer <token>`,
    * or open the dashboard once with `?token=<token>` and a cookie is set.
    * Defaults to process.env.CRONWATCH_TOKEN (on Cloudflare Workers, which
-   * have no process, pass env.CRONWATCH_TOKEN); an empty string counts as unset.
+   * have no process, pass env.CRONWATCH_TOKEN); an empty string or one of
+   * only whitespace, given here or in the variable, counts as unset, and any
+   * other type (false, a number) throws.
    * With no token in development (the first of CRONWATCH_ENV, APP_ENV and
    * NODE_ENV that is set names "development", "dev", "local", "test" or
    * "testing"), the routes make a random one and print a sign-in link to the
@@ -223,6 +225,33 @@ function forwardedOrigin(request: Request, url: URL): string {
   }
 }
 
+/**
+ * The token an Authorization header carries: what follows the scheme when
+ * the scheme is Bearer (any case) and one or more whitespace characters
+ * follow it, else null. Any other scheme (a proxy's Basic auth, say) is not
+ * a bearer at all, so the cookie and ?token= are read as if no header came.
+ */
+function bearerToken(header: string | null): string | null {
+  const match = header === null ? null : /^Bearer\s+([\s\S]*)$/i.exec(header);
+  return match ? match[1]! : null;
+}
+
+/**
+ * Where a sign-in through the form goes next: the page it was posted from
+ * (the Referer) when that is on the public origin and its query has no
+ * `token` parameter, else the dashboard.
+ */
+function signInReturn(referer: string | null, publicOrigin: string, base: string): string {
+  if (referer === null || !referer.startsWith(publicOrigin + "/")) return `${base}/`;
+  let url: URL;
+  try {
+    url = new URL(referer);
+  } catch {
+    return `${base}/`;
+  }
+  return url.searchParams.has("token") ? `${base}/` : referer;
+}
+
 function stripBase(pathname: string, base: string): string {
   let path = pathname.startsWith(base) ? pathname.slice(base.length) : pathname;
   if (path === "") path = "/";
@@ -292,7 +321,9 @@ export function createRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes
  */
 export function buildRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes {
   const optedOut = options.token === null;
-  const configured = optedOut ? null : (options.token || readEnv("CRONWATCH_TOKEN") || null);
+  // A blank token, given or read, counts as unset; one given that is not a string throws.
+  const given = secretOption(options.token, "routes: token");
+  const configured = optedOut ? null : (given || readSecretEnv("CRONWATCH_TOKEN") || null);
   const base = (options.basePath ?? "/cronwatch").replace(/\/+$/, "");
   const developing = isDevelopment();
   const fixedOrigin = configuredOrigin(options.origin);
@@ -343,7 +374,23 @@ export function buildRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes 
         : api({ ok: false, error: "Cross-site request refused" }, 403);
     }
 
-    const bearer = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? null;
+    const bearer = bearerToken(request.headers.get("authorization"));
+    const signInCookie = async () => {
+      const secure = publicOrigin.startsWith("https:") ? "; Secure" : "";
+      return `${COOKIE}=${await expectedCookie(token!)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`;
+    };
+    const signInPage = () => generated
+      ? html(messagePage("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once, or enter the token from it below, and this browser stays signed in.", base, true), 401)
+      : html(messagePage("Sign in", "Enter your CRONWATCH_TOKEN and this browser stays signed in.", base, true), 401);
+
+    // The sign-in form posts the token here, in the body, so it stays out of
+    // the URL and every access log. Cross-site posts were refused above.
+    if (token && method === "POST" && path === "/signin") {
+      const sent = (await readBody(request)).token;
+      if (sent === undefined || !constantTimeEqual(sent, token)) return signInPage();
+      return redirect(signInReturn(request.headers.get("referer"), publicOrigin, base), { "set-cookie": await signInCookie() });
+    }
+
     if (token) {
       // ?token= is only the sign-in that moves the token into a cookie.
       const query = wantsHtml && method === "GET" ? url.searchParams.get("token") : null;
@@ -355,22 +402,17 @@ export function buildRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes 
         : query !== null ? constantTimeEqual(query, token)
         : sent !== null && constantTimeEqual(sent, await expectedCookie(token));
       if (!cronSecretOk && !tokenOk) {
-        if (generated) {
-          return wantsHtml
-            ? html(messagePage("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base, true), 401)
-            : api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401);
-        }
-        return wantsHtml
-          ? html(messagePage("Sign in", `Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.`, base, true), 401)
+        if (wantsHtml) return signInPage();
+        return generated
+          ? api({ ok: false, error: "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log" }, 401)
           : api({ ok: false, error: "Unauthorized" }, 401);
       }
       if (query !== null) {
-        // Move the token from the URL into a cookie so it is not in history or logs.
+        // Move the token from the URL into a cookie, so it is not left in the
+        // browser's history. The request line that carried it may still be in
+        // an access log, which is why the sign-in form posts instead.
         url.searchParams.delete("token");
-        const secure = publicOrigin.startsWith("https:") ? "; Secure" : "";
-        return redirect(url.pathname + (url.search || ""), {
-          "set-cookie": `${COOKIE}=${await expectedCookie(token)}; Path=${base || "/"}; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`,
-        });
+        return redirect(url.pathname + (url.search || ""), { "set-cookie": await signInCookie() });
       }
     }
 

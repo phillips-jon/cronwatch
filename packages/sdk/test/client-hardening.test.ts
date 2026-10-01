@@ -479,3 +479,50 @@ test("startChecking() with an interval longer than setInterval can hold does not
   assert.equal(checks, 1, "no more within the minute");
   cw.stop();
 });
+
+test("a CRON_SECRET or secret of only whitespace counts as unset: a handler answers 503 and says why, and /api/check takes only the token", async () => {
+  const saved = { NODE_ENV: process.env.NODE_ENV, CRON_SECRET: process.env.CRON_SECRET, CRONWATCH_ENV: process.env.CRONWATCH_ENV, APP_ENV: process.env.APP_ENV };
+  try {
+    process.env.NODE_ENV = "production";
+    delete process.env.CRONWATCH_ENV;
+    delete process.env.APP_ENV;
+    for (const blank of ["", " ", "\t\n", " ﻿"]) {
+      const label = JSON.stringify(blank);
+      for (const [options, handlerSecret] of [[{}, undefined], [{ cronSecret: blank }, undefined], [{ cronSecret: null }, blank]] as const) {
+        process.env.CRON_SECRET = blank;
+        const errors: string[] = [];
+        const cw = cronwatch({ alerts: [capture()], ...options, onError: (_e, where) => errors.push(where) });
+        if (handlerSecret === undefined) assert.equal(cw.cronSecret, null, label);
+        const handler = cw.job("j").handler(async () => {}, handlerSecret === undefined ? undefined : { secret: handlerSecret });
+        const res = await handler(new Request("http://x/", { headers: { authorization: "Bearer  " } }));
+        if (handlerSecret === undefined) {
+          assert.equal(res.status, 503, label);
+          assert.deepEqual(errors, ["handler"], label);
+        } else {
+          // A blank handler secret falls back to the client's, here opted out with null.
+          assert.equal(res.status, 200, label);
+        }
+      }
+    }
+    // A blank variable is not a secret for /api/check either: only the token opens it.
+    process.env.CRON_SECRET = "  ";
+    const routes = cronwatch({ alerts: [capture()] }).routes({ token: "tok" });
+    assert.equal((await routes.POST(new Request("http://x/cronwatch/api/check", { method: "POST", headers: { authorization: "Bearer   " } }))).status, 401);
+    // Anything else is used as it is.
+    process.env.CRON_SECRET = "s3cret";
+    const kept = cronwatch({ alerts: [capture()] });
+    assert.equal(kept.cronSecret, "s3cret");
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+});
+
+test("a cronSecret or handler secret that is not a string or null throws, so false or a number never becomes a password", () => {
+  for (const value of [false, true, 0, 5, {}, ["s"]]) {
+    assert.throws(() => cronwatch({ alerts: [], cronSecret: value as unknown as string }), /^TypeError: cronSecret must be a string, or null to opt out, not (boolean|number|object|an array)$/, String(value));
+    const cw = cronwatch({ alerts: [], cronSecret: "s" });
+    assert.throws(() => cw.job("j").handler(async () => {}, { secret: value as unknown as string }), /^TypeError: handler: secret must be a string, or null to opt out, not (boolean|number|object|an array)$/, String(value));
+  }
+});

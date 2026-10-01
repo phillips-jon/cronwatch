@@ -427,12 +427,13 @@ export function jobPage(job: JobSummary, runs: Run[], now: number, base: string,
 }
 
 /**
- * A page with one message. With `signIn`, a form under it takes the token
- * and sends it as ?token=, which the routes move into the cookie: the way in
+ * A page with one message. With `signIn`, a form under it posts the token
+ * to <base>/signin in the body, keeping it out of the URL and access logs,
+ * and the routes set the cookie: the way in
  * where there is no address bar to open a link with, such as an app on an
  * iPhone's home screen, which keeps its cookies apart from Safari's.
  */
 export function messagePage(title: string, message: string, base: string, signIn = false): string {
-  const form = signIn ? `<form class="signin" method="get" action="${h(base)}/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>` : "";
+  const form = signIn ? `<form class="signin" method="post" action="${h(base)}/signin"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>` : "";
   return layout(title, `<header class="top">${brand(base)}</header><main class="message"><h1>${h(title)}</h1><p>${h(message)}</p>${form}</main>`, base);
 }

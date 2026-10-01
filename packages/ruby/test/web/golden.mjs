@@ -114,6 +114,8 @@ const routes = cw.routes({ token: "tok", basePath: "/cronwatch" });
 const bearer = { authorization: "Bearer tok" };
 const cookie = { cookie: `cronwatch_token=${createHash("sha256").update("cronwatch-cookie:tok").digest("hex")}` };
 const json = { ...bearer, "content-type": "application/json" };
+const basic = { authorization: "Basic dXNlcjpwYXNz" };
+const form = { "content-type": "application/x-www-form-urlencoded" };
 
 /** Each request: [method, path, headers, body]. {run:JOB:N} is the Nth newest run of JOB. */
 const requests = [
@@ -184,6 +186,25 @@ const requests = [
   ["GET", "/cronwatch/icons/nope.png"],
   ["GET", "/cronwatch/icons/nope.png", bearer],
   ["POST", "/cronwatch/sw.js", bearer],
+  // An Authorization header that is not a bearer (a proxy's Basic auth) is
+  // no bearer at all: the cookie and ?token= sign in as if none came.
+  ["GET", "/cronwatch/api/jobs", { ...basic, ...cookie }],
+  ["GET", "/cronwatch/api/jobs", basic],
+  ["GET", "/cronwatch/api/check", { ...basic, ...cookie }],
+  ["GET", "/cronwatch/jobs/sync-users?token=tok", basic],
+  ["GET", "/cronwatch/api/jobs", { authorization: "bearer tok" }],
+  ["GET", "/cronwatch/api/jobs", { authorization: "Bearer", ...cookie }],
+  // The sign-in form posts the token to <base>/signin in the body.
+  ["POST", "/cronwatch/signin", { ...form, origin: "http://app.test", referer: "http://app.test/cronwatch/jobs/sync-users" }, "token=tok"],
+  ["POST", "/cronwatch/signin", { ...form, referer: "http://app.test/cronwatch/?token=bad" }, "token=tok"],
+  ["POST", "/cronwatch/signin", form, "token=tok"],
+  ["POST", "/cronwatch/signin", { ...form, referer: "https://evil.example/cronwatch/jobs/sync-users" }, "token=tok"],
+  ["POST", "/cronwatch/signin", { "content-type": "application/json" }, JSON.stringify({ token: "tok" })],
+  ["POST", "/cronwatch/signin", form, "token=wrong"],
+  ["POST", "/cronwatch/signin", form, "for=1h"],
+  ["POST", "/cronwatch/signin", { ...form, origin: "https://evil.example" }, "token=tok"],
+  ["GET", "/cronwatch/signin"],
+  ["GET", "/cronwatch/signin", bearer],
 ];
 
 const captures = [];

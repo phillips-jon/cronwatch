@@ -237,3 +237,73 @@ test("without a token in development, nothing a request says about itself lets i
   }
 });
 
+
+/** Runs fn with these variables set (undefined unsets one), then puts them back. */
+async function withEnv(values: Record<string, string | undefined>, fn: () => Promise<void>): Promise<void> {
+  const before = Object.fromEntries(Object.keys(values).map((k) => [k, process.env[k]]));
+  for (const [k, v] of Object.entries(values)) {
+    if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+  try {
+    await fn();
+  } finally {
+    for (const [k, v] of Object.entries(before)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
+
+const PRODUCTION = { CRONWATCH_ENV: undefined, APP_ENV: undefined, NODE_ENV: "production" };
+
+test("a CRONWATCH_TOKEN or token of only whitespace counts as unset, so the routes stay locked", async () => {
+  for (const blank of ["", " ", "  ", "\t", " \n  ﻿ "]) {
+    await withEnv({ ...PRODUCTION, CRONWATCH_TOKEN: blank }, async () => {
+      for (const routes of [cronwatch({ alerts: [capture()], cronSecret: null }).routes(), cronwatch({ alerts: [capture()], cronSecret: null }).routes({ token: blank })]) {
+        const label = JSON.stringify(blank);
+        assert.equal((await routes.GET(new Request("http://app.test/cronwatch/api/jobs"))).status, 503, label);
+        const signIn = await routes.GET(new Request(`http://app.test/cronwatch/?token=${encodeURIComponent(blank)}`));
+        assert.equal(signIn.status, 503, label);
+        assert.equal(signIn.headers.get("set-cookie"), null, label);
+        assert.equal((await routes.GET(new Request("http://app.test/cronwatch/api/jobs", { headers: { authorization: "Bearer  " } }))).status, 503, label);
+      }
+    });
+  }
+  // A blank token given in code falls back to the variable, as an empty one always has.
+  await withEnv({ ...PRODUCTION, CRONWATCH_TOKEN: "from-env" }, async () => {
+    const routes = cronwatch({ alerts: [capture()], cronSecret: null }).routes({ token: "  " });
+    assert.equal((await routes.GET(new Request("http://app.test/cronwatch/api/jobs", { headers: { authorization: "Bearer from-env" } }))).status, 200);
+  });
+  // Anything else is used as it is, spaces and all.
+  await withEnv({ ...PRODUCTION, CRONWATCH_TOKEN: " padded " }, async () => {
+    const routes = cronwatch({ alerts: [capture()], cronSecret: null }).routes();
+    assert.equal((await routes.GET(new Request("http://app.test/cronwatch/?token=%20padded%20"))).status, 303);
+  });
+});
+
+test("a token given in code that is not a string or null throws, so it never becomes a password", () => {
+  const cw = cronwatch({ alerts: [capture()], cronSecret: null });
+  for (const token of [false, true, 0, 5, {}, ["tok"]]) {
+    assert.throws(() => cw.routes({ token: token as unknown as string }), /^TypeError: routes: token must be a string, or null to opt out, not (boolean|number|object|an array)$/, String(token));
+  }
+});
+
+test("an Authorization header that is not a bearer (a proxy's Basic auth) leaves the cookie and ?token= to sign in", async () => {
+  const { send, cookie } = app();
+  const basic = { authorization: "Basic dXNlcjpwYXNz" };
+  assert.equal((await send("GET", "/cronwatch/api/jobs", { ...basic, ...cookie })).status, 200);
+  assert.equal((await send("GET", "/cronwatch/", { ...basic, ...cookie })).status, 200);
+  assert.equal((await send("GET", "/cronwatch/api/jobs", basic)).status, 401);
+  const link = await send("GET", "/cronwatch/jobs/x?token=tok", basic);
+  assert.equal(link.status, 303);
+  assert.ok(link.headers.get("set-cookie"));
+  // Not a bearer, so GET /api/check does not run on its strength.
+  assert.equal((await send("GET", "/cronwatch/api/check", { ...basic, ...cookie })).status, 405);
+  // A bearer is matched whatever the scheme's case, and with any whitespace after it.
+  for (const authorization of ["Bearer tok", "bearer tok", "BEARER\ttok", "Bearer   tok"]) {
+    assert.equal((await send("GET", "/cronwatch/api/jobs", { authorization })).status, 200, authorization);
+  }
+  // A wrong bearer still wins over a good cookie; "Bearer" with nothing after it, or run on, is no bearer.
+  assert.equal((await send("GET", "/cronwatch/api/jobs", { authorization: "Bearer wrong", ...cookie })).status, 401);
+  assert.equal((await send("GET", "/cronwatch/api/jobs", { authorization: "Bearer", ...cookie })).status, 200);
+  assert.equal((await send("GET", "/cronwatch/api/jobs", { authorization: "Bearertok", ...cookie })).status, 200);
+});

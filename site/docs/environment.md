@@ -7,7 +7,7 @@ group: Reference
 
 # Environment variables
 
-Every CronWatch library reads a handful of environment variables, so the dashboard's token and the cron secret can stay out of your code. Their names are part of the [1.x promise](/docs/stability/#configuration-and-environment-variables). An option passed in code always wins over the variable, and a variable set to an empty string, or only spaces, counts as not set.
+Every CronWatch library reads a handful of environment variables, so the dashboard's token and the cron secret can stay out of your code. Their names are part of the [1.x promise](/docs/stability/#configuration-and-environment-variables). An option passed in code always wins over the variable, and a variable set to an empty string, or only spaces, counts as not set. For the dashboard's token and the cron secret, "only spaces" means only whitespace, as JavaScript's `trim` reads it, and an option given in code that is empty or only whitespace counts as not given too; a token or secret given in code must be a string, or null to opt out, and any other value (`false`, a number) is refused with an error rather than turned into a password.
 
 ## The ones every library reads
 
