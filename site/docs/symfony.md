@@ -38,7 +38,7 @@ The Scheduler watching needs `symfony/scheduler` and `symfony/messenger`, which 
 
 ## What is watched
 
-Every recurring message of every schedule (`#[AsSchedule]` providers, `#[AsCronTask]` and `#[AsPeriodicTask]`) is a job, and every time the worker consuming that schedule handles it is a run, recorded through the Scheduler's `PreRunEvent`, `PostRunEvent` and `FailureEvent`, with the trigger `"scheduler"`:
+Every recurring message of every schedule (`#[AsSchedule]` providers, `#[AsCronTask]` and `#[AsPeriodicTask]`) is a job, and every time the worker consuming that schedule handles it is a run, recorded through the Scheduler's `PreRunEvent`, `PostRunEvent` and `FailureEvent`, with the trigger `"symfony-scheduler"` (`"scheduler"` on runs recorded before 1.0; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)):
 
 - The run ends ok with the handler's result: a string is the output, and an HTTP response of 400 or more fails the run.
 - A handler that throws fails the run with the exception (taken out of Messenger's `HandlerFailedException`), and the exception goes on as before.
@@ -101,7 +101,7 @@ The options are `name` and a job's (`schedule`, `timezone`, `grace`, `timeout`, 
 
 ## Messenger messages
 
-A message class marked `#[Cronwatch\Watch]` is recorded where a worker handles it, whatever sent it, with the trigger `"messenger"`. Every attempt is a run of its own, so a retried message's failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failuresBeforeAlert` rides through retries. A message handled synchronously never reaches a worker and is not recorded.
+A message class marked `#[Cronwatch\Watch]` is recorded where a worker handles it, whatever sent it, with the trigger `"symfony-messenger"` (`"messenger"` on runs recorded before 1.0). Every attempt is a run of its own, so a retried message's failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failuresBeforeAlert` rides through retries. A message handled synchronously never reaches a worker and is not recorded.
 
 A watched message that a schedule sends on to a transport (`RecurringMessage` with a `RedispatchMessage`) is one job: the schedule declares the schedule under the message's name, and the worker that handles it records the runs, so a message that is sent but never handled is still reported missed. `messenger: { watch: false }` turns this off.
 

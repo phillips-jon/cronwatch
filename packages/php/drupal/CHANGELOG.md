@@ -2,6 +2,11 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
+## Unreleased
+
+### Changed
+- Runs are recorded with the triggers `drupal-cron` and `drupal-queue`, the integration's name as every other integration spells it; runs recorded before keep `cron` and `queue`.
+
 ## 0.10.0 - 2026-09-30
 
 ### Changed

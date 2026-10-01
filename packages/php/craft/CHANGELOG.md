@@ -1,5 +1,10 @@
 # Release Notes for CronWatch
 
+## Unreleased
+
+### Changed
+- Runs are recorded with the triggers `craft-queue` and `craft-command`, the integration's name as every other integration spells it; runs recorded before keep `queue` and `command`.
+
 ## 0.10.0 - 2026-09-30
 
 ### Added

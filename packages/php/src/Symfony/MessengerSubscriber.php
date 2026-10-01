@@ -34,7 +34,7 @@ use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
  */
 final class MessengerSubscriber implements EventSubscriberInterface
 {
-    public const TRIGGER = 'messenger';
+    public const TRIGGER = 'symfony-messenger';
     public const TAG = 'symfony-messenger';
 
     /** @var array<int, int> spl_object_id(message) => the run's execution key */

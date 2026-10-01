@@ -27,7 +27,7 @@ use Symfony\Component\Scheduler\Event\PreRunEvent;
  */
 final class SchedulerSubscriber implements EventSubscriberInterface
 {
-    public const TRIGGER = 'scheduler';
+    public const TRIGGER = 'symfony-scheduler';
 
     /** @var array<int, int> spl_object_id(message) => the run's execution key */
     private array $open = [];

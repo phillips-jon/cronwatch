@@ -44,7 +44,7 @@ use Illuminate\Contracts\Container\Container;
  */
 final class QueueWatcher
 {
-    public const TRIGGER = 'queue';
+    public const TRIGGER = 'laravel-queue';
     public const TAG = 'laravel-queue';
 
     /** @var array<int, int> spl_object_id(queue job) => the run's execution key */

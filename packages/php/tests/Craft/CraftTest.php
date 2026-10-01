@@ -521,7 +521,7 @@ final class CraftTest extends TestCase
         $this->assertStringEndsWith("hello\n", self::must(['cwt/task/hello']));
         $run = self::last('craft:cwt:task:hello');
         $this->assertSame('ok', $run['status']);
-        $this->assertSame('command', $run['trigger']);
+        $this->assertSame('craft-command', $run['trigger']);
         $this->assertSame('hello from cwt', $run['output']);
         $definition = self::definition('craft:cwt:task:hello');
         $this->assertSame('0 3 * * *', $definition['schedule']);
@@ -585,7 +585,7 @@ final class CraftTest extends TestCase
         $name = 'cwt.jobs.Flaky';
         $runs = self::runs($name);
         $this->assertSame(['failed', 'failed', 'ok'], array_column($runs, 'status'), 'each attempt is a run');
-        $this->assertSame(['queue'], array_values(array_unique(array_column($runs, 'trigger'))));
+        $this->assertSame(['craft-queue'], array_values(array_unique(array_column($runs, 'trigger'))));
         $this->assertStringStartsWith('RuntimeException: job a failed attempt 1', (string) $runs[0]['error']);
         $this->assertSame('job a attempt 3', $runs[2]['output']);
         // The integration's tags, and this install's under craft-config (from CRAFT_APP_ID).

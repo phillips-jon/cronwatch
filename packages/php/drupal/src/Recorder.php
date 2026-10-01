@@ -47,9 +47,9 @@ final class Recorder {
    */
   public const CRON_JOB = 'drupal:cron';
 
-  public const TRIGGER_CRON = 'cron';
+  public const TRIGGER_CRON = 'drupal-cron';
 
-  public const TRIGGER_QUEUE = 'queue';
+  public const TRIGGER_QUEUE = 'drupal-queue';
 
   public const TAG_CRON = 'drupal-cron';
 
