@@ -62,6 +62,13 @@ use Cronwatch\Js;
 final class Dashboard
 {
     public const COOKIE = 'cronwatch_token';
+    /** The package GET <base>/api names: each port answers with its own. */
+    private const LIBRARY = 'cronwatch/cronwatch';
+    /**
+     * The JSON API's version, which GET <base>/api answers. It goes up only
+     * for a change that is not additive, and such a change waits for a major release.
+     */
+    private const API_VERSION = 1;
     public const DEFAULT_RUNS = 20;
     public const MAX_RUNS = 500;
     /** Runs per job the board reads in one go: the table's sparkline, and most jobs' lanes. */
@@ -432,6 +439,10 @@ final class Dashboard
     private function serveApi(Request $request, string $method, array $rest, ?string $bearer): Response
     {
         $cw = $this->cw;
+        // What is serving the API, so a client such as @cronwatch/mcp can tell.
+        if ($method === 'GET' && $rest === []) {
+            return self::api(['ok' => true, 'library' => self::LIBRARY, 'language' => 'php', 'version' => Cronwatch::VERSION, 'api' => self::API_VERSION]);
+        }
         if ($method === 'GET' && $rest === ['jobs']) {
             return self::api(['ok' => true, 'jobs' => $cw->jobs()]);
         }
@@ -467,10 +478,12 @@ final class Dashboard
                 } catch (\InvalidArgumentException $error) {
                     return self::api(['ok' => false, 'error' => $error->getMessage()], 400);
                 }
-                return self::api(['ok' => true, 'state' => $cw->silence($name, $duration)]);
+                $cw->silence($name, $duration);
+                return self::api(['ok' => true, 'job' => $cw->jobSummary($name)]);
             }
             if ($rest[2] === 'unsilence') {
-                return self::api(['ok' => true, 'state' => $cw->unsilence($name)]);
+                $cw->unsilence($name);
+                return self::api(['ok' => true, 'job' => $cw->jobSummary($name)]);
             }
         }
         if ($rest === ['check']) {

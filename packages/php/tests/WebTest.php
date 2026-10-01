@@ -243,12 +243,28 @@ final class WebTest extends TestCase
         $check = self::json($post('/cronwatch/api/check'));
         $this->assertTrue($check['ok']);
         $this->assertCount(1, $check['jobs']);
-        $this->assertGreaterThan(0, self::json($post('/cronwatch/api/jobs/s/silence', ['for' => '2h']))['state']['silencedUntil']);
+        $this->assertGreaterThan(0, self::json($post('/cronwatch/api/jobs/s/silence', ['for' => '2h']))['job']['silencedUntil']);
         $this->assertSame('silenced', $cw->jobSummary('s')->health);
-        $this->assertNull(self::json($post('/cronwatch/api/jobs/s/unsilence'))['state']['silencedUntil']);
+        $this->assertNull(self::json($post('/cronwatch/api/jobs/s/unsilence'))['job']['silencedUntil']);
         $this->assertSame(404, $post('/cronwatch/api/jobs/nope/silence', ['for' => '1h'])->status);
         $this->assertSame(200, self::send($web, 'DELETE', '/cronwatch/api/jobs/s', self::BEARER)->status);
         $this->assertNull($cw->jobSummary('s'));
+    }
+
+    public function testGetApiNamesTheLibraryBehindTheToken(): void
+    {
+        $cw = new Cronwatch(store: new MemoryStore(), alerts: [], cronSecret: 'cron', onError: fn () => null);
+        $web = $this->routes($cw, 'tok');
+        $answer = '{"ok":true,"library":"cronwatch/cronwatch","language":"php","version":"' . Cronwatch::VERSION . '","api":1}';
+        foreach (['/cronwatch/api', '/cronwatch/api/'] as $path) {
+            $res = self::send($web, 'GET', $path, self::BEARER);
+            $this->assertSame([200, $answer, 'application/json; charset=utf-8'], [$res->status, $res->body, $res->headers['content-type']], $path);
+        }
+        $this->assertSame(401, self::send($web, 'GET', '/cronwatch/api')->status);
+        // The cron secret opens /api/check only.
+        $this->assertSame(401, self::send($web, 'GET', '/cronwatch/api', ['authorization' => 'Bearer cron'])->status);
+        $post = self::send($web, 'POST', '/cronwatch/api', self::JSON, '{}');
+        $this->assertSame([404, ['ok' => false, 'error' => 'Not found']], [$post->status, self::json($post)]);
     }
 
     public function testABodyOverAMebibyteIsRefusedWith413(): void
@@ -582,7 +598,7 @@ final class WebTest extends TestCase
             $this->assertStringContainsString('silence duration', self::json($res)['error'], $bad);
         }
         $this->assertNull($cw->jobSummary('s')->silencedUntil, 'a bad duration silences nothing');
-        $until = fn (array $body) => self::json($silence($body))['state']['silencedUntil'] - ($this->clock)();
+        $until = fn (array $body) => self::json($silence($body))['job']['silencedUntil'] - ($this->clock)();
         $this->assertSame(7_200_000, $until(['for' => 7_200_000]));
         $this->assertSame(60_000, $until(['for' => '60000']));
         $this->assertSame(90 * 60_000, $until(['for' => '90m']));

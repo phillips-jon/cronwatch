@@ -130,7 +130,7 @@ final class WebGoldenTest extends TestCase
     {
         $data = json_decode((string) file_get_contents(self::GOLDEN), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(Clock::T0, $data['t0']);
-        $this->assertCount(63, $data['captures']);
+        $this->assertCount(66, $data['captures']);
         $cw = self::seed();
         $web = $cw->routes(token: 'tok', basePath: '/cronwatch');
         $ids = [];
@@ -151,7 +151,9 @@ final class WebGoldenTest extends TestCase
             ksort($headers);
             ksort($expected);
             $this->assertSame($expected, $headers, $label);
-            $this->assertSame($capture['responseBody'], $body, $label);
+            // GET /api names the library serving it: the fixture holds placeholders for each port's values.
+            $expectedBody = str_replace(['<library>', '<language>', '<version>'], ['cronwatch/cronwatch', 'php', Cronwatch::VERSION], $capture['responseBody']);
+            $this->assertSame($expectedBody, $body, $label);
         }
         $this->assertSame([], self::$errors);
     }
