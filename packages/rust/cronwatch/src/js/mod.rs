@@ -16,7 +16,9 @@ mod number;
 mod text;
 
 pub(crate) use date::*;
-pub use json::{Object, ParseError, Value, parse, stringify};
+#[allow(deprecated)]
+pub use json::ParseError;
+pub use json::{Object, Value, parse, stringify};
 pub(crate) use json::{array_index, quote};
 #[cfg(any(feature = "alerts", feature = "triage"))]
 pub(crate) use lone::*;

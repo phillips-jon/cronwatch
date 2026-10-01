@@ -516,15 +516,18 @@ fn options_of_rebuilds_an_expect_pattern_and_a_custom_function() {
         }
     }
     use crate::serialize::Matcher;
-    let def = crate::describe_job("x", &JobOptions::new().expect_match(Pattern));
-    let rebuilt = crate::describe_job("x", &options_of(&def));
+    let def = crate::client::describe_job("x", &JobOptions::new().expect_match(Pattern));
+    let rebuilt = crate::client::describe_job("x", &options_of(&def));
     assert_eq!(rebuilt.to_json(), def.to_json());
     let options = options_of(&def);
     let rule = options.expect.as_ref().unwrap();
     assert_eq!(rule.check("Done 12"), None, "run by the JavaScript engine, /i and all");
     assert!(rule.check("nothing").is_some());
-    let custom = crate::describe_job("x", &JobOptions::new().expect_fn(|_| false));
-    assert_eq!(crate::describe_job("x", &options_of(&custom)).to_json(), r#"{"name":"x","expect":"custom function"}"#);
+    let custom = crate::client::describe_job("x", &JobOptions::new().expect_fn(|_| false));
+    assert_eq!(
+        crate::client::describe_job("x", &options_of(&custom)).to_json(),
+        r#"{"name":"x","expect":"custom function"}"#
+    );
 }
 
 #[test]

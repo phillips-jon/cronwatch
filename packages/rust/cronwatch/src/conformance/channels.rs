@@ -455,13 +455,15 @@ async fn conformance_channels() {
 
     assert!(failures.is_empty(), "channels.json: {} cases differ:\n{}", failures.len(), failures.join("\n"));
     // Every case of the fixture, so a case added there is not skipped here.
-    let total =
-        ["sends", "providerSends", "webhookPayloads", "failures", "providerFailures"].iter().map(|k| objects(&f, k).len()).sum::<usize>()
-            + objects(partial, "cases").len()
-            + ["errorBodies", "subjects", "smsSegments", "smsBodies", "discordDescriptions"]
-                .iter()
-                .map(|k| objects(cuts, k).len())
-                .sum::<usize>();
+    let total = ["sends", "providerSends", "webhookPayloads", "failures", "providerFailures"]
+        .iter()
+        .map(|k| objects(&f, k).len())
+        .sum::<usize>()
+        + objects(partial, "cases").len()
+        + ["errorBodies", "subjects", "smsSegments", "smsBodies", "discordDescriptions"]
+            .iter()
+            .map(|k| objects(cuts, k).len())
+            .sum::<usize>();
     assert_eq!(count, total);
     eprintln!("channels.json: {count} cases replayed");
 }

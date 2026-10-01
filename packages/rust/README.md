@@ -116,7 +116,7 @@ use cronwatch::web::RoutesOptions;
 # fn doc(cw: cronwatch::Client) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 let routes = cw.routes(RoutesOptions::new().token(std::env::var("CRONWATCH_TOKEN")?))?;
-let app = axum::Router::new().nest_service("/cronwatch", routes); // or routes.into_router()
+let app = axum::Router::new().nest_service("/cronwatch", routes);
 # let _: axum::Router = app;
 # Ok(())
 # }

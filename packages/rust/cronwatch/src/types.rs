@@ -107,7 +107,9 @@ impl AlertType {
     }
 }
 
-/// Why stored JSON could not be read as one of these types.
+/// Why text is not JSON (with `JSON.parse`'s wording and the byte
+/// position), or why stored JSON could not be read as one of these types:
+/// what [`js::parse`](crate::js::parse) and every `from_json` answer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JsonError(pub(crate) String);
 
@@ -118,12 +120,6 @@ impl fmt::Display for JsonError {
 }
 
 impl std::error::Error for JsonError {}
-
-impl From<js::ParseError> for JsonError {
-    fn from(e: js::ParseError) -> Self {
-        JsonError(e.to_string())
-    }
-}
 
 /// A run's numbers in JavaScript's key order: names that are array indices
 /// (`"10"`, `"200"`) first in ascending order, then the rest in the order

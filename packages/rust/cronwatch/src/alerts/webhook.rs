@@ -94,10 +94,10 @@ impl Channel for Webhook {
             let list: Vec<(&str, String)> = headers.iter().map(|(n, v)| (n.as_str(), v.clone())).collect();
             let t = post::transport(&o.transport)?;
             // A redirect is refused, not followed: the headers (and the signature) would go with it.
-            let answer = post::fetch(&*t, post::TIMEOUT, &o.url, &list, body.into_bytes()).await?;
+            let answer = post::fetch(&*t, post::DEADLINE, &o.url, &list, body.into_bytes()).await?;
             if !answer.ok() {
                 // Only the origin: a webhook URL's path or query often is the credential.
-                return Err(post::fail(format!("Webhook {} answered {}", post::origin(&o.url), answer.status)));
+                return Err(post::fail(format!("Webhook {} answered {}", post::origin_of(&o.url), answer.status)));
             }
             Ok(())
         })

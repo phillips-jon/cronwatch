@@ -139,7 +139,8 @@ async fn check_accepts_the_cron_secret_and_nothing_else_does() {
 #[tokio::test]
 async fn get_api_names_the_library_its_language_and_version() {
     let w = Web::new();
-    let want = format!(r#"{{"ok":true,"library":"cronwatch","language":"rust","version":"{}","api":1}}"#, cronwatch::VERSION);
+    let want =
+        format!(r#"{{"ok":true,"library":"cronwatch","language":"rust","version":"{}","api":1}}"#, cronwatch::VERSION);
     for path in ["/cronwatch/api", "/cronwatch/api/"] {
         let res = w.get(path, &[AUTH]).await;
         status(path, &res, 200);
@@ -1026,6 +1027,7 @@ async fn id_through(app: axum::Router, path: &str) -> String {
 }
 
 #[tokio::test]
+#[allow(deprecated)] // into_router, which still works until 1.0
 async fn the_base_path() {
     let k = Kit::new();
     k.cw.run("x", None, |_| async { Ok::<_, std::io::Error>(()) }).await.unwrap().unwrap();

@@ -837,11 +837,17 @@ impl Routes {
                             Err(message) => return Ok(api(error_body(&message), 400)),
                         };
                         cw.silence_ms(name, ms).await?;
-                        return Ok(api(Object::new().with("ok", true).with("job", summary_value(cw, name).await?), 200));
+                        return Ok(api(
+                            Object::new().with("ok", true).with("job", summary_value(cw, name).await?),
+                            200,
+                        ));
                     }
                     "unsilence" => {
                         cw.unsilence(name).await?;
-                        return Ok(api(Object::new().with("ok", true).with("job", summary_value(cw, name).await?), 200));
+                        return Ok(api(
+                            Object::new().with("ok", true).with("job", summary_value(cw, name).await?),
+                            200,
+                        ));
                     }
                     _ => {}
                 }

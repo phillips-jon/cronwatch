@@ -98,9 +98,15 @@ pub use {
     ses::{SesOptions, ses},
     shared::LinkFn,
     slack::{SlackOptions, slack},
-    twilio::{MAX_SEGMENTS, TwilioOptions, twilio},
+    twilio::{TwilioOptions, twilio},
     webhook::{WebhookOptions, signature, webhook},
 };
+
+/// The most SMS segments a Twilio message may use.
+#[cfg(feature = "alerts")]
+#[doc(hidden)]
+#[deprecated(note = "internal, outside the 1.x promise; no longer public from 1.0")]
+pub const MAX_SEGMENTS: u32 = twilio::SEGMENTS_MAX;
 
 /// `Debug` for options that hold credentials: the type's name only, so an
 /// app's own configuration can derive `Debug` without printing them.

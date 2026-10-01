@@ -24,8 +24,9 @@ use crate::serialize::{ExpectRule, Matcher};
 
 /// The fixtures the workspace replays: every one the SDK writes. A new
 /// fixture fails the test below until it is placed.
-const REPLAYED: [&str; 11] =
-    ["channels", "client", "duration", "evaluate", "format", "health", "output", "pgcron", "schedule", "store", "triage"];
+const REPLAYED: [&str; 11] = [
+    "channels", "client", "duration", "evaluate", "format", "health", "output", "pgcron", "schedule", "store", "triage",
+];
 
 /// SHA-256 as lowercase hex, for the fixtures' digests of long texts.
 #[cfg(any(feature = "alerts", feature = "triage"))]

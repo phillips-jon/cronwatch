@@ -11,7 +11,7 @@ use crate::alerts::{Request, Response, Transport};
 use crate::deliver::TriageContext;
 use crate::js::{LoneJson, Object, Value};
 use crate::store::{BoxError, BoxFuture};
-use crate::triage::{AnthropicOptions, REQUEST_TIMEOUT, anthropic, diagnosis, params};
+use crate::triage::{AnthropicOptions, DEADLINE, anthropic, diagnosis, params};
 use crate::types::{Alert, Run};
 
 /// The fixture's triage contexts, by name.
@@ -74,7 +74,7 @@ async fn conformance_triage() {
             ));
         }
         let ro = field(c, "requestOptions").as_object().unwrap();
-        assert_eq!(field(ro, "timeout").as_f64(), Some(REQUEST_TIMEOUT.as_millis() as f64));
+        assert_eq!(field(ro, "timeout").as_f64(), Some(DEADLINE.as_millis() as f64));
         assert_eq!(field(ro, "maxRetries").as_f64(), Some(0.0));
         count += 1;
     }

@@ -75,7 +75,7 @@ impl Channel for Discord {
             // A redirect is refused, not followed: a webhook URL is its own credential.
             let answer = post::fetch(
                 &*t,
-                post::TIMEOUT,
+                post::DEADLINE,
                 &o.webhook_url,
                 &[("content-type", "application/json".into())],
                 body.into_bytes(),

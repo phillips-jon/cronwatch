@@ -5,7 +5,8 @@
 //! accept, and what `lambda_http::run` takes, so AWS Lambda needs no code
 //! of the crate's own. With the `axum` feature, a dashboard nested in an
 //! axum `Router` finds its base path from the mount (axum's `NestedPath`
-//! and `OriginalUri`), and [`Routes::into_router`] nests it.
+//! and `OriginalUri`): mount it with `Router::new().nest_service(path,
+//! routes)`.
 
 use std::any::Any;
 use std::convert::Infallible;
@@ -251,10 +252,14 @@ where
 #[cfg(feature = "axum")]
 impl Routes {
     /// An axum `Router` with the dashboard nested at its base path (the
-    /// configured one, else `/cronwatch`), to merge into the app's own:
-    /// `app.merge(routes.into_router())`. Nesting it yourself works the same:
+    /// configured one, else `/cronwatch`). Deprecated: it hands out a type of
+    /// axum's, which is below 1.0, so its next release would break this
+    /// crate's API. Nest the tower service instead, which works the same:
     /// `Router::new().nest_service("/ops/cron", routes)` finds `/ops/cron`
     /// from the mount.
+    #[deprecated(
+        note = "nest the tower service instead: Router::new().nest_service(\"/cronwatch\", routes); this goes at 1.0"
+    )]
     pub fn into_router<S>(self) -> axum::Router<S>
     where
         S: Clone + Send + Sync + 'static,

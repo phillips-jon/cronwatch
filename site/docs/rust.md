@@ -23,7 +23,7 @@ Rust 1.85 or newer for `cronwatch`; `cronwatch-sqlx` needs 1.94, as sqlx 0.9 doe
 | `alerts` | Slack, Discord, webhook, email, SMS and error tracker channels, over reqwest on rustls (whose aws-lc-rs needs a C compiler) |
 | `triage` | Claude triage, over the same transport |
 | `tower` | the dashboard and job handlers as `tower::Service`s, for hyper, tonic and `lambda_http` |
-| `axum` | `tower`, and the mount point read from axum's nesting, and `Routes::into_router()` |
+| `axum` | `tower`, and the mount point read from axum's nesting |
 | `blocking` | a blocking client, for a program with no runtime of its own |
 | `regex` | `expect_match` takes a `regex::Regex` |
 | `serde` | `Serialize` and `Deserialize` on the public types (the SDK's JSON, field for field), for your own use |
@@ -177,10 +177,10 @@ use cronwatch::web::RoutesOptions;
 let routes = cw.routes(RoutesOptions::new().token(std::env::var("CRONWATCH_TOKEN")?))?;
 let app = axum::Router::new()
     .route("/", axum::routing::get(home))
-    .nest_service("/cronwatch", routes); // or routes.into_router(), mounted at /cronwatch
+    .nest_service("/cronwatch", routes);
 ```
 
-The base path its links use is found from the mount: axum records the nesting, which the `axum` feature reads, so a mount under a path parameter (`/t/{tenant}/cron`) or nested twice works. `base_path("/ops/cron")` wins over the mount (`""` for the root), and without either the base is `/cronwatch`. `routes.into_router()` is an axum `Router` nested at that base.
+The base path its links use is found from the mount: axum records the nesting, which the `axum` feature reads, so a mount under a path parameter (`/t/{tenant}/cron`) or nested twice works. `base_path("/ops/cron")` wins over the mount (`""` for the root), and without either the base is `/cronwatch`.
 
 With the `tower` feature (which `axum` turns on), `Routes` is a `tower::Service<http::Request<B>>` for any body, answering `http::Response<Full<Bytes>>`, so hyper serves it directly, and so does anything built on tower. Without either feature, `routes.handle(web::Request)` answers a `web::Response`, plain types for an adapter of your own (`web::Request::with_mount` says where it is mounted). actix-web does not use tower; an adapter there would be made on request.
 
@@ -314,7 +314,7 @@ alerts::newrelic(NewRelicOptions { account_id: env("NEW_RELIC_ACCOUNT_ID"),
 
 The options are the SDK's in Rust's case: `subject_prefix` and `link` in `EmailOptions`; `message_stream` (Postmark); `region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `session_token` and `configuration_set_name` (SES); `api_key_sid`, `api_key_secret`, `messaging_service_sid` and `segments` (Twilio, 1 to 10, `None` for the default of 3); `environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `release` (Sentry); `headers` (the webhook, extra request headers such as an `Authorization`); `endpoint` (Honeybadger, Bugsnag); `host` (Datadog); `release_stage` (Bugsnag); `event_type` (New Relic); and `recovered` and `link` wherever the SDK has them. `Default::default()` is always the SDK's default, so where the SDK sends recoveries unless told not to, Rust has the negative: `skip_recovered` for Sentry and Rollbar. No options struct prints its credentials with `{:?}`.
 
-Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the crate's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request names only the URL's origin, never its path, with the channel's keys cut out. Every options struct takes a `transport`: `ReqwestTransport::with_client(client)` wraps a `reqwest::Client` of your own (a proxy, a custom root; build it with `redirect::Policy::none()`), or implement `Transport` for a test. The default transport honours `HTTP_PROXY` and `HTTPS_PROXY`, as reqwest does. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
+Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the crate's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for connecting, sending and reading the answer, reads at most 1 MiB of it, and follows no redirect, so credentials never reach another address. A refused request names only the URL's origin, never its path, with the channel's keys cut out. Every options struct takes a `transport`: `None` for the default, reqwest on rustls with the platform's roots, which honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` as reqwest does; or implement `Transport` (one POST: the URL, the headers in order and the body) over a client of your own, or for a test. No public type of the crate is reqwest's, so a new reqwest never breaks an app's build. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
 The webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same fields every CronWatch library sends, described by its [JSON Schema](/schemas/webhook/1.json). Parse the fields (`type`, `details`), not `title` and `message`, whose wording is not promised. With a `secret` it signs the body with `X-CronWatch-Signature: sha256=<hex>`. `alerts::signature(secret, body)` is that hex, for a receiver in Rust; hash the raw body as it arrived and compare in constant time:
 
@@ -409,7 +409,7 @@ There is no Anthropic crate to add: the Messages API is one POST, and it sends t
 
 `JobOptions::new()` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone, from `$TZ` or `/etc/localtime`, by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget(metric, ceiling)`, `expect(text)` (the output must contain it), `expect_match(m)` (a `regex::Regex` with the `regex` feature, or anything implementing `cronwatch::Matcher`; stored as `matches /source/`), `expect_fn(|output| bool)` (a panic in it fails the run), `failures_before_alert` (1), `description` and `tags`, with the rules in the [TypeScript API reference](/docs/api/).
 
-`timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `.max_duration("10m").timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour. `cronwatch::describe_job(name, &options)` is the definition options give, without a client.
+`timeout` and `max_duration` both measure a run's length. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `.max_duration("10m").timeout("1h")` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
 
 The client (every call that can reach the store is `async` and returns a `Result`):
 

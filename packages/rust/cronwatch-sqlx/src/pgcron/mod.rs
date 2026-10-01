@@ -32,10 +32,11 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 use std::time::Duration;
 
+use cronwatch::__private::describe_job;
 use cronwatch::js::Value;
 use cronwatch::{
     Alert, BoxError, BoxFuture, Client, Definition, DurationSpec, JobOptions, Metrics, RecordOptions, Run, RunStatus,
-    Source, describe_job,
+    Source,
 };
 use tokio::sync::Mutex;
 
@@ -245,7 +246,7 @@ pub fn run_of(row: &PgCronRow, job: &str, id_prefix: &str, fallback_at: i64) -> 
         status,
         started_at,
         finished_at: end,
-        duration_ms: end.map(|e| cronwatch::run_duration(started_at, e)),
+        duration_ms: end.map(|e| cronwatch::__private::run_duration(started_at, e)),
         metrics: Metrics::new(),
         trigger: "pg_cron".into(),
     })

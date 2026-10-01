@@ -111,7 +111,7 @@ pub fn validate(name: &str, options: &JobOptions) -> Result<(), Error> {
             crate::js::quote(name)
         )));
     }
-    crate::options::validate_definition(name, &crate::describe_job(name, options))
+    crate::options::validate_definition(name, &crate::client::describe_job(name, options))
 }
 
 /// An interval as CronWatch's schedule text, exact to the millisecond:
