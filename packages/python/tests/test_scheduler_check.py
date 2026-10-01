@@ -11,7 +11,7 @@ import pytest
 from cronwatch._convert import every_text, field_text, zone_name
 from cronwatch._js import date_utc
 from cronwatch._scheduler_check import NeverFires, ScheduleError, check_fires, transitions
-from cronwatch.schedule import _fire_after, parse_schedule
+from cronwatch._schedule import _fire_after, parse_schedule
 
 NOW = date_utc(2026, 0, 5)
 

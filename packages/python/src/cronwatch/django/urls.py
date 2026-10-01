@@ -12,5 +12,7 @@ from django.urls import re_path
 
 from .views import dashboard
 
+__all__ = ["app_name", "urlpatterns"]
+
 app_name = "cronwatch"
 urlpatterns = [re_path(r"^(?P<path>.*)\Z", dashboard, name="dashboard")]

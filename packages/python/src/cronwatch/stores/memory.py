@@ -9,20 +9,23 @@ from collections.abc import Sequence
 from typing import Any, TypeVar
 
 from .. import _js
-from ..evaluate import state_version
-from ..output import strip_json_nul, strip_nul
+from .._deprecated import names as _deprecated_names
+from .._evaluate import state_version
+from .._output import strip_json_nul, strip_nul
 from ..types import JobDefinition, JobState, Run, RunStatus, StoredJob
 
-T = TypeVar("T")
+__all__ = ["MemoryStore"]
+
+_T = TypeVar("T")
 
 
-def _clone(value: Any, kind: type[T]) -> T:
+def _clone(value: Any, kind: type[_T]) -> _T:
     """A copy through JSON, as the SDK's memory store makes, so nothing the
     caller holds is shared and values read back as any store returns them."""
     return kind.from_dict(_js.loads(_js.dumps(value.to_dict())))  # type: ignore[attr-defined, no-any-return]
 
 
-def _kept(value: Any, kind: type[T]) -> T:
+def _kept(value: Any, kind: type[_T]) -> _T:
     """A copy as the SQL stores write it (see _sql.py), without U+0000 in
     any key or string, so every store reads back the same."""
     return kind.from_dict(_js.loads(strip_json_nul(_js.dumps(value.to_dict()))))  # type: ignore[attr-defined, no-any-return]
@@ -183,3 +186,8 @@ class MemoryStore:
         updated.output = copy.output
         updated.metrics = copy.metrics
         return updated
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"T": "_T"})

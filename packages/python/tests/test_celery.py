@@ -25,7 +25,7 @@ from celery.schedules import crontab  # noqa: E402
 
 import cronwatch  # noqa: E402
 import cronwatch.celery as cwcelery  # noqa: E402
-from cronwatch.celery import CHECK_TASK, BeatEntry, ScheduleError, convert, cron_text, cronwatch_task, install  # noqa: E402
+from cronwatch.celery import CHECK_TASK, ScheduleError, _BeatEntry, _convert, _cron_text, cronwatch_task, install  # noqa: E402
 from cronwatch.stores import SqliteStore  # noqa: E402
 
 from helpers import HOUR, Errors, make, run_python  # noqa: E402
@@ -60,26 +60,26 @@ def forget_decorations() -> Iterator[None]:
 def test_crontabs_become_the_cron_expression_croner_reads_in_the_apps_zone() -> None:
     app = new_app(timezone="Europe/London")
 
-    def entry(schedule: Any) -> BeatEntry:
-        return BeatEntry(key="k", label='beat_schedule entry "k"', task="t", schedule=celery.schedules.maybe_schedule(schedule, app=app))
+    def entry(schedule: Any) -> _BeatEntry:
+        return _BeatEntry(key="k", label='beat_schedule entry "k"', task="t", schedule=celery.schedules.maybe_schedule(schedule, app=app))
 
-    assert cron_text(crontab()) == "* * * * *"
-    assert cron_text(crontab(minute="*/15")) == "*/15 * * * *"
-    assert cron_text(crontab(minute=0, hour="9-17", day_of_week="mon-fri")) == "0 9-17 * * 1-5"
-    assert cron_text(crontab(minute=0, hour=4, day_of_month="1-7", day_of_week="sun")) == "0 4 1-7 * +0", "Celery wants both days"
-    assert cron_text(crontab(minute="0,20,40", hour="1,2", month_of_year="jan,jul")) == "*/20 1,2 * 1,7 *"
-    assert convert(entry(crontab(hour=2, minute=0)), app) == {"schedule": "0 2 * * *", "timezone": "Europe/London"}
-    assert convert(entry(90), app) == {"schedule": "every 1m30s"}
-    assert convert(entry(3600.5), app) == {"schedule": "every 1h500ms"}
+    assert _cron_text(crontab()) == "* * * * *"
+    assert _cron_text(crontab(minute="*/15")) == "*/15 * * * *"
+    assert _cron_text(crontab(minute=0, hour="9-17", day_of_week="mon-fri")) == "0 9-17 * * 1-5"
+    assert _cron_text(crontab(minute=0, hour=4, day_of_month="1-7", day_of_week="sun")) == "0 4 1-7 * +0", "Celery wants both days"
+    assert _cron_text(crontab(minute="0,20,40", hour="1,2", month_of_year="jan,jul")) == "*/20 1,2 * 1,7 *"
+    assert _convert(entry(crontab(hour=2, minute=0)), app) == {"schedule": "0 2 * * *", "timezone": "Europe/London"}
+    assert _convert(entry(90), app) == {"schedule": "every 1m30s"}
+    assert _convert(entry(3600.5), app) == {"schedule": "every 1h500ms"}
     with pytest.raises(ScheduleError, match='^cronwatch: beat_schedule entry "k" is a Fortnightly schedule, which CronWatch cannot read$'):
-        convert(entry(Fortnightly()), app)
+        _convert(entry(Fortnightly()), app)
     with pytest.raises(ScheduleError, match="never fires"):
-        convert(entry(crontab(minute=0, hour=0, day_of_month=31, month_of_year=2)), app)
+        _convert(entry(crontab(minute=0, hour=0, day_of_month=31, month_of_year=2)), app)
     with pytest.raises(ScheduleError, match="one second or more"):
-        convert(entry(0.5), app)
+        _convert(entry(0.5), app)
     utc = new_app()
     utc.conf.timezone = None
-    assert convert(BeatEntry("k", "k", "t", celery.schedules.maybe_schedule(crontab(minute=5), app=utc)), utc) == {"schedule": "5 * * * *", "timezone": "UTC"}
+    assert _convert(_BeatEntry("k", "k", "t", celery.schedules.maybe_schedule(crontab(minute=5), app=utc)), utc) == {"schedule": "5 * * * *", "timezone": "UTC"}
 
 
 def test_install_declares_every_task_beat_schedules_before_it_runs() -> None:

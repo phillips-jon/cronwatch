@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from cronwatch import schedule
+from cronwatch import _schedule
 from cronwatch._js import date_utc, iso
 
 from test_node_compat import _unavailable
@@ -120,13 +120,13 @@ def cases(seed: int, count: int) -> list[dict[str, Any]]:
 
 def python_answer(case: dict[str, Any]) -> dict[str, Any]:
     try:
-        parsed = schedule.parse_schedule(case["schedule"], case["timezone"])
+        parsed = _schedule.parse_schedule(case["schedule"], case["timezone"])
     except ValueError as error:
         return {"error": str(error)}
     fires: list[int | None] = []
     t: int | None = case["from"]
     for _ in range(case["count"]):
-        t = schedule.next_fire(parsed, t, None)  # type: ignore[arg-type]
+        t = _schedule.next_fire(parsed, t, None)  # type: ignore[arg-type]
         fires.append(t)
         if t is None:
             break

@@ -9,14 +9,44 @@ import base64
 import hashlib
 import math
 import urllib.parse
+import warnings
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 from .. import _js
-from ..duration import iso_time
+from .._duration import iso_time
 from ..types import Alert
 from ._http import HTTP, Response
 from ._http import default as default_http
+
+__all__ = [
+    "ERROR_BODY_MAX",
+    "alert_id",
+    "as_uuid",
+    "b64",
+    "basic_auth",
+    "cut",
+    "encode_uri_component",
+    "error_body",
+    "floor_div",
+    "form",
+    "host_of",
+    "http_or_default",
+    "iso",
+    "json_body",
+    "link_for",
+    "origin",
+    "plain_text",
+    "positional_url",
+    "post",
+    "present",
+    "required",
+    "run_summary",
+    "severity",
+    "sha256_hex",
+    "slice16",
+    "trimmed",
+]
 
 #: How much of a provider's error body goes into the error message.
 ERROR_BODY_MAX = 200
@@ -217,3 +247,13 @@ def form(pairs: Iterable[tuple[str, str]]) -> str:
 def json_body(value: Any) -> str:
     """JSON.stringify."""
     return _js.dumps(value)
+
+
+def positional_url(channel: str, positional: str | None, webhook_url: str | None) -> str | None:
+    """The webhook URL given by name, or (deprecated, until 2.0) as the first argument."""
+    if positional is None:
+        return webhook_url
+    if webhook_url is not None:
+        raise TypeError(f"{channel}() got webhook_url twice: pass it by name only")
+    warnings.warn(f"{channel}(url) is deprecated: pass {channel}(webhook_url=url)", DeprecationWarning, stacklevel=3)
+    return positional

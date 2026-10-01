@@ -378,11 +378,11 @@ def test_stop_also_cancels_the_first_check_start_schedules() -> None:
 
     cw.check = fake_check  # type: ignore[method-assign]
     cw._first_tick_s = 0.05
-    cw.start()
+    cw.start_checking()
     cw.stop()
     time.sleep(0.2)
     assert checks[0] == 0
-    cw.start()
+    cw.start_checking()
     deadline = time.monotonic() + 2
     while checks[0] == 0 and time.monotonic() < deadline:
         time.sleep(0.01)
@@ -577,29 +577,44 @@ def test_start_with_deliver_check_says_once_that_another_process_must_send(caplo
     cw = Cronwatch(deliver="check", cron_secret=None)
     cw.check = lambda: cronwatch.CheckResult(checked_at=0, jobs=[], alerts=[], pruned=0)  # type: ignore[method-assign]
     with caplog.at_level(logging.WARNING, logger="cronwatch"):
-        cw.start()
+        cw.start_checking()
         cw.stop()
-        cw.start()
+        cw.start_checking()
         cw.stop()
         warnings = [r.getMessage() for r in caplog.records]
         assert len(warnings) == 1
         assert 'deliver="check"' in warnings[0] and "send no alerts" in warnings[0] and "Another process" in warnings[0]
         other = Cronwatch(cron_secret=None)
         other.check = cw.check  # type: ignore[method-assign]
-        other.start()
+        other.start_checking()
         other.stop()
         assert len(caplog.records) == 1, "a delivering client says nothing"
+
+
+def test_start_is_a_deprecated_alias_of_start_checking() -> None:
+    errors = Errors()
+    cw, _, _ = make(on_error=errors)
+    cw.check = lambda: cronwatch.CheckResult(checked_at=0, jobs=[], alerts=[], pruned=0)  # type: ignore[method-assign]
+    with pytest.warns(DeprecationWarning, match=r"use start_checking\(every\)"):
+        cw.start("1m")
+    assert cw._ticker is not None
+    cw.start_checking("1m")
+    with pytest.warns(DeprecationWarning):
+        cw.start("5m")
+    assert errors.wheres == ["start_checking"], "one interval, whichever name started it"
+    cw.stop()
+    assert cw._ticker is None
 
 
 def test_a_second_start_with_another_interval_is_reported_and_ignored() -> None:
     errors = Errors()
     cw, _, _ = make(on_error=errors)
     cw.check = lambda: cronwatch.CheckResult(checked_at=0, jobs=[], alerts=[], pruned=0)  # type: ignore[method-assign]
-    cw.start("1m")
-    cw.start("1m")
+    cw.start_checking("1m")
+    cw.start_checking("1m")
     assert errors.wheres == []
-    cw.start("5m")
-    assert errors.wheres == ["start"]
+    cw.start_checking("5m")
+    assert errors.wheres == ["start_checking"]
     cw.stop()
 
 
@@ -796,7 +811,7 @@ BEARER = "Authorization: Bearer opaqueTOKENvalue1234567890"
 
 
 def test_a_secret_split_by_the_16_kb_cut_is_redacted_whole_redaction_comes_before_the_cap() -> None:
-    from cronwatch.output import OUTPUT_CAP
+    from cronwatch._output import OUTPUT_CAP
 
     cw, _, _ = make()
 
@@ -836,7 +851,7 @@ def test_a_secret_split_by_the_16_kb_cut_is_redacted_whole_redaction_comes_befor
 def test_text_past_the_redaction_window_never_keeps_what_came_right_after_its_cut() -> None:
     import re
 
-    from cronwatch.output import OUTPUT_CAP, REDACT_EDGE, redact_and_cap, redact_secrets
+    from cronwatch._output import OUTPUT_CAP, REDACT_EDGE, redact_and_cap, redact_secrets
 
     # The window starts part way into a key's body, whose header is before it:
     # the body's rest cannot be told from text, so it is never kept.

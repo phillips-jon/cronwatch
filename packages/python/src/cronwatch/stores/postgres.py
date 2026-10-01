@@ -30,10 +30,13 @@ try:
 except ImportError as error:  # pragma: no cover, the message is tested in a subprocess
     raise ImportError(f'cronwatch.stores.postgres needs psycopg 3.2 or newer: pip install "cronwatch-sdk[postgres]" ({error})') from error
 
+from .._deprecated import names as _deprecated_names
 from ..types import JobDefinition, JobState, Run, RunStatus, StoredJob
 from . import _sql
 
-T = TypeVar("T")
+__all__ = ["PostgresStore"]
+
+_T = TypeVar("T")
 
 
 class PostgresStore:
@@ -178,3 +181,8 @@ class PostgresStore:
             if self._connection is not None:
                 self._connection.close()
                 self._connection = None
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"T": "_T"})

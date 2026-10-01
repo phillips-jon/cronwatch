@@ -57,7 +57,7 @@ def fresh(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Each test starts with no client made from the settings, and no environment named outside Django."""
     for name in ("CRONWATCH_ENV", "APP_ENV", "ENVIRONMENT", "CRONWATCH_TOKEN", "CRON_SECRET"):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(cronwatch, "_client", None)
+    monkeypatch.setattr(cronwatch, "_configured", None)
     cwdjango.reset()
     yield
     cwdjango.reset()

@@ -14,7 +14,7 @@ import pytest
 from cronwatch import JobDefinition, JobState, Run
 from cronwatch.stores import MemoryStore, SqliteStore
 from cronwatch.stores import _sql
-from cronwatch.stores.sqlite import retry_busy
+from cronwatch.stores.sqlite import _retry_busy
 
 from helpers import NO_PG, PG, drop_pg_tables, pg_prefix
 
@@ -232,7 +232,7 @@ def test_busy_retries_with_a_growing_pause_then_gives_up() -> None:
             raise sqlite3.OperationalError("database is locked")
         return "ok"
 
-    assert retry_busy(busy, sleep=pauses.append) == "ok"
+    assert _retry_busy(busy, sleep=pauses.append) == "ok"
     assert pauses == [0.01, 0.02, 0.04]
 
     def always() -> None:
@@ -240,14 +240,14 @@ def test_busy_retries_with_a_growing_pause_then_gives_up() -> None:
 
     pauses.clear()
     with pytest.raises(sqlite3.OperationalError):
-        retry_busy(always, budget_ms=100, sleep=pauses.append)
+        _retry_busy(always, budget_ms=100, sleep=pauses.append)
     assert round(sum(pauses) * 1000) == 100
 
     def other() -> None:
         raise sqlite3.OperationalError("no such table: x")
 
     with pytest.raises(sqlite3.OperationalError, match="no such table"):
-        retry_busy(other, sleep=pauses.append)
+        _retry_busy(other, sleep=pauses.append)
 
 
 @pytest.mark.skipif(not hasattr(os, "fork"), reason="needs fork")

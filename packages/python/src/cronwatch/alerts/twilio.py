@@ -12,19 +12,22 @@ from collections.abc import Callable
 from typing import Any
 
 from .. import _js
+from .._deprecated import names as _deprecated_names
 from ..types import Alert
 from ._http import HTTP, TIMEOUT, RequestTimeout
 from ._shared import basic_auth, cut, encode_uri_component, form, http_or_default, link_for, post, present, required, trimmed
 
+__all__ = ["Twilio"]
+
 #: The most segments a message may use, which keeps it inside Twilio's 1600 character Body limit.
-MAX_SEGMENTS = 10
+_MAX_SEGMENTS = 10
 #: Twilio refuses a Body longer than this.
-MAX_BODY = 1600
+_MAX_BODY = 1600
 
 # The GSM 03.38 alphabet: a message in it takes 153 characters a segment
 # (when split), anything else is UCS-2 at 67. The extension table costs two.
-GSM = frozenset("@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà")
-GSM_EXTENDED = frozenset("^{}\\[~]|€\f")
+_GSM = frozenset("@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà")
+_GSM_EXTENDED = frozenset("^{}\\[~]|€\f")
 
 
 class Twilio:
@@ -79,7 +82,7 @@ class Twilio:
         self._from = from_
         self._messaging_service_sid = messaging_service_sid
         self._recovered = recovered
-        self._segments = segment_budget(segments)
+        self._segments = _segment_budget(segments)
         self._link = link
         self._http = http_or_default(http)
         # How long to wait for the numbers' requests, each already bounded by its own HTTP deadline.
@@ -90,7 +93,7 @@ class Twilio:
         the alert, when another took it, is reported through its on_error."""
         if str(alert.type) == "recovered" and not self._recovered:
             return
-        body = sms_body(alert, link_for(self._link, alert), self._segments)
+        body = _sms_body(alert, link_for(self._link, alert), self._segments)
         errors = self._send_all(body)
         failed = [(self._to[i], error) for i, error in enumerate(errors) if error is not None]
         if not failed:
@@ -101,7 +104,7 @@ class Twilio:
         # Delivered to someone: counted as sent, so a retry never texts the numbers that took it again.
         took = len(self._to) - len(failed)
         for number, error in failed:
-            report = RuntimeError(f"{error} (to {mask_number(number)}; {took} of {len(self._to)} numbers took the alert)")
+            report = RuntimeError(f"{error} (to {_mask_number(number)}; {took} of {len(self._to)} numbers took the alert)")
             on_error = getattr(context, "on_error", None)
             if callable(on_error):
                 on_error(report)
@@ -139,19 +142,19 @@ class Twilio:
         return errors
 
 
-def mask_number(number: str) -> str:
+def _mask_number(number: str) -> str:
     """A number with all but its last four digits hidden, for an error message."""
     length = _js.length16(number)
     return number if length <= 4 else "*" * min(length - 4, 8) + _js.tail16(number, 4)
 
 
-def segment_budget(segments: Any) -> int:
+def _segment_budget(segments: Any) -> int:
     """A segment count clamped to 1 to MAX_SEGMENTS; 3 for anything not a number."""
     n = math.floor(segments) if _js.is_finite(segments) else 3
-    return min(MAX_SEGMENTS, max(1, n))
+    return min(_MAX_SEGMENTS, max(1, n))
 
 
-def sms_segments(text: str) -> int:
+def _sms_segments(text: str) -> int:
     """The segments `text` takes. A character is never split across two: an
     extension character (two septets) or a surrogate pair (two UCS-2 units)
     that would straddle a boundary starts the next segment, as phones pack
@@ -159,9 +162,9 @@ def sms_segments(text: str) -> int:
     units: list[int] = []
     gsm = True
     for ch in text:
-        if ch in GSM:
+        if ch in _GSM:
             units.append(1)
-        elif ch in GSM_EXTENDED:
+        elif ch in _GSM_EXTENDED:
             units.append(2)
         else:
             gsm = False
@@ -182,16 +185,16 @@ def sms_segments(text: str) -> int:
     return count
 
 
-def fits(text: str, segments: int) -> bool:
+def _fits(text: str, segments: int) -> bool:
     """Whether `text` fits in `segments` SMS segments and Twilio's Body limit."""
-    return _js.length16(text) <= MAX_BODY and sms_segments(text) <= segments
+    return _js.length16(text) <= _MAX_BODY and _sms_segments(text) <= segments
 
 
-def sms_body(alert: Alert, link: str | None, segments: Any = 3) -> str:
+def _sms_body(alert: Alert, link: str | None, segments: Any = 3) -> str:
     """The title, then as many lines of the message (and the triage) as fit,
     then the link. The link is kept whole; the text before it is cut to make
     room. `segments` is clamped to 1 to 10."""
-    budget = segment_budget(segments)
+    budget = _segment_budget(segments)
     tail = f"\n{link}" if present(link) else ""
     lines = [alert.title, *(line for line in alert.message.split("\n") if _js.trim(line) != "")]
     if present(alert.triage):
@@ -199,7 +202,7 @@ def sms_body(alert: Alert, link: str | None, segments: Any = 3) -> str:
     text = ""
     for line in lines:
         following = f"{text}\n{line}" if text else line
-        if fits(following + tail, budget):
+        if _fits(following + tail, budget):
             text = following
             continue
         # Part of this line, cut on a code point and marked.
@@ -208,7 +211,7 @@ def sms_body(alert: Alert, link: str | None, segments: Any = 3) -> str:
         while lo < hi:
             mid = (lo + hi + 1) // 2
             candidate = (f"{text}\n" if text else "") + "".join(chars[:mid]) + "..."
-            if fits(candidate + tail, budget):
+            if _fits(candidate + tail, budget):
                 lo = mid
             else:
                 hi = mid - 1
@@ -216,4 +219,9 @@ def sms_body(alert: Alert, link: str | None, segments: Any = 3) -> str:
             text = (f"{text}\n" if text else "") + "".join(chars[:lo]) + "..."
         break
     # Only a link too long for any budget gets here too long; Twilio would refuse it whole.
-    return cut(text + tail, MAX_BODY)
+    return cut(text + tail, _MAX_BODY)
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"MAX_SEGMENTS": "_MAX_SEGMENTS", "MAX_BODY": "_MAX_BODY", "GSM": "_GSM", "GSM_EXTENDED": "_GSM_EXTENDED", "mask_number": "_mask_number", "segment_budget": "_segment_budget", "sms_segments": "_sms_segments", "fits": "_fits", "sms_body": "_sms_body"})

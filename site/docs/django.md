@@ -27,7 +27,7 @@ INSTALLED_APPS = [
 
 CRONWATCH = {
     "STORE": "cronwatch.stores.postgres.PostgresStore",   # reads DATABASE_URL
-    "ALERTS": [Slack(os.environ["SLACK_WEBHOOK_URL"])],
+    "ALERTS": [Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])],
     "TOKEN": os.environ.get("CRONWATCH_TOKEN", ""),
 }
 ```
@@ -116,7 +116,7 @@ A job that never started records nothing, so something has to look. Add one cron
 
 `cronwatch_check` runs the check and prints `cronwatch: checked N jobs, sent M alerts` (nothing at `--verbosity 0`). Every job in a `cronwatch_jobs` module is declared when Django starts, and every job in the store is checked from its stored definition. Run one checker per store.
 
-A long-running process can check on its own instead: call `client().start()` in exactly one process, and drop the crontab line. Never start it once per Gunicorn worker (in `post_fork`, say), since two checkers on one store can each send the same alert: start it in a process of its own, such as a worker you already run.
+A long-running process can check on its own instead: call `client().start_checking()` in exactly one process, and drop the crontab line. Never start it once per Gunicorn worker (in `post_fork`, say), since two checkers on one store can each send the same alert: start it in a process of its own, such as a worker you already run.
 
 ## Mount the dashboard
 

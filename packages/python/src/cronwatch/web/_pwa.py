@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from .. import _js
 from . import _icons
 
+__all__ = ["APP_JS", "Asset", "BACKGROUND_COLOR", "REVALIDATE", "SW_JS", "THEME_COLOR", "THEME_COLOR_DARK", "YEAR", "asset", "manifest"]
+
 #: The page colours the app's window takes: the paper behind the sheet, and the sheet the header sits on.
 BACKGROUND_COLOR = "#f4f4f5"
 THEME_COLOR = "#ffffff"

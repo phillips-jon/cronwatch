@@ -9,9 +9,11 @@ from collections.abc import Callable
 from typing import Any
 
 from .. import _js
-from ..types import Alert, details_to_json
+from ..types import Alert, _details_to_json
 from ._http import HTTP
 from ._shared import cut, http_or_default, iso, link_for, post, present, required, run_summary, severity
+
+__all__ = ["Bugsnag"]
 
 
 class Bugsnag:
@@ -52,7 +54,7 @@ class Bugsnag:
             meta["triage"] = alert.triage
         if link:
             meta["link"] = link
-        meta["details"] = details_to_json(alert.details)
+        meta["details"] = _details_to_json(alert.details)
         meta["run"] = run_summary(alert)
         payload = {
             "apiKey": self._api_key,

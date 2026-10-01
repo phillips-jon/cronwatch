@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 
+import cronwatch
 from cronwatch import Cronwatch, Custom
 from cronwatch.stores import MemoryStore
 from cronwatch.web import Request, Web
@@ -128,7 +129,7 @@ def through_handle(web: Web, method: str, path: str, headers: dict[str, str], bo
 def test_the_json_api_and_pages_match_the_sdk_routes(deliver: Any) -> None:
     data = golden()
     assert data["t0"] == T0
-    assert len(data["captures"]) == 63
+    assert len(data["captures"]) == 66
     errors: list[str] = []
     cw = seed(errors)
     web = cw.routes(token="tok", base_path="/cronwatch")
@@ -148,6 +149,8 @@ def test_the_json_api_and_pages_match_the_sdk_routes(deliver: Any) -> None:
         assert status == capture["status"], label
         shown = {k: v for k, v in headers.items() if k not in IGNORED_HEADERS}
         assert shown == capture["responseHeaders"], label
-        assert body == capture["responseBody"], label
+        # GET <base>/api names whichever library serves it: the fixture holds placeholders.
+        expected = capture["responseBody"].replace("<library>", "cronwatch-sdk").replace("<language>", "python").replace("<version>", cronwatch.__version__)
+        assert body == expected, label
     # Nothing in the seed or the requests reported an error, however far off a run's start is.
     assert errors == []

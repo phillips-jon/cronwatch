@@ -200,7 +200,7 @@ Python (Python 3.11 or newer)
    INSTALLED_APPS += ["cronwatch.django"]
    CRONWATCH = {
        "STORE": "cronwatch.stores.postgres.PostgresStore",
-       "ALERTS": [Slack(os.environ["SLACK_WEBHOOK_URL"])],   # from cronwatch.alerts import Slack
+       "ALERTS": [Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])],   # from cronwatch.alerts import Slack
        "TOKEN": os.environ.get("CRONWATCH_TOKEN", ""),
    }
 
@@ -240,7 +240,7 @@ Python (Python 3.11 or newer)
 4. Run the check every few minutes so missed and stuck runs are noticed: the
    Celery beat entry above, or a crontab line running
    python manage.py cronwatch_check (Django) or a script calling cw.check(),
-   or cw.start() once in a long-running process. One checker per store.
+   or cw.start_checking() once in a long-running process. One checker per store.
 
 5. Mount the dashboard: in Django,
    path("cronwatch/", include("cronwatch.django.urls")) in urls.py; elsewhere

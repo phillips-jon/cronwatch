@@ -12,20 +12,23 @@ from dataclasses import dataclass
 from typing import Any
 
 from .. import _js
-from ..types import Alert, details_to_json
+from .._deprecated import names as _deprecated_names
+from ..types import Alert, _details_to_json
 from ._http import HTTP
 from ._shared import alert_id, cut, host_of, http_or_default, link_for, post, present, required, run_summary, severity
+
+__all__ = ["Sentry"]
 
 _DIGITS = re.compile(r"^\d+\Z")
 
 
 @dataclass
-class Dsn:
+class _Dsn:
     endpoint: str
     public_key: str
 
 
-def parse_dsn(dsn: str) -> Dsn:
+def _parse_dsn(dsn: str) -> _Dsn:
     """"https://<key>@<host>/<project>" as the envelope endpoint and the public key."""
     try:
         parts = urllib.parse.urlsplit(dsn)
@@ -39,7 +42,7 @@ def parse_dsn(dsn: str) -> Dsn:
     if not parts.username or project is None or not _DIGITS.search(project):
         raise ValueError("Sentry() needs a dsn like https://<key>@<host>/<project>")
     prefix = "/" + "/".join(segments) if segments else ""
-    return Dsn(endpoint=f"{parts.scheme.lower()}://{host}{prefix}/api/{project}/envelope/", public_key=urllib.parse.unquote(parts.username))
+    return _Dsn(endpoint=f"{parts.scheme.lower()}://{host}{prefix}/api/{project}/envelope/", public_key=urllib.parse.unquote(parts.username))
 
 
 class Sentry:
@@ -62,7 +65,7 @@ class Sentry:
         http: HTTP | None = None,
     ) -> None:
         # A pasted credential often carries a stray space or newline, which a header would refuse or send.
-        parsed = parse_dsn(required(dsn, "Sentry() needs a dsn"))
+        parsed = _parse_dsn(required(dsn, "Sentry() needs a dsn"))
         self._endpoint = parsed.endpoint
         self._public_key = parsed.public_key
         self._environment = environment
@@ -96,7 +99,7 @@ class Sentry:
             extra["triage"] = alert.triage
         if link:
             extra["link"] = link
-        extra["details"] = details_to_json(alert.details)
+        extra["details"] = _details_to_json(alert.details)
         extra["run"] = run_summary(alert)
         event["extra"] = extra
         payload = _js.dumps(event)
@@ -115,3 +118,8 @@ class Sentry:
             "x-sentry-auth": f"Sentry sentry_version=7, sentry_key={self._public_key}, sentry_client=cronwatch",
         }
         post(self._http, "Sentry", self._endpoint, headers, envelope, [self._public_key])
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"Dsn": "_Dsn", "parse_dsn": "_parse_dsn"})

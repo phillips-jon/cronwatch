@@ -20,10 +20,10 @@ from typing import Any
 import pytest
 
 from cronwatch import AlertDraft, Cronwatch, JobDefinition, Run, _js, alerts
-from cronwatch.alerts import _shared, email, sigv4, twilio
+from cronwatch.alerts import _email, _shared, _sigv4, twilio
 from cronwatch.alerts import _http
 from cronwatch.alerts._http import RequestTimeout, UrllibHTTP
-from cronwatch.format import compose_alert
+from cronwatch._format import compose_alert
 
 from helpers import MIN, T0, Clock, make
 
@@ -91,7 +91,7 @@ SIGV4_CASES = [
 @pytest.mark.parametrize(("name", "method", "url", "headers", "token", "authorization"), SIGV4_CASES)
 def test_sigv4_matches_the_aws_test_suite(name: str, method: str, url: str, headers: dict[str, str], token: str | None, authorization: str) -> None:
     now = _js.date_utc(2015, 7, 30, 12, 36)
-    signed = sigv4.sign(method=method, url=url, headers=headers, body="", region="us-east-1", service="service", now=now,
+    signed = _sigv4.sign(method=method, url=url, headers=headers, body="", region="us-east-1", service="service", now=now,
                         access_key_id="AKIDEXAMPLE", secret_access_key="wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY", session_token=token)  # fmt: skip
     assert signed["authorization"] == f"AWS4-HMAC-SHA256 {SCOPE}, {authorization}"
     assert signed["x-amz-date"] == "20150830T123600Z"
@@ -103,34 +103,34 @@ def test_sigv4_matches_the_aws_test_suite(name: str, method: str, url: str, head
 # ---------------------------------------------------------------- SMS
 
 def test_sms_bodies_fit_their_segments_and_keep_the_link_whole() -> None:
-    gsm = twilio.sms_body(failed("x" * 2000), "https://app.example/j")
+    gsm = twilio._sms_body(failed("x" * 2000), "https://app.example/j")
     assert len(gsm) <= 459
     assert gsm.endswith("...\nhttps://app.example/j")
-    ucs = twilio.sms_body(failed("\U0001f600" * 500), None)
+    ucs = twilio._sms_body(failed("\U0001f600" * 500), None)
     assert _js.length16(ucs) <= 201
     ucs.encode("utf-8")  # whole characters only
-    assert twilio.sms_body(failed("one\ntwo"), None) == "nightly failed\none\ntwo"
-    assert twilio.sms_body(failed("one", triage="db down"), None) == "nightly failed\none\nTriage: db down"
+    assert twilio._sms_body(failed("one\ntwo"), None) == "nightly failed\none\ntwo"
+    assert twilio._sms_body(failed("one", triage="db down"), None) == "nightly failed\none\nTriage: db down"
     # The extension table counts two: 80 braces are 160 septets, one segment; 81 are not.
-    assert twilio.fits("{" * 80, 1)
-    assert not twilio.fits("{" * 81, 1)
-    assert twilio.fits("é" * 160, 1)
-    assert not twilio.fits("ê" * 71, 1), "a character outside GSM-7 makes the message UCS-2"
+    assert twilio._fits("{" * 80, 1)
+    assert not twilio._fits("{" * 81, 1)
+    assert twilio._fits("é" * 160, 1)
+    assert not twilio._fits("ê" * 71, 1), "a character outside GSM-7 makes the message UCS-2"
 
 
 def test_sms_bodies_stay_inside_twilios_1600_characters_and_pack_segments_as_phones_do() -> None:
     long = failed("x" * 3000, title="j failed")
-    assert len(twilio.sms_body(long, None, 12)) <= 1530, "segments capped at 10"
-    assert len(twilio.sms_body(long, None, float("nan"))) <= 459, "not a number: the default 3"
-    assert len(twilio.sms_body(long, None, "5")) <= 459, "not a number: the default 3"
-    assert len(twilio.sms_body(long, None, True)) <= 459, "not a number: the default 3"
-    assert twilio.sms_segments("a" * 160) == 1
-    assert twilio.sms_segments("a" * 161) == 2
-    assert twilio.sms_segments("a" * 152 + "{" + "a" * 152) == 3, "an escape pair never straddles a segment"
-    assert twilio.sms_segments(twilio.sms_body(failed(("a" * 152 + "{") * 3, title="t"), None, 3)) <= 3
-    assert twilio.sms_segments("\U0001f600" * 35) == 1
-    assert twilio.sms_segments("a" * 66 + "\U0001f600" + "a" * 66) == 3, "a surrogate pair never straddles a segment"
-    huge = twilio.sms_body(failed("m"), "https://example.com/" + "p" * 2000, 10)
+    assert len(twilio._sms_body(long, None, 12)) <= 1530, "segments capped at 10"
+    assert len(twilio._sms_body(long, None, float("nan"))) <= 459, "not a number: the default 3"
+    assert len(twilio._sms_body(long, None, "5")) <= 459, "not a number: the default 3"
+    assert len(twilio._sms_body(long, None, True)) <= 459, "not a number: the default 3"
+    assert twilio._sms_segments("a" * 160) == 1
+    assert twilio._sms_segments("a" * 161) == 2
+    assert twilio._sms_segments("a" * 152 + "{" + "a" * 152) == 3, "an escape pair never straddles a segment"
+    assert twilio._sms_segments(twilio._sms_body(failed(("a" * 152 + "{") * 3, title="t"), None, 3)) <= 3
+    assert twilio._sms_segments("\U0001f600" * 35) == 1
+    assert twilio._sms_segments("a" * 66 + "\U0001f600" + "a" * 66) == 3, "a surrogate pair never straddles a segment"
+    huge = twilio._sms_body(failed("m"), "https://example.com/" + "p" * 2000, 10)
     assert _js.length16(huge) <= 1600
 
 
@@ -186,18 +186,18 @@ def test_twilio_without_a_context_warns_for_each_refusal(capsys: pytest.CaptureF
 # ---------------------------------------------------------------- email
 
 def test_email_content_and_addresses() -> None:
-    mail = email.compose(failed('a <b>\n"q"'), from_="a@b.c", to=["x@y.z"], subject_prefix="[p]\n", link=lambda _a: "javascript:alert(1)")
+    mail = _email.compose(failed('a <b>\n"q"'), from_="a@b.c", to=["x@y.z"], subject_prefix="[p]\n", link=lambda _a: "javascript:alert(1)")
     assert mail.subject == "[p]  nightly failed", "one line"
     assert "javascript:" not in mail.html
     assert "a &lt;b&gt;\n&quot;q&quot;" in mail.html
-    assert email.parse_address('"Ops Team" <ops@example.com>') == {"email": "ops@example.com", "name": "Ops Team"}
-    assert email.parse_address(" ops@example.com ") == {"email": "ops@example.com"}
-    assert email.parse_address("<ops@example.com>") == {"email": "ops@example.com"}
-    assert email.compose(failed(), from_="a@b.c", to=["x@y.z"], link=lambda _a: "HTTPS://app.example/j").text.endswith("Open: HTTPS://app.example/j")
+    assert _email.parse_address('"Ops Team" <ops@example.com>') == {"email": "ops@example.com", "name": "Ops Team"}
+    assert _email.parse_address(" ops@example.com ") == {"email": "ops@example.com"}
+    assert _email.parse_address("<ops@example.com>") == {"email": "ops@example.com"}
+    assert _email.compose(failed(), from_="a@b.c", to=["x@y.z"], link=lambda _a: "HTTPS://app.example/j").text.endswith("Open: HTTPS://app.example/j")
 
 
 def test_text_cut_for_a_subject_never_leaves_half_a_surrogate_pair() -> None:
-    assert email.compose(failed(title="a" * 249 + "\U0001f600"), from_="a@b.c", to=["d@e.f"]).subject == "a" * 249
+    assert _email.compose(failed(title="a" * 249 + "\U0001f600"), from_="a@b.c", to=["d@e.f"]).subject == "a" * 249
 
 
 @pytest.mark.parametrize(
@@ -216,8 +216,10 @@ def test_text_cut_for_a_subject_never_leaves_half_a_surrogate_pair() -> None:
         (lambda: A.Datadog(api_key="k", site="evil.com/x?y"), "site like"),
         (lambda: A.NewRelic(account_id="12a", api_key="k"), "numeric account_id"),
         (lambda: A.Rollbar(access_token=None), "access_token"),  # type: ignore[arg-type]
-        (lambda: A.Slack(""), "webhook_url"),
-        (lambda: A.Discord(None), "webhook_url"),  # type: ignore[arg-type]
+        (lambda: A.Slack(webhook_url=""), "webhook_url"),
+        (lambda: A.Slack(), "webhook_url"),
+        (lambda: A.Discord(), "webhook_url"),
+        (lambda: A.Discord(webhook_url=None), "webhook_url"),  # type: ignore[arg-type]
         (lambda: A.Webhook(""), "url"),
         (lambda: A.Resend(api_key="  ", **EMAIL), "needs an api_key"),
     ],
@@ -228,11 +230,11 @@ def test_channels_refuse_what_they_cannot_send_with(make_channel: Callable[[], A
 
 
 def test_sentry_reads_a_dsn() -> None:
-    from cronwatch.alerts.sentry import parse_dsn
+    from cronwatch.alerts.sentry import _parse_dsn
 
-    dsn = parse_dsn("https://pub@o1.ingest.sentry.io/42")
+    dsn = _parse_dsn("https://pub@o1.ingest.sentry.io/42")
     assert [dsn.endpoint, dsn.public_key] == ["https://o1.ingest.sentry.io/api/42/envelope/", "pub"]
-    dsn = parse_dsn("https://p%40b@sentry.example.com:9000/prefix/7")
+    dsn = _parse_dsn("https://p%40b@sentry.example.com:9000/prefix/7")
     assert [dsn.endpoint, dsn.public_key] == ["https://sentry.example.com:9000/prefix/api/7/envelope/", "p@b"]
 
 
@@ -317,7 +319,7 @@ def alert_j(triage: str | None = None) -> Any:
 
 def test_discord_keeps_job_output_inside_its_code_block_and_pings_no_one() -> None:
     http = FakeHTTP()
-    A.Discord("https://discord.example/api/webhooks/1/secret", http=http).send(alert_j("See [the docs](https://evil.example) *now*"))
+    A.Discord(webhook_url="https://discord.example/api/webhooks/1/secret", http=http).send(alert_j("See [the docs](https://evil.example) *now*"))
     body = json.loads(http.requests[0]["body"])
     assert body["allowed_mentions"] == {"parse": []}
     description = body["embeds"][0]["description"]
@@ -333,7 +335,7 @@ def test_discord_holds_the_whole_description_to_4096_cutting_the_message_and_kee
     http = FakeHTTP()
     alert = alert_j("*_`~|[]()<>\\" * 100)
     alert.message = "Error: long\n" + "```" * 1200 + "x" * 400 + "\U0001F600" * 200
-    A.Discord("https://discord.example/api/webhooks/1/secret", http=http).send(alert)
+    A.Discord(webhook_url="https://discord.example/api/webhooks/1/secret", http=http).send(alert)
     embed = json.loads(http.requests[0]["body"])["embeds"][0]
     description = embed["description"]
     assert _js.length16(description) == 4096
@@ -347,7 +349,7 @@ def test_discord_holds_the_whole_description_to_4096_cutting_the_message_and_kee
     http.requests.clear()
     alert = alert_j("t" * 1001)
     alert.message = "\U0001F600" * 1900
-    A.Discord("https://discord.example/api/webhooks/1/secret", http=http).send(alert)
+    A.Discord(webhook_url="https://discord.example/api/webhooks/1/secret", http=http).send(alert)
     cut = json.loads(http.requests[0]["body"])["embeds"][0]["description"]
     assert _js.length16(cut) <= 4096
     assert "\ufffd" not in cut and all(not 0xD800 <= ord(ch) <= 0xDFFF for ch in cut)
@@ -355,7 +357,7 @@ def test_discord_holds_the_whole_description_to_4096_cutting_the_message_and_kee
 
 def test_discord_adds_the_link_and_reports_a_refusal() -> None:
     http = FakeHTTP(400, "x" * 500)
-    channel = A.Discord("https://discord.example/w", link=lambda a: f"https://app.example/{a.job}", http=http)
+    channel = A.Discord(webhook_url="https://discord.example/w", link=lambda a: f"https://app.example/{a.job}", http=http)
     with pytest.raises(RuntimeError, match="^Discord webhook answered 400: x{200}$"):
         channel.send(alert_j())
     assert json.loads(http.requests[0]["body"])["embeds"][0]["url"] == "https://app.example/j"
@@ -363,7 +365,7 @@ def test_discord_adds_the_link_and_reports_a_refusal() -> None:
 
 def test_slack_escapes_control_characters_and_fences_in_the_blocks_and_the_fallback_text() -> None:
     http = FakeHTTP()
-    A.Slack("https://hooks.slack.example/T/B/secret", http=http).send(alert_j("<b> & co"))
+    A.Slack(webhook_url="https://hooks.slack.example/T/B/secret", http=http).send(alert_j("<b> & co"))
     body = json.loads(http.requests[0]["body"])
     assert "<!channel>" not in body["text"]
     block = body["blocks"][1]["text"]["text"]
@@ -376,7 +378,7 @@ def test_slack_escapes_control_characters_and_fences_in_the_blocks_and_the_fallb
 
 def test_slack_link_and_failure() -> None:
     http = FakeHTTP(500, "no")
-    channel = A.Slack("https://hooks.slack.example/x", link=lambda _a: "https://app.example/j", http=http)
+    channel = A.Slack(webhook_url="https://hooks.slack.example/x", link=lambda _a: "https://app.example/j", http=http)
     with pytest.raises(RuntimeError, match="^Slack webhook answered 500: no$"):
         channel.send(alert_j())
     assert json.loads(http.requests[0]["body"])["blocks"][0]["text"]["text"] == ":x: *j failed* (<https://app.example/j|open>)"
@@ -398,9 +400,35 @@ def test_webhook_signs_the_raw_body_and_sends_the_alert_as_the_sdk_does() -> Non
     assert call["headers"]["user-agent"] == "cronwatch"
     assert call["headers"]["x-team"] == "billing"
     parsed = json.loads(call["body"])
-    assert list(parsed) == ["type", "run", "details", "job", "definition", "title", "message", "at", "triage"]
+    assert list(parsed) == ["schema", "type", "run", "details", "job", "definition", "title", "message", "at", "triage"]
+    assert parsed["schema"] == 1
     assert parsed["details"] == {"consecutiveFailures": 1, "threshold": 1}
-    assert call["body"] == _js.dumps(alert_j("db").to_dict())
+    assert call["body"] == '{"schema":1,' + _js.dumps(alert_j("db").to_dict())[1:]
+
+
+@pytest.mark.parametrize("make_channel", [A.Slack, A.Discord])
+def test_a_positional_webhook_url_still_works_with_a_deprecation_warning(make_channel: Any) -> None:
+    http = FakeHTTP()
+    name = make_channel.__name__
+    with pytest.warns(DeprecationWarning, match=rf"{name}\(webhook_url=url\)"):
+        channel = make_channel("https://hooks.example.com/x", http=http)
+    channel.send(alert_j())
+    assert http.requests[0]["url"] == "https://hooks.example.com/x"
+    with pytest.raises(TypeError, match="webhook_url twice"):
+        make_channel("https://a.example/x", webhook_url="https://b.example/x")
+
+
+def test_signature_is_the_hmac_sha256_hex_a_receiver_checks() -> None:
+    from cronwatch.alerts.webhook import signature
+
+    assert signature("key", "The quick brown fox jumps over the lazy dog") == "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+
+
+def test_hmac_sha256_hex_is_a_deprecated_alias_of_signature() -> None:
+    from cronwatch.alerts import webhook
+
+    with pytest.warns(DeprecationWarning, match="signature"):
+        assert webhook.hmac_sha256_hex("key", "body") == webhook.signature("key", "body")
 
 
 # ---------------------------------------------------------------- through the client
@@ -497,7 +525,7 @@ def test_the_default_http_posts_to_a_real_server() -> None:
         assert "\r\nContent-type: application/json" in head or "\r\ncontent-type: application/json" in head.lower()
         signature = hmac.new(b"k", body, hashlib.sha256).hexdigest()
         assert f"x-cronwatch-signature: sha256={signature}" in head.lower()
-        assert body.decode() == _js.dumps(alert_j().to_dict())
+        assert body.decode() == _js.dumps({"schema": 1, **alert_j().to_dict()})
     finally:
         server.close()
 
@@ -529,8 +557,8 @@ def test_no_channel_follows_a_redirect_so_its_credentials_never_reach_another_or
             A.Bugsnag(api_key="bs-secret", http=http),
             A.NewRelic(account_id="1", api_key="nr-secret", http=http),
             A.Webhook(f"{provider.url}/in", headers={"authorization": "Bearer wh-secret"}, secret="s", http=http),
-            A.Slack(f"{provider.url}/in", http=http),
-            A.Discord(f"{provider.url}/in", http=http),
+            A.Slack(webhook_url=f"{provider.url}/in", http=http),
+            A.Discord(webhook_url=f"{provider.url}/in", http=http),
         ]
         for channel in channels:
             with pytest.raises(RuntimeError, match="answered 307"):
@@ -740,7 +768,7 @@ def test_the_default_http_posts_only_to_http_and_https_and_never_quotes_the_url(
         UrllibHTTP(timeout=1).post("https://hooks.example.com" + secret_path + " x", "{}", {})
     assert str(invalid.value) == "cannot post to https://hooks.example.com: the URL is not valid"
     with pytest.raises(ValueError) as failed:
-        A.Slack("https://hooks.example.com" + secret_path + " x").send(alert_j())
+        A.Slack(webhook_url="https://hooks.example.com" + secret_path + " x").send(alert_j())
     assert "hookpathsecret" not in str(failed.value)
 
 
@@ -764,4 +792,4 @@ def test_a_header_value_with_a_line_break_is_refused_without_quoting_it() -> Non
 
 def test_the_default_http_gives_up_after_ten_seconds() -> None:
     assert UrllibHTTP().timeout == 10
-    assert A.Slack("https://hooks.slack.example/x")._http.timeout == 10  # type: ignore[attr-defined]
+    assert A.Slack(webhook_url="https://hooks.slack.example/x")._http.timeout == 10  # type: ignore[attr-defined]

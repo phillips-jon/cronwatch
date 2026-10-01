@@ -14,6 +14,8 @@ from typing import Any
 
 from . import _js, _zone
 
+__all__ = ["ANY", "Cron", "CronDate", "CronError", "CronPattern", "DAYS_IN_MONTH", "LAST", "NTH", "ORDER", "last_day_of_month"]
+
 # Croner's bits for "the nth weekday of the month"; 32 is the last one, 63 any.
 NTH = [1, 2, 4, 8, 16]
 LAST = 32
@@ -506,7 +508,7 @@ class Cron:
             # Croner reads a string with a colon after its first character as a
             # one-time date to fire at, not as a cron expression.
             if _ISO_DATE.match(text):
-                raise CronError("CronPattern: a one-time date is not supported by the Python port")
+                raise CronError("CronPattern: a one-time date is not supported")
             raise CronError("Invalid ISO8601 passed to timezone parser.")
         self.timezone = timezone or None
         self.pattern = CronPattern(text)

@@ -36,7 +36,7 @@ with nightly.run() as ctx:
     ctx.log("Report written:", path)   # kept with the run, shown in alerts
     ctx.metric("cost", 1.2)            # watched against budgets and baselines
 
-cw.start()  # checks for missed and stuck runs every minute, in a daemon thread
+cw.start_checking()  # checks for missed and stuck runs every minute, in a daemon thread
 ```
 
 A run is recorded when the block ends; an exception inside it is recorded as the failure and raised again. A function works the same way, as a decorator (each call is a run, and `cronwatch.current()` is its context) or passed to `run()`, which returns what the function returns:
@@ -49,7 +49,7 @@ def build_report() -> None:
 nightly.run(lambda ctx: sync_accounts(ctx))
 ```
 
-Start the check in exactly one process per store, never once per Gunicorn or uWSGI worker, since two checkers can each send the same alert. A script run from crontab exits when it is done, so instead of `start()`, add a second crontab line that declares the jobs and calls `cw.check()` every five minutes. `cronwatch.configure(...)` makes the process's client once, and `cronwatch.client()` hands it out.
+Start the check in exactly one process per store, never once per Gunicorn or uWSGI worker, since two checkers can each send the same alert. A script run from crontab exits when it is done, so instead of `start_checking()`, add a second crontab line that declares the jobs and calls `cw.check()` every five minutes. `cronwatch.configure(...)` makes the process's client once, and `cronwatch.client()` hands it out.
 
 A run that starts in one call and ends in another (a job that hands work to a queue, a webhook that reports back later) is one run too:
 
@@ -71,7 +71,7 @@ An `expect` pattern is searched in your process by `re`, which backtracks and, l
 
 `Cronwatch(...)`: `store`, `alerts`, `triage` (a function returning a short diagnosis added to each alert), `sources`, `cron_secret` (the bearer `/api/check` and a job's handler accept; default `$CRON_SECRET`), `retention` (default `"30d"`), `defaults`, `redact` (secrets are blanked from output and errors by default; pass your own function, or `False`), `deliver` (`"check"` queues alerts for another process's check to send), `on_error` (store and channel failures; default the `cronwatch` logger), `now`.
 
-The client's methods: `job(name, ...)`, `run(name, fn=None, ...)` (a run without keeping a handle), `check()`, `jobs()`, `jobs_with_runs()`, `job_summary(name)`, `runs(name)`, `get_run(id)`, `silence(name, "2h")`, `unsilence(name)`, `forget(name)`, `resume_run(name, run_id)`, `record_run(run)`, `defined_jobs()` (the jobs declared in this process), `routes()` (the dashboard, below), `start()`, `stop()`, `close()`.
+The client's methods: `job(name, ...)`, `run(name, fn=None, ...)` (a run without keeping a handle), `check()`, `jobs()`, `jobs_with_runs()`, `job_summary(name)`, `runs(name)`, `get_run(id)`, `silence(name, "2h")`, `unsilence(name)`, `forget(name)`, `resume_run(name, run_id)`, `record_run(run)`, `defined_jobs()` (the jobs declared in this process), `routes()` (the dashboard, below), `start_checking()`, `stop()`, `close()`.
 
 ### Stores
 
@@ -89,7 +89,7 @@ In `cronwatch.alerts`, standard library only, each the SDK's request for request
 from cronwatch.alerts import Slack, Resend, Twilio, Sentry
 
 alerts = [
-    Slack(os.environ["SLACK_WEBHOOK_URL"], link=lambda a: f"https://app.example.com/cronwatch/jobs/{a.job}"),
+    Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"], link=lambda a: f"https://app.example.com/cronwatch/jobs/{a.job}"),
     Resend(api_key=os.environ["RESEND_API_KEY"], from_="alerts@example.com", to="ops@example.com"),
     Twilio(account_sid=..., auth_token=..., from_="+15005550006", to=["+15551110000"]),
     Sentry(dsn=os.environ["SENTRY_DSN"]),
@@ -100,7 +100,7 @@ alerts = [
 
 ### Triage and pg_cron
 
-`cronwatch.triage.anthropic.AnthropicTriage(context="A Django app on Fly.io.")` (`pip install "cronwatch-sdk[anthropic]"`), passed as `triage=`, adds Claude's short diagnosis to each alert. Recoveries are sent without one.
+`cronwatch.triage.anthropic.Anthropic(context="A Django app on Fly.io.")` (`pip install "cronwatch-sdk[anthropic]"`), passed as `triage=`, adds Claude's short diagnosis to each alert. Recoveries are sent without one.
 
 `cronwatch.sources.pgcron.PgCron(url_or_connection, prefix="db:")`, passed in `sources=[...]`, watches pg_cron's jobs: each is declared with its schedule, and the rows of `cron.job_run_details` are copied in as runs on every check, so missed, failed, stuck and slow pg_cron jobs alert like any other.
 
@@ -116,7 +116,7 @@ app.mount("/cronwatch", cw.routes().asgi)                                       
 
 Send the token as `Authorization: Bearer <token>`, or open the dashboard once with `?token=<token>` and a cookie keeps you signed in. It defaults to `$CRONWATCH_TOKEN`, and `token=None` serves the routes open, behind your own auth.
 
-With no token set the routes answer 503, except in development, where they make one and print a sign-in link. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that is set, and `development`, `dev` and `test` count as development. The link names the host only when `origin` is set or the request's host is loopback (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`; a Host such as `localhost:1@evil.example` does not count), since a client chooses it. `/api/check` also takes the client's `cron_secret` as a bearer, so a platform cron can run checks. Behind a proxy, pass `origin="https://app.example.com"` (or `trust_proxy=True` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`).
+With no token set the routes answer 503, except in development, where they make one and print a sign-in link. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that holds more than spaces, trimmed and lowercased; `development`, `dev`, `local`, `test` and `testing` count as development, and `production` and `prod` as production. The link names the host only when `origin` is set or the request's host is loopback (`localhost`, `*.localhost`, `127.0.0.0/8`, `::1`; a Host such as `localhost:1@evil.example` does not count), since a client chooses it. `/api/check` also takes the client's `cron_secret` as a bearer, so a platform cron can run checks. Behind a proxy, pass `origin="https://app.example.com"` (or `trust_proxy=True` when the proxy sets `X-Forwarded-Proto` and `X-Forwarded-Host`).
 
 ### Django
 
@@ -184,7 +184,7 @@ import cronwatch.apscheduler
 
 scheduler.add_job(nightly_report, "cron", hour=2, id="nightly-report")
 cronwatch.apscheduler.watch(scheduler, grace="15m", jobs={"nightly-report": {"timeout": "2h"}})
-cw.start()   # checks every minute, in a thread
+cw.start_checking()  # checks every minute, in a thread
 ```
 
 Every job is declared, named after its id, with its trigger as the schedule (cron triggers in their zone, intervals as `every <n>`). A job added, rescheduled or removed later is followed. `jobs=` gives options per job, by id; `exclude=` leaves jobs out, by id or name.
@@ -206,6 +206,10 @@ lambda_handler = cron.aws_lambda                                       # AWS Lam
 ```
 
 It answers `{"ok", "job", "run", "status", "durationMs"}` with 200 or 500, 401 without the secret, and 503 when no secret is set outside development (`secret=None` lets anyone run it). A function that returns a response is answered with it, and, as for any run, a response of 400 or more fails the run. An `async def` makes an async handler. On Lambda, `cron.aws_lambda(event, context)` reads the bearer from a REST API's, an HTTP API's or a function URL's event, hands `fn` the event, and answers with the proxy result (`{"statusCode", "headers", "body", "isBase64Encoded"}`); a function may return a proxy result of its own. A function invoked directly (EventBridge Scheduler) gets an event with no headers, and IAM already decides who may invoke it, so give that handler `secret=None`.
+
+### Deprecated
+
+`cw.start(every)` (now `start_checking`), `cronwatch.web.Web(client)` (now `cw.routes()`), `AnthropicTriage` (now `Anthropic`), `Slack(url)` and `Discord(url)` with the URL positional (now `webhook_url=`), and `hmac_sha256_hex` (now `signature`) still work through 1.x, each with a `DeprecationWarning`, and go in 2.0. So do the modules and helpers 1.0 made internal under their old names (`cronwatch.evaluate`, `cronwatch.types.camel`, ...): public means what this README and the [docs](https://cronwatch.dev/docs/python/#deprecated) document, and each module's `__all__` lists it.
 
 ## Testing
 

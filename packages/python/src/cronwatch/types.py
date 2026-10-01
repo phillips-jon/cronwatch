@@ -14,7 +14,28 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import Any, ClassVar
+
+from ._deprecated import names as _deprecated_names
+
+__all__ = [
+    "Alert",
+    "AlertDraft",
+    "AlertType",
+    "CheckResult",
+    "Condition",
+    "JobDefinition",
+    "JobHealth",
+    "JobState",
+    "JobStats",
+    "JobSummary",
+    "JobWithRuns",
+    "MISSING",
+    "Run",
+    "RunStatus",
+    "SendingAlert",
+    "StoredJob",
+]
 
 
 class RunStatus(StrEnum):
@@ -32,7 +53,7 @@ class Condition(StrEnum):
     OVER_BUDGET = "over_budget"
 
 
-CONDITIONS: tuple[Condition, ...] = tuple(Condition)
+_CONDITIONS: tuple[Condition, ...] = tuple(Condition)
 
 
 class AlertType(StrEnum):
@@ -53,12 +74,12 @@ class JobHealth(StrEnum):
     NEVER_RAN = "never_ran"
 
 
-def camel(name: str) -> str:
+def _camel(name: str) -> str:
     """failures_before_alert -> failuresBeforeAlert."""
     return re.sub(r"_([a-z0-9])", lambda m: m.group(1).upper(), name)
 
 
-def snake(name: str) -> str:
+def _snake(name: str) -> str:
     """failuresBeforeAlert -> failures_before_alert."""
     return re.sub(r"([A-Z])", lambda m: "_" + m.group(1).lower(), name)
 
@@ -75,14 +96,14 @@ def _get(data: Mapping[str, Any], key: str, default: Any = None) -> Any:
     """A camelCase field from a mapping with camelCase or snake_case keys."""
     if key in data:
         return data[key]
-    s = snake(key)
+    s = _snake(key)
     if s in data:
         return data[s]
     return default
 
 
 def _has(data: Mapping[str, Any], key: str) -> bool:
-    return key in data or snake(key) in data
+    return key in data or _snake(key) in data
 
 
 class JobDefinition:
@@ -248,23 +269,23 @@ class StoredJob:
         return {"name": self.name, "definition": self.definition.to_dict(), "createdAt": self.created_at, "updatedAt": self.updated_at}
 
 
-def details_to_json(value: Any) -> Any:
+def _details_to_json(value: Any) -> Any:
     """An alert's details, snake_case keys in Python, as their camelCase JSON."""
     if isinstance(value, Mapping):
-        return {camel(k) if isinstance(k, str) else str(k): details_to_json(v) for k, v in value.items()}
+        return {_camel(k) if isinstance(k, str) else str(k): _details_to_json(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
-        return [details_to_json(v) for v in value]
+        return [_details_to_json(v) for v in value]
     if isinstance(value, StrEnum):
         return str(value)
     return value
 
 
-def details_from_json(value: Any) -> dict[str, Any]:
+def _details_from_json(value: Any) -> dict[str, Any]:
     """An alert's details read from JSON, with snake_case keys and conditions as Condition."""
 
     def convert(v: Any) -> Any:
         if isinstance(v, Mapping):
-            return {snake(k): convert(x) for k, x in v.items()}
+            return {_snake(k): convert(x) for k, x in v.items()}
         if isinstance(v, list):
             return [convert(x) for x in v]
         return v
@@ -287,7 +308,7 @@ class AlertDraft:
         self.type = _enum(AlertType, self.type)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"type": str(self.type), "run": self.run.to_dict() if self.run else None, "details": details_to_json(self.details)}
+        return {"type": str(self.type), "run": self.run.to_dict() if self.run else None, "details": _details_to_json(self.details)}
 
 
 @dataclass
@@ -331,7 +352,7 @@ class Alert:
         alert = cls(
             type=_get(data, "type"),
             run=Run.from_dict(run) if run else None,
-            details=details_from_json(_get(data, "details") or {}),
+            details=_details_from_json(_get(data, "details") or {}),
             job=_get(data, "job"),
             definition=JobDefinition.from_dict(_get(data, "definition") or {}),
             title=_get(data, "title"),
@@ -346,7 +367,7 @@ class Alert:
         out: dict[str, Any] = {
             "type": str(self.type),
             "run": self.run.to_dict() if self.run else None,
-            "details": details_to_json(self.details),
+            "details": _details_to_json(self.details),
             "job": self.job,
             "definition": self.definition.to_dict() if isinstance(self.definition, JobDefinition) else self.definition,
             "title": self.title,
@@ -427,11 +448,18 @@ class JobState:
     #: when empty: the key is never written as an empty list.
     sending: list[Any] | None = None
     version: int | None = None
+    #: Keys a newer release wrote that this one does not know, as their JSON,
+    #: written back unchanged so a shared store never loses them.
+    extra: dict[str, Any] = field(default_factory=dict, compare=False, repr=False)
+
+    #: The keys this release reads, camelCase as stored.
+    _KEYS: ClassVar[tuple[str, ...]] = ("job", "open", "consecutiveFailures", "silencedUntil", "lastAlertAt", "pendingRecovery", "undelivered", "sending", "version")
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | JobState) -> JobState:
         if isinstance(data, JobState):
             return data
+        known = set(cls._KEYS) | {_snake(k) for k in cls._KEYS}
         pending = _get(data, "pendingRecovery")
         undelivered = _get(data, "undelivered")
         sending = _get(data, "sending")
@@ -445,13 +473,15 @@ class JobState:
             undelivered=None if undelivered is None else [Alert.from_dict(a) for a in undelivered],
             sending=[SendingAlert.from_json(e) for e in sending] if isinstance(sending, list) and sending else None,
             version=_get(data, "version"),
+            extra={k: v for k, v in data.items() if k not in known},
         )
 
     def to_dict(self) -> dict[str, Any]:
         """pendingRecovery, undelivered, sending and version are left out when
         unset, as in state written before they existed (sending also when
-        empty). The version comes last, where the
-        SDK's spread of a normalized state puts it."""
+        empty). The version comes after the known keys, where the SDK's
+        spread of a normalized state puts it, and the keys this release does
+        not know come after it, as they were read."""
         out: dict[str, Any] = {
             "job": self.job,
             "open": {str(k): v for k, v in (self.open or {}).items()},
@@ -467,6 +497,8 @@ class JobState:
             out["sending"] = [_sending_to_json(e) for e in self.sending]
         if self.version is not None:
             out["version"] = self.version
+        for key, value in self.extra.items():
+            out.setdefault(key, value)
         return out
 
     def copy(self) -> JobState:
@@ -480,6 +512,7 @@ class JobState:
             undelivered=None if self.undelivered is None else list(self.undelivered),
             sending=None if self.sending is None else list(self.sending),
             version=self.version,
+            extra=dict(self.extra),
         )
 
 
@@ -547,3 +580,8 @@ class JobWithRuns:
 
     def to_dict(self) -> dict[str, Any]:
         return {"job": self.job.to_dict(), "runs": [r.to_dict() for r in self.runs]}
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"camel": "_camel", "snake": "_snake", "details_to_json": "_details_to_json", "details_from_json": "_details_from_json", "CONDITIONS": "_CONDITIONS"})

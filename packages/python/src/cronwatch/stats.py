@@ -1,22 +1,7 @@
-"""Percentiles and medians, as stats.ts computes them."""
+"""Deprecated: ``cronwatch.stats`` (percentiles) is internal from 1.0, as
+``cronwatch._stats``. Its names still work through 1.x, each warning with a
+DeprecationWarning, and the module goes in 2.0."""
 
-from __future__ import annotations
+from ._deprecated import module
 
-import math
-from collections.abc import Sequence
-
-
-def percentile(values: Sequence[float], p: float) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    index = min(len(ordered) - 1, max(0, math.ceil((p / 100) * len(ordered)) - 1))
-    return ordered[index]
-
-
-def median(values: Sequence[float]) -> float | None:
-    if not values:
-        return None
-    ordered = sorted(values)
-    mid = len(ordered) // 2
-    return (ordered[mid - 1] + ordered[mid]) / 2 if len(ordered) % 2 == 0 else ordered[mid]
+__getattr__, __dir__ = module(__name__, "cronwatch._stats")

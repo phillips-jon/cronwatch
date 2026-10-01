@@ -1,6 +1,6 @@
 """Amazon SES, API v2 SendEmail. API reference: https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_SendEmail.html
 POST https://email.<region>.amazonaws.com/v2/email/outbound-emails, signed
-with AWS Signature Version 4 (see sigv4.py), so no AWS SDK is needed
+with AWS Signature Version 4 (see _sigv4.py), so no AWS SDK is needed
 (alerts/ses.ts)."""
 
 from __future__ import annotations
@@ -12,10 +12,12 @@ from typing import Any
 
 from .. import _js
 from ..types import Alert
-from . import sigv4
+from . import _sigv4
 from ._http import HTTP
 from ._shared import http_or_default, post, present, trimmed
-from .email import compose, recipients
+from ._email import compose, recipients
+
+__all__ = ["Ses"]
 
 _REGION = re.compile(r"^[a-z0-9-]+\Z")
 
@@ -79,7 +81,7 @@ class Ses:
             payload["ConfigurationSetName"] = self._configuration_set_name
         payload["EmailTags"] = [{"Name": "source", "Value": "cronwatch"}]
         body = _js.dumps(payload)
-        headers = sigv4.sign(
+        headers = _sigv4.sign(
             method="POST",
             url=self._url,
             headers={"content-type": "application/json"},

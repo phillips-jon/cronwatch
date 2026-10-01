@@ -21,31 +21,34 @@ from dataclasses import dataclass
 from typing import Any
 
 from .. import _js
-from ..evaluate import run_duration
+from .._deprecated import names as _deprecated_names
+from .._evaluate import run_duration
 from ..types import Alert, JobDefinition, Run, RunStatus
 
+__all__ = ["Job", "PgCron"]
+
 #: How many of a job's newest runs are copied, without alerting, the first time it is seen.
-BACKFILL = 20
+_BACKFILL = 20
 #: Run details read per query, and the most pages read in one sync.
-PAGE = 500
-MAX_PAGES = 10
+_PAGE = 500
+_MAX_PAGES = 10
 #: How long a run pg_cron has queued but not started (no start_time yet) is
 #: waited for. After that it is copied as running from when it was first
 #: seen, so a run that never starts is marked stuck like any other.
-HOLD_MS = 10 * 60_000
+_HOLD_MS = 10 * 60_000
 
-JOBS_SQL = "SELECT jobid, jobname, schedule, database, username, active FROM cron.job ORDER BY jobid"
+_JOBS_SQL = "SELECT jobid, jobname, schedule, database, username, active FROM cron.job ORDER BY jobid"
 # pg_settings has no row for a setting the role may not read, where
 # current_setting() raises an error that would abort the caller's transaction.
-SETTING_SQL = "SELECT setting FROM pg_settings WHERE name = $1"
-COLUMNS = "d.runid, d.jobid, d.status, d.return_message, d.start_time, d.end_time"
+_SETTING_SQL = "SELECT setting FROM pg_settings WHERE name = $1"
+_COLUMNS = "d.runid, d.jobid, d.status, d.return_message, d.start_time, d.end_time"
 # Every tracked job's runs after its cursor, and any run still open here, whatever its job.
-RUNS_SQL = f"""SELECT {COLUMNS}
+_RUNS_SQL = f"""SELECT {_COLUMNS}
   FROM cron.job_run_details d
   LEFT JOIN unnest($1::bigint[], $2::bigint[]) AS c(jobid, after) ON d.jobid = c.jobid
   WHERE d.runid > c.after OR d.runid = ANY($3::bigint[])
-  ORDER BY d.runid LIMIT {PAGE}"""
-NEWEST_SQL = f"SELECT {COLUMNS} FROM cron.job_run_details d WHERE d.jobid = $1 ORDER BY d.runid DESC LIMIT {BACKFILL}"
+  ORDER BY d.runid LIMIT {_PAGE}"""
+_NEWEST_SQL = f"SELECT {_COLUMNS} FROM cron.job_run_details d WHERE d.jobid = $1 ORDER BY d.runid DESC LIMIT {_BACKFILL}"
 
 _SECONDS = re.compile(f"^([0-9]+)[{_js.WHITESPACE}]*seconds?\\Z", re.IGNORECASE | re.ASCII)
 _REBOOT = re.compile(r"^@reboot\Z", re.IGNORECASE | re.ASCII)
@@ -75,7 +78,7 @@ class Job:
     active: bool = True
 
 
-def schedule(text: str) -> str | None:
+def _schedule(text: str) -> str | None:
     """pg_cron takes a cron expression, with "$" for the last day of the
     month, or "N seconds" for 1 to 59 seconds. Returns the CronWatch
     schedule, or None for one that has no cadence to watch. pg_cron reads
@@ -99,7 +102,7 @@ def _raised(error: BaseException) -> str:
     return f"{type(error).__name__}: {error}"
 
 
-def job_name(job: Job) -> str:
+def _job_name(job: Job) -> str:
     """The default CronWatch name for a pg_cron job, before the prefix."""
     cleaned = _LEADING.sub("", _NOT_NAME.sub("-", job.jobname or ""), count=1)[:100]
     return cleaned or f"pg_cron:{job.jobid}"
@@ -110,7 +113,7 @@ def _finished(status: Any) -> bool:
     return status in ("succeeded", "failed")
 
 
-def epoch_ms(value: Any) -> int:
+def _epoch_ms(value: Any) -> int:
     """A timestamp as epoch milliseconds: a datetime (psycopg decodes them;
     one without a zone is read as UTC), text as Postgres or JSON writes it,
     or a number."""
@@ -129,18 +132,18 @@ def epoch_ms(value: Any) -> int:
     raise TypeError(f"not a timestamp: {value!r}")
 
 
-def run(row: Mapping[str, Any], job: str, id_prefix: str, fallback_at: int | None = None) -> Run | None:
+def _run(row: Mapping[str, Any], job: str, id_prefix: str, fallback_at: int | None = None) -> Run | None:
     """A row of cron.job_run_details as a CronWatch run, or None for one that
     has not started (no start_time, not finished). A finished row with no
     start_time (pg_cron writes these for runs a server restart cut off,
     "server restarted") starts at its end_time, else at `fallback_at` (the
     reader passes the job's newest run's start, or now)."""
-    finished_at = None if row.get("end_time") is None else epoch_ms(row["end_time"])
+    finished_at = None if row.get("end_time") is None else _epoch_ms(row["end_time"])
     done = _finished(row.get("status"))
     if row.get("start_time") is None and not done:
         return None
     if row.get("start_time") is not None:
-        started_at = epoch_ms(row["start_time"])
+        started_at = _epoch_ms(row["start_time"])
     elif finished_at is not None:
         started_at = finished_at
     else:
@@ -213,7 +216,7 @@ class _Psycopg:
             return self._run(self._own() if self._conninfo is not None else self._connection, sql, params)
 
 
-def adapter(db: Any) -> Any:
+def _adapter(db: Any) -> Any:
     """The query adapter for `db`: itself when it has query(sql, params), else psycopg."""
     if callable(getattr(db, "query", None)):
         return db
@@ -288,7 +291,7 @@ class PgCron:
         options: Mapping[str, Any] | Callable[[Job], Mapping[str, Any]] | None = None,
         timezone: str | None = None,
     ) -> None:
-        self._db = adapter(db)
+        self._db = _adapter(db)
         self._jobs = jobs if jobs is None or callable(jobs) else list(jobs)
         self._prefix = str(prefix or "")
         self._id_prefix = f"pgcron:{self._prefix}"
@@ -331,7 +334,7 @@ class PgCron:
                 "cron.log_run is off, so pg_cron records no runs: jobs are watched without their schedules and no run can fail. Turn it on to watch them.",
             )
 
-        rows = self._db.query(JOBS_SQL, [])
+        rows = self._db.query(_JOBS_SQL, [])
         if not rows:
             self._warn_once(
                 host,
@@ -377,7 +380,7 @@ class PgCron:
 
     def _setting(self, name: str) -> str | None:
         try:
-            rows = self._db.query(SETTING_SQL, [name])
+            rows = self._db.query(_SETTING_SQL, [name])
         except Exception:  # noqa: BLE001, a setting that cannot be read is assumed
             return None
         value = rows[0].get("setting") if rows else None
@@ -428,7 +431,7 @@ class PgCron:
                 self._failing.discard(job.jobid)
                 continue
             try:
-                base: Any = self._job_name(job) if self._job_name else job_name(job)
+                base: Any = self._job_name(job) if self._job_name else _job_name(job)
             except Exception as error:  # noqa: BLE001, the app's callback fails only its job
                 trouble(job, f"job_name raised {_raised(error)}")
                 continue
@@ -446,7 +449,7 @@ class PgCron:
             if name in used:
                 name = f"{name}:{job.jobid}"
             used.add(name)
-            cadence = schedule(job.schedule) if job.active and recording else None
+            cadence = _schedule(job.schedule) if job.active and recording else None
             paused = "" if job.active else " (paused)"
             definition: dict[str, Any] = {"description": f"pg_cron job {job.jobid} in {job.database} as {job.username}{paused}", "tags": ["pg_cron"], **extra}
             if cadence:
@@ -531,12 +534,12 @@ class PgCron:
             return
         if row.get("start_time") is None and not _finished(row.get("status")):
             since = self._held.get(runid, now)
-            if now - since < HOLD_MS:
+            if now - since < _HOLD_MS:
                 self._held[runid] = since
                 return
-            found = run({**row, "start_time": since}, name, self._id_prefix)
+            found = _run({**row, "start_time": since}, name, self._id_prefix)
         else:
-            found = run(row, name, self._id_prefix, self._last_at.get(jobid, now))
+            found = _run(row, name, self._id_prefix, self._last_at.get(jobid, now))
         self._held.pop(runid, None)
         if found is None:
             return
@@ -557,7 +560,7 @@ class PgCron:
         for jobid, name in names.items():
             if jobid in self._cursors:
                 continue
-            ours = [(runid, r) for r in host.store.list_runs(name, BACKFILL) if (runid := self._run_id_of(r.id)) is not None]
+            ours = [(runid, r) for r in host.store.list_runs(name, _BACKFILL) if (runid := self._run_id_of(r.id)) is not None]
             if ours:
                 self._cursors[jobid] = max(runid for runid, _ in ours)
                 self._last_at[jobid] = max(r.started_at for _, r in ours)
@@ -567,7 +570,7 @@ class PgCron:
                 continue
             # First sight: copy recent history quietly, and judge only from the newest finished run on.
             # The cursor goes to the newest row read, whatever is held, so history is never judged later.
-            ordered = list(reversed(self._db.query(NEWEST_SQL, [jobid])))
+            ordered = list(reversed(self._db.query(_NEWEST_SQL, [jobid])))
             last_finished = -1
             for i, r in enumerate(ordered):
                 if _finished(r.get("status")):
@@ -588,9 +591,9 @@ class PgCron:
                 self._pending[runid] = stored.job
         still_open = {*self._pending, *self._held}
         complete = False
-        for _ in range(MAX_PAGES):
+        for _ in range(_MAX_PAGES):
             jobids = list(names)
-            details = self._db.query(RUNS_SQL, [jobids, [self._cursors.get(j, 0) for j in jobids], sorted(still_open)])
+            details = self._db.query(_RUNS_SQL, [jobids, [self._cursors.get(j, 0) for j in jobids], sorted(still_open)])
             for row in details:
                 jobid = int(row["jobid"])
                 runid = int(row["runid"])
@@ -599,7 +602,7 @@ class PgCron:
                 # Held or not, the cursor moves on: a held run is read again by its runid.
                 if jobid in names and runid > self._cursors.get(jobid, 0):
                     self._cursors[jobid] = runid
-            if len(details) < PAGE:
+            if len(details) < _PAGE:
                 complete = True
                 break
         # Every row was read and these were not among them: pg_cron no longer has them.
@@ -607,3 +610,8 @@ class PgCron:
             for runid in still_open:
                 self._pending.pop(runid, None)
                 self._held.pop(runid, None)
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"BACKFILL": "_BACKFILL", "PAGE": "_PAGE", "MAX_PAGES": "_MAX_PAGES", "HOLD_MS": "_HOLD_MS", "JOBS_SQL": "_JOBS_SQL", "SETTING_SQL": "_SETTING_SQL", "COLUMNS": "_COLUMNS", "RUNS_SQL": "_RUNS_SQL", "NEWEST_SQL": "_NEWEST_SQL", "epoch_ms": "_epoch_ms", "adapter": "_adapter", "schedule": "_schedule", "job_name": "_job_name", "run": "_run"})

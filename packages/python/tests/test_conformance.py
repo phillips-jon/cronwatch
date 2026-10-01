@@ -17,15 +17,15 @@ from typing import Any
 
 import pytest
 
-from cronwatch import _js, alerts, duration, evaluate, output, schedule, serialize
-from cronwatch.alerts import discord, twilio
+from cronwatch import Cronwatch, _duration, _evaluate, _js, _output, _schedule, _serialize, alerts
+from cronwatch.alerts import discord, twilio, webhook
 from cronwatch.alerts._shared import error_body
-from cronwatch.alerts.email import compose as compose_email
-from cronwatch.format import compose_alert
+from cronwatch.alerts._email import compose as compose_email
+from cronwatch._format import compose_alert
 from cronwatch.sources import pgcron
-from cronwatch.job import RunRecorder
+from cronwatch._job import RunRecorder
 from cronwatch.stores import MemoryStore, SqliteStore
-from cronwatch.types import Alert, AlertDraft, JobDefinition, JobState, Run, StoredJob, snake
+from cronwatch.types import Alert, AlertDraft, JobDefinition, JobState, Run, StoredJob, _snake
 
 from helpers import NO_PG, PG, T0, drop_pg_tables, pg_prefix
 
@@ -85,18 +85,18 @@ def test_duration_parse() -> None:
     def check(c: dict[str, Any]) -> str | None:
         args = [decode(c["input"])] + ([c["label"]] if "label" in c else [])
         if "error" in c:
-            return raises(c["error"], lambda: duration.parse_duration(*args))
-        return differs(c["ms"], duration.parse_duration(*args))
+            return raises(c["error"], lambda: _duration.parse_duration(*args))
+        return differs(c["ms"], _duration.parse_duration(*args))
 
     each_case(DURATION["parse"], check)
 
 
 def test_duration_format() -> None:
-    each_case(DURATION["format"], lambda c: differs(c["text"], duration.format_duration(decode(c["ms"]))))
+    each_case(DURATION["format"], lambda c: differs(c["text"], _duration.format_duration(decode(c["ms"]))))
 
 
 def test_duration_relative() -> None:
-    each_case(DURATION["relative"], lambda c: differs(c["text"], duration.format_relative(c["at"], c["now"])))
+    each_case(DURATION["relative"], lambda c: differs(c["text"], _duration.format_relative(c["at"], c["now"])))
 
 
 # ---------------------------------------------------------------- schedule
@@ -107,8 +107,8 @@ SCHEDULE = fixture("schedule.json")
 def test_schedule_parse() -> None:
     def check(c: dict[str, Any]) -> str | None:
         if "error" in c:
-            return raises(c["error"], lambda: schedule.parse_schedule(c["schedule"], c.get("timezone")))
-        return differs(c["parsed"], schedule.parse_schedule(c["schedule"], c.get("timezone")))
+            return raises(c["error"], lambda: _schedule.parse_schedule(c["schedule"], c.get("timezone")))
+        return differs(c["parsed"], _schedule.parse_schedule(c["schedule"], c.get("timezone")))
 
     each_case(SCHEDULE["parse"], check)
 
@@ -119,11 +119,11 @@ def _times(values: list[Any]) -> list[Any]:
 
 def test_schedule_fires() -> None:
     def check(c: dict[str, Any]) -> str | None:
-        parsed = schedule.parse_schedule(c["schedule"], c.get("timezone"))
+        parsed = _schedule.parse_schedule(c["schedule"], c.get("timezone"))
         t = c["from"]
         fires = []
         for _ in c["fires"]:
-            t = schedule.next_fire(parsed, t, None)
+            t = _schedule.next_fire(parsed, t, None)
             fires.append(t)
             if t is None:
                 break
@@ -134,8 +134,8 @@ def test_schedule_fires() -> None:
 
 def test_schedule_next_fire_across_the_autumn_clock_change() -> None:
     def check(c: dict[str, Any]) -> str | None:
-        parsed = schedule.parse_schedule(c["schedule"], c.get("timezone"))
-        actual = [schedule.next_fire(parsed, c["from"] + i * c["stepMs"], None) for i in range(len(c["next"]))]
+        parsed = _schedule.parse_schedule(c["schedule"], c.get("timezone"))
+        actual = [_schedule.next_fire(parsed, c["from"] + i * c["stepMs"], None) for i in range(len(c["next"]))]
         return differs(_times(c["next"]), _times(actual))
 
     each_case(SCHEDULE["autumn"], check)
@@ -144,20 +144,20 @@ def test_schedule_next_fire_across_the_autumn_clock_change() -> None:
 def test_schedule_next_fire_for_intervals() -> None:
     each_case(
         SCHEDULE["nextFire"],
-        lambda c: differs(c["expected"], schedule.next_fire(schedule.parse_schedule(c["schedule"]), c["from"], c["lastRunAt"])),
+        lambda c: differs(c["expected"], _schedule.next_fire(_schedule.parse_schedule(c["schedule"]), c["from"], c["lastRunAt"])),
     )
 
 
 def test_schedule_expectation() -> None:
     def check(c: dict[str, Any]) -> str | None:
-        parsed = schedule.parse_schedule(c["schedule"], c.get("timezone"))
-        return differs(c["expected"], schedule.expectation(parsed, c["lastRunAt"], c["registeredAt"], c["graceMs"]))
+        parsed = _schedule.parse_schedule(c["schedule"], c.get("timezone"))
+        return differs(c["expected"], _schedule.expectation(parsed, c["lastRunAt"], c["registeredAt"], c["graceMs"]))
 
     each_case(SCHEDULE["expectation"], check)
 
 
 def test_schedule_run_covers() -> None:
-    each_case(SCHEDULE["runCovers"], lambda c: differs(c["expected"], schedule.run_covers(c["startedAt"], c["dueAt"], c["followingAt"])))
+    each_case(SCHEDULE["runCovers"], lambda c: differs(c["expected"], _schedule.run_covers(c["startedAt"], c["dueAt"], c["followingAt"])))
 
 
 # ---------------------------------------------------------------- evaluate
@@ -169,7 +169,7 @@ class Sim:
     def __init__(self, definition: JobDefinition, created_at: int) -> None:
         self.definition = definition
         self.stored = StoredJob(name=definition.name, definition=definition, created_at=created_at, updated_at=created_at)
-        self.state = evaluate.empty_state(definition.name)
+        self.state = _evaluate.empty_state(definition.name)
         self.runs: list[Run] = []
         self.order: dict[str, int] = {}
         self.seq = 0
@@ -186,10 +186,10 @@ class Sim:
     def sorted(self) -> list[Run]:
         return sorted(self.runs, key=lambda r: (-r.started_at, -self.order[r.id]))
 
-    def settle(self, previous: JobState, evaluation: evaluate.Evaluation, now: int) -> list[Alert]:
+    def settle(self, previous: JobState, evaluation: _evaluate.Evaluation, now: int) -> list[Alert]:
         state, alerts = evaluation.state, evaluation.alerts
-        if evaluate.is_silenced(previous, now):
-            state = evaluate.mute_opens(previous, state)
+        if _evaluate.is_silenced(previous, now):
+            state = _evaluate.mute_opens(previous, state)
             alerts = []
         self.state = state
         return [compose_alert(draft, self.definition, now) for draft in alerts]
@@ -198,13 +198,13 @@ class Sim:
         self.runs.append(Run(id=run_id, job=self.definition.name, status="running", started_at=now))
         self.seq += 1
         self.order[run_id] = self.seq
-        self.state = evaluate.on_run_start(self.state)
+        self.state = _evaluate.on_run_start(self.state)
         return {"state": self.state}
 
     def finish_run(self, run: Run, now: int) -> list[Alert]:
         history = [r.copy() for r in self.sorted() if r.id != run.id]
         previous = self.state
-        return self.settle(previous, evaluate.on_run_finish(self.definition, run.copy(), previous, history, now), now)
+        return self.settle(previous, _evaluate.on_run_finish(self.definition, run.copy(), previous, history, now), now)
 
     def finish(self, run_id: str, now: int, fields: dict[str, Any]) -> dict[str, Any]:
         run = next(r for r in self.runs if r.id == run_id)
@@ -229,23 +229,23 @@ class Sim:
         alerts: list[Alert] = []
         running = sorted((r for r in self.runs if r.status == "running"), key=lambda r: (r.started_at, self.order[r.id]))
         for run in running:
-            if not evaluate.is_stuck(self.definition, run, now):
+            if not _evaluate.is_stuck(self.definition, run, now):
                 continue
             run.status = Run.from_dict({**run.to_dict(), "status": "timeout"}).status
             run.finished_at = now
             run.duration_ms = now - run.started_at
-            run.error = f"Still running after {duration.format_duration(evaluate.timeout_ms(self.definition))}; marked as timed out"
+            run.error = f"Still running after {_duration.format_duration(_evaluate.timeout_ms(self.definition))}; marked as timed out"
             alerts.extend(self.finish_run(run, now))
         recent = [r.copy() for r in self.sorted()[:20]]
         previous = self.state
-        evaluation = evaluate.on_check(self.definition, self.stored, recent[0] if recent else None, previous, now)
+        evaluation = _evaluate.on_check(self.definition, self.stored, recent[0] if recent else None, previous, now)
         alerts.extend(self.settle(previous, evaluation, now))
         return {
             "alerts": alerts,
             "state": self.state,
             "nextExpectedAt": evaluation.next_expected_at,
             "dueAt": evaluation.due_at,
-            "summary": evaluate.summarize(self.stored, recent, self.state, evaluation.next_expected_at, now),
+            "summary": _evaluate.summarize(self.stored, recent, self.state, evaluation.next_expected_at, now),
         }
 
 
@@ -294,12 +294,12 @@ def test_compose_alert() -> None:
 
 
 def test_format_number() -> None:
-    each_case(FORMAT["numbers"], lambda c: differs(c["text"], evaluate.format_number(c["n"])))
+    each_case(FORMAT["numbers"], lambda c: differs(c["text"], _evaluate.format_number(c["n"])))
 
 
 def test_cap_output() -> None:
     def check(c: dict[str, Any]) -> str | None:
-        capped = output.cap_output(c["prefix"] + c["piece"] * c["times"])
+        capped = _output.cap_output(c["prefix"] + c["piece"] * c["times"])
         return differs([c["length"], c["sha256"]], [_js.length16(capped), hashlib.sha256(capped.encode("utf-8")).hexdigest()])
 
     each_case(FORMAT["capOutput"], check)
@@ -317,13 +317,13 @@ def expect_from(value: Any) -> Any:
 def test_to_stored() -> None:
     def check(c: dict[str, Any]) -> str | None:
         fields = {k: expect_from(v) if k == "expect" else v for k, v in c["definition"].items()}
-        return differs(c["stored"], serialize.to_stored(JobDefinition(fields)))
+        return differs(c["stored"], _serialize.to_stored(JobDefinition(fields)))
 
     each_case(FORMAT["toStored"], check)
 
 
 def test_check_expectation() -> None:
-    each_case(FORMAT["checkExpectation"], lambda c: differs(c["result"], serialize.check_expectation(expect_from(c["expect"]), c["output"])))
+    each_case(FORMAT["checkExpectation"], lambda c: differs(c["result"], _serialize.check_expectation(expect_from(c["expect"]), c["output"])))
 
 
 # ---------------------------------------------------------------- health
@@ -344,7 +344,7 @@ def test_job_health() -> None:
         HEALTH["jobHealth"],
         lambda c: differs(
             c["health"],
-            str(evaluate.job_health(JobDefinition.from_dict(c["definition"]), run_from(c["lastRun"]), state_from(c["state"]), c["now"])),  # type: ignore[arg-type]
+            str(_evaluate.job_health(JobDefinition.from_dict(c["definition"]), run_from(c["lastRun"]), state_from(c["state"]), c["now"])),  # type: ignore[arg-type]
         ),
     )
 
@@ -353,28 +353,28 @@ def test_summarize() -> None:
     def check(c: dict[str, Any]) -> str | None:
         stored = StoredJob.from_dict(c["stored"])
         recent = [Run.from_dict(r) for r in c["recent"]]
-        return differs(c["summary"], evaluate.summarize(stored, recent, state_from(c["state"]), c["nextExpectedAt"], c["now"]))  # type: ignore[arg-type]
+        return differs(c["summary"], _evaluate.summarize(stored, recent, state_from(c["state"]), c["nextExpectedAt"], c["now"]))  # type: ignore[arg-type]
 
     each_case(HEALTH["summarize"], check)
 
 
 def test_percentile_and_median() -> None:
-    each_case(HEALTH["percentile"], lambda c: differs(c["percentile"], evaluate.percentile(c["values"], c["p"])))
-    each_case(HEALTH["median"], lambda c: differs(c["median"], evaluate.median(c["values"])))
+    each_case(HEALTH["percentile"], lambda c: differs(c["percentile"], _evaluate.percentile(c["values"], c["p"])))
+    each_case(HEALTH["median"], lambda c: differs(c["median"], _evaluate.median(c["values"])))
 
 
 def test_normalize_state() -> None:
-    each_case(HEALTH["normalizeState"], lambda c: differs(c["normalized"], evaluate.normalize_state(state_from(c["state"]), "j")))
+    each_case(HEALTH["normalizeState"], lambda c: differs(c["normalized"], _evaluate.normalize_state(state_from(c["state"]), "j")))
 
 
 def test_mute_opens() -> None:
-    each_case(HEALTH["muteOpens"], lambda c: differs(c["muted"], evaluate.mute_opens(state_from(c["previous"]), state_from(c["next"]))))  # type: ignore[arg-type]
+    each_case(HEALTH["muteOpens"], lambda c: differs(c["muted"], _evaluate.mute_opens(state_from(c["previous"]), state_from(c["next"]))))  # type: ignore[arg-type]
 
 
 def test_is_stuck() -> None:
     each_case(
         HEALTH["isStuck"],
-        lambda c: differs(c["stuck"], evaluate.is_stuck(JobDefinition.from_dict(c["definition"]), Run.from_dict(c["run"]), c["now"])),
+        lambda c: differs(c["stuck"], _evaluate.is_stuck(JobDefinition.from_dict(c["definition"]), Run.from_dict(c["run"]), c["now"])),
     )
 
 
@@ -382,26 +382,26 @@ def test_unevaluable_summary() -> None:
     def check(c: dict[str, Any]) -> str | None:
         stored = StoredJob.from_dict(c["stored"])
         recent = [Run.from_dict(r) for r in c["recent"]]
-        return differs(c["summary"], evaluate.unevaluable_summary(stored, recent, state_from(c["state"]), c["now"]))  # type: ignore[arg-type]
+        return differs(c["summary"], _evaluate.unevaluable_summary(stored, recent, state_from(c["state"]), c["now"]))  # type: ignore[arg-type]
 
     each_case(HEALTH["unevaluableSummary"], check)
 
 
 def test_apply_silence() -> None:
     def check(c: dict[str, Any]) -> str | None:
-        evaluation = evaluate.Evaluation(state_from(c["evaluation"]["state"]), [draft_from(a) for a in c["evaluation"]["alerts"]])  # type: ignore[arg-type]
-        result = evaluate.apply_silence(state_from(c["previous"]), evaluation, c["now"])  # type: ignore[arg-type]
+        evaluation = _evaluate.Evaluation(state_from(c["evaluation"]["state"]), [draft_from(a) for a in c["evaluation"]["alerts"]])  # type: ignore[arg-type]
+        result = _evaluate.apply_silence(state_from(c["previous"]), evaluation, c["now"])  # type: ignore[arg-type]
         return differs(c["result"], {"state": result.state.to_dict(), "alerts": [a.to_dict() for a in result.alerts]})
 
     each_case(HEALTH["applySilence"], check)
 
 
 def test_run_duration() -> None:
-    each_case(HEALTH["runDuration"], lambda c: differs(c["durationMs"], evaluate.run_duration(c["startedAt"], c["finishedAt"])))
+    each_case(HEALTH["runDuration"], lambda c: differs(c["durationMs"], _evaluate.run_duration(c["startedAt"], c["finishedAt"])))
 
 
 def test_state_version() -> None:
-    each_case(HEALTH["stateVersion"], lambda c: differs(c["version"], evaluate.state_version(JobState.from_dict(json.loads(c["state"])))))
+    each_case(HEALTH["stateVersion"], lambda c: differs(c["version"], _evaluate.state_version(JobState.from_dict(json.loads(c["state"])))))
 
 
 def test_failure_count() -> None:
@@ -413,8 +413,8 @@ def test_failure_count() -> None:
     })
 
     def check(c: dict[str, Any]) -> str | None:
-        normalized = evaluate.normalize_state(JobState.from_dict(json.loads(c["state"])), "j")
-        result = evaluate.on_run_finish(definition, run.copy(), normalized, [], T0)
+        normalized = _evaluate.normalize_state(JobState.from_dict(json.loads(c["state"])), "j")
+        result = _evaluate.on_run_finish(definition, run.copy(), normalized, [], T0)
         return differs(c["consecutiveFailures"], normalized.consecutive_failures) or differs(
             c["failed"], {"state": result.state.to_dict(), "alerts": [a.to_dict() for a in result.alerts]}
         )
@@ -425,7 +425,7 @@ def test_failure_count() -> None:
 def test_silence_end() -> None:
     each_case(
         HEALTH["silenceEnd"],
-        lambda c: differs(c["silencedUntil"], evaluate.silence_end(c["now"], duration.parse_duration(c["duration"], "silence duration"))),
+        lambda c: differs(c["silencedUntil"], _evaluate.silence_end(c["now"], _duration.parse_duration(c["duration"], "silence duration"))),
     )
 
 
@@ -433,11 +433,11 @@ DELIVERY = HEALTH["delivery"]
 
 
 def test_delivery_constants_are_the_sdks() -> None:
-    assert DELIVERY["maxUndelivered"] == evaluate.MAX_UNDELIVERED
-    assert DELIVERY["sendLeaseMs"] == evaluate.SEND_LEASE_MS
+    assert DELIVERY["maxUndelivered"] == _evaluate.MAX_UNDELIVERED
+    assert DELIVERY["sendLeaseMs"] == _evaluate.SEND_LEASE_MS
 
 
-def delivered(result: evaluate.Delivery) -> str:
+def delivered(result: _evaluate.Delivery) -> str:
     """The result as JSON with the state's keys in order. An alert's keys are
     sorted on both sides: the fixture's alerts are written by hand, in an
     order no writer of either SDK uses (compose_alert's is held by format.json)."""
@@ -457,45 +457,45 @@ def same_delivery(expected: Any, actual: str) -> str | None:
 
 
 def test_alert_key() -> None:
-    each_case(DELIVERY["alertKey"], lambda c: differs(c["key"], evaluate.alert_key(Alert.from_dict(c["alert"]))))
+    each_case(DELIVERY["alertKey"], lambda c: differs(c["key"], _evaluate.alert_key(Alert.from_dict(c["alert"]))))
 
 
 def test_delivery_normalize_state() -> None:
     each_case(
         DELIVERY["normalizeState"],
-        lambda c: same_delivery({"state": c["normalized"], "dropped": 0}, delivered(evaluate.Delivery(evaluate.normalize_state(state_from(c["state"]), "j"), 0))),
+        lambda c: same_delivery({"state": c["normalized"], "dropped": 0}, delivered(_evaluate.Delivery(_evaluate.normalize_state(state_from(c["state"]), "j"), 0))),
     )
 
 
 def test_queue_undelivered() -> None:
     each_case(
         DELIVERY["queueUndelivered"],
-        lambda c: same_delivery(c["result"], delivered(evaluate.queue_undelivered(JobState.from_dict(c["state"]), [Alert.from_dict(a) for a in c["alerts"]]))),
+        lambda c: same_delivery(c["result"], delivered(_evaluate.queue_undelivered(JobState.from_dict(c["state"]), [Alert.from_dict(a) for a in c["alerts"]]))),
     )
 
 
 def test_hold_alerts() -> None:
     def check(c: dict[str, Any]) -> str | None:
         alerts_ = [Alert.from_dict(a) for a in c["alerts"]]
-        return same_delivery(c["result"], delivered(evaluate.hold_alerts(JobState.from_dict(c["state"]), alerts_, c["until"], c["deferred"])))
+        return same_delivery(c["result"], delivered(_evaluate.hold_alerts(JobState.from_dict(c["state"]), alerts_, c["until"], c["deferred"])))
 
     each_case(DELIVERY["holdAlerts"], check)
 
 
 def test_release_sending() -> None:
-    each_case(DELIVERY["releaseSending"], lambda c: same_delivery(c["result"], delivered(evaluate.release_sending(JobState.from_dict(c["state"]), c["now"]))))
+    each_case(DELIVERY["releaseSending"], lambda c: same_delivery(c["result"], delivered(_evaluate.release_sending(JobState.from_dict(c["state"]), c["now"]))))
 
 
 def test_record_sent() -> None:
     def check(c: dict[str, Any]) -> str | None:
         lists = [[Alert.from_dict(a) for a in c[key]] for key in ("delivered", "failed", "stale")]
-        return same_delivery(c["result"], delivered(evaluate.record_sent(JobState.from_dict(c["state"]), *lists, c["now"])))
+        return same_delivery(c["result"], delivered(_evaluate.record_sent(JobState.from_dict(c["state"]), *lists, c["now"])))
 
     each_case(DELIVERY["recordSent"], check)
 
 
 def test_stale_alert() -> None:
-    each_case(HEALTH["staleAlert"], lambda c: differs(c["stale"], evaluate.stale_alert(Alert.from_dict(c["alert"]), state_from(c["state"]))))  # type: ignore[arg-type]
+    each_case(HEALTH["staleAlert"], lambda c: differs(c["stale"], _evaluate.stale_alert(Alert.from_dict(c["alert"]), state_from(c["state"]))))  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------- output
@@ -519,21 +519,21 @@ def digest(text: str | None) -> dict[str, Any] | None:
 
 
 def test_output_cap_is_the_sdks() -> None:
-    assert OUTPUT["outputCap"] == output.OUTPUT_CAP
+    assert OUTPUT["outputCap"] == _output.OUTPUT_CAP
 
 
 def test_redact_secrets() -> None:
-    each_case(OUTPUT["redact"], lambda c: differs(c["result"], digest(output.redact_secrets(expand(c["input"])))))
+    each_case(OUTPUT["redact"], lambda c: differs(c["result"], digest(_output.redact_secrets(expand(c["input"])))))
 
 
 def test_redact_and_cap() -> None:
-    assert OUTPUT["redactEdge"] == output.REDACT_EDGE
-    each_case(OUTPUT["redactAndCap"], lambda c: differs(c["result"], digest(output.redact_and_cap(expand(c["input"]), output.redact_secrets))))
+    assert OUTPUT["redactEdge"] == _output.REDACT_EDGE
+    each_case(OUTPUT["redactAndCap"], lambda c: differs(c["result"], digest(_output.redact_and_cap(expand(c["input"]), _output.redact_secrets))))
 
 
 def test_error_message(monkeypatch: pytest.MonkeyPatch) -> None:
     frames: dict[int, list[str]] = {}
-    monkeypatch.setattr(output, "_frames", lambda error: frames.get(id(error), []))
+    monkeypatch.setattr(_output, "_frames", lambda error: frames.get(id(error), []))
 
     def check(c: dict[str, Any]) -> str | None:
         if "value" in c:
@@ -542,7 +542,7 @@ def test_error_message(monkeypatch: pytest.MonkeyPatch) -> None:
             kind = type(c["name"], (Exception,), {})
             error = kind(expand(c["message"]))
             frames[id(error)] = c["frames"]
-        return differs(c["result"], digest(output.error_message(error)))
+        return differs(c["result"], digest(_output.error_message(error)))
 
     each_case(OUTPUT["errorMessage"], check)
 
@@ -565,7 +565,7 @@ def test_expect_text() -> None:
         for line in expand_lines(c["lines"]):
             recorder.context.log(line)
         text = recorder.expect_text()
-        checks = [{"expect": k["expect"], "result": serialize.check_expectation(k["expect"], text)} for k in c["checks"]]
+        checks = [{"expect": k["expect"], "result": _serialize.check_expectation(k["expect"], text)} for k in c["checks"]]
         return differs([c["expectText"], c["output"], c["checks"]], [digest(text), digest(recorder.output()), checks])
 
     each_case(OUTPUT["expectText"], check)
@@ -776,9 +776,9 @@ def channel_for(c: dict[str, Any], http: Any) -> Any:
     options = c["options"]
     given = link if options.get("link") else None
     if c["channel"] == "slack":
-        return alerts.Slack(options["webhookUrl"], link=given, http=http)
+        return alerts.Slack(webhook_url=options["webhookUrl"], link=given, http=http)
     if c["channel"] == "discord":
-        return alerts.Discord(options["webhookUrl"], link=given, http=http)
+        return alerts.Discord(webhook_url=options["webhookUrl"], link=given, http=http)
     if c["channel"] == "webhook":
         return alerts.Webhook(options["url"], headers=options.get("headers"), secret=options.get("secret"), http=http)
     keywords: dict[str, Any] = {}
@@ -791,7 +791,7 @@ def channel_for(c: dict[str, Any], http: Any) -> Any:
         elif key == "from":
             keywords["from_"] = value
         else:
-            keywords[snake(key)] = value
+            keywords[_snake(key)] = value
     return PROVIDERS[c["channel"]](**keywords, http=http)
 
 
@@ -811,6 +811,20 @@ def test_channel_payloads() -> None:
         return differs([c["url"], c["headers"], c["body"]], [request["url"], request["headers"], digest(request["body"])])
 
     each_case(CHANNELS["sends"], check)
+
+
+def test_webhook_payloads() -> None:
+    """The webhook's whole body, "schema": 1 first, and its signature, byte for byte."""
+
+    def check(c: dict[str, Any]) -> str | None:
+        http = FakeHTTP()
+        alerts.Webhook("https://hooks.example.com/cw", secret=c["secret"], http=http).send(Alert.from_dict(CHANNEL_ALERTS[c["alert"]]))
+        request = http.requests[-1]
+        mine = webhook.signature(c["secret"], request["body"])
+        return differs([c["body"], c["signature"], c["signature"]], [request["body"], request["headers"]["x-cronwatch-signature"], f"sha256={mine}"])
+
+    assert len(CHANNELS["webhookPayloads"]) == 15
+    each_case(CHANNELS["webhookPayloads"], check)
 
 
 def test_channel_failures() -> None:
@@ -919,13 +933,13 @@ def test_discord_descriptions() -> None:
 
     def check(c: dict[str, Any]) -> str | None:
         alert = Alert.from_dict({**first, "message": expand(c["message"]), "triage": expand(c["triage"])})
-        return differs(c["description"], digest(discord.embed_description(alert)))
+        return differs(c["description"], digest(discord._embed_description(alert)))
 
     each_case(TEXT_CUTS["discordDescriptions"], check)
 
 
 def test_sms_segments() -> None:
-    each_case(TEXT_CUTS["smsSegments"], lambda c: differs(c["segments"], twilio.sms_segments(c["text"])))
+    each_case(TEXT_CUTS["smsSegments"], lambda c: differs(c["segments"], twilio._sms_segments(c["text"])))
 
 
 def test_sms_bodies() -> None:
@@ -934,7 +948,7 @@ def test_sms_bodies() -> None:
     def check(c: dict[str, Any]) -> str | None:
         link_ = f"https://app.example/{'p' * 2000}" if c.get("link") == "long" else "https://app.example/j"
         segments = math.nan if c["segments"] is None else c["segments"]
-        return differs(c["body"], digest(twilio.sms_body(long, link_, segments)))
+        return differs(c["body"], digest(twilio._sms_body(long, link_, segments)))
 
     each_case(TEXT_CUTS["smsBodies"], check)
 
@@ -945,23 +959,123 @@ PGCRON = fixture("pgcron.json")
 
 
 def test_pg_cron_hold_is_the_sdks() -> None:
-    assert PGCRON["holdMs"] == pgcron.HOLD_MS
+    assert PGCRON["holdMs"] == pgcron._HOLD_MS
 
 
 def test_pg_cron_schedules() -> None:
-    each_case(PGCRON["schedules"], lambda c: differs(c["result"], pgcron.schedule(c["schedule"])))
+    each_case(PGCRON["schedules"], lambda c: differs(c["result"], pgcron._schedule(c["schedule"])))
 
 
 def test_pg_cron_names() -> None:
-    each_case(PGCRON["names"], lambda c: differs(c["name"], pgcron.job_name(pgcron.Job(jobid=c["job"]["jobid"], jobname=c["job"]["jobname"]))))
+    each_case(PGCRON["names"], lambda c: differs(c["name"], pgcron._job_name(pgcron.Job(jobid=c["job"]["jobid"], jobname=c["job"]["jobname"]))))
 
 
 def test_pg_cron_rows_as_runs() -> None:
     def check(c: dict[str, Any]) -> str | None:
-        run = pgcron.run(c["row"], "db:j", "pgcron:db:", c["fallbackAt"] if c["fallbackAt"] is not None else T0)
+        run = pgcron._run(c["row"], "db:j", "pgcron:db:", c["fallbackAt"] if c["fallbackAt"] is not None else T0)
         return differs(c["run"], run)
 
     each_case(PGCRON["runs"], check)
+
+
+# ---------------------------------------------------------------- client
+
+CLIENT = fixture("client.json")
+
+
+def test_client_run_ids() -> None:
+    """start, resume and record_run hold run ids to 1 to 200 UTF-16 units, each with its own error."""
+
+    def check(c: dict[str, Any]) -> str | None:
+        cw = Cronwatch(store=MemoryStore(), alerts=[], cron_secret=None, now=lambda: T0)
+        job = cw.job("j")
+        method = c["method"]
+
+        def call() -> None:
+            if method == "start":
+                job.start(id=c["id"]).finish()
+            elif method == "resume":
+                job.resume(c["id"])
+            else:
+                cw.record_run({"id": c["id"], "job": "j", "status": "ok", "startedAt": T0 - 1000, "finishedAt": T0, "durationMs": 1000, "error": None, "output": None, "metrics": {}, "trigger": "run"})
+
+        try:
+            if "error" in c:
+                # The port's own spelling of the method, as its NUL message already has it.
+                return raises(c["error"].replace("recordRun:", "record_run:"), call)
+            call()
+            return None
+        finally:
+            cw.close()
+
+    each_case(CLIENT["runIds"], check)
+
+
+def canonical(value: Any) -> str:
+    """JSON with sorted keys: the fixture compares objects as values, not by key order."""
+    return json.dumps(json.loads(as_json(value)), sort_keys=True)
+
+
+@pytest.mark.parametrize("kind", STORES)
+def test_client_unknown_fields(kind: str, tmp_path: Path) -> None:
+    """What a newer release wrote (a state or definition key, a run status, a
+    trigger, an open condition) survives a check, a silence, an unsilence, a
+    summary and a run, over each store."""
+    unknown = CLIENT["unknownFields"]
+    seed = unknown["seed"]
+    store = make_store(kind, tmp_path)
+    store.upsert_job(JobDefinition.from_dict(seed["definition"]), seed["createdAt"])
+    for run in seed["runs"]:
+        store.insert_run(Run.from_dict(run))
+    store.set_state(JobState.from_dict(seed["state"]))
+    clock = {"now": 0}
+    sent: list[Alert] = []
+    errors: list[str] = []
+    cw = Cronwatch(
+        store=store,
+        now=lambda: clock["now"],
+        cron_secret=None,
+        alerts=[alerts.Custom("capture", sent.append)],
+        on_error=lambda error, where: errors.append(f"{where}: {error}"),
+    )
+    try:
+        for step in unknown["steps"]:
+            clock["now"] = step["at"] if "at" in step else clock["now"]
+            op = step["op"]
+            if op == "check":
+                cw.check()
+            elif op == "silence":
+                cw.silence("keep", step["for"])
+            elif op == "unsilence":
+                cw.unsilence("keep")
+            elif op == "summary":
+                summary = cw.job_summary("keep")
+                assert summary is not None
+                got = summary.to_dict()
+                # `open` follows the stored state's key order, which Postgres's JSONB does not keep: compared as a set.
+                assert canonical({**got, "open": sorted(got["open"])}) == canonical({**step["summary"], "open": sorted(step["summary"]["open"])}), op
+            elif op == "declareAndRun":
+                clock["now"] = step["startedAt"]
+                handle = cw.job("keep", **{_snake(k): v for k, v in step["declared"].items()}).start(id=step["id"])
+                clock["now"] = step["finishedAt"]
+                handle.finish(step["output"])
+            else:
+                raise AssertionError(f"unknown step {op}")
+            got_job = store.get_job("keep")
+            got_state = store.get_state("keep")
+            assert got_job is not None and got_state is not None
+            snapshot = {
+                "job": got_job.to_dict(),
+                "state": got_state.to_dict(),
+                "runs": [r.to_dict() for r in store.list_runs("keep", 10)],
+                "alerts": [a.to_dict() for a in sent],
+                "errors": list(errors),
+            }
+            sent.clear()
+            errors.clear()
+            assert canonical(snapshot) == canonical(step["expect"]), op
+    finally:
+        cw.close()
 
 
 # ---------------------------------------------------------------- every fixture
@@ -971,5 +1085,5 @@ ELSEWHERE = {"triage.json"}
 
 
 def test_every_fixture_is_replayed() -> None:
-    replayed = {"duration.json", "schedule.json", "evaluate.json", "format.json", "health.json", "output.json", "store.json", "channels.json", "pgcron.json"}
+    replayed = {"client.json", "duration.json", "schedule.json", "evaluate.json", "format.json", "health.json", "output.json", "store.json", "channels.json", "pgcron.json"}
     assert {p.name for p in DIR.glob("*.json")} == replayed | ELSEWHERE

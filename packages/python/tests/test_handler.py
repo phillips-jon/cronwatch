@@ -127,7 +127,7 @@ def test_an_interrupt_is_recorded_and_raised_rather_than_answered() -> None:
 
 
 def test_the_authorization_header_is_read_from_any_kind_of_request() -> None:
-    from cronwatch.handler import authorization
+    from cronwatch._handler import authorization
 
     class Headers:
         def get(self, name: str) -> str | None:
@@ -323,7 +323,7 @@ def test_an_async_handler_called_directly_is_awaited() -> None:
     response = asyncio.run(handler(get()))
     assert response.status == 200
     assert cw.runs("d")[0].output == "ok"
-    from cronwatch.handler import AsyncHandler
+    from cronwatch._handler import AsyncHandler
 
     assert isinstance(handler, AsyncHandler)
     with pytest.raises(TypeError, match="handler"):
@@ -451,7 +451,7 @@ def test_a_binary_answer_goes_to_lambda_as_base64() -> None:
 
 
 def test_an_asgi_handler_refuses_a_body_over_the_limit() -> None:
-    from cronwatch.web import MAX_BODY
+    from cronwatch.web import _MAX_BODY
 
     cw, _, _ = make(cron_secret=SECRET)
     ran: list[int] = []
@@ -461,7 +461,7 @@ def test_an_asgi_handler_refuses_a_body_over_the_limit() -> None:
 
     async def receive() -> dict[str, Any]:
         calls[0] += 1
-        return {"type": "http.request", "body": b"x" * (MAX_BODY // 2 + 1), "more_body": True}
+        return {"type": "http.request", "body": b"x" * (_MAX_BODY // 2 + 1), "more_body": True}
 
     async def emit(message: dict[str, Any]) -> None:
         sent.append(message)

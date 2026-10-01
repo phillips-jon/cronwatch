@@ -14,6 +14,8 @@ from ..types import Alert
 from ._http import HTTP
 from ._shared import cut, http_or_default, link_for, post, present, required, severity
 
+__all__ = ["NewRelic"]
+
 _DIGITS = re.compile(r"^\d+\Z")
 
 

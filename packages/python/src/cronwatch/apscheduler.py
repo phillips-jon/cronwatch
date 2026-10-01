@@ -10,7 +10,7 @@ or newer in the 3.x line (``pip install "cronwatch-sdk[apscheduler]"``).
     scheduler.add_job(nightly_report, "cron", hour=2, id="nightly-report")
     cronwatch.apscheduler.watch(scheduler, grace="15m")
     scheduler.start()
-    cw.start()          # checks for missed and stuck runs every minute
+    cw.start_checking()  # checks for missed and stuck runs every minute
 
 Every job of the scheduler is then a CronWatch job, named after its id (or,
 for an id APScheduler generated, its name, which is the function's), with its
@@ -81,14 +81,15 @@ if not str(getattr(apscheduler, "__version__", "3")).startswith("3."):  # pragma
 import cronwatch
 
 from ._convert import check_options, every_text, field_text, zone_name
+from ._deprecated import names as _deprecated_names
 from ._scheduler_check import NeverFires, ScheduleError, check_fires
-from .client import NAME_RE, Cronwatch, JobHandle
-from .run_handle import RunHandle
-from .schedule import parse_schedule
+from ._client import NAME_RE, Cronwatch, JobHandle
+from ._run_handle import RunHandle
+from ._schedule import parse_schedule
 
 __all__ = ["ScheduleError", "SchedulerWatch", "convert", "watch"]
 
-TRIGGER = "apscheduler"
+_TRIGGER = "apscheduler"
 #: What APScheduler generates for a job added without an id.
 _GENERATED_ID = re.compile(r"[0-9a-f]{32}\Z")
 #: Runs that ended before their submission was heard of, remembered so it starts nothing.
@@ -137,7 +138,7 @@ def _is_all(field: Any) -> bool:
     return len(field.expressions) == 1 and type(field.expressions[0]) is AllExpression and not field.expressions[0].step
 
 
-def cron_text(trigger: Any, where: str) -> str:
+def _cron_text(trigger: Any, where: str) -> str:
     """The cron expression croner reads for a CronTrigger. APScheduler fires on
     a day that matches the day of the month and the day of the week together
     (Monday is its 0), which croner reads with "+" before the day of the week
@@ -243,7 +244,7 @@ def convert(trigger: Any, where: str = "cronwatch: this job") -> dict[str, Any] 
         zone = zone_name(trigger.timezone)
         if zone is None:
             raise ScheduleError(f"{where} is read in {trigger.timezone!r}, which is not an IANA timezone; give the trigger one, such as UTC or Europe/London")
-        text = cron_text(trigger, where)
+        text = _cron_text(trigger, where)
         key = (text, zone)
         with _converted_lock:
             hit = _converted.get(key)
@@ -494,7 +495,7 @@ class SchedulerWatch:
             return
         handle = self._handle_for(event.job_id, event.jobstore)
         if handle is not None:
-            self._active[first] = handle.start(trigger=TRIGGER)
+            self._active[first] = handle.start(trigger=_TRIGGER)
 
     def _ended(self, event: Any) -> None:
         key = (event.job_id, event.scheduled_run_time)
@@ -509,7 +510,7 @@ class SchedulerWatch:
                 if handle is None:
                     return
                 self._done.append(key)
-                run = handle.start(trigger=TRIGGER)
+                run = handle.start(trigger=_TRIGGER)
             if run is not None:
                 run.fail(skipped)
             return
@@ -519,7 +520,7 @@ class SchedulerWatch:
                 return
             if not caught_up:
                 self._done.append(key)  # ended before its submission was heard of
-            run = handle.start(trigger=TRIGGER)
+            run = handle.start(trigger=_TRIGGER)
         if event.code == events.EVENT_JOB_ERROR:
             run.fail(event.exception if event.exception is not None else RuntimeError("the job failed"))
         else:
@@ -559,3 +560,8 @@ def watch(
         )
         _watches[id(scheduler)] = made
     return made
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"TRIGGER": "_TRIGGER", "cron_text": "_cron_text"})

@@ -9,11 +9,14 @@ from collections.abc import Callable
 from typing import Any
 
 from .. import _js
-from ..types import Alert, details_to_json
+from .._deprecated import names as _deprecated_names
+from ..types import Alert, _details_to_json
 from ._http import HTTP
 from ._shared import alert_id, as_uuid, cut, http_or_default, link_for, post, present, required, run_summary, severity
 
-ENDPOINT = "https://api.rollbar.com/api/1/item/"
+__all__ = ["Rollbar"]
+
+_ENDPOINT = "https://api.rollbar.com/api/1/item/"
 
 
 class Rollbar:
@@ -48,7 +51,7 @@ class Rollbar:
             custom["triage"] = alert.triage
         if link:
             custom["link"] = link
-        custom["details"] = details_to_json(alert.details)
+        custom["details"] = _details_to_json(alert.details)
         custom["run"] = run_summary(alert)
         item = {
             "data": {
@@ -65,4 +68,9 @@ class Rollbar:
             }
         }
         headers = {"content-type": "application/json", "x-rollbar-access-token": self._access_token}
-        post(self._http, "Rollbar", ENDPOINT, headers, _js.dumps(item), [self._access_token])
+        post(self._http, "Rollbar", _ENDPOINT, headers, _js.dumps(item), [self._access_token])
+
+
+#: Names 1.0 made internal, still answering under their old names (each
+#: warning, until 2.0).
+__getattr__ = _deprecated_names(__name__, globals(), {"ENDPOINT": "_ENDPOINT"})

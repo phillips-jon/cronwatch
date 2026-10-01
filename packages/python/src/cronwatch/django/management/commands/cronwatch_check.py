@@ -15,6 +15,8 @@ from django.core.management.base import BaseCommand
 
 from ... import client
 
+__all__ = ["Command"]
+
 
 class Command(BaseCommand):
     help = "Check for missed and stuck runs and send alerts (what cw.check() does)."

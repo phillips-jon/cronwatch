@@ -39,7 +39,7 @@ from cronwatch.stores import SqliteStore
 
 cw = cronwatch.Cronwatch(
     store=SqliteStore("./data/cronwatch.db"),
-    alerts=[Slack(os.environ["SLACK_WEBHOOK_URL"])],
+    alerts=[Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])],
     retention="30d",
 )
 ```
@@ -47,7 +47,7 @@ cw = cronwatch.Cronwatch(
 Or configure one for the whole process and reach it anywhere with `cronwatch.client()`:
 
 ```python
-cronwatch.configure(alerts=[Slack(os.environ["SLACK_WEBHOOK_URL"])])
+cronwatch.configure(alerts=[Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"])])
 ```
 
 `configure` takes the same options and returns the client. Configuring again replaces it and stops the old one's interval checks. `cronwatch.client()` before any `configure` is a client with the defaults (the memory store, alerts printed to the console).
@@ -117,12 +117,12 @@ async def main() -> None:
 A long-running process (a web server, a worker) checks in a daemon thread:
 
 ```python
-cw.start()          # every minute; cw.start("5m") to change it
+cw.start_checking()  # every minute; cw.start_checking("5m") to change it
 ```
 
-Calling `start` again while it runs does nothing; a different interval is reported to `on_error` and ignored, so call `stop()` first to change it.
+(A job's `start()` opens a run; the client's `start_checking()` starts the checks. `cw.start(every)` is its old name, still working with a `DeprecationWarning` until 2.0.) Calling `start_checking` again while it runs does nothing; a different interval is reported to `on_error` and ignored, so call `stop()` first to change it.
 
-Start the checker in exactly one process per store: one process with `start`, or one scheduled check. Two checkers on one database can each send the same alert. So never call `start` once per Gunicorn or uWSGI worker (in a `post_fork` hook, say): start it in a process of its own, such as a worker or scheduler you already run, or use the crontab check below. A forked child gets a fresh client state and no check thread, so a `start` in the parent before it forks does not carry into the workers either.
+Start the checker in exactly one process per store: one process with `start_checking`, or one scheduled check. Two checkers on one database can each send the same alert. So never call `start_checking` once per Gunicorn or uWSGI worker (in a `post_fork` hook, say): start it in a process of its own, such as a worker or scheduler you already run, or use the crontab check below. A forked child gets a fresh client state and no check thread, so a `start_checking` in the parent before it forks does not carry into the workers either.
 
 A script run from crontab exits when it is done, so nothing inside it notices the run that never happened. Add a second crontab line that checks:
 
@@ -162,14 +162,14 @@ application = cw.routes()
 
 - `token`: leave it out to read `CRONWATCH_TOKEN`; an empty string counts as unset. `None` opts out and serves the routes open, for a mount behind your own auth.
 
-  Without a token, in development, the routes make a token of their own and print a sign-in link to standard output on the first request. Anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that is set (where the SDK reads `NODE_ENV` third), and `development`, `dev` and `test` count as development.
+  Without a token, in development, the routes make a token of their own and print a sign-in link to standard output on the first request. Anywhere else they answer 503. The environment is the first of `CRONWATCH_ENV`, `APP_ENV` and `ENVIRONMENT` that holds more than spaces (where the SDK reads `NODE_ENV` third), trimmed and lowercased; `development`, `dev`, `local`, `test` and `testing` count as development, and `production` and `prod` as production, as in every CronWatch library.
 
   The link names the host only when `origin` is set or the request's host is loopback: `localhost`, a name ending in `.localhost`, `127.0.0.0/8` or `::1`. Only a host that is one of those counts, so a Host header such as `localhost:1@evil.example` does not. Otherwise the link leaves the host out, since a client chooses it: `Sign in: /cronwatch/?token=... on this server (the first request's host is not local, so the link leaves it out)`.
 - `base_path`: where it is mounted. It defaults to the mount point the server reports (`SCRIPT_NAME`, or ASGI's `root_path`), so the mounts above need nothing more.
 - `origin`: the public origin, such as `"https://app.example.com"`, to pin it whatever a request says. It then replaces the request's own for the cross-site check on writes, the cookie's `Secure` flag, redirects and the sign-in line.
 - `trust_proxy`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`, as the SDK's option does. Off by default.
 
-The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's `cron_secret` as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). The ASGI app runs each request in a worker thread, so it needs an asyncio server (uvicorn, Hypercorn, Daphne).
+The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` answers `{"ok":true,"library":"cronwatch-sdk","language":"python","version":"<cronwatch.__version__>","api":1}`, and silencing or unsilencing over the API answers the job's summary. `/api/check` also accepts the client's `cron_secret` as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app). The ASGI app runs each request in a worker thread, so it needs an asyncio server (uvicorn, Hypercorn, Daphne).
 
 ## Jobs a URL starts
 
@@ -221,12 +221,12 @@ scheduler = BackgroundScheduler(timezone="UTC")
 scheduler.add_job(nightly_report, "cron", hour=2, id="nightly-report")
 watch(scheduler, client=cw)
 scheduler.start()
-cw.start()          # the check, for runs that never happened
+cw.start_checking()  # the check, for runs that never happened
 ```
 
 `pip install "cronwatch-sdk[apscheduler]"` (APScheduler 3.10 or newer). `watch` adds a listener to an APScheduler 3 scheduler (background, blocking, asyncio or any other) and needs no change to your jobs. Every job becomes a CronWatch job named after its id, with its trigger as the schedule: a cron trigger becomes the same cron expression, checked against APScheduler's own fire times; an interval trigger is `every <interval>`; a date trigger runs once. A job added or rescheduled later is followed, and a removed one stops being expected.
 
-Each run is recorded from APScheduler's own events: the return value is the output when it is a string (and checked by `expect`), an exception fails it, and a run APScheduler skipped because it could not start within `misfire_grace_time` is failed with that reason. The events are recorded in a thread of the listener's own, so neither the scheduler nor an asyncio loop waits on the store.
+Each run is recorded from APScheduler's own events, with the trigger `apscheduler` (see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)): the return value is the output when it is a string (and checked by `expect`), an exception fails it, and a run APScheduler skipped because it could not start within `misfire_grace_time` is failed with that reason. The events are recorded in a thread of the listener's own, so neither the scheduler nor an asyncio loop waits on the store.
 
 `watch`'s own options (`grace`, `timeout`, `failures_before_alert` and the rest) apply to every job it declares. `jobs=` gives options per job, by id, with `name=` for a job name other than the id and `schedule=` to replace the trigger's: `watch(scheduler, jobs={"nightly-report": {"timeout": "2h"}})`. `exclude=` leaves jobs out, by id or name.
 
@@ -255,8 +255,8 @@ import os
 from cronwatch import Console, Custom
 from cronwatch.alerts import Slack, Discord, Webhook
 
-Slack(os.environ["SLACK_WEBHOOK_URL"], link=lambda a: f"https://app.example.com/cronwatch/jobs/{a.job}")
-Discord(os.environ["DISCORD_WEBHOOK_URL"])
+Slack(webhook_url=os.environ["SLACK_WEBHOOK_URL"], link=lambda a: f"https://app.example.com/cronwatch/jobs/{a.job}")
+Discord(webhook_url=os.environ["DISCORD_WEBHOOK_URL"])
 Webhook("https://hooks.example.com/cronwatch", secret=os.environ.get("CRONWATCH_WEBHOOK_SECRET"),
         headers={"X-Team": "ops"})
 Console()
@@ -330,14 +330,19 @@ Each request gives up 10 seconds after it starts. A refused request raises `"<Pr
 
 One difference from Node: `urllib` honours the `HTTP_PROXY` and `HTTPS_PROXY` environment variables, which Node's `fetch` ignores by default.
 
-A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`. Verifying it in Python:
+The webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same fields in every language, described by its [JSON Schema](/docs/alerts/#the-webhook-39-s-schema). Parse the fields (`type`, `details`), not `title` and `message`, whose wording is not promised.
+
+A webhook with a `secret` signs its body with `X-CronWatch-Signature: sha256=<hex>`. `cronwatch.alerts.webhook.signature(secret, body)` gives the hex, the HMAC-SHA256 of the raw body as it arrived (before any JSON parsing). Verifying it in Python:
 
 ```python
-import hashlib, hmac
+import hmac
+from cronwatch.alerts.webhook import signature
 
-expected = "sha256=" + hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+expected = "sha256=" + signature(secret, raw_body.decode())
 ok = hmac.compare_digest(expected, request.headers.get("X-CronWatch-Signature", ""))
 ```
+
+`hmac_sha256_hex` is the old name of `signature`: it still works, with a `DeprecationWarning`, and goes in 2.0.
 
 ### Processes that cannot send
 
@@ -361,7 +366,7 @@ cw = cronwatch.Cronwatch(
     store=PostgresStore(),
     sources=[PgCron(os.environ["DATABASE_URL"], prefix="db:")],
 )
-cw.start()
+cw.start_checking()
 ```
 
 The first argument is a connection string, a psycopg connection or pool, or anything with `query(sql, params)` that returns rows as dicts. On a connection that is not in autocommit mode it never ends a transaction of yours. The options (`jobs`, `prefix`, `job_name`, `options`, `timezone`) and the rules for renamed jobs, runs cut off by a restart and history seen for the first time are the SDK's; see [Supabase and pg_cron](/docs/supabase/).
@@ -384,9 +389,9 @@ pip install "cronwatch-sdk[anthropic]"
 ```
 
 ```python
-from cronwatch.triage.anthropic import AnthropicTriage
+from cronwatch.triage.anthropic import Anthropic
 
-cw = cronwatch.Cronwatch(triage=AnthropicTriage(context="A Flask app on Postgres, jobs run from crontab."))
+cw = cronwatch.Cronwatch(triage=Anthropic(context="A Flask app on Postgres, jobs run from crontab."))
 ```
 
 | Option | Default | |
@@ -423,6 +428,8 @@ A triage of your own is any function that takes the context (`alert`, `recent_ru
 
 `cw.job(name, **options)` takes `schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `timezone` (IANA; the process's zone by default), `grace` (`"10m"`), `timeout` (`"1h"`), `max_duration`, `budget` (`{"metric": ceiling}`), `expect` (a string the output must contain, a compiled `re` pattern it must match, or a function), `failures_before_alert` (1), `description` and `tags`, with the rules in the [API reference](/docs/api/). An `expect` pattern, like an `expect` function, runs in your process with no time limit, so keep it clear of repeats that can backtrack without end (see [expect rules](/docs/conditions/#expect-rules)). A name is 1 to 120 letters, digits, `.`, `_`, `:` or `-`, starting with a letter or digit. Bad options raise `ValueError` when the job is declared.
 
+`timeout` and `max_duration` both measure a run's length, and are easy to mix up. `timeout` is for a run that has not finished: once a running run is older than it, the next check gives up on it (the run becomes `timeout`, a failure) and the job is stuck. `max_duration` is for a run that finished: one that succeeded but took longer is slow, and stays a success. So set `timeout` well above `max_duration`: `max_duration="10m", timeout="1h"` hears about a run that crept past ten minutes, and gives up on one still going after an hour.
+
 The client:
 
 | Method | |
@@ -430,13 +437,13 @@ The client:
 | `job(name, **options)` | declare a job and get its handle |
 | `run(name, fn=None, **options)` | run without keeping a handle; without `fn`, a context manager |
 | `check()` | find missed and stuck runs, send alerts, retry alerts no channel accepted, prune |
-| `start(every="1m")`, `stop()` | check in a daemon thread; the interval is at least 5 seconds |
+| `start_checking(every="1m")`, `stop()` | check in a daemon thread; the interval is at least 5 seconds. (A job's `start()` opens a run; this starts the checks.) |
 | `jobs()`, `jobs_with_runs(limit=20)`, `job_summary(name)` | summaries, without alerting |
 | `runs(name, limit=50)`, `get_run(run_id)` | newest first; `limit` is 1 to 500 |
 | `silence(name, "2h")`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
 | `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resume_run(name, run_id)` | `job(name).resume(run_id)` for a job declared in this process |
-| `record_run(run, evaluate=True)` | record a run that happened elsewhere, for a source; returns the alerts it sent. Every metric must be a finite number, as with `metric()`; one that is not raises `ValueError` and nothing is recorded |
+| `record_run(run, evaluate=True)` | record a run that happened elsewhere, for a source; returns the alerts it sent. Its id is 1 to 200 characters with no NUL, as `start()` takes, and every metric must be a finite number, as with `metric()`; anything else raises `ValueError` and nothing is recorded |
 | `defined_jobs()` | the definitions declared in this process |
 | `close()` | stop the thread, wait for a check already under way, then close the store |
 
@@ -444,9 +451,25 @@ The client:
 
 The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the PHP, Go, Rust, Elixir, Java and .NET stores: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
+A 1.x release keeps what it does not know: a key a newer release added to a job's state or definition, a condition, a run status or a trigger is read, carried through every write and written back as it was, so any 1.x of any language can share a store with any other. Releases before 1.0 do not promise this: upgrade every process to 1.0 together.
+
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store.
 
-The cron reader matches croner with two exceptions, both for schedules that never make sense: a date no month has (`0 0 30 2 *`) is a schedule that never fires, where croner gives up; and a one-time date in place of a cron expression (`2026-12-01T00:00:00`) is refused.
+The cron reader matches croner and the SDK, including the two schedules that never make sense (a one-time date is refused, a date no month has never fires): see [Schedule syntax](/docs/schedules/#schedule-syntax).
+
+## Deprecated
+
+These names still work through every 1.x release, each with a `DeprecationWarning`, and go in 2.0:
+
+| Deprecated | Use |
+|---|---|
+| `cw.start(every)`, `AsyncCronwatch.start(every)` | `cw.start_checking(every)`: a job's `start()` opens a run, so the client's is named for what it starts |
+| `cronwatch.web.Web(client, ...)` | `cw.routes(...)`, or `cronwatch.client().routes(...)` for the process's client |
+| `AnthropicTriage` from `cronwatch.triage.anthropic` | `Anthropic`, the name every port uses |
+| `Slack(url)` and `Discord(url)`, the URL given positionally | `Slack(webhook_url=url)`, `Discord(webhook_url=url)` |
+| `hmac_sha256_hex(secret, body)` from `cronwatch.alerts.webhook` | `signature(secret, body)`, the name every port uses |
+
+Public means what this page and the README document; everything else is internal. The modules that only implement the client are underscored from 1.0 (`cronwatch._evaluate`, `cronwatch._client`, `cronwatch._schedule` and so on), and so are the helpers and constants of the public modules (`cronwatch.types.camel`, `cronwatch.alerts.twilio.sms_segments`, the pg_cron source's SQL). Under their old names (`cronwatch.evaluate`, `cronwatch.alerts.twilio.sms_segments`) they still work, warning when used, and go in 2.0. Each module's `__all__` lists what it promises.
 
 ## Kept in step
 

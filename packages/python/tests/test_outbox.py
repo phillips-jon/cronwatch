@@ -12,7 +12,7 @@ from typing import Any
 import pytest
 
 from cronwatch import Alert, Cronwatch
-from cronwatch.evaluate import SEND_LEASE_MS
+from cronwatch._evaluate import SEND_LEASE_MS
 from cronwatch.stores import MemoryStore
 
 from helpers import MIN, T0, Capture, Clock, Wrapped, boom

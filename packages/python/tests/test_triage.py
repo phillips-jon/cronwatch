@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from cronwatch import AbortError, AbortSignal, Alert, Run, TriageContext, _js
-from cronwatch.triage.anthropic import REQUEST_TIMEOUT_MS, AnthropicTriage
+from cronwatch.triage.anthropic import _REQUEST_TIMEOUT_MS, Anthropic, AnthropicTriage
 
 from helpers import MIN, make
 
@@ -59,8 +59,8 @@ class StubClient:
         return self.response
 
 
-def triage_for(options: dict[str, Any], client: Any) -> AnthropicTriage:
-    return AnthropicTriage(
+def triage_for(options: dict[str, Any], client: Any) -> Anthropic:
+    return Anthropic(
         client=client,
         model=options.get("model"),
         effort=options.get("effort"),
@@ -89,7 +89,7 @@ def test_requests_match_what_the_sdk_sends() -> None:
         expected, actual = _js.dumps(c["params"]), _js.dumps(body(params))
         if expected != actual:
             failures.append(f"#{i} {c['context']} {c['options']}\n  expected {expected[:600]}\n  got      {actual[:600]}")
-        assert c["requestOptions"]["timeout"] == params["timeout"] * 1000 == REQUEST_TIMEOUT_MS
+        assert c["requestOptions"]["timeout"] == params["timeout"] * 1000 == _REQUEST_TIMEOUT_MS
         assert client.options == [{"max_retries": c["requestOptions"]["maxRetries"]}]
     assert not failures, "\n".join(failures)
 
@@ -172,6 +172,13 @@ def test_the_client_adds_the_diagnosis_to_alerts_but_recoveries() -> None:
 
 def test_a_client_is_built_from_the_api_key() -> None:
     anthropic = pytest.importorskip("anthropic")
-    triage = AnthropicTriage(api_key="sk-test")
+    triage = Anthropic(api_key="sk-test")
     assert isinstance(triage.client, anthropic.Anthropic)
     assert triage.client.api_key == "sk-test"
+
+
+def test_anthropic_triage_is_a_deprecated_alias_of_anthropic() -> None:
+    with pytest.warns(DeprecationWarning, match="use cronwatch.triage.anthropic.Anthropic"):
+        triage = AnthropicTriage(api_key="sk-test", model="m", context="c")
+    assert isinstance(triage, Anthropic)
+    assert (triage.model, triage.context) == ("m", "c")

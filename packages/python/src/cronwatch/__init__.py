@@ -10,7 +10,7 @@
         ctx.log("Report written")
         ctx.metric("cost", 1.2)
 
-    cw.start()  # checks for missed and stuck runs every minute, in a daemon thread
+    cw.start_checking()  # checks for missed and stuck runs every minute, in a daemon thread
 
 The Python port of @cronwatch/sdk: the same rules, the same alert text and
 the same stored rows, so a Python, a Node and a Ruby process can share one
@@ -19,17 +19,18 @@ database.
 
 from __future__ import annotations
 
+import importlib
 import threading
 from typing import Any
 
 from . import alerts, stores
 from .alerts import ChannelContext, Console, Custom
-from .client import ChannelTimeout, CheckInterrupted, Cronwatch, JobHandle, TriageContext
-from .duration import format_duration, parse_duration
-from .job import AbortError, AbortSignal, JobContext, current
-from .output import redact_secrets
-from .run_handle import RunHandle
-from .schedule import parse_schedule
+from ._client import ChannelTimeout, CheckInterrupted, Cronwatch, JobHandle, TriageContext
+from ._duration import format_duration, parse_duration
+from ._job import AbortError, AbortSignal, JobContext, current
+from ._output import redact_secrets
+from ._run_handle import RunHandle
+from ._schedule import parse_schedule
 from .types import (
     Alert,
     AlertDraft,
@@ -48,9 +49,19 @@ from .types import (
     StoredJob,
 )
 
+# cronwatch.client, the module 1.0 made internal (it is cronwatch._client),
+# is also the function below: its deprecated name is imported here, before
+# the function takes the name back, so importing it later cannot replace the
+# function.
+from . import client as _client_module  # noqa: E402, F401
+
 __version__ = "0.10.0"
 
-_client: Cronwatch | None = None
+#: The modules 1.0 made internal, under their old names: each still works,
+#: warning when a name of it is used, and goes in 2.0.
+_MOVED = ("duration", "stats", "output", "schedule", "evaluate", "format", "serialize", "job", "run_handle", "handler")
+
+_configured: Cronwatch | None = None
 _lock = threading.Lock()
 
 
@@ -58,10 +69,10 @@ def configure(**options: Any) -> Cronwatch:
     """Make the process's client, taking the same options as Cronwatch(), and
     return it. cronwatch.client() hands it out afterwards. Calling it again
     replaces the client (stopping the old one's interval checks)."""
-    global _client
+    global _configured
     made = Cronwatch(**options)
     with _lock:
-        previous, _client = _client, made
+        previous, _configured = _configured, made
     if previous is not None:
         previous.stop()
     return made
@@ -69,11 +80,17 @@ def configure(**options: Any) -> Cronwatch:
 
 def client() -> Cronwatch:
     """The client configure() made, or a default one (memory store, console alerts) when it was never called."""
-    global _client
+    global _configured
     with _lock:
-        if _client is None:
-            _client = Cronwatch()
-        return _client
+        if _configured is None:
+            _configured = Cronwatch()
+        return _configured
+
+
+def __getattr__(name: str) -> Any:
+    if name in _MOVED:
+        return importlib.import_module(f"{__name__}.{name}")
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = [

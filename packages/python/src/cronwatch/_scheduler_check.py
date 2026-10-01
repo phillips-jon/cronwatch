@@ -22,7 +22,20 @@ import time
 from collections.abc import Callable
 
 from . import _js, _zone
-from .schedule import ParsedSchedule, _due_after_run, _fire_after
+from ._schedule import ParsedSchedule, _due_after_run, _fire_after
+
+__all__ = [
+    "CHANGE_WINDOW_MS",
+    "HORIZON_YEARS",
+    "NeverFires",
+    "Runs",
+    "SAMPLE_MONTHS",
+    "SAMPLE_RUNS",
+    "SAMPLE_YEAR",
+    "ScheduleError",
+    "check_fires",
+    "transitions",
+]
 
 #: How far ahead the daylight saving check looks, and how far either side of
 #: each clock change it compares the scheduler's runs with CronWatch's.
