@@ -30,3 +30,18 @@ func environment() string {
 	}
 	return ""
 }
+
+// blank is whether a token or secret is empty or only whitespace, as
+// String.prototype.trim sees it. Such a value counts as not set, so the
+// routes and handlers fail closed instead of taking it as a password.
+func blank(s string) bool { return js.Trim(s) == "" }
+
+// secretEnv is a secret from the environment (CRONWATCH_TOKEN,
+// CRON_SECRET): "" when the variable is unset, empty or blank, else its
+// value as it is, untrimmed.
+func secretEnv(name string) string {
+	if v := os.Getenv(name); !blank(v) {
+		return v
+	}
+	return ""
+}

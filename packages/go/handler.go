@@ -34,7 +34,8 @@ type handlerConfig struct {
 
 // WithSecret is the secret the handler's requests must carry, as
 // `Authorization: Bearer <secret>`, in place of the client's cron secret
-// (WithCronSecret, $CRON_SECRET by default). "" counts as unset.
+// (WithCronSecret, $CRON_SECRET by default). One that is empty or only
+// whitespace counts as unset, and the client's is used.
 func WithSecret(secret string) HandlerOption {
 	return func(c *handlerConfig) { c.secret, c.open = secret, false }
 }
@@ -89,7 +90,7 @@ func HandlerValue[T any](job *Job, fn func(ctx context.Context, job *JobContext,
 	switch {
 	case cfg.open:
 		h.optedOut = true
-	case cfg.secret != "":
+	case !blank(cfg.secret):
 		h.secret = cfg.secret
 	default:
 		h.secret = c.cronSecret

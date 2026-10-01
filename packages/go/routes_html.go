@@ -548,13 +548,14 @@ func failuresRow(job JobSummary) string {
 }
 
 // messagePage is a page with one message. With signIn, a form under it
-// takes the token and sends it as ?token=, which the routes move into the
-// cookie: the way in where there is no address bar to open a link with,
-// such as an app on an iPhone's home screen.
+// posts the token to <base>/signin in the body, keeping it out of the URL
+// and access logs, and the routes set the cookie: the way in where there is
+// no address bar to open a link with, such as an app on an iPhone's home
+// screen.
 func messagePage(title, message, base string, signIn bool) string {
 	form := ""
 	if signIn {
-		form = `<form class="signin" method="get" action="` + escapeHTML(base) + `/"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>`
+		form = `<form class="signin" method="post" action="` + escapeHTML(base) + `/signin"><label for="token">Token</label><input id="token" name="token" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required><button class="primary" type="submit">Sign in</button></form>`
 	}
 	return layout(title, `<header class="top">`+brand(base, nil)+`</header><main class="message"><h1>`+escapeHTML(title)+`</h1><p>`+escapeHTML(message)+`</p>`+form+`</main>`, base, 0)
 }

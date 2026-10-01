@@ -166,7 +166,7 @@ func New(options ...Option) (*Client, error) {
 		channelBusy: map[int]int{},
 	}
 	c.onError = func(err error, where string) { fmt.Fprintf(Stderr, "[cronwatch] %s: %v\n", where, err) }
-	c.cronSecret = os.Getenv("CRON_SECRET")
+	c.cronSecret = secretEnv("CRON_SECRET")
 	for _, o := range options {
 		if err := o(c); err != nil {
 			return nil, err
