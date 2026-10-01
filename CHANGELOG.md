@@ -99,6 +99,7 @@ Every deprecated name, with its replacement and the release it goes in, is on th
 - One malformed job, run or state row (a hand edit, another writer, a damaged database) affects only its own job, in every language: it no longer stops every check or makes the whole dashboard answer 500. A definition that does not parse or is not an object reads as `{ name }`, and that job is reported and shown as failing; tags that are not a list of strings are left out; unparseable metrics read as `{}`; a time that is not a number reads as 0 (a start) or empty (a finish or duration); a state that does not parse reads as none and is replaced by the next write; and a queued alert that is not an object, a recovery that does not say what it recovers from, and an alert without a numeric time are dropped instead of blocking the job's alerts.
 - An `Authorization` header that is not a bearer, such as a proxy's Basic auth, no longer locks the dashboard: the cookie and `?token=` sign in as if no header came.
 - pg_cron: forgetting the old name of a renamed job while a run of it is open lets the run go, where every check after reported `job is not declared`.
+- Ruby: the channels' HTTP client reads at most 1 MiB of an answer's body, and none of a 2xx answer's, where it read everything that came within the 10 second deadline, so a hostile or broken endpoint could stream gigabytes into the worker.
 
 ## 0.10.0 and earlier
 

@@ -229,6 +229,42 @@ class AlertsTest < Minitest::Test
     server&.close
   end
 
+  # A server that answers `status` and then sends body bytes as fast as it
+  # can, without end, until the client goes.
+  def flooding_server(status)
+    server = TCPServer.new("127.0.0.1", 0)
+    Thread.new do
+      client = server.accept
+      client.readpartial(4096)
+      client.write("HTTP/1.1 #{status} X\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n")
+      chunk = "x" * 65_536
+      loop { client.write(chunk) }
+    rescue StandardError
+      nil
+    ensure
+      client&.close
+    end
+    server
+  end
+
+  # A hostile or broken endpoint that never stops sending cannot fill the
+  # worker's memory or hold it until the deadline: an answer outside 2xx is
+  # read to MAX_BODY (1 MiB) and no further, and a 2xx answer's body is not
+  # read at all, since no channel needs it.
+  def test_the_default_http_adapter_caps_the_body_it_reads_and_skips_a_2xx_body
+    [[500, Cronwatch::HTTP::MAX_BODY], [200, 0]].each do |status, size|
+      server = flooding_server(status)
+      response = nil
+      took = elapsed { response = Cronwatch::HTTP::NetHTTP.new(timeout: 8).post("http://127.0.0.1:#{server.addr[1]}/", "{}", {}) }
+      assert_operator took, :<, 4, "#{status}: stops reading long before the deadline"
+      assert_equal status, response.status
+      assert_equal size, response.body.bytesize, status.to_s
+    ensure
+      server&.close
+    end
+    assert_equal 1_048_576, Cronwatch::HTTP::MAX_BODY
+  end
+
   def test_the_default_http_adapter_raises_when_no_answer_comes_before_the_deadline
     server = TCPServer.new("127.0.0.1", 0)
     held = []

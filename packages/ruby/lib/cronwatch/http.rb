@@ -11,6 +11,11 @@ module Cronwatch
   # @api private
   module HTTP
     TIMEOUT = 10
+    # The most of an answer's body read (1 MiB): a channel reads 200
+    # characters of a refusal, and a hostile or broken endpoint could
+    # otherwise stream gigabytes into the worker within the deadline.
+    # Reading stops there. A 2xx answer's body is not read at all.
+    MAX_BODY = 1_048_576
 
     Response = Struct.new(:status, :body, keyword_init: true) do
       def ok? = status >= 200 && status < 300
@@ -35,6 +40,8 @@ module Cronwatch
       # sends. Past the deadline before an answer, raises HTTP::TimeoutError;
       # past it while the body is still arriving, returns the answer with an
       # empty body, as the SDK's channels treat a body they could not read.
+      # A 2xx answer comes back with an empty body, unread, since no channel
+      # needs it; any other with at most MAX_BODY bytes of it.
       def post(url, body, headers)
         uri = HTTP.postable(url)
         deadline = HTTP.monotonic + @timeout
@@ -48,7 +55,11 @@ module Cronwatch
           conn.read_timeout = remaining
           conn.write_timeout = remaining
           conn.request(request) do |response|
-            return Response.new(status: response.code.to_i, body: read_body(conn, response, deadline))
+            status = response.code.to_i
+            # Returning from inside the block leaves the rest unread; the connection closes after.
+            return Response.new(status: status, body: "") if status >= 200 && status < 300
+
+            return Response.new(status: status, body: read_body(conn, response, deadline))
           end
         end
       rescue Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout
@@ -67,17 +78,20 @@ module Cronwatch
 
       private
 
-      # The body, read in chunks until the deadline; "" when it passes first.
+      # The body, read in chunks until it ends or MAX_BODY bytes have come,
+      # whichever is first; "" when the deadline passes first.
       def read_body(conn, response, deadline)
-        chunks = []
+        body = "".b
         conn.read_timeout = HTTP.remaining(deadline)
         response.read_body do |chunk|
           raise TimeoutError if HTTP.monotonic >= deadline
 
-          chunks << chunk
+          body << chunk.b.byteslice(0, MAX_BODY - body.bytesize)
+          break if body.bytesize >= MAX_BODY
+
           conn.read_timeout = HTTP.remaining(deadline)
         end
-        chunks.join.b
+        body
       rescue Net::ReadTimeout, TimeoutError
         ""
       end
