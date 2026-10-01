@@ -8,9 +8,18 @@ namespace Cronwatch;
  * A job's state. `version` goes up by one on every write, so a store can
  * refuse a write made from a stale read (see compareAndSetState); null
  * counts as 0.
+ *
+ * Fields this release does not know (a newer release's) are kept as they
+ * were read and written back after the known ones, so a process sharing the
+ * store with a newer one never erases what the newer one wrote.
  */
 final class JobState
 {
+    private const KNOWN = ['job', 'open', 'consecutiveFailures', 'silencedUntil', 'lastAlertAt', 'pendingRecovery', 'undelivered', 'version', 'sending'];
+
+    /** @var array<string, mixed> the stored fields this release does not know, as decoded JSON */
+    private array $extra = [];
+
     /**
      * @param array<string, int|float> $open conditions currently open, with the time each one opened
      * @param int|float|null $lastAlertAt when an alert last reached at least one channel
@@ -48,7 +57,7 @@ final class JobState
         $pending = $f['pendingRecovery'] ?? null;
         $undelivered = $f['undelivered'] ?? null;
         $sending = $f['sending'] ?? null;
-        return new self(
+        $state = new self(
             job: is_scalar($f['job'] ?? null) ? (string) $f['job'] : '',
             open: Js::fields($f['open'] ?? []),
             // A foreign row's count may be anything; one that is not a number
@@ -64,6 +73,8 @@ final class JobState
             // Kept only when it is a list holding something; each entry is read leniently (see SendingAlert).
             sending: is_array($sending) && $sending !== [] && array_is_list($sending) ? array_map(SendingAlert::fromJson(...), $sending) : null,
         );
+        $state->extra = array_diff_key($f, array_flip(self::KNOWN));
+        return $state;
     }
 
     /** A decoded JSON object (or an array standing for one), or one of this package's alerts. */
@@ -76,7 +87,8 @@ final class JobState
      * pendingRecovery, undelivered and version are left out when unset, as in
      * state written before they existed, and sending when it holds nothing.
      * The version comes after the others and sending last, where the SDK's
-     * spread of a normalized state puts them.
+     * spread of a normalized state puts them. Fields this release does not
+     * know follow, as they were read.
      */
     public function toJson(): array
     {
@@ -98,6 +110,9 @@ final class JobState
         }
         if ($this->sending !== null && $this->sending !== []) {
             $out['sending'] = array_map(fn (SendingAlert $s) => $s->toJson(), array_values($this->sending));
+        }
+        foreach ($this->extra as $key => $value) {
+            $out[$key] = $value;
         }
         return $out;
     }

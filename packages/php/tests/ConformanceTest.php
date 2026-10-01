@@ -35,7 +35,7 @@ use PHPUnit\Framework\TestCase;
  * the store scripts against every store. Values are compared as the JSON the
  * SDK would write, so key order and number formatting count too. The
  * channel, pg_cron and triage fixtures are replayed by tests of their own
- * (ChannelConformanceTest, PgCronTest, TriageTest), listed here so a new
+ * (ChannelConformanceTest, ClientConformanceTest, PgCronTest, TriageTest), listed here so a new
  * fixture fails until something replays it.
  */
 final class ConformanceTest extends TestCase
@@ -719,6 +719,7 @@ final class ConformanceTest extends TestCase
     /** The fixtures replayed by a test of their own. */
     private const ELSEWHERE = [
         'channels.json' => ChannelConformanceTest::class,
+        'client.json' => ClientConformanceTest::class,
         'pgcron.json' => PgCronTest::class,
         'triage.json' => TriageTest::class,
     ];

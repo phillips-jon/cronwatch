@@ -294,11 +294,13 @@ Each sends exactly the request the SDK's does: the same URL, headers and body, b
 
 Every channel takes `http:`, an `Cronwatch\Alerts\Http` to send through (`post($url, $body, $headers, $timeoutMs)`), for a proxy or a test double. `Cronwatch\Alerts\Transport::set($http)` sets the one every channel given none uses.
 
-A webhook takes `headers:` for headers of your own (`['Authorization' => 'Bearer ...']`), and with a `secret` signs its body with `X-CronWatch-Signature: sha256=<hex>`. Verifying it in PHP:
+A webhook posts the [alert payload](/docs/alerts/#the-alert-payload) with `"schema": 1` as its first field, the same body every language posts, described by [its JSON Schema](/docs/alerts/#the-webhook-s-schema). Read its fields rather than `title` and `message`, whose wording is not promised. It takes `headers:` for headers of your own (`['Authorization' => 'Bearer ...']`), and with a `secret` signs its body with `X-CronWatch-Signature: sha256=<hex>`. `Webhook::signature($secret, $body)` is that HMAC-SHA256 as lowercase hex; verifying in PHP:
 
 ```php
+use Cronwatch\Alerts\Webhook;
+
 $body = file_get_contents('php://input');
-$expected = 'sha256=' . hash_hmac('sha256', $body, $secret);
+$expected = 'sha256=' . Webhook::signature($secret, $body);
 $ok = hash_equals($expected, $_SERVER['HTTP_X_CRONWATCH_SIGNATURE'] ?? '');
 ```
 
@@ -395,7 +397,7 @@ The client:
 | `silence($name, '2h')`, `unsilence($name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
 | `forget($name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resumeRun($name, $id)` | `job($name)->resume($id)` for a job declared in this process |
-| `recordRun($run, evaluate: true)` | record a run that happened elsewhere, for a source; a metric that is not a finite number throws and nothing is recorded; returns the alerts it sent |
+| `recordRun($run, evaluate: true)` | record a run that happened elsewhere, for a source; a run id that is not 1 to 200 characters, or holds a NUL, and a metric that is not a finite number throw and nothing is recorded; returns the alerts it sent |
 | `routes(...)` | the dashboard and JSON API |
 | `definedJobs()` | the definitions declared in this process |
 | `Cronwatch::current()` | the context of the run in progress in this process, or null |
@@ -406,6 +408,8 @@ There is no `start()` or `stop()`: a PHP process does not stay up between checks
 ## Sharing a database with the other languages
 
 The SQLite and Postgres stores write the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem's store, the Python package's and the Go, Rust, Elixir, Java and .NET ports' SQL stores: the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns. The MySQL store keeps the same columns and values in MySQL's dialect, which the Go, Rust, Elixir, Java and .NET ports' MySQL stores write too; Node, Ruby and Python have no MySQL store. The package's tests share a SQLite file with the built SDK and check that each side reads what the other wrote, column by column. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+
+A 1.x release keeps what it reads but does not know: a field of a job's state or definition, a condition, a run status or a trigger that a newer release wrote is kept as it was through every check, run and silence, never erased. So any 1.x release of any language can share a store with any other. 0.x releases are not covered: upgrade every process to 1.0 together.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses, and run one checker for the store.
 

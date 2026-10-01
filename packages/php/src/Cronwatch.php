@@ -54,6 +54,8 @@ final class Cronwatch
     /** Runs read for a baseline, and the most read when failures crowd out the successes. */
     public const HISTORY_PAGE = Evaluate::BASELINE_WINDOW + 5;
     public const HISTORY_MAX = 200;
+    /** The longest run id, in UTF-16 code units: what start(), resume() and recordRun() take, and every store holds. */
+    private const MAX_RUN_ID = 200;
     /** Run ids that start with this belong to the pg_cron source. */
     public const RESERVED_RUN_ID_PREFIX = 'pgcron:';
     /** The options `defaults` may set. */
@@ -263,6 +265,11 @@ final class Cronwatch
     {
         $given = $run instanceof Run ? $run : Run::fromJson($run);
         $declared = $this->definitions[$given->job] ?? throw new \InvalidArgumentException("recordRun: job \"{$given->job}\" is not declared; call job() first");
+        // The longest id start() takes; MySQL's column would hold 255, but every store holds 200.
+        $length = Js::length16($given->id);
+        if ($given->id === '' || $length > self::MAX_RUN_ID) {
+            throw new \InvalidArgumentException('recordRun: run ids must be 1 to ' . self::MAX_RUN_ID . " characters (got {$length} characters; job \"{$given->job}\")");
+        }
         if (str_contains($given->id, "\0")) {
             throw new \InvalidArgumentException("recordRun: run ids cannot contain a NUL character (job \"{$given->job}\")");
         }
@@ -1058,8 +1065,8 @@ final class Cronwatch
     private static function checkRunId(string $job, string $id, string $method): void
     {
         $length = Js::length16($id);
-        if ($id === '' || $length > 200) {
-            throw new \InvalidArgumentException("job \"{$job}\": {$method}() needs a run id of 1 to 200 characters (got {$length} characters)");
+        if ($id === '' || $length > self::MAX_RUN_ID) {
+            throw new \InvalidArgumentException("job \"{$job}\": {$method}() needs a run id of 1 to " . self::MAX_RUN_ID . " characters (got {$length} characters)");
         }
         // Postgres refuses NUL in text, so no store could hold such an id.
         if (str_contains($id, "\0")) {
