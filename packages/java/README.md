@@ -292,6 +292,10 @@ final class CronwatchMain {
 
 `check` prints `cronwatch: checked 3 jobs, sent 1 alert` and exits non-zero when the check fails, so cron mails it; code already running in an app calls `CronwatchCli.run`, which answers the status and never ends the JVM. `examples/crontab` is such a program on SQLite.
 
+## Deprecated
+
+These still work, marked `@Deprecated(forRemoval = true)`, through every 1.x release, and go in 2.0: `cw.start()` and its overloads (use `cw.startChecking()`); `dev.cronwatch.jdbc.SqlStore` (use `dev.cronwatch.store.SqlStore`, the same store, now beside `MemoryStore`); `dev.cronwatch.bridge.Bridge` (use `SchedulerBridge`, the .NET port's name; the bridge is for integration authors and outside the 1.x promise); `Routes.of(cw, options)` (use `cw.routes(options)`). `Json.quote`, `Json.kind`, `Json.copy`, `Json.MAX_DEPTH`, pg_cron's helpers (`PgCron.schedule`, `jobName`, `run`, `HOLD_MS`, `PgCronRow`), `Twilio.MAX_SEGMENTS` and every part of `dev.cronwatch.storetest` but `StoreContract.run` are internal from 1.0. The [Java docs](https://cronwatch.dev/docs/java/#deprecated) have the list.
+
 ## Testing this package
 
 ```bash

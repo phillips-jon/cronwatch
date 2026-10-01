@@ -407,6 +407,19 @@ A job's options, on `JobOptions.builder()`: `schedule` (five or six field cron, 
 
 `CronwatchException` has a `kind()`: `INVALID` (an option, name, schedule or run id the SDK refuses, with its message), `STORE` (the store's own exception as the cause) and `OTHER`. Reads (`jobs()`, `jobSummary()`, `runs()`) and `check()` throw it when the store fails; `run`, `start`, `flush` and `finish` never do.
 
+## Deprecated
+
+These names still work, and do exactly what their replacements do, through every 1.x release; each is marked `@Deprecated(forRemoval = true)`, so the compiler warns where it is used, and each goes in 2.0.
+
+| Deprecated | Use instead |
+|---|---|
+| `cw.start()`, `start(Duration)`, `start(String)` | `cw.startChecking()`, with the same overloads: a job's `start` opens a run, so the client's is named for what it starts |
+| `dev.cronwatch.jdbc.SqlStore` | `dev.cronwatch.store.SqlStore`, the same store beside `MemoryStore`; the old class hands every call to it |
+| `dev.cronwatch.bridge.Bridge` | `dev.cronwatch.bridge.SchedulerBridge`, the name the .NET port has; the bridge is for integration authors and outside the 1.x promise |
+| `Routes.of(cw, options)` | `cw.routes(options)`, the one way to mount the dashboard |
+
+Public means documented here or in the package's README; everything else may change in any release. These were public before 1.0 without being meant for apps, and are internal from 1.0: `Json.quote`, `Json.kind`, `Json.copy` and `Json.MAX_DEPTH` (`Json.stringify` of a string is `quote`); `PgCron.schedule`, `PgCron.jobName`, `PgCron.run`, `PgCron.HOLD_MS` and `PgCronRow`; `Twilio.MAX_SEGMENTS`; and in `dev.cronwatch.storetest`, everything but `StoreContract.run` (`StoreReplay`, `FinishOnce`, `ForeignRows`, `StoreContract.newRun`). A record that may grow (`Run`, `StoredJob`, `JobState`, `Alert`, `JobSummary`, `CheckResult`) is built with its static `of`, whose parameters stay put when the record gains a component; its canonical constructor does not.
+
 ## Runs that span calls
 
 A run is normally one call. Work that starts in one place and ends in another (a job that hands work to a queue, a webhook that reports completion later) can be one run too: `job.start` records it as running and answers a `RunHandle`, and `finish` on that handle, or on one from `resumeRun` in another process, ends it.
@@ -427,6 +440,8 @@ again.finish();                                               // or again.fail(e
 `SqlStore` writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Rust, Elixir and .NET stores (the MySQL tables are the PHP, Go, Rust, Elixir and .NET ports'): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and a Java client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
+
+A 1.x release keeps what it does not know of what it reads: a key of a job's state or definition, a condition, a run's status or trigger that a newer release wrote is kept as it was through every check, silence and run, so any 1.x release of any language can share a store with any other. 0.x processes are not covered: upgrade every process to 1.0 together.
 
 ## Kept in step
 
