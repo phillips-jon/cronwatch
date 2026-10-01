@@ -221,7 +221,7 @@ cronwatch.app=billing
 cronwatch.jobs[NightlyReports.build].grace=15m
 ```
 
-With `@EnableScheduling`, every `@Scheduled` method is watched with no code changes (`cronwatch.scheduled.enabled=false` turns it off). Each invocation is a run, recorded from the `Observation` Spring makes of it, in the thread that runs the method, so `Cronwatch.current()` works inside it; a method that throws fails its run and Spring's error handler does what it did before. A job is named `SimpleClassName.method` after the bean's own class, the full name when two classes' simple names would give one name, and `@CronwatchJob` names it and gives its options:
+With `@EnableScheduling`, every `@Scheduled` method is watched with no code changes (`cronwatch.scheduled.enabled=false` turns it off). Each invocation is a run (trigger `spring-scheduled`; runs recorded before 1.0 carry `scheduled`), recorded from the `Observation` Spring makes of it, in the thread that runs the method, so `Cronwatch.current()` works inside it; a method that throws fails its run and Spring's error handler does what it did before. A job is named `SimpleClassName.method` after the bean's own class, the full name when two classes' simple names would give one name, and `@CronwatchJob` names it and gives its options:
 
 ```java spring
 class NightlyReports {
