@@ -16,7 +16,7 @@ composer require drupal/cronwatch
 drush pm:install cronwatch
 ```
 
-Installing makes three tables in the site's database (`cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`, after the site's table prefix) with the library's own `CREATE` statements; uninstalling drops them. The database is MySQL 8.0.13 or newer, MariaDB 10.6 or newer, Postgres or SQLite; the module refuses another driver at install, with a message.
+The module's page on drupal.org is [drupal.org/project/cronwatch](https://www.drupal.org/project/cronwatch). Installing makes three tables in the site's database (`cronwatch_jobs`, `cronwatch_runs` and `cronwatch_state`, after the site's table prefix) with the library's own `CREATE` statements; uninstalling drops them. The database is MySQL 8.0.13 or newer, MariaDB 10.6 or newer, Postgres or SQLite; the module refuses another driver at install, with a message.
 
 Then, under Configuration, System, CronWatch, say where alerts go and send a test alert.
 
