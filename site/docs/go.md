@@ -457,7 +457,7 @@ A 1.x release keeps what it does not know of what another wrote: a key in a job'
 
 The public types write the SDK's JSON through their `MarshalJSON`. Call it directly, or use a `json.Encoder` with `SetEscapeHTML(false)`, when the bytes must match: `json.Marshal` passes a type's own JSON through its HTML escaping, which rewrites `<`, `>` and `&`.
 
-The cron reader matches croner with two exceptions, both for schedules that never make sense: a date no month has (`0 0 30 2 *`) is a schedule that never fires, where croner gives up; and a one-time date in place of a cron expression (`2026-12-01T00:00:00`) is refused.
+The cron reader matches croner, and the SDK, on every expression: a date no month has (`0 0 30 2 *`) never fires, and a one-time date in place of a cron expression is refused, as the [schedules page](/docs/schedules/) says.
 
 ## Kept in step
 

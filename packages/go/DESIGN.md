@@ -285,8 +285,6 @@ After 0.6.1, a second audit's medium and low findings, each fixed with a regress
 
 ## Where it cannot match the SDK
 
-- A cron expression that names a date no month has (`0 0 30 2 *`) makes croner, which walks by recursion a year at a time, run out of stack before the year 3000, so the SDK reports the job as unevaluable. The port walks in a loop and answers that the schedule never fires: no next expected time, never missed.
-- Croner reads a string with a colon after its first character as a one-time date, through JavaScript's lenient `Date.parse`. The port refuses every such string: one that looks like an ISO date with `CronPattern: a one-time date is not supported by the Go port`, anything else with the message croner gives for text `Date.parse` cannot read (`Invalid ISO8601 passed to timezone parser.`).
 - In the process's own zone (no `timezone`), a wall-clock time in a gap is found by croner's `fromTZ` rule, as it is for a named zone, where JavaScript's local `Date` uses the offset before the transition. The two agree for one-hour gaps; the conformance fixtures run in UTC. The process zone is `time.Local`.
 - Croner accepts any zone when it reads an expression and fails on a bad one only when asked for a fire time; the port's parser checks the zone at once. Declaring a job with a bad zone gives the SDK's message either way (`job "x": timezone "Mars/Base" is not an IANA timezone`); a stored definition another writer gave a bad zone is unevaluable in both.
 - Zone names are matched without regard to case, as `Intl` does, through the zone database Go reads (`$ZONEINFO`, the system's, or `time/tzdata` when the app imports it). Fixed offsets (`+05:30`) are zones too, as Node 24's `Intl` and croner accept them.

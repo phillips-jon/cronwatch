@@ -224,7 +224,7 @@ func TestADateNoMonthHasNeverFires(t *testing.T) {
 
 func TestOneTimeDatesAreRefused(t *testing.T) {
 	for text, want := range map[string]string{
-		"2026-12-01T00:00:00": "CronPattern: a one-time date is not supported by the Go port",
+		"2026-12-01T00:00:00": "CronPattern: a one-time date is not supported",
 		"0 2:30 * * *":        "Invalid ISO8601 passed to timezone parser.",
 	} {
 		_, err := Parse(text, "")
