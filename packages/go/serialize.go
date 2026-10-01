@@ -95,7 +95,7 @@ func toStored(fields *js.Object, rule expectRule) Definition {
 	if rule != nil {
 		out.Set("expect", rule.describe())
 	}
-	return Definition{out}
+	return Definition{o: out}
 }
 
 // checkExpectation is serialize.ts checkExpectation: nil when there is no

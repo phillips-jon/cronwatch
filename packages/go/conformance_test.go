@@ -1,5 +1,7 @@
 package cronwatch
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // Replays conformance/*.json, the cases scripts/conformance.mjs writes by
 // running the TypeScript SDK. evaluate, format and health have their own
 // test files here (conformance_<name>_test.go), store.json is replayed

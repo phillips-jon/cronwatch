@@ -76,12 +76,21 @@ func Datadog(o DatadogOptions) (cronwatch.Channel, error) {
 		event := js.NewObject(
 			"title", cut(js.WellFormed(a.Title), 500),
 			"text", cut(js.WellFormed(plainText(a, link)), 4000),
-			"alert_type", datadogAlertType[a.Type],
+		)
+		// Left out for a type this release does not know, as the SDK does.
+		if alertType, ok := datadogAlertType[a.Type]; ok {
+			event.Set("alert_type", alertType)
+		}
+		rest := js.NewObject(
 			"aggregation_key", aggregationKey(a),
 			"date_happened", js.FloorDiv(a.At, 1000),
 			"priority", "normal",
 			"tags", tags,
 		)
+		for _, k := range rest.Keys() {
+			v, _ := rest.Get(k)
+			event.Set(k, v)
+		}
 		if o.Host != "" {
 			event.Set("host", o.Host)
 		}

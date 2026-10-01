@@ -6,6 +6,10 @@
 //	func TestMyStore(t *testing.T) {
 //		storetest.Run(t, func(t *testing.T) cronwatch.Store { return mystore.New(...) })
 //	}
+//
+// Run is the one name here the 1.x releases promise. The other exported
+// names are the module's own test kit (its fixture replays, clocks and
+// captures), deprecated, and go in 1.0.
 package storetest
 
 import (
@@ -22,6 +26,9 @@ import (
 
 // NewRun is a run as the contract test writes them: finished ten
 // milliseconds after it started unless it is running, with one metric.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 func NewRun(id, job string, status cronwatch.RunStatus, startedAt int64) cronwatch.Run {
 	r := cronwatch.Run{ID: id, Job: job, Status: status, StartedAt: startedAt, Metrics: cronwatch.Metrics{{Name: "n", Value: 1}}, Trigger: "run"}
 	if status != cronwatch.StatusRunning {
@@ -352,6 +359,9 @@ func Run(t *testing.T, newStore func(t *testing.T) cronwatch.Store) {
 // path) against stores from newStore, which must each be empty: prune scripts,
 // CompareAndSetState steps and UpdateRunIf steps, each read back and
 // compared with what the SDK's memory store answered.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 func ReplayFixture(t *testing.T, path string, newStore func(t *testing.T) cronwatch.Store) {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -555,6 +565,9 @@ func ReplayFixture(t *testing.T, path string, newStore func(t *testing.T) cronwa
 // writeRaw stores a state row for job "v" holding the JSON text given as it
 // is, as a store's own writes never would; the replay deletes job "v"
 // before each case.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 func ReplayForeignVersions(t *testing.T, path string, store cronwatch.Store, writeRaw func(text string) error) {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -607,6 +620,9 @@ func ReplayForeignVersions(t *testing.T, path string, store cronwatch.Store, wri
 }
 
 // NewRunPlain is the fixture script's run: as NewRun, with no metrics.
+//
+// Deprecated: only Run is promised; this is the module's own test kit, and
+// goes in 1.0.
 func NewRunPlain(id, job string, status cronwatch.RunStatus, startedAt int64) cronwatch.Run {
 	r := NewRun(id, job, status, startedAt)
 	r.Metrics = cronwatch.Metrics{}

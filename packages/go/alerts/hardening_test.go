@@ -1,5 +1,7 @@
 package alerts
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // The channels' hardening, as the SDK's channels-hardening.test.ts and the
 // other ports' tests have it, against real HTTP servers where it matters:
 // redirects refused, one deadline, bodies capped, only the origin in an
@@ -596,6 +598,57 @@ func TestDiscordHoldsTheWholeDescriptionTo4096(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// The second review: an alert of a type this release does not know (a
+// newer release's, retried from the queue) went out with an empty Datadog
+// alert_type, Honeybadger class and a Discord colour of 0, where the SDK
+// leaves each key out. Datadog may refuse an empty alert_type for good.
+func TestAnUnknownTypeLeavesOutTheKeysMappedFromIt(t *testing.T) {
+	cases := []struct {
+		name string
+		make func(*http.Client) (cronwatch.Channel, error)
+		key  func(*js.Object) (any, bool)
+	}{
+		{"datadog", func(c *http.Client) (cronwatch.Channel, error) {
+			return Datadog(DatadogOptions{APIKey: "dd-key", HTTPClient: c})
+		}, func(o *js.Object) (any, bool) { return o.Get("alert_type") }},
+		{"honeybadger", func(c *http.Client) (cronwatch.Channel, error) {
+			return Honeybadger(HoneybadgerOptions{APIKey: "hb-key", HTTPClient: c})
+		}, func(o *js.Object) (any, bool) {
+			e, _ := o.Get("error")
+			return e.(*js.Object).Get("class")
+		}},
+		{"discord", func(c *http.Client) (cronwatch.Channel, error) {
+			return Discord(DiscordOptions{WebhookURL: "https://discord.example/api/webhooks/1/x", HTTPClient: c})
+		}, func(o *js.Object) (any, bool) {
+			embeds, _ := o.Get("embeds")
+			return embeds.([]any)[0].(*js.Object).Get("color")
+		}},
+	}
+	for _, c := range cases {
+		rec := &recorder{}
+		ch, err := c.make(&http.Client{Transport: rec})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, typ := range []cronwatch.AlertType{"future_condition", cronwatch.AlertFailed} {
+			a := sample(t)
+			a.Type = typ
+			rec.reset(202, "{}")
+			if err := ch.Send(bg, a, cronwatch.ChannelContext{}); err != nil {
+				t.Fatal(err)
+			}
+			v, err := js.Parse(rec.taken()[0].body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			value, has := c.key(v.(*js.Object))
+			if known := typ == cronwatch.AlertFailed; has != known {
+				t.Errorf("%s, %s: the key is there %v (%v)", c.name, typ, has, value)
+			}
+		}
+	}
+}
 
 func TestChannelsNeedTheirOptions(t *testing.T) {
 	email := EmailOptions{From: "a@b.c", To: []string{"d@e.f"}}

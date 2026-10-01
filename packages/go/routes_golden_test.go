@@ -1,5 +1,7 @@
 package cronwatch_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // Replays packages/ruby/test/web/golden.json, the SDK routes' answers to a
 // fixed seed (written by golden.mjs), against Client.Routes seeded the same
 // way, and compares status, headers and body byte for byte: straight into
@@ -64,8 +66,8 @@ func readGolden(t *testing.T) goldenFile {
 	if g.T0 != T0 {
 		t.Fatalf("golden.json's t0 is %d, not %d", g.T0, T0)
 	}
-	if len(g.Captures) != 66 {
-		t.Fatalf("golden.json has %d captures, not 66", len(g.Captures))
+	if len(g.Captures) != 82 {
+		t.Fatalf("golden.json has %d captures, not 82", len(g.Captures))
 	}
 	// GET /api names the library, its language and its version, which the
 	// fixture holds as placeholders for each port to fill in with its own.

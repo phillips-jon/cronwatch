@@ -1,5 +1,7 @@
 package river_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // River end to end, against the Postgres CRONWATCH_TEST_PG names: a client
 // with CronWatch's middleware works jobs that fail and retry, snooze,
 // cancel themselves and panic, a periodic job, and the check.

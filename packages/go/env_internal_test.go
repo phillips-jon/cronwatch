@@ -18,6 +18,7 @@ func TestEnvironmentOrder(t *testing.T) {
 		{"", "Testing", "", "development"},
 		{"", "DEV", "", "development"},
 		{"", "   ", "production", "production"},
+		{" ", "", "development", "development"},
 		{" \t", "", "", ""},
 		{"\ufeffdev\u00a0", "", "", "development"},
 	}

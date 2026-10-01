@@ -1,5 +1,7 @@
 package cronwatch_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // start-finish.test.ts, and the tests of finish-once.test.ts after its
 // three backend loops (those are storetest.FinishOnce, in store_test.go).
 // The resume-in-a-second-client case runs here on the memory store; the

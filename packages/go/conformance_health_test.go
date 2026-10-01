@@ -191,13 +191,16 @@ func TestConformanceHealth(t *testing.T) {
 		}
 		sameJSON(t, "median", got, field(c, "median"))
 	}
+	// Any JSON value, as a store may hold: one that is not an object reads
+	// as no state (readState), and the fields of one are read leniently.
+	normalized := 0
 	for i, c := range objects(f, "normalizeState") {
-		var in *JobState
-		if field(c, "state") != nil {
-			s := fixtureState(t, field(c, "state"))
-			in = &s
-		}
-		sameJSON(t, fmt.Sprintf("normalizeState %d", i), normalizeState(in, "j").JSValue(), field(c, "normalized"))
+		sameJSON(t, fmt.Sprintf("normalizeState %d", i), sorted(normalizeState(readState(field(c, "state")), "j").JSValue()), sorted(field(c, "normalized")))
+		sameJSON(t, fmt.Sprintf("normalizeState %d key order", i), normalizeState(readState(field(c, "state")), "j").JSValue().(*js.Object).Keys(), field(c, "normalized").(*js.Object).Keys())
+		normalized++
+	}
+	if normalized < 10 {
+		t.Errorf("only %d normalizeState cases", normalized)
 	}
 	for i, c := range objects(f, "muteOpens") {
 		got := muteOpens(fixtureState(t, field(c, "previous")), fixtureState(t, field(c, "next")))
@@ -294,6 +297,7 @@ func TestConformanceHealth(t *testing.T) {
 			t.Errorf("silenceEnd %d (%v from %d): %d, want %d", i, field(c, "duration"), now(c), got, want)
 		}
 	}
+	stale := 0
 	for i, c := range objects(f, "staleAlert") {
 		a, err := alertFrom(field(c, "alert"))
 		if err != nil {
@@ -302,5 +306,15 @@ func TestConformanceHealth(t *testing.T) {
 		if got := staleAlert(a, fixtureState(t, field(c, "state"))); got != field(c, "stale") {
 			t.Errorf("staleAlert %d: %v", i, got)
 		}
+		// One no state can match is written back as it was read, until a
+		// retry drops it.
+		if a.malformed {
+			sameJSON(t, fmt.Sprintf("staleAlert %d written back", i), sorted(a.JSValue()), sorted(field(c, "alert")))
+		}
+		alertKey(a)
+		stale++
+	}
+	if stale < 14 {
+		t.Errorf("only %d staleAlert cases", stale)
 	}
 }

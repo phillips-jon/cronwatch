@@ -15,9 +15,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"math/big"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -68,8 +66,10 @@ type routesConfig struct {
 
 // WithToken is the token the dashboard asks for. Send it as
 // `Authorization: Bearer <token>`, or open the dashboard once with
-// ?token=<token> and a cookie is set. The default is CRONWATCH_TOKEN; ""
-// counts as unset. With no token in development (CRONWATCH_ENV, APP_ENV or
+// ?token=<token> and a cookie is set, or sign in through the form on the
+// sign-in page. The default is CRONWATCH_TOKEN; a token, given here or in
+// the variable, that is empty or only whitespace counts as unset, and any
+// other is used as it is. With no token in development (CRONWATCH_ENV, APP_ENV or
 // GO_ENV naming it), the routes make a random one and print a sign-in link
 // to Stdout on their first request; with no token otherwise they answer
 // 503. /api/check also takes the client's cron secret as a bearer, so a
@@ -182,9 +182,10 @@ func (c *Client) Routes(options ...RoutesOption) (*Routes, error) {
 	rt := &Routes{c: c, optedOut: cfg.open, base: cfg.base, origin: origin, trustProxy: cfg.trustProxy}
 	configured := ""
 	if !cfg.open {
+		// A blank token, given or read, counts as unset.
 		configured = cfg.token
-		if configured == "" {
-			configured = os.Getenv("CRONWATCH_TOKEN")
+		if blank(configured) {
+			configured = secretEnv("CRONWATCH_TOKEN")
 		}
 	}
 	// A handler cannot tell a local caller from a remote one (proxies,
@@ -501,8 +502,33 @@ func crossSite(r *http.Request, publicOrigin string) bool {
 	return ok && site != "same-origin" && site != "none"
 }
 
-// bearer is the Authorization header without its "Bearer " (in any case,
-// with any spaces after it), or false when there is none.
+// signInReturn is where a sign-in through the form goes next: the page it
+// was posted from (the Referer) when that is on the public origin and its
+// query has no token parameter, else the dashboard.
+func signInReturn(referer, publicOrigin, base string) string {
+	if !strings.HasPrefix(referer, publicOrigin+"/") {
+		return base + "/"
+	}
+	// A URL parser drops tabs and newlines before it reads anything.
+	rest := strings.Map(func(r rune) rune {
+		if r == '\t' || r == '\n' || r == '\r' {
+			return -1
+		}
+		return r
+	}, referer[len(publicOrigin):])
+	rest, _, _ = strings.Cut(rest, "#")
+	if _, search, ok := strings.Cut(rest, "?"); ok {
+		if _, has := param(parseForm(search), "token"); has {
+			return base + "/"
+		}
+	}
+	return referer
+}
+
+// bearer is the token an Authorization header carries: what follows the
+// scheme when the scheme is Bearer (any case) and whitespace follows it,
+// else false. Any other header (a proxy's Basic auth, "Bearer" alone) is no
+// bearer at all, so the cookie and ?token= are read as if none came.
 func bearer(r *http.Request) (string, bool) {
 	value, ok := header(r, "Authorization")
 	if !ok {
@@ -514,7 +540,7 @@ func bearer(r *http.Request) (string, bool) {
 			return rest, true
 		}
 	}
-	return text, true
+	return "", false
 }
 
 var wholeOrDecimal = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`)
@@ -534,41 +560,10 @@ func silenceDuration(value string, present bool) (float64, error) {
 	return schedule.ParseDuration(d, "silence duration")
 }
 
-var (
-	decimalNumber = regexp.MustCompile(`^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?$`)
-	radixNumber   = regexp.MustCompile(`^0([xXoObB])([0-9a-fA-F]+)$`)
-)
-
-// numberOf is Number(text): decimal, 0x, 0o or 0b, Infinity, or NaN.
-func numberOf(text string) float64 {
-	text = js.Trim(text)
-	switch {
-	case text == "":
-		return 0
-	case decimalNumber.MatchString(text):
-		n, _ := strconv.ParseFloat(text, 64)
-		return n
-	case text == "Infinity" || text == "+Infinity":
-		return math.Inf(1)
-	case text == "-Infinity":
-		return math.Inf(-1)
-	}
-	if m := radixNumber.FindStringSubmatch(text); m != nil {
-		base := map[byte]int{'x': 16, 'o': 8, 'b': 2}[strings.ToLower(m[1])[0]]
-		n, ok := new(big.Int).SetString(m[2], base)
-		if !ok {
-			return math.NaN()
-		}
-		f, _ := new(big.Float).SetInt(n).Float64()
-		return f
-	}
-	return math.NaN()
-}
-
 func runsLimit(value string, present bool) int {
 	n := math.NaN()
 	if present && js.Trim(value) != "" {
-		n = math.Trunc(numberOf(value))
+		n = math.Trunc(js.Number(value))
 	}
 	if math.IsNaN(n) || math.IsInf(n, 0) {
 		return defaultRuns
@@ -648,6 +643,35 @@ func (rt *Routes) serve(r *http.Request, pathname, path, rawQuery, base string, 
 	}
 
 	sentBearer, hasBearer := bearer(r)
+	signInCookie := func() [2]string {
+		secure := ""
+		if strings.HasPrefix(publicOrigin, "https:") {
+			secure = "; Secure"
+		}
+		return [2]string{"Set-Cookie", tokenCookie + "=" + rt.cookie + "; Path=" + cookiePath(base) + "; HttpOnly; SameSite=Lax; Max-Age=" + strconv.Itoa(cookieMaxAge) + secure}
+	}
+	signInPage := func() answer {
+		if rt.generated {
+			return page(messagePage("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once, or enter the token from it below, and this browser stays signed in.", base, true), http.StatusUnauthorized)
+		}
+		return page(messagePage("Sign in", "Enter your CRONWATCH_TOKEN and this browser stays signed in.", base, true), http.StatusUnauthorized)
+	}
+
+	// The sign-in form posts the token here, in the body, so it stays out of
+	// the URL and every access log. Cross-site posts were refused above.
+	if rt.token != "" && method == http.MethodPost && path == "/signin" {
+		data, err := readLimited(r)
+		if errors.Is(err, errBodyTooLarge) {
+			return signInPage(), nil
+		}
+		sent, ok := readBody(r, data)["token"]
+		if !ok || !constantTimeEqual(sent, rt.token) {
+			return signInPage(), nil
+		}
+		referer, _ := header(r, "Referer")
+		return redirectAnswer(signInReturn(referer, publicOrigin, base), signInCookie()), nil
+	}
+
 	if rt.token != "" {
 		// ?token= is only the sign-in that moves the token into a cookie.
 		queryToken, hasQuery := "", false
@@ -666,19 +690,19 @@ func (rt *Routes) serve(r *http.Request, pathname, path, rawQuery, base string, 
 			tokenOK = hasCookie && constantTimeEqual(sent, rt.cookie)
 		}
 		if !cronSecretOK && !tokenOK {
-			if rt.generated {
-				if wantsHTML {
-					return page(messagePage("Sign in", "CRONWATCH_TOKEN is not set, so this development server made a token. The sign-in link is in the server log: open it once and this browser stays signed in.", base, true), http.StatusUnauthorized), nil
-				}
-				return apiAnswer(js.NewObject("ok", false, "error", "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log"), http.StatusUnauthorized), nil
-			}
 			if wantsHTML {
-				return page(messagePage("Sign in", "Open this page with ?token=<your CRONWATCH_TOKEN> once and it will stay signed in.", base, true), http.StatusUnauthorized), nil
+				return signInPage(), nil
+			}
+			if rt.generated {
+				return apiAnswer(js.NewObject("ok", false, "error", "Unauthorized: CRONWATCH_TOKEN is not set, so this development server made a token; it is in the server log"), http.StatusUnauthorized), nil
 			}
 			return apiAnswer(js.NewObject("ok", false, "error", "Unauthorized"), http.StatusUnauthorized), nil
 		}
 		if hasQuery {
-			// Move the token from the URL into a cookie so it is not in history or logs.
+			// Move the token from the URL into a cookie, so it is not left in
+			// the browser's history. The request line that carried it may
+			// still be in an access log, which is why the sign-in form posts
+			// instead.
 			var rest []string
 			for _, p := range query {
 				if p.name != "token" {
@@ -689,12 +713,7 @@ func (rt *Routes) serve(r *http.Request, pathname, path, rawQuery, base string, 
 			if len(rest) > 0 {
 				search = "?" + strings.Join(rest, "&")
 			}
-			secure := ""
-			if strings.HasPrefix(publicOrigin, "https:") {
-				secure = "; Secure"
-			}
-			return redirectAnswer(pathname+search, [2]string{"Set-Cookie",
-				tokenCookie + "=" + rt.cookie + "; Path=" + cookiePath(base) + "; HttpOnly; SameSite=Lax; Max-Age=" + strconv.Itoa(cookieMaxAge) + secure}), nil
+			return redirectAnswer(pathname+search, signInCookie()), nil
 		}
 	}
 

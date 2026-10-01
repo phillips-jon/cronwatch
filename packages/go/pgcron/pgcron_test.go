@@ -1,5 +1,7 @@
 package pgcron_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // The pg_cron source against the fake tables (fake_test.go), as the SDK's
 // pgcron.test.ts has it, and the replay of conformance/pgcron.json. The
 // tests against a real pg_cron are in the sqltest module, which has a
@@ -343,6 +345,61 @@ func TestAJobForgottenFromTheDashboardIsDeclaredAgainAndItsRunsRecorded(t *testi
 	}
 	sameList(t, "the runs after the forget", ids, []string{"pgcron:3", "pgcron:2"})
 	same(t, "declared", k.cw.Declares("vacuum"), true)
+}
+
+// The second review: a run copied under a name later retired (a rename)
+// and then forgotten from the dashboard was read at every check and
+// refused as not declared until the process restarted. It is let go.
+func TestARenamedJobsOldNameForgottenWhileItsRunIsOpenLetsTheRunGo(t *testing.T) {
+	c := storetest.NewClock(T0)
+	cron := newFakeCron()
+	job := cron.job(1, name("a"), "*/5 * * * *", true)
+	running := cron.add(1, "running", T0-1000, -1)
+	k := newKit(t, cron, c, cronwatch.NewMemoryStore(), pgcron.Options{})
+	k.check(t)
+	runID := "pgcron:" + strconv.FormatInt(running.runid, 10)
+	if r := k.run(t, runID); r == nil || r.Job != "a" {
+		t.Fatalf("copied under a: %v", r)
+	}
+	cron.update(func() { job.jobname = name("b") })
+	c.Advance(1000)
+	k.check(t)
+	old, err := k.cw.JobSummary(bg, "a")
+	if err != nil || old == nil || !strings.Contains(old.Definition.Description(), "renamed to b") {
+		t.Fatalf("a retired: %v %v", old, err)
+	}
+	if err := k.cw.Forget(bg, "a"); err != nil {
+		t.Fatal(err)
+	}
+	cron.update(func() { running.status, running.end = "succeeded", at(c.Now()) })
+	asked := len(cron.opens)
+	for range 3 {
+		c.Advance(1000)
+		k.check(t)
+	}
+	sameList(t, "errors", k.errors.List(), nil)
+	gone, err := k.cw.JobSummary(bg, "a")
+	if err != nil || gone != nil {
+		t.Errorf("a is not declared again: %v %v", gone, err)
+	}
+	if r := k.run(t, runID); r != nil {
+		t.Errorf("the run was recorded: %s %s", r.Job, r.Status)
+	}
+	// The first check after the forget reads the run and lets it go; the
+	// others no longer ask for it.
+	if len(cron.opens) != asked+3 {
+		t.Fatalf("details queries: %d", len(cron.opens)-asked)
+	}
+	for i, open := range cron.opens[asked+1:] {
+		if contains(open, running.runid) {
+			t.Errorf("check %d still asked for the run: %v", i+2, open)
+		}
+	}
+	var declared []string
+	for _, d := range k.cw.DefinedJobs() {
+		declared = append(declared, d.Name())
+	}
+	sameList(t, "declared", declared, []string{"b"})
 }
 
 func TestAJobsOptionsApplyAndAScheduleItCannotReadIsReported(t *testing.T) {

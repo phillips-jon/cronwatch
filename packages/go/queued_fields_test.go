@@ -94,3 +94,33 @@ func TestQueuedAlertsKeepFieldsTheyDoNotKnow(t *testing.T) {
 		}
 	}
 }
+
+// The second review: the keys a newer release adds to a queued alert's run
+// (an attempt, say) were dropped when an older process wrote the state
+// back. They are kept, as at the alert's top and in its details.
+func TestAQueuedAlertsRunKeepsFieldsItDoesNotKnow(t *testing.T) {
+	at := strconv.FormatInt(T0, 10)
+	run := `{"id":"r1","job":"keep","status":"failed","startedAt":` + strconv.FormatInt(T0-2000, 10) + `,"finishedAt":` + strconv.FormatInt(T0-1000, 10) +
+		`,"durationMs":1000,"error":"Error: boom","output":null,"metrics":{},"trigger":"run","attempt":2,"futureRun":{"a":[1]}}`
+	failed := `{"type":"failed","run":` + run + `,"details":{"consecutiveFailures":1,"threshold":1},"job":"keep","definition":{"name":"keep"},"title":"t","message":"m","at":` + at + `}`
+	text := `{"job":"keep","open":{"failed":` + at + `},"consecutiveFailures":1,"silencedUntil":null,"lastAlertAt":null,"pendingRecovery":[],"undelivered":[` + failed + `],"version":1}`
+	var seed cronwatch.JobState
+	check(t, json.Unmarshal([]byte(text), &seed))
+	eq(t, "round trip", jsonOf(seed), text)
+
+	channel := &refusing{}
+	k := newKit(t, cronwatch.WithAlerts(channel))
+	k.cw.MustJob("keep")
+	check(t, k.cw.Store().SetState(bg, seed))
+	k.c.Advance(MIN)
+	checkNow(t, k.cw)
+	if _, err := k.cw.Silence(bg, "keep", hour); err != nil {
+		t.Fatal(err)
+	}
+	got := state(t, k.cw, "keep")
+	if len(got.Undelivered) != 1 {
+		t.Fatalf("undelivered: %s", jsonOf(got))
+	}
+	eq(t, "the queued alert, its run's fields kept", jsonOf(got.Undelivered[0]), failed)
+	sameList(t, "retried as stored", channel.list(), []string{failed})
+}

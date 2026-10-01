@@ -1,5 +1,7 @@
 package cronwatch_test
 
+//lint:file-ignore SA1019 storetest's helpers are this module's own test kit, deprecated only for apps
+
 // What the client tests share: a client with a settable clock, a capture
 // channel and an error list (the SDK tests' make()), and a store whose
 // methods can be made to fail or to run a hook first (helpers.ts flaky(),

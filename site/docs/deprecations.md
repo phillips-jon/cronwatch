@@ -83,6 +83,7 @@ Marked `Deprecated:` in their doc comments, which editors and `staticcheck` poin
 | `cronwatch.MaxBody`, `cronwatch.ReservedRunIDPrefix` | nothing: internal | 1.0 |
 | `pgcron.Hold`, `pgcron.Schedule`, `pgcron.JobName`, `pgcron.RunOf` | nothing: internal | 1.0 |
 | `triage.System` | nothing: internal | 1.0 |
+| everything in `storetest` but `Run` | `storetest.Run` | 1.0 |
 
 ## Rust
 

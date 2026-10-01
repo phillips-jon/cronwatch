@@ -281,9 +281,17 @@ func WithSources(sources ...Source) Option {
 }
 
 // WithCronSecret is the shared secret job handlers' requests must carry.
-// The default is $CRON_SECRET; "" counts as unset.
+// The default is $CRON_SECRET, which counts as unset when it is empty or
+// only whitespace. A secret given here that is empty or only whitespace
+// means none, with no fallback to $CRON_SECRET; any other is used as it is.
 func WithCronSecret(secret string) Option {
-	return func(c *Client) error { c.cronSecret, c.secretOptOut = secret, false; return nil }
+	return func(c *Client) error {
+		if blank(secret) {
+			secret = ""
+		}
+		c.cronSecret, c.secretOptOut = secret, false
+		return nil
+	}
 }
 
 // WithoutCronSecret lets job handlers run without a secret.

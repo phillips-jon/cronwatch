@@ -47,7 +47,10 @@ func Discord(o DiscordOptions) (cronwatch.Channel, error) {
 			embed.Set("url", link)
 		}
 		embed.Set("description", description)
-		embed.Set("color", discordColor[a.Type])
+		// Left out for a type this release does not know, as the SDK does.
+		if color, ok := discordColor[a.Type]; ok {
+			embed.Set("color", color)
+		}
 		embed.Set("timestamp", js.ISOString(a.At))
 		payload := js.StringifyLone(js.NewObject(
 			"content", title,

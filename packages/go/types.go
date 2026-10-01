@@ -251,8 +251,16 @@ func runFrom(v any) (Run, error) {
 // object, its fields in the order they were given (defaults, then the
 // job's options, then name), `expect` described in words. Fields a newer
 // writer added are kept.
+//
+// A store that reads a definition that is not a JSON object (a foreign,
+// hand-edited or damaged row's) gives the zero Definition: the client
+// reads that job as one it cannot evaluate, reports it and shows it as
+// failing, and the other jobs carry on.
 type Definition struct {
 	o *js.Object
+	// unreadable is a definition the client read as {name} in place of
+	// one that was not a JSON object: such a job is not evaluated.
+	unreadable bool
 }
 
 // Name is the job's name.
@@ -295,7 +303,42 @@ func (d Definition) Keys() []string { return d.o.Keys() }
 
 func (d Definition) get(key string) (any, bool) { return d.o.Get(key) }
 
-func (d Definition) clone() Definition { return Definition{d.o.Clone()} }
+func (d Definition) clone() Definition { return Definition{d.o.Clone(), d.unreadable} }
+
+// readStoredJob is a stored job as the client reads it, so a foreign,
+// hand-edited or damaged row affects only its own job (the SDK's
+// readStoredJob): a definition that is not a JSON object (the zero
+// Definition) becomes {name} and is unreadable, and tags are kept only as
+// a list of strings. Every other field is kept as stored.
+func readStoredJob(stored StoredJob) StoredJob {
+	if stored.Definition.o == nil {
+		stored.Definition = Definition{o: js.NewObject("name", stored.Name), unreadable: true}
+		return stored
+	}
+	if tags, has := stored.Definition.o.Get("tags"); has {
+		list, ok := tags.([]any)
+		for _, t := range list {
+			if _, ok = t.(string); !ok {
+				break
+			}
+		}
+		if !ok {
+			o := stored.Definition.o.Clone()
+			o.Delete("tags")
+			stored.Definition = Definition{o: o}
+		}
+	}
+	return stored
+}
+
+// evaluable is an error for a job whose stored definition was not a JSON
+// object: it is reported and shown as failing while the others carry on.
+func evaluable(stored StoredJob) error {
+	if stored.Definition.unreadable {
+		return fmt.Errorf("job %s: its stored definition is not a JSON object", js.Quote(stored.Name))
+	}
+	return nil
+}
 
 // JSValue is the definition as a JSON object.
 //
@@ -319,7 +362,7 @@ func definitionFrom(v any) (Definition, error) {
 	if !ok {
 		return Definition{}, fmt.Errorf("a definition must be an object, not %s", kind(v))
 	}
-	return Definition{o}, nil
+	return Definition{o: o}, nil
 }
 
 // StoredJob is a job as a store knows it.
@@ -614,16 +657,33 @@ var stateKeys = map[string]bool{
 	"pendingRecovery": true, "undelivered": true,
 }
 
+// readState is a stored state read leniently: one that is not a JSON
+// object (a foreign or damaged row's 5, "x" or []) is no state, nil.
+func readState(v any) *JobState {
+	s, err := stateFrom(v)
+	if err != nil {
+		return nil
+	}
+	return &s
+}
+
 func stateFrom(v any) (JobState, error) {
 	o, ok := v.(*js.Object)
 	if !ok {
 		return JobState{}, fmt.Errorf("a job state must be an object, not %s", kind(v))
 	}
 	s := JobState{Job: str(o, "job"), Open: []OpenCondition{}}
+	// Read leniently, as the SDK's normalizeState does, so a foreign,
+	// hand-edited or damaged state affects only its own job and the next
+	// write puts it right: open keeps only its entries whose value is a
+	// number (anything but an object reads as none open), silencedUntil and
+	// lastAlertAt that are not numbers read as nil, pendingRecovery keeps
+	// only its strings and undelivered only its entries that are objects.
 	if open, ok := get(o, "open").(*js.Object); ok {
 		for _, k := range open.Keys() {
-			at, _ := open.Get(k)
-			s.Open = append(s.Open, OpenCondition{Condition(k), toInt(at)})
+			if at, ok := get(open, k).(float64); ok {
+				s.Open = append(s.Open, OpenCondition{Condition(k), toInt(at)})
+			}
 		}
 	}
 	s.ConsecutiveFailures = failureCount(get(o, "consecutiveFailures"))
@@ -800,6 +860,22 @@ type Alert struct {
 	// know, so the queued alert is written back and retried with it, as
 	// the SDK carries the object it read.
 	read *js.Object
+	// kept are the keys of read (bits over keptKeys) whose value this
+	// release's fields cannot hold (a foreign row's run that is not an
+	// object, an at that is not a number), written back as they were read.
+	kept uint16
+	// runRead is the alert's run as read when it holds a key this release
+	// does not write (one a newer release adds), so the run is written back
+	// with it.
+	runRead *js.Object
+	// sparse is an alert read without some of the keys this release
+	// writes, written back without them as it was read.
+	sparse bool
+	// malformed is an alert read from a foreign or damaged row that no
+	// state can match (staleAlert): a recovery whose details.after is not
+	// a list of strings, or another whose at is not a number. It is written
+	// back as it was read until the next retry drops it.
+	malformed bool
 }
 
 func (a Alert) clone() Alert {
@@ -811,6 +887,8 @@ func (a Alert) clone() Alert {
 	c.Definition = a.Definition.clone()
 	c.Triage = copyStr(a.Triage)
 	c.read = a.read.Clone()
+	c.kept = a.kept
+	c.runRead = a.runRead.Clone()
 	// The details' slices and pointers too, so a channel that changes what
 	// it was given changes nothing another channel or a store holds.
 	switch d := a.Details.(type) {
@@ -833,9 +911,12 @@ func (a Alert) clone() Alert {
 // Deprecated: JSValue is how this module writes the SDK's JSON, and goes in
 // 1.0. Use MarshalJSON, or encoding/json, for the same bytes.
 func (a Alert) JSValue() any {
+	if a.malformed && a.read != nil {
+		return a.read.Clone()
+	}
 	var run any
 	if a.Run != nil {
-		run = a.Run.JSValue()
+		run = keepUnknown(a.Run.JSValue().(*js.Object), a.runRead, runKeys)
 	}
 	var details any = &js.Object{}
 	if a.Details != nil {
@@ -857,7 +938,40 @@ func (a Alert) JSValue() any {
 	if a.TriageTried || a.Triage != nil {
 		o.Set("triage", strOrNull(a.Triage))
 	}
-	return keepUnknown(o, a.read, alertKeys)
+	out := keepUnknown(o, a.read, alertKeys)
+	if a.read == nil {
+		return out
+	}
+	for _, k := range keptKeys {
+		if a.kept&keptBit(k) != 0 {
+			v, _ := a.read.Get(k)
+			out.Set(k, js.CloneValue(v))
+		}
+	}
+	if a.sparse {
+		for _, k := range out.Keys() {
+			if !a.read.Has(k) && !(k == "triage" && (a.TriageTried || a.Triage != nil)) {
+				out.Delete(k)
+			}
+		}
+	}
+	return out
+}
+
+// sentKeys are the keys every alert this release writes has.
+var sentKeys = []string{"type", "run", "details", "job", "definition", "title", "message", "at"}
+
+// keptKeys are the keys an alert can keep as read (Alert.kept).
+var keptKeys = append(append([]string(nil), sentKeys...), "triage")
+
+// keptBit is a key's bit in Alert.kept.
+func keptBit(key string) uint16 {
+	for i, k := range keptKeys {
+		if k == key {
+			return 1 << i
+		}
+	}
+	return 0
 }
 
 // alertKeys are the keys of an alert this release writes.
@@ -957,38 +1071,100 @@ func alertFrom(v any) (Alert, error) {
 	if f, ok := get(o, "at").(float64); ok && f != math.Trunc(f) {
 		a.rawAt = &f
 	}
+	var kept uint16
 	if r := get(o, "run"); r != nil {
 		// A queued alert's run keeps the metrics that are numbers, as a
 		// stored run row does, so one another writer stored otherwise
-		// cannot fail every read of the job's state.
+		// cannot fail every read of the job's state; and the keys a newer
+		// release added to it (runRead).
 		if ro, ok := r.(*js.Object); ok {
+			a.runRead = unknownOnly(ro, runKeys)
 			ro = ro.Clone()
 			m, _ := ro.Get("metrics")
 			ro.Set("metrics", numberMetrics(m).JSValue())
-			r = ro
+			run, err := runFrom(ro)
+			if err != nil {
+				return Alert{}, err
+			}
+			a.Run = &run
+		} else {
+			// Not a run (a foreign or damaged row's): kept as it was.
+			kept |= keptBit("run")
 		}
-		run, err := runFrom(r)
-		if err != nil {
-			return Alert{}, err
-		}
-		a.Run = &run
 	}
 	details, _ := get(o, "details").(*js.Object)
 	a.Details = detailsFrom(a.Type, details)
 	if d, ok := get(o, "definition").(*js.Object); ok {
-		a.Definition = Definition{d}
+		a.Definition = Definition{o: d}
 	} else {
-		a.Definition = Definition{&js.Object{}}
+		a.Definition = Definition{o: &js.Object{}}
 	}
 	if o.Has("triage") {
 		a.TriageTried = true
 		a.Triage = nullableStr(o, "triage")
 	}
-	if keepsUnknown(a.Type, o) {
+	// A value of another type than this release writes there is kept as
+	// it was read, so a write puts back what another writer stored.
+	for _, k := range []string{"type", "job", "title", "message", "at", "details", "definition", "triage"} {
+		v, has := o.Get(k)
+		if !has {
+			continue
+		}
+		var fits bool
+		switch k {
+		case "at":
+			_, fits = v.(float64)
+		case "details", "definition":
+			_, fits = v.(*js.Object)
+		case "triage":
+			_, fits = v.(string)
+			fits = fits || v == nil
+		default:
+			_, fits = v.(string)
+		}
+		if !fits {
+			kept |= keptBit(k)
+		}
+	}
+	for _, k := range sentKeys {
+		a.sparse = a.sparse || !o.Has(k)
+	}
+	a.malformed = malformedAlert(o)
+	if keepsUnknown(a.Type, o) || kept != 0 || a.sparse || a.malformed {
 		a.read = o.Clone()
+		a.kept = kept
 	}
 	return a, nil
 }
+
+// malformedAlert is whether an alert as read is one no state can match, as
+// the SDK's staleAlert judges a foreign or damaged row's: a recovery whose
+// details.after is not a list of strings, or another whose at is not a
+// number.
+func malformedAlert(o *js.Object) bool {
+	if t, _ := get(o, "type").(string); t == string(AlertRecovered) {
+		d, ok := get(o, "details").(*js.Object)
+		if !ok {
+			return true
+		}
+		after, ok := get(d, "after").([]any)
+		if !ok {
+			return true
+		}
+		for _, c := range after {
+			if _, ok := c.(string); !ok {
+				return true
+			}
+		}
+		return false
+	}
+	_, ok := get(o, "at").(float64)
+	return !ok
+}
+
+// runKeys are the keys of a run this release writes.
+var runKeys = map[string]bool{"id": true, "job": true, "status": true, "startedAt": true, "finishedAt": true,
+	"durationMs": true, "error": true, "output": true, "metrics": true, "trigger": true}
 
 func detailsFrom(t AlertType, o *js.Object) AlertDetails {
 	switch t {
