@@ -582,6 +582,51 @@ async fn mysql_keeps_a_run_with_a_long_trigger() {
     }
 }
 
+/// State rows a damaged or hand-edited row could hold in MySQL's LONGTEXT:
+/// text that is not JSON, JSON that is not an object, and objects whose
+/// version is not a number. A check, a silence and a second check answer
+/// with no error, and the silence replaces each row (it counts as version
+/// 0, as on SQLite).
+#[tokio::test]
+async fn mysql_replaces_a_damaged_state_row() {
+    const DAMAGED: [&str; 10] = [
+        "{",
+        "not json",
+        "5",
+        r#""x""#,
+        "[]",
+        "null",
+        r#"{"version":"x"}"#,
+        r#"{"version":true}"#,
+        r#"{"version":{"a":1}}"#,
+        r#"{"version":[1]}"#,
+    ];
+    for s in mysqls() {
+        let store = Arc::new(s.store("damaged"));
+        store.init().await.unwrap();
+        let p = store.table_prefix().to_string();
+        let db = s.db();
+        for (i, text) in DAMAGED.iter().enumerate() {
+            store.upsert_job(&definition(&format!(r#"{{"name":"dmg{i}"}}"#)), 1).await.unwrap();
+            db.exec(&format!("INSERT INTO {p}state (job, state) VALUES ('dmg{i}', '{text}')")).await;
+        }
+        let clock = Clock::new(T0);
+        let proc = Process::new(store.clone() as Arc<dyn Store>, &clock);
+        proc.client.check().await.unwrap();
+        for (i, text) in DAMAGED.iter().enumerate() {
+            let name = format!("dmg{i}");
+            if let Err(e) = proc.client.silence(&name, "1h").await {
+                panic!("{}: silencing over {text}: {e}", s.name);
+            }
+            let st = store.get_state(&name).await.unwrap().expect("the state");
+            assert_eq!(st.silenced_until, Some(T0 + 3_600_000), "{}: over {text}", s.name);
+        }
+        proc.client.check().await.unwrap();
+        assert_eq!(proc.errors.list(), Vec::<String>::new(), "{}", s.name);
+        s.cleanup().await;
+    }
+}
+
 #[tokio::test]
 async fn each_server_names_its_dialect() {
     for s in servers() {
