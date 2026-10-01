@@ -5,6 +5,7 @@ import { parseDuration } from "../duration.js";
 import type { Duration, JobSummary, Run } from "../types.js";
 import { dashboardPage, jobPage, messagePage } from "./html.js";
 import { staticAsset, type StaticAsset } from "./pwa.js";
+import { API_VERSION, VERSION } from "../version.js";
 import { BOARD_BEHIND_MS, BOARD_LANES, BOARD_RUNS, weekRunsLimit, type LaneInput } from "./timeline.js";
 
 export interface RoutesOptions {
@@ -58,6 +59,8 @@ export interface Routes {
 }
 
 const COOKIE = "cronwatch_token";
+/** The package GET <base>/api names: each port answers with its own. */
+const LIBRARY = "@cronwatch/sdk";
 
 /**
  * The cookie holds a digest of the token, so a leaked cookie does not reveal
@@ -408,6 +411,10 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
     // JSON API
     if (parts[0] === "api") {
       const rest = parts.slice(1);
+      // What is serving the API, so a client such as @cronwatch/mcp can tell.
+      if (method === "GET" && rest.length === 0) {
+        return api({ ok: true, library: LIBRARY, version: VERSION, api: API_VERSION });
+      }
       if (method === "GET" && rest[0] === "jobs" && rest.length === 1) {
         return api({ ok: true, jobs: await cw.jobs() });
       }
@@ -435,9 +442,13 @@ export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes
           } catch (e) {
             return api({ ok: false, error: (e as Error).message }, 400);
           }
-          return api({ ok: true, state: await cw.silence(name, duration) });
+          await cw.silence(name, duration);
+          return api({ ok: true, job: await cw.jobSummary(name) });
         }
-        if (rest[2] === "unsilence") return api({ ok: true, state: await cw.unsilence(name) });
+        if (rest[2] === "unsilence") {
+          await cw.unsilence(name);
+          return api({ ok: true, job: await cw.jobSummary(name) });
+        }
       }
       if (rest[0] === "check" && rest.length === 1) {
         // A page cannot send an Authorization header cross-site, so a GET

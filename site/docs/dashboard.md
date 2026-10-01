@@ -152,16 +152,21 @@ The service worker keeps only that shell in its cache. Every page, form post and
 
 | Method and path | Does | Returns |
 |---|---|---|
+| `GET /api` | what is serving the API | `{ ok: true, library, version, api: 1 }` |
 | `GET /api/jobs` | list jobs | `{ ok: true, jobs: JobSummary[] }` |
 | `GET /api/jobs/:name?runs=20` | one job with recent runs (`runs` is 1 to 500) | `{ ok: true, job: JobSummary, runs: Run[] }` |
 | `DELETE /api/jobs/:name` | forget the job and its runs | `{ ok: true }` |
-| `POST /api/jobs/:name/silence` | body `{ "for": "2h" }` | `{ ok: true, state: JobState }` |
-| `POST /api/jobs/:name/unsilence` | | `{ ok: true, state: JobState }` |
+| `POST /api/jobs/:name/silence` | body `{ "for": "2h" }` | `{ ok: true, job: JobSummary }` |
+| `POST /api/jobs/:name/unsilence` | | `{ ok: true, job: JobSummary }` |
 | `POST /api/check` | run the check now | `{ ok: true, checkedAt, jobs, alerts, pruned }` |
 | `GET /api/check` | the same, with a bearer only | `{ ok: true, checkedAt, jobs, alerts, pruned }` |
 | `GET /api/runs/:id` | one run | `{ ok: true, run: Run }` |
 
 Every success body carries `ok: true` beside its fields.
+
+`GET /api` says what is answering: `library` is the package (`@cronwatch/sdk`, or the port's own name, such as `cronwatch` for the gem), `version` its release, and `api` the version of this API, now `1`. The API only grows: a later release may add fields and endpoints, but does not remove or retype one, or move a path, without a new `api` number in a major release. So read the fields you need and ignore the rest. [`@cronwatch/mcp`](/docs/mcp/) works with any dashboard that answers this way, and with the 0.x releases before it.
+
+Silence and unsilence answer the job's summary, as `GET /api/jobs/:name` does, with `silencedUntil` set or cleared. Before 1.0 they answered the job's stored state instead (`{ ok: true, state }`); `@cronwatch/mcp` reads either.
 
 `for` is a duration string such as `"30m"`, `"2h"` or `"1h30m"`, at most 64 characters, or a number of milliseconds (a JSON number or a string of digits). It defaults to one hour when left out, from the body or a `?for=` query. Anything else, such as `"forever"` or `"2 hours"`, is refused with 400 and the reason, and nothing is silenced. The dashboard's silence form shows the same error as a page. Silencing or unsilencing a job that is not in the store answers 404.
 
@@ -195,8 +200,6 @@ interface JobSummary {
 ```
 
 A job CronWatch cannot evaluate, for example one whose stored schedule or timeout no longer parses, shows as `failing` (or `silenced` while it is) with `nextExpectedAt: null`, and the reason goes to `onError`. Every other job is listed and checked as usual.
-
-The `state` the silence endpoints return is the job's stored `JobState`, including its `version`, which goes up by one on every write (see [stores](/docs/stores/#two-processes-one-store)).
 
 ## Run
 

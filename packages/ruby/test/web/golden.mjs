@@ -24,7 +24,9 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { cronwatch, custom, memory } from "../../../sdk/dist/index.js";
+import { cronwatch, custom, memory, VERSION } from "../../../sdk/dist/index.js";
+
+const LIBRARY = "@cronwatch/sdk";
 
 if (process.env.TZ !== "UTC") {
   console.error("golden: run with TZ=UTC (npm run check:conformance does); the fixture depends on the time zone");
@@ -116,6 +118,9 @@ const json = { ...bearer, "content-type": "application/json" };
 /** Each request: [method, path, headers, body]. {run:JOB:N} is the Nth newest run of JOB. */
 const requests = [
   ["GET", "/cronwatch/api/jobs", bearer],
+  ["GET", "/cronwatch/api", bearer],
+  ["GET", "/cronwatch/api/", bearer],
+  ["GET", "/cronwatch/api"],
   ["GET", "/cronwatch/api/jobs/nightly-report?runs=3", bearer],
   ["GET", "/cronwatch/api/jobs/nightly-report", bearer],
   ["GET", "/cronwatch/api/jobs/broken?runs=abc", bearer],
@@ -191,7 +196,17 @@ for (const [method, template, headers = {}, body] of requests) {
   const responseBody = responseHeaders["content-type"] === "image/png"
     ? `base64:${Buffer.from(await response.arrayBuffer()).toString("base64")}`
     : await response.text();
-  captures.push({ method, path: template, headers, body: body ?? null, status: response.status, responseHeaders, responseBody });
+  captures.push({ method, path: template, headers, body: body ?? null, status: response.status, responseHeaders, responseBody: about(responseBody) });
+}
+
+/**
+ * GET /api names the library and its version, which differ from port to
+ * port: the fixture holds <library> and <version> in their place, and each
+ * port's replay puts in its own.
+ */
+function about(text) {
+  const prefix = `{"ok":true,"library":${JSON.stringify(LIBRARY)},"version":${JSON.stringify(VERSION)},`;
+  return text.startsWith(prefix) ? `{"ok":true,"library":"<library>","version":"<version>",${text.slice(prefix.length)}` : text;
 }
 
 if (errors.length) {

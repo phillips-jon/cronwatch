@@ -27,6 +27,8 @@ import { addMarkdownChangelog, addReadmeChangelog, today } from "./changelogs.mj
 /** Every place the release version lives. Each pattern captures (before)(version)(after). */
 const VERSIONED = [
   { file: "packages/sdk/package.json", pattern: /^( {2}"version": ")([^"]+)(")/m },
+  // What the SDK reports about itself (VERSION, and GET <base>/api).
+  { file: "packages/sdk/src/version.ts", pattern: /^(export const VERSION = ")([^"]+)(")/m },
   { file: "packages/mcp/package.json", pattern: /^( {2}"version": ")([^"]+)(")/m },
   { file: "packages/mcp/package.json", pattern: /^( {4}"@cronwatch\/sdk": ")([^"]+)(")/m },
   { file: "packages/ruby/lib/cronwatch/version.rb", pattern: /^(\s*VERSION = ")([^"]+)(")/m },

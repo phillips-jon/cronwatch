@@ -5,8 +5,12 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { cronwatch, custom, memory } from "@cronwatch/sdk";
 import { createServer } from "../src/server.js";
 
-/** A fake of the JSON API @cronwatch/sdk mounts, enough to exercise every tool. */
-function fakeApi() {
+/**
+ * A fake of the JSON API @cronwatch/sdk mounts, enough to exercise every
+ * tool. `legacy` answers silence as a 0.x dashboard did, with the job's
+ * stored state; a 1.x one answers its summary.
+ */
+function fakeApi(legacy = false) {
   const calls: string[] = [];
   const job = {
     name: "nightly", definition: { name: "nightly", schedule: "0 2 * * *" }, health: "failing", open: ["failed"],
@@ -20,7 +24,9 @@ function fakeApi() {
     const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "content-type": "application/json" } });
     if (p === "/cronwatch/api/jobs") return json({ ok: true, jobs: [job] });
     if (p === "/cronwatch/api/jobs/nightly") return json({ ok: true, job, runs: [job.lastRun] });
-    if (p === "/cronwatch/api/jobs/nightly/silence") return json({ ok: true, state: { silencedUntil: 1_700_100_000_000 } });
+    if (p === "/cronwatch/api/jobs/nightly/silence") {
+      return json(legacy ? { ok: true, state: { silencedUntil: 1_700_100_000_000 } } : { ok: true, job: { ...job, health: "silenced", silencedUntil: 1_700_100_000_000 } });
+    }
     if (p === "/cronwatch/api/check") return json({ ok: true, checkedAt: 1_700_000_000_000, jobs: [job], alerts: [{ type: "missed", job: "nightly", title: "x" }], pruned: 0 });
     return json({ ok: false, error: "No such job" }, 404);
   };
@@ -76,6 +82,15 @@ test("tools call the API with the bearer token and summarise", async () => {
   const guide = await client.callTool({ name: "get_setup_guide", arguments: {} });
   assert.match((guide.content as { text: string }[])[0]!.text, /cw\.job\("nightly-report"/);
   await close();
+});
+
+test("silence reads the silence's end from a 1.x dashboard's summary and a 0.x one's state", async () => {
+  for (const legacy of [false, true]) {
+    const { client, close } = await connected(fakeApi(legacy));
+    const silence = await client.callTool({ name: "silence_job", arguments: { name: "nightly", for: "2h" } });
+    assert.equal((silence.content as { text: string }[])[0]!.text, "nightly is silenced until 2023-11-16T02:00:00.000Z.", `legacy: ${legacy}`);
+    await close();
+  }
 });
 
 test("drives the real SDK routes end to end", async () => {

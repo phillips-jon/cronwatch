@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { cronwatch } from "../src/index.js";
 import { escapeName } from "../src/routes/escape.js";
+import { VERSION } from "../src/version.js";
 import { capture, clock } from "./helpers.js";
 
 function app(token: string | null = "tok") {
@@ -40,6 +42,32 @@ test("everything needs the token", async () => {
   assert.equal((await get("/cronwatch/api/jobs")).status, 401);
   assert.equal((await get("/cronwatch/api/jobs", { headers: { authorization: "Bearer wrong" } })).status, 401);
   assert.equal((await get("/cronwatch/api/jobs", { headers: { authorization: "Bearer tok" } })).status, 200);
+});
+
+test("GET /api names the library, its version and the API's version, behind the token", async () => {
+  const { get, auth } = app();
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+  assert.equal(VERSION, pkg.version, "src/version.ts is in step with package.json");
+  for (const path of ["/cronwatch/api", "/cronwatch/api/"]) {
+    const res = await get(path, { headers: auth });
+    assert.equal(res.status, 200, path);
+    assert.equal(await res.text(), `{"ok":true,"library":"@cronwatch/sdk","version":"${pkg.version}","api":1}`);
+  }
+  assert.equal((await get("/cronwatch/api")).status, 401);
+});
+
+test("silence and unsilence answer the job's summary, not its stored state", async () => {
+  const { cw, c, routes, auth } = app();
+  cw.job("s", { schedule: "every 1h" });
+  const post = (path: string) => routes.POST(new Request(`http://app.test${path}`, { method: "POST", headers: auth }));
+  const silenced = await (await post("/cronwatch/api/jobs/s/silence?for=2h")).json();
+  assert.deepEqual(Object.keys(silenced), ["ok", "job"]);
+  assert.deepEqual(silenced.job, JSON.parse(JSON.stringify(await cw.jobSummary("s"))));
+  assert.equal(silenced.job.silencedUntil, c.now() + 2 * 3_600_000);
+  assert.equal(silenced.job.health, "silenced");
+  const unsilenced = await (await post("/cronwatch/api/jobs/s/unsilence")).json();
+  assert.deepEqual(Object.keys(unsilenced), ["ok", "job"]);
+  assert.equal(unsilenced.job.silencedUntil, null);
 });
 
 test("the check endpoint also accepts the cron secret, nothing else does", async () => {
@@ -140,10 +168,10 @@ test("check, silence, unsilence and forget over the API", async () => {
   assert.equal(check.ok, true);
   assert.equal(check.jobs.length, 1);
   const silenced = await (await post("/cronwatch/api/jobs/s/silence", { for: "2h" })).json();
-  assert.ok(silenced.state.silencedUntil > 0);
+  assert.ok(silenced.job.silencedUntil > 0);
   assert.equal((await cw.jobSummary("s"))!.health, "silenced");
   const un = await (await post("/cronwatch/api/jobs/s/unsilence")).json();
-  assert.equal(un.state.silencedUntil, null);
+  assert.equal(un.job.silencedUntil, null);
   assert.equal((await post("/cronwatch/api/jobs/nope/silence", { for: "1h" })).status, 404);
   const del = await routes.DELETE(new Request("http://app.test/cronwatch/api/jobs/s", { method: "DELETE", headers: auth }));
   assert.equal(del.status, 200);

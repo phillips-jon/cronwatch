@@ -196,8 +196,10 @@ export function createServer(options: ServerOptions): McpServer {
     },
     async ({ name, for: duration }) => {
       try {
-        const { state } = await api.call<{ state: JobState }>("POST", `/jobs/${encodeURIComponent(name)}/silence`, { for: duration });
-        return text(`${name} is silenced until ${iso(state.silencedUntil)}.`);
+        // A 1.x dashboard answers the job's summary; a 0.x one answered its stored state.
+        const answer = await api.call<{ job?: JobSummary; state?: JobState }>("POST", `/jobs/${encodeURIComponent(name)}/silence`, { for: duration });
+        const until = answer.job?.silencedUntil ?? answer.state?.silencedUntil ?? null;
+        return text(`${name} is silenced until ${iso(until)}.`);
       } catch (e) {
         return failure(e);
       }

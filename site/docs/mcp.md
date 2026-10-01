@@ -78,6 +78,8 @@ Use an `https` URL. The server sends the token with every request, so over plain
 
 The tools return prose an agent can act on, not raw JSON. A typical exchange: "why did invoice-run fail last night" becomes `get_job`, a read of the error and the earlier runs, and a suggested fix in your code.
 
+The server works with the [JSON API](/docs/dashboard/#endpoints) of any release, 0.x or 1.x, in any language: the API only grows within a major release, and the one answer that changed at 1.0 (silence now returns the job's summary, not its stored state) is read either way.
+
 ## Security
 
 The token gives the agent everything the dashboard can do, including silencing and forgetting jobs; there is no read-only token. Give the MCP server the token only where you are content for the agent to do those things. Run history includes whatever your jobs logged, so the agent reads that too; if it is sensitive, log less.

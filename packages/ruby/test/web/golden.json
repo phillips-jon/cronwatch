@@ -21,6 +21,55 @@
     },
     {
       "method": "GET",
+      "path": "/cronwatch/api",
+      "headers": {
+        "authorization": "Bearer tok"
+      },
+      "body": null,
+      "status": 200,
+      "responseHeaders": {
+        "cache-control": "no-store",
+        "content-type": "application/json; charset=utf-8",
+        "referrer-policy": "same-origin",
+        "x-content-type-options": "nosniff",
+        "x-robots-tag": "noindex"
+      },
+      "responseBody": "{\"ok\":true,\"library\":\"<library>\",\"version\":\"<version>\",\"api\":1}"
+    },
+    {
+      "method": "GET",
+      "path": "/cronwatch/api/",
+      "headers": {
+        "authorization": "Bearer tok"
+      },
+      "body": null,
+      "status": 200,
+      "responseHeaders": {
+        "cache-control": "no-store",
+        "content-type": "application/json; charset=utf-8",
+        "referrer-policy": "same-origin",
+        "x-content-type-options": "nosniff",
+        "x-robots-tag": "noindex"
+      },
+      "responseBody": "{\"ok\":true,\"library\":\"<library>\",\"version\":\"<version>\",\"api\":1}"
+    },
+    {
+      "method": "GET",
+      "path": "/cronwatch/api",
+      "headers": {},
+      "body": null,
+      "status": 401,
+      "responseHeaders": {
+        "cache-control": "no-store",
+        "content-type": "application/json; charset=utf-8",
+        "referrer-policy": "same-origin",
+        "x-content-type-options": "nosniff",
+        "x-robots-tag": "noindex"
+      },
+      "responseBody": "{\"ok\":false,\"error\":\"Unauthorized\"}"
+    },
+    {
+      "method": "GET",
       "path": "/cronwatch/api/jobs/nightly-report?runs=3",
       "headers": {
         "authorization": "Bearer tok"
@@ -377,7 +426,7 @@
         "x-content-type-options": "nosniff",
         "x-robots-tag": "noindex"
       },
-      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":1767612600000,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[],\"version\":3}}"
+      "responseBody": "{\"ok\":true,\"job\":{\"name\":\"sync-users\",\"definition\":{\"schedule\":\"*/15 * * * *\",\"grace\":60000,\"timeout\":\"5m\",\"name\":\"sync-users\"},\"health\":\"silenced\",\"open\":[\"missed\"],\"lastRun\":{\"id\":\"<id:5>\",\"job\":\"sync-users\",\"status\":\"ok\",\"startedAt\":1767594600000,\"finishedAt\":1767594612345,\"durationMs\":12345,\"error\":null,\"output\":null,\"metrics\":{},\"trigger\":\"run\"},\"nextExpectedAt\":1767606300000,\"consecutiveFailures\":0,\"silencedUntil\":1767612600000,\"stats\":{\"runs\":1,\"okRate\":1,\"p50Ms\":12345,\"p95Ms\":12345}}}"
     },
     {
       "method": "POST",
@@ -412,7 +461,7 @@
         "x-content-type-options": "nosniff",
         "x-robots-tag": "noindex"
       },
-      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":1767610800000,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[],\"version\":4}}"
+      "responseBody": "{\"ok\":true,\"job\":{\"name\":\"sync-users\",\"definition\":{\"schedule\":\"*/15 * * * *\",\"grace\":60000,\"timeout\":\"5m\",\"name\":\"sync-users\"},\"health\":\"silenced\",\"open\":[\"missed\"],\"lastRun\":{\"id\":\"<id:5>\",\"job\":\"sync-users\",\"status\":\"ok\",\"startedAt\":1767594600000,\"finishedAt\":1767594612345,\"durationMs\":12345,\"error\":null,\"output\":null,\"metrics\":{},\"trigger\":\"run\"},\"nextExpectedAt\":1767606300000,\"consecutiveFailures\":0,\"silencedUntil\":1767610800000,\"stats\":{\"runs\":1,\"okRate\":1,\"p50Ms\":12345,\"p95Ms\":12345}}}"
     },
     {
       "method": "POST",
@@ -483,7 +532,7 @@
         "x-content-type-options": "nosniff",
         "x-robots-tag": "noindex"
       },
-      "responseBody": "{\"ok\":true,\"state\":{\"job\":\"sync-users\",\"open\":{\"missed\":1767605400000},\"consecutiveFailures\":0,\"silencedUntil\":null,\"lastAlertAt\":1767605400000,\"pendingRecovery\":[],\"undelivered\":[],\"version\":5}}"
+      "responseBody": "{\"ok\":true,\"job\":{\"name\":\"sync-users\",\"definition\":{\"schedule\":\"*/15 * * * *\",\"grace\":60000,\"timeout\":\"5m\",\"name\":\"sync-users\"},\"health\":\"late\",\"open\":[\"missed\"],\"lastRun\":{\"id\":\"<id:5>\",\"job\":\"sync-users\",\"status\":\"ok\",\"startedAt\":1767594600000,\"finishedAt\":1767594612345,\"durationMs\":12345,\"error\":null,\"output\":null,\"metrics\":{},\"trigger\":\"run\"},\"nextExpectedAt\":1767606300000,\"consecutiveFailures\":0,\"silencedUntil\":null,\"stats\":{\"runs\":1,\"okRate\":1,\"p50Ms\":12345,\"p95Ms\":12345}}}"
     },
     {
       "method": "GET",

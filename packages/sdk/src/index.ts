@@ -15,6 +15,7 @@ export { CronWatch, consoleChannel, custom } from "./client.js";
 export type { CronWatchOptions, HandlerFn, HandlerOptions, JobFn, JobHandle, RecordRunOptions, RunHandle, RunOutcome, Source, SourceHost, StartOptions } from "./client.js";
 export type { JobContext } from "./job.js";
 export { memory } from "./stores/memory.js";
+export { VERSION } from "./version.js";
 export { createRoutes } from "./routes/index.js";
 export type { FetchHandler, Routes, RoutesOptions } from "./routes/index.js";
 export { parseDuration, formatDuration } from "./duration.js";

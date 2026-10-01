@@ -133,7 +133,7 @@ test("silence durations: strings are validated, numbers are milliseconds", async
   }
   assert.equal((await cw.jobSummary("s"))!.silencedUntil, null, "a bad duration silences nothing");
 
-  const until = async (body: unknown) => (await (await silence(body)).json()).state.silencedUntil - c.now();
+  const until = async (body: unknown) => (await (await silence(body)).json()).job.silencedUntil - c.now();
   assert.equal(await until({ for: 7_200_000 }), 7_200_000);
   assert.equal(await until({ for: "60000" }), 60_000);
   assert.equal(await until({ for: "90m" }), 90 * 60_000);
