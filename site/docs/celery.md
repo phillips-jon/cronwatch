@@ -67,7 +67,7 @@ def import_orders(batch_id): ...
 
 ## Retries, failures and lost workers
 
-A task that raises still raises on to Celery, so its retries, error handlers and result backend see it unchanged.
+Every run a worker records has the trigger `celery` (see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)), and its id starts with the task's id. A task that raises still raises on to Celery, so its retries, error handlers and result backend see it unchanged.
 
 Each attempt is a run of its own: an attempt that ends in `self.retry()` is a failed run with the error that caused it, and the attempt that finally succeeds closes the alert with a recovery. So a task that fails, retries and then succeeds sends one failed alert and one recovery, not one per attempt. To ride through a few retries without any alert, set `failures_before_alert` to the number of attempts you are willing to lose.
 
