@@ -124,10 +124,10 @@ public class ScheduleConformanceTests
         }
 
         failures.Check("schedule");
-        Assert.Equal(62, parse.Count);
-        Assert.Equal(64, fires.Count);
+        Assert.Equal(75, parse.Count);
+        Assert.Equal(70, fires.Count);
         Assert.Equal(4, nextFire.Count);
-        Assert.Equal(572, expectation.Count);
+        Assert.Equal(575, expectation.Count);
         Assert.Equal(13, runCovers.Count);
         Assert.Equal(8, autumn.Count);
         DurationConformanceTests.Known(f, "parse", "fires", "nextFire", "expectation", "runCovers", "autumn");

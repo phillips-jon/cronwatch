@@ -13,13 +13,12 @@ namespace Cronwatch.Internal;
 /// expression they read, every one they refuse and every fire time.
 /// </summary>
 /// <remarks>
-/// Where it cannot match croner: a date no month has (<c>0 0 30 2 *</c>) makes croner, which walks
-/// by recursion a year at a time, run out of stack before the year 3000; this port walks in a loop
-/// and answers that the expression never fires. Croner reads a string with a colon after its first
-/// character as a one-time date, through JavaScript's lenient <c>Date.parse</c>; this port refuses
-/// every such string: one that looks like an ISO date with "CronPattern: a one-time date is not
-/// supported by the .NET port", anything else with the message croner gives for text
-/// <c>Date.parse</c> cannot read, "Invalid ISO8601 passed to timezone parser.". An expression
+/// As the SDK settles the two schedules croner itself does not: a date no month has
+/// (<c>0 0 30 2 *</c>), which makes croner run out of stack, is an expression that never fires;
+/// and a string with a colon after its first character, which croner reads as a one-time date, is
+/// refused: one that looks like an ISO date with "CronPattern: a one-time date is not supported",
+/// anything else with the message croner gives for text <c>Date.parse</c> cannot read, "Invalid
+/// ISO8601 passed to timezone parser.". An expression
 /// schedules nothing and only answers <see cref="NextRuns"/>; safe to share between threads.
 /// </remarks>
 internal sealed class CronExpression
@@ -48,7 +47,7 @@ internal sealed class CronExpression
             // fire at, not as a cron expression.
             if (IsIsoDate(text))
             {
-                throw new CronException("CronPattern: a one-time date is not supported by the .NET port");
+                throw new CronException("CronPattern: a one-time date is not supported");
             }
             throw new CronException("Invalid ISO8601 passed to timezone parser.");
         }

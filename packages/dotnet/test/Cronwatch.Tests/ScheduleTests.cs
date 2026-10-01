@@ -202,7 +202,7 @@ public class ScheduleTests
     [Fact]
     public void One_time_dates_are_refused()
     {
-        Assert.EndsWith(": CronPattern: a one-time date is not supported by the .NET port", Error(() => Must("2026-12-01T00:00:00", null)), StringComparison.Ordinal);
+        Assert.EndsWith(": CronPattern: a one-time date is not supported", Error(() => Must("2026-12-01T00:00:00", null)), StringComparison.Ordinal);
         Assert.EndsWith(": Invalid ISO8601 passed to timezone parser.", Error(() => Must("0 2:30 * * *", null)), StringComparison.Ordinal);
     }
 

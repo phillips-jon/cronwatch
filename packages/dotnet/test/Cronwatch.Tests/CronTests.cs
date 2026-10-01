@@ -49,7 +49,7 @@ public class CronTests
     [InlineData("@reboot", "CronPattern: @reboot is not supported in this environment. This is an event-based trigger that requires system startup detection.")]
     // Croner takes these for a one-time date; the port refuses them (see CronExpression).
     [InlineData("0 12:30 * * *", "Invalid ISO8601 passed to timezone parser.")]
-    [InlineData("2026-12-01T00:00:00", "CronPattern: a one-time date is not supported by the .NET port")]
+    [InlineData("2026-12-01T00:00:00", "CronPattern: a one-time date is not supported")]
     public void Croners_messages(string text, string message)
     {
         var e = Assert.Throws<CronException>(() => CronExpression.Parse(text, TimeZoneInfo.Utc));
