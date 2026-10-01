@@ -107,7 +107,7 @@ defmodule Cronwatch.Store.SQLiteTest do
 
     {:error, :rolled_back} =
       Repo.transaction(fn ->
-        :ok = EctoStore.insert_run(h, StoreCase.new_run("kept", "j", "running", 1))
+        :ok = EctoStore.insert_run(h, StoreCase.test_run("kept", "j", "running", 1))
         Repo.query!("CREATE TABLE app_rows (x INTEGER)")
         Repo.rollback(:rolled_back)
       end)

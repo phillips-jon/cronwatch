@@ -85,7 +85,7 @@ defmodule Cronwatch.Store.PostgresTest do
     # Numbers come back as numbers, and JSONB as Postgres orders it: keys by
     # length, then bytes.
     run = %{
-      StoreCase.new_run("r1", "nightly", "ok", Clock.t0())
+      StoreCase.test_run("r1", "nightly", "ok", Clock.t0())
       | finished_at: Clock.t0() + 1000,
         duration_ms: 1000,
         output: "tab\tand \"quotes\" 😀",
@@ -105,7 +105,7 @@ defmodule Cronwatch.Store.PostgresTest do
     assert JS.Object.keys(j.definition) == ["name", "tags", "schedule"]
 
     # Runs started in one millisecond come back in insertion order (seq).
-    for id <- ~w(t1 t2 t3), do: :ok = EctoStore.insert_run(h, StoreCase.new_run(id, "ties", "ok", 5))
+    for id <- ~w(t1 t2 t3), do: :ok = EctoStore.insert_run(h, StoreCase.test_run(id, "ties", "ok", 5))
     {:ok, ties} = EctoStore.list_runs(h, "ties", 10)
     assert Enum.map(ties, & &1.id) == ~w(t3 t2 t1)
 
@@ -245,7 +245,7 @@ defmodule Cronwatch.Store.MySQLDialectTests do
         :ok = EctoStore.upsert_job(h, definition, 1)
 
         run = %{
-          StoreCase.new_run("r1", "nightly", "ok", 1)
+          StoreCase.test_run("r1", "nightly", "ok", 1)
           | finished_at: 2,
             duration_ms: 1,
             output: "tab\tand \"quotes\" 😀",
@@ -312,7 +312,7 @@ defmodule Cronwatch.Store.MySQLDialectTests do
         cas.("a landed write is counted as written", landed, 0, true)
 
         # A flush that writes what the row already holds still wrote.
-        run = %{StoreCase.new_run("r", "j", "running", 1) | output: "same"}
+        run = %{StoreCase.test_run("r", "j", "running", 1) | output: "same"}
         :ok = EctoStore.insert_run(h, run)
         assert EctoStore.update_run_if(h, run, ["running"]) == {:ok, true}
         assert EctoStore.update_run_if(h, run, ["timeout"]) == {:ok, false}
@@ -325,7 +325,7 @@ defmodule Cronwatch.Store.MySQLDialectTests do
         :ok = EctoStore.init(h)
 
         :ok =
-          EctoStore.insert_run(h, %{StoreCase.new_run("r", "j", "running", 1) | trigger: String.duplicate("é", 300)})
+          EctoStore.insert_run(h, %{StoreCase.test_run("r", "j", "running", 1) | trigger: String.duplicate("é", 300)})
 
         assert {:ok, %{trigger: trigger}} = EctoStore.get_run(h, "r")
         assert trigger == String.duplicate("é", 255)

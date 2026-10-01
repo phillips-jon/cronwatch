@@ -137,7 +137,7 @@ defmodule Cronwatch.Test.ServerStoreTests do
         {EctoStore, h} = store = Servers.store(@kind)
         p = h.prefix
         :ok = EctoStore.init(h)
-        :ok = EctoStore.insert_run(h, StoreCase.new_run("good", "a", "running", 1))
+        :ok = EctoStore.insert_run(h, StoreCase.test_run("good", "a", "running", 1))
         :ok = EctoStore.upsert_job(h, JS.parse!(~s({"name":"a","schedule":"0 * * * *"})), 1)
 
         Servers.sql(

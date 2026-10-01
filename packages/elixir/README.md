@@ -84,6 +84,8 @@ defmodule MyApp.StoreTest do
 end
 ```
 
+The `use` is what 1.x promises; the functions `Cronwatch.StoreCase` had besides are deprecated since 1.0.
+
 ### Alerts and triage
 
 The SDK's channels, request for request: `Cronwatch.Alerts.Slack`, `Discord`, `Webhook` (signed), `Resend`, `Postmark`, `SendGrid`, `Mailgun`, `SES`, `Twilio`, `Sentry`, `Honeybadger`, `Datadog`, `Rollbar`, `Bugsnag` and `NewRelic`, each given as `{module, opts}` with the SDK's options in snake_case, checked when the instance starts:
