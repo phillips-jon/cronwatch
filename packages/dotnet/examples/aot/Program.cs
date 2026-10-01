@@ -12,7 +12,6 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Cronwatch;
-using Cronwatch.AspNetCore;
 using Cronwatch.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

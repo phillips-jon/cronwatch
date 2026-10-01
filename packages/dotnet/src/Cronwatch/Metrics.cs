@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using Cronwatch.Internal;
 
 namespace Cronwatch;
 
@@ -123,14 +124,14 @@ public sealed class Metrics : IReadOnlyDictionary<string, double>, IEquatable<Me
         }
         if (v is not JsObject o)
         {
-            throw new JsonParseException("metrics must be an object, not " + Json.Kind(v));
+            throw new JsonParseException("metrics must be an object, not " + JsonText.Kind(v));
         }
         var output = new JsObject();
         foreach (var e in o)
         {
-            if (!Json.TryNumber(e.Value, out double n))
+            if (!JsonText.TryNumber(e.Value, out double n))
             {
-                throw new JsonParseException("metric " + Json.Quote(e.Key) + " must be a number, not " + Json.Kind(e.Value));
+                throw new JsonParseException("metric " + JsonText.Quote(e.Key) + " must be a number, not " + JsonText.Kind(e.Value));
             }
             output.Set(e.Key, n);
         }
@@ -145,7 +146,7 @@ public sealed class Metrics : IReadOnlyDictionary<string, double>, IEquatable<Me
         {
             foreach (var e in o)
             {
-                if (Json.TryNumber(e.Value, out double n))
+                if (JsonText.TryNumber(e.Value, out double n))
                 {
                     output.Set(e.Key, n);
                 }

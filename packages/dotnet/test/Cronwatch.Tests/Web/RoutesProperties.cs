@@ -78,9 +78,9 @@ public class RoutesProperties
                 bool tls = g.Bool();
                 byte[]? body = g.Bool() ? Encoding.UTF8.GetBytes(g.Bool() ? g.Joined(Bodies, 10) : g.AnyString(60)) : null;
                 var request = body == null
-                    ? new WebRequest(method, target) { Headers = headers, IsTls = tls }
-                    : new WebRequest(method, target) { Headers = headers, IsTls = tls, Body = body };
-                WebResponse r = await w.Routes.HandleAsync(request);
+                    ? new CronwatchRequest(method, target) { Headers = headers, IsTls = tls }
+                    : new CronwatchRequest(method, target) { Headers = headers, IsTls = tls, Body = body };
+                CronwatchResponse r = await w.Routes.HandleAsync(request);
                 Assert.True(r.Status != 500, "seed " + seed.ToString(CultureInfo.InvariantCulture) + " answered 500: " + r.Text());
             }
             Assert.True(w.Wheres().Count == 0, "reported: " + string.Join("; ", w.Messages()));
@@ -115,7 +115,7 @@ public class RoutesProperties
             }
             catch (Exception e) when (e is not Xunit.Sdk.XunitException)
             {
-                throw new InvalidOperationException("the property failed for seed " + seed.ToString(CultureInfo.InvariantCulture) + " on " + Json.Quote(text), e);
+                throw new InvalidOperationException("the property failed for seed " + seed.ToString(CultureInfo.InvariantCulture) + " on " + JsonText.Quote(text), e);
             }
         }
     }

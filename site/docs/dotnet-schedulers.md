@@ -31,7 +31,7 @@ Every attempt is a run of its own. An attempt that fails is a failed run with it
 
 ### The check
 
-Each integration's check runs a sync first: the scheduler's jobs are declared again, and the jobs of this app's that the store holds with a schedule the scheduler no longer has are declared again without it. It runs once a minute across the cluster, on the scheduler's own lock. `AddCronwatch`'s hosted check and `cw.Start()` check too, but without the sync, so a job taken out of the scheduler by a deploy keeps its schedule and is reported missed; prefer the integration's check, and give `AddCronwatch` `NoCheck = true` so each instance does not check again.
+Each integration's check runs a sync first: the scheduler's jobs are declared again, and the jobs of this app's that the store holds with a schedule the scheduler no longer has are declared again without it. It runs once a minute across the cluster, on the scheduler's own lock. `AddCronwatch`'s hosted check and `cw.StartChecking()` check too, but without the sync, so a job taken out of the scheduler by a deploy keeps its schedule and is reported missed; prefer the integration's check, and give `AddCronwatch` `NoCheck = true` so each instance does not check again.
 
 ## Hangfire
 
@@ -115,7 +115,7 @@ builder.Services.AddCronwatchJob<NightlyReport>("nightly-report", new JobOptions
 });
 ```
 
-Each fire is a run with the trigger `schedule`, the class (an `ICronwatchJob`) resolved from a new DI scope, its token cancelled at the job's timeout and at shutdown. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. `AddCronwatch`'s hosted check watches these jobs. [Hosted jobs](/docs/dotnet/#hosted-jobs) on the .NET page has the rest.
+Each fire is a run with the trigger `hosting` (`schedule` before 1.0), the class (an `ICronwatchJob`) resolved from a new DI scope, its token cancelled at the job's timeout and at shutdown. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. `AddCronwatch`'s hosted check watches these jobs. [Hosted jobs](/docs/dotnet/#hosted-jobs) on the .NET page has the rest.
 
 Coravel is not integrated: an invocable that should be watched wraps its body in a run.
 
@@ -137,3 +137,7 @@ A program a crontab runs needs no integration: the job's line wraps its work in 
 ```
 
 The program hands `CronwatchCli.RunAsync` the factory for your client, or in a Generic Host app returns `await app.RunCronwatchCommandAsync(args)`, which checks from the host's own services without starting it; `check` runs one check, prints what it did and answers non-zero when it fails. [From a crontab](/docs/dotnet/#from-a-crontab) on the .NET page has both sides.
+
+## Another scheduler
+
+The two integrations are built on `Cronwatch.Bridge` (`SchedulerBridge`, `Watch`, `Entry`), which declares a scheduler's entries as jobs and checks their schedules against the scheduler's own fire times. It is public for integration authors, but outside the 1.x promise: it changes as the integrations need, in any minor release. A scheduler of your own can wrap each job's work in `job.RunAsync`, which is promised.

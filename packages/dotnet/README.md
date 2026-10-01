@@ -56,7 +56,7 @@ string path = await nightly.RunAsync(async (job, ct) =>
 });
 
 CheckResult result = await cw.CheckAsync(); // missed and stuck runs, retries, pruning
-cw.Start(TimeSpan.FromMinutes(1)); // a check every minute, for a long-running process
+cw.StartChecking(TimeSpan.FromMinutes(1)); // a check every minute, for a long-running process
 await cw.SilenceAsync("nightly-report", "2h");
 ```
 
@@ -96,7 +96,7 @@ A run is judged once, however many processes finish it. A run id holding a NUL i
 
 ### Alerts, triage and pg_cron
 
-The SDK's fifteen channels are in `Cronwatch.Alerts`: Slack, Discord, a signed webhook, Resend, Postmark, SendGrid, Mailgun, SES, Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic, each made from its options (`new ResendChannel(new ResendOptions { ... })`), with `Slack.Webhook(url)` and `Discord.Webhook(url)` for the common case. `AnthropicTriage` adds a short diagnosis from Claude to each alert but recoveries, and `PgCronSource` watches the jobs Postgres's pg_cron runs:
+The SDK's fifteen channels are in `Cronwatch.Alerts`: Slack, Discord, a signed webhook, Resend, Postmark, SendGrid, Mailgun, SES, Twilio, Sentry, Honeybadger, Datadog, Rollbar, Bugsnag and New Relic, each made from its options (`new ResendChannel(new ResendOptions { ... })`), with `SlackChannel.Webhook(url)` and `DiscordChannel.Webhook(url)` for the common case. `AnthropicTriage` adds a short diagnosis from Claude to each alert but recoveries, and `PgCronSource` watches the jobs Postgres's pg_cron runs:
 
 ```csharp
 var pg = NpgsqlDataSource.Create(connectionString);
@@ -106,7 +106,7 @@ await using var cw = new CronwatchClient(new CronwatchOptions
     Store = SqlStore.Postgres(pg), // SqlStore.MySql(dataSource) for MySQL and MariaDB
     Alerts =
     {
-        Slack.Webhook(slackWebhookUrl),
+        SlackChannel.Webhook(slackWebhookUrl),
         new ResendChannel(new ResendOptions { ApiKey = resendApiKey, From = "cron@example.com", To = { "ops@example.com" } }),
     },
     Triage = new AnthropicTriage(), // reads ANTHROPIC_API_KEY when it runs
@@ -153,7 +153,7 @@ public sealed class NightlyReport(ReportBuilder reports) : ICronwatchJob
 }
 ```
 
-Each fire is a run with the trigger `schedule`, its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
+`AddCronwatch` and `AddCronwatchJob` are in the namespace `Microsoft.Extensions.DependencyInjection`, as Microsoft's own registration methods are, so they need no `using`; `ICronwatchJob` is in `Cronwatch.Hosting`. Each fire is a run with the trigger `hosting` (runs recorded before 1.0 carry `schedule`), its class resolved from a new DI scope. A fire that comes while the previous run is still going is skipped and logged once. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in Hangfire or Quartz.NET with a shared store. A crontab line can check from the app's own host without starting it (no web server, queue or hosted job starts):
 
 ```csharp
 var app = builder.Build();
@@ -201,7 +201,7 @@ public sealed class SendDigest(CronwatchClient cw) : IInvocable
 
 ### The dashboard and a job's handler on ASP.NET Core
 
-`Cronwatch.Hosting` holds the client in the app's container (`AddCronwatch`, a singleton disposed when the host stops, errors and warnings through the app's `ILogger`, a check every minute as a hosted service once the host has started, and `Retention`, `Token`, `CheckEvery` and `Environment` read from the `Cronwatch` section of the configuration). `Cronwatch.AspNetCore` serves the dashboard and its JSON API (the SDK's `cw.routes()`, the pages and answers byte for byte, so `@cronwatch/mcp` works against it) and a job's handler for a platform cron that calls a URL:
+`Cronwatch.Hosting` holds the client in the app's container (`AddCronwatch`, a singleton disposed when the host stops, errors and warnings through the app's `ILogger`, a check every minute as a hosted service once the host has started, and `Retention`, `Token`, `CheckEvery` and `Environment` read from the `Cronwatch` section of the configuration). `Cronwatch.AspNetCore` serves the dashboard and its JSON API (the SDK's `cw.routes()`, the pages and answers byte for byte, so `@cronwatch/mcp` works against it) and a job's handler for a platform cron that calls a URL. `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` are in the namespace `Microsoft.AspNetCore.Builder`, as `MapHealthChecks` is, so they need no `using`:
 
 ```csharp
 WebApplicationBuilder builder = WebApplication.CreateBuilder();
@@ -224,11 +224,11 @@ app.MapCronwatchHandler("/cron/nightly", "nightly-report", async (JobContext job
 
 The dashboard asks for its token as `Authorization: Bearer <token>`, or once as `?token=` on a page, which moves it into a cookie. In development with no token it makes one and prints a sign-in link on its first request; outside development with none it answers 503. `Token = DashboardToken.None` serves it open, behind the app's own sign-in: while it has a token its endpoints allow anonymous requests (so an app whose fallback policy requires a signed-in user still reaches the dashboard's sign-in), and open it takes the app's authorization policy. The endpoints skip antiforgery (the dashboard has its own cross-site check) and are left out of OpenAPI. `app.UseCronwatch("/cronwatch")` serves it as middleware instead, and `MapGroup("/admin").MapCronwatch()` under a group; middleware is no endpoint, so an open dashboard served that way is behind the app's sign-in only when `UseAuthentication` and `UseAuthorization`, with a fallback policy, come before it. A job's handler follows the same rule: while it has a secret its endpoint allows anonymous requests, and one open to anyone (`HandlerSecret.None`, or the client's `CronSecret.None`) takes the app's authorization policy. Behind a proxy, `RoutesOptions.Origin` names the public origin, or `TrustProxy` reads `X-Forwarded-Proto` and `X-Forwarded-Host`.
 
-Without ASP.NET Core, the routes and the handler are framework-free: any server hands them a `WebRequest` and writes the `WebResponse` back.
+Without ASP.NET Core, the routes and the handler are framework-free: any server hands them a `CronwatchRequest` and writes the `CronwatchResponse` back.
 
 ```csharp
 Routes routes = cw.Routes(new RoutesOptions { Token = "letmein-example" });
-WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/api/jobs")
+CronwatchResponse answer = await routes.HandleAsync(new CronwatchRequest("GET", "/cronwatch/api/jobs")
 {
     Headers = [new("host", "app.example.com"), new("authorization", "Bearer letmein-example")],
 });
@@ -237,6 +237,19 @@ WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/
 ### Telemetry
 
 An `ActivitySource` and a `Meter`, both named `Cronwatch`: an activity around each run and each check, and counters of runs, alerts and checks with a histogram of run durations. Add `.AddSource("Cronwatch")` and `.AddMeter("Cronwatch")` to an OpenTelemetry setup.
+
+## Deprecated
+
+These names still work through every 1.x release, marked `[Obsolete]`, and go in 2.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
+
+- `cw.Start(every)`: use `cw.StartChecking(every)`, since a job's `StartAsync` opens a run.
+- `Cronwatch.Web.WebRequest` and `WebResponse`: use `CronwatchRequest` and `CronwatchResponse`, since `System.Net` has types of those names. Each converts to and from its replacement, so code written against them still compiles, except a handler lambda that names the request's type.
+- `Cronwatch.Web.WebAdapters`: use `Adapters`, the Java port's name.
+- `Cronwatch.Hosting.CronwatchServiceCollectionExtensions` and `Cronwatch.AspNetCore.CronwatchAspNetCore`, the former classes of the extension methods, which are in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder` now: `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods.
+- `Slack.Webhook(url)` and `Discord.Webhook(url)`: use `SlackChannel.Webhook(url)` and `DiscordChannel.Webhook(url)`, on the channel types.
+- `Json.Quote`, `Json.Kind`, `Json.Copy`, `Json.TryNumber` and `Json.MaxDepth`: internal helpers, no longer promised; `Json.Parse`, `Json.ParseObject` and `Json.Stringify` are (`Json.Stringify(text)` quotes a string as `Quote` did).
+- `StoreContract.NewRun` and `ForeignRows`: fixture helpers, no longer promised; the store kit promises `StoreContract.RunAsync`, `StoreReplay` and `FinishOnce`.
+- `IConditionalRunStore`, `IStateCasStore` and `IRunDeletingStore`: use `IUpdateRunIfStore`, `ICompareAndSetStateStore` and `IDeleteRunIfStore`, named after their methods. Each former interface extends its replacement, so a store of your own that implements it is still used.
 
 ## Testing this package
 

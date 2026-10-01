@@ -120,12 +120,12 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         ArgumentNullException.ThrowIfNull(name);
         if (!ValidName(name))
         {
-            throw CronwatchException.Invalid("job name " + Json.Quote(name) + " must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"");
+            throw CronwatchException.Invalid("job name " + JsonText.Quote(name) + " must be 1 to 120 characters of letters, digits, \".\", \"_\", \":\" or \"-\"");
         }
         JsObject fields = _defaults.Copy();
         foreach (var e in options.Fields())
         {
-            fields.Set(e.Key, Json.Copy(e.Value));
+            fields.Set(e.Key, JsonText.Copy(e.Value));
         }
         fields.Set("name", name);
         Definition stored = Expect.ToStored(fields, options.Expect);
@@ -153,7 +153,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
 
     private void Validate(string name, Definition def)
     {
-        string quoted = Json.Quote(name);
+        string quoted = JsonText.Quote(name);
         try
         {
             if (def.Has("schedule"))
@@ -171,7 +171,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
                 string tz = def.Get("timezone") as string ?? "";
                 if (!Schedules.IsZone(tz))
                 {
-                    throw CronwatchException.Invalid("job " + quoted + ": timezone " + Json.Quote(tz) + " is not an IANA timezone");
+                    throw CronwatchException.Invalid("job " + quoted + ": timezone " + JsonText.Quote(tz) + " is not an IANA timezone");
                 }
             }
             if (def.Has("grace"))
@@ -189,7 +189,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
             if (def.Has("failuresBeforeAlert"))
             {
                 object? v = def.Get("failuresBeforeAlert");
-                double n = Json.TryNumber(v, out double x) ? x : 0;
+                double n = JsonText.TryNumber(v, out double x) ? x : 0;
                 if (!Js.IsInteger(n) || n < 1)
                 {
                     throw CronwatchException.Invalid("job " + quoted + ": failuresBeforeAlert must be a whole number, 1 or more (got " + AlertFormat.JsText(v) + ")");
@@ -199,7 +199,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
             {
                 foreach (var e in budget)
                 {
-                    double ceiling = Json.TryNumber(e.Value, out double c) ? c : 0;
+                    double ceiling = JsonText.TryNumber(e.Value, out double c) ? c : 0;
                     if (!double.IsFinite(ceiling) || ceiling < 0)
                     {
                         throw CronwatchException.Invalid("job " + quoted + ": budget." + e.Key + " must be a finite number, 0 or more (got " + Js.FormatNumber(ceiling) + ")");
@@ -244,7 +244,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     /// <exception cref="CronwatchException">When the job is not declared, or the store fails.</exception>
     public Task<bool> SyncJobAsync(string name, CancellationToken cancellationToken = default)
     {
-        JobDef declared = Declared(name) ?? throw CronwatchException.Invalid("job " + Json.Quote(name) + " is not declared in this process");
+        JobDef declared = Declared(name) ?? throw CronwatchException.Invalid("job " + JsonText.Quote(name) + " is not declared in this process");
         return Spawn(async () =>
         {
             await EnsureReadyAsync().ConfigureAwait(false);
@@ -296,7 +296,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
             }
             return true;
         }
-        if (Json.TryNumber(a, out double da) && Json.TryNumber(b, out double db))
+        if (JsonText.TryNumber(a, out double da) && JsonText.TryNumber(b, out double db))
         {
             return da == db;
         }
@@ -429,7 +429,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
         if (stored.Job != def.Name)
         {
             throw CronwatchException.Invalid(
-                "run " + Json.Quote(stored.Id) + " belongs to job " + Json.Quote(stored.Job) + ", not " + Json.Quote(def.Name));
+                "run " + JsonText.Quote(stored.Id) + " belongs to job " + JsonText.Quote(stored.Job) + ", not " + JsonText.Quote(def.Name));
         }
         bool finished = stored.Status == RunStatus.Ok || stored.Status == RunStatus.Failed;
         return new RunHandle(this, def, stored.Id, stored, true, finished ? "already finished as " + stored.Status.Value : null);
@@ -439,7 +439,7 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
     /// <exception cref="CronwatchException">Of kind <see cref="CronwatchErrorKind.Invalid"/> when it is not, or the run is another job's.</exception>
     public Task<RunHandle> ResumeRunAsync(string name, string runId, CancellationToken cancellationToken = default)
     {
-        JobDef def = Declared(name) ?? throw CronwatchException.Invalid("resumeRun: job " + Json.Quote(name) + " is not declared; call Job() first");
+        JobDef def = Declared(name) ?? throw CronwatchException.Invalid("resumeRun: job " + JsonText.Quote(name) + " is not declared; call Job() first");
         return ResumeHandleAsync(def, runId, cancellationToken);
     }
 
@@ -525,12 +525,17 @@ public sealed partial class CronwatchClient : IAsyncDisposable, IDisposable
 
     /// <summary>
     /// Checks on an interval (a minute by default, five seconds at least, at most 2^31 - 1 ms),
-    /// the first a second from now, on the client's clock: the SDK's <c>start()</c>, for a
-    /// long-running process. A second call does nothing.
+    /// the first a second from now, on the client's clock: the SDK's <c>startChecking()</c>, for a
+    /// long-running process. A second call does nothing. (A job's <c>StartAsync</c> opens a run;
+    /// this starts the checks.)
     /// </summary>
-    public void Start(Duration? every = null) => StartInterval(every is { } e ? e.Milliseconds("check interval") : 60_000);
+    public void StartChecking(Duration? every = null) => StartInterval(every is { } e ? e.Milliseconds("check interval") : 60_000);
 
-    /// <summary>Stops the interval.</summary>
+    /// <summary><see cref="StartChecking"/>, under its former name.</summary>
+    [Obsolete("Renamed StartChecking, since a job's StartAsync opens a run. This name still works through 1.x and goes in 2.0.")]
+    public void Start(Duration? every = null) => StartChecking(every);
+
+    /// <summary>Stops the checks <see cref="StartChecking"/> began.</summary>
     public void Stop() => StopInterval();
 
     // ---- what a source uses

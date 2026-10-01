@@ -16,7 +16,7 @@ namespace Cronwatch.StoreTesting;
 /// the SQL that plants each row, since only it can write raw rows into its database. Each method
 /// disposes the store with the client it makes.
 /// </summary>
-public static class ForeignRows
+internal static class ForeignRowChecks
 {
     /// <summary>
     /// The starts a foreign or damaged row could give a cron job's last run, as SQL literals:
@@ -127,4 +127,24 @@ public static class ForeignRows
             }
         }
     }
+}
+
+/// <summary>
+/// The foreign-row checks <c>ServerStoreTests</c> run over a server's raw rows: fixture helpers,
+/// not part of the 1.x promise, which covers <see cref="StoreContract.RunAsync"/>,
+/// <see cref="StoreReplay"/> and <see cref="FinishOnce"/>.
+/// </summary>
+[Obsolete("A fixture helper of the port's own tests, not part of the 1.x promise. It still works through 1.x and goes in 2.0.")]
+public static class ForeignRows
+{
+    /// <summary>The far start times the checks write.</summary>
+    public static IReadOnlyList<string> FarStarts => ForeignRowChecks.FarStarts;
+
+    /// <summary>A check over foreign rows written with <paramref name="sql"/>.</summary>
+    public static Task CheckOverForeignRowsAsync(IStore store, string prefix, Func<string, Task> sql) =>
+        ForeignRowChecks.CheckOverForeignRowsAsync(store, prefix, sql);
+
+    /// <summary>A cron job's check over a foreign row that started at <paramref name="startedAt"/>.</summary>
+    public static Task CronOverForeignRowAsync(IStore store, string prefix, string startedAt, Func<string, Task> sql) =>
+        ForeignRowChecks.CronOverForeignRowAsync(store, prefix, startedAt, sql);
 }

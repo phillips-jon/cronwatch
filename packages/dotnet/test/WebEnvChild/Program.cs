@@ -72,14 +72,14 @@ internal static class Cases
         new(new CronwatchOptions { CronSecret = CronSecret.None, ProcessExitHook = false, Alerts = [], Environment = environment });
 
     /// <summary>A request for a full URL, as a server would hand it over.</summary>
-    private static Task<WebResponse> Serve(Routes routes, string url, IEnumerable<KeyValuePair<string, string>> headers)
+    private static Task<CronwatchResponse> Serve(Routes routes, string url, IEnumerable<KeyValuePair<string, string>> headers)
     {
         bool tls = url.StartsWith("https://", StringComparison.Ordinal);
         string rest = url[(url.IndexOf("://", StringComparison.Ordinal) + 3)..];
         int slash = rest.IndexOf('/', StringComparison.Ordinal);
         var all = new List<KeyValuePair<string, string>> { new("host", slash < 0 ? rest : rest[..slash]) };
         all.AddRange(headers);
-        return routes.HandleAsync(new WebRequest("GET", slash < 0 ? "/" : rest[slash..]) { Headers = all, IsTls = tls });
+        return routes.HandleAsync(new CronwatchRequest("GET", slash < 0 ? "/" : rest[slash..]) { Headers = all, IsTls = tls });
     }
 
     private static KeyValuePair<string, string> H(string name, string value) => new(name, value);
@@ -89,10 +89,10 @@ internal static class Cases
         await using var cw = Client();
         Routes routes = cw.Routes();
         Check(routes.Token() == null, "no token");
-        WebResponse api = await Serve(routes, "http://localhost/cronwatch/api/jobs", None);
+        CronwatchResponse api = await Serve(routes, "http://localhost/cronwatch/api/jobs", None);
         Check(api.Status == 503, "api 503");
         Check(api.Text() == "{\"ok\":false,\"error\":\"CRONWATCH_TOKEN is not set\"}", api.Text());
-        WebResponse page = await Serve(routes, "http://localhost/cronwatch", None);
+        CronwatchResponse page = await Serve(routes, "http://localhost/cronwatch", None);
         Check(page.Status == 503, "page 503");
         Check(page.Text().Contains("CronWatch routes are locked", StringComparison.Ordinal), "locked page");
         Check(page.Text().Contains("DashboardToken.None", StringComparison.Ordinal), "names the opt-out");
@@ -122,11 +122,11 @@ internal static class Cases
         }
         string token = routes.Token()!;
         Console.Out.Write("TOKEN " + token + "\n");
-        WebResponse page = await Serve(routes, "http://localhost:3000/cronwatch/", None);
+        CronwatchResponse page = await Serve(routes, "http://localhost:3000/cronwatch/", None);
         Check(page.Text().Contains("sign-in link is in the server log", StringComparison.Ordinal), "the page says where");
-        WebResponse api = await Serve(routes, "http://localhost:3000/cronwatch/api/jobs", None);
+        CronwatchResponse api = await Serve(routes, "http://localhost:3000/cronwatch/api/jobs", None);
         Check(api.Text().Contains("in the server log", StringComparison.Ordinal), "the api says where");
-        WebResponse signIn = await Serve(routes, "http://localhost:3000/cronwatch/?token=" + token, None);
+        CronwatchResponse signIn = await Serve(routes, "http://localhost:3000/cronwatch/?token=" + token, None);
         Check(signIn.Status == 303, "sign-in");
         Check(signIn.Header("location") == "/cronwatch/", "location");
         string setCookie = signIn.Header("set-cookie")!;
@@ -160,7 +160,7 @@ internal static class Cases
         await using var cw = Client();
         Check(await Jobs(cw, new RoutesOptions()) == 401, "the environment's token asked for");
         Routes routes = cw.Routes(new RoutesOptions { Token = "" });
-        WebResponse res = await Serve(routes, "http://app.test/cronwatch/api/jobs", [H("authorization", "Bearer envtok")]);
+        CronwatchResponse res = await Serve(routes, "http://app.test/cronwatch/api/jobs", [H("authorization", "Bearer envtok")]);
         Check(res.Status == 200, "the environment's token");
     }
 
@@ -198,7 +198,7 @@ internal static class Cases
         foreach (string host in new[] { "evil.example/.localhost", "localhost:1@evil.example" })
         {
             Routes routes = cw.Routes();
-            await routes.HandleAsync(new WebRequest("GET", "/cronwatch/") { Headers = [H("host", host)] });
+            await routes.HandleAsync(new CronwatchRequest("GET", "/cronwatch/") { Headers = [H("host", host)] });
         }
     }
 
@@ -227,12 +227,12 @@ internal static class Cases
                 ran++;
                 return Task.CompletedTask;
             });
-            WebResponse res = await h.HandleAsync(new WebRequest("GET", "/"));
+            CronwatchResponse res = await h.HandleAsync(new CronwatchRequest("GET", "/"));
             Check(res.Status == 503, "503");
             Check(res.Text().Contains("CRON_SECRET is not set", StringComparison.Ordinal), res.Text());
             Check(res.Text().Contains("HandlerSecret.None", StringComparison.Ordinal), res.Text());
             Check(res.Header("content-type") == "application/json; charset=utf-8", "json");
-            await h.HandleAsync(new WebRequest("GET", "/"));
+            await h.HandleAsync(new CronwatchRequest("GET", "/"));
             Check(ran == 0, "ran");
             Check(wheres.Count == 1 && wheres[0] == "handler", "reported once: " + string.Join(", ", wheres));
             Check(messages[0].Contains("HandlerSecret.None", StringComparison.Ordinal), messages[0]);
@@ -241,14 +241,14 @@ internal static class Cases
             Handler open = cw.Job("open").Handler(
                 (j, r, ct) => Task.FromException(new InvalidOperationException("private detail")),
                 new HandlerOptions { Secret = HandlerSecret.None });
-            WebResponse failed = await open.HandleAsync(new WebRequest("GET", "/"));
+            CronwatchResponse failed = await open.HandleAsync(new CronwatchRequest("GET", "/"));
             Check(failed.Status == 500, "500");
             Check(!failed.Text().Contains("error", StringComparison.Ordinal), failed.Text());
         }
         // A client made with CronSecret.None lets anyone in.
         await using var anyone = Client();
         Handler any = anyone.Job("any").Handler((j, r, ct) => Task.CompletedTask);
-        Check((await any.HandleAsync(new WebRequest("GET", "/"))).Status == 200, "anyone");
+        Check((await any.HandleAsync(new CronwatchRequest("GET", "/"))).Status == 200, "anyone");
     }
 
     public static async Task HandlerDevelopment()
@@ -268,7 +268,7 @@ internal static class Cases
             },
         });
         Handler h = cw.Job("dev").Handler((j, r, ct) => Task.CompletedTask);
-        Check((await h.HandleAsync(new WebRequest("GET", "/"))).Status == 200, "development lets it run");
+        Check((await h.HandleAsync(new CronwatchRequest("GET", "/"))).Status == 200, "development lets it run");
         Check(wheres.Count == 0, "nothing reported");
     }
 
@@ -295,7 +295,7 @@ internal static class Cases
             ran++;
             return Task.CompletedTask;
         });
-        Check((await h.HandleAsync(new WebRequest("GET", "/"))).Status == 503, "503");
+        Check((await h.HandleAsync(new CronwatchRequest("GET", "/"))).Status == 503, "503");
         Check(ran == 0, "ran");
         // With nothing given, the variables are read.
         await using var fallback = Client();

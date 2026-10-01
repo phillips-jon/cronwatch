@@ -210,7 +210,7 @@ public class CorrectnessTests
     {
         var counter = new CountingSource();
         await using var m = Make(sources: [counter]);
-        m.Cw.Start();
+        m.Cw.StartChecking();
         m.Cw.Stop();
         m.Clock.Advance(5_000);
         await Task.Delay(50);

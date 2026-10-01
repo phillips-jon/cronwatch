@@ -34,9 +34,12 @@ internal static class Env
 
     private static readonly string[] DotNet = ["ASPNETCORE_ENVIRONMENT", "DOTNET_ENVIRONMENT"];
 
-    public static string Environment(string? fallback = null)
+    public static string Environment(string? fallback = null) => Environment(fallback, System.Environment.GetEnvironmentVariable);
+
+    /// <summary>The environment as <see cref="Environment(string?)"/> reads it, from <paramref name="variable"/>.</summary>
+    internal static string Environment(string? fallback, Func<string, string?> variable)
     {
-        string? own = First(Own);
+        string? own = First(Own, variable);
         if (own != null)
         {
             return own;
@@ -46,14 +49,14 @@ internal static class Env
         {
             return given;
         }
-        return First(DotNet) ?? "";
+        return First(DotNet, variable) ?? "";
     }
 
-    private static string? First(string[] variables)
+    private static string? First(string[] variables, Func<string, string?> variable)
     {
         foreach (string name in variables)
         {
-            string? value = System.Environment.GetEnvironmentVariable(name);
+            string? value = variable(name);
             if (value == null)
             {
                 continue;
@@ -235,7 +238,10 @@ internal static class HttpFailure
     public static string? Of(object? value) => value switch
     {
         HttpResponseMessage m => Text((int)m.StatusCode, m.ReasonPhrase),
+        Web.CronwatchResponse w => Text(w.Status),
+#pragma warning disable CS0618 // the former name, kept through 1.x
         Web.WebResponse w => Text(w.Status),
+#pragma warning restore CS0618
         _ => null,
     };
 }

@@ -74,7 +74,7 @@ public sealed record Alert
     {
         if (v is not JsObject o)
         {
-            throw new JsonParseException("an alert must be an object, not " + Json.Kind(v));
+            throw new JsonParseException("an alert must be an object, not " + JsonText.Kind(v));
         }
         var type = new AlertType(Values.String(o, "type"));
         Run? run = null;

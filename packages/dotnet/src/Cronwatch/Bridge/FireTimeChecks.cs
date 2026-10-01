@@ -10,6 +10,7 @@ namespace Cronwatch.Bridge;
 /// scheduler every minute walks only what changed: a cron that fires each second in a zone with
 /// daylight saving takes most of a second to walk. Only what the last read saw is kept. Safe to
 /// use from many threads at once.
+/// For integration authors, outside the 1.x promise: the bridge changes as the integrations need, in any minor release.
 /// </summary>
 public sealed class FireTimeChecks
 {

@@ -182,7 +182,7 @@ public class AuditCoreTests
         });
         var job = cw.Job("scoped-handler");
         Handler handler = job.Handler((j, request, ct) => Task.CompletedTask);
-        Assert.Equal(200, (await handler.HandleAsync(new WebRequest("GET", "/"))).Status);
+        Assert.Equal(200, (await handler.HandleAsync(new CronwatchRequest("GET", "/"))).Status);
         Assert.Equal(["scoped-handler"], scopes);
     }
 

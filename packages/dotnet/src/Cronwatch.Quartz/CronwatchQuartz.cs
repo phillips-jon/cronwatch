@@ -319,7 +319,7 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     internal static string NameOf(JobKey key) =>
         key.Group == JobKey.DefaultGroup ? key.Name : key.Group + "." + key.Name;
 
-    private static string Label(string name) => "Quartz job " + Json.Quote(name);
+    private static string Label(string name) => "Quartz job " + Json.Stringify(name);
 
     private JobOptions? OptionsFor(string name) => _options.Jobs.TryGetValue(name, out var given) ? given : null;
 
@@ -364,10 +364,10 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         string schedule = "";
         string zone = "";
         string? problem = null;
-        string triggerName = Json.Quote(trigger.Key.ToString());
+        string triggerName = Json.Stringify(trigger.Key.ToString());
         if (trigger.CalendarName is { } calendar)
         {
-            problem = "cronwatch: " + label + "'s trigger " + triggerName + " has the calendar " + Json.Quote(calendar)
+            problem = "cronwatch: " + label + "'s trigger " + triggerName + " has the calendar " + Json.Stringify(calendar)
                 + ", which excludes times CronWatch cannot know, so it is watched without a schedule";
         }
         else if (trigger is ICronTrigger cron)
@@ -377,7 +377,7 @@ public sealed class CronwatchQuartz : IAsyncDisposable
             string expression = cron.CronExpressionString ?? "";
             if (zoneId == null)
             {
-                problem = "cronwatch: " + label + "'s trigger " + triggerName + " is in the zone " + Json.Quote(tz.Id)
+                problem = "cronwatch: " + label + "'s trigger " + triggerName + " is in the zone " + Json.Stringify(tz.Id)
                     + ", which has no IANA name, so it is watched without a schedule";
             }
             else
@@ -466,7 +466,7 @@ public sealed class CronwatchQuartz : IAsyncDisposable
         }
         catch (Exception e) when (e is FormatException or ArgumentException)
         {
-            throw new ScheduleException("cronwatch: " + label + " is " + Json.Quote(expression) + ", which Quartz cannot read: " + e.Message);
+            throw new ScheduleException("cronwatch: " + label + " is " + Json.Stringify(expression) + ", which Quartz cannot read: " + e.Message);
         }
         bool daily = fields.Length >= 6 && IsAny(fields[3]) && IsAny(fields[4]) && IsAny(fields[5]) && (fields.Length < 7 || IsAny(fields[6]));
         SchedulerBridge.CheckFires(SchedulerBridge.Walking(at => NextAfter(quartz, at), Scheduler), expr, zoneId, "cronwatch: " + label, Scheduler, daily, now);

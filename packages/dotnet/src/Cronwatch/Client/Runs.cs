@@ -129,22 +129,28 @@ public sealed partial class CronwatchClient
         }
     }
 
+    /// <summary>
+    /// The longest run id, in UTF-16 code units (JavaScript's string length): what a run's start,
+    /// <c>ResumeAsync</c> and <c>RecordRunAsync</c> take, and every store holds.
+    /// </summary>
+    private const int MaxRunId = 200;
+
     internal static void CheckRunId(string job, string id, string method)
     {
-        if (id.Length == 0 || id.Length > 200)
+        if (id.Length == 0 || id.Length > MaxRunId)
         {
             throw CronwatchException.Invalid(
-                "job " + Json.Quote(job) + ": " + method + "() needs a run id of 1 to 200 characters (got " + id.Length + " characters)");
+                "job " + JsonText.Quote(job) + ": " + method + "() needs a run id of 1 to " + MaxRunId + " characters (got " + id.Length + " characters)");
         }
         // Postgres refuses NUL in text, so no store could hold such an id.
         if (id.Contains('\0', StringComparison.Ordinal))
         {
-            throw CronwatchException.Invalid("job " + Json.Quote(job) + ": " + method + "() cannot take a run id containing a NUL character");
+            throw CronwatchException.Invalid("job " + JsonText.Quote(job) + ": " + method + "() cannot take a run id containing a NUL character");
         }
         if (id.StartsWith(ReservedRunIdPrefix, StringComparison.Ordinal))
         {
             throw CronwatchException.Invalid(
-                "job " + Json.Quote(job) + ": " + method + "() cannot take a run id starting with " + Json.Quote(ReservedRunIdPrefix)
+                "job " + JsonText.Quote(job) + ": " + method + "() cannot take a run id starting with " + JsonText.Quote(ReservedRunIdPrefix)
                 + ", which the pg_cron source uses for its runs");
         }
     }
@@ -343,7 +349,7 @@ public sealed partial class CronwatchClient
     private async Task<bool> DiscardRunAsync(Run run)
     {
         string where = "discarding " + run.Job;
-        if (_store is not IRunDeletingStore deleting)
+        if (_store is not IDeleteRunIfStore deleting)
         {
             Report("the store cannot take back a run (it has no DeleteRunIfAsync); recorded as it ended", where);
             return false;
@@ -532,7 +538,7 @@ public sealed partial class CronwatchClient
                 }
                 if (stored.Job != run.Job)
                 {
-                    return "belongs to job " + Json.Quote(stored.Job);
+                    return "belongs to job " + JsonText.Quote(stored.Job);
                 }
             }
         }
@@ -624,10 +630,16 @@ public sealed partial class CronwatchClient
     private async Task<IReadOnlyList<Alert>> RecordRunNowAsync(Run input, bool evaluate)
     {
         JobDef def = Declared(input.Job)
-            ?? throw CronwatchException.Invalid("recordRun: job " + Json.Quote(input.Job) + " is not declared; call Job() first");
+            ?? throw CronwatchException.Invalid("recordRun: job " + JsonText.Quote(input.Job) + " is not declared; call Job() first");
+        // The longest id a run's start takes; MySQL's column would hold 255, but every store holds 200.
+        if (input.Id.Length == 0 || input.Id.Length > MaxRunId)
+        {
+            throw CronwatchException.Invalid(
+                "recordRun: run ids must be 1 to " + MaxRunId + " characters (got " + input.Id.Length + " characters; job " + JsonText.Quote(input.Job) + ")");
+        }
         if (input.Id.Contains('\0', StringComparison.Ordinal))
         {
-            throw CronwatchException.Invalid("recordRun: run ids cannot contain a NUL character (job " + Json.Quote(input.Job) + ")");
+            throw CronwatchException.Invalid("recordRun: run ids cannot contain a NUL character (job " + JsonText.Quote(input.Job) + ")");
         }
         // Refused as a job's Metric refuses them: a store keeps NaN and infinity as null.
         foreach (var metric in input.Metrics)
@@ -635,7 +647,7 @@ public sealed partial class CronwatchClient
             if (!double.IsFinite(metric.Value))
             {
                 throw CronwatchException.Invalid(
-                    "recordRun: metric " + Json.Quote(metric.Key) + " must be a finite number (job " + Json.Quote(input.Job) + ", run " + Json.Quote(input.Id) + ")");
+                    "recordRun: metric " + JsonText.Quote(metric.Key) + " must be a finite number (job " + JsonText.Quote(input.Job) + ", run " + JsonText.Quote(input.Id) + ")");
             }
         }
         await SyncAsync(def).ConfigureAwait(false);
@@ -699,7 +711,7 @@ public sealed partial class CronwatchClient
         string where = "recording " + run.Job;
         if (stored.Job != run.Job)
         {
-            Report("run " + run.Id + " of " + run.Job + " belongs to job " + Json.Quote(stored.Job) + "; ignored", where);
+            Report("run " + run.Id + " of " + run.Job + " belongs to job " + JsonText.Quote(stored.Job) + "; ignored", where);
             return [];
         }
         bool open = stored.Status == RunStatus.Running || stored.Status == RunStatus.Timeout;

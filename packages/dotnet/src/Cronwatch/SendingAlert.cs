@@ -45,7 +45,7 @@ public sealed record SendingAlert
             return new SendingAlert();
         }
         long? until = null;
-        if (Json.TryNumber(o.Get("until"), out double d))
+        if (JsonText.TryNumber(o.Get("until"), out double d))
         {
             // A whole millisecond, rounded up, so a fractional end is past the same instants.
             until = Js.ToLong(System.Math.Ceiling(d));

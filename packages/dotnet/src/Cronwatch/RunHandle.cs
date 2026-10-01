@@ -158,7 +158,7 @@ public sealed class RunHandle
             if (stored.Job != name)
             {
                 PutBack(taken);
-                _client.Report("run " + Id + " of " + name + " belongs to job " + Json.Quote(stored.Job) + "; ignored", "flushing " + name);
+                _client.Report("run " + Id + " of " + name + " belongs to job " + JsonText.Quote(stored.Job) + "; ignored", "flushing " + name);
                 return;
             }
             string? output = lines == null ? stored.Output : JoinOutput(stored.Output, OutputText.RedactAndCap(lines, _client.Redact));
@@ -301,7 +301,7 @@ public sealed class RunHandle
             }
             if (prior.Job != name)
             {
-                Ignored("belongs to job " + Json.Quote(prior.Job));
+                Ignored("belongs to job " + JsonText.Quote(prior.Job));
                 return null;
             }
             if (prior.Status == RunStatus.Ok || prior.Status == RunStatus.Failed)

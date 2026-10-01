@@ -53,7 +53,7 @@ public class ChannelTests
     private static IChannel Refused(string which) => which switch
     {
         "slack" => new SlackChannel(new SlackOptions()),
-        "discord" => Discord.Webhook(""),
+        "discord" => DiscordChannel.Webhook(""),
         "webhook" => new WebhookChannel(new WebhookOptions { Secret = Secret }),
         "resend" => new ResendChannel(new ResendOptions { ApiKey = "  \n", From = "a@example.com", To = { "b@example.com" } }),
         "resend-from" => new ResendChannel(new ResendOptions { ApiKey = Secret, To = { "b@example.com" } }),
@@ -121,8 +121,8 @@ public class ChannelTests
             Assert.DoesNotContain("+15551110000", text, StringComparison.Ordinal);
             Assert.Contains("set", text, StringComparison.Ordinal);
         }
-        Assert.Equal("SlackChannel", Slack.Webhook("https://hooks.example/" + Secret).ToString());
-        Assert.Equal("DiscordChannel", Discord.Webhook("https://hooks.example/" + Secret).ToString());
+        Assert.Equal("SlackChannel", SlackChannel.Webhook("https://hooks.example/" + Secret).ToString());
+        Assert.Equal("DiscordChannel", DiscordChannel.Webhook("https://hooks.example/" + Secret).ToString());
     }
 
     [Fact]
@@ -139,19 +139,21 @@ public class ChannelTests
         Alert alert = ChannelsConformanceTests.Sample();
         await channel.SendAsync(alert, new ChannelContext(_ => { }), CancellationToken.None);
         TransportRequest sent = Assert.Single(rec.Taken());
+        // The payload's version first, then the alert's own fields.
+        string body = "{\"schema\":1," + alert.ToJson()[1..];
         Assert.Equal(
-            ["content-type: application/cloudevents+json", "user-agent: cronwatch", "x-one: 2", "x-cronwatch-signature: sha256=" + WebhookChannel.Signature("s3cret", alert.ToJson())],
+            ["content-type: application/cloudevents+json", "user-agent: cronwatch", "x-one: 2", "x-cronwatch-signature: sha256=" + WebhookChannel.Signature("s3cret", body)],
             sent.Headers.Select(h => h.Key + ": " + h.Value).ToList());
-        Assert.Equal(alert.ToJson(), Recorder.Body(sent));
+        Assert.Equal(body, Recorder.Body(sent));
         // The receiver's check, as the SDK documents it: HMAC-SHA256 of the raw body, hex.
-        Assert.Equal(ChannelShared.Hex(System.Security.Cryptography.HMACSHA256.HashData("s3cret"u8, sent.Body.Span)), WebhookChannel.Signature("s3cret", alert.ToJson()));
+        Assert.Equal(ChannelShared.Hex(System.Security.Cryptography.HMACSHA256.HashData("s3cret"u8, sent.Body.Span)), WebhookChannel.Signature("s3cret", body));
     }
 
     [Fact]
     public async Task A_channel_without_a_transport_posts_through_the_clients()
     {
         var rec = new Recorder();
-        var channel = Slack.Webhook("https://hooks.slack.example/T/B/" + Secret);
+        var channel = SlackChannel.Webhook("https://hooks.slack.example/T/B/" + Secret);
         await channel.SendAsync(ChannelsConformanceTests.Sample(), new ChannelContext(_ => { }, rec), CancellationToken.None);
         Assert.Equal("https://hooks.slack.example/T/B/" + Secret, Assert.Single(rec.Taken()).Url);
     }

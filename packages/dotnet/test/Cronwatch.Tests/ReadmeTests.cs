@@ -67,7 +67,7 @@ public class ReadmeTests
             });
 
             CheckResult result = await cw.CheckAsync(); // missed and stuck runs, retries, pruning
-            cw.Start(TimeSpan.FromMinutes(1)); // a check every minute, for a long-running process
+            cw.StartChecking(TimeSpan.FromMinutes(1)); // a check every minute, for a long-running process
             await cw.SilenceAsync("nightly-report", "2h");
             // End of the README's example.
 
@@ -177,7 +177,7 @@ public class ReadmeTests
             Store = SqlStore.Postgres(pg), // SqlStore.MySql(dataSource) for MySQL and MariaDB
             Alerts =
             {
-                Slack.Webhook(slackWebhookUrl),
+                SlackChannel.Webhook(slackWebhookUrl),
                 new ResendChannel(new ResendOptions { ApiKey = resendApiKey, From = "cron@example.com", To = { "ops@example.com" } }),
             },
             Triage = new AnthropicTriage(), // reads ANTHROPIC_API_KEY when it runs

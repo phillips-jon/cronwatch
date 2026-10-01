@@ -12,7 +12,8 @@ namespace Cronwatch.Hosting;
 /// (<c>Retention</c>, <c>Token</c>, <c>CheckEvery</c>, <c>Environment</c>), with what the host
 /// gives besides: the app's <c>ILogger</c> for errors and warnings, the host's environment, and
 /// every <see cref="IChannel"/> in the container as a channel. <see cref="ToString"/> never shows
-/// a secret.
+/// a secret. Each of <see cref="CronwatchOptions"/>' settings is here under the same name, but
+/// <c>RunScope</c>, which the host fills with its <c>ILogger</c> scope; a test holds the two in step.
 /// </summary>
 [DebuggerDisplay("{ToString(),nq}")]
 public sealed class CronwatchHostOptions
@@ -46,6 +47,12 @@ public sealed class CronwatchHostOptions
 
     /// <summary>A diagnosis for each alert, or null for none.</summary>
     public ITriage? Triage { get; set; }
+
+    /// <summary>
+    /// The one POST every channel and triage make, unless one has a transport of its own (see
+    /// <see cref="CronwatchOptions.Transport"/>). Default: the client's own.
+    /// </summary>
+    public Cronwatch.Alerts.ITransport? Transport { get; set; }
 
     /// <summary>Sources synced at the start of every check.</summary>
     public IList<ISource> Sources => _sources;

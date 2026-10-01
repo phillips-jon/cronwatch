@@ -34,8 +34,8 @@ public class JsTests
     [Fact]
     public void Strings_escape_only_what_javascript_escapes()
     {
-        Assert.Equal("\"<a>&'+é\\u0000\\n\\ud83d\"", Json.Quote("<a>&'+é\0\n\ud83d"));
-        Assert.Equal("\"\ud83d\ude00\"", Json.Quote("\ud83d\ude00"));
+        Assert.Equal("\"<a>&'+é\\u0000\\n\\ud83d\"", JsonText.Quote("<a>&'+é\0\n\ud83d"));
+        Assert.Equal("\"\ud83d\ude00\"", JsonText.Quote("\ud83d\ude00"));
     }
 
     [Fact]

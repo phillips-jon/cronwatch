@@ -104,11 +104,11 @@ public abstract class ServerStoreTests
     {
         await using var server = Connect();
         string p = server.Prefix("far");
-        await ForeignRows.CheckOverForeignRowsAsync(Store(server.Source).WithPrefix(p), p, server.ExecAsync);
-        foreach (string start in ForeignRows.FarStarts)
+        await ForeignRowChecks.CheckOverForeignRowsAsync(Store(server.Source).WithPrefix(p), p, server.ExecAsync);
+        foreach (string start in ForeignRowChecks.FarStarts)
         {
             string each = server.Prefix("cron");
-            await ForeignRows.CronOverForeignRowAsync(Store(server.Source).WithPrefix(each), each, start, server.ExecAsync);
+            await ForeignRowChecks.CronOverForeignRowAsync(Store(server.Source).WithPrefix(each), each, start, server.ExecAsync);
         }
     }
 
@@ -172,7 +172,7 @@ public abstract class ServerStoreTests
         await store.InitAsync();
         foreach (string id in new[] { "b", "a", "c" })
         {
-            await store.InsertRunAsync(StoreContract.NewRun(id, "j", RunStatus.Running, 1000));
+            await store.InsertRunAsync(StoreContract.MakeRun(id, "j", RunStatus.Running, 1000));
         }
         Assert.Equal(["c", "a", "b"], (await store.ListRunsAsync("j", 10)).Select(r => r.Id));
         Assert.Equal(["b", "a", "c"], (await store.RunningRunsAsync()).Select(r => r.Id));
@@ -368,7 +368,7 @@ public abstract class MySqlFamilyStoreTests : ServerStoreTests
         await using var server = new Server(Databases.MySql(url, useAffectedRows));
         var store = Store(server.Source).WithPrefix(server.Prefix("landed"));
         await store.InitAsync();
-        var finished = StoreContract.NewRun("r1", "j", RunStatus.Ok, 1000) with { FinishedAt = 2000, DurationMs = 1000, Metrics = Metrics.Of([new("b", 2), new("a", 1)]) };
+        var finished = StoreContract.MakeRun("r1", "j", RunStatus.Ok, 1000) with { FinishedAt = 2000, DurationMs = 1000, Metrics = Metrics.Of([new("b", 2), new("a", 1)]) };
         await store.InsertRunAsync(finished);
         // The same values over a row already holding them: matched, but not changed.
         Assert.True(await store.UpdateRunIfAsync(finished, [RunStatus.Ok]));

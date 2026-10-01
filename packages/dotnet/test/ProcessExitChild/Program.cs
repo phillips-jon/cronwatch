@@ -44,7 +44,7 @@ Environment.Exit(3);
 /// and holds the insert back for half a second, so the process is stopping before the client has
 /// seen the insert return.
 /// </summary>
-internal sealed class ExitAfterInsert(SqlStore inner) : IStore, IConditionalRunStore, IStateCasStore
+internal sealed class ExitAfterInsert(SqlStore inner) : IStore, IUpdateRunIfStore, ICompareAndSetStateStore
 {
     public async Task InsertRunAsync(Run run, CancellationToken cancellationToken = default)
     {

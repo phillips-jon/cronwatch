@@ -103,7 +103,7 @@ public class HostingTests
     public void Nothing_public_in_the_hosting_packages_hands_out_a_secret()
     {
         var secretish = new[] { "secret", "token", "apikey", "password", "webhook", "url", "dsn" };
-        foreach (var assembly in new[] { typeof(CronwatchHostOptions).Assembly, typeof(CronwatchAspNetCore).Assembly })
+        foreach (var assembly in new[] { typeof(CronwatchHostOptions).Assembly, typeof(CronwatchAspNetCoreExtensions).Assembly })
         {
             foreach (Type t in assembly.GetExportedTypes())
             {

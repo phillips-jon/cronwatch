@@ -45,12 +45,19 @@ public sealed class WebhookOptions
 }
 
 /// <summary>
-/// POSTs each alert as JSON to any URL (<c>alerts/webhook.ts</c>). The body is the
-/// <see cref="Alert"/> as the SDK writes it (<see cref="Alert.ToJson"/>). A redirect is an error:
-/// point the URL at where the receiver really is.
+/// POSTs each alert as JSON to any URL (<c>alerts/webhook.ts</c>). The body is the payload's
+/// version, <c>"schema":1</c>, first, then the <see cref="Alert"/> as the SDK writes it
+/// (<see cref="Alert.ToJson"/>); its JSON Schema is https://cronwatch.dev/schemas/webhook/1.json.
+/// A redirect is an error: point the URL at where the receiver really is.
 /// </summary>
 public sealed class WebhookChannel : IChannel
 {
+    /// <summary>
+    /// The payload's version, sent as its first field. It goes up only if a major release changes
+    /// the payload in a way that is not additive.
+    /// </summary>
+    private const int Schema = 1;
+
     private readonly string _url;
     private readonly List<KeyValuePair<string, string>> _headers;
     private readonly string _secret;
@@ -90,7 +97,12 @@ public sealed class WebhookChannel : IChannel
     {
         ArgumentNullException.ThrowIfNull(alert);
         ArgumentNullException.ThrowIfNull(context);
-        string body = alert.ToJson();
+        var payload = new JsObject().Set("schema", Schema);
+        foreach (var field in alert.ToValue())
+        {
+            payload.Set(field.Key, field.Value);
+        }
+        string body = payload.ToJson();
         // A JavaScript object's keys: an exact name given again keeps its place.
         var headers = new JsObject().Set("content-type", "application/json").Set("user-agent", "cronwatch");
         foreach (var h in _headers)

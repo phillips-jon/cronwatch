@@ -693,7 +693,7 @@ Java (Java 21 or newer)
    builder.Services.AddCronwatch(o =>
    {
        o.Store = SqlStore.Postgres(dataSource);   // or SqlStore.Sqlite, SqlStore.MySql
-       o.Alerts.Add(Slack.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
+       o.Alerts.Add(SlackChannel.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
    });
 
    It is a singleton that checks every minute as a hosted service and logs
@@ -703,7 +703,7 @@ Java (Java 21 or newer)
    await using var cw = new CronwatchClient(new CronwatchOptions
    {
        Store = SqlStore.Sqlite(SqliteFactory.Instance.CreateDataSource("Data Source=cronwatch.db")),
-       Alerts = { Slack.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
+       Alerts = { SlackChannel.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
    });
 
    Other channels in Cronwatch.Alerts, each made from its options
@@ -735,7 +735,7 @@ Java (Java 21 or newer)
      and wrap each iteration's work in await nightly.RunAsync(async (job, ct)
      => { ...; job.Log("Report written"); }, stoppingToken). A new job that
      only needs a cron inside the host can be a class implementing
-     ICronwatchJob, registered with services.AddCronwatchJob<T>(name,
+     ICronwatchJob (using Cronwatch.Hosting), registered with services.AddCronwatchJob<T>(name,
      options), which runs it on that schedule.
    - Anything else, or a program a crontab runs: the same RunAsync. What the
      function throws fails the run and is thrown again; in a crontab
@@ -748,7 +748,7 @@ Java (Java 21 or newer)
 4. Run the check every few minutes so missed and stuck runs are noticed:
    AddCronwatch does it as a hosted service (CheckEvery, a minute by
    default); with Hangfire or Quartz.NET their check job above runs it once
-   per cluster, so set o.NoCheck = true in AddCronwatch; cw.Start() in any
+   per cluster, so set o.NoCheck = true in AddCronwatch; cw.StartChecking() in any
    other long-running process; or, for a program a crontab runs, a second
    crontab line running the app with the arguments "cronwatch check". In a
    Generic Host app, end Main with return await

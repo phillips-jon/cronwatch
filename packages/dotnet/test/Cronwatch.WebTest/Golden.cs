@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Cronwatch.Internal;
 using Cronwatch.Web;
 
 namespace Cronwatch.WebTest;
@@ -76,7 +77,7 @@ public static partial class Golden
     public const long T0 = 1_767_605_400_000L;
 
     /// <summary>How many captures golden.json holds.</summary>
-    public const int CaptureCount = 63;
+    public const int CaptureCount = 66;
 
     /// <summary>The captures whose request target is not a valid percent-encoding.</summary>
     public static readonly IReadOnlySet<string> MalformedTargets = new HashSet<string>(StringComparer.Ordinal) { "/cronwatch/jobs/%zz", "/cronwatch/api/jobs/%zz" };
@@ -119,6 +120,19 @@ public static partial class Golden
         return output;
     }
 
+    /// <summary>
+    /// <c>GET /api</c>'s answer names the library, its language and its version, which differ from
+    /// port to port: golden.json holds <c>&lt;library&gt;</c>, <c>&lt;language&gt;</c> and
+    /// <c>&lt;version&gt;</c> in their place, and this port puts in its own.
+    /// </summary>
+    private static string About(string body)
+    {
+        const string Placeholders = """{"ok":true,"library":"<library>","language":"<language>","version":"<version>",""";
+        return body.StartsWith(Placeholders, StringComparison.Ordinal)
+            ? """{"ok":true,"library":"Cronwatch","language":"dotnet","version":""" + JsonText.Quote(CronwatchClient.Version) + "," + body[Placeholders.Length..]
+            : body;
+    }
+
     /// <summary>The captures, in order.</summary>
     public static IReadOnlyList<Capture> Captures()
     {
@@ -139,7 +153,7 @@ public static partial class Golden
                 o.Get("body") as string,
                 (int)(double)o.Get("status")!,
                 Pairs(o.Get("responseHeaders")),
-                (string)o.Get("responseBody")!));
+                About((string)o.Get("responseBody")!)));
         }
         if (output.Count != CaptureCount)
         {
@@ -301,14 +315,14 @@ public static partial class Golden
         });
     }
 
-    /// <summary>The capture as a <see cref="WebRequest"/> for <paramref name="path"/>, from <c>app.test</c>.</summary>
-    public static WebRequest Request(Capture c, string path, string? mount = null)
+    /// <summary>The capture as a <see cref="CronwatchRequest"/> for <paramref name="path"/>, from <c>app.test</c>.</summary>
+    public static CronwatchRequest Request(Capture c, string path, string? mount = null)
     {
         var headers = new List<KeyValuePair<string, string>> { new("host", "app.test") };
         headers.AddRange(c.Headers);
         return c.BodyBytes is { } body
-            ? new WebRequest(c.Method, path) { Headers = headers, Body = body, Mount = mount }
-            : new WebRequest(c.Method, path) { Headers = headers, Mount = mount };
+            ? new CronwatchRequest(c.Method, path) { Headers = headers, Body = body, Mount = mount }
+            : new CronwatchRequest(c.Method, path) { Headers = headers, Mount = mount };
     }
 
     /// <summary>
@@ -368,7 +382,7 @@ public static partial class Golden
         foreach (Capture c in Captures())
         {
             string path = await ResolveAsync(seeded.Client, c.Path);
-            WebResponse answer = await routes.HandleAsync(Request(c, path));
+            CronwatchResponse answer = await routes.HandleAsync(Request(c, path));
             // Straight into the routes nothing is added: no content-length, as the SDK's answers.
             Compare(c, answer.Status, answer.Headers, answer.Body.ToArray(), ids, new HashSet<string>());
             matched++;

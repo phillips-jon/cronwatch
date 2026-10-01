@@ -2,7 +2,7 @@ using System;
 
 namespace Cronwatch.Bridge;
 
-/// <summary>One job a scheduler runs, as an integration reads it.</summary>
+/// <summary>One job a scheduler runs, as an integration reads it. For integration authors, outside the 1.x promise: the bridge changes as the integrations need, in any minor release.</summary>
 public sealed class Entry
 {
     /// <summary>An entry.</summary>

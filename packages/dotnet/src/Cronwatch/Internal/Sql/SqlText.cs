@@ -51,7 +51,7 @@ internal static class SqlText
         if (!ok)
         {
             throw new ArgumentException(
-                "cronwatch: invalid table prefix " + Json.Quote(prefix)
+                "cronwatch: invalid table prefix " + JsonText.Quote(prefix)
                 + ". Use lowercase letters, digits and underscores, not starting with a digit, at most "
                 + MaxPrefix.ToString(CultureInfo.InvariantCulture) + " characters.");
         }

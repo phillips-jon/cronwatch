@@ -189,7 +189,7 @@ internal static class Support
     /// A store over another whose methods throw while named in <see cref="Broken"/>, whose
     /// conditional run update can be held at a gate, and whose compare-and-set can refuse.
     /// </summary>
-    public class Wrapped(IStore inner) : IStore, IConditionalRunStore, IStateCasStore, IRunDeletingStore
+    public class Wrapped(IStore inner) : IStore, IUpdateRunIfStore, ICompareAndSetStateStore, IDeleteRunIfStore
     {
         public Wrapped()
             : this(new MemoryStore())
@@ -344,7 +344,7 @@ internal static class Support
             {
                 await gate;
             }
-            return await ((IConditionalRunStore)Inner).UpdateRunIfAsync(run, from, cancellationToken);
+            return await ((IUpdateRunIfStore)Inner).UpdateRunIfAsync(run, from, cancellationToken);
         }
 
         public Task<bool> CompareAndSetStateAsync(JobState state, long expected, CancellationToken cancellationToken = default)
@@ -354,13 +354,13 @@ internal static class Support
             {
                 return Task.FromResult(false);
             }
-            return ((IStateCasStore)Inner).CompareAndSetStateAsync(state, expected, cancellationToken);
+            return ((ICompareAndSetStateStore)Inner).CompareAndSetStateAsync(state, expected, cancellationToken);
         }
 
         public Task<bool> DeleteRunIfAsync(string id, string job, RunStatus status, CancellationToken cancellationToken = default)
         {
             Check("deleteRunIf");
-            return ((IRunDeletingStore)Inner).DeleteRunIfAsync(id, job, status, cancellationToken);
+            return ((IDeleteRunIfStore)Inner).DeleteRunIfAsync(id, job, status, cancellationToken);
         }
     }
 

@@ -104,7 +104,7 @@ public sealed class ObservedRun
     /// (a job its server's shutdown put back in its queue): the running row is deleted, nothing is
     /// judged or alerted, and the job's state is left as it was. A row a check already marked
     /// stuck is left as it is. When the store cannot take a run back (it has no
-    /// <see cref="IRunDeletingStore"/>, or it failed), which is reported, the run is closed as a
+    /// <see cref="IDeleteRunIfStore"/>, or it failed), which is reported, the run is closed as a
     /// success instead. Says whether it was given back.
     /// </summary>
     public async Task<bool> TakeBackAsync()

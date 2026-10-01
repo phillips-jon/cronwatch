@@ -128,7 +128,7 @@ public class OutputConformanceTests
                 string needle = Fixtures.String(ch, "expect")!;
                 string? result = (text ?? "").Contains(needle, System.StringComparison.Ordinal)
                     ? null
-                    : "Output did not contain " + Json.Quote(needle);
+                    : "Output did not contain " + JsonText.Quote(needle);
                 failures.Same(name + ": expect " + needle, result, ch.Get("result"));
             }
         }

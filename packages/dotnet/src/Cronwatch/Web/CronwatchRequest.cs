@@ -31,7 +31,7 @@ public delegate Task<byte[]> WebBodyReader(int limit, CancellationToken cancella
 /// <see cref="ToString"/> names the method, the path and the header names, never a value.
 /// </remarks>
 [DebuggerDisplay("{ToString(),nq}")]
-public sealed class WebRequest
+public sealed class CronwatchRequest
 {
     /// <summary>
     /// The most of a request body the dashboard reads: its forms and JSON are a few bytes. A body
@@ -45,7 +45,7 @@ public sealed class WebRequest
     private byte[]? _body;
 
     /// <summary>A request with this method and target (the path and query as sent, or the absolute form a proxy is sent).</summary>
-    public WebRequest(string method, string target)
+    public CronwatchRequest(string method, string target)
     {
         ArgumentNullException.ThrowIfNull(method);
         ArgumentNullException.ThrowIfNull(target);
@@ -163,7 +163,7 @@ public sealed class WebRequest
         {
             names.Add(h.Key);
         }
-        return "WebRequest(" + Method + " " + path + ", headers [" + string.Join(", ", names) + "]" + (IsTls ? ", tls" : "") + ")";
+        return "CronwatchRequest(" + Method + " " + path + ", headers [" + string.Join(", ", names) + "]" + (IsTls ? ", tls" : "") + ")";
     }
 }
 

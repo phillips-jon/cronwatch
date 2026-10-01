@@ -13,7 +13,7 @@ namespace Cronwatch.Tests.Web;
 /// <summary>
 /// <c>job.Handler()</c>: the SDK's handler tests (<c>client.test.ts</c> and
 /// <c>client-hardening.test.ts</c>), as the Go, Rust, Elixir and Java ports have them, and the
-/// .NET answers: a <see cref="WebResponse"/> the function returns, a throw answered 500, and the
+/// .NET answers: a <see cref="CronwatchResponse"/> the function returns, a throw answered 500, and the
 /// request's token linked into the run's. Without a secret, and in development, it is tested in
 /// <see cref="RoutesEnvTests"/>.
 /// </summary>
@@ -31,7 +31,7 @@ public class HandlerTests
             OnWarning = _ => { },
         });
 
-    private static WebRequest Get(string? auth, bool fail = false)
+    private static CronwatchRequest Get(string? auth, bool fail = false)
     {
         var headers = new List<KeyValuePair<string, string>>();
         if (auth != null)
@@ -42,10 +42,10 @@ public class HandlerTests
         {
             headers.Add(new("x-fail", "1"));
         }
-        return new WebRequest("GET", "/api/cron/hourly") { Headers = headers };
+        return new CronwatchRequest("GET", "/api/cron/hourly") { Headers = headers };
     }
 
-    private static WebRequest Post(string secret) =>
+    private static CronwatchRequest Post(string secret) =>
         new("POST", "/") { Headers = [new("authorization", "Bearer " + secret)] };
 
     [Fact]
@@ -64,17 +64,17 @@ public class HandlerTests
             return Task.CompletedTask;
         });
         Assert.Equal(401, (await h.HandleAsync(Get(null))).Status);
-        WebResponse wrong = await h.HandleAsync(Get("Bearer wrong"));
+        CronwatchResponse wrong = await h.HandleAsync(Get("Bearer wrong"));
         Assert.Equal("{\"ok\":false,\"error\":\"Unauthorized\"}", wrong.Text());
         Assert.Equal(401, (await h.HandleAsync(Get("bearer " + Secret))).Status);
-        WebResponse res = await h.HandleAsync(Get("Bearer " + Secret));
+        CronwatchResponse res = await h.HandleAsync(Get("Bearer " + Secret));
         Assert.Equal(200, res.Status);
         Assert.Equal("application/json; charset=utf-8", res.Header("content-type"));
         Assert.Equal("no-store", res.Header("cache-control"));
         var runs = await cw.RunsAsync("hourly", 10);
         Assert.Equal("{\"ok\":true,\"job\":\"hourly\",\"run\":\"" + runs[0].Id + "\",\"status\":\"ok\",\"durationMs\":0}", res.Text());
         time.Advance(1000);
-        WebResponse failed = await h.HandleAsync(Get("Bearer " + Secret, fail: true));
+        CronwatchResponse failed = await h.HandleAsync(Get("Bearer " + Secret, fail: true));
         Assert.Equal(500, failed.Status);
         Assert.Equal("IOException: nope", WebKit.JsonOf(failed).Get("error"));
         runs = await cw.RunsAsync("hourly", 10);
@@ -91,14 +91,14 @@ public class HandlerTests
         const string own = "own-word";
         await using var cw = Client(clientSecret);
         Job job = cw.Job("own");
-        Task Ok(JobContext j, WebRequest r, CancellationToken ct) => Task.CompletedTask;
+        Task Ok(JobContext j, CronwatchRequest r, CancellationToken ct) => Task.CompletedTask;
         Handler h = job.Handler(Ok, new HandlerOptions { Secret = own });
         Assert.Equal(401, (await h.HandleAsync(Post(clientSecret))).Status);
         Assert.Equal(200, (await h.HandleAsync(Post(own))).Status);
         Handler empty = job.Handler(Ok, new HandlerOptions { Secret = "" });
         Assert.Equal(200, (await empty.HandleAsync(Post(clientSecret))).Status);
         Handler open = job.Handler(Ok, new HandlerOptions { Secret = HandlerSecret.None });
-        Assert.Equal(200, (await open.HandleAsync(new WebRequest("POST", "/"))).Status);
+        Assert.Equal(200, (await open.HandleAsync(new CronwatchRequest("POST", "/"))).Status);
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class HandlerTests
     {
         await using var cw = Client(CronSecret.None);
         Handler h = cw.Job("any").Handler((j, r, ct) => Task.CompletedTask);
-        Assert.Equal(200, (await h.HandleAsync(new WebRequest("GET", "/"))).Status);
+        Assert.Equal(200, (await h.HandleAsync(new CronwatchRequest("GET", "/"))).Status);
     }
 
     [Fact]
@@ -116,8 +116,8 @@ public class HandlerTests
         var time = Support.Clock();
         await using var cw = Client(CronSecret.None, capture, time);
         Job job = cw.Job("h");
-        Handler returned = job.Handler((j, r, ct) => Task.FromResult(new WebResponse(503).WithHeader("x-upstream", "1").WithBody("bad")));
-        WebResponse res = await returned.HandleAsync(new WebRequest("GET", "/"));
+        Handler returned = job.Handler((j, r, ct) => Task.FromResult(new CronwatchResponse(503).WithHeader("x-upstream", "1").WithBody("bad")));
+        CronwatchResponse res = await returned.HandleAsync(new CronwatchRequest("GET", "/"));
         Assert.Equal(503, res.Status);
         Assert.Equal("bad", res.Text());
         Assert.Equal("1", res.Header("x-upstream"));
@@ -126,8 +126,8 @@ public class HandlerTests
         Assert.Equal(["failed"], capture.Types());
 
         time.Advance(1000);
-        Handler fine = job.Handler((j, r, ct) => Task.FromResult(new WebResponse(202).WithHeader("content-type", "text/plain").WithBody("queued")));
-        res = await fine.HandleAsync(new WebRequest("GET", "/"));
+        Handler fine = job.Handler((j, r, ct) => Task.FromResult(new CronwatchResponse(202).WithHeader("content-type", "text/plain").WithBody("queued")));
+        res = await fine.HandleAsync(new CronwatchRequest("GET", "/"));
         Assert.Equal(202, res.Status);
         Assert.Equal("queued", res.Text());
         Assert.Equal("text/plain", res.Header("content-type"));
@@ -135,7 +135,7 @@ public class HandlerTests
 
         time.Advance(1000);
         Handler text = job.Handler((j, r, ct) => Task.FromResult("Report written"));
-        res = await text.HandleAsync(new WebRequest("GET", "/"));
+        res = await text.HandleAsync(new CronwatchRequest("GET", "/"));
         Assert.Equal(200, res.Status);
         Assert.Equal("Report written", (await cw.RunsAsync("h", 10))[0].Output);
     }
@@ -146,7 +146,7 @@ public class HandlerTests
         var capture = new Capture();
         await using var cw = Client(Secret, capture);
         Handler h = cw.Job("p").Handler((j, r, ct) => Task.FromException(new InvalidOperationException("boom")));
-        WebResponse res = await h.HandleAsync(Post(Secret));
+        CronwatchResponse res = await h.HandleAsync(Post(Secret));
         Assert.Equal(500, res.Status);
         Assert.Equal("application/json; charset=utf-8", res.Header("content-type"));
         var runs = await cw.RunsAsync("p", 10);
@@ -160,7 +160,7 @@ public class HandlerTests
         Handler open = cw.Job("q").Handler(
             (j, r, ct) => throw new InvalidOperationException("private detail"),
             new HandlerOptions { Secret = HandlerSecret.None });
-        WebResponse anyone = await open.HandleAsync(new WebRequest("GET", "/"));
+        CronwatchResponse anyone = await open.HandleAsync(new CronwatchRequest("GET", "/"));
         Assert.Equal(500, anyone.Status);
         Assert.False(WebKit.JsonOf(anyone).Has("error"));
 
@@ -179,7 +179,7 @@ public class HandlerTests
             await Task.Delay(Timeout.Infinite, ct);
         });
         using var cts = new CancellationTokenSource();
-        Task<WebResponse> answer = h.HandleAsync(new WebRequest("GET", "/"), cts.Token);
+        Task<CronwatchResponse> answer = h.HandleAsync(new CronwatchRequest("GET", "/"), cts.Token);
         await started.Task;
         await cts.CancelAsync();
         // The caller may stop waiting or be answered; either way the run is recorded failed.
@@ -201,15 +201,15 @@ public class HandlerTests
         var time = Support.Clock();
         await using var cw = Client(CronSecret.None, clock: time);
         Job job = cw.Job("fetch");
-        WebResponse res = await job.RunAsync((j, ct) => Task.FromResult(new WebResponse(502)));
+        CronwatchResponse res = await job.RunAsync((j, ct) => Task.FromResult(new CronwatchResponse(502)));
         Assert.Equal(502, res.Status);
         Assert.Equal("HTTP 502 Bad Gateway", (await cw.RunsAsync("fetch", 10))[0].Error);
         time.Advance(1000);
-        WebResponse unknown = await job.RunAsync((j, ct) => Task.FromResult(new WebResponse(599)));
+        CronwatchResponse unknown = await job.RunAsync((j, ct) => Task.FromResult(new CronwatchResponse(599)));
         Assert.Equal(599, unknown.Status);
         Assert.Equal("HTTP 599", (await cw.RunsAsync("fetch", 10))[0].Error);
         time.Advance(1000);
-        await job.RunAsync((j, ct) => Task.FromResult(new WebResponse(204)));
+        await job.RunAsync((j, ct) => Task.FromResult(new CronwatchResponse(204)));
         Assert.Equal(RunStatus.Ok, (await cw.RunsAsync("fetch", 10))[0].Status);
     }
 }

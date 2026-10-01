@@ -12,7 +12,8 @@ namespace Cronwatch.Bridge;
 /// <summary>
 /// What the scheduler integrations share (<c>Cronwatch.Hangfire</c>, <c>Cronwatch.Quartz</c>),
 /// carried over from the Go, Rust, Elixir and Java ports' bridge. An app does not need it; a
-/// scheduler integration of the app's own can.
+/// scheduler integration of the app's own can. For integration authors, outside the 1.x promise: the bridge changes as the integrations need, in any minor release. Every type in
+/// <c>Cronwatch.Bridge</c> is.
 /// </summary>
 /// <remarks>
 /// <see cref="Watch"/> declares a scheduler's entries as jobs, one per name, tagged with the
@@ -236,7 +237,7 @@ public static class SchedulerBridge
                 {
                     options.SetField(key, text);
                 }
-                else if (Json.TryNumber(value, out double ms))
+                else if (JsonText.TryNumber(value, out double ms))
                 {
                     options.SetField(key, ms);
                 }
@@ -246,7 +247,7 @@ public static class SchedulerBridge
                 {
                     foreach (var e in budget)
                     {
-                        if (Json.TryNumber(e.Value, out double ceiling))
+                        if (JsonText.TryNumber(e.Value, out double ceiling))
                         {
                             options.Budget[e.Key] = ceiling;
                         }
@@ -254,7 +255,7 @@ public static class SchedulerBridge
                 }
                 break;
             case "failuresBeforeAlert":
-                if (Json.TryNumber(value, out double n) && n >= 0 && n <= int.MaxValue && n == Math.Floor(n))
+                if (JsonText.TryNumber(value, out double n) && n >= 0 && n <= int.MaxValue && n == Math.Floor(n))
                 {
                     options.SetField(key, (int)n);
                 }

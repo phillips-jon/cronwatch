@@ -54,14 +54,14 @@ internal sealed class Checker
         }
         catch (ArgumentException e)
         {
-            throw new ScheduleException(where + " is " + Json.Quote(expr) + ", which CronWatch cannot read: " + e.Message);
+            throw new ScheduleException(where + " is " + JsonText.Quote(expr) + ", which CronWatch cannot read: " + e.Message);
         }
         TimeZoneInfo? tz = CronZones.Find(zone);
         if (tz == null)
         {
-            throw new ScheduleException(where + ": timezone " + Json.Quote(zone) + " is not an IANA timezone");
+            throw new ScheduleException(where + ": timezone " + JsonText.Quote(zone) + " is not an IANA timezone");
         }
-        var checker = new Checker(runs, parsed, tz, zone, where + " is " + Json.Quote(expr), scheduler);
+        var checker = new Checker(runs, parsed, tz, zone, where + " is " + JsonText.Quote(expr), scheduler);
         try
         {
             checker.Run(daily, now);

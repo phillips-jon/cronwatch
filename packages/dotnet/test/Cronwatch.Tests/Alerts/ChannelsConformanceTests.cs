@@ -120,7 +120,7 @@ public class ChannelsConformanceTests
                 MessagingServiceSid = S(o, "messagingServiceSid"),
                 To = Strings(o.Get("to")),
                 Recovered = recovered is true,
-                Segments = o.Get("segments") is double d ? d : null,
+                Segments = o.Get("segments") is double d ? (int)d : null,
                 Link = link,
                 Transport = transport,
             }),
@@ -233,7 +233,7 @@ public class ChannelsConformanceTests
     [Fact]
     public void Every_section_of_channels_json_is_replayed()
     {
-        string[] known = ["generatedBy", "sdkVersion", "alerts", "sends", "failures", "providerSends", "providerFailures", "twilioPartial", "textCuts", "urls"];
+        string[] known = ["generatedBy", "sdkVersion", "alerts", "sends", "failures", "providerSends", "providerFailures", "twilioPartial", "textCuts", "urls", "webhookPayloads"];
         Assert.Equal([], Fixtures.Load("channels").Keys.Where(k => !known.Contains(k, StringComparer.Ordinal)));
     }
 
@@ -267,6 +267,39 @@ public class ChannelsConformanceTests
         }
         Assert.Equal([], wrong);
         Assert.True(cases.Count > 700, "the fixture's urls: " + cases.Count);
+    }
+
+    /// <summary>
+    /// The <c>webhookPayloads</c> section: the webhook's body for every alert, <c>"schema":1</c>
+    /// first, byte for byte, and its signature header.
+    /// </summary>
+    [Fact]
+    public async Task Webhook_payloads_are_the_sdks()
+    {
+        JsObject f = Fixtures.Load("channels");
+        var alerts = new Dictionary<string, Alert>(StringComparer.Ordinal);
+        foreach (JsObject c in Fixtures.Objects(f, "alerts"))
+        {
+            alerts[S(c, "name")] = Alert.FromValue(c.Get("alert"));
+        }
+        var rec = new Recorder();
+        var cx = new ChannelContext(e => throw new InvalidOperationException("reported: " + e.Message), rec);
+        var failures = new Fixtures.Failures();
+        List<JsObject> cases = Fixtures.Objects(f, "webhookPayloads");
+        foreach (JsObject c in cases)
+        {
+            var ch = new WebhookChannel(new WebhookOptions { Url = "https://hooks.example/cw", Secret = S(c, "secret"), Transport = rec });
+            rec.AnswerWith(200, "");
+            await ch.SendAsync(alerts[S(c, "alert")], cx, CancellationToken.None);
+            TransportRequest r = Assert.Single(rec.Taken());
+            string body = Recorder.Body(r);
+            failures.Same(S(c, "alert") + " body", body, c.Get("body"));
+            failures.Same(S(c, "alert") + " signature", r.Headers.Single(h => h.Key == "x-cronwatch-signature").Value, c.Get("signature"));
+            failures.Same(S(c, "alert") + " Signature", "sha256=" + WebhookChannel.Signature(S(c, "secret"), body), c.Get("signature"));
+        }
+        failures.Check("channels");
+        Assert.Equal(15, cases.Count);
+        Assert.Equal("f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8", WebhookChannel.Signature("key", "The quick brown fox jumps over the lazy dog"));
     }
 
     [Fact]

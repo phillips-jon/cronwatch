@@ -329,7 +329,7 @@ public sealed partial class CronwatchClient
             if (_deferDelivery && !_warnedDeferredStart)
             {
                 _warnedDeferredStart = true;
-                Warn("[cronwatch] Start() was called with Deliver.AtCheck, so these checks send no alerts. Another process must run checks with Deliver.Now (the default) to send them.");
+                Warn("[cronwatch] StartChecking() was called with Deliver.AtCheck, so these checks send no alerts. Another process must run checks with Deliver.Now (the default) to send them.");
             }
             // Each tick asks for a check without waiting on it, as setInterval does: a tick while a
             // long check runs shares that check.

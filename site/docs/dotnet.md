@@ -20,6 +20,8 @@ dotnet add package Cronwatch
 | your ADO.NET driver: `Microsoft.Data.Sqlite`, `Npgsql` or `MySqlConnector` | `SqlStore` over your `DbDataSource`, and the pg_cron source; none is a dependency of CronWatch |
 | `Cronwatch.Hosting` | the client in the Generic Host's container (`AddCronwatch`), the check as a hosted service, errors through `ILogger`, hosted jobs on a cron (`AddCronwatchJob`), and `cronwatch check` from the app's own command line |
 | `Cronwatch.AspNetCore` | the dashboard and a job's handler on ASP.NET Core (`MapCronwatch`, `UseCronwatch`, `MapCronwatchHandler`); it brings `Cronwatch.Hosting` |
+
+`AddCronwatch` and `AddCronwatchJob` are in the namespace `Microsoft.Extensions.DependencyInjection`, `RunCronwatchCommandAsync` in `Microsoft.Extensions.Hosting`, and `MapCronwatch`, `UseCronwatch` and `MapCronwatchHandler` in `Microsoft.AspNetCore.Builder`, as Microsoft's own `AddHealthChecks` and `MapHealthChecks` are, so they need no `using`. `ICronwatchJob` and `CronwatchHostOptions` are in `Cronwatch.Hosting`.
 | `Cronwatch.Hangfire` | Hangfire 1.8; see [.NET schedulers](/docs/dotnet-schedulers/#hangfire) |
 | `Cronwatch.Quartz` | Quartz.NET 4; see [.NET schedulers](/docs/dotnet-schedulers/#quartz-net) |
 
@@ -33,7 +35,7 @@ var pg = NpgsqlDataSource.Create(builder.Configuration.GetConnectionString("app"
 builder.Services.AddCronwatch(o =>
 {
     o.Store = SqlStore.Postgres(pg);                         // default: a MemoryStore
-    o.Alerts.Add(Slack.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
+    o.Alerts.Add(SlackChannel.Webhook(builder.Configuration["SLACK_WEBHOOK_URL"]!));
     o.Retention = "30d";
 });
 ```
@@ -46,10 +48,10 @@ Anywhere else, make one and dispose it when the app stops:
 await using var cw = new CronwatchClient(new CronwatchOptions
 {
     Store = SqlStore.Postgres(pg),
-    Alerts = { Slack.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
+    Alerts = { SlackChannel.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!) },
     Retention = "30d",
 });
-cw.Start();                                                  // check every minute, in a long-running service
+cw.StartChecking();                                          // check every minute, in a long-running service
 ```
 
 Every option has the SDK's default, and the constructor checks them, so a bad option fails at startup with the SDK's message, as a `CronwatchException`. With no options it keeps everything in memory and writes alerts to the console. `DisposeAsync` stops the check, records the runs still open in this process, waits up to five seconds for sends in flight, and lets go of the store.
@@ -129,13 +131,13 @@ public sealed class NightlyReport(ReportBuilder reports) : ICronwatchJob
 }
 ```
 
-Each fire is a run with the trigger `schedule`, its class resolved from a new DI scope and disposed after it. A cron or `every 5m` both work. The jobs are declared as the host starts (a bad schedule stops it, with the SDK's message) and first fire once the host has started. A fire that comes while the previous run is still going is skipped and logged once, so a slow job cannot pile up behind itself; a paused process does not catch up in a burst. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in [Hangfire or Quartz.NET](/docs/dotnet-schedulers/) with a shared store.
+Each fire is a run with the trigger `hosting` (runs recorded before 1.0 carry `schedule`; see [Triggers, tags and job names](/docs/dashboard/#triggers-tags-and-job-names)), its class resolved from a new DI scope and disposed after it. A cron or `every 5m` both work. The jobs are declared as the host starts (a bad schedule stops it, with the SDK's message) and first fire once the host has started. A fire that comes while the previous run is still going is skipped and logged once, so a slow job cannot pile up behind itself; a paused process does not catch up in a burst. It is a scheduler for one process: every replica of a service runs its hosted jobs, so a job that must run once across a cluster belongs in [Hangfire or Quartz.NET](/docs/dotnet-schedulers/) with a shared store.
 
 A loop of your own needs no helper: declare the job with its schedule and call `job.RunAsync` in the loop. `job.NextFire(after, lastRunAt)` answers the job's next fire time in epoch milliseconds, for a scheduler of your own.
 
 ## Run the check
 
-A job that never starts cannot report itself, so something has to look. `AddCronwatch` runs the check as a hosted service every minute. Outside the host, `cw.Start()` checks every minute, the first a second after it is called; `cw.Start("5m")` or a `TimeSpan` sets the interval (five seconds at least), and `Stop()` ends it. Where another process checks, call `CheckAsync()` there:
+A job that never starts cannot report itself, so something has to look. `AddCronwatch` runs the check as a hosted service every minute. Outside the host, `cw.StartChecking()` checks every minute, the first a second after it is called; `cw.StartChecking("5m")` or a `TimeSpan` sets the interval (five seconds at least), and `Stop()` ends it. (`Start` is its former name, deprecated.) Where another process checks, call `CheckAsync()` there:
 
 ```csharp
 CheckResult result = await cw.CheckAsync();   // CheckedAt, Jobs, Alerts, Pruned
@@ -194,11 +196,11 @@ app.MapCronwatch("/cronwatch");   // the token from CRONWATCH_TOKEN or Cronwatch
 
 `MapCronwatch` maps the path and everything beneath it on endpoint routing, which minimal APIs, MVC, Razor Pages and Blazor all use, and answers the convention builder. Under a route group (`app.MapGroup("/admin").MapCronwatch()`) the group sets the base path. The endpoints skip antiforgery (the dashboard has its own cross-site check) and are left out of OpenAPI. While the dashboard has a token they allow anonymous requests, so an app whose fallback policy requires a signed-in user still reaches the dashboard's own sign-in; `Token = DashboardToken.None` serves it open, and then it takes the app's authorization policy. `app.UseCronwatch("/cronwatch")` serves it as middleware instead, ahead of the app's other middleware: middleware is no endpoint, so an open dashboard served that way is behind your sign-in only when `UseAuthentication` and `UseAuthorization`, with a fallback policy, come before it.
 
-Without ASP.NET Core, the routes are framework-free: any server hands them a `WebRequest` and writes the `WebResponse` back.
+Without ASP.NET Core, the routes are framework-free: any server hands them a `CronwatchRequest` and writes the `CronwatchResponse` back.
 
 ```csharp
 Routes routes = cw.Routes(new RoutesOptions { Token = Environment.GetEnvironmentVariable("CRONWATCH_TOKEN") });
-WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/api/jobs")
+CronwatchResponse answer = await routes.HandleAsync(new CronwatchRequest("GET", "/cronwatch/api/jobs")
 {
     Headers = [new("host", "app.example.com"), new("authorization", "Bearer " + token)],
 });
@@ -212,7 +214,7 @@ WebResponse answer = await routes.HandleAsync(new WebRequest("GET", "/cronwatch/
 - `TrustProxy = true`: take the origin from the first `X-Forwarded-Proto` and `X-Forwarded-Host`. Only behind a proxy that sets or overwrites both.
 - `BasePath`: where it is mounted, when the adapter cannot tell; `MapCronwatch` and `UseCronwatch` say so already.
 
-A request body past 1 MiB is answered 413. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
+A request body past 1 MiB is answered 413. The token rules, cookie, cross-site rule and every endpoint are the SDK's; see [Dashboard and API](/docs/dashboard/). `GET /api` names what is serving it, `{"ok":true,"library":"Cronwatch","language":"dotnet","version":"1.0.0","api":1}` with the package's version, and the silence and unsilence endpoints answer the job's summary, `{"ok":true,"job":{...}}`. `/api/check` also accepts the client's cron secret as a bearer, so an outside cron can run the check over HTTP. The dashboard is installable as a web app, with its manifest, icons and service worker under the mount point; see [Install it as an app](/docs/dashboard/#install-it-as-an-app).
 
 ## Jobs a URL starts
 
@@ -229,9 +231,9 @@ app.MapCronwatchHandler("/cron/nightly", "nightly-report", async (JobContext job
 });
 ```
 
-The job is looked up by name on the app's client, so declare it first (or pass the `Job` itself). Without ASP.NET Core, `job.Handler((job, request, ct) => ...)` answers a framework-free `Handler` whose `HandleAsync` takes a `WebRequest`. The secret is `HandlerOptions.Secret`, else the client's `CronSecret` (`CRON_SECRET` by default), compared in constant time; `""` counts as unset. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 rather than let anyone on the internet run the job; `HandlerSecret.None` (or the client's `CronSecret.None`) opts out on purpose, for an endpoint your platform already protects, and then the endpoint takes the app's authorization policy.
+The job is looked up by name on the app's client, so declare it first (or pass the `Job` itself). Without ASP.NET Core, `job.Handler((job, request, ct) => ...)` answers a framework-free `Handler` whose `HandleAsync` takes a `CronwatchRequest`. The secret is `HandlerOptions.Secret`, else the client's `CronSecret` (`CRON_SECRET` by default), compared in constant time; `""` counts as unset. A wrong or missing bearer is answered 401 and runs nothing. With no secret at all, outside development, the handler answers 503 rather than let anyone on the internet run the job; `HandlerSecret.None` (or the client's `CronSecret.None`) opts out on purpose, for an endpoint your platform already protects, and then the endpoint takes the app's authorization policy.
 
-A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, and the error's first line as `"error"` for a caller who sent the secret. A `string` the function returns is the run's output when nothing was logged; a `WebResponse` or an `IResult` it returns is the answer itself, and a status of 400 or more fails the run. The request's `RequestAborted` token is linked into the run's, so a caller that goes away cancels the job as a platform's timeout would.
+A run is answered 200 or 500 with `{"ok","job","run","status","durationMs"}`, and the error's first line as `"error"` for a caller who sent the secret. A `string` the function returns is the run's output when nothing was logged; a `CronwatchResponse` or an `IResult` it returns is the answer itself, and a status of 400 or more fails the run. The request's `RequestAborted` token is linked into the run's, so a caller that goes away cancels the job as a platform's timeout would.
 
 ## Stores
 
@@ -252,7 +254,7 @@ var store = SqlStore.Postgres(pg).WithPrefix("app_cron_");
 
 The tables (`cronwatch_jobs`, `cronwatch_runs`, `cronwatch_state`) are made on the client's first use, byte for byte as the SDK makes them. `WithPrefix` names them: lowercase letters, digits and underscores, not starting with a digit, at most 47 characters. An app on EF Core or Dapper gives the store the data source underneath. The store's writes never join a transaction your code has open: each opens its connection with the ambient `TransactionScope` suppressed and never uses your connection, so a run recorded inside a transaction that rolls back stays recorded.
 
-A store of your own implements `IStore`: `InitAsync`, `UpsertJobAsync`, `GetJobAsync`, `ListJobsAsync`, `DeleteJobAsync`, `InsertRunAsync`, `UpdateRunAsync`, `GetRunAsync`, `ListRunsAsync`, `LastRunAsync`, `RunningRunsAsync`, `GetStateAsync`, `SetStateAsync` and `PruneAsync`, with epoch milliseconds for every time. Three capability interfaces keep processes sharing a store from judging a run twice or losing each other's updates: `IConditionalRunStore` (`UpdateRunIfAsync`), `IStateCasStore` (`CompareAndSetStateAsync`) and `IRunDeletingStore` (`DeleteRunIfAsync`, which takes back an attempt a scheduler gave back without failing; see [.NET schedulers](/docs/dotnet-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `Cronwatch.StoreTesting` is the contract the built-in stores pass, from any test framework:
+A store of your own implements `IStore`: `InitAsync`, `UpsertJobAsync`, `GetJobAsync`, `ListJobsAsync`, `DeleteJobAsync`, `InsertRunAsync`, `UpdateRunAsync`, `GetRunAsync`, `ListRunsAsync`, `LastRunAsync`, `RunningRunsAsync`, `GetStateAsync`, `SetStateAsync` and `PruneAsync`, with epoch milliseconds for every time. Three capability interfaces keep processes sharing a store from judging a run twice or losing each other's updates: `IUpdateRunIfStore` (`UpdateRunIfAsync`), `ICompareAndSetStateStore` (`CompareAndSetStateAsync`) and `IDeleteRunIfStore` (`DeleteRunIfAsync`, which takes back an attempt a scheduler gave back without failing; see [.NET schedulers](/docs/dotnet-schedulers/#retries)). They mean what the [TypeScript interface](/docs/stores/#writing-a-store) says. `Cronwatch.StoreTesting` is the contract the built-in stores pass, from any test framework:
 
 ```csharp
 await StoreContract.RunAsync(new MyStore());
@@ -269,8 +271,8 @@ await using var cw = new CronwatchClient(new CronwatchOptions
 {
     Alerts =
     {
-        Slack.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!),
-        Discord.Webhook(Environment.GetEnvironmentVariable("DISCORD_WEBHOOK_URL")!),
+        SlackChannel.Webhook(Environment.GetEnvironmentVariable("SLACK_WEBHOOK_URL")!),
+        DiscordChannel.Webhook(Environment.GetEnvironmentVariable("DISCORD_WEBHOOK_URL")!),
         new WebhookChannel(new WebhookOptions
         {
             Url = "https://hooks.example.com/cronwatch",
@@ -314,11 +316,18 @@ new BugsnagChannel(new BugsnagOptions { ApiKey = Env("BUGSNAG_API_KEY") });
 new NewRelicChannel(new NewRelicOptions { AccountId = "1234567", ApiKey = Env("NEW_RELIC_LICENSE_KEY") });
 ```
 
-The options are the SDK's in PascalCase: `SubjectPrefix` and `Link` among the email options; `MessageStream` (Postmark); `Region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `SessionToken` and `ConfigurationSetName` (SES); `ApiKeySid`, `ApiKeySecret`, `MessagingServiceSid` and `Segments` (Twilio, 1 to 10, default 3); `Environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `Release` (Sentry); `Headers` (the webhook, extra request headers in the order sent); `Endpoint` (Honeybadger, Bugsnag); `Host` (Datadog); `ReleaseStage` (Bugsnag); `EventType` (New Relic); and `Recovered` and `Link` wherever the SDK has them, with the SDK's defaults. No options class's `ToString()` prints a credential, and neither does a logger that walks its public properties.
+The options are the SDK's in PascalCase: `SubjectPrefix` and `Link` among the email options; `MessageStream` (Postmark); `Region` (`"eu"` for SendGrid, Mailgun and New Relic, the AWS region for SES); `SessionToken` and `ConfigurationSetName` (SES); `ApiKeySid`, `ApiKeySecret`, `MessagingServiceSid` and `Segments` (Twilio, an `int?`, 1 to 10, default 3); `Environment` (Sentry, Honeybadger and Rollbar, `"production"` by default); `Release` (Sentry); `Headers` (the webhook, extra request headers in the order sent); `Endpoint` (Honeybadger, Bugsnag); `Host` (Datadog); `ReleaseStage` (Bugsnag); `EventType` (New Relic); and `Recovered` and `Link` wherever the SDK has them, with the SDK's defaults. No options class's `ToString()` prints a credential, and neither does a logger that walks its public properties.
 
 Each sends exactly the request the SDK's does: the same URL, headers and body, byte for byte (the package's tests replay the SDK's recorded requests), with the same idempotency key, event id or UUID for one alert, so a provider that deduplicates drops a resend whichever language sent it. SES is signed with SigV4, with no AWS SDK. Each request has one ten second deadline for the whole request, reads at most 1 MiB of the answer, follows no redirect (so credentials never reach another address), uses no proxy, and always verifies TLS. A refused request names only the URL's origin, never its path, with the channel's keys cut out. The requests go through the client's `ITransport`, by default an `HttpClientTransport` over one `HttpClient` the client makes on its first send and disposes with itself; `Transport` on the client's options, or on one channel's or triage's, takes one of your own, for `IHttpClientFactory`, a proxy or your own trust store. [Alerts](/docs/alerts/#email-sms-and-error-trackers) describes what each one sends.
 
-A webhook signs its body with `X-CronWatch-Signature: sha256=<hex>`. `WebhookChannel.Signature(secret, body)` is that hex, for a receiver in .NET; compare it with `CryptographicOperations.FixedTimeEquals`.
+A webhook posts the alert as JSON with `"schema": 1` as its first field, the same body every CronWatch library posts, described by its [JSON Schema](/docs/alerts/#the-webhook-39-s-schema); parse the fields, not `Title` and `Message`, whose wording is not promised. It signs the body with `X-CronWatch-Signature: sha256=<hex>`. `WebhookChannel.Signature(secret, body)` is that hex, for a receiver in .NET; compare it with `CryptographicOperations.FixedTimeEquals`:
+
+```csharp
+string body = await new StreamReader(request.Body).ReadToEndAsync();
+byte[] want = Encoding.ASCII.GetBytes("sha256=" + WebhookChannel.Signature(secret, body));
+byte[] got = Encoding.ASCII.GetBytes(request.Headers["X-CronWatch-Signature"].ToString());
+bool genuine = CryptographicOperations.FixedTimeEquals(want, got);
+```
 
 ### Processes that cannot send
 
@@ -362,7 +371,7 @@ A function given to `Redact` replaces the default; one that throws falls back to
 ```csharp
 await using var cw = new CronwatchClient(new CronwatchOptions
 {
-    Alerts = { Slack.Webhook(slackWebhookUrl) },
+    Alerts = { SlackChannel.Webhook(slackWebhookUrl) },
     Triage = new AnthropicTriage(new AnthropicTriageOptions
     {
         Context = "An ASP.NET Core service on Kubernetes with a Postgres database.",
@@ -414,7 +423,7 @@ The core, `Cronwatch.Hosting`, `Cronwatch.AspNetCore` and `Cronwatch.Quartz` are
 | `ProcessExitHook` | `true` | see [The current run and the timeout](#the-current-run-and-the-timeout) |
 | `Clock` | `TimeProvider.System` | every time and timer the client uses; a `FakeTimeProvider` in tests |
 
-A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the clock's local zone by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget` (metrics and their ceilings), `Expect`, `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/).
+A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname such as `"@hourly"`, or `"every 5m"`), `Timezone` (IANA; the clock's local zone by default), `Grace` (`"10m"`), `Timeout` (`"1h"`), `MaxDuration`, `Budget` (metrics and their ceilings), `Expect`, `FailuresBeforeAlert` (1), `Description` and `Tags`, with the rules in the [TypeScript API reference](/docs/api/). `Timeout` and `MaxDuration` both measure a run's length: `Timeout` gives up on a run still going (it becomes `timeout`, a failure, and the job is stuck), while `MaxDuration` flags a run that finished successfully but slowly (it stays ok, and the job is slow). Set `Timeout` well above `MaxDuration`: `new JobOptions { MaxDuration = "10m", Timeout = "1h" }`.
 
 | Method | |
 |---|---|
@@ -429,7 +438,7 @@ A job's options, on `JobOptions`: `Schedule` (five or six field cron, a nickname
 | `ForgetAsync(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `job.StartAsync(options)`, `job.ResumeAsync(id)`, `ResumeRunAsync(name, id)` | runs that span calls |
 | `job.OpenAsync(options)` | a run seen from outside the function, for a scheduler integration: an `ObservedRun` to close or take back |
-| `RecordRunAsync(run)` | record a run that happened elsewhere, for a source; answers the alerts it sent |
+| `RecordRunAsync(run)` | record a run that happened elsewhere, for a source, its id 1 to 200 characters; answers the alerts it sent |
 | `SyncJobAsync(name)` | write a declaration to the store now, unless it already holds it |
 | `DefinedJobs` | the jobs declared in this client |
 | `Routes()`, `job.Handler(fn)` | the dashboard and a job's handler |
@@ -457,6 +466,23 @@ await again.FinishAsync();                                                      
 `SqlStore` writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Rust, Elixir and Java stores (the MySQL tables are the PHP, Go, Rust, Elixir and Java ports'): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The package's tests share a SQLite file with the built SDK, and have a Node client and a .NET client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
+
+A 1.x release keeps what it does not know in the stored data: a field of a job's state or definition a newer release added, a condition it does not alert on, a run status or trigger it has not seen. It writes them back as they were, never treating an unknown status as running, so any 1.x release of any language can share a store with any other. 0.x releases are not covered: upgrade every process to 1.0 together.
+
+## Deprecated
+
+These names still work through every 1.x release, marked `[Obsolete]` so the compiler points at the replacement, and go in 2.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
+
+| Deprecated | Use |
+|---|---|
+| `cw.Start(every)` | `cw.StartChecking(every)`, since a job's `StartAsync` opens a run |
+| `Cronwatch.Web.WebRequest`, `WebResponse` | `CronwatchRequest`, `CronwatchResponse`, since `System.Net` has types of those names; each converts to and from its replacement, so `WebResponse answer = await routes.HandleAsync(new WebRequest(...))` still compiles, and a handler's function may still return a `WebResponse`. A handler function whose lambda names the request's type must say `CronwatchRequest` |
+| `Cronwatch.Web.WebAdapters` | `Adapters`, the Java port's name |
+| `Cronwatch.Hosting.CronwatchServiceCollectionExtensions`, `Cronwatch.AspNetCore.CronwatchAspNetCore` | the extension methods' classes in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder`; `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods |
+| `Slack.Webhook(url)`, `Discord.Webhook(url)` | `SlackChannel.Webhook(url)`, `DiscordChannel.Webhook(url)`, on the channel types |
+| `Json.Quote`, `Json.Kind`, `Json.Copy`, `Json.TryNumber`, `Json.MaxDepth` | internal now: `Json.Parse`, `Json.ParseObject` and `Json.Stringify` are the JSON the library promises (`Json.Stringify(text)` quotes a string as `Quote` did) |
+| `StoreContract.NewRun`, `ForeignRows` | fixture helpers, no longer promised: the store kit promises `StoreContract.RunAsync`, `StoreReplay` and `FinishOnce` |
+| `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it is still used |
 
 ## Kept in step
 

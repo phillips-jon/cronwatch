@@ -438,7 +438,7 @@ public class CronwatchQuartzTests
     }
 
     /// <summary>A memory store whose insert of a run of <c>opening</c> waits at a gate, and says when it is there.</summary>
-    private sealed class GatedInsert(MemoryStore inner) : IStore, IConditionalRunStore, IStateCasStore, IRunDeletingStore
+    private sealed class GatedInsert(MemoryStore inner) : IStore, IUpdateRunIfStore, ICompareAndSetStateStore, IDeleteRunIfStore
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 

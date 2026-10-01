@@ -13,7 +13,10 @@ namespace Cronwatch;
 /// missed run cannot be noticed across one. Its values are immutable records, so what goes in and
 /// out needs no copying.
 /// </summary>
-public sealed class MemoryStore : IStore, IConditionalRunStore, IStateCasStore, IRunDeletingStore
+public sealed class MemoryStore : IStore, IUpdateRunIfStore, ICompareAndSetStateStore, IDeleteRunIfStore,
+#pragma warning disable CS0618 // the former names, kept through 1.x
+    IConditionalRunStore, IStateCasStore, IRunDeletingStore
+#pragma warning restore CS0618
 {
     private readonly Lock _lock = new();
     private readonly Dictionary<string, StoredJob> _jobs = new(StringComparer.Ordinal);

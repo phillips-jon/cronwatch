@@ -138,7 +138,7 @@ public class HostedJobTests
         await m.FireAsync("counting", T0.AddMinutes(10));
         await Eventually("the second run", async () => (await Runs(m.Cw, "counting")).Count(r => r.Status == RunStatus.Ok) == 2);
         Run[] runs = await Runs(m.Cw, "counting");
-        Assert.All(runs, r => Assert.Equal("schedule", r.Trigger));
+        Assert.All(runs, r => Assert.Equal("hosting", r.Trigger));
         Assert.NotEqual(runs[0].Output, runs[1].Output);
         await Eventually("both scopes disposed", () => Task.FromResult(Counting.Scoped.Disposed - disposedBefore >= 2));
         Assert.Equal("*/5 * * * *", m.Cw.DefinedJobs.Single(d => d.Name == "counting").Schedule);

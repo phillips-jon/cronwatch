@@ -45,11 +45,11 @@ internal static class Origins
         if (kind == UrlKind.Invalid)
         {
             throw new ArgumentException(
-                "routes: origin must be an absolute URL such as \"https://app.example.com\", got " + Json.Quote(value));
+                "routes: origin must be an absolute URL such as \"https://app.example.com\", got " + JsonText.Quote(value));
         }
         if (url is not { Scheme: "http" or "https" })
         {
-            throw new ArgumentException("routes: origin must be http or https, got " + Json.Quote(value));
+            throw new ArgumentException("routes: origin must be http or https, got " + JsonText.Quote(value));
         }
         return url.Origin;
     }
