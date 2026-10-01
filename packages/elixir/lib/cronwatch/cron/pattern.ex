@@ -1,10 +1,11 @@
 defmodule Cronwatch.Cron.Pattern do
-  @moduledoc """
-  Croner's CronPattern: the fields of an expression as tables of what
-  matches, read with croner's checks and its messages word for word. A table
-  entry is 1 (a match) or, in the day of the week, croner's bits for the nth
-  weekday (1, 2, 4, 8, 16), 32 for the last one and 63 for any.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # Croner's CronPattern: the fields of an expression as tables of what
+  # matches, read with croner's checks and its messages word for word. A table
+  # entry is 1 (a match) or, in the day of the week, croner's bits for the nth
+  # weekday (1, 2, 4, 8, 16), 32 for the last one and 63 for any.
 
   alias Cronwatch.JS
 

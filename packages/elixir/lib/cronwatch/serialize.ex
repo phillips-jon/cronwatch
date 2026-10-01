@@ -1,17 +1,18 @@
 defmodule Cronwatch.Serialize do
-  @moduledoc """
-  Expect rules and how a definition is stored (the SDK's `serialize.ts`).
-
-  A job's `expect` is a rule its successful run's output must satisfy:
-
-    * `{:contains, text}`: the output must contain the text, stored as
-      `contains "text"`;
-    * `{:matches, %Cronwatch.JSRE{}}`: a JavaScript pattern must match
-      somewhere, stored as `matches /source/flags` and run by
-      `Cronwatch.JSRE` within its step budget;
-    * `{:fun, fun}`: a one-argument function must return true, stored as
-      `custom function`.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # Expect rules and how a definition is stored (the SDK's `serialize.ts`).
+  #
+  # A job's `expect` is a rule its successful run's output must satisfy:
+  #
+  #   * `{:contains, text}`: the output must contain the text, stored as
+  #     `contains "text"`;
+  #   * `{:matches, %Cronwatch.JSRE{}}`: a JavaScript pattern must match
+  #     somewhere, stored as `matches /source/flags` and run by
+  #     `Cronwatch.JSRE` within its step budget;
+  #   * `{:fun, fun}`: a one-argument function must return true, stored as
+  #     `custom function`.
 
   alias Cronwatch.JS
   alias Cronwatch.JS.Object

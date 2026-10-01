@@ -20,7 +20,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
       * `:dynamic_repo`: a repo started with `name: nil` (its pid) or under
         another name, put with `put_dynamic_repo/1` around each statement.
 
-    Every statement is written by `Cronwatch.Store.SQL` and run with
+    Every statement is the SDK's, run with
     `Ecto.Adapters.SQL.query/4`; nothing uses Ecto's schemas. The tables are
     made by `c:Cronwatch.Store.init/1` on the instance's first use (`CREATE
     TABLE IF NOT EXISTS`), so a Node process and an Elixir process can make
@@ -62,7 +62,7 @@ if Code.ensure_loaded?(Ecto.Adapters.SQL) do
     @type t :: %__MODULE__{
             repo: module(),
             prefix: String.t(),
-            dialect: SQL.dialect(),
+            dialect: :sqlite | :postgres | :mysql,
             sql: %{atom() => String.t()},
             dynamic_repo: pid() | atom() | nil
           }

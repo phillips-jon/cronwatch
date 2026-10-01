@@ -3,7 +3,7 @@ defmodule Cronwatch.Job do
   A declared job's handle, as `Cronwatch.job/2` answers it: the instance it
   belongs to, its name, and its definition. `definition` is the stored JSON
   object (a `Cronwatch.JS.Object`, fields in the order given, `expect`
-  described last); `expect` is the rule itself.
+  described last); `expect` is the rule itself, as the options give it.
   """
 
   alias Cronwatch.JS.Object
@@ -16,8 +16,11 @@ defmodule Cronwatch.Job do
           name: String.t(),
           fields: Object.t(),
           definition: Object.t(),
-          expect: Cronwatch.Serialize.rule() | nil
+          expect: rule() | nil
         }
+
+  @typedoc "An `expect` rule, as `Cronwatch.job/2` reads it from the options."
+  @type rule :: {:contains, String.t()} | {:matches, term()} | {:fun, (String.t() -> term())}
 
   @doc false
   def new(instance, name, options, defaults) do

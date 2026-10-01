@@ -8,6 +8,9 @@ defmodule Cronwatch.Bridge.Entry do
   once), the integration's `defaults` for every job (before the schedule)
   and the entry's own `options` (after it, so a schedule among them
   replaces the scheduler's).
+
+  Part of `Cronwatch.Bridge`: for integration authors, outside the 1.x
+  promise.
   """
 
   defstruct name: nil, label: nil, schedule: "", timezone: "", problem: nil, defaults: [], options: []
@@ -25,6 +28,9 @@ end
 
 defmodule Cronwatch.Bridge.Watch do
   @moduledoc """
+  Part of `Cronwatch.Bridge`: for integration authors, outside the 1.x
+  promise.
+
   The jobs an integration declared for one scheduler, the jobs gone from
   it, and the jobs a worker runs that another process declared: the Go
   port's `bridge/watch.go` and the Rust port's `Watch`, with both audits'

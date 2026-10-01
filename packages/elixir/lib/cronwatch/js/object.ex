@@ -5,12 +5,18 @@ defmodule Cronwatch.JS.Object do
   then every other key in the order it was first set.
 
   Elixir maps have no order, so every JSON object CronWatch reads or writes is
-  one of these, and `Cronwatch.JS.stringify/1` writes it in that order.
+  one of these, and is written in that order.
   """
 
   defstruct pairs: []
 
-  @type t :: %__MODULE__{pairs: [{String.t(), Cronwatch.JS.value()}]}
+  @type t :: %__MODULE__{pairs: [{String.t(), value()}]}
+
+  @typedoc "A JSON value: JavaScript's numbers include its infinities and NaN."
+  @type value :: nil | boolean() | number_value() | String.t() | [value()] | t()
+
+  @typedoc "A JavaScript number."
+  @type number_value :: integer() | float() | :infinity | :neg_infinity | :nan
 
   @doc "An empty object."
   @spec new() :: t()
@@ -37,7 +43,7 @@ defmodule Cronwatch.JS.Object do
   # their values: array indices first, in ascending order, then the rest.
   # Setting a key at a time costs a walk of the pairs each, which made an
   # object of many keys (a request body, a stored row) quadratic to read.
-  @spec from_order([String.t()], %{String.t() => Cronwatch.JS.value()}) :: t()
+  @spec from_order([String.t()], %{String.t() => value()}) :: t()
   def from_order(keys, values) do
     {indices, rest} =
       keys
@@ -55,7 +61,7 @@ defmodule Cronwatch.JS.Object do
   Gives `key` the value: a new key takes its place in JavaScript's order, a
   key already there keeps its place.
   """
-  @spec put(t(), String.t(), Cronwatch.JS.value()) :: t()
+  @spec put(t(), String.t(), value()) :: t()
   def put(%__MODULE__{pairs: pairs} = o, key, value) when is_binary(key) do
     case replace(pairs, key, value) do
       {:ok, pairs} ->
@@ -99,7 +105,7 @@ defmodule Cronwatch.JS.Object do
   end
 
   @doc "`{:ok, value}` when the key is there, else `:error`."
-  @spec fetch(t(), String.t()) :: {:ok, Cronwatch.JS.value()} | :error
+  @spec fetch(t(), String.t()) :: {:ok, value()} | :error
   def fetch(%__MODULE__{pairs: pairs}, key) do
     case List.keyfind(pairs, key, 0) do
       {_, v} -> {:ok, v}
@@ -120,7 +126,7 @@ defmodule Cronwatch.JS.Object do
   def keys(%__MODULE__{pairs: pairs}), do: Enum.map(pairs, &elem(&1, 0))
 
   @doc "The keys and values, in order."
-  @spec to_list(t()) :: [{String.t(), Cronwatch.JS.value()}]
+  @spec to_list(t()) :: [{String.t(), value()}]
   def to_list(%__MODULE__{pairs: pairs}), do: pairs
 
   @doc "How many keys there are."
@@ -131,10 +137,9 @@ defmodule Cronwatch.JS.Object do
   @spec merge(t(), t()) :: t()
   def merge(a, %__MODULE__{pairs: pairs}), do: Enum.reduce(pairs, a, fn {k, v}, o -> put(o, k, v) end)
 
-  @doc """
-  The key as an array index, which JavaScript orders before every other key,
-  or nil.
-  """
+  @doc false
+  # The key as an array index, which JavaScript orders before every other key,
+  # or nil.
   @spec array_index(String.t()) :: non_neg_integer() | nil
   def array_index(key) when byte_size(key) == 0 or byte_size(key) > 10, do: nil
   def array_index(<<?0, _, _::binary>>), do: nil

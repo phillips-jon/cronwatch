@@ -1,16 +1,17 @@
 defmodule Cronwatch.Zone do
-  @moduledoc """
-  Time zones for the croner port, from `tz`'s copy of the IANA database,
-  named as `Intl` names them: without regard to case, so
-  `"america/new_york"` is New York, as `Intl.DateTimeFormat` reads it. A fixed
-  offset (`"+05:30"`, `"-0800"`, `"+05"`) is a zone too, since `Intl` and
-  croner both take one.
-
-  Tz.TimeZoneDatabase is called directly, for the offset at an instant;
-  the app's `config :elixir, :time_zone_database` is never read or set.
-  Without a name, a zone is the process's own: `$TZ` when it names a zone,
-  else the zone `/etc/localtime` links to, else UTC.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # Time zones for the croner port, from `tz`'s copy of the IANA database,
+  # named as `Intl` names them: without regard to case, so
+  # `"america/new_york"` is New York, as `Intl.DateTimeFormat` reads it. A fixed
+  # offset (`"+05:30"`, `"-0800"`, `"+05"`) is a zone too, since `Intl` and
+  # croner both take one.
+  #
+  # Tz.TimeZoneDatabase is called directly, for the offset at an instant;
+  # the app's `config :elixir, :time_zone_database` is never read or set.
+  # Without a name, a zone is the process's own: `$TZ` when it names a zone,
+  # else the zone `/etc/localtime` links to, else UTC.
 
   alias Cronwatch.JS
 

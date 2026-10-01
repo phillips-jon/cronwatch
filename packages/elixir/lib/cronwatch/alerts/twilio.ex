@@ -43,7 +43,8 @@ defmodule Cronwatch.Alerts.Twilio do
     :transport
   ]
 
-  @doc "The most segments a message may use, which keeps it inside Twilio's 1600 character Body limit."
+  @doc false
+  # The most segments a message may use, which keeps it inside Twilio's 1600 character Body limit.
   def max_segments, do: 10
 
   # The longest Body Twilio takes.
@@ -172,12 +173,11 @@ defmodule Cronwatch.Alerts.Twilio do
        |> MapSet.new()
   @gsm_extended MapSet.new(String.to_charlist("^{}\\[~]|€\f"))
 
-  @doc """
-  How many SMS segments `text` takes. A character is never split across
-  two: an extension character (two septets) or a surrogate pair (two UCS-2
-  units) that would straddle a boundary starts the next segment, as phones
-  pack them.
-  """
+  @doc false
+  # How many SMS segments `text` takes. A character is never split across
+  # two: an extension character (two septets) or a surrogate pair (two UCS-2
+  # units) that would straddle a boundary starts the next segment, as phones
+  # pack them.
   @spec sms_segments(String.t()) :: pos_integer()
   def sms_segments(text) do
     chars = String.to_charlist(text)
@@ -217,12 +217,11 @@ defmodule Cronwatch.Alerts.Twilio do
   defp segment_budget(n) when is_float(n), do: n |> Float.floor() |> trunc() |> segment_budget()
   defp segment_budget(_), do: 3
 
-  @doc """
-  The text of an alert: the title, then as many lines of the message (and
-  the triage) as fit in `segments` SMS segments, then the link. The link is
-  kept whole; the text before it is cut to make room. `segments` is clamped
-  to 1 to 10, and 3 for anything not a number.
-  """
+  @doc false
+  # The text of an alert: the title, then as many lines of the message (and
+  # the triage) as fit in `segments` SMS segments, then the link. The link is
+  # kept whole; the text before it is cut to make room. `segments` is clamped
+  # to 1 to 10, and 3 for anything not a number.
   @spec sms_body(Cronwatch.Alert.t(), String.t() | nil, term()) :: String.t()
   def sms_body(alert, link, segments \\ 3) do
     budget = segment_budget(segments)

@@ -24,6 +24,8 @@ A release that a crontab runs needs no integration: see [a crontab](#a-crontab) 
 - **Each run is a run in the scheduler's own process.** The integration attaches to the scheduler's `:telemetry` events, which fire in the process that runs the job, so the run's context is there: `Cronwatch.log/1`, `Cronwatch.metric/2` and `Cronwatch.current/0` work inside the job with no code, and Logger metadata carries `cronwatch_job` and `cronwatch_run`. The process is monitored like any run's, so a job killed part way is a failed run at once.
 - **Options per job.** `defaults:` are job options for every job, before its schedule, and each integration takes options per job after them.
 
+Both integrations are built on `Cronwatch.Bridge`, which is public for integration authors but outside the 1.x promise: it changes whenever an integration needs something (see [What 1.x promises](/docs/elixir/#what-1-x-promises)).
+
 ### Retries
 
 For Oban, every attempt is a run of its own. An attempt that fails (an error, a raise, `{:error, reason}`, or a `{:cancel, reason}` the worker gives up with) is a failed run with its cause, so failing attempts open one failed alert and the attempt that succeeds closes it with a recovery; `failures_before_alert: 3` counts failed attempts in a row. An attempt that snoozes did not fail and did not do its work: its run is taken back, so nothing is judged, no alert is sent and the failures in a row are left as they were. If the job was due, its schedule reports it missed. Taking a run back needs a store with `delete_run_if`, which the memory store and `Cronwatch.Store.Ecto` have; with a store of your own without it, the snooze is kept as an `ok` run, still not judged.

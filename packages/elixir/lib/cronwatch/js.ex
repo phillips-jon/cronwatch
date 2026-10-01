@@ -1,25 +1,26 @@
 defmodule Cronwatch.JS do
-  @moduledoc """
-  What the port needs of JavaScript's own behaviour, so that every value the
-  SDK writes, compares or counts is written, compared and counted the same way
-  here: numbers as `Number.prototype.toString` prints them, `JSON.stringify`
-  and `JSON.parse` (objects keep JavaScript's key order, see
-  `Cronwatch.JS.Object`), string lengths and cuts in UTF-16 code units, the
-  characters `\\s` matches, and `Date`'s calendar arithmetic.
-
-  A JSON value is `nil`, a boolean, a number (an integer, a float, or one of
-  `:infinity`, `:neg_infinity` and `:nan`, which JavaScript has and Erlang's
-  floats do not), a binary, a list, or a `Cronwatch.JS.Object`. `parse/1`
-  reads a whole number that JavaScript holds exactly (up to 2^53) as an
-  integer and anything else as a float, so a value reads back as it was
-  written.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # What the port needs of JavaScript's own behaviour, so that every value the
+  # SDK writes, compares or counts is written, compared and counted the same way
+  # here: numbers as `Number.prototype.toString` prints them, `JSON.stringify`
+  # and `JSON.parse` (objects keep JavaScript's key order, see
+  # `Cronwatch.JS.Object`), string lengths and cuts in UTF-16 code units, the
+  # characters `\\s` matches, and `Date`'s calendar arithmetic.
+  #
+  # A JSON value is `nil`, a boolean, a number (an integer, a float, or one of
+  # `:infinity`, `:neg_infinity` and `:nan`, which JavaScript has and Erlang's
+  # floats do not), a binary, a list, or a `Cronwatch.JS.Object`. `parse/1`
+  # reads a whole number that JavaScript holds exactly (up to 2^53) as an
+  # integer and anything else as a float, so a value reads back as it was
+  # written.
 
   alias Cronwatch.JS.Object
   alias Cronwatch.JS.Units
 
-  @type number_value :: integer() | float() | :infinity | :neg_infinity | :nan
-  @type value :: nil | boolean() | number_value() | String.t() | [value()] | Object.t()
+  @type number_value :: Object.number_value()
+  @type value :: Object.value()
 
   # 2^53: every integer up to it is a double exactly.
   @max_safe 9_007_199_254_740_992

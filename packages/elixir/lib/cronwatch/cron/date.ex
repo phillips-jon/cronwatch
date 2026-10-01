@@ -1,10 +1,11 @@
 defmodule Cronwatch.Cron.Date do
-  @moduledoc """
-  Croner's CronDate: a wall-clock time whose fields are moved forward to the
-  next match, a field at a time, spilling into the next month or year as
-  croner does. The fields are year, month (0 based), day, hour, minute,
-  second and milliseconds, held in a tuple in that order.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # Croner's CronDate: a wall-clock time whose fields are moved forward to the
+  # next match, a field at a time, spilling into the next month or year as
+  # croner does. The fields are year, month (0 based), day, hour, minute,
+  # second and milliseconds, held in a tuple in that order.
 
   import Bitwise
 

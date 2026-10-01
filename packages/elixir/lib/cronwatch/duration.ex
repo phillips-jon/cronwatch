@@ -1,8 +1,9 @@
 defmodule Cronwatch.Duration do
-  @moduledoc """
-  The SDK's `duration.ts`: durations (`"15m"`, `"1h30m"`, a number of
-  milliseconds) read and written as the SDK does, its errors word for word.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # The SDK's `duration.ts`: durations (`"15m"`, `"1h30m"`, a number of
+  # milliseconds) read and written as the SDK does, its errors word for word.
 
   alias Cronwatch.JS
   alias Cronwatch.JS.Object

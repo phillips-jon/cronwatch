@@ -18,7 +18,7 @@ defmodule Cronwatch.Transport do
   fails on it, so credential headers never go where it points.
 
   The deadline and the answer's cap are not the transport's to enforce:
-  `Cronwatch.Alerts.Post` runs `c:post/2` and reads the body in a process
+  the channel's request runs `c:post/2` and reads the body in a process
   of its own, which it kills past the deadline, and reads at most 1 MiB of
   the body. A body can be a binary, or a function of no arguments called
   in that same process for each chunk in turn (`{:ok, chunk}`, `:done` or
@@ -49,10 +49,9 @@ defmodule Cronwatch.Transport do
 
   @callback post(opts :: term(), Request.t()) :: {:ok, Response.t()} | {:error, term()}
 
-  @doc """
-  The transport to use: the one given, else the instance's (`fallback`),
-  else `Cronwatch.Transport.HTTP`.
-  """
+  @doc false
+  # The transport to use: the one given, else the instance's (`fallback`),
+  # else `Cronwatch.Transport.HTTP`.
   @spec resolve(spec(), spec()) :: {module(), term()}
   def resolve(given, fallback \\ nil)
   def resolve(nil, nil), do: {Cronwatch.Transport.HTTP, []}
@@ -60,7 +59,8 @@ defmodule Cronwatch.Transport do
   def resolve({module, opts}, _) when is_atom(module), do: {module, opts}
   def resolve(module, _) when is_atom(module), do: {module, []}
 
-  @doc "Checks a transport given as an option: nil, a module or `{module, opts}` whose module has `post/2`."
+  @doc false
+  # Checks a transport given as an option: nil, a module or `{module, opts}` whose module has `post/2`.
   @spec check(term(), String.t()) :: :ok | {:error, String.t()}
   def check(nil, _who), do: :ok
   def check({module, _opts}, who) when is_atom(module), do: check(module, who)

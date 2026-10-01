@@ -33,11 +33,10 @@ defmodule Cronwatch.Alerts.Email do
 
   @keys [:from, :to, :subject_prefix, :link]
 
-  @doc """
-  Reads and checks the shared options once, when the channel is made: the
-  to addresses with blanks dropped and each trimmed. `module` names the
-  channel in a refusal.
-  """
+  @doc false
+  # Reads and checks the shared options once, when the channel is made: the
+  # to addresses with blanks dropped and each trimmed. `module` names the
+  # channel in a refusal.
   @spec options(module(), keyword()) :: {:ok, t()} | {:error, String.t()}
   def options(module, opts) do
     given = Keyword.merge(Keyword.take(opts, @keys), Keyword.get(opts, :email) || [])
@@ -69,7 +68,8 @@ defmodule Cronwatch.Alerts.Email do
     end
   end
 
-  @doc "The mail for an alert: `%{from, to, subject, text, html}`."
+  @doc false
+  # The mail for an alert: `%{from, to, subject, text, html}`.
   @spec compose(Cronwatch.Alert.t(), t()) :: %{
           from: String.t(),
           to: [String.t()],
@@ -89,7 +89,8 @@ defmodule Cronwatch.Alerts.Email do
   # `.replace(/[\r\n]+/g, " ")`.
   def one_line(text), do: Regex.replace(~r/[\r\n]+/, text, " ")
 
-  @doc "Escapes text for HTML content and double quoted attributes."
+  @doc false
+  # Escapes text for HTML content and double quoted attributes.
   @spec escape_html(String.t()) :: String.t()
   def escape_html(text) do
     text
@@ -126,11 +127,10 @@ defmodule Cronwatch.Alerts.Email do
     Enum.join(parts, "\n")
   end
 
-  @doc """
-  `Name <a@b.c>` split into its parts as a JSON object; a bare address has
-  no name (email.ts's `parseAddress`: `/^\\s*(.*?)\\s*<([^<>]+)>\\s*$/`, then
-  the name without the double quotes around it).
-  """
+  @doc false
+  # `Name <a@b.c>` split into its parts as a JSON object; a bare address has
+  # no name (email.ts's `parseAddress`: `/^\\s*(.*?)\\s*<([^<>]+)>\\s*$/`, then
+  # the name without the double quotes around it).
   @spec parse_address(String.t()) :: Object.t()
   def parse_address(text) do
     bare = Object.new([{"email", JS.trim(text)}])

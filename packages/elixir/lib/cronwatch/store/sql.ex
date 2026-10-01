@@ -1,23 +1,24 @@
 defmodule Cronwatch.Store.SQL do
-  @moduledoc """
-  The SQL store's schema and statements, by dialect. SQLite's and Postgres's
-  are `stores/sql.ts`'s text for text, so a Node, Ruby, Python, PHP, Go, Rust
-  and Elixir process can share one database and `sqlite_master` reads the same
-  whoever made the tables.
-
-  Postgres differs from `sql.ts` in one place, its JSON: Postgrex would encode
-  a JSON parameter through the repo's JSON library and decode a `jsonb` column
-  into a map, losing the SDK's key order and numbers, so a JSON parameter is
-  written `$n::text::jsonb` and a JSON column is read `col::text`. The schema
-  does not differ.
-
-  MySQL (and MariaDB) has a dialect of its own, the PHP, Go and Rust ports'
-  (`packages/go/sqlstore/sql.go`), since it has no `ON CONFLICT`, no partial
-  index and no `TEXT` primary key: the same tables, columns and values, with
-  the JSON columns as `LONGTEXT` holding the SDK's JSON byte for byte, never
-  MySQL's `JSON` type, which would rewrite it. It needs MySQL 8.0.13 or
-  MariaDB 10.6 or newer.
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # The SQL store's schema and statements, by dialect. SQLite's and Postgres's
+  # are `stores/sql.ts`'s text for text, so a Node, Ruby, Python, PHP, Go, Rust
+  # and Elixir process can share one database and `sqlite_master` reads the same
+  # whoever made the tables.
+  #
+  # Postgres differs from `sql.ts` in one place, its JSON: Postgrex would encode
+  # a JSON parameter through the repo's JSON library and decode a `jsonb` column
+  # into a map, losing the SDK's key order and numbers, so a JSON parameter is
+  # written `$n::text::jsonb` and a JSON column is read `col::text`. The schema
+  # does not differ.
+  #
+  # MySQL (and MariaDB) has a dialect of its own, the PHP, Go and Rust ports'
+  # (`packages/go/sqlstore/sql.go`), since it has no `ON CONFLICT`, no partial
+  # index and no `TEXT` primary key: the same tables, columns and values, with
+  # the JSON columns as `LONGTEXT` holding the SDK's JSON byte for byte, never
+  # MySQL's `JSON` type, which would rewrite it. It needs MySQL 8.0.13 or
+  # MariaDB 10.6 or newer.
 
   @typedoc "The database's SQL."
   @type dialect :: :sqlite | :postgres | :mysql

@@ -1,12 +1,13 @@
 defmodule Cronwatch.Output do
-  @moduledoc """
-  The SDK's `output.ts`: the output cap, error text and secret redaction.
-
-  Lengths and cuts are in UTF-16 code units, as JavaScript counts them, so the
-  same output is capped at the same character here and in every other port.
-  An error is written as a JavaScript stack reads, `Name: message` and up to
-  five frames, with Elixir's own names and frames (see `describe_exception/3`).
-  """
+  @moduledoc false
+  # Internal: not the package's API, and it can change in any release.
+  #
+  # The SDK's `output.ts`: the output cap, error text and secret redaction.
+  #
+  # Lengths and cuts are in UTF-16 code units, as JavaScript counts them, so the
+  # same output is capped at the same character here and in every other port.
+  # An error is written as a JavaScript stack reads, `Name: message` and up to
+  # five frames, with Elixir's own names and frames (see `describe_exception/3`).
 
   alias Cronwatch.JS
   alias Cronwatch.JSRE

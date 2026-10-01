@@ -86,10 +86,9 @@ defmodule Cronwatch.Metrics do
 
   def from_value(v), do: {:error, "metrics must be an object, not #{Read.kind(v)}"}
 
-  @doc """
-  A stored row's metrics as the SDK reads them: the numbers of an object,
-  whatever else it holds, and none for anything else.
-  """
+  @doc false
+  # A stored row's metrics as the SDK reads them: the numbers of an object,
+  # whatever else it holds, and none for anything else.
   @spec lenient(term()) :: t()
   def lenient(%Object{pairs: pairs}), do: %Object{pairs: Enum.filter(pairs, fn {_, v} -> Read.number?(v) end)}
 

@@ -377,6 +377,14 @@ The functions, each taking `instance:` among its options:
 | `sync_job(name)` | write a declaration to the store now, unless it already holds it |
 | `defined_jobs()` | the jobs declared in this instance |
 
+### What 1.x promises
+
+The package's API is what this page and the README name, and nothing else; every module and function HexDocs leaves out is internal and can change in any release. That includes the port's own machinery: its JavaScript values and regular expressions, the croner port, durations and schedules, zones, the output cap and redaction's parts, the stored definition's serializer, the SQL statements and the alert channels' shared request. Three things are public but outside the promise:
+
+- `Cronwatch.Bridge` (with `Bridge.Watch` and `Bridge.Entry`) is what the Oban and Quantum integrations are built on. It is for integration authors, changes whenever an integration needs something, and a scheduler integration of your own builds on it at its own risk.
+- `Cronwatch.StoreCase` promises only `use Cronwatch.StoreCase, store: ..., fixture: ...`, which runs the whole contract; the tests it defines can grow in any release.
+- The Oban integration reads Oban's crontab expressions through `Oban.Cron.Expression`, and zone names are confirmed through `Tz.PeriodsProvider`, both of which their packages mark internal. A new release of Oban or tz may need a CronWatch patch release; the tests on each dependency's newest release catch it.
+
 ### Deprecated
 
 These still work through 1.x, marked deprecated, and go in 2.0:
@@ -384,6 +392,7 @@ These still work through 1.x, marked deprecated, and go in 2.0:
 | Deprecated | Use | |
 |---|---|---|
 | `Cronwatch.start()` and `Cronwatch.start(every: d)` | `Cronwatch.start_checking(every: d)` | `start(job, options)`, which opens a run, is unchanged. `start/0` is marked `@deprecated`, so the compiler warns; a keyword list given to `start/1` warns when it is called |
+| `Cronwatch.StoreCase.contract/1`, `replay_fixture/2`, `make/1`, `scenarios/0`, `new_run/4` and `canonical/1` | `use Cronwatch.StoreCase, store: ..., fixture: ...` | the tests the template defines run them; called directly, the compiler warns |
 
 `Cronwatch.Error` has a `kind`: `:invalid` (an option, name, schedule or run id the SDK refuses, with its message), `:store` (the store's own error as `reason`) and `:other`. A failed run's error is written `Name: message` from the exception's module (`RuntimeError: disk full`), with up to five frames of its stacktrace, each `Module.function/arity (file:line)`; a throw is written `throw: <value>`, an exit `exit: <reason>`, and a returned `{:error, reason}` as its reason (an exception in it as the exception, `:error` alone as `error`).
 

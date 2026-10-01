@@ -4,6 +4,10 @@ defmodule Cronwatch.Bridge do
   `Cronwatch.Quantum`), carried over from the Go and Rust ports' bridge. An
   app does not need it; a scheduler integration of your own can.
 
+  For integration authors, outside the 1.x promise: the bridge changes
+  whenever an integration needs something, so it can change in any release.
+  A scheduler integration of your own builds on it at its own risk.
+
     * `Cronwatch.Bridge.Watch` declares a scheduler's entries as jobs, one
       per name, tagged with the integration and the app, and declares a job
       whose entry is gone again without its schedule, so it is never
