@@ -155,6 +155,5 @@ These names still work, and do exactly what their replacements do, through every
 | `CronWatch`, `CronWatchOptions` | `Cronwatch`, `CronwatchOptions`: the spelling every port uses |
 | `createRoutes(cw, options)` | `cw.routes(options)` |
 | `cw.start(every)` | `cw.startChecking(every)`: a job's `start()` opens a run, so the client's is named for what it starts |
-| `hmacSha256Hex(secret, body)` from `/webhook` | `signature(secret, body)`, the name every port uses |
 
-These were exported by accident, are internal to their entry points, and are no longer exported from 1.0: `MAX_SEGMENTS`, `MAX_BODY`, `smsSegments` and `smsBody` from `/twilio`; `parseDsn` from `/sentry`; `DESCRIPTION_MAX`, `embedDescription`, `codeBlockSafe` and `escapeMarkdown` from `/discord`; `PG_CRON_HOLD_MS`, `pgCronSchedule`, `pgCronJobName` and `pgCronRun` from `/pg-cron`.
+These were exported by accident. Each is marked `@deprecated` too, still works, and is no longer exported from 1.0: `hmacSha256Hex` from `/webhook` (use `signature(secret, body)`, the name every port uses), and, internal to their entry points, `MAX_SEGMENTS`, `MAX_BODY`, `smsSegments` and `smsBody` from `/twilio`; `parseDsn` from `/sentry`; `DESCRIPTION_MAX`, `embedDescription`, `codeBlockSafe` and `escapeMarkdown` from `/discord`; `PG_CRON_HOLD_MS`, `pgCronSchedule`, `pgCronJobName` and `pgCronRun` from `/pg-cron`.

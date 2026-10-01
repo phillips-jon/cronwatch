@@ -90,9 +90,13 @@ defmodule Cronwatch.Alerts.Email do
   def one_line(text), do: Regex.replace(~r/[\r\n]+/, text, " ")
 
   @doc false
+  @deprecated "Internal to the email channels, public by accident; removed in 1.0"
+  def escape_html(text), do: html_escape(text)
+
+  @doc false
   # Escapes text for HTML content and double quoted attributes.
-  @spec escape_html(String.t()) :: String.t()
-  def escape_html(text) do
+  @spec html_escape(String.t()) :: String.t()
+  def html_escape(text) do
     text
     |> String.replace("&", "&amp;")
     |> String.replace("<", "&lt;")
@@ -114,14 +118,14 @@ defmodule Cronwatch.Alerts.Email do
       [
         "<!doctype html>",
         ~s(<html><body style="margin:0;padding:16px;font-family:Georgia,serif;color:#1d1b16;background:#ffffff">),
-        ~s(<p style="margin:0 0 12px;font-size:18px"><strong>#{escape_html(alert.title)}</strong></p>),
+        ~s(<p style="margin:0 0 12px;font-size:18px"><strong>#{html_escape(alert.title)}</strong></p>),
         ~s(<pre style="margin:0 0 12px;padding:12px;background:#f6f3ec;white-space:pre-wrap;) <>
-          ~s(word-break:break-word;font:13px/1.45 Menlo,Consolas,monospace">#{escape_html(alert.message)}</pre>)
+          ~s(word-break:break-word;font:13px/1.45 Menlo,Consolas,monospace">#{html_escape(alert.message)}</pre>)
       ] ++
-        if(triage == "", do: [], else: [~s(<p style="margin:0 0 12px"><em>Triage:</em> #{escape_html(triage)}</p>)]) ++
+        if(triage == "", do: [], else: [~s(<p style="margin:0 0 12px"><em>Triage:</em> #{html_escape(triage)}</p>)]) ++
         if(link == "",
           do: [],
-          else: [~s(<p style="margin:0"><a href="#{escape_html(link)}">Open #{escape_html(alert.job)}</a></p>)]
+          else: [~s(<p style="margin:0"><a href="#{html_escape(link)}">Open #{html_escape(alert.job)}</a></p>)]
         ) ++ ["</body></html>"]
 
     Enum.join(parts, "\n")

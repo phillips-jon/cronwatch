@@ -45,6 +45,7 @@ final class Sentry implements AlertChannel
      * The envelope endpoint and public key of a DSN.
      *
      * @return array{string, string}
+     * @deprecated Internal to the Sentry channel, public by accident; removed in 1.0.
      */
     public static function parseDsn(#[\SensitiveParameter] string $dsn): array
     {

@@ -50,7 +50,7 @@ defmodule Cronwatch.Alerts.Discord do
   @impl true
   def send(%__MODULE__{} = o, %Alert{} = alert, ctx) do
     link = Shared.link_for(o.link, alert)
-    description = embed_description(alert)
+    description = description_of(alert)
 
     embed =
       Object.new(
@@ -81,13 +81,17 @@ defmodule Cronwatch.Alerts.Discord do
   @description_max 4096
 
   @doc false
+  @deprecated "Internal to the Discord channel, public by accident; removed in 1.0"
+  def embed_description(alert), do: description_of(alert)
+
+  @doc false
   # The embed's description (discord.ts's `embedDescription`): the message in
   # a code block, then the triage. Each part has its own cap, and escaping can
   # grow both, so the whole is held to 4096 UTF-16 units, the most Discord
   # takes, by cutting the message's block, never the triage: Discord refuses
   # a longer one on every retry.
-  @spec embed_description(Alert.t()) :: Units.t()
-  def embed_description(%Alert{} = alert) do
+  @spec description_of(Alert.t()) :: Units.t()
+  def description_of(%Alert{} = alert) do
     # codeBlockSafe after the cut, as the SDK does it: it works on code
     # units, so a lone half at the end passes through.
     message = Units.head(alert.message, 3800)

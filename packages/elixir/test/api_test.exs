@@ -74,6 +74,41 @@ defmodule Cronwatch.APITest do
     end
   end
 
+  # Functions that were public by accident before 1.0: deprecated, still
+  # working, and removed in 1.0. The rest of @hidden_functions are called
+  # across the package's modules, so they stay, hidden and internal.
+  @removed_in_1_0 [
+    {Cronwatch.Alerts.Email, :escape_html, 1},
+    {Cronwatch.Alerts.Twilio, :max_segments, 0},
+    {Cronwatch.Alerts.Twilio, :sms_body, 3},
+    {Cronwatch.Alerts.Twilio, :sms_segments, 1},
+    {Cronwatch.Alerts.Discord, :embed_description, 1},
+    {Cronwatch.Alerts.Webhook, :body, 1},
+    {Cronwatch.Sources.PgCron, :hold_ms, 0},
+    {Cronwatch.Sources.PgCron, :schedule, 1},
+    {Cronwatch.Sources.PgCron, :job_name, 1},
+    {Cronwatch.Sources.PgCron, :run_of, 4},
+    {Cronwatch.Triage.Anthropic, :default_model, 0},
+    {Cronwatch.Triage.Anthropic, :system, 0}
+  ]
+
+  test "the helpers public by accident are deprecated, to go in 1.0" do
+    for {module, name, arity} <- @removed_in_1_0 do
+      Code.ensure_loaded!(module)
+
+      assert {_, message} = List.keyfind(module.__info__(:deprecated), {name, arity}, 0),
+             "#{inspect(module)}.#{name}/#{arity}"
+
+      assert message =~ "removed in 1.0"
+    end
+
+    # Called through apply/3 so the deprecated functions compile without a warning.
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
+    assert apply(Cronwatch.Alerts.Email, :escape_html, ["<a&b>"]) == "&lt;a&amp;b&gt;"
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
+    assert apply(Cronwatch.Alerts.Twilio, :sms_segments, ["hi"]) == 1
+  end
+
   test "StoreCase promises its use; the helpers it had are deprecated, and still work" do
     deprecated = Enum.map(Cronwatch.StoreCase.__info__(:deprecated), &elem(&1, 0))
 

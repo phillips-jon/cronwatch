@@ -215,7 +215,7 @@ defmodule Cronwatch.Conformance.ProviderChannelsTest do
 
     {failures, n} =
       Enum.reduce(list(cuts, "smsSegments"), {failures, n}, fn c, {failures, n} ->
-        got = Alerts.Twilio.sms_segments(field(c, "text"))
+        got = Alerts.Twilio.segments_of(field(c, "text"))
 
         if got == field(c, "segments"),
           do: {failures, n + 1},
@@ -236,7 +236,7 @@ defmodule Cronwatch.Conformance.ProviderChannelsTest do
             do: "https://app.example/" <> String.duplicate("p", 2000),
             else: "https://app.example/j"
 
-        got = JS.stringify(digest(Alerts.Twilio.sms_body(long, link, field(c, "segments"))))
+        got = JS.stringify(digest(Alerts.Twilio.body_of(long, link, field(c, "segments"))))
 
         if got == JS.stringify(field(c, "body")),
           do: {failures, n + 1},

@@ -471,18 +471,18 @@ A 1.x release keeps what it does not know in the stored data: a field of a job's
 
 ## Deprecated
 
-These names still work through every 1.x release, marked `[Obsolete]` so the compiler points at the replacement, and go in 2.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
+These names still work, marked `[Obsolete]` so the compiler points at the replacement. A rename works through every 1.x release and goes in 2.0; a helper that was public by accident goes in 1.0. One name moved without an alias: `ICronwatchJob` is in `Cronwatch.Hosting` now, so a job class written before 1.0 adds `using Cronwatch.Hosting;` (an alias left in `Cronwatch` would make the name ambiguous in every file that imports both).
 
-| Deprecated | Use |
-|---|---|
-| `cw.Start(every)` | `cw.StartChecking(every)`, since a job's `StartAsync` opens a run |
-| `Cronwatch.Web.WebRequest`, `WebResponse` | `CronwatchRequest`, `CronwatchResponse`, since `System.Net` has types of those names; each converts to and from its replacement, so `WebResponse answer = await routes.HandleAsync(new WebRequest(...))` still compiles, and a handler's function may still return a `WebResponse`. A handler function whose lambda names the request's type must say `CronwatchRequest` |
-| `Cronwatch.Web.WebAdapters` | `Adapters`, the Java port's name |
-| `Cronwatch.Hosting.CronwatchServiceCollectionExtensions`, `Cronwatch.AspNetCore.CronwatchAspNetCore` | the extension methods' classes in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder`; `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods |
-| `Slack.Webhook(url)`, `Discord.Webhook(url)` | `SlackChannel.Webhook(url)`, `DiscordChannel.Webhook(url)`, on the channel types |
-| `Json.Quote`, `Json.Kind`, `Json.Copy`, `Json.TryNumber`, `Json.MaxDepth` | internal now: `Json.Parse`, `Json.ParseObject` and `Json.Stringify` are the JSON the library promises (`Json.Stringify(text)` quotes a string as `Quote` did) |
-| `StoreContract.NewRun`, `ForeignRows` | fixture helpers, no longer promised: the store kit promises `StoreContract.RunAsync`, `StoreReplay` and `FinishOnce` |
-| `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it is still used |
+| Deprecated | Use | Goes in |
+|---|---|---|
+| `cw.Start(every)` | `cw.StartChecking(every)`, since a job's `StartAsync` opens a run | 2.0 |
+| `Cronwatch.Web.WebRequest`, `WebResponse` | `CronwatchRequest`, `CronwatchResponse`, since `System.Net` has types of those names; each converts to and from its replacement, so `WebResponse answer = await routes.HandleAsync(new WebRequest(...))` still compiles, and a handler's function may still return a `WebResponse`. A handler function whose lambda names the request's type must say `CronwatchRequest` | 2.0 |
+| `Cronwatch.Web.WebAdapters` | `Adapters`, the Java port's name | 2.0 |
+| `Cronwatch.Hosting.CronwatchServiceCollectionExtensions`, `Cronwatch.AspNetCore.CronwatchAspNetCore` | the extension methods' classes in `Microsoft.Extensions.DependencyInjection` and `Microsoft.AspNetCore.Builder`; `services.AddCronwatch(...)` and `app.MapCronwatch(...)` compile as before, and the former classes keep the methods as plain static methods | 2.0 |
+| `Slack.Webhook(url)`, `Discord.Webhook(url)` | `SlackChannel.Webhook(url)`, `DiscordChannel.Webhook(url)`, on the channel types | 2.0 |
+| `Json.Quote`, `Json.Kind`, `Json.Copy`, `Json.TryNumber`, `Json.MaxDepth` | internal: `Json.Parse`, `Json.ParseObject` and `Json.Stringify` are the JSON the library promises (`Json.Stringify(text)` quotes a string as `Quote` did) | 1.0 |
+| `StoreContract.NewRun`, `ForeignRows` | fixture helpers: the store kit promises `StoreContract.RunAsync`, `StoreReplay` and `FinishOnce` | 1.0 |
+| `IConditionalRunStore`, `IStateCasStore`, `IRunDeletingStore` | `IUpdateRunIfStore`, `ICompareAndSetStateStore`, `IDeleteRunIfStore`, named after their methods; each former interface extends its replacement, so a store that implements it is still used | 2.0 |
 
 ## Kept in step
 

@@ -83,7 +83,7 @@ final class Webhook implements AlertChannel
     /**
      * HMAC-SHA256 of the body as lowercase hex.
      *
-     * @deprecated since 1.0, removed in 2.0: use signature(), which is the same.
+     * @deprecated Public by accident; removed in 1.0: use signature(), which is the same.
      */
     public static function hmacSha256Hex(#[\SensitiveParameter] string $secret, #[\SensitiveParameter] string $body): string
     {

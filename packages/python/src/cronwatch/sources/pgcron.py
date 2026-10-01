@@ -612,6 +612,6 @@ class PgCron:
                 self._held.pop(runid, None)
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"BACKFILL": "_BACKFILL", "PAGE": "_PAGE", "MAX_PAGES": "_MAX_PAGES", "HOLD_MS": "_HOLD_MS", "JOBS_SQL": "_JOBS_SQL", "SETTING_SQL": "_SETTING_SQL", "COLUMNS": "_COLUMNS", "RUNS_SQL": "_RUNS_SQL", "NEWEST_SQL": "_NEWEST_SQL", "epoch_ms": "_epoch_ms", "adapter": "_adapter", "schedule": "_schedule", "job_name": "_job_name", "run": "_run"})

@@ -76,6 +76,8 @@ A name, option or settings key is deprecated in a minor release, never a patch:
 2. It keeps working until the next major release, and for at least six months.
 3. A major release removes only what a release before it deprecated, so every removal has had a warning.
 
+1.0 itself follows the same rule for what was deprecated before it. A rename of documented API keeps its old name, deprecated, through every 1.x release and goes in 2.0, so 1.0 breaks nothing the docs showed. A name that was public only by accident (a helper, a constant, a JSON or pg_cron helper, a store test kit's internals) is deprecated before 1.0 and goes in 1.0. So do Rust's two names that hand out types of crates below 1.0.
+
 Every name deprecated today, in every language, is on the [Deprecations](/docs/deprecations/) page.
 
 ## Major releases

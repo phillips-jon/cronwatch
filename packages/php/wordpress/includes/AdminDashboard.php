@@ -21,7 +21,7 @@ use Cronwatch\Web\Response;
  * before wp-admin writes anything. WordPress has already checked the login
  * and the manage_options capability by then (the menu page asks for it),
  * and the handler checks it again; it is never a public URL. The dashboard
- * runs open (token false), since WordPress is its sign-in, and every change
+ * runs open (token null), since WordPress is its sign-in, and every change
  * (a POST from its forms) must carry a WordPress nonce as well as pass the
  * dashboard's own same-origin check.
  *
@@ -100,7 +100,7 @@ final class AdminDashboard
             // The plugin's check: WP-Cron's events declared as jobs first.
             Plugin::prepare();
         }
-        $dashboard = new Dashboard(Plugin::client(), token: false, basePath: self::MARKER, origin: self::origin(admin_url()), empty: self::emptyBoard(), head: [self::class, 'head']);
+        $dashboard = new Dashboard(Plugin::client(), token: null, basePath: self::MARKER, origin: self::origin(admin_url()), empty: self::emptyBoard(), head: [self::class, 'head']);
         return self::rewrite($dashboard->handle($request));
     }
 

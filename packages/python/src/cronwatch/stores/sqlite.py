@@ -204,6 +204,6 @@ class SqliteStore:
                 self._db = None
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"BUSY_RETRY_MS": "_BUSY_RETRY_MS", "retry_busy": "_retry_busy", "T": "_T"})

@@ -57,8 +57,8 @@ from . import client as _client_module  # noqa: E402, F401
 
 __version__ = "0.10.0"
 
-#: The modules 1.0 made internal, under their old names: each still works,
-#: warning when a name of it is used, and goes in 2.0.
+#: The internal modules, under their old public names: each still works,
+#: warning when a name of it is used, until 1.0 removes it.
 _MOVED = ("duration", "stats", "output", "schedule", "evaluate", "format", "serialize", "job", "run_handle", "handler")
 
 _configured: Cronwatch | None = None

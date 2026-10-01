@@ -45,6 +45,7 @@ defmodule Cronwatch.Alerts.Twilio do
 
   @doc false
   # The most segments a message may use, which keeps it inside Twilio's 1600 character Body limit.
+  @deprecated "Internal to the Twilio channel, public by accident; removed in 1.0"
   def max_segments, do: 10
 
   # The longest Body Twilio takes.
@@ -103,7 +104,7 @@ defmodule Cronwatch.Alerts.Twilio do
   def send(%__MODULE__{recovered: false}, %{type: "recovered"}, _ctx), do: :ok
 
   def send(%__MODULE__{} = s, alert, ctx) do
-    body = sms_body(alert, Shared.link_for(s.link, alert), s.budget)
+    body = body_of(alert, Shared.link_for(s.link, alert), s.budget)
     n = length(s.to)
     transport = s.transport || ctx.transport
 
@@ -174,12 +175,16 @@ defmodule Cronwatch.Alerts.Twilio do
   @gsm_extended MapSet.new(String.to_charlist("^{}\\[~]|€\f"))
 
   @doc false
+  @deprecated "Internal to the Twilio channel, public by accident; removed in 1.0"
+  def sms_segments(text), do: segments_of(text)
+
+  @doc false
   # How many SMS segments `text` takes. A character is never split across
   # two: an extension character (two septets) or a surrogate pair (two UCS-2
   # units) that would straddle a boundary starts the next segment, as phones
   # pack them.
-  @spec sms_segments(String.t()) :: pos_integer()
-  def sms_segments(text) do
+  @spec segments_of(String.t()) :: pos_integer()
+  def segments_of(text) do
     chars = String.to_charlist(text)
 
     gsm =
@@ -210,7 +215,7 @@ defmodule Cronwatch.Alerts.Twilio do
   end
 
   # Whether text fits within `segments` SMS segments and Twilio's Body limit.
-  defp fits?(text, segments), do: JS.len16(text) <= @max_body and sms_segments(text) <= segments
+  defp fits?(text, segments), do: JS.len16(text) <= @max_body and segments_of(text) <= segments
 
   # A segment count clamped to 1 to max_segments/0; 3 for anything not a number.
   defp segment_budget(n) when is_integer(n), do: n |> max(1) |> min(10)
@@ -218,12 +223,16 @@ defmodule Cronwatch.Alerts.Twilio do
   defp segment_budget(_), do: 3
 
   @doc false
+  @deprecated "Internal to the Twilio channel, public by accident; removed in 1.0"
+  def sms_body(alert, link, segments \\ 3), do: body_of(alert, link, segments)
+
+  @doc false
   # The text of an alert: the title, then as many lines of the message (and
   # the triage) as fit in `segments` SMS segments, then the link. The link is
   # kept whole; the text before it is cut to make room. `segments` is clamped
   # to 1 to 10, and 3 for anything not a number.
-  @spec sms_body(Cronwatch.Alert.t(), String.t() | nil, term()) :: String.t()
-  def sms_body(alert, link, segments \\ 3) do
+  @spec body_of(Cronwatch.Alert.t(), String.t() | nil, term()) :: String.t()
+  def body_of(alert, link, segments \\ 3) do
     budget = segment_budget(segments)
     tail = if link in [nil, ""], do: "", else: "\n" <> link
     triage = Shared.triage(alert)

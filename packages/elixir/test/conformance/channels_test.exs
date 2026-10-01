@@ -127,7 +127,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
         Enum.flat_map(list(field(f, "textCuts"), "discordDescriptions"), fn c ->
           triage = if t = field(c, "triage"), do: expand(t)
           alert = %{first | message: expand(field(c, "message")), triage: triage}
-          got = JS.stringify(digest(Units.to_string(Discord.embed_description(alert))))
+          got = JS.stringify(digest(Units.to_string(Discord.description_of(alert))))
 
           if got == JS.stringify(field(c, "description")),
             do: [],
@@ -192,7 +192,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
         String.duplicate("```", 1200) <> String.duplicate("x", 400) <> String.duplicate("\u{1F600}", 200)
 
     triage = String.duplicate("*_`~|[]()<>\\", 100)
-    d = Discord.embed_description(%{first | message: message, triage: triage})
+    d = Discord.description_of(%{first | message: message, triage: triage})
     text = Units.to_string(d)
 
     assert Units.length(d) == 4096
@@ -203,7 +203,7 @@ defmodule Cronwatch.Conformance.ChannelsTest do
 
     # Emoji at the cut: never half a surrogate pair.
     d =
-      Discord.embed_description(%{
+      Discord.description_of(%{
         first
         | message: String.duplicate("\u{1F600}", 1900),
           triage: String.duplicate("t", 1001)

@@ -185,14 +185,14 @@ defmodule Cronwatch.Sources.PgCronTest do
     failures =
       Enum.reduce(Conformance.list(f, "schedules"), failures, fn c, acc ->
         input = Conformance.field(c, "schedule")
-        Conformance.same(acc, "schedule #{JS.quote(input)}", PgCron.schedule(input), Conformance.field(c, "result"))
+        Conformance.same(acc, "schedule #{JS.quote(input)}", PgCron.schedule_of(input), Conformance.field(c, "result"))
       end)
 
     failures =
       Enum.reduce(Conformance.list(f, "names"), failures, fn c, acc ->
         j = Conformance.field(c, "job")
         job = %PgCron.Job{job_id: Object.get(j, "jobid"), job_name: Object.get(j, "jobname")}
-        Conformance.same(acc, "name of #{JS.stringify(j)}", PgCron.job_name(job), Conformance.field(c, "name"))
+        Conformance.same(acc, "name of #{JS.stringify(j)}", PgCron.default_name(job), Conformance.field(c, "name"))
       end)
 
     failures =
@@ -201,7 +201,7 @@ defmodule Cronwatch.Sources.PgCronTest do
         fallback = Conformance.field(c, "fallbackAt") || @t0
 
         got =
-          case PgCron.run_of(row, "db:j", "pgcron:db:", fallback) do
+          case PgCron.to_run(row, "db:j", "pgcron:db:", fallback) do
             nil -> nil
             r -> Run.to_value(r)
           end
@@ -210,7 +210,9 @@ defmodule Cronwatch.Sources.PgCronTest do
       end)
 
     Conformance.check!(failures, "pgcron")
-    assert PgCron.hold_ms() == Conformance.field(f, "holdMs")
+    # Through apply/3: hold_ms/0 is deprecated, internal to the source.
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
+    assert apply(PgCron, :hold_ms, []) == Conformance.field(f, "holdMs")
 
     count =
       length(Conformance.list(f, "schedules")) + length(Conformance.list(f, "names")) +
@@ -637,12 +639,12 @@ defmodule Cronwatch.Sources.PgCronTest do
   end
 
   test "the helpers read as the SDK does" do
-    assert PgCron.schedule(" 1  2 * * * 7 ") == "1 2 * * *"
-    assert PgCron.schedule("0 0 $ * *") == "0 0 L * *"
-    assert PgCron.schedule("5 Seconds") == "every 5s"
-    assert PgCron.schedule("05 seconds") == "every 5s"
-    assert PgCron.schedule("@REBOOT") == nil
-    assert PgCron.schedule("") == ""
+    assert PgCron.schedule_of(" 1  2 * * * 7 ") == "1 2 * * *"
+    assert PgCron.schedule_of("0 0 $ * *") == "0 0 L * *"
+    assert PgCron.schedule_of("5 Seconds") == "every 5s"
+    assert PgCron.schedule_of("05 seconds") == "every 5s"
+    assert PgCron.schedule_of("@REBOOT") == nil
+    assert PgCron.schedule_of("") == ""
     assert PgCron.description_job_id("pg_cron job 12 in cw as postgres") == 12
     assert PgCron.description_job_id("pg_cron job x in cw") == nil
     assert PgCron.description_job_id(nil) == nil
@@ -653,6 +655,6 @@ defmodule Cronwatch.Sources.PgCronTest do
     assert PgCron.run_id_of("pgcron:db:", "pgcron:db:") == 0
     assert PgCron.run_id_of("pgcron:db:1.5", "pgcron:db:") == nil
     assert PgCron.run_id_of("pgcron:other:1", "pgcron:db:") == nil
-    assert PgCron.job_name(%PgCron.Job{job_id: 3, job_name: "  --weird name!! v2 "}) == "weird-name-v2-"
+    assert PgCron.default_name(%PgCron.Job{job_id: 3, job_name: "  --weird name!! v2 "}) == "weird-name-v2-"
   end
 end

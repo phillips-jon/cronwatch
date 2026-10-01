@@ -134,7 +134,7 @@ internal static class ForeignRowChecks
 /// not part of the 1.x promise, which covers <see cref="StoreContract.RunAsync"/>,
 /// <see cref="StoreReplay"/> and <see cref="FinishOnce"/>.
 /// </summary>
-[Obsolete("A fixture helper of the port's own tests, not part of the 1.x promise. It still works through 1.x and goes in 2.0.")]
+[Obsolete("A fixture helper of the port's own tests, public by accident. It still works, and is removed in 1.0.")]
 public static class ForeignRows
 {
     /// <summary>The far start times the checks write.</summary>

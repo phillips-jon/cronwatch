@@ -1,6 +1,7 @@
-"""What 1.0 made internal still works under its old name through 1.x,
-warning with a DeprecationWarning, and goes in 2.0: the implementation
-modules, now underscored, and the helpers the public modules exposed."""
+"""What was public by accident before 1.0 still works under its old name,
+warning with a DeprecationWarning, until 1.0 removes it: the implementation
+modules, now underscored, and the helpers the public modules exposed. The
+renames of documented API warn the same way and go in 2.0."""
 
 from __future__ import annotations
 

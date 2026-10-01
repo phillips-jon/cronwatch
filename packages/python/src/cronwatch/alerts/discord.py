@@ -97,6 +97,6 @@ def _escape_markdown(text: str) -> str:
     return _MARKDOWN.sub(lambda m: "\\" + m.group(0), text)
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"COLOR": "_COLOR", "DESCRIPTION_MAX": "_DESCRIPTION_MAX", "embed_description": "_embed_description", "code_block_safe": "_code_block_safe", "escape_markdown": "_escape_markdown"})

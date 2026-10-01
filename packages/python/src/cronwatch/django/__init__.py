@@ -183,6 +183,6 @@ def reset() -> None:
         previous.stop()
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"CLIENT_OPTIONS": "_CLIENT_OPTIONS", "WEB_OPTIONS": "_WEB_OPTIONS", "KEYS": "_KEYS"})

@@ -1,7 +1,6 @@
 """Deprecated: ``cronwatch.job`` (a run's context: JobContext, AbortSignal and
-current are in cronwatch) is internal from 1.0, as ``cronwatch._job``. Its
-names still work through 1.x, each warning with a DeprecationWarning, and
-the module goes in 2.0."""
+current are in cronwatch) is internal, as ``cronwatch._job``. Its
+names still work, each warning with a DeprecationWarning, until 1.0 removes the module."""
 
 from ._deprecated import module
 

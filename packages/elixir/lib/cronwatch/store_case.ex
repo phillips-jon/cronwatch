@@ -21,8 +21,8 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
 
     `use Cronwatch.StoreCase` is what 1.x promises. The functions this
     module had besides (`contract`, `replay_fixture`, `make`, `scenarios`,
-    `new_run` and `canonical`) are deprecated since 1.0 and go in 2.0: the
-    tests the template defines run what they ran.
+    `new_run` and `canonical`) were public by accident: they are deprecated
+    and go in 1.0, and the tests the template defines run what they ran.
     """
 
     use ExUnit.CaseTemplate
@@ -65,7 +65,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     end
 
     @doc false
-    @deprecated "use Cronwatch.StoreCase, which runs the scenarios"
+    @deprecated "Use Cronwatch.StoreCase, which runs the scenarios; removed in 1.0"
     @spec scenarios() :: [{String.t(), ((-> Store.t()) -> term())}]
     def scenarios, do: scenario_list()
 
@@ -240,7 +240,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     end
 
     @doc false
-    @deprecated "use Cronwatch.StoreCase with store:, which makes the stores"
+    @deprecated "Use Cronwatch.StoreCase with store:, which makes the stores; removed in 1.0"
     @spec make(term()) :: Store.t()
     def make(store), do: store_for(store)
 
@@ -273,7 +273,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     def store_for(module) when is_atom(module), do: store_for({module, []})
 
     @doc false
-    @deprecated "build a %Cronwatch.Run{} of your own"
+    @deprecated "Build a %Cronwatch.Run{} of your own; removed in 1.0"
     @spec new_run(String.t(), String.t(), String.t(), integer()) :: Run.t()
     def new_run(id, job, status, started_at), do: test_run(id, job, status, started_at)
 
@@ -297,7 +297,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     end
 
     @doc false
-    @deprecated "compare JSON values of your own"
+    @deprecated "Compare JSON values of your own; removed in 1.0"
     @spec canonical(String.t() | Cronwatch.JS.Object.value()) :: String.t()
     def canonical(v), do: canonical_json(v)
 
@@ -348,7 +348,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     defp json_of(v, fun), do: fun.(v)
 
     @doc false
-    @deprecated "use Cronwatch.StoreCase, which runs the contract"
+    @deprecated "Use Cronwatch.StoreCase, which runs the contract; removed in 1.0"
     @spec contract(Store.t()) :: :ok
     def contract(store), do: run_contract(store)
 
@@ -561,7 +561,7 @@ if Code.ensure_loaded?(ExUnit.CaseTemplate) do
     end
 
     @doc false
-    @deprecated "use Cronwatch.StoreCase with fixture:, which replays it"
+    @deprecated "Use Cronwatch.StoreCase with fixture:, which replays it; removed in 1.0"
     @spec replay_fixture(String.t(), (-> Store.t())) :: pos_integer()
     def replay_fixture(text, make), do: run_replay(text, make)
 

@@ -85,6 +85,6 @@ def _code_block_safe(text: str) -> str:
     return text.replace("```", "`​`​`")
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"EMOJI": "_EMOJI", "escape": "_escape", "code_block_safe": "_code_block_safe"})

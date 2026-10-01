@@ -188,7 +188,8 @@ A program a crontab runs needs neither: [`examples/crontab`](https://github.com/
 | `Client::start(every)`, `blocking::Client::start(every)` | `start_checking(every)`: a job's `start` opens a run, so the client's is named for what it starts | 2.0 |
 | `Routes::into_router()` | `Router::new().nest_service("/cronwatch", routes)`: axum is below 1.0, so its types stay out of this crate's API | 1.0 |
 | `ReqwestTransport::with_client(client)` | the default transport (`transport: None`, which honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`), or a `Transport` of your own: reqwest is below 1.0 | 1.0 |
-| `describe_job`, `run_duration`, `state_version`; `js::ParseError`; `alerts::MAX_SEGMENTS`, `alerts::post::{TIMEOUT, MAX_BODY, origin}`; `triage::{SYSTEM, REQUEST_TIMEOUT, FALLBACK_BETA}`; `cronwatch_sqlx::pgcron::{HOLD, schedule, job_name, run_of}` | nothing: internal, public by accident (`JsonError` for `ParseError`) | 1.0 |
+| `describe_job(name, &options)` | nothing: documented before 1.0, so it stays through 1.x | 2.0 |
+| `run_duration`, `state_version`; `js::ParseError`; `alerts::MAX_SEGMENTS`, `alerts::post::{TIMEOUT, MAX_BODY, origin}`; `triage::{SYSTEM, REQUEST_TIMEOUT, FALLBACK_BETA}`; `cronwatch_sqlx::pgcron::{HOLD, schedule, job_name, run_of}` | nothing: internal, public by accident (`JsonError` for `ParseError`) | 1.0 |
 | everything in `storetest` but `run` (`replay_fixture`, `finish_once`, `Shared`, `Clock`, `T0` and the other fixture helpers) | `storetest::run`, the contract test | 1.0 |
 
 `cronwatch::bridge`, which the scheduler integrations are built on, is for integration authors and outside the promise. `cronwatch-apalis` stays below 1.0 while apalis is a release candidate.

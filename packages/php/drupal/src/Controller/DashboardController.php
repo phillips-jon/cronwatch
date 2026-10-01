@@ -26,7 +26,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * (the dashboard is a page of its own, with its own styles and a strict
  * CSP). /admin/reports/cronwatch/view?cw=<path> is the dashboard's page at
  * <path>: Drupal has checked the "view cronwatch dashboard" permission by
- * then, so the dashboard runs open (token false), Drupal's sign-in standing
+ * then, so the dashboard runs open (token NULL), Drupal's sign-in standing
  * for its token. A change (silence, forget, "Run check now", all POSTs)
  * also needs "administer cronwatch" and Drupal's CSRF token, which every
  * form's action carries, besides the dashboard's own same-origin check.
@@ -113,7 +113,7 @@ final class DashboardController extends ControllerBase {
         $this->recorder->prepare();
       }
     }
-    $dashboard = new Dashboard($this->recorder->client(), token: FALSE, basePath: EmbeddedDashboard::MARKER, origin: $request->getSchemeAndHttpHost());
+    $dashboard = new Dashboard($this->recorder->client(), token: NULL, basePath: EmbeddedDashboard::MARKER, origin: $request->getSchemeAndHttpHost());
     $inner = EmbeddedDashboard::request(HttpFoundation::toRequest($request), $path, ['cw', 'token']);
     $answer = EmbeddedDashboard::rewrite(
       $dashboard->handle($inner),

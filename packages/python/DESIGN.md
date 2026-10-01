@@ -29,7 +29,7 @@ packages/python/
     py.typed
     _js.py           JavaScript's numbers, JSON.stringify, trim, \s, UTF-16 lengths, Date.UTC and toISOString
     _env.py          the environment
-    _deprecated.py   the old names 1.0 made internal: module shims and module __getattr__ aliases, each warning
+    _deprecated.py   the old names of internals made public by accident: module shims and module __getattr__ aliases, each warning
     _zone.py         zoneinfo zones (case-insensitive, as Intl), croner's wall-clock arithmetic (fromTZ)
     _cron.py         croner: CronPattern (the reading of an expression, its checks and messages) and CronDate (the walk)
     types.py         Run, JobState, StoredJob, JobDefinition, Alert, AlertDraft, JobSummary, CheckResult, the StrEnums
@@ -43,14 +43,14 @@ packages/python/
     _job.py          JobContext (log, metric, signal), RunRecorder, AbortSignal, current()
     _run_handle.py   RunHandle: a run started by job.start() or found by job.resume(), finished later
     duration.py stats.py output.py schedule.py evaluate.py format.py serialize.py job.py run_handle.py client.py handler.py
-                     the underscored modules' old names: deprecated shims, until 2.0
+                     the underscored modules' old names: deprecated shims, until 1.0
     alerts/
       __init__.py    the channel protocol, ChannelContext, Console, Custom, and every channel's class
       _http.py       the POSTs, on urllib.request: no redirect followed, one ten second deadline (Response, UrllibHTTP)
       _shared.py     alerts/shared.ts: the POST with redacted errors, alert ids, run summaries, JavaScript's cuts and encodings
       _email.py      subject, text and HTML for every email channel (alerts/email.ts)
       _sigv4.py      AWS Signature Version 4 on hashlib and hmac (alerts/sigv4.ts)
-      email.py sigv4.py   their old names: deprecated shims, until 2.0
+      email.py sigv4.py   their old names: deprecated shims, until 1.0
       slack.py discord.py webhook.py resend.py postmark.py sendgrid.py mailgun.py ses.py twilio.py
       sentry.py honeybadger.py datadog.py rollbar.py bugsnag.py newrelic.py
     sources/
@@ -105,25 +105,25 @@ packages/python/
     test_apscheduler.py   cronwatch.apscheduler on background and asyncio schedulers, and events in every order
     test_scheduler_check.py   the schedule check against schedulers that agree, skip a run or run at other times
     test_env.py           the environment, the SDK's env.test.ts table
-    test_deprecated.py    every name 1.0 made internal or renamed still answers, warning
+    test_deprecated.py    every name made internal or renamed still answers, warning
 ```
 
 ## Public and internal
 
 Public means documented in the README or on the site; everything else is internal, and the code says which. Every module has `__all__`, listing its public names. The modules that only implement the client are underscored (`_client`, `_evaluate`, `_format`, `_serialize`, `_schedule`, `_duration`, `_output`, `_stats`, `_job`, `_run_handle`, `_handler`, `alerts._email`, `alerts._sigv4`); what of them is public is re-exported from `cronwatch` (`Cronwatch`, `JobHandle`, `RunHandle`, `JobContext`, `parse_duration`, `parse_schedule`, `redact_secrets` and the rest of its `__all__`). In the public modules (`types`, `alerts` and each channel's module, `stores`, `sources.pgcron`, `triage.anthropic`, `web`, `aio`, `celery`, `apscheduler`, `django`), helpers and constants are underscored.
 
-Everything 0.x published keeps working through 1.x, deprecated, and goes in 2.0: each old module name (`cronwatch.evaluate`, `cronwatch.client`, ...) is a shim whose names warn with a `DeprecationWarning` when used (`_deprecated.module`), and each old helper name answers through its module's `__getattr__`, warning the same way (`_deprecated.names`). `cronwatch.client` is both the old module and the function `client()`: the package imports the shim before it defines the function, so a later `import cronwatch.client` cannot replace the function. `tests/test_deprecated.py` holds every old name to its new one.
+Everything 0.x published keeps working, deprecated: a rename of documented API (`start`, `Web`, `AnthropicTriage`, a positional webhook URL) through 1.x, going in 2.0, and what was public by accident (`hmac_sha256_hex`, the old modules and helpers) until 1.0 removes it. Each old module name (`cronwatch.evaluate`, `cronwatch.client`, ...) is a shim whose names warn with a `DeprecationWarning` when used (`_deprecated.module`), and each old helper name answers through its module's `__getattr__`, warning the same way (`_deprecated.names`). `cronwatch.client` is both the old module and the function `client()`: the package imports the shim before it defines the function, so a later `import cronwatch.client` cannot replace the function. `tests/test_deprecated.py` holds every old name to its new one.
 
 The deprecated public API, also listed on the site's Python page:
 
-| Deprecated | Use |
-|---|---|
-| `cw.start(every)`, `AsyncCronwatch.start(every)` | `start_checking(every)`: a job's `start()` opens a run |
-| `cronwatch.web.Web(client, ...)` | `cw.routes(...)` (`cronwatch.client().routes(...)` for the process's client) |
-| `cronwatch.triage.anthropic.AnthropicTriage` | `cronwatch.triage.anthropic.Anthropic`, as every port names it |
-| `Slack(url)`, `Discord(url)` | `Slack(webhook_url=url)`, `Discord(webhook_url=url)` |
-| `cronwatch.alerts.webhook.hmac_sha256_hex(secret, body)` | `signature(secret, body)`, as every port names it |
-| the modules and helpers above | what `cronwatch` and the public modules document |
+| Deprecated | Use | Goes in |
+|---|---|---|
+| `cw.start(every)`, `AsyncCronwatch.start(every)` | `start_checking(every)`: a job's `start()` opens a run | 2.0 |
+| `cronwatch.web.Web(client, ...)` | `cw.routes(...)` (`cronwatch.client().routes(...)` for the process's client) | 2.0 |
+| `cronwatch.triage.anthropic.AnthropicTriage` | `cronwatch.triage.anthropic.Anthropic`, as every port names it | 2.0 |
+| `Slack(url)`, `Discord(url)` | `Slack(webhook_url=url)`, `Discord(webhook_url=url)` | 2.0 |
+| `cronwatch.alerts.webhook.hmac_sha256_hex(secret, body)` | `signature(secret, body)`, as every port names it | 1.0 |
+| the modules and helpers above | what `cronwatch` and the public modules document | 1.0 |
 
 ## The Python API
 

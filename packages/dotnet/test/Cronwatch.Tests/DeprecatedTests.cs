@@ -5,13 +5,13 @@ using Cronwatch.Alerts;
 using Cronwatch.Web;
 using Xunit;
 
-#pragma warning disable CS0618 // the former names, kept through 1.x, are what this file tests
+#pragma warning disable CS0618 // the deprecated names are what this file tests
 
 namespace Cronwatch.Tests;
 
 /// <summary>
-/// The names 1.0 renamed, kept through 1.x as deprecated aliases (the 1.0 plan, D11): each still
-/// compiles where it did and does what its replacement does.
+/// The deprecated names (the 1.0 plan, D11): each still compiles where it did and does what its
+/// replacement does. A rename stays through 1.x; a helper public by accident goes in 1.0.
 /// </summary>
 public class DeprecatedTests
 {

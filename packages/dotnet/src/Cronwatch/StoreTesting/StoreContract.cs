@@ -21,7 +21,7 @@ public static class StoreContract
     /// A run as the contract writes them: finished ten milliseconds after it started unless it is
     /// running, with one metric, <c>n</c>, of 1.
     /// </summary>
-    [Obsolete("A fixture helper, not part of the 1.x promise, which covers RunAsync. It still works through 1.x and goes in 2.0.")]
+    [Obsolete("A fixture helper, public by accident: the store kit promises RunAsync. It still works, and is removed in 1.0.")]
     public static Run NewRun(string id, string job, RunStatus status, long startedAt) => MakeRun(id, job, status, startedAt);
 
     /// <summary>A run as the contract writes them (see <see cref="NewRun"/>).</summary>

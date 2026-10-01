@@ -222,6 +222,6 @@ def _sms_body(alert: Alert, link: str | None, segments: Any = 3) -> str:
     return cut(text + tail, _MAX_BODY)
 
 
-#: Names 1.0 made internal, still answering under their old names (each
-#: warning, until 2.0).
+#: Internal names, still answering under their old public names (each
+#: warning, until 1.0 removes them).
 __getattr__ = _deprecated_names(__name__, globals(), {"MAX_SEGMENTS": "_MAX_SEGMENTS", "MAX_BODY": "_MAX_BODY", "GSM": "_GSM", "GSM_EXTENDED": "_GSM_EXTENDED", "mask_number": "_mask_number", "segment_budget": "_segment_budget", "sms_segments": "_sms_segments", "fits": "_fits", "sms_body": "_sms_body"})

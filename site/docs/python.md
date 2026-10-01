@@ -342,7 +342,7 @@ expected = "sha256=" + signature(secret, raw_body.decode())
 ok = hmac.compare_digest(expected, request.headers.get("X-CronWatch-Signature", ""))
 ```
 
-`hmac_sha256_hex` is the old name of `signature`: it still works, with a `DeprecationWarning`, and goes in 2.0.
+`hmac_sha256_hex` is the old name of `signature`: it still works, with a `DeprecationWarning`, and goes in 1.0, since it was public by accident.
 
 ### Processes that cannot send
 
@@ -459,17 +459,18 @@ The cron reader matches croner and the SDK, including the two schedules that nev
 
 ## Deprecated
 
-These names still work through every 1.x release, each with a `DeprecationWarning`, and go in 2.0:
+These names still work, each with a `DeprecationWarning`. A rename of documented API works through every 1.x release and goes in 2.0; a name that was public by accident goes in 1.0.
 
-| Deprecated | Use |
-|---|---|
-| `cw.start(every)`, `AsyncCronwatch.start(every)` | `cw.start_checking(every)`: a job's `start()` opens a run, so the client's is named for what it starts |
-| `cronwatch.web.Web(client, ...)` | `cw.routes(...)`, or `cronwatch.client().routes(...)` for the process's client |
-| `AnthropicTriage` from `cronwatch.triage.anthropic` | `Anthropic`, the name every port uses |
-| `Slack(url)` and `Discord(url)`, the URL given positionally | `Slack(webhook_url=url)`, `Discord(webhook_url=url)` |
-| `hmac_sha256_hex(secret, body)` from `cronwatch.alerts.webhook` | `signature(secret, body)`, the name every port uses |
+| Deprecated | Use | Goes in |
+|---|---|---|
+| `cw.start(every)`, `AsyncCronwatch.start(every)` | `cw.start_checking(every)`: a job's `start()` opens a run, so the client's is named for what it starts | 2.0 |
+| `cronwatch.web.Web(client, ...)` | `cw.routes(...)`, or `cronwatch.client().routes(...)` for the process's client | 2.0 |
+| `AnthropicTriage` from `cronwatch.triage.anthropic` | `Anthropic`, the name every port uses | 2.0 |
+| `Slack(url)` and `Discord(url)`, the URL given positionally | `Slack(webhook_url=url)`, `Discord(webhook_url=url)` | 2.0 |
+| `hmac_sha256_hex(secret, body)` from `cronwatch.alerts.webhook` | `signature(secret, body)`, the name every port uses | 1.0 |
+| the internal modules and helpers under their old names (below) | what this page documents | 1.0 |
 
-Public means what this page and the README document; everything else is internal. The modules that only implement the client are underscored from 1.0 (`cronwatch._evaluate`, `cronwatch._client`, `cronwatch._schedule` and so on), and so are the helpers and constants of the public modules (`cronwatch.types.camel`, `cronwatch.alerts.twilio.sms_segments`, the pg_cron source's SQL). Under their old names (`cronwatch.evaluate`, `cronwatch.alerts.twilio.sms_segments`) they still work, warning when used, and go in 2.0. Each module's `__all__` lists what it promises.
+Public means what this page and the README document; everything else is internal. The modules that only implement the client are underscored (`cronwatch._evaluate`, `cronwatch._client`, `cronwatch._schedule` and so on), and so are the helpers and constants of the public modules (`cronwatch.types.camel`, `cronwatch.alerts.twilio.sms_segments`, the pg_cron source's SQL). They were public by accident: under their old names (`cronwatch.evaluate`, `cronwatch.alerts.twilio.sms_segments`) they still work, warning when used, and go in 1.0. Each module's `__all__` lists what it promises.
 
 ## Kept in step
 

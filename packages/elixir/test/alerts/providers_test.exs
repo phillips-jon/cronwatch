@@ -284,15 +284,17 @@ defmodule Cronwatch.Alerts.ProvidersTest do
 
   test "SMS bodies keep the link whole and fit the segments" do
     a = %{alert("failed") | message: String.duplicate("line of output\n", 200)}
-    body = Alerts.Twilio.sms_body(a, "https://app.example/j", 2)
+    body = Alerts.Twilio.body_of(a, "https://app.example/j", 2)
     assert String.ends_with?(body, "\nhttps://app.example/j")
-    assert Alerts.Twilio.sms_segments(body) <= 2
-    assert Alerts.Twilio.sms_segments("") == 1
-    assert Alerts.Twilio.sms_segments(String.duplicate("a", 160)) == 1
-    assert Alerts.Twilio.sms_segments(String.duplicate("a", 161)) == 2
-    assert Alerts.Twilio.sms_segments(String.duplicate("é", 70)) == 1
-    assert Alerts.Twilio.sms_segments(String.duplicate("ж", 71)) == 2
-    assert Alerts.Twilio.max_segments() == 10
+    assert Alerts.Twilio.segments_of(body) <= 2
+    assert Alerts.Twilio.segments_of("") == 1
+    assert Alerts.Twilio.segments_of(String.duplicate("a", 160)) == 1
+    assert Alerts.Twilio.segments_of(String.duplicate("a", 161)) == 2
+    assert Alerts.Twilio.segments_of(String.duplicate("é", 70)) == 1
+    assert Alerts.Twilio.segments_of(String.duplicate("ж", 71)) == 2
+    # Through apply/3: max_segments/0 is deprecated, internal to the channel.
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
+    assert apply(Alerts.Twilio, :max_segments, []) == 10
   end
 
   defp alert(type) do

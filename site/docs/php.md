@@ -413,13 +413,16 @@ Public means documented here or in the README; every other class and method is m
 
 ### Deprecated
 
-Each still works through 1.x and goes in 2.0.
+Each still works, marked `@deprecated` in its docblock. A rename of documented API works through 1.x and goes in 2.0; a name that was public by accident goes in 1.0.
 
-| Deprecated | Use |
-|---|---|
-| `cronSecret: false`, `token: false`, `handler($fn, secret: false)` | `null`, which does the same |
-| `$job->wrap($fn)` | `$job->monitor($fn)`, the same name as Python's decorator |
-| `Cronwatch\Alerts\Webhook::hmacSha256Hex($secret, $body)` | `Webhook::signature($secret, $body)`, the name every language uses |
+| Deprecated | Use | Goes in |
+|---|---|---|
+| `cronSecret: false`, `token: false`, `handler($fn, secret: false)` | `null`, which does the same | 2.0 |
+| `$job->wrap($fn)` | `$job->monitor($fn)`, the same name as Python's decorator | 2.0 |
+| `Cronwatch\Alerts\Webhook::hmacSha256Hex($secret, $body)` | `Webhook::signature($secret, $body)`, the name every language uses | 1.0 |
+| `Twilio::MAX_SEGMENTS`, `MAX_BODY`, `smsSegments`, `smsBody`, `fits`, `segmentBudget`, `maskNumber`; `Sentry::parseDsn`; `Discord::DESCRIPTION_MAX`, `embedDescription`, `codeBlockSafe`, `escapeMarkdown`; `Sources\PgCron::HOLD_MS`, `BACKFILL`, `PAGE`, `MAX_PAGES`, the `*_SQL` constants, `schedule`, `jobName`, `run`, `epochMs`, `adapter` | nothing: internal to their channel or source | 1.0 |
+
+The classes and methods marked `@internal` were never promised and carry no deprecation: they may change in any release.
 
 ## Sharing a database with the other languages
 
