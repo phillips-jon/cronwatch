@@ -20,7 +20,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from .. import _js
+from .. import _js, _pg
 from .._deprecated import names as _deprecated_names
 from .._evaluate import run_duration
 from ..types import Alert, JobDefinition, Run, RunStatus
@@ -195,7 +195,7 @@ class _Psycopg:
 
     def _own(self) -> Any:
         if self._connection is None or self._connection.closed or self._connection.broken:
-            self._connection = self._psycopg.connect(self._conninfo or "", autocommit=True)
+            self._connection = _pg.connect(self._psycopg, self._conninfo or "", autocommit=True)
         return self._connection
 
     def _run(self, connection: Any, sql: str, params: Sequence[Any]) -> list[dict[str, Any]]:
