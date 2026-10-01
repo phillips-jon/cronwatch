@@ -89,7 +89,7 @@ def _enum(kind: type[StrEnum], value: Any) -> Any:
     """A known wire string as its enum member; anything else as it came."""
     try:
         return kind(value)
-    except ValueError:
+    except (ValueError, TypeError):  # TypeError: a foreign row's list or object
         return value
 
 
@@ -208,7 +208,9 @@ class Run:
     def from_dict(cls, data: Mapping[str, Any] | Run) -> Run:
         if isinstance(data, Run):
             return data
-        metrics = _get(data, "metrics") or {}
+        metrics = _get(data, "metrics")
+        if not isinstance(metrics, Mapping):
+            metrics = {}
         return cls(
             id=_get(data, "id"),
             job=_get(data, "job"),
@@ -343,6 +345,10 @@ class Alert:
     # (a stored "a_b" would come back "aB") is kept.
     _details_json: Any = field(default=None, init=False, compare=False, repr=False)
     _details_read: Any = field(default=None, init=False, compare=False, repr=False)
+    # Known keys the stored entry lacked, and a `run` or `definition` it held
+    # that was not an object: written back as they came while still unset.
+    _absent: frozenset[str] = field(default=frozenset(), init=False, compare=False, repr=False)
+    _raw: dict[str, Any] = field(default_factory=dict, init=False, compare=False, repr=False)
 
     #: The keys this release reads, as stored.
     _KEYS: ClassVar[tuple[str, ...]] = ("type", "run", "details", "job", "definition", "title", "message", "at", "triage")
@@ -359,33 +365,40 @@ class Alert:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | Alert) -> Alert:
+        """Read leniently, as a foreign or damaged row may hold anything: a
+        `run`, `definition` or `details` that is not an object reads as none
+        (and is written back as it came while unchanged), and a key the
+        entry lacked stays left out when it is written back."""
         if isinstance(data, Alert):
             return data
         run = _get(data, "run")
-        raw_details = _get(data, "details") or {}
+        raw_details = _get(data, "details")
+        raw_definition = _get(data, "definition")
         alert = cls(
             type=_get(data, "type"),
-            run=Run.from_dict(run) if run else None,
-            details=_details_from_json(raw_details),
+            run=Run.from_dict(run) if isinstance(run, Mapping) else None,
+            details=_details_from_json(raw_details if isinstance(raw_details, Mapping) else {}),
             job=_get(data, "job"),
-            definition=JobDefinition.from_dict(_get(data, "definition") or {}),
+            definition=JobDefinition.from_dict(raw_definition if isinstance(raw_definition, Mapping) else None),
             title=_get(data, "title"),
             message=_get(data, "message"),
             at=_get(data, "at"),
         )
         if _has(data, "triage"):
             alert.set_triage(_get(data, "triage"))
-        if isinstance(raw_details, Mapping):
-            alert._details_json = copy.deepcopy(dict(raw_details))
+        if _has(data, "details"):
+            alert._details_json = copy.deepcopy(dict(raw_details) if isinstance(raw_details, Mapping) else raw_details)
             alert._details_read = copy.deepcopy(alert.details)
+        alert._absent = frozenset(k for k in cls._KEYS if k != "triage" and not _has(data, k))
+        alert._raw = {k: v for k, v in (("run", run), ("definition", raw_definition)) if v is not None and not isinstance(v, Mapping)}
         known = set(cls._KEYS) | {_snake(k) for k in cls._KEYS}
         alert._extra = {k: v for k, v in data.items() if k not in known}
         return alert
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
-            "type": str(self.type),
-            "run": self.run.to_dict() if self.run else None,
+            "type": str(self.type) if isinstance(self.type, str) else self.type,
+            "run": self.run.to_dict() if self.run else self._raw.get("run"),
             "details": self._details_out(),
             "job": self.job,
             "definition": self.definition.to_dict() if isinstance(self.definition, JobDefinition) else self.definition,
@@ -393,6 +406,12 @@ class Alert:
             "message": self.message,
             "at": self.at,
         }
+        if "definition" in self._raw and out["definition"] == {}:
+            out["definition"] = self._raw["definition"]
+        for key in self._absent:
+            # A key the stored entry lacked, still unset, stays left out.
+            if out[key] is None or (key in ("details", "definition") and out[key] == {}):
+                del out[key]
         if self.triage_tried:
             out["triage"] = self.triage
         for key, value in self._extra.items():
@@ -400,7 +419,7 @@ class Alert:
         return out
 
     def _details_out(self) -> Any:
-        if self._details_json is not None and self.details == self._details_read:
+        if self._details_read is not None and self.details == self._details_read:
             return copy.deepcopy(self._details_json)
         return _details_to_json(self.details)
 
@@ -454,6 +473,41 @@ class SendingAlert:
         return out
 
 
+# A stored state is read leniently, since a foreign, hand-edited or damaged
+# row must affect only its own job, and the next write puts it right (the
+# SDK's normalizeState): `open` keeps only its entries whose value is a
+# number (anything but an object reads as {}); `silencedUntil` and
+# `lastAlertAt` that are not numbers read as None; `pendingRecovery` keeps
+# only its strings, and `undelivered` only its entries that are objects (a
+# value of neither shape reads as []).
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _read_number(value: Any) -> Any:
+    return value if _is_number(value) else None
+
+
+def _read_open(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {_enum(Condition, k): v for k, v in value.items() if _is_number(v)}
+
+
+def _read_conditions(value: Any) -> list[Condition | str]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [_enum(Condition, c) for c in value if isinstance(c, str)]
+
+
+def _read_alerts(value: Any) -> list[Alert]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    return [a if isinstance(a, Alert) else Alert.from_dict(a) for a in value if isinstance(a, (Alert, Mapping))]
+
+
 def _sending_to_json(entry: Any) -> Any:
     return entry.to_dict() if isinstance(entry, SendingAlert) else entry
 
@@ -497,12 +551,12 @@ class JobState:
         sending = _get(data, "sending")
         return cls(
             job=_get(data, "job"),
-            open={_enum(Condition, k): v for k, v in (_get(data, "open") or {}).items()},
+            open=_read_open(_get(data, "open")),
             consecutive_failures=_get(data, "consecutiveFailures", 0),
-            silenced_until=_get(data, "silencedUntil"),
-            last_alert_at=_get(data, "lastAlertAt"),
-            pending_recovery=None if pending is None else [_enum(Condition, c) for c in pending],
-            undelivered=None if undelivered is None else [Alert.from_dict(a) for a in undelivered],
+            silenced_until=_read_number(_get(data, "silencedUntil")),
+            last_alert_at=_read_number(_get(data, "lastAlertAt")),
+            pending_recovery=None if pending is None else _read_conditions(pending),
+            undelivered=None if undelivered is None else _read_alerts(undelivered),
             sending=[SendingAlert.from_json(e) for e in sending] if isinstance(sending, list) and sending else None,
             version=_get(data, "version"),
             extra={k: v for k, v in data.items() if k not in known},

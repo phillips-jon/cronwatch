@@ -7,7 +7,7 @@ with ``query(sql, params)`` returning rows as dicts::
     from cronwatch.stores.postgres import PostgresStore
 
     cw = cronwatch.Cronwatch(store=PostgresStore(url), sources=[PgCron(url, prefix="db:")])
-    cw.start()
+    cw.start_checking()
 """
 
 from __future__ import annotations
@@ -312,6 +312,8 @@ class PgCron:
         self._declared: dict[str, str] = {}
         # Names declared again without a schedule by _retire, whose open runs are still read.
         self._retired: set[str] = set()
+        # The names the host declares, read once per sync (see sync()); None for a host without defined_jobs.
+        self._declared_now: set[str] | None = None
         self._scanned = False
         self._warned: set[str] = set()
         # Jobids whose callback failed, reported once until it works again.
@@ -348,6 +350,11 @@ class PgCron:
             return []
 
         alerts: list[Alert] = []
+        # The names declared now, after the retires above. A run copied under
+        # a retired name that was then forgotten (the dashboard's forget) has
+        # no job to go to: it is let go, never recorded and never read again.
+        defined = getattr(host, "defined_jobs", None)
+        self._declared_now = {d.name for d in defined()} if callable(defined) else None
         self._start_cursors(host, names, alerts, now)
         self._read_new(host, names, alerts, now)
         return alerts
@@ -504,11 +511,15 @@ class PgCron:
             visible = {job.jobid for job in every}
             for stored in host.store.list_jobs():
                 definition = stored.definition
+                # A foreign or damaged definition (not an object, tags not a list) is not one of ours.
+                if not isinstance(definition, JobDefinition) or not isinstance(definition.tags, list):
+                    continue
                 if not stored.name.startswith(self._prefix) or stored.name in in_use:
                     continue
-                if not definition.schedule or "pg_cron" not in (definition.tags or []):
+                if not definition.schedule or "pg_cron" not in definition.tags:
                     continue
-                match = _DESCRIBED.search(definition.description or "")
+                description = definition.description
+                match = _DESCRIBED.search(description if isinstance(description, str) else "")
                 if not match:
                     continue
                 jobid = int(match.group(1))
@@ -529,8 +540,12 @@ class PgCron:
         runid = int(row["runid"])
         jobid = int(row["jobid"])
         name = self._pending.get(runid) or names.get(jobid)
-        if not name:
+        declared_now = self._declared_now
+        if not name or (declared_now is not None and name not in names.values() and name not in declared_now):
+            self._pending.pop(runid, None)
             self._held.pop(runid, None)
+            if name:
+                self._retired.discard(name)
             return
         if row.get("start_time") is None and not _finished(row.get("status")):
             since = self._held.get(runid, now)

@@ -5,7 +5,7 @@ Nothing here touches a store or a network, which is what makes it testable."""
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,6 +27,10 @@ from .types import (
     RunStatus,
     SendingAlert,
     StoredJob,
+    _read_alerts,
+    _read_conditions,
+    _read_number,
+    _read_open,
 )
 
 __all__ = [
@@ -145,18 +149,29 @@ def empty_state(job: str) -> JobState:
     return JobState(job=job, open={}, consecutive_failures=0, silenced_until=None, last_alert_at=None, pending_recovery=[], undelivered=[])
 
 
-def normalize_state(state: JobState | None, job: str) -> JobState:
+def normalize_state(state: JobState | Mapping[str, Any] | Any, job: str) -> JobState:
     """A stored state with every field present, or a fresh one. State written
     by an older version lacks the newer fields. `sending` is the exception: it
-    is there only while it holds an alert (see hold_alerts)."""
-    if state is None:
+    is there only while it holds an alert (see hold_alerts).
+
+    Read leniently, since a foreign, hand-edited or damaged row must affect
+    only its own job, and the next write puts it right: a state that is not
+    an object (a JobState, or its JSON as a mapping) reads as none; `open`
+    keeps only its entries whose value is a number; `silenced_until` and
+    `last_alert_at` that are not numbers read as None; `pending_recovery`
+    keeps only its strings, and `undelivered` only its alerts (anything but
+    a list reads as []). Unknown fields are kept as written."""
+    if isinstance(state, Mapping):
+        state = JobState.from_dict(state)
+    if not isinstance(state, JobState):
         return empty_state(job)
     out = state.copy()
+    out.open = _read_open(state.open)
     out.consecutive_failures = failure_count(state)
-    if out.pending_recovery is None:
-        out.pending_recovery = []
-    if out.undelivered is None:
-        out.undelivered = []
+    out.silenced_until = _read_number(state.silenced_until)
+    out.last_alert_at = _read_number(state.last_alert_at)
+    out.pending_recovery = _read_conditions(state.pending_recovery)
+    out.undelivered = _read_alerts(state.undelivered)
     if not isinstance(out.sending, list) or not out.sending:
         out.sending = None
     return out
@@ -186,8 +201,25 @@ class Delivery:
 
 
 def alert_key(alert: Alert) -> str:
-    """Identifies an alert across retries, and in `sending`."""
-    return f"{alert.type}|{_js.number(alert.at)}|{alert.run.id if alert.run else ''}"
+    """Identifies an alert across retries, and in `sending`. Never raises,
+    whatever a foreign or damaged row's alert holds."""
+    run_id = alert.run.id if isinstance(alert.run, Run) else None
+    return f"{_template(alert.type)}|{_template(alert.at)}|{'' if run_id is None else _template(run_id)}"
+
+
+def _template(value: Any) -> str:
+    """A value as a JavaScript template literal writes it, for the values JSON holds."""
+    if value is None:
+        return "null"
+    if value is True or value is False:
+        return "true" if value else "false"
+    if _js.is_number(value):
+        return _js.number(value)
+    if isinstance(value, str):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return ",".join("" if v is None else _template(v) for v in value)
+    return "[object Object]"
 
 
 def _newest(items: list[Any], most: int) -> tuple[list[Any], int]:
@@ -515,9 +547,18 @@ def stale_alert(alert: Alert, state: JobState) -> bool:
     is dropped rather than sent late. An alert for a condition is stale once
     that condition has closed, or has closed and opened again (it opened at a
     time other than the alert's). A recovery is stale when any condition it
-    names is open again; while they all stay closed it is kept."""
+    names is open again; while they all stay closed it is kept. From a
+    foreign or damaged row: an alert whose `at` is not a number, and a
+    recovery whose `details.after` is not a list of strings, are stale."""
     if alert.type == AlertType.RECOVERED:
-        return any(c in state.open for c in alert.details.get("after") or [])
+        # One whose details say nothing of what it recovers from cannot be judged, and goes.
+        after = alert.details.get("after") if isinstance(alert.details, Mapping) else None
+        if not isinstance(after, list):
+            return True
+        return any(not isinstance(c, str) or c in state.open for c in after)
+    # One with no time cannot match an open condition.
+    if not _js.is_number(alert.at) or not isinstance(alert.type, str):
+        return True
     return state.open.get(str(alert.type), _MISSING) != alert.at
 
 

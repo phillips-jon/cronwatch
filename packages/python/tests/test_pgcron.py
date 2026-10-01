@@ -235,6 +235,41 @@ def test_a_job_forgotten_from_the_dashboard_is_declared_again_and_its_later_runs
     assert [d.name for d in cw.defined_jobs()] == ["vacuum"]
 
 
+def test_a_renamed_jobs_old_name_forgotten_while_its_run_is_open_lets_the_run_go_with_no_error() -> None:
+    clock = Clock()
+    cron = FakeCron()
+    cron.job(1, "a", "0 3 * * *")
+    running = cron.add(1, "running", T0 - 5000, None)
+    opened: list[list[int]] = []
+
+    class Spy:
+        def query(self, text: str, values: list[Any]) -> list[dict[str, Any]]:
+            if "unnest" in text:
+                opened.append([int(v) for v in values[2]])
+            return cron.query(text, values)
+
+    errors: list[str] = []
+    cw = client(Spy(), clock, errors=errors, capture=Capture())
+    cw.check()
+    assert cw.get_run(f"pgcron:{running.runid}").job == "a"
+    cron.jobs[0]["jobname"] = "b"
+    clock.advance(MIN)
+    cw.check()
+    assert "renamed to b" in cw.job_summary("a").definition.description
+    cw.forget("a")
+    running.status = "succeeded"
+    running.end_time = at(T0)
+    for _ in range(3):
+        clock.advance(MIN)
+        opened.clear()
+        cw.check()
+    assert errors == []
+    assert cw.job_summary("a") is None, "the forgotten name is not declared again"
+    assert cw.get_run(f"pgcron:{running.runid}") is None, "the run is not recorded"
+    assert all(running.runid not in ids for ids in opened), "and is no longer read"
+    assert [d.name for d in cw.defined_jobs()] == ["b"]
+
+
 def test_job_options_apply_and_an_unreadable_schedule_is_reported() -> None:
     import re
 
