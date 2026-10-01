@@ -146,19 +146,19 @@ export interface RunHandle {
 
 /**
  * What a Source may use of the client: declare jobs, read the store, and
- * record runs it found elsewhere. A CronWatch is one.
+ * record runs it found elsewhere. A Cronwatch is one.
  */
 export interface SourceHost {
-  /** Declare a job, as CronWatch.job(). Throws for an invalid name or option. */
+  /** Declare a job, as Cronwatch.job(). Throws for an invalid name or option. */
   job(name: string, options?: JobOptions): unknown;
   /**
-   * The definitions declared now, as CronWatch.definedJobs(): a source reads
+   * The definitions declared now, as Cronwatch.definedJobs(): a source reads
    * it to declare again a job forgotten since (the dashboard's forget), whose
    * definition has not changed. A host without it is taken to keep every
    * job the source declared.
    */
   definedJobs?(): { name: string }[];
-  /** See CronWatch.recordRun(). */
+  /** See Cronwatch.recordRun(). */
   recordRun(run: Run, options?: RecordRunOptions): Promise<Alert[]>;
   readonly store: Store;
   readonly now: () => number;
@@ -181,7 +181,7 @@ export interface RecordRunOptions {
   evaluate?: boolean;
 }
 
-export interface CronWatchOptions {
+export interface CronwatchOptions {
   /** Where jobs, runs and state live. Defaults to an in-memory store that forgets on restart. */
   store?: Store;
   /**
@@ -297,7 +297,7 @@ function sameState(a: JobState, b: JobState): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export class CronWatch {
+export class Cronwatch {
   readonly store: Store;
   readonly alerts: AlertChannel[];
   readonly triage: TriageFn | undefined;
@@ -310,9 +310,9 @@ export class CronWatch {
   /** cronSecret was passed as null: handlers may run without a secret. */
   private readonly secretOptOut: boolean;
   private readonly redact: (text: string) => string;
-  /** "check": queue alerts for another process's check instead of sending them. See CronWatchOptions.deliver. */
+  /** "check": queue alerts for another process's check instead of sending them. See CronwatchOptions.deliver. */
   private readonly deferDelivery: boolean;
-  private readonly defaults: NonNullable<CronWatchOptions["defaults"]>;
+  private readonly defaults: NonNullable<CronwatchOptions["defaults"]>;
   private readonly definitions = new Map<string, JobDefinition>();
   private readonly synced = new Set<string>();
   /** The tail of each job's queue of state updates. See serial(). */
@@ -330,7 +330,7 @@ export class CronWatch {
   private warnedNoSecret = false;
   private warnedDeferredStart = false;
 
-  constructor(options: CronWatchOptions = {}) {
+  constructor(options: CronwatchOptions = {}) {
     this.store = options.store ?? (this.usingDefaultStore = true, memory());
     this.alerts = options.alerts ?? [consoleChannel()];
     this.triage = options.triage;
@@ -1513,3 +1513,14 @@ export function custom(name: string, send: (alert: Alert) => Promise<void> | voi
 }
 
 export type { Condition };
+
+/**
+ * The client's former name.
+ * @deprecated Renamed `Cronwatch`, the spelling every port uses. This name
+ * still works through 1.x and goes in 2.0.
+ */
+export const CronWatch = Cronwatch;
+/** @deprecated Renamed `Cronwatch`; this name goes in 2.0. */
+export type CronWatch = Cronwatch;
+/** @deprecated Renamed `CronwatchOptions`; this name goes in 2.0. */
+export type CronWatchOptions = CronwatchOptions;

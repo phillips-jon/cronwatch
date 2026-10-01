@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import pg from "pg";
 import { cronwatch, memory } from "../src/index.js";
-import type { CronWatch } from "../src/index.js";
+import type { Cronwatch } from "../src/index.js";
 import { postgres } from "../src/stores/postgres.js";
 import { sqlite } from "../src/stores/sqlite.js";
 import type { Run, Store } from "../src/types.js";
@@ -284,5 +284,5 @@ test("a run finished while a check marks it timeout is judged once", async () =>
   c.advance(HOUR);
 });
 
-// Keeps the CronWatch type import used when only some tests run.
-export type { CronWatch };
+// Keeps the Cronwatch type import used when only some tests run.
+export type { Cronwatch };

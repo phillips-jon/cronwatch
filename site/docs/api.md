@@ -128,7 +128,7 @@ The development sign-in line names the host only when `origin` is set or the fir
 
 ## Exports
 
-`@cronwatch/sdk`: `cronwatch`, `CronWatch`, `memory`, `custom`, `consoleChannel`, `createRoutes`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails`, `ParsedSchedule`, `JobContext`, `RunHandle`, `StartOptions`, `RunOutcome`, `RecordRunOptions`, `Source` and `SourceHost` (the interface a source is given: `job()`, `recordRun()`, `store`, `now` and `onError`), and `FetchHandler`, `Routes` and `RoutesOptions`.
+`@cronwatch/sdk`: `cronwatch`, `Cronwatch` (the client class, and its options type `CronwatchOptions`; the former spellings `CronWatch` and `CronWatchOptions` still work through 1.x, deprecated), `memory`, `custom`, `consoleChannel`, `createRoutes`, `parseDuration`, `formatDuration`, `parseSchedule`, `nextFire` (the next time a parsed schedule fires after a given time), `composeAlert`, and every type they use, including `Alert`, `AlertDraft`, `AlertDetails`, `ParsedSchedule`, `JobContext`, `RunHandle`, `StartOptions`, `RunOutcome`, `RecordRunOptions`, `Source` and `SourceHost` (the interface a source is given: `job()`, `recordRun()`, `store`, `now` and `onError`), and `FetchHandler`, `Routes` and `RoutesOptions`.
 
 Stores: `@cronwatch/sdk/sqlite` (`sqlite`), `/postgres` (`postgres`) and `/d1` (`d1`). `/sqlite` needs `better-sqlite3` and `/postgres` needs `pg`, both optional peer dependencies; `/d1` needs nothing.
 

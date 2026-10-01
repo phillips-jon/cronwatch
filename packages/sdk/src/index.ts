@@ -1,5 +1,5 @@
-import { CronWatch } from "./client.js";
-import type { CronWatchOptions } from "./client.js";
+import { Cronwatch } from "./client.js";
+import type { CronwatchOptions } from "./client.js";
 
 /**
  * Create a CronWatch client. One per app, at module level:
@@ -7,12 +7,12 @@ import type { CronWatchOptions } from "./client.js";
  *   export const cw = cronwatch({ store: sqlite({ path: "./data/cronwatch.db" }), alerts: [slack({ webhookUrl })] });
  *   export const nightly = cw.job("nightly-report", { schedule: "0 2 * * *", grace: "15m" });
  */
-export function cronwatch(options: CronWatchOptions = {}): CronWatch {
-  return new CronWatch(options);
+export function cronwatch(options: CronwatchOptions = {}): Cronwatch {
+  return new Cronwatch(options);
 }
 
-export { CronWatch, consoleChannel, custom } from "./client.js";
-export type { CronWatchOptions, HandlerFn, HandlerOptions, JobFn, JobHandle, RecordRunOptions, RunHandle, RunOutcome, Source, SourceHost, StartOptions } from "./client.js";
+export { Cronwatch, CronWatch, consoleChannel, custom } from "./client.js";
+export type { CronwatchOptions, CronWatchOptions, HandlerFn, HandlerOptions, JobFn, JobHandle, RecordRunOptions, RunHandle, RunOutcome, Source, SourceHost, StartOptions } from "./client.js";
 export type { JobContext } from "./job.js";
 export { memory } from "./stores/memory.js";
 export { VERSION } from "./version.js";

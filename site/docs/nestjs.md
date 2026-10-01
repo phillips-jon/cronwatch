@@ -11,12 +11,12 @@ group: More JavaScript platforms
 
 ## A module for the client
 
-The SDK's `CronWatch` class works as the injection token, so services ask for it by type. The module starts the check once the application has booted and closes the client on shutdown.
+The SDK's `Cronwatch` class works as the injection token, so services ask for it by type. The module starts the check once the application has booted and closes the client on shutdown.
 
 ```ts
 // src/cronwatch/cronwatch.module.ts
 import { Global, Module, type OnApplicationBootstrap, type OnApplicationShutdown } from "@nestjs/common";
-import { CronWatch, cronwatch } from "@cronwatch/sdk";
+import { Cronwatch, cronwatch } from "@cronwatch/sdk";
 import { postgres } from "@cronwatch/sdk/postgres";
 import { slack } from "@cronwatch/sdk/slack";
 import { CronwatchController } from "./cronwatch.controller";
@@ -25,7 +25,7 @@ import { CronwatchController } from "./cronwatch.controller";
 @Module({
   providers: [
     {
-      provide: CronWatch,
+      provide: Cronwatch,
       useFactory: () =>
         cronwatch({
           store: postgres({ connectionString: process.env.DATABASE_URL }),
@@ -37,7 +37,7 @@ import { CronwatchController } from "./cronwatch.controller";
   exports: [CronWatch],
 })
 export class CronwatchModule implements OnApplicationBootstrap, OnApplicationShutdown {
-  constructor(private readonly cw: CronWatch) {}
+  constructor(private readonly cw: Cronwatch) {}
 
   onApplicationBootstrap() {
     this.cw.start("1m");
@@ -68,13 +68,13 @@ Declare the job in the constructor and wrap the method body in `run()`. Give the
 // src/reports/reports.service.ts
 import { Injectable } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { CronWatch, type JobHandle } from "@cronwatch/sdk";
+import { Cronwatch, type JobHandle } from "@cronwatch/sdk";
 
 @Injectable()
 export class ReportsService {
   private readonly nightly: JobHandle;
 
-  constructor(cw: CronWatch) {
+  constructor(cw: Cronwatch) {
     this.nightly = cw.job("nightly-report", {
       schedule: "0 0 2 * * *",
       timezone: "Europe/London",
@@ -108,7 +108,7 @@ Every instance of the app runs every `@Cron` method. All of their runs are recor
 ```ts
 // src/cronwatch/cronwatch.controller.ts
 import { All, Controller, Req, Res } from "@nestjs/common";
-import { CronWatch } from "@cronwatch/sdk";
+import { Cronwatch } from "@cronwatch/sdk";
 import { toNodeHandler, type NodeHandler } from "@cronwatch/sdk/node";
 import type { Request, Response } from "express";
 
@@ -116,7 +116,7 @@ import type { Request, Response } from "express";
 export class CronwatchController {
   private readonly serveRoutes: NodeHandler;
 
-  constructor(cw: CronWatch) {
+  constructor(cw: Cronwatch) {
     this.serveRoutes = toNodeHandler(cw.routes({ basePath: "/cronwatch" }).handler);
   }
 

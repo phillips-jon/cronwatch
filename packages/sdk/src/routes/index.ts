@@ -1,4 +1,4 @@
-import type { CronWatch } from "../client.js";
+import type { Cronwatch } from "../client.js";
 import { isDevelopment, readEnv } from "../env.js";
 import { constantTimeEqual, json } from "../http.js";
 import { parseDuration } from "../duration.js";
@@ -85,7 +85,7 @@ const BOARD_PAGE_RUNS = 20;
  * newest runs all fall inside it (one that runs more often than every hour or so) is
  * read again, deeper, and those reads go out together.
  */
-async function boardLanes(cw: CronWatch, entries: { job: JobSummary; runs: Run[] }[], now: number): Promise<LaneInput[]> {
+async function boardLanes(cw: Cronwatch, entries: { job: JobSummary; runs: Run[] }[], now: number): Promise<LaneInput[]> {
   const from = now - BOARD_BEHIND_MS;
   return Promise.all(entries.slice(0, BOARD_LANES).map(async ({ job, runs }) => {
     const short = runs.length >= BOARD_PAGE_RUNS && runs[runs.length - 1]!.startedAt > from;
@@ -276,7 +276,7 @@ function runsLimit(value: string | null): number {
  *
  *   export const { GET, POST, DELETE } = cw.routes();
  */
-export function createRoutes(cw: CronWatch, options: RoutesOptions = {}): Routes {
+export function createRoutes(cw: Cronwatch, options: RoutesOptions = {}): Routes {
   const optedOut = options.token === null;
   const configured = optedOut ? null : (options.token || readEnv("CRONWATCH_TOKEN") || null);
   const base = (options.basePath ?? "/cronwatch").replace(/\/+$/, "");
