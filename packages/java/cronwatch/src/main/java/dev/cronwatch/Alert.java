@@ -10,6 +10,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * A condition opening or closing, with the text every channel shows.
  *
+ * <p>Build one with {@link #of}, not the canonical constructor: a record that may grow gains a
+ * component in a minor release, which changes its constructor, while {@code of} keeps its
+ * parameters and gives the new component its default.
+ *
  * @param type what the alert says
  * @param run the run behind the alert, when there is one
  * @param details what the alert carries beyond its text
@@ -42,6 +46,21 @@ public record Alert(
     Objects.requireNonNull(definition, "definition");
     Objects.requireNonNull(title, "title");
     Objects.requireNonNull(message, "message");
+  }
+
+  /** An alert with these fields, as a channel's test might build one. */
+  public static Alert of(
+      AlertType type,
+      @Nullable Run run,
+      AlertDetails details,
+      String job,
+      Definition definition,
+      String title,
+      String message,
+      @Nullable String triage,
+      boolean triageTried,
+      long at) {
+    return new Alert(type, run, details, job, definition, title, message, triage, triageTried, at);
   }
 
   /** This alert with triage tried and its diagnosis, or null when it gave nothing. */

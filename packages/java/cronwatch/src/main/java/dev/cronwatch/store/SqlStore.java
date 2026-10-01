@@ -472,7 +472,7 @@ public final class SqlStore implements Store {
     // JSON of another shape (another writer's, or a hand edit) is a definition with nothing in
     // it, as the SDK reads it: one such row must not fail every read of the jobs.
     Definition definition = Definition.of(value instanceof JsObject o ? o : new JsObject());
-    return new StoredJob(
+    return StoredJob.of(
         name, definition, integer(row, "created_at", 0), integer(row, "updated_at", 0));
   }
 
@@ -490,7 +490,7 @@ public final class SqlStore implements Store {
         throw new IllegalStateException("run " + id + ": " + e.getMessage(), e);
       }
     }
-    return new Run(
+    return Run.of(
         id,
         textOr(row, "job"),
         RunStatus.of(textOr(row, "status")),
@@ -641,7 +641,7 @@ public final class SqlStore implements Store {
       String trigger = r.trigger();
       if (trigger.codePointCount(0, trigger.length()) > 255) {
         r =
-            new Run(
+            Run.of(
                 r.id(),
                 r.job(),
                 r.status(),

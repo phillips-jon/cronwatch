@@ -9,6 +9,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * One execution of a job, as a store keeps it. Times are epoch milliseconds.
  *
+ * <p>Build one with {@link #of}, not the canonical constructor: a record that may grow gains a
+ * component in a minor release, which changes its constructor, while {@code of} keeps its
+ * parameters and gives the new component its default.
+ *
  * @param id the run's id: a UUID, or one the app gave {@code start}
  * @param job the job's name
  * @param status where the run stands
@@ -40,6 +44,22 @@ public record Run(
     Objects.requireNonNull(status, "status");
     Objects.requireNonNull(metrics, "metrics");
     Objects.requireNonNull(trigger, "trigger");
+  }
+
+  /** A run, as a store reads one back: every field the SDK's run has, in its order. */
+  public static Run of(
+      String id,
+      String job,
+      RunStatus status,
+      long startedAt,
+      @Nullable Long finishedAt,
+      @Nullable Long durationMs,
+      @Nullable String error,
+      @Nullable String output,
+      Metrics metrics,
+      String trigger) {
+    return new Run(
+        id, job, status, startedAt, finishedAt, durationMs, error, output, metrics, trigger);
   }
 
   /** A run that has just started: running, with nothing recorded yet. */

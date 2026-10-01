@@ -17,6 +17,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * What the checks remember about a job between runs.
  *
+ * <p>A store keeps the state as its JSON ({@link #toJson}, {@link #fromJson}), which carries every
+ * key, known or not. To build one in code, use {@link #of} or {@link #empty}, not the canonical
+ * constructor: a record that may grow gains a component in a minor release, which changes its
+ * constructor, while {@code of} keeps its parameters.
+ *
  * @param job the job's name
  * @param open the conditions open, each with when it opened, in the order they opened
  * @param consecutiveFailures failed runs in a row
@@ -89,6 +94,32 @@ public record JobState(
         undelivered,
         version,
         extra,
+        null);
+  }
+
+  /**
+   * A state with these fields, nothing in {@link #sending} and no keys beyond the SDK's: for a
+   * state built in code (a store reads one with {@link #fromJson}).
+   */
+  public static JobState of(
+      String job,
+      Map<Condition, Long> open,
+      long consecutiveFailures,
+      @Nullable Long silencedUntil,
+      @Nullable Long lastAlertAt,
+      @Nullable List<Condition> pendingRecovery,
+      @Nullable List<Alert> undelivered,
+      @Nullable Long version) {
+    return new JobState(
+        job,
+        open,
+        consecutiveFailures,
+        silencedUntil,
+        lastAlertAt,
+        pendingRecovery,
+        undelivered,
+        version,
+        new JsObject(),
         null);
   }
 

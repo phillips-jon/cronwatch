@@ -103,7 +103,7 @@ dataSource.setUrl("jdbc:postgresql://localhost/app");
 Cronwatch cw = Cronwatch.builder().store(SqlStore.postgres(dataSource)).build();
 ```
 
-A store of your own implements `dev.cronwatch.store.Store` and is held to the contract every store passes, from any test framework:
+A store of your own implements `dev.cronwatch.store.Store`, building the records it hands back with their static factories (`Run.of(...)`, `StoredJob.of(...)`, and `JobState.fromJson` for the state's JSON) rather than their canonical constructors, since a record may gain a component in a 1.x release. It is held to the contract every store passes, from any test framework:
 
 ```java
 dev.cronwatch.storetest.StoreContract.run(new MemoryStore());

@@ -65,7 +65,7 @@ public final class MemoryStore implements Store {
   }
 
   private static Run kept(Run run) {
-    return new Run(
+    return Run.of(
         run.id(),
         run.job(),
         run.status(),
@@ -85,7 +85,7 @@ public final class MemoryStore implements Store {
       String name = definition.name();
       StoredJob existing = jobs.get(name);
       long createdAt = existing == null ? now : existing.createdAt();
-      jobs.put(name, new StoredJob(name, kept(definition), createdAt, now));
+      jobs.put(name, StoredJob.of(name, kept(definition), createdAt, now));
     } finally {
       lock.unlock();
     }

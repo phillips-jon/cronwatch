@@ -44,7 +44,7 @@ public final class StoreContract {
    */
   static Run newRun(String id, String job, RunStatus status, long startedAt) {
     boolean finished = !status.equals(RunStatus.RUNNING);
-    return new Run(
+    return Run.of(
         id,
         job,
         status,
