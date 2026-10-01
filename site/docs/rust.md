@@ -422,7 +422,7 @@ The client (every call that can reach the store is `async` and returns a `Result
 | `silence(name, d)`, `unsilence(name)` | stop alerts for a while; state keeps updating underneath. The silence ends on a whole millisecond, held at 2^53 - 1 ms however long it asks for |
 | `forget(name)` | remove a job and its runs. A job still declared in code comes back: on its next run, or at the next check or dashboard read of a process that declares it |
 | `resume_run(name, run_id)` | `resume` for a job declared in this process |
-| `record_run(run, options)` | record a run that happened elsewhere, for a source; returns the alerts it sent. A metric that is not a finite number is an error and nothing is recorded |
+| `record_run(run, options)` | record a run that happened elsewhere, for a source; returns the alerts it sent. A run id that is not 1 to 200 characters, or holds a NUL, or a metric that is not a finite number is an error and nothing is recorded |
 | `sync_job(name)` | write a declaration to the store now, unless it already holds it |
 | `routes(options)` | the dashboard and JSON API |
 | `defined_jobs()` | the definitions declared in this process |
@@ -451,6 +451,8 @@ run.finish().await; // or run.fail(&err), or run.finish_with(result)
 ## Sharing a database with the other languages
 
 The SQL store writes the same three tables as `@cronwatch/sdk/sqlite` and `@cronwatch/sdk/postgres`, the Ruby gem, and the Python, PHP, Go, Elixir, Java and .NET stores (the MySQL tables are the PHP and Go ports', which the Elixir, Java and .NET ports share): the same names, columns and indexes, epoch milliseconds in the time columns, and the same JSON in the JSON columns, byte for byte, keys in the SDK's order. The crate's tests share a SQLite file with the built SDK, and have a Node client and a Rust client take turns on one job's state. Create the tables from any side; the others find them and leave them alone. Use the same prefix everywhere.
+
+A 1.x release keeps what it does not know in stored data: a field a newer release added to a job's definition or state, a condition it does not know in the state's open conditions, a run status or trigger it does not know. Each is written back as it was, so any 1.x release of any language can share a store with any other, in either direction. 0.x releases are not covered: upgrade every process to 1.0 together.
 
 Each process alerts on the jobs it runs, and any side's check sees every job in the store. One dashboard shows them all, and one MCP server reads it. Give each job a name only one side uses.
 

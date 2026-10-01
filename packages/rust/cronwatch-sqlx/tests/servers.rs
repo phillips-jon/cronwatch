@@ -3,8 +3,11 @@
 //! the finish-once scenarios over several stores (each on a pool of its own)
 //! on one database, a client end to end, and each dialect's own tests
 //! (stores.test.ts's for Postgres, the PHP port's MysqlStoreTest for MySQL
-//! and MariaDB), as the Go port's sqltest module has them.
+//! and MariaDB), as the Go port's sqltest module has them, and
+//! `conformance/client.json`'s stored fields this release does not know.
 
+#[path = "../../cronwatch/tests/client_fixture/mod.rs"]
+mod client_fixture;
 mod common;
 
 use std::sync::Arc;
@@ -35,6 +38,14 @@ async fn each_server_replays_store_json() {
     for s in servers() {
         let cases = storetest::replay_fixture(&fixture, || s.store("replay")).await;
         assert!(cases >= 20, "{}: {cases} cases", s.name);
+        s.cleanup().await;
+    }
+}
+
+#[tokio::test]
+async fn each_server_keeps_stored_fields_this_release_does_not_know() {
+    for s in servers() {
+        assert_eq!(client_fixture::replay_unknown_fields(Arc::new(s.store("unknown"))).await, 5, "{}", s.name);
         s.cleanup().await;
     }
 }

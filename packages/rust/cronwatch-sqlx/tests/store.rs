@@ -1,7 +1,10 @@
 //! The SQL store on SQLite: the store contract, the store.json replay, the
 //! finish-once scenarios over several stores on one file, the SDK's schema,
-//! rows of other shapes, and a client end to end.
+//! rows of other shapes, a client end to end, and `conformance/client.json`'s
+//! stored fields this release does not know.
 
+#[path = "../../cronwatch/tests/client_fixture/mod.rs"]
+mod client_fixture;
 mod common;
 
 use std::sync::Arc;
@@ -27,6 +30,13 @@ async fn the_sqlite_store_replays_store_json() {
     let fixture = std::fs::read_to_string(repo().join("conformance/store.json")).expect("conformance/store.json");
     let cases = storetest::replay_fixture(&fixture, || SqlStore::sqlite(memory_pool())).await;
     assert!(cases >= 20, "{cases} cases");
+}
+
+#[tokio::test]
+async fn the_sqlite_store_keeps_stored_fields_this_release_does_not_know() {
+    let dir = TempDir::new();
+    let steps = client_fixture::replay_unknown_fields(Arc::new(store(&dir.file("unknown.db"), "cronwatch_"))).await;
+    assert_eq!(steps, 5);
 }
 
 #[tokio::test]
