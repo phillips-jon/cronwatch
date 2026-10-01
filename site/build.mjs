@@ -171,6 +171,11 @@ ${index ? `<link rel="canonical" href="${canonical}">` : `<meta name="robots" co
 ${head ? `${head}\n` : ""}<meta property="og:title" content="${escape(fullTitle)}">
 <meta property="og:description" content="${escape(description)}">
 ${index ? `<meta property="og:url" content="${canonical}">\n` : ""}<meta property="og:type" content="website">
+<meta property="og:image" content="${SITE}/assets/og.png">
+<meta property="og:image:width" content="2400">
+<meta property="og:image:height" content="1260">
+<meta property="og:image:alt" content="CronWatch: Cron fails silently. This doesn’t. Beside it, the dashboard's health and last 24 hours.">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="${THEME_COLOR}">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://use.typekit.net/gie6nes.css">
