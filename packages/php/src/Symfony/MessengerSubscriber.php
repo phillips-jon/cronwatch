@@ -20,7 +20,8 @@ use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
  * Messages whose class carries #[Cronwatch\Watch], recorded where a worker
  * handles them (messenger:consume), so queued work is the run rather than
  * its dispatch: WorkerMessageReceivedEvent starts the run (trigger
- * "messenger"; the handler's Cronwatch::current() is its context),
+ * "symfony-messenger", "messenger" before 1.0; the handler's
+ * Cronwatch::current() is its context),
  * WorkerMessageHandledEvent ends it ok with the handler's result, and
  * WorkerMessageFailedEvent ends it failed with what the handler threw.
  * Every attempt is a run of its own, so a retried message's failing

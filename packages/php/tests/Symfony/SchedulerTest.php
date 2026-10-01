@@ -31,10 +31,10 @@ use Symfony\Component\Scheduler\Trigger\CallbackTrigger;
  */
 final class SchedulerTest extends TestCase
 {
-    /** The test kernel's app tag: a hash of its secret, when no app_id is set. */
+    /** The test kernel's app tag: a hash of its project directory, when no app_id is set. */
     private static function appTag(): string
     {
-        return 'symfony-scheduler:app-' . substr(hash('sha256', 'cronwatch:secret:test-' . 'secret'), 0, 12);
+        return 'symfony-scheduler:app-' . substr(hash('sha256', 'cronwatch:dir:' . static::getContainer()->getParameter('kernel.project_dir')), 0, 12);
     }
 
     protected function tearDown(): void
@@ -259,6 +259,39 @@ final class SchedulerTest extends TestCase
         $this->assertTrue($store->getJob($plain)->definition->has('schedule'));
         $check('Shop', [], $store);
         $this->assertFalse($store->getJob($plain)->definition->has('schedule'));
+    }
+
+    /**
+     * The tag is on the dashboard and in the API, so nothing secret goes
+     * into it: before 1.0 it was 48 bits of a fast hash of APP_SECRET.
+     */
+    public function testTheDefaultTagIsTheProjectDirectorysNeverTheSecrets(): void
+    {
+        $secret = new \Symfony\Component\DependencyInjection\ParameterBag\ParameterBag(['kernel.secret' => 'weak-secret']);
+        $dir = 'symfony-scheduler:app-' . substr(hash('sha256', 'cronwatch:dir:/srv/shop'), 0, 12);
+        $this->assertSame($dir, (new ScheduledMessages(fn () => $this->client(), [], [], true, null, $secret, '/srv/shop'))->appTag());
+        // A deploy tool's release directory is read as its root, so the tag outlives a deploy.
+        foreach (['/srv/shop/releases/20261001120000', '/srv/shop/releases/42/'] as $release) {
+            $this->assertSame($dir, (new ScheduledMessages(fn () => $this->client(), [], [], true, null, $secret, $release))->appTag(), $release);
+        }
+    }
+
+    public function testJobsTaggedFromTheSecretBefore10AreStillThisAppsOwn(): void
+    {
+        $secret = new \Symfony\Component\DependencyInjection\ParameterBag\ParameterBag(['kernel.secret' => 'weak-secret']);
+        $old = 'symfony-scheduler:app-' . substr(hash('sha256', 'cronwatch:secret:weak-secret'), 0, 12);
+        $store = new \Cronwatch\Store\MemoryStore();
+        // An earlier release declared a job, tagged from the secret, and another app one of its own.
+        $before = new Cronwatch(store: $store, alerts: [], cronSecret: null);
+        $before->job('gone', ['schedule' => '0 * * * *', 'tags' => ['symfony-scheduler', $old]]);
+        $before->job('theirs', ['schedule' => '0 * * * *', 'tags' => ['symfony-scheduler', 'symfony-scheduler:blog']]);
+        $before->check();
+        $cw = $this->client(['store' => $store]);
+        (new ScheduledMessages(fn () => $cw, [], [], true, null, $secret, '/srv/shop'))->prepare();
+        $cw->check();
+        $this->assertFalse($store->getJob('gone')->definition->has('schedule'), 'taken out of the schedule, it is declared without it');
+        $this->assertTrue($store->getJob('theirs')->definition->has('schedule'), 'another app\'s job is left alone');
+        $this->assertSame([], $this->errors);
     }
 
     public function testWithoutAnAppIdOrASecretTheProjectDirectoryNamesTheApp(): void

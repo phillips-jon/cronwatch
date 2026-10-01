@@ -603,6 +603,22 @@ final class CraftTest extends TestCase
         $this->assertSame('Queue job cwt\jobs\Flaky', self::definition($name)['description']);
     }
 
+    /**
+     * A listener of EVENT_BEFORE_EXEC registered after the plugin's cancels
+     * the job (the fixtures' Module does, for Cancelled): the queue sends no
+     * "after" event, and the attempt is no run at all, not one left running
+     * (stuck) or ended as interrupted when the process exits. In a child
+     * process per job (queue/run's default) and in the worker's own.
+     */
+    public function testAQueueJobAnotherListenerCancelsIsNoRun(): void
+    {
+        foreach ([[], ['--isolate=0']] as $options) {
+            self::must(['cwt/task/push-cancelled']);
+            self::must(['queue/run', ...$options]);
+            $this->assertSame([], self::runs('cwt-cancelled'), 'queue/run ' . implode(' ', $options));
+        }
+    }
+
     public function testAlertLinksNeverTakeTheHostOfAVisitorsRequest(): void
     {
         // A site as Craft makes one: @web not set, so Craft takes it from each
@@ -659,6 +675,27 @@ final class CraftTest extends TestCase
         $this->assertSame('0 3 * * *', self::definition('craft:cwt:task:hello')['schedule']);
     }
 
+    /**
+     * Whether $call prepares the check it runs: with hello taken out of the
+     * settings, a prepared check declares it again without its schedule.
+     */
+    private static function prepares(callable $call): bool
+    {
+        $config = self::$root . '/config/cronwatch.php';
+        $before = (string) file_get_contents($config);
+        file_put_contents($config, str_replace("'cwt/task/hello' => ['schedule' => '0 3 * * *', 'timezone' => 'UTC'],", '', $before));
+        // A server of its own, so no opcode cache holds the file as it was.
+        self::stopServer();
+        try {
+            $call();
+            return !array_key_exists('schedule', self::definition('craft:cwt:task:hello') ?? []);
+        } finally {
+            file_put_contents($config, $before);
+            self::stopServer();
+            self::must(['cronwatch/check']);
+        }
+    }
+
     public function testTheDashboardIsInTheControlPanel(): void
     {
         self::signIn('admin');
@@ -694,6 +731,17 @@ final class CraftTest extends TestCase
         preg_match('#name="CRAFT_CSRF_TOKEN" value="([^"]+)"#', $page, $m);
         [$status] = self::http('POST', $check, 'viewer', $origin, 'CRAFT_CSRF_TOKEN=' . rawurlencode(html_entity_decode($m[1] ?? '')));
         $this->assertSame(403, $status, 'changing needs cronwatch-manage');
+
+        // A bearer means nothing in the embedded dashboard: a viewer's GET of /api/check runs no check.
+        [$status, , $body] = self::http('GET', '/admin/cronwatch/view?cw=' . rawurlencode('/api/check'), 'viewer', ['Authorization' => 'Bearer anything']);
+        $this->assertSame(405, $status, $body);
+        // The check by its API path, or with a slash after it, declares the settings' jobs first too.
+        foreach (['/api/check', '/check/'] as $at) {
+            $this->assertTrue(self::prepares(function () use ($at, $origin, $token): void {
+                [$status, , $body] = self::http('POST', '/admin/cronwatch/view?cw=' . rawurlencode($at), 'admin', $origin, 'CRAFT_CSRF_TOKEN=' . rawurlencode($token));
+                $this->assertContains($status, [200, 303], "{$at}: {$body}");
+            }), "{$at} declares the settings' jobs first");
+        }
 
         [$status] = self::http('GET', '/admin/cronwatch/view?cw=%2F');
         $this->assertNotSame(200, $status, 'an anonymous visitor is sent to the login page');
@@ -752,6 +800,12 @@ final class CraftTest extends TestCase
             [$status, , $body] = self::http('POST', '/cronwatch/api/check', null, ['Authorization' => "Bearer {$token}"]);
             $this->assertSame(200, $status, $body);
             $this->assertStringContainsString('"ok":true', $body);
+
+            // A platform cron's GET with the token is a check too, prepared first.
+            $this->assertTrue(self::prepares(function () use ($token): void {
+                [$status, , $body] = self::http('GET', '/cronwatch/api/check', null, ['Authorization' => "Bearer {$token}"]);
+                $this->assertSame(200, $status, $body);
+            }), 'GET /cronwatch/api/check declares the settings\' jobs first');
         } finally {
             file_put_contents($config, $before);
         }

@@ -53,6 +53,12 @@ final class TaskController extends Controller
     }
 
     /** Pushes a flaky job that succeeds on attempt `succeedOn`, and a marked one. */
+    public function actionPushCancelled(): int
+    {
+        Craft::$app->getQueue()->push(new \cwt\jobs\Cancelled());
+        return ExitCode::OK;
+    }
+
     public function actionPush(string $id, int $succeedOn = 1): int
     {
         Craft::$app->getQueue()->push(new Flaky(['key' => $id, 'succeedOn' => $succeedOn]));

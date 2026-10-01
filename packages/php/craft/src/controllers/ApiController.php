@@ -40,8 +40,10 @@ final class ApiController extends Controller
             throw new NotFoundHttpException();
         }
         $cw = $recorder->client();
-        $check = strtoupper($request->method) === 'POST' && str_ends_with(rtrim($request->path, '/'), '/cronwatch/api/check');
-        if ($check && self::signedIn($request, $token, $cw->cronSecret)) {
+        // POST, or GET with a bearer, as the dashboard runs the check for either.
+        $method = strtoupper($request->method);
+        $check = ($method === 'POST' || $method === 'GET') && DashboardController::isCheck(substr($request->path, $at + strlen('/cronwatch')));
+        if ($check && self::signedIn($request, $token, $cw->cronSecret, $method === 'POST')) {
             $recorder->prepare();
         }
         $dashboard = new Dashboard($cw, token: $token, basePath: substr($request->path, 0, $at) . '/cronwatch');
@@ -63,10 +65,13 @@ final class ApiController extends Controller
      * dashboard's cookie, compared in constant time. The dashboard checks
      * again.
      */
-    private static function signedIn(Request $request, string $token, ?string $cronSecret): bool
+    private static function signedIn(Request $request, string $token, ?string $cronSecret, bool $orCookie = true): bool
     {
         if (preg_match('/^Bearer\s+(.+)$/is', (string) $request->header('authorization'), $m) === 1) {
             return hash_equals($token, $m[1]) || ($cronSecret !== null && hash_equals($cronSecret, $m[1]));
+        }
+        if (!$orCookie) {
+            return false;
         }
         foreach (explode(';', (string) $request->header('cookie')) as $pair) {
             [$name, $value] = array_pad(explode('=', trim($pair), 2), 2, '');

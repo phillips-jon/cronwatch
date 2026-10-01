@@ -15,10 +15,12 @@
 ### Fixed
 - `GET /cronwatch/api`, with no path after it, reaches the JSON API instead of the site's 404 page, so the API's own answer at its root (the library and its version, from 1.0) is served.
 - From the library: a job's stored state keeps the fields a newer release wrote, so sites and apps on different 1.x releases can share one database.
-- The dashboard in the Control Panel no longer passes the request's `Authorization` header on, so a `GET` of its `/api/check` with any bearer, from a user who may only view the dashboard, no longer runs the check.
 - From the library: one malformed job, run or state row (a hand edit, a damaged database) affects only its own job instead of stopping every check or the whole dashboard, and a state row that is not JSON is replaced by the next write.
 - From the library: the JSON API takes only a `Bearer` Authorization header as its token, so a proxy's Basic auth in front of the site no longer locks it.
 - From the library: without ext-curl, an alert channel's request keeps its 10 second deadline and its 1 MiB cap while the server keeps sending.
+- The dashboard in the Control Panel ignores an `Authorization` header, so a user who may only view it can no longer run the check with a GET of `/api/check` and any bearer token. Running the check there needs the `cronwatch-manage` permission, whatever the path.
+- A watched queue job that another plugin cancels before it runs (marking `EVENT_BEFORE_EXEC` handled, after CronWatch's listener) is no run at all. Before, its run was left running, or recorded failed as interrupted when the worker's process for it ended.
+- A check through `/cronwatch/api/check` by GET with the token or `CRON_SECRET` (a platform cron), or by the dashboard's `/api/check` or `/check/` in the Control Panel, declares the settings' jobs first, as a POST did. Before, such a check left a command taken out of the settings on its old schedule, and never declared a new one.
 
 ## 0.10.0 - 2026-09-30
 

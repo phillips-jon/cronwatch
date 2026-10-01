@@ -54,11 +54,15 @@ final class Plugin extends BasePlugin
         Event::on(Queue::class, Queue::EVENT_BEFORE_EXEC, fn (ExecEvent $e) => $recorder()->jobStarting($e));
         Event::on(Queue::class, Queue::EVENT_AFTER_EXEC, fn (ExecEvent $e) => $recorder()->jobFinished($e));
         Event::on(Queue::class, Queue::EVENT_AFTER_ERROR, fn (ExecEvent $e) => $recorder()->jobFailed($e));
+        // An attempt another listener cancelled gets no "after" event: the queue's end of it takes the run back.
+        Event::on(\craft\queue\Queue::class, \craft\queue\Queue::EVENT_AFTER_EXEC_AND_RELEASE, fn (ExecEvent $e) => $recorder()->jobAbandoned((string) $e->id));
 
         if (Craft::$app->getRequest()->getIsConsoleRequest()) {
             // Console commands the settings list or a WatchCommand behavior marks.
             Event::on(\yii\console\Controller::class, Controller::EVENT_BEFORE_ACTION, fn (ActionEvent $e) => $recorder()->commandStarting($e));
             Event::on(\yii\console\Controller::class, Controller::EVENT_AFTER_ACTION, fn (ActionEvent $e) => $recorder()->commandFinished($e));
+            // queue/exec, the child process a worker runs one job in: any attempt still open was cancelled.
+            Event::on(\yii\queue\cli\Command::class, Controller::EVENT_AFTER_ACTION, fn (ActionEvent $e) => $e->action->id === 'exec' ? $recorder()->jobAbandoned() : null);
             Event::on(ConsoleErrorHandler::class, ConsoleErrorHandler::EVENT_BEFORE_HANDLE_EXCEPTION, fn (ExceptionEvent $e) => $recorder()->commandFailed($e->exception));
         }
 

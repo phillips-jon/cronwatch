@@ -9,6 +9,7 @@ namespace Cronwatch\WordPress;
 use Cronwatch\Alert;
 use Cronwatch\Alerts\ChannelContext;
 use Cronwatch\Duration;
+use Cronwatch\Js;
 use Cronwatch\JobDefinition;
 
 /**
@@ -76,9 +77,10 @@ final class Admin
 
     /**
      * Sanitizes and saves the posted settings. Returns the notice to show:
-     * "saved", "grace" when the grace did not parse, "token" when a token
-     * typed in was refused, or "grace-token" when both were (the rest is
-     * saved either way). A token the plugin makes is kept for the page to
+     * "saved", or the fields refused, joined by "-" in this order: "grace"
+     * when the grace did not parse, "secret" when a webhook secret typed in
+     * held a control character, "token" when a token typed in was refused
+     * ("grace-token" when two were; the rest is saved either way). A token the plugin makes is kept for the page to
      * show once.
      *
      * @param array<string, mixed> $posted
@@ -92,13 +94,25 @@ final class Admin
             'email_to' => implode(', ', $emails),
             'slack_webhook_url' => esc_url_raw($text('slack_webhook_url'), ['https']),
             'webhook_url' => esc_url_raw($text('webhook_url'), ['http', 'https']),
-            // A secret is never shown again: left blank, the saved one stays.
-            'webhook_secret' => !empty($posted['webhook_secret_clear']) ? '' : ($text('webhook_secret') !== '' ? sanitize_text_field($text('webhook_secret')) : $old['webhook_secret']),
+            'webhook_secret' => $old['webhook_secret'],
             'grace' => $old['grace'],
             'api_enabled' => !empty($posted['api_enabled']) ? '1' : '',
             'api_token' => $old['api_token'],
         ];
         $refused = [];
+        // The webhook's signing secret: never shown again, so left blank the saved one stays. One typed in is
+        // saved exactly as typed, since the receiver signs with the same bytes (sanitize_text_field() would
+        // escape "<", strip "%XX" and collapse spaces); one holding a control character is refused.
+        $secret = isset($posted['webhook_secret']) && is_string($posted['webhook_secret']) ? $posted['webhook_secret'] : '';
+        if (!empty($posted['webhook_secret_clear'])) {
+            $new['webhook_secret'] = '';
+        } elseif (Js::trim($secret) !== '') {
+            if (preg_match('/[\x00-\x1F\x7F]/', $secret) === 1 || preg_match('//u', $secret) !== 1) {
+                $refused[] = 'secret';
+            } else {
+                $new['webhook_secret'] = $secret;
+            }
+        }
         // The API's token: one typed in (never shown again), a new one made on request, or one made when the API is first turned on.
         $token = preg_replace('/\s+/', '', $text('api_token')) ?? '';
         if ($token !== '') {
@@ -180,12 +194,15 @@ final class Admin
         $notice = isset($_GET['cronwatch_notice']) ? sanitize_key(wp_unslash($_GET['cronwatch_notice'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only picks which notice to show.
         echo '<div class="wrap"><h1>' . esc_html__('CronWatch', 'cronwatch') . '</h1>';
         // A save that refused more than one field names each: "grace-token".
-        $refused = array_intersect(explode('-', $notice), ['grace', 'token']);
+        $refused = array_intersect(explode('-', $notice), ['grace', 'secret', 'token']);
         if ($notice === 'saved') {
             echo '<div class="notice notice-success"><p>' . esc_html__('Settings saved.', 'cronwatch') . '</p></div>';
         } elseif ($refused !== []) {
             if (in_array('grace', $refused, true)) {
                 echo '<div class="notice notice-error"><p>' . esc_html__('The grace was not a duration such as 10m or 1h30m, so it was left as it was. The rest was saved.', 'cronwatch') . '</p></div>';
+            }
+            if (in_array('secret', $refused, true)) {
+                echo '<div class="notice notice-error"><p>' . esc_html__('The webhook signing secret was not saved: it may not hold a line break, a tab or another control character. The saved one was kept, and the rest was saved.', 'cronwatch') . '</p></div>';
             }
             if (in_array('token', $refused, true)) {
                 /* translators: %d: the least number of characters an API token may have. */

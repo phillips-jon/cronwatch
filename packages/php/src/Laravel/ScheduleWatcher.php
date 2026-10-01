@@ -15,7 +15,8 @@ use Illuminate\Contracts\Container\Container;
  * Records the scheduler's runs from its events, so every scheduled task
  * is watched with no code changes:
  *
- * - ScheduledTaskStarting starts the run (trigger "schedule"); a callback's
+ * - ScheduledTaskStarting starts the run (trigger "laravel-scheduler",
+ *   "schedule" before 1.0); a callback's
  *   Cronwatch::current() is its context while it runs.
  * - ScheduledTaskFinished ends it: ok, or failed with "Exited with code N"
  *   for a command that exited non-zero (a callback returning false, "Returned

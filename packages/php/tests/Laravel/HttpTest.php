@@ -203,6 +203,34 @@ final class HttpTest extends TestCase
         });
     }
 
+    /**
+     * Laravel's env() reads CRONWATCH_TOKEN=null in .env as null, and the
+     * raw environment still holds the word: the dashboard never takes it,
+     * or any other word env() reads as something else, for the token.
+     */
+    public function testATokenLaravelReadsAsNullIsNeverTheWordInTheRawEnvironment(): void
+    {
+        self::withoutSecrets(function (): void {
+            $this->seeded();
+            foreach (['null', '(null)', 'NULL', 'empty', '(empty)', 'true', 'false'] as $word) {
+                putenv("CRONWATCH_TOKEN={$word}");
+                $_SERVER['CRONWATCH_TOKEN'] = $_ENV['CRONWATCH_TOKEN'] = $word;
+                // What env('CRONWATCH_TOKEN') in config/cronwatch.php gives: null, "" or a bool.
+                $this->app['config']->set('cronwatch.dashboard.token', \Illuminate\Support\Env::get('CRONWATCH_TOKEN'));
+                $status = $this->getJson('/cronwatch/api/jobs', ['Authorization' => "Bearer {$word}"])->getStatusCode();
+                $this->assertContains($status, [401, 503], "CRONWATCH_TOKEN={$word} is not the token");
+            }
+            // A value the config gives is never replaced by the environment's.
+            putenv('CRONWATCH_TOKEN=from-the-environment');
+            $_SERVER['CRONWATCH_TOKEN'] = $_ENV['CRONWATCH_TOKEN'] = 'from-the-environment';
+            $this->app['config']->set('cronwatch.dashboard.token', '  ');
+            $this->assertContains($this->getJson('/cronwatch/api/jobs', ['Authorization' => 'Bearer from-the-environment'])->getStatusCode(), [401, 503]);
+            // A config of null (cached without the variable) still reads it as env() does.
+            $this->app['config']->set('cronwatch.dashboard.token', null);
+            $this->getJson('/cronwatch/api/jobs', ['Authorization' => 'Bearer from-the-environment'])->assertOk();
+        });
+    }
+
     /** Runs $body with CRONWATCH_TOKEN and CRON_SECRET unset everywhere PHP reads them. */
     private static function withoutSecrets(callable $body): void
     {
@@ -216,6 +244,7 @@ final class HttpTest extends TestCase
             $body();
         } finally {
             foreach ($saved as $name => [$env, $server, $envArray]) {
+                unset($_SERVER[$name], $_ENV[$name]);
                 putenv($env === false ? $name : "{$name}={$env}");
                 if ($server !== null) {
                     $_SERVER[$name] = $server;

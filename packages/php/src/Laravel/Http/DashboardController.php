@@ -6,6 +6,7 @@ namespace Cronwatch\Laravel\Http;
 
 use Cronwatch\FromEnv;
 use Cronwatch\Cronwatch;
+use Cronwatch\Laravel\Settings;
 use Cronwatch\Web\HttpFoundation;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Config\Repository;
@@ -32,15 +33,31 @@ final class DashboardController
     {
         $path = trim((string) $this->config->get('cronwatch.dashboard.path', 'cronwatch'), '/');
         $base = rtrim($request->getBaseUrl(), '/') . ($path === '' ? '' : "/{$path}");
-        $token = $this->config->get('cronwatch.dashboard.token');
         // Served open only to a request the gate lets in, asked again here rather
         // than trusted to the route's middleware, which the config may change.
         $open = !Authorize::hasBearer($request) && $this->gate->check(Authorize::GATE, [$request->user()]);
         $dashboard = $this->cw->routes(
-            token: $open ? null : (is_string($token) && $token !== '' ? $token : FromEnv::Read),
+            token: $open ? null : self::token($this->config),
             basePath: $base,
             origin: $request->getSchemeAndHttpHost(),
         );
         return HttpFoundation::toResponse($dashboard->handle(HttpFoundation::toRequest($request)), true);
+    }
+
+    /**
+     * The dashboard's token: the config's, else CRONWATCH_TOKEN as Laravel's
+     * env() reads it (Settings::secret()). With neither, the library's
+     * default makes a development token or stays locked; but when the raw
+     * environment holds a value env() did not take (`CRONWATCH_TOKEN=null`),
+     * that default would read it as the token, so the dashboard asks for a
+     * random one instead, which no request carries.
+     */
+    private static function token(Repository $config): string|FromEnv
+    {
+        $token = Settings::secret($config, 'dashboard.token', 'CRONWATCH_TOKEN');
+        if ($token !== null) {
+            return $token;
+        }
+        return Settings::rawOnly('CRONWATCH_TOKEN') ? bin2hex(random_bytes(32)) : FromEnv::Read;
     }
 }

@@ -752,6 +752,19 @@ final class DrupalTest extends TestCase
 
         [$status] = self::http('GET', '/admin/reports/cronwatch/view?cw=/', 'viewer');
         $this->assertSame(200, $status, 'a viewer may look');
+
+        // A bearer means nothing in the embedded dashboard: a viewer's GET of /api/check runs no check.
+        [$status, , $body] = self::http('GET', '/admin/reports/cronwatch/view?cw=/api/check', 'viewer', ['Authorization' => 'Bearer anything']);
+        $this->assertSame(405, $status, $body);
+        // The check by its API path, or with a slash after it, declares every job first too.
+        $declared = fn (): int => (int) self::inDrupal("echo json_encode(\\Drupal::state()->get('cwt.declared', 0));");
+        $this->assertSame(1, preg_match('/[?&]token=([^&]+)/', $check, $csrf));
+        foreach (['/api/check', '/check/', '/api//check/'] as $at) {
+            $before = $declared();
+            [$status, , $body] = self::http('POST', '/admin/reports/cronwatch/view?cw=' . rawurlencode($at) . '&token=' . $csrf[1], 'admin', $origin);
+            $this->assertContains($status, [200, 303], "{$at}: {$body}");
+            $this->assertGreaterThan($before, $declared(), "{$at} declares every job first");
+        }
         [$status] = self::http('GET', '/admin/reports/cronwatch/view?cw=/');
         $this->assertSame(403, $status, 'an anonymous visitor may not');
 
@@ -859,6 +872,16 @@ final class DrupalTest extends TestCase
         $this->assertSame(200, $status);
         $this->assertStringContainsString('"ok":true', $body);
         $this->assertGreaterThan($before, $declared());
+
+        // A platform cron's GET with the token is a check too, declared first; a GET with only the cookie is not one.
+        $before = $declared();
+        [$status, , $body] = self::http('GET', '/cronwatch/api/check', null, ['Authorization' => "Bearer {$token}"]);
+        $this->assertSame(200, $status, $body);
+        $this->assertGreaterThan($before, $declared(), 'GET /api/check declares every job first');
+        $before = $declared();
+        [$status] = self::http('GET', '/cronwatch/api/check', null, ['Cookie' => \Cronwatch\Web\Dashboard::COOKIE . '=' . \Cronwatch\Web\Dashboard::cookieValue($token)]);
+        $this->assertSame(405, $status);
+        $this->assertSame($before, $declared());
     }
 
     // ------------------------------------------------------------ Ultimate Cron

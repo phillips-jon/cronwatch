@@ -13,7 +13,8 @@ use Illuminate\Contracts\Container\Container;
 /**
  * Queued jobs that opt in (#[Cronwatch\Watch] on the class, or
  * ShouldBeWatched), watched through the queue's events, so each attempt
- * is a run with the trigger "queue", recorded in the worker that ran it:
+ * is a run with the trigger "laravel-queue" ("queue" before 1.0), recorded
+ * in the worker that ran it:
  *
  * - JobProcessing starts the run; Cronwatch::current() is its context
  *   while the job runs, for log() and metric().

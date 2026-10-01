@@ -16,7 +16,8 @@ use Symfony\Component\Scheduler\Event\PreRunEvent;
  * Records each scheduled message's handling as a run, from the Scheduler's
  * events in the worker that consumes the schedule (messenger:consume
  * scheduler_<name>), so every recurring message is watched with no code
- * changes: PreRunEvent starts the run (trigger "scheduler"; the handler's
+ * changes: PreRunEvent starts the run (trigger "symfony-scheduler",
+ * "scheduler" before 1.0; the handler's
  * Cronwatch::current() is its context), PostRunEvent ends it ok with the
  * handler's result (a string is the output, an HTTP response of 400 or more
  * fails it), and FailureEvent ends it failed with what the handler threw.

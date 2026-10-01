@@ -303,13 +303,38 @@ final class Recorder
         if ($found === null) {
             return;
         }
+        // An attempt of this job still open was cancelled (see jobAbandoned()).
+        $this->jobAbandoned((string) $event->id);
         $this->safely(function () use ($event, $found): void {
             [$name, $options, $tags] = $found;
             $handle = $this->declare($name, $options, $tags);
             $id = (string) $event->id;
             $runId = strlen($id) <= 100 ? "craft-queue:{$id}:{$event->attempt}:" . bin2hex(random_bytes(4)) : null;
-            $this->queueRuns[$id] = $this->client()->startExecution($handle->definition, self::TRIGGER_QUEUE, $runId);
+            // It may turn out not to run: another listener of EVENT_BEFORE_EXEC, after this one, may cancel it.
+            $this->queueRuns[$id] = $this->client()->startExecution($handle->definition, self::TRIGGER_QUEUE, $runId, mayDiscard: true);
         }, 'starting ' . $job::class);
+    }
+
+    /**
+     * The queue is done with an attempt (Craft's Queue::EVENT_AFTER_EXEC_AND_RELEASE
+     * for the job `id`; the end of `queue/exec`, the child process a worker
+     * runs each job in, for every job): an attempt still open there never
+     * ran, since a listener of EVENT_BEFORE_EXEC registered after this
+     * plugin's cancelled it (marked the event handled), and the queue then
+     * sends no "after" event. Its run is taken back, as if it never started:
+     * left open, it would be reported stuck, or interrupted when the process
+     * ended.
+     */
+    public function jobAbandoned(?string $id = null): void
+    {
+        foreach ($id === null ? array_keys($this->queueRuns) : [$id] as $one) {
+            $key = $this->queueRuns[$one] ?? null;
+            if ($key === null) {
+                continue;
+            }
+            unset($this->queueRuns[$one]);
+            $this->safely(fn () => $this->client()->discardExecution($key), 'taking back a cancelled queue job');
+        }
     }
 
     /** Queue::EVENT_AFTER_EXEC: the attempt succeeded. */
