@@ -374,6 +374,7 @@ Cronwatch.Bridge.Entry.Schedule.get -> string!
 Cronwatch.Bridge.Entry.Timezone.get -> string!
 Cronwatch.Bridge.FireTimeChecks
 Cronwatch.Bridge.FireTimeChecks.Check(string! job, string! expression, string! zone, long now, System.Func<string!>! walk) -> (string? Schedule, string? Problem)
+Cronwatch.Bridge.FireTimeChecks.BeginRead() -> void
 Cronwatch.Bridge.FireTimeChecks.EndRead() -> void
 Cronwatch.Bridge.FireTimeChecks.FireTimeChecks() -> void
 Cronwatch.Bridge.FireTimeChecks.Walks.get -> int

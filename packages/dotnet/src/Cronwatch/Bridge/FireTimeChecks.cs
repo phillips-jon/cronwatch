@@ -18,6 +18,7 @@ public sealed class FireTimeChecks
     private readonly Dictionary<string, Checked> _checked = new(StringComparer.Ordinal);
     private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
     private int _walks;
+    private int _reading;
 
     private sealed record Checked(string? Schedule, string? Problem);
 
@@ -61,13 +62,34 @@ public sealed class FireTimeChecks
     }
 
     /// <summary>
-    /// Ends one read of the scheduler: what it did not ask about is dropped, so a cron changed or
-    /// removed is not kept for good.
+    /// Starts one read of the scheduler. Reads may overlap (a read loop and a check job, say):
+    /// what is dropped waits until the last of them ends.
+    /// </summary>
+    public void BeginRead()
+    {
+        lock (_lock)
+        {
+            _reading++;
+        }
+    }
+
+    /// <summary>
+    /// Ends one read of the scheduler: once no read is left, what none of them asked about is
+    /// dropped, so a cron changed or removed is not kept for good. Without a
+    /// <see cref="BeginRead"/> it ends the read at once.
     /// </summary>
     public void EndRead()
     {
         lock (_lock)
         {
+            if (_reading > 0)
+            {
+                _reading--;
+            }
+            if (_reading > 0)
+            {
+                return;
+            }
             var drop = new List<string>();
             foreach (string key in _checked.Keys)
             {

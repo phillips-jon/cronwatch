@@ -147,32 +147,39 @@ public sealed class CronwatchHangfire : IDisposable
     /// <summary>The recurring jobs, one entry each, the check's own left out.</summary>
     internal List<Entry> Entries()
     {
-        JobStorage storage = _options.Storage ?? JobStorage.Current;
-        List<RecurringJobDto> jobs;
-        using (IStorageConnection connection = storage.GetConnection())
+        _checks.BeginRead();
+        try
         {
-            jobs = connection.GetRecurringJobs();
+            JobStorage storage = _options.Storage ?? JobStorage.Current;
+            List<RecurringJobDto> jobs;
+            using (IStorageConnection connection = storage.GetConnection())
+            {
+                jobs = connection.GetRecurringJobs();
+            }
+            long now = _cw.NowMs;
+            var output = new List<Entry>();
+            foreach (RecurringJobDto dto in jobs)
+            {
+                if (dto.Removed || dto.Id == CheckJobId)
+                {
+                    continue;
+                }
+                string label = Label(dto.Id);
+                if (!SchedulerBridge.ValidName(dto.Id))
+                {
+                    Watch.ReportOnce(
+                        "cronwatch: " + label + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
+                        "declaring " + label);
+                    continue;
+                }
+                output.Add(EntryOf(dto, label, now));
+            }
+            return output;
         }
-        long now = _cw.NowMs;
-        var output = new List<Entry>();
-        foreach (RecurringJobDto dto in jobs)
+        finally
         {
-            if (dto.Removed || dto.Id == CheckJobId)
-            {
-                continue;
-            }
-            string label = Label(dto.Id);
-            if (!SchedulerBridge.ValidName(dto.Id))
-            {
-                Watch.ReportOnce(
-                    "cronwatch: " + label + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
-                    "declaring " + label);
-                continue;
-            }
-            output.Add(EntryOf(dto, label, now));
+            _checks.EndRead();
         }
-        _checks.EndRead();
-        return output;
     }
 
     private Entry EntryOf(RecurringJobDto dto, string label, long now)

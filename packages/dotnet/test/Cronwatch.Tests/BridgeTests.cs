@@ -198,6 +198,41 @@ public class BridgeTests
         Assert.Equal(4, checks.Walks);
     }
 
+    [Fact]
+    public void Overlapping_reads_keep_what_either_asked_about()
+    {
+        var checks = new FireTimeChecks();
+        long now = Js.DateUtc(2026, 8, 1, 0, 0, 0, 0);
+        string Walk() => "0 2 * * *";
+        // A read loop and a check job read at once: the one that ends first drops nothing the
+        // other has asked about, so the next read walks nothing again.
+        checks.BeginRead();
+        checks.Check("a", "0 0 2 * * ?", "UTC", now, Walk);
+        checks.BeginRead();
+        checks.Check("a", "0 0 2 * * ?", "UTC", now, Walk);
+        checks.Check("b", "0 0 3 * * ?", "UTC", now, Walk);
+        checks.EndRead();
+        checks.Check("b", "0 0 3 * * ?", "UTC", now, Walk);
+        checks.Check("c", "0 0 4 * * ?", "UTC", now, Walk);
+        checks.EndRead();
+        Assert.Equal(3, checks.Walks);
+        checks.BeginRead();
+        foreach (string job in new[] { "a", "b", "c" })
+        {
+            checks.Check(job, "0 0 " + (job[0] - 'a' + 2) + " * * ?", "UTC", now, Walk);
+        }
+        checks.EndRead();
+        Assert.Equal(3, checks.Walks);
+        // Once every read has ended, what the last ones did not ask about is dropped.
+        checks.BeginRead();
+        checks.Check("a", "0 0 2 * * ?", "UTC", now, Walk);
+        checks.EndRead();
+        checks.BeginRead();
+        checks.Check("b", "0 0 3 * * ?", "UTC", now, Walk);
+        checks.EndRead();
+        Assert.Equal(4, checks.Walks);
+    }
+
     private static Entry E(string name, string label, string schedule) => new(name, label, schedule, "");
 
     private static async Task<string> Stored(IStore store, string name)

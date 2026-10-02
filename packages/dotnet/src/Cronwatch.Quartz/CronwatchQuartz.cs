@@ -326,36 +326,43 @@ public sealed class CronwatchQuartz : IAsyncDisposable
     /// <summary>Every job the scheduler holds with a trigger, one entry per trigger.</summary>
     internal async Task<IReadOnlyList<Entry>> EntriesAsync(IScheduler scheduler, CancellationToken cancellationToken)
     {
-        var output = new List<Entry>();
-        long now = _cw.NowMs;
-        List<JobKey> keys = await scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup(), cancellationToken).ConfigureAwait(false);
-        keys.Sort((a, b) => string.CompareOrdinal(a.Group + "\0" + a.Name, b.Group + "\0" + b.Name));
-        foreach (JobKey key in keys)
+        _checks.BeginRead();
+        try
         {
-            if (key.Equals(CheckJobKey))
+            var output = new List<Entry>();
+            long now = _cw.NowMs;
+            List<JobKey> keys = await scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup(), cancellationToken).ConfigureAwait(false);
+            keys.Sort((a, b) => string.CompareOrdinal(a.Group + "\0" + a.Name, b.Group + "\0" + b.Name));
+            foreach (JobKey key in keys)
             {
-                continue;
+                if (key.Equals(CheckJobKey))
+                {
+                    continue;
+                }
+                List<ITrigger> triggers = await scheduler.GetTriggersOfJob(key, cancellationToken).ConfigureAwait(false);
+                if (triggers.Count == 0)
+                {
+                    continue;
+                }
+                string name = NameOf(key);
+                if (!SchedulerBridge.ValidName(name))
+                {
+                    _watch.ReportOnce(
+                        "cronwatch: " + Label(name) + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
+                        "declaring " + Label(name));
+                    continue;
+                }
+                foreach (ITrigger trigger in triggers)
+                {
+                    output.Add(EntryOf(name, trigger, now));
+                }
             }
-            List<ITrigger> triggers = await scheduler.GetTriggersOfJob(key, cancellationToken).ConfigureAwait(false);
-            if (triggers.Count == 0)
-            {
-                continue;
-            }
-            string name = NameOf(key);
-            if (!SchedulerBridge.ValidName(name))
-            {
-                _watch.ReportOnce(
-                    "cronwatch: " + Label(name) + " is not a CronWatch job name (1 to 120 letters, digits, \".\", \"_\", \":\" or \"-\"), so it is not watched; rename it",
-                    "declaring " + Label(name));
-                continue;
-            }
-            foreach (ITrigger trigger in triggers)
-            {
-                output.Add(EntryOf(name, trigger, now));
-            }
+            return output;
         }
-        _checks.EndRead();
-        return output;
+        finally
+        {
+            _checks.EndRead();
+        }
     }
 
     private Entry EntryOf(string name, ITrigger trigger, long now)
