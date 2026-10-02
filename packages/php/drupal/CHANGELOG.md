@@ -2,6 +2,11 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
+## Unreleased
+
+### Added
+- Released with the library 0.12.0, which adds the `under_floor` alert: a job that runs cleanly but reports a metric below its `floor`, or at 0 after runs that never were, sends one warning. Jobs take a `floor` option beside `budget`.
+
 ## 0.11.1 - 2026-10-01
 
 ### Changed
