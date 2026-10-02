@@ -2,7 +2,7 @@ module cronwatch.dev/go/robfigcron
 
 go 1.25.0
 
-require cronwatch.dev/go v0.11.0
+require cronwatch.dev/go v0.11.1
 
 require github.com/robfig/cron/v3 v3.0.1
 

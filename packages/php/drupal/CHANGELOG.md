@@ -2,7 +2,7 @@
 
 All notable changes to the CronWatch module for Drupal, newest first. Each release carries the CronWatch library (`cronwatch/cronwatch`) of the same version.
 
-## Unreleased
+## 0.11.1 - 2026-10-01
 
 ### Changed
 - Released with the library 0.11.1, whose own dashboard gains a light and dark switch (Cmd+Shift+D); the dashboard in Drupal's admin pages is unchanged and follows the system's setting.

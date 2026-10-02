@@ -1,6 +1,6 @@
 # Release Notes for CronWatch
 
-## Unreleased
+## 0.11.1 - 2026-10-01
 
 ### Changed
 - Released with the library 0.11.1, whose own dashboard gains a light and dark switch (Cmd+Shift+D); the dashboard in the control panel is unchanged and follows the system's setting.

@@ -4,7 +4,7 @@ Tags: cron, wp-cron, monitoring, scheduled tasks, alerts
 Requires at least: 6.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 0.11.0
+Stable tag: 0.11.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -130,7 +130,7 @@ No. It is in wp-admin, for users who may manage options, and every change it mak
 
 == Changelog ==
 
-= Unreleased =
+= 0.11.1 =
 
 * Released with the library 0.11.1, whose own dashboard gains a light and dark switch (Cmd+Shift+D); the dashboard in wp-admin is unchanged and follows the system's setting.
 
