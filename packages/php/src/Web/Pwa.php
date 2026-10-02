@@ -23,12 +23,28 @@ final class Pwa
     public const THEME_COLOR_DARK = '#111113';
 
     /**
-     * Registers the service worker, and does nothing else. The page works
-     * the same without it. Its own URL gives the base, so it is the same text
+     * Registers the service worker, and switches between light and dark on
+     * Cmd+Shift+D (Ctrl+Shift+D elsewhere), keeping the choice in
+     * localStorage. The page works the same without it. Its own URL gives the base, so it is the same text
      * wherever the dashboard is mounted.
      */
     public const APP_JS = <<<'JS'
 "use strict";
+(function () {
+  var root = document.documentElement;
+  try {
+    var stored = localStorage.getItem("cronwatch-theme");
+    if (stored === "light" || stored === "dark") root.setAttribute("data-theme", stored);
+  } catch (e) {}
+  document.addEventListener("keydown", function (event) {
+    if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey || event.code !== "KeyD") return;
+    event.preventDefault();
+    var shown = root.getAttribute("data-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    var next = shown === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("cronwatch-theme", next); } catch (e) {}
+  });
+})();
 (function () {
   var script = document.currentScript;
   if (!script || !("serviceWorker" in navigator)) return;

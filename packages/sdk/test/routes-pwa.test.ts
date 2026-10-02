@@ -158,23 +158,88 @@ test("the offline page is public, plain and says why", async () => {
   assert.match(html, /<h1>You are offline<\/h1><p>CronWatch shows live data from your app, so it needs a connection.<\/p>/);
 });
 
-test("app.js registers the service worker and does nothing else", async () => {
+/** A page for app.js to run on: the root's attributes, a key listener, localStorage and the system's scheme. */
+function page(options: { stored?: string | null; systemDark?: boolean; storage?: "throws" } = {}) {
+  const attributes = new Map<string, string>();
+  const stored = new Map<string, string>();
+  if (options.stored != null) stored.set("cronwatch-theme", options.stored);
+  let onKey: ((event: unknown) => void) | undefined;
+  const blocked = () => { throw new Error("SecurityError"); };
+  const localStorage = options.storage === "throws"
+    ? { getItem: blocked, setItem: blocked }
+    : { getItem: (k: string) => stored.get(k) ?? null, setItem: (k: string, v: string) => { stored.set(k, v); } };
+  const context = {
+    URL, localStorage,
+    matchMedia: (query: string) => ({ matches: query === "(prefers-color-scheme: dark)" && !!options.systemDark }),
+    document: {
+      currentScript: { src: "https://app.example/ops/cron/app.js" },
+      documentElement: { getAttribute: (n: string) => attributes.get(n) ?? null, setAttribute: (n: string, v: string) => { attributes.set(n, v); } },
+      addEventListener: (type: string, listener: (event: unknown) => void) => { if (type === "keydown") onKey = listener; },
+    },
+    navigator: {},
+  };
+  const press = (keys: { metaKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean; code?: string }) => {
+    let prevented = false;
+    onKey!({ metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, code: "KeyD", ...keys, preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  return { context, press, theme: () => attributes.get("data-theme"), stored: () => stored.get("cronwatch-theme") };
+}
+
+test("app.js registers the service worker", async () => {
   const { get } = app();
   const res = await get("/cronwatch/app.js");
   assert.equal(res.headers.get("content-type"), "text/javascript; charset=utf-8");
   assert.equal(res.headers.get("cache-control"), "no-cache");
   const js = await res.text();
-  assert.doesNotMatch(js, /fetch|cookie|Storage|XMLHttpRequest|innerHTML|eval|import/);
+  assert.doesNotMatch(js, /fetch|cookie|sessionStorage|indexedDB|XMLHttpRequest|innerHTML|eval|import/);
   const registered: [string, unknown][] = [];
-  const context = {
-    URL,
-    document: { currentScript: { src: "https://app.example/ops/cron/app.js" } },
-    navigator: { serviceWorker: { register: (url: string, options: unknown) => { registered.push([url, options]); return Promise.resolve(); } } },
-  };
-  vm.runInNewContext(js, context);
+  const { context } = page();
+  vm.runInNewContext(js, { ...context, navigator: { serviceWorker: { register: (url: string, options: unknown) => { registered.push([url, options]); return Promise.resolve(); } } } });
   assert.deepEqual(JSON.parse(JSON.stringify(registered)), [["https://app.example/ops/cron/sw.js", { scope: "/ops/cron/" }]]);
-  // Without service workers it does nothing at all.
-  vm.runInNewContext(js, { URL, document: context.document, navigator: {} });
+  // Without service workers it registers nothing.
+  vm.runInNewContext(js, context);
+});
+
+test("app.js switches between light and dark on Cmd+Shift+D or Ctrl+Shift+D and keeps the choice", async () => {
+  const js = await (await app().get("/cronwatch/app.js")).text();
+
+  // Nothing stored: the page follows the system until the first press.
+  const light = page();
+  vm.runInNewContext(js, light.context);
+  assert.equal(light.theme(), undefined);
+  assert.equal(light.press({ metaKey: true, shiftKey: true }), true);
+  assert.equal(light.theme(), "dark");
+  assert.equal(light.stored(), "dark");
+  assert.equal(light.press({ ctrlKey: true, shiftKey: true }), true);
+  assert.equal(light.theme(), "light");
+  assert.equal(light.stored(), "light");
+
+  // On a dark system the first press goes to light.
+  const dark = page({ systemDark: true });
+  vm.runInNewContext(js, dark.context);
+  dark.press({ metaKey: true, shiftKey: true });
+  assert.equal(dark.theme(), "light");
+
+  // Other keys are left alone.
+  for (const keys of [{ metaKey: true }, { shiftKey: true }, { metaKey: true, shiftKey: true, altKey: true }, { metaKey: true, shiftKey: true, code: "KeyE" }]) {
+    assert.equal(light.press(keys), false);
+  }
+  assert.equal(light.theme(), "light");
+
+  // A stored choice applies on load; anything else stored is ignored.
+  const kept = page({ stored: "dark" });
+  vm.runInNewContext(js, kept.context);
+  assert.equal(kept.theme(), "dark");
+  const junk = page({ stored: "purple" });
+  vm.runInNewContext(js, junk.context);
+  assert.equal(junk.theme(), undefined);
+
+  // Without storage it still switches, for the page it is on.
+  const blocked = page({ storage: "throws" });
+  vm.runInNewContext(js, blocked.context);
+  blocked.press({ metaKey: true, shiftKey: true });
+  assert.equal(blocked.theme(), "dark");
 });
 
 /** Runs sw.js with a scope, fake caches and a fake network, and returns its listeners and what it stored. */

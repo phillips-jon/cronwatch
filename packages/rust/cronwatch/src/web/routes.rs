@@ -47,7 +47,7 @@ const COOKIE_MAX_AGE: u32 = 60 * 60 * 24 * 30;
 pub const DEFAULT_BASE_PATH: &str = "/cronwatch";
 
 // 'self' only for what the app shell needs: app.js (which registers the
-// service worker and nothing else), the manifest, the worker and the icons.
+// service worker and the theme toggle), the manifest, the worker and the icons.
 // No inline script, and the pages work without any.
 const PAGE_CSP: &str = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
 const ASSET_CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'";

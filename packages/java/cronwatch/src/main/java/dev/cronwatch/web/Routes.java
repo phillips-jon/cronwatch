@@ -74,7 +74,7 @@ public final class Routes implements Endpoint {
   private static final int COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
 
   // 'self' only for what the app shell needs: app.js (which registers the service worker and
-  // nothing else), the manifest, the worker and the icons. No inline script, and the pages work
+  // the theme toggle), the manifest, the worker and the icons. No inline script, and the pages work
   // without any.
   private static final String PAGE_CSP =
       "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:;"

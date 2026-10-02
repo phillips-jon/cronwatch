@@ -51,7 +51,7 @@ defmodule Cronwatch.Web.Routes do
   def max_body, do: @max_body
 
   # 'self' only for what the app shell needs: app.js (which registers the
-  # service worker and nothing else), the manifest, the worker and the icons.
+  # service worker and the theme toggle), the manifest, the worker and the icons.
   # No inline script, and the pages work without any.
   @page_csp "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
   @asset_csp "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"

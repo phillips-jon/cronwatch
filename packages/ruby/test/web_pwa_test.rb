@@ -156,7 +156,7 @@ class WebPWATest < Minitest::Test
     app_js = send_request(web, "GET", "/cronwatch/app.js")
     assert_equal "text/javascript; charset=utf-8", app_js.headers["content-type"]
     assert_includes app_js.body, "navigator.serviceWorker.register("
-    refute_match(/fetch|cookie|Storage|XMLHttpRequest|innerHTML|eval|import/, app_js.body)
+    refute_match(/fetch|cookie|sessionStorage|indexedDB|XMLHttpRequest|innerHTML|eval|import/, app_js.body)
     sw = send_request(web, "GET", "/cronwatch/sw.js")
     assert_equal "text/javascript; charset=utf-8", sw.headers["content-type"]
     assert_equal "no-cache", sw.headers["cache-control"]

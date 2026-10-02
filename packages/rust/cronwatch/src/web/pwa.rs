@@ -19,7 +19,8 @@ pub(crate) const THEME_COLOR_DARK: &str = "#111113";
 
 /// The pages' style sheet.
 pub(crate) const STYLE_CSS: &str = include_str!("assets/style.css");
-/// The script every page loads: it registers the service worker, nothing else.
+/// The script every page loads: it registers the service worker and toggles
+/// between light and dark on Cmd+Shift+D.
 pub(crate) const APP_JS: &str = include_str!("assets/app.js");
 /// The service worker, which caches the app shell and the offline page only.
 pub(crate) const SW_JS: &str = include_str!("assets/sw.js");
