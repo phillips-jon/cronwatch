@@ -11,8 +11,8 @@ Each database is a feature (sqlx 0.9, Rust 1.94 or newer):
 
 ```toml
 [dependencies]
-cronwatch = "0.11"
-cronwatch-sqlx = { version = "0.11", features = ["postgres"] }
+cronwatch = "0.12"
+cronwatch-sqlx = { version = "0.12", features = ["postgres"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres"] }
 ```
 

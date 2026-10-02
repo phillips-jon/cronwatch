@@ -16,7 +16,7 @@
     "require": {
         "php": ">=8.2",
         "craftcms/cms": "^5.3",
-        "cronwatch/cronwatch": "^0.11.1"
+        "cronwatch/cronwatch": "^0.12.0"
     },
     "autoload": {
         "psr-4": {

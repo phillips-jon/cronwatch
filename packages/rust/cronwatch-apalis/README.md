@@ -6,8 +6,8 @@ apalis 1.0 has not shipped: this crate is built against its release candidates, 
 
 ```toml
 [dependencies]
-cronwatch = "0.11"
-cronwatch-apalis = "0.11"
+cronwatch = "0.12"
+cronwatch-apalis = "0.12"
 apalis = "=1.0.0-rc.10"
 apalis-cron = "=1.0.0-rc.9"
 ```

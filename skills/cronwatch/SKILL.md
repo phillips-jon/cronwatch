@@ -1,7 +1,7 @@
 ---
 name: cronwatch
 description: This skill should be used when the user asks to "monitor a cron job", "add CronWatch", "watch this scheduled job", "alert me if this job fails or doesn't run", "check on my cron jobs", "why did the nightly job fail", or mentions @cronwatch/sdk, the cronwatch gem, cronwatch-sdk (Python), cronwatch/cronwatch (PHP), the CronWatch WordPress plugin, cronwatch.dev/go (Go), the cronwatch crate (Rust), the cronwatch package on Hex (Elixir), dev.cronwatch:cronwatch (Java), the Cronwatch package on NuGet (.NET), cronwatch.dev or the cronwatch MCP server.
-version: 0.11.1
+version: 0.12.0
 ---
 
 # CronWatch
@@ -109,7 +109,7 @@ The MCP server works against it unchanged. Docs: https://cronwatch.dev/docs/rust
 
 For an Elixir app, use the `cronwatch` package on Hex (Elixir 1.18 or newer on OTP 27 or newer); it is a port with the same conditions and alert text, and options in snake_case kept in the order given (`schedule: "0 2 * * *", timezone: "UTC", grace: "15m"`; durations as text, milliseconds or anything `to_timeout/1` takes).
 
-- **Install:** `{:cronwatch, "~> 0.11"}` in `mix.exs`'s deps. It needs only `tz` and `telemetry`; the SQL store uses the app's own Ecto repo and adapter, and the dashboard and handler use `plug`.
+- **Install:** `{:cronwatch, "~> 0.12"}` in `mix.exs`'s deps. It needs only `tz` and `telemetry`; the SQL store uses the app's own Ecto repo and adapter, and the dashboard and handler use `plug`.
 - **Instance and store:** `{Cronwatch, store: {Cronwatch.Store.Ecto, repo: MyApp.Repo}, alerts: [...], jobs: [{"nightly-report", schedule: "0 2 * * *", timezone: "UTC"}]}` among the application's children, after the repo, over a store every node shares (SQLite, Postgres, MySQL or MariaDB, by the repo's adapter). Its options are checked when it starts; functions answer `{:ok, value}` or `{:error, %Cronwatch.Error{}}`, with `!` variants.
 - **Wrap:** `Cronwatch.run("nightly-report", fn job -> ... end)` in the calling process: a raise, throw, exit, `{:error, reason}` or `:error` fails the run and is handed back as it came, a process killed mid-run records a failed run at once, `Cronwatch.cancelled?(job)` turns true at the timeout, and `Cronwatch.log(job, line)` and `Cronwatch.metric(job, name, value)` record output and numbers (`Cronwatch.current/0`, `log/1` and `metric/2` find the run deeper down, in a `Task` too). Schedulers, each given in the instance's `integrations:` with no change to the workers: `{Cronwatch.Oban, oban: Oban}` (Oban 2.20 or newer; every Cron plugin crontab worker is a job on its entry's schedule, each attempt a run through Oban's telemetry, a snooze given back, other workers only when named in `workers:`) and `{Cronwatch.Quantum, scheduler: MyApp.Scheduler}` (Quantum 3.5; every active job, named after its name). Each schedule is checked against the scheduler's own fire times.
 - **Check:** `Cronwatch.Oban.CheckWorker` in Oban's crontab, a Quantum job whose task is `{Cronwatch.Quantum, :check, [[scheduler: MyApp.Scheduler]]}`, `check_every: :timer.minutes(1)` on the instance, or for a release a crontab runs a second line with `bin/my_app eval "Cronwatch.Release.check(MyApp.Cronwatch)"` (options under `config :my_app, MyApp.Cronwatch`; `mix cronwatch.check` from source).
